@@ -1,0 +1,26 @@
+[package]
+name = "mpdoxide"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi-to-tui = "3.1.0"
+anyhow = "1.0.72"
+async-trait = "0.1.73"
+base64 = "0.21.2"
+clap = { version = "4.3.19", features = ["derive", "cargo" ] }
+console-subscriber = "0.1.10"
+crossterm = { version = "0.27.0", features = ["event-stream"] }
+image = "0.24.7"
+ratatui = { version = "0.22.0", features = ["all-widgets"] }
+serde = { version = "1.0.182", features = ["derive"] }
+strum = { version = "0.25.0", features = ["derive"] }
+time = { version = "0.3.25", features = ["macros", "local-offset"] }
+tokio = { version = "1.29.1", features = ["sync", "full", "tracing"] }
+tokio-stream = "0.1.14"
+tracing = { version = "0.1.37", features = [] }
+tracing-subscriber = { version = "0.3.17", features = ["time", "ansi"] }
+flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
+tracing-appender = "0.2.2"
