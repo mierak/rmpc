@@ -203,7 +203,7 @@ impl Screen for DirectoriesScreen {
         let current = List::new(current_items)
             .block(Block::default().borders(Borders::TOP | Borders::BOTTOM))
             .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-        let preview = List::new(std::mem::take(&mut self.next)) // its ok to take here as new preview is prepared every time
+        let preview = List::new(self.next.clone())
             .block(Block::default().borders(Borders::ALL))
             .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
 
