@@ -43,7 +43,7 @@ pub trait Screen {
         &mut self,
         _client: &mut Client<'_>,
         _app: &mut crate::state::State,
-        _hared_state: &mut SharedUiState,
+        _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         Ok(())
     }

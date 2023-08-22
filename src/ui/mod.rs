@@ -86,6 +86,22 @@ struct Screens {
     directories: DirectoriesScreen,
 }
 
+macro_rules! do_for_screen {
+            ($screen:expr, $fn:ident, $($param:expr),+) => {
+                $screen.$fn($($param),+)
+            };
+        }
+
+macro_rules! screen_call {
+            ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
+                match $app.active_tab {
+                    screens::Screens::Queue => do_for_screen!($self.screens.queue, $fn, $($param),+),
+                    screens::Screens::Logs => do_for_screen!($self.screens.logs, $fn, $($param),+),
+                    screens::Screens::Directories => do_for_screen!($self.screens.directories, $fn, $($param),+),
+                }
+            }
+        }
+
 impl Ui<'_> {
     pub fn render(
         &mut self,
@@ -148,23 +164,7 @@ impl Ui<'_> {
             }
             frame.render_widget(tabs, tabs_area);
 
-            match app.active_tab {
-                screens::Screens::Queue => self
-                    .screens
-                    .queue
-                    .render(frame, content, app, &self.shared_state)
-                    .unwrap(),
-                screens::Screens::Logs => self
-                    .screens
-                    .logs
-                    .render(frame, content, app, &self.shared_state)
-                    .unwrap(),
-                screens::Screens::Directories => self
-                    .screens
-                    .directories
-                    .render(frame, content, app, &self.shared_state)
-                    .unwrap(),
-            };
+            screen_call!(self, app, render(frame, content, app, &self.shared_state)).unwrap();
         })?;
 
         Ok(())
@@ -172,148 +172,40 @@ impl Ui<'_> {
 
     #[instrument(skip(self, app), fields(screen))]
     pub async fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<Render, MpdError> {
+        macro_rules! screen_call_inner {
+            ($fn:ident($($param:expr),+)) => {
+                screen_call!(self, app, $fn($($param),+)).await.unwrap();
+            }
+        }
         match key.code {
             KeyCode::Right => {
-                match app.active_tab {
-                    screens::Screens::Queue => {
-                        self.screens
-                            .queue
-                            .on_hide(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Logs => {
-                        self.screens
-                            .logs
-                            .on_hide(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Directories => {
-                        self.screens
-                            .directories
-                            .on_hide(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                }
-                .unwrap();
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
                 app.active_tab = app.active_tab.next();
                 tracing::Span::current().record("screen", app.active_tab.to_string());
-                match app.active_tab {
-                    screens::Screens::Queue => {
-                        self.screens
-                            .queue
-                            .before_show(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Logs => {
-                        self.screens
-                            .logs
-                            .before_show(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Directories => {
-                        self.screens
-                            .directories
-                            .before_show(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                }
-                .unwrap();
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+
                 Ok(Render::NoSkip)
             }
             KeyCode::Left => {
-                match app.active_tab {
-                    screens::Screens::Queue => {
-                        self.screens
-                            .queue
-                            .on_hide(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Logs => {
-                        self.screens
-                            .logs
-                            .on_hide(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Directories => {
-                        self.screens
-                            .directories
-                            .on_hide(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                }
-                .unwrap();
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
                 app.active_tab = app.active_tab.prev();
                 tracing::Span::current().record("screen", app.active_tab.to_string());
-                match app.active_tab {
-                    screens::Screens::Queue => {
-                        self.screens
-                            .queue
-                            .before_show(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Logs => {
-                        self.screens
-                            .logs
-                            .before_show(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Directories => {
-                        self.screens
-                            .directories
-                            .before_show(&mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                }
-                .unwrap();
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+
                 Ok(Render::NoSkip)
             }
             _ => {
                 tracing::Span::current().record("screen", app.active_tab.to_string());
-                match app.active_tab {
-                    screens::Screens::Queue => {
-                        self.screens
-                            .queue
-                            .handle_key(key, &mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Logs => {
-                        self.screens
-                            .logs
-                            .handle_key(key, &mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                    screens::Screens::Directories => {
-                        self.screens
-                            .directories
-                            .handle_key(key, &mut self.client, app, &mut self.shared_state)
-                            .await
-                    }
-                }
+                screen_call_inner!(handle_key(key, &mut self.client, app, &mut self.shared_state));
+                Ok(Render::NoSkip)
             }
         }
     }
+
     pub async fn before_show(&mut self, app: &mut State) {
-        match app.active_tab {
-            screens::Screens::Queue => {
-                self.screens
-                    .queue
-                    .before_show(&mut self.client, app, &mut self.shared_state)
-                    .await
-            }
-            screens::Screens::Logs => {
-                self.screens
-                    .logs
-                    .before_show(&mut self.client, app, &mut self.shared_state)
-                    .await
-            }
-            screens::Screens::Directories => {
-                self.screens
-                    .directories
-                    .before_show(&mut self.client, app, &mut self.shared_state)
-                    .await
-            }
-        }
-        .unwrap();
+        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state));
     }
 
     pub fn display_message(&mut self, message: &str, level: Level) {

@@ -120,7 +120,6 @@ impl Screen for LogsScreen {
                 self.scrollbar.prev();
                 return Ok(Render::NoSkip);
             }
-            // TODO
             KeyCode::Char('d') => {
                 for _ in 0..5 {
                     self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
