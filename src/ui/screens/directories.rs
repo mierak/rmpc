@@ -189,8 +189,8 @@ impl Screen for DirectoriesScreen {
         &mut self,
         frame: &mut ratatui::Frame<ratatui::prelude::CrosstermBackend<std::io::Stdout>>,
         area: Rect,
-        _app: &crate::state::State,
-        _state: &SharedUiState,
+        _app: &mut crate::state::State,
+        _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let (prev_items, prev_state) = self.dirs.others.last_mut().unwrap();
         let prev_items = prev_items.to_listitems();

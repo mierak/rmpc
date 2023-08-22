@@ -90,6 +90,12 @@ impl ScrollbarState {
         self.position < self.offset + self.viewport_content_length && self.position >= self.offset
     }
 
+    pub fn center_on(&mut self, position: u16) {
+        self.position(position);
+        self.offset = (self.position.saturating_sub(self.viewport_content_length / 2))
+            .clamp(0, self.content_length.saturating_sub(self.viewport_content_length));
+    }
+
     pub fn calculate_offset(&mut self) {
         if self.offset + self.viewport_content_length > self.content_length {
             self.offset = self.content_length.saturating_sub(self.viewport_content_length);

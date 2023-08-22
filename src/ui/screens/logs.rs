@@ -34,8 +34,8 @@ impl Screen for LogsScreen {
         &mut self,
         frame: &mut Frame<CrosstermBackend<Stdout>>,
         area: Rect,
-        app: &crate::state::State,
-        _shared: &SharedUiState,
+        app: &mut crate::state::State,
+        _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let lines = app
             .logs

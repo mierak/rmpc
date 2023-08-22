@@ -36,6 +36,7 @@ pub struct QueueScreen {
     frame_counter: FrameCounter,
     img_state: ImageState,
     scrollbar: ScrollbarState,
+    should_center: bool,
 }
 
 #[async_trait]
@@ -44,18 +45,33 @@ impl Screen for QueueScreen {
         &mut self,
         frame: &mut Frame<CrosstermBackend<Stdout>>,
         area: Rect,
-        app: &crate::state::State,
-        _shared: &SharedUiState,
+        app: &mut crate::state::State,
+        _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        if app.album_art.is_some() && app.album_art.ne(&self.img_state.image) {
-            // TODO remove the clone
-            // drain? take?
-            self.img_state.image = app.album_art.clone();
-            self.img_state.needs_transfer = true;
-            tracing::debug!(
-                message = "New image received",
-                size = app.album_art.as_ref().map(|a| a.0.len())
-            );
+        match (&mut app.album_art, &mut self.img_state.image) {
+            (Some(ref mut v), None) => {
+                self.img_state.image = Some(crate::state::MyVec(std::mem::take(&mut v.0)));
+                self.img_state.needs_transfer = true;
+                tracing::debug!(
+                    message = "New image received",
+                    size = app.album_art.as_ref().map(|a| a.0.len())
+                );
+            }
+            (Some(a), Some(i)) if a.ne(&i) && !a.0.is_empty() => {
+                self.img_state.image = Some(crate::state::MyVec(std::mem::take(&mut a.0)));
+                self.img_state.needs_transfer = true;
+                tracing::debug!(
+                    message = "New image received",
+                    size = app.album_art.as_ref().map(|a| a.0.len())
+                );
+            }
+            (Some(_), Some(_)) => {} // The image is identical, should be in place already
+            (None, None) => {}       // Default img should be in place already
+            (None, Some(_)) => {
+                // Show default img
+                self.img_state.image = None;
+                self.img_state.needs_transfer = true;
+            }
         }
 
         let [top, queue_section, logs] = *Layout::default()
@@ -104,6 +120,10 @@ impl Screen for QueueScreen {
         self.scrollbar
             .content_length(app.queue.as_ref().map_or(0, |v| v.0.len()) as u16);
         self.scrollbar.viewport_content_length(queue_section.height);
+        if self.should_center {
+            self.should_center = false;
+            self.scrollbar.center_on(self.scrollbar.get_position());
+        }
 
         let mut rows = Vec::with_capacity(app.queue.as_ref().map_or(0, |v| v.0.len()));
         if let Some(queue) = app.queue.as_ref() {
@@ -236,11 +256,11 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> Result<()> {
         if self.scrollbar.get_position() == 0 {
-            // todo put in the middle
             if let Some(queue) = _app.queue.as_ref() {
                 for (idx, song) in queue.0.iter().enumerate() {
                     if _app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
-                        self.scrollbar.position(idx as u16);
+                        self.should_center = true;
+                        self.scrollbar.center_on(idx as u16);
                     }
                 }
             }

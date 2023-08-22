@@ -313,13 +313,25 @@ const GRID: &[&str] = &[
     "\u{1D244}",
 ];
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ImageState {
     pub idx: u32,
     pub needs_transfer: bool,
     pub width: u8,
     pub height: u16,
     pub image: Option<MyVec<u8>>,
+}
+
+impl Default for ImageState {
+    fn default() -> Self {
+        Self {
+            idx: 0,
+            needs_transfer: true,
+            width: 0,
+            height: 0,
+            image: None,
+        }
+    }
 }
 
 #[derive(Debug, Default)]

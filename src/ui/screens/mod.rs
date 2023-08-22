@@ -34,8 +34,8 @@ pub trait Screen {
         &mut self,
         frame: &mut Frame<CrosstermBackend<Stdout>>,
         area: Rect,
-        app: &crate::state::State,
-        shared_state: &SharedUiState,
+        app: &mut crate::state::State,
+        shared_state: &mut SharedUiState,
     ) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides

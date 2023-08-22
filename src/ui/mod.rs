@@ -87,26 +87,26 @@ struct Screens {
 }
 
 macro_rules! do_for_screen {
-            ($screen:expr, $fn:ident, $($param:expr),+) => {
-                $screen.$fn($($param),+)
-            };
-        }
+    ($screen:expr, $fn:ident, $($param:expr),+) => {
+        $screen.$fn($($param),+)
+    };
+}
 
 macro_rules! screen_call {
-            ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
-                match $app.active_tab {
-                    screens::Screens::Queue => do_for_screen!($self.screens.queue, $fn, $($param),+),
-                    screens::Screens::Logs => do_for_screen!($self.screens.logs, $fn, $($param),+),
-                    screens::Screens::Directories => do_for_screen!($self.screens.directories, $fn, $($param),+),
-                }
-            }
+    ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
+        match $app.active_tab {
+            screens::Screens::Queue => do_for_screen!($self.screens.queue, $fn, $($param),+),
+            screens::Screens::Logs => do_for_screen!($self.screens.logs, $fn, $($param),+),
+            screens::Screens::Directories => do_for_screen!($self.screens.directories, $fn, $($param),+),
         }
+    }
+}
 
 impl Ui<'_> {
     pub fn render(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-        app: &crate::state::State,
+        app: &mut crate::state::State,
     ) -> Result<()> {
         if self
             .shared_state
@@ -164,7 +164,7 @@ impl Ui<'_> {
             }
             frame.render_widget(tabs, tabs_area);
 
-            screen_call!(self, app, render(frame, content, app, &self.shared_state)).unwrap();
+            screen_call!(self, app, render(frame, content, app, &mut self.shared_state)).unwrap();
         })?;
 
         Ok(())
@@ -205,7 +205,9 @@ impl Ui<'_> {
     }
 
     pub async fn before_show(&mut self, app: &mut State) {
-        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state));
+        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state))
+            .await
+            .unwrap();
     }
 
     pub fn display_message(&mut self, message: &str, level: Level) {

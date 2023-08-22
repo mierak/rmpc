@@ -279,9 +279,10 @@ async fn render_task(
     }
     while let Some(()) = render_rx.recv().await {
         let mut ui = ui.lock().await;
-        let state = state.lock().await;
+        let mut state = state.lock().await;
         let mut terminal = terminal.lock().await;
-        ui.render(&mut terminal, &state).expect("Expected render to succeed");
+        ui.render(&mut terminal, &mut state)
+            .expect("Expected render to succeed");
     }
 }
 
