@@ -25,7 +25,6 @@ impl<T> std::fmt::Debug for MyVecDeque<T> {
     }
 }
 
-#[derive(Debug)]
 pub struct State {
     pub active_tab: Screens,
     pub status: Status,
@@ -34,6 +33,18 @@ pub struct State {
     pub logs: MyVecDeque<Vec<u8>>,
     pub status_loop_active: bool,
     pub album_art: Option<MyVec<u8>>,
+}
+
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "State {{ active_tab: {}, logs_count: {}, queue_len: {:?}}}",
+            self.active_tab,
+            self.logs.0.len(),
+            self.queue.as_ref().map(|v| v.0.len())
+        )
+    }
 }
 
 impl State {

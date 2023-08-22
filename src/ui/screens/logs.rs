@@ -6,24 +6,26 @@ use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Alignment, Constraint, CrosstermBackend, Direction, Layout, Margin, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{Block, Borders, Paragraph, ScrollbarOrientation},
     Frame,
 };
 
 use crate::{
     mpd::{client::Client, errors::MpdError},
     state::State,
-    ui::{Render, SharedUiState},
+    ui::{
+        widgets::scrollbar::{Scrollbar, ScrollbarState},
+        Render, SharedUiState,
+    },
 };
 
 use super::Screen;
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
-    pub scrollbar: ScrollbarState,
-    pub scrollbar_position: usize,
+    scrollbar: ScrollbarState,
 }
 
 #[async_trait]
@@ -40,8 +42,14 @@ impl Screen for LogsScreen {
             .0
             .iter()
             .flat_map(|l| l.into_text().unwrap().lines)
+            .enumerate()
+            .map(|(idx, mut l)| {
+                if idx == self.scrollbar.get_position() as usize {
+                    l.patch_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+                }
+                l
+            })
             .collect::<Vec<Line>>();
-        let len = lines.len();
 
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
@@ -57,27 +65,21 @@ impl Screen for LogsScreen {
             .split(area) else {
                 return Ok(())
             };
-        self.scrollbar = self.scrollbar.content_length(TryInto::<u16>::try_into(len).unwrap());
-        self.scrollbar = self.scrollbar.viewport_content_length(content.height);
+        self.scrollbar
+            .content_length(TryInto::<u16>::try_into(lines.len()).unwrap());
+        self.scrollbar.viewport_content_length(content.height.saturating_sub(2));
 
-        let logs_wg = Paragraph::new(lines)
+        let logs_wg = Paragraph::new(lines[self.scrollbar.get_range_usize()].to_vec())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .style(Style::default().fg(Color::Gray))
                     .title(Span::styled(
-                        format!("Logs: {}", len),
+                        format!("Logs: {}", lines.len()),
                         Style::default().add_modifier(Modifier::BOLD),
                     )),
             )
-            .alignment(Alignment::Left)
-            .scroll((
-                std::convert::TryInto::<u16>::try_into(self.scrollbar_position)
-                    .unwrap()
-                    .saturating_sub(content.height),
-                0,
-            ));
-        // .wrap(Wrap { trim: true });
+            .alignment(Alignment::Left);
 
         frame.render_widget(logs_wg, content);
         frame.render_stateful_widget(
@@ -86,7 +88,7 @@ impl Screen for LogsScreen {
                 vertical: 1,
                 horizontal: 0,
             }),
-            &mut self.scrollbar,
+            &mut self.scrollbar.inner,
         );
 
         Ok(())
@@ -98,7 +100,6 @@ impl Screen for LogsScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        self.scrollbar_position = _app.logs.0.len();
         self.scrollbar.last();
         Ok(())
     }
@@ -112,32 +113,24 @@ impl Screen for LogsScreen {
     ) -> Result<Render, MpdError> {
         match key.code {
             KeyCode::Char('j') => {
-                self.scrollbar_position = self.scrollbar_position.saturating_add(1);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
+                self.scrollbar.next();
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('k') => {
-                self.scrollbar_position = self.scrollbar_position.saturating_sub(1);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
+                self.scrollbar.prev();
                 return Ok(Render::NoSkip);
             }
             // TODO
             KeyCode::Char('d') => {
-                self.scrollbar_position = self.scrollbar_position.saturating_add(5);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
+                for _ in 0..5 {
+                    self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
+                }
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('u') => {
-                self.scrollbar_position = self.scrollbar_position.saturating_sub(5);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
-                self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
+                for _ in 0..5 {
+                    self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
+                }
                 return Ok(Render::NoSkip);
             }
             _ => {}

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::io::Stdout;
 
 use crate::{
@@ -9,6 +10,7 @@ use crate::{
         widgets::{
             frame_counter::FrameCounter,
             kitty_image::{ImageState, KittyImage},
+            scrollbar::{Scrollbar, ScrollbarState},
         },
         Render, SharedUiState,
     },
@@ -20,7 +22,7 @@ use ratatui::{
     prelude::{Alignment, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, LineGauge, Paragraph, Row, Table, Wrap},
+    widgets::{Block, Borders, LineGauge, Paragraph, Row, ScrollDirection, ScrollbarOrientation, Table, Wrap},
     Frame,
 };
 use tracing::error;
@@ -33,6 +35,7 @@ use super::Screen;
 pub struct QueueScreen {
     frame_counter: FrameCounter,
     img_state: ImageState,
+    scrollbar: ScrollbarState,
 }
 
 #[async_trait]
@@ -44,7 +47,7 @@ impl Screen for QueueScreen {
         app: &crate::state::State,
         _shared: &SharedUiState,
     ) -> anyhow::Result<()> {
-        if app.album_art.ne(&self.img_state.image) {
+        if app.album_art.is_some() && app.album_art.ne(&self.img_state.image) {
             // TODO remove the clone
             // drain? take?
             self.img_state.image = app.album_art.clone();
@@ -55,11 +58,58 @@ impl Screen for QueueScreen {
             );
         }
 
+        let [top, queue_section, logs] = *Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(2),
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(70),
+                ]
+                .as_ref(),
+            ).split(area) else { return Ok(()) };
+
+        let [img_section, queue_section] = *Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                         Constraint::Percentage(25),
+                         Constraint::Percentage(75),
+            ].as_ref()).split(queue_section) else { return Ok(()) };
+
+        let [table_header_section, queue_section] = *Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                         Constraint::Min(3),
+                         Constraint::Percentage(100),
+            ].as_ref()).split(queue_section) else { return Ok(()) };
+        let [queue_section, scrollbar_section] = *Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                         Constraint::Percentage(100),
+                         Constraint::Min(1),
+            ].as_ref()).split(queue_section) else { return Ok(()) };
+
+        let [left, left2, right3, right2, right] = *Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20)
+                ].as_ref(),
+            ) .split(top) else { return Ok(())};
+
+        self.scrollbar
+            .content_length(app.queue.as_ref().map_or(0, |v| v.0.len()) as u16);
+        self.scrollbar.viewport_content_length(queue_section.height);
+
         let mut rows = Vec::with_capacity(app.queue.as_ref().map_or(0, |v| v.0.len()));
         if let Some(queue) = app.queue.as_ref() {
-            for song in queue.0.iter() {
+            for (idx, song) in queue.0.iter().enumerate() {
                 let mut row = Row::new(vec![
-                    song.artist.as_ref().map_or("-", |v| v).to_owned(),
+                    song.artist.as_ref().map_or("-".to_owned(), |v| format!(" {v}")),
                     song.title.as_ref().map_or("-", |v| v).to_owned(),
                     song.album.as_ref().map_or("-", |v| v).to_owned(),
                     song.duration.as_ref().map_or("-".to_string(), |v| {
@@ -71,7 +121,7 @@ impl Screen for QueueScreen {
                 if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
                     row = row.style(Style::default().fg(Color::Blue));
                 }
-                if song.selected {
+                if idx as u16 == self.scrollbar.get_position() {
                     row = row.style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
                 }
                 rows.push(row)
@@ -88,12 +138,22 @@ impl Screen for QueueScreen {
                 Constraint::Percentage(25),
             ]);
 
-        let table = Table::new(rows).widths(&[
+        let table = Table::new(rows[self.scrollbar.get_range_usize()].to_vec()).widths(&[
             Constraint::Percentage(15),
             Constraint::Percentage(35),
             Constraint::Percentage(35),
             Constraint::Percentage(15),
         ]);
+
+        let scrollbar = Scrollbar::default()
+            .orientation(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .track_symbol("│")
+            .end_symbol(Some("↓"))
+            .track_style(Style::default().fg(Color::White).bg(Color::Black))
+            .begin_style(Style::default().fg(Color::White).bg(Color::Black))
+            .end_style(Style::default().fg(Color::White).bg(Color::Black))
+            .thumb_style(Style::default().fg(Color::Blue));
 
         let volume = LineGauge::default()
             .block(
@@ -103,7 +163,7 @@ impl Screen for QueueScreen {
             )
             .gauge_style(
                 Style::default()
-                    .fg(Color::White)
+                    .fg(Color::Blue)
                     .bg(Color::Black)
                     .add_modifier(Modifier::ITALIC),
             )
@@ -123,43 +183,6 @@ impl Screen for QueueScreen {
                 .title("Status")
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
         );
-
-        let [top, queue_section, logs] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(2),
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(70),
-                ]
-                .as_ref(),
-            ).split(area) else {
-                return Ok(())
-            };
-        let [img_section, queue_section] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                         Constraint::Percentage(25),
-                         Constraint::Percentage(75),
-            ].as_ref()).split(queue_section) else { return Ok(()) };
-        let [table_header_section, queue_section] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                         Constraint::Min(3),
-                         Constraint::Percentage(100),
-            ].as_ref()).split(queue_section) else { return Ok(()) };
-
-        let [left, left2, right3, right2, right] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20)
-                ].as_ref(),
-            ) .split(top) else { return Ok(())};
 
         let logs_wg = Paragraph::new(
             app.logs
@@ -187,7 +210,14 @@ impl Screen for QueueScreen {
         frame.render_widget(volume, right);
         frame.render_widget(&self.frame_counter, left);
         frame.render_widget(header_table, table_header_section);
-        frame.render_widget(table, queue_section);
+        frame.render_widget(
+            table,
+            queue_section.inner(&ratatui::prelude::Margin {
+                vertical: 0,
+                horizontal: 1,
+            }),
+        );
+        frame.render_stateful_widget(scrollbar, scrollbar_section, &mut self.scrollbar.inner);
         frame.render_widget(logs_wg, logs);
         frame.render_stateful_widget(
             KittyImage::default().block(Block::default().borders(Borders::TOP)),
@@ -196,6 +226,25 @@ impl Screen for QueueScreen {
         );
         self.frame_counter.increment();
 
+        Ok(())
+    }
+
+    async fn before_show(
+        &mut self,
+        _client: &mut Client<'_>,
+        _app: &mut crate::state::State,
+        _shared: &mut SharedUiState,
+    ) -> Result<()> {
+        if self.scrollbar.get_position() == 0 {
+            // todo put in the middle
+            if let Some(queue) = _app.queue.as_ref() {
+                for (idx, song) in queue.0.iter().enumerate() {
+                    if _app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
+                        self.scrollbar.position(idx as u16);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -221,8 +270,11 @@ impl Screen for QueueScreen {
             KeyCode::Char(',') => client.set_volume(app.status.volume.dec()).await?,
             KeyCode::Char('.') => client.set_volume(app.status.volume.inc()).await?,
             KeyCode::Char('d') => {
-                // TODO select another song after delete
-                if let Some(selected_song) = app.queue.as_ref().and_then(|q| q.0.iter().find(|s| s.selected)) {
+                if let Some(Some(selected_song)) = app
+                    .queue
+                    .as_ref()
+                    .map(|v| v.0.get(self.scrollbar.get_position() as usize))
+                {
                     match client.delete_id(selected_song.id).await {
                         Ok(_) => {}
                         Err(e) => error!("{:?}", e),
@@ -235,39 +287,23 @@ impl Screen for QueueScreen {
                 client.pause_toggle().await?;
             }
             KeyCode::Enter => {
-                if let Some(queue) = app.queue.as_mut() {
-                    if let Some(song) = queue.0.iter().find(|s| s.selected) {
-                        client.play_id(song.id).await?;
-                    }
+                if let Some(Some(selected_song)) = app
+                    .queue
+                    .as_ref()
+                    .map(|v| v.0.get(self.scrollbar.get_position() as usize))
+                {
+                    client.play_id(selected_song.id).await?;
                 }
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                if let Some(queue) = app.queue.as_mut() {
-                    if let Some((idx, song)) = queue.0.iter_mut().enumerate().find(|s| s.1.selected) {
-                        song.selected = false;
-                        if idx > 0 {
-                            queue.0[idx - 1].selected = true;
-                        } else {
-                            queue.0.last_mut().unwrap().selected = true;
-                        }
-                    } else if !queue.0.is_empty() {
-                        queue.0.last_mut().unwrap().selected = true;
-                    }
+                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
+                    self.scrollbar.scroll(ScrollDirection::Backward);
                 }
                 return Ok(Render::NoSkip);
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if let Some(queue) = app.queue.as_mut() {
-                    if let Some((idx, song)) = queue.0.iter_mut().enumerate().find(|s| s.1.selected) {
-                        song.selected = false;
-                        if idx < queue.0.len() - 1 {
-                            queue.0[idx + 1].selected = true;
-                        } else {
-                            queue.0.first_mut().unwrap().selected = true;
-                        }
-                    } else if !queue.0.is_empty() {
-                        queue.0.first_mut().unwrap().selected = true;
-                    }
+                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
+                    self.scrollbar.scroll(ScrollDirection::Forward);
                 }
                 return Ok(Render::NoSkip);
             }

@@ -292,6 +292,29 @@ impl Ui<'_> {
             }
         }
     }
+    pub async fn before_show(&mut self, app: &mut State) {
+        match app.active_tab {
+            screens::Screens::Queue => {
+                self.screens
+                    .queue
+                    .before_show(&mut self.client, app, &mut self.shared_state)
+                    .await
+            }
+            screens::Screens::Logs => {
+                self.screens
+                    .logs
+                    .before_show(&mut self.client, app, &mut self.shared_state)
+                    .await
+            }
+            screens::Screens::Directories => {
+                self.screens
+                    .directories
+                    .before_show(&mut self.client, app, &mut self.shared_state)
+                    .await
+            }
+        }
+        .unwrap();
+    }
 
     pub fn display_message(&mut self, message: &str, level: Level) {
         self.shared_state.status_message = Some(StatusMessage {

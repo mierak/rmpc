@@ -150,16 +150,6 @@ async fn main_task(
     mut event_receiver: tokio::sync::mpsc::Receiver<AppEvent>,
     render_sender: Sender<()>,
 ) {
-    let mut locked_state = state2.lock().await;
-    if let Some(selected_id) = locked_state.status.songid {
-        if let Some(queue) = locked_state.queue.as_mut() {
-            if let Some(song) = queue.0.iter_mut().find(|s| s.id == selected_id) {
-                song.selected = true;
-            }
-        }
-    }
-    drop(locked_state);
-
     loop {
         while let Some(event) = event_receiver.recv().await {
             let mut ui = ui_mutex.lock().await;
@@ -282,6 +272,11 @@ async fn render_task(
     state: Arc<Mutex<state::State>>,
     terminal: Arc<Mutex<Terminal<CrosstermBackend<Stdout>>>>,
 ) {
+    {
+        let mut ui = ui.lock().await;
+        let mut state = state.lock().await;
+        ui.before_show(&mut state).await;
+    }
     while let Some(()) = render_rx.recv().await {
         let mut ui = ui.lock().await;
         let state = state.lock().await;

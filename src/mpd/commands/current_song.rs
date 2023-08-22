@@ -16,7 +16,6 @@ pub struct Song {
     pub pos: u32,               // Duration of the current song in seconds.
 
     pub others: Vec<(String, String)>,
-
     // pub name: Option<String>, // a name for this song. This is not the song title. The exact meaning of this tag is not well-defined. It is often used by badly configured internet radio stations with broken tags to squeeze both the artist name and the song title in one tag.
     // pub artistsort: Option<String>, // same as artist, but for sorting. This usually omits prefixes such as “The”.
     // pub albumsort: Option<String>,  // same as album, but for sorting.
@@ -49,16 +48,13 @@ pub struct Song {
     // pub musicbrainz_releasetrackid: Option<String>, // the release track id in the MusicBrainz database.
     // pub musicbrainz_workid: Option<String>, // the work id in the MusicBrainz database.
     // pub last_modified: Option<String>, // ISO 8601
-    //
-    // Info state added by app, not MPD
-    pub selected: bool,
 }
 impl std::fmt::Debug for Song {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Song {{ file: {}, title: {:?}, id: {}, selected: {}, pos: {} }}",
-            self.file, self.title, self.id, self.selected, self.pos
+            "Song {{ file: {}, title: {:?}, id: {}, pos: {} }}",
+            self.file, self.title, self.id, self.pos
         )
     }
 }
@@ -117,13 +113,7 @@ impl std::str::FromStr for Song {
                 // "musicbrainz_workid" => resunt.musicbrainz_workid = Some(value.to_owned()),
                 "time" => {}   // deprecated
                 "format" => {} // ignored
-
                 key => resunt.others.push((key.to_owned(), value.to_owned())),
-                key => tracing::warn!(
-                    message = "Encountered unknow key/value pair while parsing 'listfiles' command",
-                    key,
-                    value
-                ),
             }
         }
 
