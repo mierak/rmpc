@@ -63,6 +63,7 @@ pub trait Screen {
         key: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
+        _shared: &mut SharedUiState,
     ) -> Result<Render, MpdError>;
 }
 

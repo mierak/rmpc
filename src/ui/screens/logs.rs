@@ -108,6 +108,7 @@ impl Screen for LogsScreen {
         key: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
+        _shared: &mut SharedUiState,
     ) -> Result<Render, MpdError> {
         match key.code {
             KeyCode::Char('j') => {

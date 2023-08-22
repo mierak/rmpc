@@ -62,7 +62,11 @@ impl Screen for QueueScreen {
                     song.artist.as_ref().map_or("-", |v| v).to_owned(),
                     song.title.as_ref().map_or("-", |v| v).to_owned(),
                     song.album.as_ref().map_or("-", |v| v).to_owned(),
-                    song.duration.as_ref().map_or("-".to_string(), |v| v.to_string()),
+                    song.duration.as_ref().map_or("-".to_string(), |v| {
+                        let secs = v.as_secs();
+                        let min = secs / 60;
+                        format!("{}:{:0>2}", min, secs - min * 60)
+                    }),
                 ]);
                 if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
                     row = row.style(Style::default().fg(Color::Blue));
@@ -200,6 +204,7 @@ impl Screen for QueueScreen {
         key: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
+        _shared: &mut SharedUiState,
     ) -> Result<Render, MpdError> {
         match key.code {
             // these two are here only to induce panic for testing

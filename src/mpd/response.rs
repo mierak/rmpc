@@ -143,17 +143,10 @@ where
             Ok(Self { body: None })
         } else {
             match result.parse::<T>() {
-                Ok(body) => {
-                    // trace!(command = ?String::from_utf8_lossy(command), response = ?body);
-                    Ok(Self { body: Some(body) })
-                }
-                Err(err) => {
-                    // tracing::error!(command = ?String::from_utf8_lossy(command), ?err, result);
-                    Err(MpdError::Parse(format!(
-                        "cannot parse '{result}', nested error: '{err:?}', command: '{}",
-                        "" // String::from_utf8_lossy(command)
-                    )))
-                }
+                Ok(body) => Ok(Self { body: Some(body) }),
+                Err(err) => Err(MpdError::Parse(format!(
+                    "cannot parse '{result}', nested error: '{err:?}'"
+                ))),
             }
         }
     }

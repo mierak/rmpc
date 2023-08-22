@@ -181,6 +181,15 @@ impl<'a> Client<'a> {
 
     // Database
     #[tracing::instrument(skip(self))]
+    pub async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
+        if let Some(path) = path {
+            Ok(self.execute(format!("lsinfo \"{}\"", path).as_bytes()).await?.unwrap())
+        } else {
+            Ok(self.execute(b"lsinfo").await?.unwrap())
+        }
+    }
+
+    #[tracing::instrument(skip(self))]
     pub async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
         if let Some(path) = path {
             Ok(self

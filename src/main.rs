@@ -8,6 +8,7 @@ use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::CrosstermBackend, Terminal};
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::{debug, error, info, instrument, warn};
+use ui::Level;
 
 use crate::ui::Ui;
 
@@ -20,7 +21,7 @@ mod ui;
 #[derive(Debug)]
 pub enum AppEvent {
     UserInput(Event),
-    ErrorInfo(Vec<u8>),
+    StatusBar(String),
     // TODO there is an issue here
     // if an error is emmited from an ui thread, tracing will notify the thread that it should
     // rerender to show the error which potentionally triggers the error again entering an
@@ -28,7 +29,6 @@ pub enum AppEvent {
     // Maybe it could be solved if we can rerender only the status bar since it already is
     // in the shared ui part
     Log(Vec<u8>),
-    ClearStatusBar,
     Elapsed(u64),
 }
 
@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
 
 #[instrument(skip_all)]
 async fn main_task(
-    ui: Arc<Mutex<Ui<'_>>>,
+    ui_mutex: Arc<Mutex<Ui<'static>>>,
     state2: Arc<Mutex<state::State>>,
     mut event_receiver: tokio::sync::mpsc::Receiver<AppEvent>,
     render_sender: Sender<()>,
@@ -162,7 +162,7 @@ async fn main_task(
 
     loop {
         while let Some(event) = event_receiver.recv().await {
-            let mut ui = ui.lock().await;
+            let mut ui = ui_mutex.lock().await;
             let mut state = state2.lock().await;
 
             match event {
@@ -177,22 +177,14 @@ async fn main_task(
                     }
                 },
                 AppEvent::UserInput(_) => {}
-                AppEvent::ErrorInfo(error) => {
-                    state.error = error;
-                    let state = Arc::clone(&state2);
-                    tokio::task::spawn(async move {
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                        state.lock().await.error.clear();
-                    });
+                AppEvent::StatusBar(message) => {
+                    ui.display_message(&message, Level::Error);
                 }
                 AppEvent::Log(msg) => {
                     state.logs.0.push_back(msg);
                     if state.logs.0.len() > 1000 {
                         state.logs.0.pop_front();
                     }
-                }
-                AppEvent::ClearStatusBar => {
-                    state.error.clear();
                 }
                 AppEvent::Elapsed(secs) => {
                     state.status.elapsed = state.status.elapsed.saturating_add(Duration::from_secs(secs));

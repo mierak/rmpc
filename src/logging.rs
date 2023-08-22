@@ -34,7 +34,7 @@ impl std::io::Write for TestWriter {
 pub fn configure(level: Level, tx: Sender<AppEvent>) -> Vec<WorkerGuard> {
     let error_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::StatusBar)));
     let logs_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::Log)));
-    let file_appender = tracing_appender::rolling::RollingFileAppender::new(Rotation::HOURLY, "./", "mpdox.log");
+    let file_appender = tracing_appender::rolling::RollingFileAppender::new(Rotation::DAILY, "./", "mpdox.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     let (non_blocking_errors, _errors_guard) = tracing_appender::non_blocking(&*error_writer);
     let (non_blocking_logs, _logs_guard) = tracing_appender::non_blocking(&*logs_writer);
@@ -125,7 +125,9 @@ impl Write for &LogChannelWriter {
                 self.tx.try_send(AppEvent::Log(buf.to_owned())).unwrap();
             }
             WriterVariant::StatusBar => {
-                self.tx.try_send(AppEvent::ErrorInfo(buf.to_owned())).unwrap();
+                self.tx
+                    .try_send(AppEvent::StatusBar(String::from_utf8_lossy(buf).to_string()))
+                    .unwrap();
             }
         }
         Ok(buf.len())

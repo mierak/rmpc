@@ -30,8 +30,37 @@ use self::{
 pub mod screens;
 pub mod widgets;
 
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum Level {
+    Trace,
+    Debug,
+    Warn,
+    Error,
+    Info,
+}
+
+#[derive(Debug)]
+pub struct StatusMessage {
+    pub message: String,
+    pub level: Level,
+    pub created: tokio::time::Instant,
+}
+
+impl StatusMessage {
+    pub fn new(message: String, level: Level) -> Self {
+        Self {
+            message,
+            level,
+            created: tokio::time::Instant::now(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
-pub struct SharedUiState {}
+pub struct SharedUiState {
+    pub status_message: Option<StatusMessage>,
+}
 
 #[derive(Debug)]
 pub struct Ui<'a> {
@@ -63,6 +92,14 @@ impl Ui<'_> {
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         app: &crate::state::State,
     ) -> Result<()> {
+        if self
+            .shared_state
+            .status_message
+            .as_ref()
+            .is_some_and(|m| m.created.elapsed() > std::time::Duration::from_secs(5))
+        {
+            self.shared_state.status_message = None;
+        }
         terminal.draw(|frame| {
             let tab_names = screens::Screens::VARIANTS
                 .iter()
@@ -92,7 +129,15 @@ impl Ui<'_> {
                     return
                 };
 
-            if app.error.is_empty() {
+            if let Some(StatusMessage {
+                ref message, ref level, ..
+            }) = self.shared_state.status_message
+            {
+                let status_bar = Paragraph::new(message.into_text().unwrap())
+                    .alignment(ratatui::prelude::Alignment::Center)
+                    .style(Style::default().fg(level.to_color()).bg(Color::Black));
+                frame.render_widget(status_bar, bar_area);
+            } else {
                 let elapsed_bar = ProgressBar::default().fg(Color::Blue).bg(Color::Black);
                 let elapsed_bar = if app.status.duration == Duration::ZERO {
                     elapsed_bar.value(0.0)
@@ -100,10 +145,6 @@ impl Ui<'_> {
                     elapsed_bar.value(app.status.elapsed.as_secs_f32() / app.status.duration.as_secs_f32())
                 };
                 frame.render_widget(elapsed_bar, bar_area);
-            } else {
-                let status_bar = Paragraph::new(app.error.into_text().unwrap())
-                    .style(Style::default().fg(Color::Red).bg(Color::Black));
-                frame.render_widget(status_bar, bar_area);
             }
             frame.render_widget(tabs, tabs_area);
 
@@ -229,14 +270,35 @@ impl Ui<'_> {
             _ => {
                 tracing::Span::current().record("screen", app.active_tab.to_string());
                 match app.active_tab {
-                    screens::Screens::Queue => self.screens.queue.handle_key(key, &mut self.client, app).await,
-                    screens::Screens::Logs => self.screens.logs.handle_key(key, &mut self.client, app).await,
+                    screens::Screens::Queue => {
+                        self.screens
+                            .queue
+                            .handle_key(key, &mut self.client, app, &mut self.shared_state)
+                            .await
+                    }
+                    screens::Screens::Logs => {
+                        self.screens
+                            .logs
+                            .handle_key(key, &mut self.client, app, &mut self.shared_state)
+                            .await
+                    }
                     screens::Screens::Directories => {
-                        self.screens.directories.handle_key(key, &mut self.client, app).await
+                        self.screens
+                            .directories
+                            .handle_key(key, &mut self.client, app, &mut self.shared_state)
+                            .await
                     }
                 }
             }
         }
+    }
+
+    pub fn display_message(&mut self, message: &str, level: Level) {
+        self.shared_state.status_message = Some(StatusMessage {
+            message: message.to_owned(),
+            level,
+            created: tokio::time::Instant::now(),
+        })
     }
 }
 
@@ -261,4 +323,19 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
 pub enum Render {
     Skip,
     NoSkip,
+}
+
+trait LevelExt {
+    fn to_color(&self) -> Color;
+}
+impl LevelExt for Level {
+    fn to_color(&self) -> Color {
+        match *self {
+            Level::Info => Color::Blue,
+            Level::Warn => Color::Yellow,
+            Level::Error => Color::Red,
+            Level::Debug => Color::LightGreen,
+            Level::Trace => Color::Magenta,
+        }
+    }
 }
