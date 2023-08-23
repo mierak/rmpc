@@ -22,7 +22,7 @@ use ratatui::{
     prelude::{Alignment, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, LineGauge, Paragraph, Row, ScrollDirection, ScrollbarOrientation, Table, Wrap},
+    widgets::{Block, Borders, Paragraph, Row, ScrollDirection, ScrollbarOrientation, Table, Wrap},
     Frame,
 };
 use tracing::error;
@@ -175,19 +175,15 @@ impl Screen for QueueScreen {
             .end_style(Style::default().fg(Color::White).bg(Color::Black))
             .thumb_style(Style::default().fg(Color::Blue));
 
-        let volume = LineGauge::default()
+        let volume = crate::ui::widgets::volume::Volume::default()
+            .value(*app.status.volume.value())
             .block(
                 Block::default()
                     .title("Volume")
                     .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
             )
-            .gauge_style(
-                Style::default()
-                    .fg(Color::Blue)
-                    .bg(Color::Black)
-                    .add_modifier(Modifier::ITALIC),
-            )
-            .ratio((*app.status.volume.value() as f32 / 100.0).into());
+            .style(Style::default().fg(Color::Blue));
+
         let repeat = Paragraph::new(if app.status.repeat { "On" } else { "Off" }).block(
             Block::default()
                 .title("Repeat")
@@ -324,6 +320,18 @@ impl Screen for QueueScreen {
             KeyCode::Down | KeyCode::Char('j') => {
                 if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
                     self.scrollbar.scroll(ScrollDirection::Forward);
+                }
+                return Ok(Render::NoSkip);
+            }
+            KeyCode::Char('G') => {
+                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
+                    self.scrollbar.last();
+                }
+                return Ok(Render::NoSkip);
+            }
+            KeyCode::Char('g') => {
+                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
+                    self.scrollbar.first();
                 }
                 return Ok(Render::NoSkip);
             }

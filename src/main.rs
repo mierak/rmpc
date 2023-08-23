@@ -97,7 +97,7 @@ async fn main() -> Result<()> {
     let config = Config::parse();
     let (tx, rx) = tokio::sync::mpsc::channel::<AppEvent>(1024);
     let tx_clone = tx.clone();
-    let (render_tx, render_rx) = tokio::sync::mpsc::channel::<()>(8);
+    let (render_tx, render_rx) = tokio::sync::mpsc::channel::<()>(1024);
     let _guards = logging::configure(config.log, tx.clone());
 
     let mut client = Client::init(config.mpd_address.clone(), Some("command"), true).await?;
@@ -152,8 +152,8 @@ async fn main_task(
 ) {
     loop {
         while let Some(event) = event_receiver.recv().await {
-            let mut ui = ui_mutex.lock().await;
             let mut state = state2.lock().await;
+            let mut ui = ui_mutex.lock().await;
 
             match event {
                 AppEvent::UserInput(Event::Key(key)) => match ui.handle_key(key, &mut state).await {
@@ -273,13 +273,14 @@ async fn render_task(
     terminal: Arc<Mutex<Terminal<CrosstermBackend<Stdout>>>>,
 ) {
     {
-        let mut ui = ui.lock().await;
         let mut state = state.lock().await;
+        let mut ui = ui.lock().await;
         ui.before_show(&mut state).await;
     }
+
     while let Some(()) = render_rx.recv().await {
-        let mut ui = ui.lock().await;
         let mut state = state.lock().await;
+        let mut ui = ui.lock().await;
         let mut terminal = terminal.lock().await;
         ui.render(&mut terminal, &mut state)
             .expect("Expected render to succeed");
