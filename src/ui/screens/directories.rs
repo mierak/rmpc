@@ -2,9 +2,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    prelude::{Constraint, Layout, Rect},
+    prelude::{Backend, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, List, ListItem, ListState},
+    Frame,
 };
 
 use crate::{
@@ -185,9 +186,9 @@ impl FileOrDirExt for Song {
 
 #[async_trait]
 impl Screen for DirectoriesScreen {
-    fn render(
+    fn render<B: Backend>(
         &mut self,
-        frame: &mut ratatui::Frame<ratatui::prelude::CrosstermBackend<std::io::Stdout>>,
+        frame: &mut Frame<B>,
         area: Rect,
         _app: &mut crate::state::State,
         _state: &mut SharedUiState,

@@ -9,7 +9,7 @@ use tokio::{
 use tracing::{debug, trace};
 
 use super::{
-    commands::{volume::Bound, *},
+    commands::{status::Single, volume::Bound, *},
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     response::{BinaryMpdResponse, EmptyMpdResponse, MpdResponse},
 };
@@ -159,8 +159,9 @@ impl<'a> Client<'a> {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn single(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(format!("single {}", enabled as u8).as_bytes()).await
+    pub async fn single(&mut self, single: Single) -> MpdResult<()> {
+        self.execute_ok(format!("single {}", single.to_mpd_value()).as_bytes())
+            .await
     }
 
     // Current queue

@@ -13,7 +13,7 @@ pub struct Status {
     pub volume: Volume,               // 0-100 (deprecated: -1 if the volume cannot be determined)
     pub repeat: bool,                 // 0 or 1
     pub random: bool,                 // 0 or 1
-    pub single: String,               // 0, 1, or oneshot
+    pub single: Single,               // 0, 1, or oneshot
     pub consume: String,              // 0, 1 or oneshot
     pub playlist: Option<u32>,        // 31-bit unsigned integer, the playlist version number
     pub playlistlength: u32,          // integer, the length of the playlist
@@ -40,6 +40,60 @@ pub enum State {
     Stop,
     Pause,
 }
+
+#[derive(Debug, Default)]
+pub enum Single {
+    On,
+    #[default]
+    Off,
+    Oneshot,
+}
+
+impl Single {
+    pub fn cycle(&self) -> Self {
+        match self {
+            Single::On => Single::Off,
+            Single::Off => Single::Oneshot,
+            Single::Oneshot => Single::On,
+        }
+    }
+    pub fn to_mpd_value(&self) -> &'static str {
+        match self {
+            Single::On => "1",
+            Single::Off => "0",
+            Single::Oneshot => "oneshot",
+        }
+    }
+}
+
+impl std::fmt::Display for Single {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Single::On => "On",
+                Single::Off => "Off",
+                Single::Oneshot => "Oneshot",
+            }
+        )?;
+        Ok(())
+    }
+}
+
+impl std::str::FromStr for Single {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "0" => Single::Off,
+            "1" => Single::On,
+            "oneshot" => Single::Oneshot,
+            _ => todo!(),
+        })
+    }
+}
+
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -81,7 +135,7 @@ impl std::str::FromStr for Status {
                 "volume" => res.volume = Volume::new(value.parse()?),
                 "repeat" => res.repeat = value != "0",
                 "random" => res.random = value != "0",
-                "single" => res.single = value.to_owned(),
+                "single" => res.single = value.parse()?,
                 "consume" => res.consume = value.to_owned(),
                 "playlist" => res.playlist = Some(value.parse()?),
                 "playlistlength" => res.playlistlength = value.parse()?,

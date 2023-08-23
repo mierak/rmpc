@@ -1,11 +1,11 @@
-use std::{io::Stdout, ops::DerefMut, sync::Arc, time::Duration};
+use std::{ops::DerefMut, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use config::Config;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
-use ratatui::{prelude::CrosstermBackend, Terminal};
+use ratatui::{prelude::Backend, Terminal};
 use tokio::sync::{mpsc::Sender, Mutex};
 use tracing::{debug, error, info, instrument, warn};
 use ui::Level;
@@ -266,11 +266,11 @@ async fn progrss_loop_task(state: Arc<Mutex<state::State>>, render_sender: tokio
 }
 
 #[instrument(skip_all)]
-async fn render_task(
+async fn render_task<B: Backend>(
     mut render_rx: tokio::sync::mpsc::Receiver<()>,
     ui: Arc<Mutex<Ui<'_>>>,
     state: Arc<Mutex<state::State>>,
-    terminal: Arc<Mutex<Terminal<CrosstermBackend<Stdout>>>>,
+    terminal: Arc<Mutex<Terminal<B>>>,
 ) {
     {
         let mut state = state.lock().await;
@@ -282,8 +282,9 @@ async fn render_task(
         let mut state = state.lock().await;
         let mut ui = ui.lock().await;
         let mut terminal = terminal.lock().await;
-        ui.render(&mut terminal, &mut state)
-            .expect("Expected render to succeed");
+        terminal
+            .draw(|frame| ui.render(frame, &mut state).expect("Expected render to succeed"))
+            .unwrap();
     }
 }
 

@@ -1,18 +1,33 @@
 use ratatui::{
+    prelude::Alignment,
     style::Style,
     widgets::{Block, Widget},
 };
 
+use super::get_line_offset;
+
 const CHARS: &[&str] = &["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Volume<'a> {
     value: u8,
     block: Option<Block<'a>>,
-    /// Widget style
+    alignment: Alignment,
     style: Style,
 }
 
+impl<'a> Default for Volume<'a> {
+    fn default() -> Self {
+        Self {
+            value: 0,
+            block: None,
+            alignment: Alignment::Left,
+            style: Style::default(),
+        }
+    }
+}
+
+#[allow(dead_code)]
 impl<'a> Volume<'a> {
     pub fn value(mut self, value: u8) -> Self {
         self.value = value;
@@ -26,6 +41,11 @@ impl<'a> Volume<'a> {
 
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
+        self
+    }
+
+    pub fn alignment(mut self, alignment: Alignment) -> Self {
+        self.alignment = alignment;
         self
     }
 }
@@ -44,11 +64,14 @@ impl Widget for Volume<'_> {
         if area.height < 1 {
             return;
         }
+
+        let left_offset = get_line_offset(20, area.width, self.alignment);
+
         let i = self.value / 13;
         buf.set_string(
-            area.left(),
+            area.left() + left_offset,
             area.top(),
-            format!(" {} {}%", CHARS[0..i as usize].join(""), self.value),
+            format!("Volume: {:<7} {:>3}%", CHARS[0..i as usize].join(""), self.value),
             self.style,
         )
     }

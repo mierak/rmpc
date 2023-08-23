@@ -1,11 +1,9 @@
-use std::io::Stdout;
-
 use ansi_to_tui::IntoText;
 use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    prelude::{Alignment, Constraint, CrosstermBackend, Direction, Layout, Margin, Rect},
+    prelude::{Alignment, Backend, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, ScrollbarOrientation},
@@ -30,9 +28,9 @@ pub struct LogsScreen {
 
 #[async_trait]
 impl Screen for LogsScreen {
-    fn render(
+    fn render<B: Backend>(
         &mut self,
-        frame: &mut Frame<CrosstermBackend<Stdout>>,
+        frame: &mut Frame<B>,
         area: Rect,
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,

@@ -1,28 +1,21 @@
 use anyhow::Result;
-use std::io::Stdout;
 
 use crate::{
-    mpd::{
-        client::Client,
-        commands::{volume::Bound, State as MpdState},
-    },
+    mpd::{client::Client, commands::State as MpdState},
     ui::{
         widgets::{
-            frame_counter::FrameCounter,
             kitty_image::{ImageState, KittyImage},
             scrollbar::{Scrollbar, ScrollbarState},
         },
-        Render, SharedUiState,
+        DurationExt, Render, SharedUiState,
     },
 };
-use ansi_to_tui::IntoText;
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    prelude::{Alignment, Constraint, CrosstermBackend, Direction, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, ScrollDirection, ScrollbarOrientation, Table, Wrap},
+    prelude::{Backend, Constraint, Direction, Layout, Rect},
+    style::{Color, Style, Stylize},
+    widgets::{Block, Borders, Row, ScrollDirection, ScrollbarOrientation, Table},
     Frame,
 };
 use tracing::error;
@@ -33,7 +26,6 @@ use super::Screen;
 
 #[derive(Debug, Default)]
 pub struct QueueScreen {
-    frame_counter: FrameCounter,
     img_state: ImageState,
     scrollbar: ScrollbarState,
     should_center: bool,
@@ -41,9 +33,9 @@ pub struct QueueScreen {
 
 #[async_trait]
 impl Screen for QueueScreen {
-    fn render(
+    fn render<B: Backend>(
         &mut self,
-        frame: &mut Frame<CrosstermBackend<Stdout>>,
+        frame: &mut Frame<B>,
         area: Rect,
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
@@ -74,23 +66,12 @@ impl Screen for QueueScreen {
             }
         }
 
-        let [top, queue_section, logs] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(2),
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(70),
-                ]
-                .as_ref(),
-            ).split(area) else { return Ok(()) };
-
         let [img_section, queue_section] = *Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                         Constraint::Percentage(25),
-                         Constraint::Percentage(75),
-            ].as_ref()).split(queue_section) else { return Ok(()) };
+                         Constraint::Percentage(35),
+                         Constraint::Percentage(65),
+            ].as_ref()).split(area) else { return Ok(()) };
 
         let [table_header_section, queue_section] = *Layout::default()
             .direction(Direction::Vertical)
@@ -98,24 +79,13 @@ impl Screen for QueueScreen {
                          Constraint::Min(3),
                          Constraint::Percentage(100),
             ].as_ref()).split(queue_section) else { return Ok(()) };
+
         let [queue_section, scrollbar_section] = *Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                          Constraint::Percentage(100),
                          Constraint::Min(1),
             ].as_ref()).split(queue_section) else { return Ok(()) };
-
-        let [left, left2, right3, right2, right] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20)
-                ].as_ref(),
-            ) .split(top) else { return Ok(())};
 
         self.scrollbar
             .content_length(app.queue.as_ref().map_or(0, |v| v.0.len()) as u16);
@@ -132,11 +102,7 @@ impl Screen for QueueScreen {
                     song.artist.as_ref().map_or("-".to_owned(), |v| format!(" {v}")),
                     song.title.as_ref().map_or("-", |v| v).to_owned(),
                     song.album.as_ref().map_or("-", |v| v).to_owned(),
-                    song.duration.as_ref().map_or("-".to_string(), |v| {
-                        let secs = v.as_secs();
-                        let min = secs / 60;
-                        format!("{}:{:0>2}", min, secs - min * 60)
-                    }),
+                    song.duration.as_ref().map_or("-".to_string(), |v| v.to_string()),
                 ]);
                 if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
                     row = row.style(Style::default().fg(Color::Blue));
@@ -149,13 +115,13 @@ impl Screen for QueueScreen {
         }
 
         let header_table = Table::new([])
-            .header(Row::new(vec!["Artist", "Tille", "Album", "Duration"]))
+            .header(Row::new(vec!["  Artist", "Title", "Album", "Duration"]))
             .block(Block::default().borders(Borders::TOP | Borders::BOTTOM))
             .widths(&[
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
+                Constraint::Percentage(15),
+                Constraint::Percentage(35),
+                Constraint::Percentage(35),
+                Constraint::Percentage(15),
             ]);
 
         let table = Table::new(rows[self.scrollbar.get_range_usize()].to_vec()).widths(&[
@@ -175,56 +141,6 @@ impl Screen for QueueScreen {
             .end_style(Style::default().fg(Color::White).bg(Color::Black))
             .thumb_style(Style::default().fg(Color::Blue));
 
-        let volume = crate::ui::widgets::volume::Volume::default()
-            .value(*app.status.volume.value())
-            .block(
-                Block::default()
-                    .title("Volume")
-                    .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-            )
-            .style(Style::default().fg(Color::Blue));
-
-        let repeat = Paragraph::new(if app.status.repeat { "On" } else { "Off" }).block(
-            Block::default()
-                .title("Repeat")
-                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-        );
-        let random = Paragraph::new(if app.status.random { "On" } else { "Off" }).block(
-            Block::default()
-                .title("Random")
-                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-        );
-        let status = Paragraph::new(format!("{}", app.status.state)).block(
-            Block::default()
-                .title("Status")
-                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-        );
-
-        let logs_wg = Paragraph::new(
-            app.logs
-                .0
-                .iter()
-                .flat_map(|l| l.into_text().unwrap().lines)
-                .collect::<Vec<Line>>(),
-        )
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::Gray))
-                .title(Span::styled(
-                    format!("Logs: {}", app.logs.0.len()),
-                    Style::default().add_modifier(Modifier::BOLD),
-                )),
-        )
-        .alignment(Alignment::Left)
-        .scroll(((app.logs.0.len() as u16).max(logs.height) - logs.height, 0))
-        .wrap(Wrap { trim: true });
-
-        frame.render_widget(repeat, left2);
-        frame.render_widget(random, right2);
-        frame.render_widget(status, right3);
-        frame.render_widget(volume, right);
-        frame.render_widget(&self.frame_counter, left);
         frame.render_widget(header_table, table_header_section);
         frame.render_widget(
             table,
@@ -234,13 +150,11 @@ impl Screen for QueueScreen {
             }),
         );
         frame.render_stateful_widget(scrollbar, scrollbar_section, &mut self.scrollbar.inner);
-        frame.render_widget(logs_wg, logs);
         frame.render_stateful_widget(
             KittyImage::default().block(Block::default().borders(Borders::TOP)),
             img_section,
             &mut self.img_state,
         );
-        self.frame_counter.increment();
 
         Ok(())
     }
@@ -272,19 +186,6 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> Result<Render, MpdError> {
         match key.code {
-            // these two are here only to induce panic for testing
-            KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => client.next().await?,
-            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => client.prev().await?,
-
-            KeyCode::Char('n') if app.status.state == MpdState::Play => client.next().await?,
-            KeyCode::Char('p') if app.status.state == MpdState::Play => client.prev().await?,
-            KeyCode::Char('s') if app.status.state == MpdState::Play => client.stop().await?,
-            KeyCode::Char('z') => client.repeat(!app.status.repeat).await?,
-            KeyCode::Char('x') => client.random(!app.status.random).await?,
-            KeyCode::Char('f') if app.status.state == MpdState::Play => client.seek_curr_forwards(5).await?,
-            KeyCode::Char('b') if app.status.state == MpdState::Play => client.seek_curr_backwards(5).await?,
-            KeyCode::Char(',') => client.set_volume(app.status.volume.dec()).await?,
-            KeyCode::Char('.') => client.set_volume(app.status.volume.inc()).await?,
             KeyCode::Char('d') => {
                 if let Some(Some(selected_song)) = app
                     .queue

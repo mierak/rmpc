@@ -1,10 +1,8 @@
-use std::io::Stdout;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    prelude::{CrosstermBackend, Rect},
+    prelude::{Backend, Rect},
     Frame,
 };
 use strum::{Display, EnumIter, EnumVariantNames};
@@ -30,9 +28,9 @@ pub enum Screens {
 
 #[async_trait]
 pub trait Screen {
-    fn render(
+    fn render<B: Backend>(
         &mut self,
-        frame: &mut Frame<CrosstermBackend<Stdout>>,
+        frame: &mut Frame<B>,
         area: Rect,
         app: &mut crate::state::State,
         shared_state: &mut SharedUiState,
