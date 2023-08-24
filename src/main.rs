@@ -1,4 +1,4 @@
-use std::{ops::DerefMut, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use clap::Parser;

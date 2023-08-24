@@ -15,6 +15,7 @@ pub struct Listed {
     pub last_modified: String, // TODO timestamp?
 }
 
+#[allow(dead_code)]
 impl ListFiles {
     pub fn value(&self) -> &Vec<Listed> {
         &self.0

@@ -85,12 +85,12 @@ impl std::str::FromStr for OnOffOneshot {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "0" => OnOffOneshot::Off,
-            "1" => OnOffOneshot::On,
-            "oneshot" => OnOffOneshot::Oneshot,
-            _ => todo!(),
-        })
+        match s {
+            "0" => Ok(OnOffOneshot::Off),
+            "1" => Ok(OnOffOneshot::On),
+            "oneshot" => Ok(OnOffOneshot::Oneshot),
+            val => Err(anyhow!("Received unknown value for OnOffOneshot '{}'", val)),
+        }
     }
 }
 
