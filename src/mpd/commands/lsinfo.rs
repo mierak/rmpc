@@ -67,10 +67,15 @@ impl std::str::FromStr for FileOrDir {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.split_once('\n').unwrap().0.starts_with("file:") {
+        if s.starts_with("file:") {
             Ok(Self::File(s.parse()?))
-        } else {
+        } else if s.starts_with("directory:") {
             Ok(Self::Dir(s.parse()?))
+        } else {
+            // TODO: playlists are not handled
+            Err(anyhow::anyhow!(
+                "Parsing FilOrDir failed. Playlists are not handled yet."
+            ))
         }
     }
 }

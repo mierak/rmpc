@@ -346,11 +346,13 @@ struct Data {
 }
 impl<'a> KittyImage<'a> {
     fn create_data_to_transfer(&self, image_data: &[u8], compression: Compression) -> Data {
+        // todo query cell size and resize exactly
         let image = image::io::Reader::new(Cursor::new(image_data))
             .with_guessed_format()
             .unwrap()
             .decode()
-            .unwrap();
+            .unwrap()
+            .resize(800, 600, image::imageops::FilterType::Lanczos3);
 
         let binding = image.to_rgba8();
         let rgba = binding.as_raw();
@@ -392,7 +394,6 @@ impl<'a> KittyImage<'a> {
 
         let first: String = iter.by_ref().take(4096).collect();
 
-        // delete all images
         print!(
             "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
             state.idx, img_width, img_height, cols, rows, first
@@ -436,6 +437,7 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             state.needs_transfer = false;
             state.idx = state.idx.wrapping_add(1);
 
+            // delete all images
             print!("\x1b_Ga=d\x1b\\");
 
             let Data {

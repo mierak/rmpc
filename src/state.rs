@@ -74,3 +74,41 @@ impl State {
         })
     }
 }
+
+pub trait PlayListInfoExt {
+    fn get_selected(&self, idx: Option<usize>) -> Option<&Song>;
+    fn get_by_id(&self, id: Option<u32>) -> Option<(usize, &Song)>;
+    fn is_empty_or_none(&self) -> bool;
+    fn len(&self) -> Option<usize>;
+}
+
+impl PlayListInfoExt for Option<PlayListInfo> {
+    fn get_selected(&self, idx: Option<usize>) -> Option<&Song> {
+        match (self, idx) {
+            (None, None) => None,
+            (None, Some(_)) => None,
+            (Some(_), None) => None,
+            (Some(q), Some(idx)) => q.0.get(idx),
+        }
+    }
+
+    fn get_by_id(&self, id: Option<u32>) -> Option<(usize, &Song)> {
+        match (self, id) {
+            (None, None) => None,
+            (None, Some(_)) => None,
+            (Some(_), None) => None,
+            (Some(q), Some(id)) => q.0.iter().enumerate().find(|s| s.1.id == id),
+        }
+    }
+
+    fn is_empty_or_none(&self) -> bool {
+        match self {
+            Some(v) => v.0.is_empty(),
+            None => true,
+        }
+    }
+
+    fn len(&self) -> Option<usize> {
+        self.as_ref().map(|v| v.0.len())
+    }
+}

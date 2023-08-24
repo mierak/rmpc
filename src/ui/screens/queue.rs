@@ -2,20 +2,18 @@ use anyhow::Result;
 
 use crate::{
     mpd::{client::Client, commands::State as MpdState},
+    state::PlayListInfoExt,
     ui::{
-        widgets::{
-            kitty_image::{ImageState, KittyImage},
-            scrollbar::{Scrollbar, ScrollbarState},
-        },
-        DurationExt, Render, SharedUiState,
+        widgets::kitty_image::{ImageState, KittyImage},
+        DurationExt, MyState, Render, SharedUiState,
     },
 };
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, Row, ScrollDirection, ScrollbarOrientation, Table},
+    widgets::{Block, Borders, Row, Scrollbar, ScrollbarOrientation, Table, TableState},
     Frame,
 };
 use tracing::error;
@@ -24,11 +22,12 @@ use crate::{mpd::errors::MpdError, state::State};
 
 use super::Screen;
 
+const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
+
 #[derive(Debug, Default)]
 pub struct QueueScreen {
     img_state: ImageState,
-    scrollbar: ScrollbarState,
-    should_center: bool,
+    scrolling_state: MyState<TableState>,
 }
 
 #[async_trait]
@@ -66,6 +65,8 @@ impl Screen for QueueScreen {
             }
         }
 
+        let queue_len = app.queue.len().unwrap_or(0);
+
         let [img_section, queue_section] = *Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -73,31 +74,19 @@ impl Screen for QueueScreen {
                          Constraint::Percentage(65),
             ].as_ref()).split(area) else { return Ok(()) };
 
-        let [table_header_section, queue_section] = *Layout::default()
+        let [table_header_section, mut queue_section] = *Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                         Constraint::Min(3),
+                         Constraint::Min(2),
                          Constraint::Percentage(100),
             ].as_ref()).split(queue_section) else { return Ok(()) };
 
-        let [queue_section, scrollbar_section] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                         Constraint::Percentage(100),
-                         Constraint::Min(1),
-            ].as_ref()).split(queue_section) else { return Ok(()) };
+        self.scrolling_state.viewport_len(Some(queue_section.height));
+        self.scrolling_state.content_len(Some(queue_len as u16));
 
-        self.scrollbar
-            .content_length(app.queue.as_ref().map_or(0, |v| v.0.len()) as u16);
-        self.scrollbar.viewport_content_length(queue_section.height);
-        if self.should_center {
-            self.should_center = false;
-            self.scrollbar.center_on(self.scrollbar.get_position());
-        }
-
-        let mut rows = Vec::with_capacity(app.queue.as_ref().map_or(0, |v| v.0.len()));
+        let mut rows = Vec::with_capacity(queue_len);
         if let Some(queue) = app.queue.as_ref() {
-            for (idx, song) in queue.0.iter().enumerate() {
+            for song in queue.0.iter() {
                 let mut row = Row::new(vec![
                     song.artist.as_ref().map_or("-".to_owned(), |v| format!(" {v}")),
                     song.title.as_ref().map_or("-", |v| v).to_owned(),
@@ -107,16 +96,13 @@ impl Screen for QueueScreen {
                 if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
                     row = row.style(Style::default().fg(Color::Blue));
                 }
-                if idx as u16 == self.scrollbar.get_position() {
-                    row = row.style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-                }
                 rows.push(row)
             }
         }
 
         let header_table = Table::new([])
-            .header(Row::new(vec!["  Artist", "Title", "Album", "Duration"]))
-            .block(Block::default().borders(Borders::TOP | Borders::BOTTOM))
+            .header(Row::new(TABLE_HEADER.to_vec()))
+            .block(Block::default().borders(Borders::TOP))
             .widths(&[
                 Constraint::Percentage(15),
                 Constraint::Percentage(35),
@@ -124,12 +110,15 @@ impl Screen for QueueScreen {
                 Constraint::Percentage(15),
             ]);
 
-        let table = Table::new(rows[self.scrollbar.get_range_usize()].to_vec()).widths(&[
-            Constraint::Percentage(15),
-            Constraint::Percentage(35),
-            Constraint::Percentage(35),
-            Constraint::Percentage(15),
-        ]);
+        let table = Table::new(rows)
+            .block(Block::default().borders(Borders::TOP))
+            .widths(&[
+                Constraint::Percentage(15),
+                Constraint::Percentage(35),
+                Constraint::Percentage(35),
+                Constraint::Percentage(15),
+            ])
+            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
 
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
@@ -142,14 +131,18 @@ impl Screen for QueueScreen {
             .thumb_style(Style::default().fg(Color::Blue));
 
         frame.render_widget(header_table, table_header_section);
-        frame.render_widget(
-            table,
+        frame.render_stateful_widget(table, queue_section, &mut self.scrolling_state.inner);
+
+        queue_section.y = queue_section.y.saturating_add(1);
+        queue_section.height = queue_section.height.saturating_sub(1);
+        frame.render_stateful_widget(
+            scrollbar,
             queue_section.inner(&ratatui::prelude::Margin {
                 vertical: 0,
-                horizontal: 1,
+                horizontal: 0,
             }),
+            &mut self.scrolling_state.scrollbar_state,
         );
-        frame.render_stateful_widget(scrollbar, scrollbar_section, &mut self.scrollbar.inner);
         frame.render_stateful_widget(
             KittyImage::default().block(Block::default().borders(Borders::TOP)),
             img_section,
@@ -165,16 +158,8 @@ impl Screen for QueueScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        if self.scrollbar.get_position() == 0 {
-            if let Some(queue) = _app.queue.as_ref() {
-                for (idx, song) in queue.0.iter().enumerate() {
-                    if _app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
-                        self.should_center = true;
-                        self.scrollbar.center_on(idx as u16);
-                    }
-                }
-            }
-        }
+        self.scrolling_state
+            .select(_app.queue.get_by_id(_app.status.songid).map(|v| v.0));
         Ok(())
     }
 
@@ -186,12 +171,24 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> Result<Render, MpdError> {
         match key.code {
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if !app.queue.is_empty_or_none() {
+                    for _ in 0..5 {
+                        self.scrolling_state.next();
+                    }
+                }
+                return Ok(Render::NoSkip);
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if !app.queue.is_empty_or_none() {
+                    for _ in 0..5 {
+                        self.scrolling_state.prev();
+                    }
+                }
+                return Ok(Render::NoSkip);
+            }
             KeyCode::Char('d') => {
-                if let Some(Some(selected_song)) = app
-                    .queue
-                    .as_ref()
-                    .map(|v| v.0.get(self.scrollbar.get_position() as usize))
-                {
+                if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                     match client.delete_id(selected_song.id).await {
                         Ok(_) => {}
                         Err(e) => error!("{:?}", e),
@@ -200,39 +197,36 @@ impl Screen for QueueScreen {
                     error!("No song selected");
                 }
             }
+            KeyCode::Char('D') => client.clear().await?,
             KeyCode::Char(' ') if app.status.state == MpdState::Play || app.status.state == MpdState::Pause => {
                 client.pause_toggle().await?;
             }
             KeyCode::Enter => {
-                if let Some(Some(selected_song)) = app
-                    .queue
-                    .as_ref()
-                    .map(|v| v.0.get(self.scrollbar.get_position() as usize))
-                {
+                if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                     client.play_id(selected_song.id).await?;
                 }
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
-                    self.scrollbar.scroll(ScrollDirection::Backward);
+                if !app.queue.is_empty_or_none() {
+                    self.scrolling_state.prev();
                 }
                 return Ok(Render::NoSkip);
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
-                    self.scrollbar.scroll(ScrollDirection::Forward);
+                if !app.queue.is_empty_or_none() {
+                    self.scrolling_state.next();
                 }
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('G') => {
-                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
-                    self.scrollbar.last();
+                if !app.queue.is_empty_or_none() {
+                    self.scrolling_state.last();
                 }
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('g') => {
-                if app.queue.as_ref().is_some_and(|q| !q.0.is_empty()) {
-                    self.scrollbar.first();
+                if !app.queue.is_empty_or_none() {
+                    self.scrolling_state.first();
                 }
                 return Ok(Render::NoSkip);
             }

@@ -10,7 +10,7 @@ use crossterm::{
 use ratatui::{
     prelude::{Alignment, Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style, Stylize},
-    widgets::{Borders, Paragraph},
+    widgets::{Borders, ListState, Paragraph, ScrollbarState, TableState},
     Frame, Terminal,
 };
 use strum::{IntoEnumIterator, VariantNames};
@@ -24,7 +24,10 @@ use crate::{
 use crate::{state::State, ui::widgets::line::Line};
 
 use self::{
-    screens::{directories::DirectoriesScreen, logs::LogsScreen, queue::QueueScreen, Screen},
+    screens::{
+        albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, logs::LogsScreen,
+        queue::QueueScreen, Screen,
+    },
     widgets::{frame_counter::FrameCounter, progress_bar::ProgressBar},
 };
 
@@ -86,6 +89,8 @@ struct Screens {
     queue: QueueScreen,
     logs: LogsScreen,
     directories: DirectoriesScreen,
+    albums: AlbumsScreen,
+    artists: ArtistsScreen,
 }
 
 macro_rules! do_for_screen {
@@ -100,6 +105,8 @@ macro_rules! screen_call {
             screens::Screens::Queue => do_for_screen!($self.screens.queue, $fn, $($param),+),
             screens::Screens::Logs => do_for_screen!($self.screens.logs, $fn, $($param),+),
             screens::Screens::Directories => do_for_screen!($self.screens.directories, $fn, $($param),+),
+            screens::Screens::Artists => do_for_screen!($self.screens.artists, $fn, $($param),+),
+            screens::Screens::Albums => do_for_screen!($self.screens.albums, $fn, $($param),+),
         }
     }
 }
@@ -146,8 +153,7 @@ impl Ui<'_> {
 
         let tab_names = screens::Screens::VARIANTS
             .iter()
-            .enumerate()
-            .map(|(i, e)| format!("{: ^17}", format!("({}) {e}", i + 1)))
+            .map(|e| format!("{: ^13}", format!("{e}")))
             .collect::<Vec<String>>();
 
         let tabs = Tabs::new(tab_names)
@@ -158,7 +164,7 @@ impl Ui<'_> {
                     .unwrap()
                     .0,
             )
-            .divider("|")
+            .divider("")
             .block(ratatui::widgets::Block::default().borders(Borders::TOP))
             .highlight_style(Style::default().fg(Color::Black).bg(Color::Blue));
 
@@ -179,10 +185,15 @@ impl Ui<'_> {
                 "Random".to_owned(),
                 if app.status.random { on_style } else { off_style },
             ),
+            match app.status.consume {
+                crate::mpd::commands::status::OnOffOneshot::On => ("Consume".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::Off => ("Consume".to_owned(), off_style),
+                crate::mpd::commands::status::OnOffOneshot::Oneshot => ("Oneshot(C)".to_owned(), on_style),
+            },
             match app.status.single {
-                crate::mpd::commands::status::Single::On => ("Single".to_owned(), on_style),
-                crate::mpd::commands::status::Single::Off => ("Single".to_owned(), off_style),
-                crate::mpd::commands::status::Single::Oneshot => ("Oneshot".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::On => ("Single".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::Off => ("Single".to_owned(), off_style),
+                crate::mpd::commands::status::OnOffOneshot::Oneshot => ("Oneshot(S)".to_owned(), on_style),
             },
         ])
         .separator(" / ".to_owned())
@@ -208,7 +219,11 @@ impl Ui<'_> {
             app.status
                 .bitrate
                 .as_ref()
-                .map_or("".to_owned(), |v| format!(" ({} kbps)", v))
+                .map_or("".to_owned(), |v| if v == "0" {
+                    "".to_owned()
+                } else {
+                    format!(" ({} kbps)", v)
+                })
                 .to_owned()
         ))
         .style(Style::default().fg(Color::Gray));
@@ -280,6 +295,15 @@ impl Ui<'_> {
             KeyCode::Char('b') if app.status.state == MpdState::Play => self.client.seek_curr_backwards(5).await?,
             KeyCode::Char(',') => self.client.set_volume(app.status.volume.dec()).await?,
             KeyCode::Char('.') => self.client.set_volume(app.status.volume.inc()).await?,
+            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                app.active_tab = app.active_tab.next();
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+
+                return Ok(Render::NoSkip);
+            }
             KeyCode::Right => {
                 screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
@@ -290,6 +314,15 @@ impl Ui<'_> {
                 return Ok(Render::NoSkip);
             }
             KeyCode::Left => {
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                app.active_tab = app.active_tab.prev();
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+
+                return Ok(Render::NoSkip);
+            }
+            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                 app.active_tab = app.active_tab.prev();
@@ -383,5 +416,113 @@ impl BoolExt for bool {
         } else {
             "Off"
         }
+    }
+}
+
+#[derive(Debug, Default)]
+struct MyState<T: ScrollingState> {
+    pub scrollbar_state: ScrollbarState,
+    pub inner: T,
+    pub content_len: Option<u16>,
+    pub viewport_len: Option<u16>,
+}
+
+impl<T: ScrollingState> MyState<T> {
+    fn viewport_len(&mut self, viewport_len: Option<u16>) -> &Self {
+        self.viewport_len = viewport_len;
+        self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
+        self
+    }
+
+    fn content_len(&mut self, content_len: Option<u16>) -> &Self {
+        self.content_len = content_len;
+        self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
+        self
+    }
+
+    fn first(&mut self) {
+        if self.content_len.is_some() {
+            self.select(Some(0));
+        } else {
+            self.select(None);
+        }
+    }
+
+    fn last(&mut self) {
+        if let Some(item_count) = self.content_len {
+            self.select(Some(item_count.saturating_sub(1) as usize));
+        } else {
+            self.select(None);
+        }
+    }
+
+    fn next(&mut self) {
+        if let Some(item_count) = self.content_len {
+            let i = match self.get_selected() {
+                Some(i) => {
+                    if i >= item_count.saturating_sub(1) as usize {
+                        0
+                    } else {
+                        i + 1
+                    }
+                }
+                None => 0,
+            };
+            self.select(Some(i));
+        } else {
+            self.select(None);
+        }
+    }
+
+    fn prev(&mut self) {
+        if let Some(item_count) = self.content_len {
+            let i = match self.get_selected() {
+                Some(i) => {
+                    if i == 0 {
+                        item_count.saturating_sub(1) as usize
+                    } else {
+                        i - 1
+                    }
+                }
+                None => 0,
+            };
+            self.select(Some(i));
+        } else {
+            self.select(None);
+        }
+    }
+
+    fn select(&mut self, idx: Option<usize>) {
+        self.inner.select_scrolling(idx);
+        self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0) as u16);
+    }
+
+    fn get_selected(&self) -> Option<usize> {
+        self.inner.get_selected_scrolling()
+    }
+}
+
+trait ScrollingState {
+    fn select_scrolling(&mut self, idx: Option<usize>);
+    fn get_selected_scrolling(&self) -> Option<usize>;
+}
+
+impl ScrollingState for TableState {
+    fn select_scrolling(&mut self, idx: Option<usize>) {
+        self.select(idx)
+    }
+
+    fn get_selected_scrolling(&self) -> Option<usize> {
+        self.selected()
+    }
+}
+
+impl ScrollingState for ListState {
+    fn select_scrolling(&mut self, idx: Option<usize>) {
+        self.select(idx)
+    }
+
+    fn get_selected_scrolling(&self) -> Option<usize> {
+        self.selected()
     }
 }

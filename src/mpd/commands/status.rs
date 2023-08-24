@@ -9,12 +9,12 @@ pub const COMMAND: &[u8; 6] = b"status";
 
 #[derive(Debug, Default)]
 pub struct Status {
-    pub partition: String,            // the name of the current partition (see Partition commands)
-    pub volume: Volume,               // 0-100 (deprecated: -1 if the volume cannot be determined)
-    pub repeat: bool,                 // 0 or 1
-    pub random: bool,                 // 0 or 1
-    pub single: Single,               // 0, 1, or oneshot
-    pub consume: String,              // 0, 1 or oneshot
+    pub partition: String, // the name of the current partition (see Partition commands)
+    pub volume: Volume,    // 0-100 (deprecated: -1 if the volume cannot be determined)
+    pub repeat: bool,
+    pub random: bool,
+    pub single: OnOffOneshot,
+    pub consume: OnOffOneshot,
     pub playlist: Option<u32>,        // 31-bit unsigned integer, the playlist version number
     pub playlistlength: u32,          // integer, the length of the playlist
     pub state: State,                 // play, stop, or pause
@@ -42,53 +42,53 @@ pub enum State {
 }
 
 #[derive(Debug, Default)]
-pub enum Single {
+pub enum OnOffOneshot {
     On,
     #[default]
     Off,
     Oneshot,
 }
 
-impl Single {
+impl OnOffOneshot {
     pub fn cycle(&self) -> Self {
         match self {
-            Single::On => Single::Off,
-            Single::Off => Single::Oneshot,
-            Single::Oneshot => Single::On,
+            OnOffOneshot::On => OnOffOneshot::Off,
+            OnOffOneshot::Off => OnOffOneshot::Oneshot,
+            OnOffOneshot::Oneshot => OnOffOneshot::On,
         }
     }
     pub fn to_mpd_value(&self) -> &'static str {
         match self {
-            Single::On => "1",
-            Single::Off => "0",
-            Single::Oneshot => "oneshot",
+            OnOffOneshot::On => "1",
+            OnOffOneshot::Off => "0",
+            OnOffOneshot::Oneshot => "oneshot",
         }
     }
 }
 
-impl std::fmt::Display for Single {
+impl std::fmt::Display for OnOffOneshot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                Single::On => "On",
-                Single::Off => "Off",
-                Single::Oneshot => "Oneshot",
+                OnOffOneshot::On => "On",
+                OnOffOneshot::Off => "Off",
+                OnOffOneshot::Oneshot => "Oneshot",
             }
         )?;
         Ok(())
     }
 }
 
-impl std::str::FromStr for Single {
+impl std::str::FromStr for OnOffOneshot {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "0" => Single::Off,
-            "1" => Single::On,
-            "oneshot" => Single::Oneshot,
+            "0" => OnOffOneshot::Off,
+            "1" => OnOffOneshot::On,
+            "oneshot" => OnOffOneshot::Oneshot,
             _ => todo!(),
         })
     }
@@ -136,7 +136,7 @@ impl std::str::FromStr for Status {
                 "repeat" => res.repeat = value != "0",
                 "random" => res.random = value != "0",
                 "single" => res.single = value.parse()?,
-                "consume" => res.consume = value.to_owned(),
+                "consume" => res.consume = value.parse()?,
                 "playlist" => res.playlist = Some(value.parse()?),
                 "playlistlength" => res.playlistlength = value.parse()?,
                 "state" => res.state = value.parse()?,

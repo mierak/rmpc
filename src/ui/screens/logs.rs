@@ -3,27 +3,24 @@ use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    prelude::{Alignment, Backend, Constraint, Direction, Layout, Margin, Rect},
+    prelude::{Backend, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, ScrollbarOrientation},
+    text::Span,
+    widgets::{Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation},
     Frame,
 };
 
 use crate::{
     mpd::{client::Client, errors::MpdError},
     state::State,
-    ui::{
-        widgets::scrollbar::{Scrollbar, ScrollbarState},
-        Render, SharedUiState,
-    },
+    ui::{MyState, Render, SharedUiState},
 };
 
 use super::Screen;
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
-    scrollbar: ScrollbarState,
+    scrolling_state: MyState<ListState>,
 }
 
 #[async_trait]
@@ -42,17 +39,22 @@ impl Screen for LogsScreen {
             .flat_map(|l| l.into_text().unwrap().lines)
             .enumerate()
             .map(|(idx, mut l)| {
-                if idx == self.scrollbar.get_position() as usize {
+                if self.scrolling_state.inner.selected().is_some_and(|v| v == idx) {
                     l.patch_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
                 }
-                l
+                ListItem::new(l)
             })
-            .collect::<Vec<Line>>();
+            .collect::<Vec<ListItem>>();
 
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
-            .end_symbol(Some("↓"));
+            .track_symbol("│")
+            .end_symbol(Some("↓"))
+            .track_style(Style::default().fg(Color::White).bg(Color::Black))
+            .begin_style(Style::default().fg(Color::White).bg(Color::Black))
+            .end_style(Style::default().fg(Color::White).bg(Color::Black))
+            .thumb_style(Style::default().fg(Color::Blue));
 
         let [content, scroll] = *Layout::default()
         .direction(Direction::Horizontal)
@@ -63,30 +65,29 @@ impl Screen for LogsScreen {
             .split(area) else {
                 return Ok(())
             };
-        self.scrollbar
-            .content_length(TryInto::<u16>::try_into(lines.len()).unwrap());
-        self.scrollbar.viewport_content_length(content.height.saturating_sub(2));
 
-        let logs_wg = Paragraph::new(lines[self.scrollbar.get_range_usize()].to_vec())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .style(Style::default().fg(Color::Gray))
-                    .title(Span::styled(
-                        format!("Logs: {}", lines.len()),
-                        Style::default().add_modifier(Modifier::BOLD),
-                    )),
-            )
-            .alignment(Alignment::Left);
+        let content_len = lines.len();
+        self.scrolling_state.content_len(Some(content_len as u16));
+        self.scrolling_state.viewport_len(Some(content.height));
 
-        frame.render_widget(logs_wg, content);
+        let logs_wg = List::new(lines).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::Gray))
+                .title(Span::styled(
+                    format!("Logs: {}", content_len),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+        );
+
+        frame.render_stateful_widget(logs_wg, content, &mut self.scrolling_state.inner);
         frame.render_stateful_widget(
             scrollbar,
             scroll.inner(&Margin {
                 vertical: 1,
                 horizontal: 0,
             }),
-            &mut self.scrollbar.inner,
+            &mut self.scrolling_state.scrollbar_state,
         );
 
         Ok(())
@@ -98,7 +99,7 @@ impl Screen for LogsScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        self.scrollbar.last();
+        // self.list_state.last();
         Ok(())
     }
 
@@ -111,22 +112,22 @@ impl Screen for LogsScreen {
     ) -> Result<Render, MpdError> {
         match key.code {
             KeyCode::Char('j') => {
-                self.scrollbar.next();
+                self.scrolling_state.next();
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('k') => {
-                self.scrollbar.prev();
+                self.scrolling_state.prev();
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('d') => {
                 for _ in 0..5 {
-                    self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Forward);
+                    self.scrolling_state.next();
                 }
                 return Ok(Render::NoSkip);
             }
             KeyCode::Char('u') => {
                 for _ in 0..5 {
-                    self.scrollbar.scroll(ratatui::widgets::ScrollDirection::Backward);
+                    self.scrolling_state.prev();
                 }
                 return Ok(Render::NoSkip);
             }

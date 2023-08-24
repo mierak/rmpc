@@ -6,8 +6,11 @@ use config::Config;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
-use tokio::sync::{mpsc::Sender, Mutex};
-use tracing::{debug, error, info, instrument, warn};
+use tokio::{
+    sync::{mpsc::Sender, Mutex},
+    task::JoinHandle,
+};
+use tracing::{error, info, instrument, trace, warn};
 use ui::Level;
 
 use crate::ui::Ui;
@@ -36,7 +39,7 @@ pub enum AppEvent {
 struct RenderLoop {
     state: Arc<Mutex<state::State>>,
     render_sender: tokio::sync::mpsc::Sender<()>,
-    is_running: Arc<Mutex<bool>>,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl RenderLoop {
@@ -44,7 +47,7 @@ impl RenderLoop {
         Self {
             state,
             render_sender,
-            is_running: Arc::new(Mutex::new(false)),
+            handle: None,
         }
     }
 
@@ -57,38 +60,36 @@ impl RenderLoop {
 
     #[instrument(skip(self))]
     async fn start(&mut self) -> bool {
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
-        let mut is_running = self.is_running.lock().await;
-        if *is_running {
-            return false;
+        if self.handle.is_none() {
+            tracing::debug!("Started update loop");
+
+            let state = Arc::clone(&self.state);
+            let sender = self.render_sender.clone();
+
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            self.handle = Some(tokio::spawn(async move {
+                tracing::debug!("Started status update loop");
+                loop {
+                    interval.tick().await;
+                    let mut state = state.lock().await;
+                    state.status.elapsed = state.status.elapsed.saturating_add(Duration::from_secs(1));
+                    if (sender.send(()).await).is_err() {
+                        error!("Unable to send render command from status update loop");
+                    }
+                }
+            }));
+            true
+        } else {
+            false
         }
-        *is_running.deref_mut() = true;
-        let state = Arc::clone(&self.state);
-        let running = Arc::clone(&self.is_running);
-        let sender = self.render_sender.clone();
-
-        tokio::spawn(async move {
-            tracing::debug!("Started status update loop");
-            loop {
-                interval.tick().await;
-                if !*running.lock().await {
-                    break;
-                }
-                let mut state = state.lock().await;
-                state.status.elapsed = state.status.elapsed.saturating_add(Duration::from_secs(1));
-                if (sender.send(()).await).is_err() {
-                    error!("Unable to send render command from status update loop");
-                }
-            }
-            tracing::debug!("Status update loop finished");
-        });
-
-        true
     }
 
     #[instrument(skip(self))]
     async fn stop(&mut self) {
-        *self.is_running.lock().await = false;
+        if let Some(handle) = &self.handle {
+            handle.abort();
+            self.handle = None;
+        }
     }
 }
 
@@ -202,7 +203,7 @@ async fn idle_task(
 
         for event in events {
             let mut state = state1.lock().await;
-            debug!(message = "Received idle event", idle_event = ?event);
+            trace!(message = "Received idle event", idle_event = ?event);
             match event {
                 IdleEvent::Mixer => state.status.volume = client.get_volume().await.unwrap(),
                 IdleEvent::Player => {

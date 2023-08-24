@@ -14,6 +14,8 @@ use crate::{
 
 use super::{Render, SharedUiState};
 
+pub mod albums;
+pub mod artists;
 pub mod directories;
 pub mod logs;
 pub mod queue;
@@ -24,6 +26,8 @@ pub enum Screens {
     Queue,
     Logs,
     Directories,
+    Artists,
+    Albums,
 }
 
 #[async_trait]
@@ -70,13 +74,17 @@ impl Screens {
         match self {
             Screens::Queue => Screens::Logs,
             Screens::Logs => Screens::Directories,
-            Screens::Directories => Screens::Queue,
+            Screens::Directories => Screens::Artists,
+            Screens::Artists => Screens::Albums,
+            Screens::Albums => Screens::Queue,
         }
     }
 
     pub fn prev(&self) -> Self {
         match self {
-            Screens::Queue => Screens::Directories,
+            Screens::Queue => Screens::Albums,
+            Screens::Albums => Screens::Artists,
+            Screens::Artists => Screens::Directories,
             Screens::Directories => Screens::Logs,
             Screens::Logs => Screens::Queue,
         }
