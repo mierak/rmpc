@@ -4,6 +4,7 @@ use crate::{
     mpd::{client::Client, commands::State as MpdState},
     state::PlayListInfoExt,
     ui::{
+        modals::Modals,
         widgets::kitty_image::{ImageState, KittyImage},
         DurationExt, MyState, Render, SharedUiState,
     },
@@ -197,7 +198,7 @@ impl Screen for QueueScreen {
                     error!("No song selected");
                 }
             }
-            KeyCode::Char('D') => client.clear().await?,
+            KeyCode::Char('D') => app.visible_modal = Some(Modals::ConfirmQueueClear),
             KeyCode::Char(' ') if app.status.state == MpdState::Play || app.status.state == MpdState::Pause => {
                 client.pause_toggle().await?;
             }

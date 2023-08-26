@@ -86,6 +86,9 @@ impl<'a> Widget for Line<'a> {
         {
             let len = word.chars().count() as u16;
             let x = area.left() + left_offset + chars_written;
+            if x >= area.left() + area.width {
+                return;
+            }
             let chars_left = width.saturating_sub(chars_written);
             buf.set_stringn(x, top, word, chars_left as usize, *style);
             chars_written += len;

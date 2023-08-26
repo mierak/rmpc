@@ -1,5 +1,6 @@
 use ratatui::prelude::Alignment;
 
+pub mod button;
 pub mod frame_counter;
 pub mod kitty_image;
 pub mod line;

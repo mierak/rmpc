@@ -5,7 +5,7 @@ use crate::{
         client::Client,
         commands::{PlayListInfo, Song, Status},
     },
-    ui::screens::Screens,
+    ui::{modals::Modals, screens::Screens},
 };
 use anyhow::Result;
 use tracing::instrument;
@@ -27,6 +27,7 @@ impl<T> std::fmt::Debug for MyVecDeque<T> {
 
 pub struct State {
     pub active_tab: Screens,
+    pub visible_modal: Option<Modals>,
     pub status: Status,
     pub current_song: Option<Song>,
     pub queue: Option<PlayListInfo>,
@@ -65,6 +66,7 @@ impl State {
 
         Ok(Self {
             active_tab: Screens::default(),
+            visible_modal: None,
             status,
             queue,
             current_song,

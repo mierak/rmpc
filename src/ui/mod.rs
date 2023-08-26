@@ -24,6 +24,7 @@ use crate::{
 use crate::{state::State, ui::widgets::line::Line};
 
 use self::{
+    modals::{confirm_queue_clear::ConfirmQueueClearModal, Modal},
     screens::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, logs::LogsScreen,
         queue::QueueScreen, Screen,
@@ -31,6 +32,7 @@ use self::{
     widgets::{frame_counter::FrameCounter, progress_bar::ProgressBar},
 };
 
+pub mod modals;
 pub mod screens;
 pub mod widgets;
 
@@ -71,6 +73,7 @@ pub struct SharedUiState {
 pub struct Ui<'a> {
     client: Client<'a>,
     screens: Screens,
+    modals: UiModals,
     shared_state: SharedUiState,
 }
 
@@ -79,11 +82,16 @@ impl<'a> Ui<'a> {
         Self {
             client,
             screens: Screens::default(),
+            modals: UiModals::default(),
             shared_state: SharedUiState::default(),
         }
     }
 }
 
+#[derive(Debug, Default)]
+struct UiModals {
+    confirm_queue_clear: ConfirmQueueClearModal,
+}
 #[derive(Debug, Default)]
 struct Screens {
     queue: QueueScreen,
@@ -93,7 +101,7 @@ struct Screens {
     artists: ArtistsScreen,
 }
 
-macro_rules! do_for_screen {
+macro_rules! invoke {
     ($screen:expr, $fn:ident, $($param:expr),+) => {
         $screen.$fn($($param),+)
     };
@@ -102,11 +110,20 @@ macro_rules! do_for_screen {
 macro_rules! screen_call {
     ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
         match $app.active_tab {
-            screens::Screens::Queue => do_for_screen!($self.screens.queue, $fn, $($param),+),
-            screens::Screens::Logs => do_for_screen!($self.screens.logs, $fn, $($param),+),
-            screens::Screens::Directories => do_for_screen!($self.screens.directories, $fn, $($param),+),
-            screens::Screens::Artists => do_for_screen!($self.screens.artists, $fn, $($param),+),
-            screens::Screens::Albums => do_for_screen!($self.screens.albums, $fn, $($param),+),
+            screens::Screens::Queue => invoke!($self.screens.queue, $fn, $($param),+),
+            screens::Screens::Logs => invoke!($self.screens.logs, $fn, $($param),+),
+            screens::Screens::Directories => invoke!($self.screens.directories, $fn, $($param),+),
+            screens::Screens::Artists => invoke!($self.screens.artists, $fn, $($param),+),
+            screens::Screens::Albums => invoke!($self.screens.albums, $fn, $($param),+),
+        }
+    }
+}
+
+macro_rules! modal_call {
+    ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
+        // todo unwrap
+        match $app.visible_modal.as_ref().unwrap() {
+            modals::Modals::ConfirmQueueClear => invoke!($self.modals.confirm_queue_clear, $fn, $($param),+),
         }
     }
 }
@@ -268,6 +285,9 @@ impl Ui<'_> {
         frame.render_widget(tabs, tabs_area);
 
         screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state)).unwrap();
+        if app.visible_modal.is_some() {
+            modal_call!(self, app, render(frame, app, &mut self.shared_state)).unwrap();
+        }
         self.shared_state.frame_counter.increment();
 
         Ok(())
@@ -280,61 +300,65 @@ impl Ui<'_> {
                 screen_call!(self, app, $fn($($param),+)).await.unwrap();
             }
         }
-        match key.code {
-            // these two are here only to induce panic for testing
-            KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.next().await?,
-            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.prev().await?,
+        if app.visible_modal.is_some() {
+            return modal_call!(self, app, handle_key(key, &mut self.client, app)).await;
+        } else {
+            match key.code {
+                // these two are here only to induce panic for testing
+                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.next().await?,
+                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.prev().await?,
 
-            KeyCode::Char('n') if app.status.state == MpdState::Play => self.client.next().await?,
-            KeyCode::Char('p') if app.status.state == MpdState::Play => self.client.prev().await?,
-            KeyCode::Char('s') if app.status.state == MpdState::Play => self.client.stop().await?,
-            KeyCode::Char('z') => self.client.repeat(!app.status.repeat).await?,
-            KeyCode::Char('x') => self.client.random(!app.status.random).await?,
-            KeyCode::Char('c') => self.client.single(app.status.single.cycle()).await?,
-            KeyCode::Char('f') if app.status.state == MpdState::Play => self.client.seek_curr_forwards(5).await?,
-            KeyCode::Char('b') if app.status.state == MpdState::Play => self.client.seek_curr_backwards(5).await?,
-            KeyCode::Char(',') => self.client.set_volume(app.status.volume.dec()).await?,
-            KeyCode::Char('.') => self.client.set_volume(app.status.volume.inc()).await?,
-            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                KeyCode::Char('n') if app.status.state == MpdState::Play => self.client.next().await?,
+                KeyCode::Char('p') if app.status.state == MpdState::Play => self.client.prev().await?,
+                KeyCode::Char('s') if app.status.state == MpdState::Play => self.client.stop().await?,
+                KeyCode::Char('z') => self.client.repeat(!app.status.repeat).await?,
+                KeyCode::Char('x') => self.client.random(!app.status.random).await?,
+                KeyCode::Char('c') => self.client.single(app.status.single.cycle()).await?,
+                KeyCode::Char('f') if app.status.state == MpdState::Play => self.client.seek_curr_forwards(5).await?,
+                KeyCode::Char('b') if app.status.state == MpdState::Play => self.client.seek_curr_backwards(5).await?,
+                KeyCode::Char(',') => self.client.set_volume(app.status.volume.dec()).await?,
+                KeyCode::Char('.') => self.client.set_volume(app.status.volume.inc()).await?,
+                KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                app.active_tab = app.active_tab.next();
-                tracing::Span::current().record("screen", app.active_tab.to_string());
-                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                    app.active_tab = app.active_tab.next();
+                    tracing::Span::current().record("screen", app.active_tab.to_string());
+                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                return Ok(Render::NoSkip);
-            }
-            KeyCode::Right => {
-                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                    return Ok(Render::NoSkip);
+                }
+                KeyCode::Right => {
+                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                app.active_tab = app.active_tab.next();
-                tracing::Span::current().record("screen", app.active_tab.to_string());
-                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                    app.active_tab = app.active_tab.next();
+                    tracing::Span::current().record("screen", app.active_tab.to_string());
+                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                return Ok(Render::NoSkip);
-            }
-            KeyCode::Left => {
-                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                    return Ok(Render::NoSkip);
+                }
+                KeyCode::Left => {
+                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                app.active_tab = app.active_tab.prev();
-                tracing::Span::current().record("screen", app.active_tab.to_string());
-                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                    app.active_tab = app.active_tab.prev();
+                    tracing::Span::current().record("screen", app.active_tab.to_string());
+                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                return Ok(Render::NoSkip);
-            }
-            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                    return Ok(Render::NoSkip);
+                }
+                KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                app.active_tab = app.active_tab.prev();
-                tracing::Span::current().record("screen", app.active_tab.to_string());
-                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                    app.active_tab = app.active_tab.prev();
+                    tracing::Span::current().record("screen", app.active_tab.to_string());
+                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                return Ok(Render::NoSkip);
-            }
-            _ => {
-                tracing::Span::current().record("screen", app.active_tab.to_string());
-                screen_call_inner!(handle_key(key, &mut self.client, app, &mut self.shared_state));
-                return Ok(Render::NoSkip);
+                    return Ok(Render::NoSkip);
+                }
+                _ => {
+                    tracing::Span::current().record("screen", app.active_tab.to_string());
+                    screen_call_inner!(handle_key(key, &mut self.client, app, &mut self.shared_state));
+                    return Ok(Render::NoSkip);
+                }
             }
         }
         Ok(Render::Skip)

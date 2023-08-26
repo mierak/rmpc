@@ -69,10 +69,13 @@ impl RenderLoop {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             self.handle = Some(tokio::spawn(async move {
                 tracing::debug!("Started status update loop");
+                let mut client = Client::init("127.0.0.1:6600".to_owned(), Some("command"), true)
+                    .await
+                    .unwrap();
                 loop {
                     interval.tick().await;
                     let mut state = state.lock().await;
-                    state.status.elapsed = state.status.elapsed.saturating_add(Duration::from_secs(1));
+                    state.status = client.get_status().await.unwrap();
                     if (sender.send(()).await).is_err() {
                         error!("Unable to send render command from status update loop");
                     }
