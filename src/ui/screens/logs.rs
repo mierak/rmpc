@@ -49,7 +49,7 @@ impl Screen for LogsScreen {
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
-            .track_symbol("│")
+            .track_symbol(Some("│"))
             .end_symbol(Some("↓"))
             .track_style(Style::default().fg(Color::White).bg(Color::Black))
             .begin_style(Style::default().fg(Color::White).bg(Color::Black))
@@ -113,26 +113,26 @@ impl Screen for LogsScreen {
         match key.code {
             KeyCode::Char('j') => {
                 self.scrolling_state.next();
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('k') => {
                 self.scrolling_state.prev();
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('d') => {
                 for _ in 0..5 {
                     self.scrolling_state.next();
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('u') => {
                 for _ in 0..5 {
                     self.scrolling_state.prev();
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             _ => {}
         }
-        Ok(Render::Skip)
+        Ok(Render::Yes)
     }
 }

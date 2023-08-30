@@ -124,7 +124,7 @@ impl Screen for QueueScreen {
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
-            .track_symbol("│")
+            .track_symbol(Some("│"))
             .end_symbol(Some("↓"))
             .track_style(Style::default().fg(Color::White).bg(Color::Black))
             .begin_style(Style::default().fg(Color::White).bg(Color::Black))
@@ -178,7 +178,7 @@ impl Screen for QueueScreen {
                         self.scrolling_state.next();
                     }
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if !app.queue.is_empty_or_none() {
@@ -186,7 +186,7 @@ impl Screen for QueueScreen {
                         self.scrolling_state.prev();
                     }
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('d') => {
                 if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
@@ -211,28 +211,28 @@ impl Screen for QueueScreen {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.prev();
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.next();
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('G') => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.last();
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('g') => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.first();
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             _ => {}
         };
-        Ok(Render::Skip)
+        Ok(Render::Yes)
     }
 }

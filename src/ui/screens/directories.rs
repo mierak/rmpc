@@ -1,10 +1,13 @@
+use std::cmp::Ordering;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Backend, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation},
     Frame,
 };
 
@@ -15,15 +18,24 @@ use crate::{
         errors::MpdError,
     },
     state::State,
-    ui::{Level, MyState, Render, SharedUiState, StatusMessage},
+    ui::{Level, Render, SharedUiState, StatusMessage},
 };
 
-use super::Screen;
+use super::{DirStack, Screen};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct DirectoriesScreen {
-    dirs: DirStack,
+    dirs: DirStack<FileOrDir>,
     next: Vec<ListItem<'static>>,
+}
+
+impl Default for DirectoriesScreen {
+    fn default() -> Self {
+        Self {
+            dirs: DirStack::new(Vec::new()),
+            next: Vec::new(),
+        }
+    }
 }
 
 #[async_trait]
@@ -67,7 +79,7 @@ impl Screen for DirectoriesScreen {
         let previous_scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
-            .track_symbol("│")
+            .track_symbol(Some("│"))
             .end_symbol(Some("↓"))
             .track_style(Style::default().fg(Color::White).bg(Color::Black))
             .begin_style(Style::default().fg(Color::White).bg(Color::Black))
@@ -76,7 +88,7 @@ impl Screen for DirectoriesScreen {
         let current_scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalLeft)
             .begin_symbol(Some("↑"))
-            .track_symbol("│")
+            .track_symbol(Some("│"))
             .end_symbol(Some("↓"))
             .track_style(Style::default().fg(Color::White).bg(Color::Black))
             .begin_style(Style::default().fg(Color::White).bg(Color::Black))
@@ -113,6 +125,7 @@ impl Screen for DirectoriesScreen {
         _shared: &mut SharedUiState,
     ) -> Result<()> {
         self.dirs = DirStack::new(_client.lsinfo(None).await.unwrap().0);
+        self.prepare_preview(_client).await;
 
         Ok(())
     }
@@ -128,12 +141,12 @@ impl Screen for DirectoriesScreen {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.dirs.next();
                 self.prepare_preview(_client).await;
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.dirs.prev();
                 self.prepare_preview(_client).await;
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('a') => match self.dirs.get_selected() {
                 Some(FileOrDir::Dir(dir)) => {
@@ -177,73 +190,16 @@ impl Screen for DirectoriesScreen {
                     }
                     None => {}
                 }
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             KeyCode::Char('h') => {
                 self.dirs.pop();
                 self.prepare_preview(_client).await;
-                return Ok(Render::NoSkip);
+                return Ok(Render::No);
             }
             _ => {}
         }
-        Ok(Render::Skip)
-    }
-}
-
-#[derive(Default, Debug)]
-struct DirStack {
-    current: (Vec<FileOrDir>, MyState<ListState>),
-    others: Vec<(Vec<FileOrDir>, MyState<ListState>)>,
-}
-
-impl DirStack {
-    fn new(mut root: Vec<FileOrDir>) -> Self {
-        let mut val = DirStack::default();
-        let mut root_state = MyState::default();
-
-        val.push(Vec::new());
-
-        if !root.is_empty() {
-            root_state.select(Some(0));
-            root.sort();
-        };
-
-        val.current = (root, root_state);
-        val
-    }
-
-    fn push(&mut self, head: Vec<FileOrDir>) {
-        let mut new_state = MyState::default();
-        if !head.is_empty() {
-            new_state.select(Some(0));
-        };
-        let current_head = std::mem::replace(&mut self.current, (head, new_state));
-        self.others.push(current_head);
-    }
-
-    fn pop(&mut self) -> Option<(Vec<FileOrDir>, MyState<ListState>)> {
-        if self.others.len() > 1 {
-            let top = self.others.pop().expect("There should always be at least two elements");
-            Some(std::mem::replace(&mut self.current, top))
-        } else {
-            None
-        }
-    }
-
-    fn get_selected(&self) -> Option<&FileOrDir> {
-        if let Some(sel) = self.current.1.get_selected() {
-            self.current.0.get(sel)
-        } else {
-            None
-        }
-    }
-
-    fn next(&mut self) {
-        self.current.1.next()
-    }
-
-    fn prev(&mut self) {
-        self.current.1.prev()
+        Ok(Render::Yes)
     }
 }
 
@@ -261,7 +217,26 @@ impl DirectoriesScreen {
     }
 }
 
-trait FileOrDirExt {
+impl std::cmp::Ord for FileOrDir {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (_, FileOrDir::Dir(_)) => Ordering::Greater,
+            (FileOrDir::Dir(_), _) => Ordering::Less,
+            (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => t1.cmp(t2),
+        }
+    }
+}
+impl std::cmp::PartialOrd for FileOrDir {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (_, FileOrDir::Dir(_)) => Some(Ordering::Greater),
+            (FileOrDir::Dir(_), _) => Some(Ordering::Less),
+            (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => Some(t1.cmp(t2)),
+        }
+    }
+}
+
+pub trait FileOrDirExt {
     fn to_listitems(&self) -> Vec<ListItem<'static>>;
 }
 
@@ -272,7 +247,7 @@ impl FileOrDirExt for Vec<FileOrDir> {
                 let (kind, name) = match val {
                     // cfg
                     FileOrDir::Dir(v) => (" 📁", v.path.clone().to_owned()),
-                    FileOrDir::File(v) => (" 🎶", v.title.as_ref().unwrap_or(&"Untitled".to_string()).to_owned()),
+                    FileOrDir::File(v) => (" 🎵", v.title.as_ref().unwrap_or(&"Untitled".to_string()).to_owned()),
                 };
                 ListItem::new(format!("{} {}", kind, name))
             })
@@ -282,37 +257,56 @@ impl FileOrDirExt for Vec<FileOrDir> {
 
 impl FileOrDirExt for Song {
     fn to_listitems(&self) -> Vec<ListItem<'static>> {
-        let mut res = vec![
-            ListItem::new(format!(
-                " {}: {}",
-                "Title",
-                self.title.as_ref().unwrap_or(&"Untitled".to_owned())
-            )),
-            ListItem::new(format!(
-                " {}: {}",
-                "Artist",
-                self.artist.as_ref().unwrap_or(&"Unknown".to_owned())
-            )),
-            ListItem::new(format!(
-                " {}: {}",
-                "Unknown Album",
-                self.album.as_ref().unwrap_or(&"Untitled".to_owned())
-            )),
-            ListItem::new(format!(" {}: {}", "File", self.file)),
-            ListItem::new(format!(
-                " {}: {}",
-                "Duration",
+        let key_style = Style::default().fg(Color::Yellow);
+        let separator = Span::from(": ");
+        let start_of_line_spacer = Span::from(" ");
+
+        let title = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Title", key_style),
+            separator.clone(),
+            Span::from(self.title.as_ref().unwrap_or(&"Untitled".to_owned()).to_owned()),
+        ]);
+        let artist = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Artist", key_style),
+            separator.clone(),
+            Span::from(": "),
+            Span::from(self.artist.as_ref().unwrap_or(&"Unknown".to_owned()).to_owned()),
+        ]);
+        let album = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Album", key_style),
+            separator.clone(),
+            Span::from(self.album.as_ref().unwrap_or(&"Unknown".to_owned()).to_owned()),
+        ]);
+        let duration = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Duration", key_style),
+            separator.clone(),
+            Span::from(
                 self.duration
                     .as_ref()
-                    .map_or("-".to_owned(), |v| v.as_secs().to_string())
-            )),
-        ];
-        let mut s = self
-            .others
-            .iter()
-            .map(|v| ListItem::new(format!(" {}: {}", v.0, v.1)))
-            .collect::<Vec<ListItem>>();
-        res.append(&mut s);
-        res
+                    .map_or("-".to_owned(), |v| v.as_secs().to_string()),
+            ),
+        ]);
+        let r = vec![title, artist, album, duration];
+        let r = [
+            r,
+            self.others
+                .iter()
+                .map(|(k, v)| {
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled(k.to_owned(), key_style),
+                        separator.clone(),
+                        Span::from(v.to_owned()),
+                    ])
+                })
+                .collect(),
+        ]
+        .concat();
+
+        r.into_iter().map(ListItem::new).collect()
     }
 }

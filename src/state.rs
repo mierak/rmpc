@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use crate::{
     mpd::{
         client::Client,
-        commands::{PlayListInfo, Song, Status},
+        commands::{Song, Songs, Status},
     },
     ui::{modals::Modals, screens::Screens},
 };
@@ -30,7 +30,7 @@ pub struct State {
     pub visible_modal: Option<Modals>,
     pub status: Status,
     pub current_song: Option<Song>,
-    pub queue: Option<PlayListInfo>,
+    pub queue: Option<Songs>,
     pub logs: MyVecDeque<Vec<u8>>,
     pub status_loop_active: bool,
     pub album_art: Option<MyVec<u8>>,
@@ -84,7 +84,7 @@ pub trait PlayListInfoExt {
     fn len(&self) -> Option<usize>;
 }
 
-impl PlayListInfoExt for Option<PlayListInfo> {
+impl PlayListInfoExt for Option<Songs> {
     fn get_selected(&self, idx: Option<usize>) -> Option<&Song> {
         match (self, idx) {
             (None, None) => None,

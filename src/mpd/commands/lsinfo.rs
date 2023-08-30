@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use super::Song;
 use anyhow::Result;
 
@@ -19,25 +17,6 @@ pub struct Dir {
     pub path: String,
     pub full_path: String,
     pub last_modified: String,
-}
-
-impl std::cmp::Ord for FileOrDir {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (_, FileOrDir::Dir(_)) => Ordering::Greater,
-            (FileOrDir::Dir(_), _) => Ordering::Less,
-            (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => t1.cmp(t2),
-        }
-    }
-}
-impl std::cmp::PartialOrd for FileOrDir {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (_, FileOrDir::Dir(_)) => Some(Ordering::Greater),
-            (FileOrDir::Dir(_), _) => Some(Ordering::Less),
-            (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => Some(t1.cmp(t2)),
-        }
-    }
 }
 
 impl std::str::FromStr for Dir {

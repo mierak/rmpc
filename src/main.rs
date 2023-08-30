@@ -161,8 +161,8 @@ async fn main_task(
 
             match event {
                 AppEvent::UserInput(Event::Key(key)) => match ui.handle_key(key, &mut state).await {
-                    Ok(ui::Render::Skip) => continue,
-                    Ok(ui::Render::NoSkip) => {
+                    Ok(ui::Render::Yes) => continue,
+                    Ok(ui::Render::No) => {
                         render_sender.send(()).await.unwrap();
                     }
                     Err(err) => {

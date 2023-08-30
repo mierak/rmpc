@@ -9,7 +9,7 @@ use tokio::{
 use tracing::{debug, trace};
 
 use super::{
-    commands::{status::OnOffOneshot, volume::Bound, *},
+    commands::{list::MpdList, status::OnOffOneshot, volume::Bound, *},
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     response::{BinaryMpdResponse, EmptyMpdResponse, MpdResponse},
 };
@@ -187,8 +187,31 @@ impl<'a> Client<'a> {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn playlist_info(&mut self) -> MpdResult<Option<PlayListInfo>> {
+    pub async fn playlist_info(&mut self) -> MpdResult<Option<Songs>> {
         self.execute(PLAYLIST_INFO_COMMAND).await
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Songs>> {
+        self.execute(format!("find \"({})\"", filter.to_query_str()).as_bytes())
+            .await
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
+        self.execute_ok(format!("findadd \"({})\"", filter.to_query_str()).as_bytes())
+            .await
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<Option<MpdList>> {
+        match filter {
+            Some(filter) => {
+                self.execute(format!("list {tag} \"({})\"", filter.to_query_str()).as_bytes())
+                    .await
+            }
+            None => self.execute(format!("list {tag}").as_bytes()).await,
+        }
     }
 
     // Database
@@ -316,5 +339,89 @@ impl<'a> Client<'a> {
             }
             Err(e) => Err(e),
         }
+    }
+}
+
+trait StrExt {
+    fn escape(self) -> String;
+}
+impl StrExt for &str {
+    fn escape(self) -> String {
+        self.replace('\\', "\\\\")
+            .replace('(', "\\(")
+            .replace(')', "\\)")
+            .replace('\'', "\\\\'")
+            .replace('\"', "\\\"")
+    }
+}
+
+#[cfg(test)]
+mod strext_tests {
+    use crate::mpd::client::StrExt;
+
+    #[test]
+    fn escapes_correctly() {
+        let input: &'static str = r#"(Artist == "foo'bar")"#;
+
+        assert_eq!(input.escape(), r#"\(Artist == \"foo\\'bar\"\)"#);
+    }
+}
+
+#[derive(Debug)]
+pub struct Filter<'a> {
+    pub tag: &'a str,
+    pub value: &'a str,
+}
+trait FilterExt {
+    fn to_query_str(&self) -> String;
+}
+impl FilterExt for &[Filter<'_>] {
+    fn to_query_str(&self) -> String {
+        self.iter()
+            .enumerate()
+            .fold(String::new(), |mut acc, (idx, Filter { tag, value })| {
+                if idx > 0 {
+                    acc.push_str(&format!(" AND ({tag} == '{}')", value.escape()));
+                } else {
+                    acc.push_str(&format!("({tag} == '{}')", value.escape()));
+                }
+                acc
+            })
+    }
+}
+
+#[cfg(test)]
+mod filter_tests {
+    use crate::mpd::client::FilterExt;
+
+    use super::Filter;
+
+    #[test]
+    fn single_value() {
+        let input: &[Filter<'_>] = &[Filter {
+            tag: "artist",
+            value: "mrs singer",
+        }];
+
+        assert_eq!(input.to_query_str(), "(artist == 'mrs singer')");
+    }
+
+    #[test]
+    fn multiple_values() {
+        let input: &[Filter<'_>] = &[
+            Filter {
+                tag: "album",
+                value: "the greatest",
+            },
+            Filter {
+                tag: "artist",
+                value: "mrs singer",
+            },
+        ];
+
+        assert_eq!(
+            input.to_query_str(),
+            "(album == 'the greatest') AND (artist == 'mrs singer')"
+        );
     }
 }

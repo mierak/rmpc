@@ -10,18 +10,19 @@ use crossterm::{
 use ratatui::{
     prelude::{Alignment, Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style, Stylize},
+    text::{Line, Span},
     widgets::{Borders, ListState, Paragraph, ScrollbarState, TableState},
     Frame, Terminal,
 };
 use strum::{IntoEnumIterator, VariantNames};
 use tracing::instrument;
 
+use crate::state::State;
 use crate::{
     mpd::commands::{volume::Bound, State as MpdState},
     mpd::{client::Client, errors::MpdError},
     ui::widgets::tabs::Tabs,
 };
-use crate::{state::State, ui::widgets::line::Line};
 
 use self::{
     modals::{confirm_queue_clear::ConfirmQueueClearModal, Modal},
@@ -193,28 +194,30 @@ impl Ui<'_> {
 
         let on_style = Style::default().fg(Color::Gray);
         let off_style = Style::default().fg(Color::DarkGray);
-        let states = Line::new(vec![
-            (
+        let separator = Span::styled(" / ", on_style);
+        let states = Paragraph::new(Line::from(vec![
+            Span::styled(
                 "Repeat".to_owned(),
                 if app.status.repeat { on_style } else { off_style },
             ),
-            (
+            separator.clone(),
+            Span::styled(
                 "Random".to_owned(),
                 if app.status.random { on_style } else { off_style },
             ),
+            separator.clone(),
             match app.status.consume {
-                crate::mpd::commands::status::OnOffOneshot::On => ("Consume".to_owned(), on_style),
-                crate::mpd::commands::status::OnOffOneshot::Off => ("Consume".to_owned(), off_style),
-                crate::mpd::commands::status::OnOffOneshot::Oneshot => ("Oneshot(C)".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Consume".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Consume".to_owned(), off_style),
+                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(C)".to_owned(), on_style),
             },
+            separator,
             match app.status.single {
-                crate::mpd::commands::status::OnOffOneshot::On => ("Single".to_owned(), on_style),
-                crate::mpd::commands::status::OnOffOneshot::Off => ("Single".to_owned(), off_style),
-                crate::mpd::commands::status::OnOffOneshot::Oneshot => ("Oneshot(S)".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Single".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Single".to_owned(), off_style),
+                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(S)".to_owned(), on_style),
             },
-        ])
-        .separator(" / ".to_owned())
-        .separator_style(on_style)
+        ]))
         .alignment(Alignment::Right);
 
         // center
@@ -245,17 +248,16 @@ impl Ui<'_> {
         ))
         .style(Style::default().fg(Color::Gray));
 
-        let song_info = app.current_song.as_ref().map_or(Line::default(), |v| {
+        let song_info = Paragraph::new(app.current_song.as_ref().map_or(Line::default(), |v| {
             let artist = v.artist.as_ref().unwrap_or(&"Unknown".to_owned()).to_owned();
             let album = v.album.as_ref().unwrap_or(&"Unknown Album".to_owned()).to_owned();
-            Line::new(vec![
-                (artist, Style::default().fg(Color::Yellow)),
-                (album, Style::default().fg(Color::LightBlue)),
+            Line::from(vec![
+                Span::styled(artist, Style::default().fg(Color::Yellow)),
+                Span::styled(" - ", Style::default().bold()),
+                Span::styled(album, Style::default().fg(Color::LightBlue)),
             ])
-            .alignment(Alignment::Center)
-            .separator(" - ".to_owned())
-            .separator_style(Style::default().bold())
-        });
+        }))
+        .alignment(Alignment::Center);
 
         if let Some(StatusMessage {
             ref message, ref level, ..
@@ -275,7 +277,6 @@ impl Ui<'_> {
             frame.render_widget(elapsed_bar, bar_area);
         }
 
-        // fame.render_widget(&self.shared_state.frame_counter, left);
         frame.render_widget(states, states_area);
         frame.render_widget(status, status_area);
         frame.render_widget(elapsed, elapsed_area);
@@ -325,7 +326,7 @@ impl Ui<'_> {
                     tracing::Span::current().record("screen", app.active_tab.to_string());
                     screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::NoSkip);
+                    return Ok(Render::No);
                 }
                 KeyCode::Right => {
                     screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
@@ -334,7 +335,7 @@ impl Ui<'_> {
                     tracing::Span::current().record("screen", app.active_tab.to_string());
                     screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::NoSkip);
+                    return Ok(Render::No);
                 }
                 KeyCode::Left => {
                     screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
@@ -343,7 +344,7 @@ impl Ui<'_> {
                     tracing::Span::current().record("screen", app.active_tab.to_string());
                     screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::NoSkip);
+                    return Ok(Render::No);
                 }
                 KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
@@ -352,16 +353,16 @@ impl Ui<'_> {
                     tracing::Span::current().record("screen", app.active_tab.to_string());
                     screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::NoSkip);
+                    return Ok(Render::No);
                 }
                 _ => {
                     tracing::Span::current().record("screen", app.active_tab.to_string());
                     screen_call_inner!(handle_key(key, &mut self.client, app, &mut self.shared_state));
-                    return Ok(Render::NoSkip);
+                    return Ok(Render::No);
                 }
             }
         }
-        Ok(Render::Skip)
+        Ok(Render::Yes)
     }
 
     pub async fn before_show(&mut self, app: &mut State) {
@@ -394,12 +395,12 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
-/// NoSkip should be used only in rare cases when we do not receive idle event from mpd based on our action
+/// No should be used only in rare cases when we do not receive idle event from mpd based on our action
 /// as those idle events will trigger render by themselves.
 /// These cases include selecting (not playing!) next/previous song
 pub enum Render {
-    Skip,
-    NoSkip,
+    Yes,
+    No,
 }
 
 trait LevelExt {

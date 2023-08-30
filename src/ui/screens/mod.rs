@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Rect},
+    widgets::ListState,
     Frame,
 };
 use strum::{Display, EnumIter, EnumVariantNames};
@@ -12,7 +13,7 @@ use crate::{
     state::State,
 };
 
-use super::{Render, SharedUiState};
+use super::{MyState, Render, SharedUiState};
 
 pub mod albums;
 pub mod artists;
@@ -88,5 +89,65 @@ impl Screens {
             Screens::Directories => Screens::Logs,
             Screens::Logs => Screens::Queue,
         }
+    }
+}
+
+#[derive(Debug, Default)]
+struct DirStack<T: std::fmt::Debug> {
+    current: (Vec<T>, MyState<ListState>),
+    others: Vec<(Vec<T>, MyState<ListState>)>,
+}
+
+impl<T: std::fmt::Debug> DirStack<T> {
+    fn new(root: Vec<T>) -> Self {
+        let mut val = Self {
+            others: Vec::new(),
+            current: (Vec::new(), MyState::default()),
+        };
+        let mut root_state = MyState::default();
+
+        val.push(Vec::new());
+
+        if !root.is_empty() {
+            root_state.select(Some(0));
+            // root.sort();
+        };
+
+        val.current = (root, root_state);
+        val
+    }
+
+    fn push(&mut self, head: Vec<T>) {
+        let mut new_state = MyState::default();
+        if !head.is_empty() {
+            new_state.select(Some(0));
+        };
+        let current_head = std::mem::replace(&mut self.current, (head, new_state));
+        self.others.push(current_head);
+    }
+
+    fn pop(&mut self) -> Option<(Vec<T>, MyState<ListState>)> {
+        if self.others.len() > 1 {
+            let top = self.others.pop().expect("There should always be at least two elements");
+            Some(std::mem::replace(&mut self.current, top))
+        } else {
+            None
+        }
+    }
+
+    fn get_selected(&self) -> Option<&T> {
+        if let Some(sel) = self.current.1.get_selected() {
+            self.current.0.get(sel)
+        } else {
+            None
+        }
+    }
+
+    fn next(&mut self) {
+        self.current.1.next()
+    }
+
+    fn prev(&mut self) {
+        self.current.1.prev()
     }
 }

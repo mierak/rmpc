@@ -97,7 +97,7 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
             .collect();
 
         let chunks = Layout::default()
-            .direction(self.direction.clone())
+            .direction(self.direction)
             .constraints(constraints)
             .split(area);
 

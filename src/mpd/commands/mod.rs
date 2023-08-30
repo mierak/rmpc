@@ -1,5 +1,6 @@
 pub mod current_song;
 pub mod idle;
+pub mod list;
 pub mod list_files;
 pub mod lsinfo;
 pub mod playlist_info;
@@ -14,7 +15,7 @@ pub use self::idle::COMMAND as IDLE_COMMAND;
 pub use self::list_files::ListFiles;
 pub use self::list_files::Listed;
 pub use self::lsinfo::LsInfo;
-pub use self::playlist_info::PlayListInfo;
+pub use self::playlist_info::Songs;
 pub use self::playlist_info::COMMAND as PLAYLIST_INFO_COMMAND;
 pub use self::status::State;
 pub use self::status::Status;

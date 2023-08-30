@@ -4,9 +4,9 @@ use anyhow::{Context, Result};
 pub const COMMAND: &[u8; 12] = b"playlistinfo";
 
 #[derive(Debug, Default)]
-pub struct PlayListInfo(pub Vec<Song>);
+pub struct Songs(pub Vec<Song>);
 
-impl std::str::FromStr for PlayListInfo {
+impl std::str::FromStr for Songs {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

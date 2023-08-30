@@ -33,14 +33,14 @@ impl Modal for ConfirmQueueClearModal {
         let block = Block::default().borders(Borders::ALL).title("Clear the queue?");
         let text = Paragraph::new("Are you sure you want to clear the queue?").wrap(Wrap { trim: true });
 
-        let popup_area = frame.size().centered_exact(16, 7);
+        let popup_area = frame.size().centered_exact(20, 7);
         let [text_area, buttons_area] = *Layout::default()
             .constraints([Constraint::Length(3), Constraint::Max(1)].as_ref())
             .direction(Direction::Vertical)
             .split(block.inner(popup_area.inner(&Margin {horizontal: 1, vertical: 0}))) else { return Ok(()); };
 
         let group = ButtonGroup::default().buttons(vec![
-            Button::default().label("Delete"),
+            Button::default().label("Clear"),
             Button::default().label("Cancel"),
         ]);
 
@@ -85,6 +85,6 @@ impl Modal for ConfirmQueueClearModal {
             }
             _ => {}
         }
-        Ok(Render::NoSkip)
+        Ok(Render::No)
     }
 }
