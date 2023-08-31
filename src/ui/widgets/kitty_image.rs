@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::io::{Cursor, Write};
 
 use ansi_to_tui::IntoText;
@@ -345,30 +345,34 @@ struct Data {
     img_height: u32,
 }
 impl<'a> KittyImage<'a> {
-    fn create_data_to_transfer(&self, image_data: &[u8], compression: Compression) -> Data {
+    fn create_data_to_transfer(&self, image_data: &[u8], compression: Compression) -> Result<Data> {
         // todo query cell size and resize exactly
         let image = image::io::Reader::new(Cursor::new(image_data))
             .with_guessed_format()
-            .unwrap()
+            .context("Unable to guess image format")?
             .decode()
-            .unwrap()
+            .context("Unable to decode image")?
             .resize(800, 600, image::imageops::FilterType::Lanczos3);
 
         let binding = image.to_rgba8();
         let rgba = binding.as_raw();
 
         let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
-        e.write_all(rgba).unwrap();
+        e.write_all(rgba)
+            .context("Error occured when writing image bytes to zlib encoder")?;
 
-        let content = base64::engine::general_purpose::STANDARD.encode(e.finish().unwrap());
-        Data {
+        let content = base64::engine::general_purpose::STANDARD.encode(
+            e.finish()
+                .context("Error occured when flushing image bytes to zlib encoder")?,
+        );
+        Ok(Data {
             content,
             img_width: image.width(),
             img_height: image.height(),
-        }
+        })
     }
 
-    fn creade_unicode_placeholder_grid(&self, cols: usize, rows: usize, state: &ImageState) -> Result<Text<'static>> {
+    fn create_unicode_placeholder_grid(&self, cols: usize, rows: usize, state: &ImageState) -> Result<Text<'static>> {
         let mut res = String::new();
         for row in GRID.iter().take(rows) {
             for col in GRID.iter().take(cols) {
@@ -440,16 +444,15 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             // delete all images
             print!("\x1b_Ga=d\x1b\\");
 
-            let Data {
-                content,
-                img_width,
-                img_height,
-            } = self.create_data_to_transfer(image, Compression::new(6));
-
-            self.transfer_data(content, width, height, img_width, img_height, state)
+            match self.create_data_to_transfer(image, Compression::new(6)) {
+                Ok(data) => self.transfer_data(data.content, width, height, data.img_width, data.img_height, state),
+                Err(e) => {
+                    tracing::error!(message = "Failed to transfer image data", error = ?e)
+                }
+            }
         }
 
-        match self.creade_unicode_placeholder_grid(width, height, state) {
+        match self.create_unicode_placeholder_grid(width, height, state) {
             Ok(res) => Paragraph::new(res).alignment(Alignment::Center).render(area, buf),
             Err(e) => tracing::error!(message = "Failed to construct unicode placeholder grid", error = ?e),
         };

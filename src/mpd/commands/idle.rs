@@ -39,7 +39,7 @@ impl std::str::FromStr for IdleEvents {
                 (_, "options") => res.push(IdleEvent::Options),
                 (_, "database") => res.push(IdleEvent::Database),
                 (_, "update") => res.push(IdleEvent::Update),
-                (_, "storedPlaylist") => res.push(IdleEvent::StoredPlaylist),
+                (_, "stored_playlist") => res.push(IdleEvent::StoredPlaylist),
                 (_, "playlist") => res.push(IdleEvent::Playlist),
                 (_, "output") => res.push(IdleEvent::Output),
                 (_, "partition") => res.push(IdleEvent::Partition),
