@@ -378,7 +378,7 @@ impl<'a> KittyImage<'a> {
             for col in GRID.iter().take(cols) {
                 res.push_str(&format!("\x1b[38;5;{}m", state.idx));
                 res.push_str(DELIM);
-                res.push_str(&format!("{}{}", row, col));
+                res.push_str(&format!("{row}{col}"));
             }
             res.push_str("\x1b[39m\n");
         }
@@ -387,7 +387,7 @@ impl<'a> KittyImage<'a> {
 
     fn transfer_data(
         &self,
-        content: String,
+        content: &str,
         cols: usize,
         rows: usize,
         img_width: u32,
@@ -405,8 +405,8 @@ impl<'a> KittyImage<'a> {
 
         while iter.peek().is_some() {
             let chunk: String = iter.by_ref().take(4096).collect();
-            let m = if iter.peek().is_some() { 1 } else { 0 };
-            print!("\x1b_Gm={};{}\x1b\\", m, chunk);
+            let m = i32::from(iter.peek().is_some());
+            print!("\x1b_Gm={m};{chunk}\x1b\\");
         }
     }
 
@@ -445,9 +445,9 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             print!("\x1b_Ga=d\x1b\\");
 
             match self.create_data_to_transfer(image, Compression::new(6)) {
-                Ok(data) => self.transfer_data(data.content, width, height, data.img_width, data.img_height, state),
+                Ok(data) => self.transfer_data(&data.content, width, height, data.img_width, data.img_height, state),
                 Err(e) => {
-                    tracing::error!(message = "Failed to transfer image data", error = ?e)
+                    tracing::error!(message = "Failed to transfer image data", error = ?e);
                 }
             }
         }

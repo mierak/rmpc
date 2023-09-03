@@ -6,10 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{
-    mpd::{client::Client, errors::MpdError},
-    state::State,
-};
+use crate::{mpd::client::Client, state::State};
 
 use super::{Render, SharedUiState};
 
@@ -29,12 +26,8 @@ pub trait Modal {
         _shared_state: &mut SharedUiState,
     ) -> Result<()>;
 
-    async fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        _client: &mut Client<'_>,
-        _app: &mut State,
-    ) -> Result<Render, MpdError>;
+    // todo global modal keys (esc, ctrl c)
+    async fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, _app: &mut State) -> Result<Render>;
 }
 
 pub trait RectExt {

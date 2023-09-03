@@ -73,6 +73,6 @@ impl Widget for Volume<'_> {
             area.top(),
             format!("Volume: {:<7} {:>3}%", CHARS[0..i as usize].join(""), self.value),
             self.style,
-        )
+        );
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Margin},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    mpd::{client::Client, errors::MpdError},
+    mpd::client::Client,
     state::State,
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
@@ -51,12 +51,7 @@ impl Modal for ConfirmQueueClearModal {
         Ok(())
     }
 
-    async fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        _client: &mut Client<'_>,
-        _app: &mut State,
-    ) -> Result<Render, MpdError> {
+    async fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, _app: &mut State) -> Result<Render> {
         match key.code {
             KeyCode::Char('j') => {
                 if self.button_group.selected == 1 {
@@ -76,9 +71,13 @@ impl Modal for ConfirmQueueClearModal {
                 _app.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
             }
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                _app.visible_modal = None;
+                self.button_group = ButtonGroupState::default();
+            }
             KeyCode::Enter => {
                 if self.button_group.selected == 0 {
-                    _client.clear().await?
+                    _client.clear().await?;
                 }
                 _app.visible_modal = None;
                 self.button_group = ButtonGroupState::default();

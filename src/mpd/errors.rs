@@ -9,12 +9,13 @@ pub enum MpdError {
     Generic(String),
     ClientClosed,
     Mpd(MpdFailureResponse),
+    ValueExpected,
 }
 
 impl std::error::Error for MpdError {}
 impl From<std::io::Error> for MpdError {
     fn from(err: std::io::Error) -> Self {
-        MpdError::Generic(format!("{}", err))
+        MpdError::Generic(format!("{err}"))
     }
 }
 
@@ -26,6 +27,7 @@ impl Display for MpdError {
             MpdError::Generic(msg) => write!(f, "GenericError: '{msg}'"),
             MpdError::ClientClosed => write!(f, "Client has been already closed."),
             MpdError::Mpd(err) => write!(f, "MpdError: '{err}'"),
+            MpdError::ValueExpected => write!(f, "Expected value from mpd but got nothing"),
         }
     }
 }

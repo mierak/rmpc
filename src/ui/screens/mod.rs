@@ -3,17 +3,13 @@ use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Rect},
-    widgets::ListState,
     Frame,
 };
 use strum::{Display, EnumIter, EnumVariantNames};
 
-use crate::{
-    mpd::{client::Client, errors::MpdError},
-    state::State,
-};
+use crate::{mpd::client::Client, state::State};
 
-use super::{MyState, Render, SharedUiState};
+use super::{Render, SharedUiState};
 
 pub mod albums;
 pub mod artists;
@@ -67,11 +63,11 @@ pub trait Screen {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<Render, MpdError>;
+    ) -> Result<Render>;
 }
 
 impl Screens {
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         match self {
             Screens::Queue => Screens::Logs,
             Screens::Logs => Screens::Directories,
@@ -81,7 +77,7 @@ impl Screens {
         }
     }
 
-    pub fn prev(&self) -> Self {
+    pub fn prev(self) -> Self {
         match self {
             Screens::Queue => Screens::Albums,
             Screens::Albums => Screens::Artists,
@@ -92,62 +88,204 @@ impl Screens {
     }
 }
 
-#[derive(Debug, Default)]
-struct DirStack<T: std::fmt::Debug> {
-    current: (Vec<T>, MyState<ListState>),
-    others: Vec<(Vec<T>, MyState<ListState>)>,
-}
+pub mod dirstack {
+    use ratatui::widgets::{ListState, ScrollbarState, TableState};
 
-impl<T: std::fmt::Debug> DirStack<T> {
-    fn new(root: Vec<T>) -> Self {
-        let mut val = Self {
-            others: Vec::new(),
-            current: (Vec::new(), MyState::default()),
-        };
-        let mut root_state = MyState::default();
-
-        val.push(Vec::new());
-
-        if !root.is_empty() {
-            root_state.select(Some(0));
-            // root.sort();
-        };
-
-        val.current = (root, root_state);
-        val
+    #[derive(Debug)]
+    pub struct DirStack<T: std::fmt::Debug> {
+        current: (Vec<T>, MyState<ListState>),
+        others: Vec<(Vec<T>, MyState<ListState>)>,
     }
 
-    fn push(&mut self, head: Vec<T>) {
-        let mut new_state = MyState::default();
-        if !head.is_empty() {
-            new_state.select(Some(0));
-        };
-        let current_head = std::mem::replace(&mut self.current, (head, new_state));
-        self.others.push(current_head);
-    }
+    impl<T: std::fmt::Debug> DirStack<T> {
+        pub fn new(root: Vec<T>) -> Self {
+            let mut result = Self {
+                others: Vec::new(),
+                current: (Vec::new(), MyState::default()),
+            };
+            let mut root_state = MyState::default();
 
-    fn pop(&mut self) -> Option<(Vec<T>, MyState<ListState>)> {
-        if self.others.len() > 1 {
-            let top = self.others.pop().expect("There should always be at least two elements");
-            Some(std::mem::replace(&mut self.current, top))
-        } else {
-            None
+            result.push(Vec::new());
+
+            if !root.is_empty() {
+                root_state.select(Some(0));
+                // root.sort();
+            };
+
+            result.current = (root, root_state);
+            result
+        }
+
+        /// Returns the element at the top of the stack
+        pub fn current(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
+            (&self.current.0, &mut self.current.1)
+        }
+
+        /// Returns the element at the second element from the top of the stack
+        pub fn previous(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
+            let last = self
+                .others
+                .last_mut()
+                .expect("Previous items to always containt at least one item. This should have been handled in pop()");
+            (&last.0, &mut last.1)
+        }
+
+        pub fn push(&mut self, head: Vec<T>) {
+            let mut new_state = MyState::default();
+            if !head.is_empty() {
+                new_state.select(Some(0));
+            };
+            let current_head = std::mem::replace(&mut self.current, (head, new_state));
+            self.others.push(current_head);
+        }
+
+        pub fn pop(&mut self) -> Option<(Vec<T>, MyState<ListState>)> {
+            if self.others.len() > 1 {
+                let top = self.others.pop().expect("There should always be at least two elements");
+                Some(std::mem::replace(&mut self.current, top))
+            } else {
+                None
+            }
+        }
+
+        pub fn get_selected(&self) -> Option<&T> {
+            if let Some(sel) = self.current.1.get_selected() {
+                self.current.0.get(sel)
+            } else {
+                None
+            }
+        }
+
+        pub fn next(&mut self) {
+            self.current.1.next();
+        }
+
+        pub fn prev(&mut self) {
+            self.current.1.prev();
         }
     }
 
-    fn get_selected(&self) -> Option<&T> {
-        if let Some(sel) = self.current.1.get_selected() {
-            self.current.0.get(sel)
-        } else {
-            None
+    #[derive(Debug, Default)]
+    pub struct MyState<T: ScrollingState> {
+        pub scrollbar_state: ScrollbarState,
+        pub inner: T,
+        pub content_len: Option<u16>,
+        pub viewport_len: Option<u16>,
+    }
+
+    impl<T: ScrollingState> MyState<T> {
+        pub fn viewport_len(&mut self, viewport_len: Option<u16>) -> &Self {
+            self.viewport_len = viewport_len;
+            self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
+            self
+        }
+
+        pub fn content_len(&mut self, content_len: Option<u16>) -> &Self {
+            self.content_len = content_len;
+            self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
+            self
+        }
+
+        pub fn first(&mut self) {
+            if self.content_len.is_some() {
+                self.select(Some(0));
+            } else {
+                self.select(None);
+            }
+        }
+
+        pub fn last(&mut self) {
+            if let Some(item_count) = self.content_len {
+                self.select(Some(item_count.saturating_sub(1) as usize));
+            } else {
+                self.select(None);
+            }
+        }
+
+        pub fn next(&mut self) {
+            if let Some(item_count) = self.content_len {
+                let i = match self.get_selected() {
+                    Some(i) => {
+                        if i >= item_count.saturating_sub(1) as usize {
+                            0
+                        } else {
+                            i + 1
+                        }
+                    }
+                    None => 0,
+                };
+                self.select(Some(i));
+            } else {
+                self.select(None);
+            }
+        }
+
+        pub fn prev(&mut self) {
+            if let Some(item_count) = self.content_len {
+                let i = match self.get_selected() {
+                    Some(i) => {
+                        if i == 0 {
+                            item_count.saturating_sub(1) as usize
+                        } else {
+                            i - 1
+                        }
+                    }
+                    None => 0,
+                };
+                self.select(Some(i));
+            } else {
+                self.select(None);
+            }
+        }
+
+        #[allow(clippy::cast_possible_truncation)]
+        pub fn select(&mut self, idx: Option<usize>) {
+            self.inner.select_scrolling(idx);
+            self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0) as u16);
+        }
+
+        pub fn get_selected(&self) -> Option<usize> {
+            self.inner.get_selected_scrolling()
         }
     }
 
-    fn next(&mut self) {
-        self.current.1.next()
+    pub trait ScrollingState {
+        fn select_scrolling(&mut self, idx: Option<usize>);
+        fn get_selected_scrolling(&self) -> Option<usize>;
     }
 
-    fn prev(&mut self) {
-        self.current.1.prev()
+    impl ScrollingState for TableState {
+        fn select_scrolling(&mut self, idx: Option<usize>) {
+            self.select(idx);
+        }
+
+        fn get_selected_scrolling(&self) -> Option<usize> {
+            self.selected()
+        }
+    }
+
+    impl ScrollingState for ListState {
+        fn select_scrolling(&mut self, idx: Option<usize>) {
+            self.select(idx);
+        }
+
+        fn get_selected_scrolling(&self) -> Option<usize> {
+            self.selected()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::DirStack;
+
+        #[test]
+        fn leaves_at_least_one_element_in_others() {
+            let mut val: DirStack<String> = DirStack::new(Vec::new());
+            val.push(Vec::new());
+            assert!(val.pop().is_some());
+            assert!(val.pop().is_none());
+
+            val.previous();
+        }
     }
 }

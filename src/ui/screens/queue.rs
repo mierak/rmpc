@@ -6,7 +6,7 @@ use crate::{
     ui::{
         modals::Modals,
         widgets::kitty_image::{ImageState, KittyImage},
-        DurationExt, MyState, Render, SharedUiState,
+        DurationExt, Render, SharedUiState,
     },
 };
 use async_trait::async_trait;
@@ -19,9 +19,9 @@ use ratatui::{
 };
 use tracing::error;
 
-use crate::{mpd::errors::MpdError, state::State};
+use crate::state::State;
 
-use super::Screen;
+use super::{dirstack::MyState, Screen};
 
 const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
 
@@ -83,21 +83,21 @@ impl Screen for QueueScreen {
             ].as_ref()).split(queue_section) else { return Ok(()) };
 
         self.scrolling_state.viewport_len(Some(queue_section.height));
-        self.scrolling_state.content_len(Some(queue_len as u16));
+        self.scrolling_state.content_len(Some(u16::try_from(queue_len)?));
 
         let mut rows = Vec::with_capacity(queue_len);
         if let Some(queue) = app.queue.as_ref() {
-            for song in queue.0.iter() {
+            for song in &queue.0 {
                 let mut row = Row::new(vec![
                     song.artist.as_ref().map_or("-".to_owned(), |v| format!(" {v}")),
                     song.title.as_ref().map_or("-", |v| v).to_owned(),
                     song.album.as_ref().map_or("-", |v| v).to_owned(),
-                    song.duration.as_ref().map_or("-".to_string(), |v| v.to_string()),
+                    song.duration.as_ref().map_or("-".to_string(), DurationExt::to_string),
                 ]);
                 if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
                     row = row.style(Style::default().fg(Color::Blue));
                 }
-                rows.push(row)
+                rows.push(row);
             }
         }
 
@@ -170,7 +170,7 @@ impl Screen for QueueScreen {
         client: &mut Client<'_>,
         app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<Render, MpdError> {
+    ) -> Result<Render> {
         match key.code {
             KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if !app.queue.is_empty_or_none() {

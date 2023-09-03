@@ -1,7 +1,7 @@
 use std::{io::Stdout, time::Duration};
 
 use ansi_to_tui::IntoText;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     execute,
@@ -11,16 +11,16 @@ use ratatui::{
     prelude::{Alignment, Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Borders, ListState, Paragraph, ScrollbarState, TableState},
+    widgets::{Borders, Paragraph},
     Frame, Terminal,
 };
 use strum::{IntoEnumIterator, VariantNames};
 use tracing::instrument;
 
-use crate::state::State;
+use crate::state::{State, StatusExt};
 use crate::{
+    mpd::client::Client,
     mpd::commands::{volume::Bound, State as MpdState},
-    mpd::{client::Client, errors::MpdError},
     ui::widgets::tabs::Tabs,
 };
 
@@ -121,15 +121,16 @@ macro_rules! screen_call {
 }
 
 macro_rules! modal_call {
-    ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
+    ($self:ident, $modal:ident, $app:ident, $fn:ident($($param:expr),+)) => {
         // todo unwrap
-        match $app.visible_modal.as_ref().unwrap() {
+        match $modal {
             modals::Modals::ConfirmQueueClear => invoke!($self.modals.confirm_queue_clear, $fn, $($param),+),
         }
     }
 }
 
 impl Ui<'_> {
+    #[instrument(skip_all)]
     pub fn render<B: Backend>(&mut self, frame: &mut Frame<B>, app: &mut crate::state::State) -> Result<()> {
         if self
             .shared_state
@@ -179,7 +180,7 @@ impl Ui<'_> {
                 screens::Screens::iter()
                     .enumerate()
                     .find(|(_, t)| t == &app.active_tab)
-                    .unwrap()
+                    .context("No active tab found. This really should not happen since we iterate over all the enum values as provided by strum.")?
                     .0,
             )
             .divider("")
@@ -196,34 +197,30 @@ impl Ui<'_> {
         let off_style = Style::default().fg(Color::DarkGray);
         let separator = Span::styled(" / ", on_style);
         let states = Paragraph::new(Line::from(vec![
-            Span::styled(
-                "Repeat".to_owned(),
-                if app.status.repeat { on_style } else { off_style },
-            ),
+            Span::styled("Repeat", if app.status.repeat { on_style } else { off_style }),
             separator.clone(),
-            Span::styled(
-                "Random".to_owned(),
-                if app.status.random { on_style } else { off_style },
-            ),
+            Span::styled("Random", if app.status.random { on_style } else { off_style }),
             separator.clone(),
             match app.status.consume {
-                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Consume".to_owned(), on_style),
-                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Consume".to_owned(), off_style),
-                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(C)".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Consume", on_style),
+                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Consume", off_style),
+                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(C)", on_style),
             },
             separator,
             match app.status.single {
-                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Single".to_owned(), on_style),
-                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Single".to_owned(), off_style),
-                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(S)".to_owned(), on_style),
+                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Single", on_style),
+                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Single", off_style),
+                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", on_style),
             },
         ]))
         .alignment(Alignment::Right);
 
         // center
-        let song_name = Paragraph::new(app.current_song.as_ref().map_or("No song".to_owned(), |v| {
-            v.title.as_ref().unwrap_or(&"No song".to_owned()).to_owned()
-        }))
+        let song_name = Paragraph::new(
+            app.current_song
+                .as_ref()
+                .map_or("No song", |v| v.title.as_ref().map_or("No song", |v| v.as_str())),
+        )
         .style(Style::default().bold())
         .alignment(Alignment::Center);
 
@@ -236,21 +233,13 @@ impl Ui<'_> {
             "{}/{}{}",
             app.status.elapsed.to_string(),
             app.status.duration.to_string(),
-            app.status
-                .bitrate
-                .as_ref()
-                .map_or("".to_owned(), |v| if v == "0" {
-                    "".to_owned()
-                } else {
-                    format!(" ({} kbps)", v)
-                })
-                .to_owned()
+            app.status.bitrate()
         ))
         .style(Style::default().fg(Color::Gray));
 
         let song_info = Paragraph::new(app.current_song.as_ref().map_or(Line::default(), |v| {
-            let artist = v.artist.as_ref().unwrap_or(&"Unknown".to_owned()).to_owned();
-            let album = v.album.as_ref().unwrap_or(&"Unknown Album".to_owned()).to_owned();
+            let artist = v.artist.as_ref().map_or("Unknown", |v| v.as_str());
+            let album = v.album.as_ref().map_or("Unknown Album", |v| v.as_str());
             Line::from(vec![
                 Span::styled(artist, Style::default().fg(Color::Yellow)),
                 Span::styled(" - ", Style::default().bold()),
@@ -263,9 +252,13 @@ impl Ui<'_> {
             ref message, ref level, ..
         }) = self.shared_state.status_message
         {
-            let status_bar = Paragraph::new(message.into_text().unwrap())
-                .alignment(ratatui::prelude::Alignment::Center)
-                .style(Style::default().fg(level.to_color()).bg(Color::Black));
+            let status_bar = Paragraph::new(
+                message
+                    .into_text()
+                    .context("Failed to convert status bar message to text")?,
+            )
+            .alignment(ratatui::prelude::Alignment::Center)
+            .style(Style::default().fg(level.to_color()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
         } else {
             let elapsed_bar = ProgressBar::default().fg(Color::Blue).bg(Color::Black);
@@ -285,9 +278,9 @@ impl Ui<'_> {
         frame.render_widget(song_info, song_info_area);
         frame.render_widget(tabs, tabs_area);
 
-        screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state)).unwrap();
-        if app.visible_modal.is_some() {
-            modal_call!(self, app, render(frame, app, &mut self.shared_state)).unwrap();
+        screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
+        if let Some(modal) = &app.visible_modal {
+            modal_call!(self, modal, app, render(frame, app, &mut self.shared_state))?;
         }
         self.shared_state.frame_counter.increment();
 
@@ -295,88 +288,87 @@ impl Ui<'_> {
     }
 
     #[instrument(skip(self, app), fields(screen))]
-    pub async fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<Render, MpdError> {
+    pub async fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<Render> {
         macro_rules! screen_call_inner {
             ($fn:ident($($param:expr),+)) => {
-                screen_call!(self, app, $fn($($param),+)).await.unwrap();
+                screen_call!(self, app, $fn($($param),+)).await?
             }
         }
-        if app.visible_modal.is_some() {
-            return modal_call!(self, app, handle_key(key, &mut self.client, app)).await;
-        } else {
-            match key.code {
-                // these two are here only to induce panic for testing
-                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.next().await?,
-                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.prev().await?,
+        if let Some(modal) = &app.visible_modal {
+            return modal_call!(self, modal, app, handle_key(key, &mut self.client, app)).await;
+        }
 
-                KeyCode::Char('n') if app.status.state == MpdState::Play => self.client.next().await?,
-                KeyCode::Char('p') if app.status.state == MpdState::Play => self.client.prev().await?,
-                KeyCode::Char('s') if app.status.state == MpdState::Play => self.client.stop().await?,
-                KeyCode::Char('z') => self.client.repeat(!app.status.repeat).await?,
-                KeyCode::Char('x') => self.client.random(!app.status.random).await?,
-                KeyCode::Char('c') => self.client.single(app.status.single.cycle()).await?,
-                KeyCode::Char('f') if app.status.state == MpdState::Play => self.client.seek_curr_forwards(5).await?,
-                KeyCode::Char('b') if app.status.state == MpdState::Play => self.client.seek_curr_backwards(5).await?,
-                KeyCode::Char(',') => self.client.set_volume(app.status.volume.dec()).await?,
-                KeyCode::Char('.') => self.client.set_volume(app.status.volume.inc()).await?,
-                KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+        match key.code {
+            // these two are here only to induce panic for testing
+            KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.next().await?,
+            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => self.client.prev().await?,
 
-                    app.active_tab = app.active_tab.next();
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+            KeyCode::Char('n') if app.status.state == MpdState::Play => self.client.next().await?,
+            KeyCode::Char('p') if app.status.state == MpdState::Play => self.client.prev().await?,
+            KeyCode::Char('s') if app.status.state == MpdState::Play => self.client.stop().await?,
+            KeyCode::Char('z') => self.client.repeat(!app.status.repeat).await?,
+            KeyCode::Char('x') => self.client.random(!app.status.random).await?,
+            KeyCode::Char('c') => self.client.single(app.status.single.cycle()).await?,
+            KeyCode::Char('f') if app.status.state == MpdState::Play => self.client.seek_curr_forwards(5).await?,
+            KeyCode::Char('b') if app.status.state == MpdState::Play => self.client.seek_curr_backwards(5).await?,
+            KeyCode::Char(',') => self.client.set_volume(app.status.volume.dec()).await?,
+            KeyCode::Char('.') => self.client.set_volume(app.status.volume.inc()).await?,
+            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::No);
-                }
-                KeyCode::Right => {
-                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                app.active_tab = app.active_tab.next();
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    app.active_tab = app.active_tab.next();
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                return Ok(Render::No);
+            }
+            KeyCode::Right => {
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::No);
-                }
-                KeyCode::Left => {
-                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                app.active_tab = app.active_tab.next();
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    app.active_tab = app.active_tab.prev();
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                return Ok(Render::No);
+            }
+            KeyCode::Left => {
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::No);
-                }
-                KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                app.active_tab = app.active_tab.prev();
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
 
-                    app.active_tab = app.active_tab.prev();
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                return Ok(Render::No);
+            }
+            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                    return Ok(Render::No);
-                }
-                _ => {
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(handle_key(key, &mut self.client, app, &mut self.shared_state));
-                    return Ok(Render::No);
-                }
+                app.active_tab = app.active_tab.prev();
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+
+                return Ok(Render::No);
+            }
+            _ => {
+                tracing::Span::current().record("screen", app.active_tab.to_string());
+                screen_call_inner!(handle_key(key, &mut self.client, app, &mut self.shared_state));
+                return Ok(Render::No);
             }
         }
         Ok(Render::Yes)
     }
 
-    pub async fn before_show(&mut self, app: &mut State) {
-        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state))
-            .await
-            .unwrap();
+    #[instrument(skip_all)]
+    pub async fn before_show(&mut self, app: &mut State) -> Result<()> {
+        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state)).await
     }
 
-    pub fn display_message(&mut self, message: &str, level: Level) {
+    pub fn display_message(&mut self, message: String, level: Level) {
         self.shared_state.status_message = Some(StatusMessage {
-            message: message.to_owned(),
+            message,
             level,
             created: tokio::time::Instant::now(),
-        })
+        });
     }
 }
 
@@ -441,113 +433,5 @@ impl BoolExt for bool {
         } else {
             "Off"
         }
-    }
-}
-
-#[derive(Debug, Default)]
-struct MyState<T: ScrollingState> {
-    pub scrollbar_state: ScrollbarState,
-    pub inner: T,
-    pub content_len: Option<u16>,
-    pub viewport_len: Option<u16>,
-}
-
-impl<T: ScrollingState> MyState<T> {
-    fn viewport_len(&mut self, viewport_len: Option<u16>) -> &Self {
-        self.viewport_len = viewport_len;
-        self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
-        self
-    }
-
-    fn content_len(&mut self, content_len: Option<u16>) -> &Self {
-        self.content_len = content_len;
-        self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
-        self
-    }
-
-    fn first(&mut self) {
-        if self.content_len.is_some() {
-            self.select(Some(0));
-        } else {
-            self.select(None);
-        }
-    }
-
-    fn last(&mut self) {
-        if let Some(item_count) = self.content_len {
-            self.select(Some(item_count.saturating_sub(1) as usize));
-        } else {
-            self.select(None);
-        }
-    }
-
-    fn next(&mut self) {
-        if let Some(item_count) = self.content_len {
-            let i = match self.get_selected() {
-                Some(i) => {
-                    if i >= item_count.saturating_sub(1) as usize {
-                        0
-                    } else {
-                        i + 1
-                    }
-                }
-                None => 0,
-            };
-            self.select(Some(i));
-        } else {
-            self.select(None);
-        }
-    }
-
-    fn prev(&mut self) {
-        if let Some(item_count) = self.content_len {
-            let i = match self.get_selected() {
-                Some(i) => {
-                    if i == 0 {
-                        item_count.saturating_sub(1) as usize
-                    } else {
-                        i - 1
-                    }
-                }
-                None => 0,
-            };
-            self.select(Some(i));
-        } else {
-            self.select(None);
-        }
-    }
-
-    fn select(&mut self, idx: Option<usize>) {
-        self.inner.select_scrolling(idx);
-        self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0) as u16);
-    }
-
-    fn get_selected(&self) -> Option<usize> {
-        self.inner.get_selected_scrolling()
-    }
-}
-
-trait ScrollingState {
-    fn select_scrolling(&mut self, idx: Option<usize>);
-    fn get_selected_scrolling(&self) -> Option<usize>;
-}
-
-impl ScrollingState for TableState {
-    fn select_scrolling(&mut self, idx: Option<usize>) {
-        self.select(idx)
-    }
-
-    fn get_selected_scrolling(&self) -> Option<usize> {
-        self.selected()
-    }
-}
-
-impl ScrollingState for ListState {
-    fn select_scrolling(&mut self, idx: Option<usize>) {
-        self.select(idx)
-    }
-
-    fn get_selected_scrolling(&self) -> Option<usize> {
-        self.selected()
     }
 }

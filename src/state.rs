@@ -59,7 +59,7 @@ impl State {
             .as_ref()
             .and_then(|p| p.0.iter().find(|s| status.songid.is_some_and(|i| i == s.id)))
         {
-            client.find_album_art(&song.file).await.unwrap().map(MyVec)
+            client.find_album_art(&song.file).await?.map(MyVec)
         } else {
             None
         };
@@ -87,19 +87,15 @@ pub trait PlayListInfoExt {
 impl PlayListInfoExt for Option<Songs> {
     fn get_selected(&self, idx: Option<usize>) -> Option<&Song> {
         match (self, idx) {
-            (None, None) => None,
-            (None, Some(_)) => None,
-            (Some(_), None) => None,
             (Some(q), Some(idx)) => q.0.get(idx),
+            _ => None,
         }
     }
 
     fn get_by_id(&self, id: Option<u32>) -> Option<(usize, &Song)> {
         match (self, id) {
-            (None, None) => None,
-            (None, Some(_)) => None,
-            (Some(_), None) => None,
             (Some(q), Some(id)) => q.0.iter().enumerate().find(|s| s.1.id == id),
+            _ => None,
         }
     }
 
@@ -112,5 +108,23 @@ impl PlayListInfoExt for Option<Songs> {
 
     fn len(&self) -> Option<usize> {
         self.as_ref().map(|v| v.0.len())
+    }
+}
+
+pub trait StatusExt {
+    fn bitrate(&self) -> String;
+}
+impl StatusExt for Status {
+    fn bitrate(&self) -> String {
+        match &self.bitrate {
+            Some(val) => {
+                if val == "0" {
+                    String::new()
+                } else {
+                    format!(" ({val} kbps)")
+                }
+            }
+            None => String::new(),
+        }
     }
 }

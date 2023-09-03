@@ -2,6 +2,7 @@ use ansi_to_tui::IntoText;
 use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
+use itertools::Itertools;
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
@@ -11,12 +12,12 @@ use ratatui::{
 };
 
 use crate::{
-    mpd::{client::Client, errors::MpdError},
+    mpd::client::Client,
     state::State,
-    ui::{MyState, Render, SharedUiState},
+    ui::{Render, SharedUiState},
 };
 
-use super::Screen;
+use super::{dirstack::MyState, Screen};
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
@@ -32,19 +33,25 @@ impl Screen for LogsScreen {
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let lines = app
+        let lines: Vec<_> = app
             .logs
             .0
             .iter()
-            .flat_map(|l| l.into_text().unwrap().lines)
+            .map(|l| -> Result<_> { Ok(l.into_text()?.lines) })
+            .flatten_ok()
             .enumerate()
-            .map(|(idx, mut l)| {
-                if self.scrolling_state.inner.selected().is_some_and(|v| v == idx) {
-                    l.patch_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+            .map(|(idx, l)| -> Result<_> {
+                match l {
+                    Ok(mut val) => {
+                        if self.scrolling_state.inner.selected().is_some_and(|v| v == idx) {
+                            val.patch_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+                        }
+                        Ok(ListItem::new(val))
+                    }
+                    Err(err) => Err(err),
                 }
-                ListItem::new(l)
             })
-            .collect::<Vec<ListItem>>();
+            .try_collect()?;
 
         let scrollbar = Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
@@ -67,7 +74,7 @@ impl Screen for LogsScreen {
             };
 
         let content_len = lines.len();
-        self.scrolling_state.content_len(Some(content_len as u16));
+        self.scrolling_state.content_len(Some(u16::try_from(content_len)?));
         self.scrolling_state.viewport_len(Some(content.height));
 
         let logs_wg = List::new(lines).block(
@@ -75,7 +82,7 @@ impl Screen for LogsScreen {
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::Gray))
                 .title(Span::styled(
-                    format!("Logs: {}", content_len),
+                    format!("Logs: {content_len}"),
                     Style::default().add_modifier(Modifier::BOLD),
                 )),
         );
@@ -99,7 +106,7 @@ impl Screen for LogsScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        // self.list_state.last();
+        self.scrolling_state.last();
         Ok(())
     }
 
@@ -109,7 +116,7 @@ impl Screen for LogsScreen {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<Render, MpdError> {
+    ) -> Result<Render> {
         match key.code {
             KeyCode::Char('j') => {
                 self.scrolling_state.next();

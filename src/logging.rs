@@ -22,7 +22,7 @@ struct TestWriter;
 impl std::io::Write for TestWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let buf_len = buf.len();
-        println!("{:?}", buf);
+        println!("{buf:?}");
         Ok(buf_len)
     }
 
@@ -31,13 +31,13 @@ impl std::io::Write for TestWriter {
     }
 }
 
-pub fn configure(level: Level, tx: Sender<AppEvent>) -> Vec<WorkerGuard> {
+pub fn configure(level: Level, tx: &Sender<AppEvent>) -> Vec<WorkerGuard> {
     let error_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::StatusBar)));
     let logs_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::Log)));
     let file_appender = tracing_appender::rolling::RollingFileAppender::new(Rotation::DAILY, "./", "mpdox.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    let (non_blocking_errors, _errors_guard) = tracing_appender::non_blocking(&*error_writer);
-    let (non_blocking_logs, _logs_guard) = tracing_appender::non_blocking(&*logs_writer);
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking_errors, errors_guard) = tracing_appender::non_blocking(&*error_writer);
+    let (non_blocking_logs, logs_guard) = tracing_appender::non_blocking(&*logs_writer);
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::Layer::default()
@@ -77,7 +77,7 @@ pub fn configure(level: Level, tx: Sender<AppEvent>) -> Vec<WorkerGuard> {
         )
         .init();
 
-    vec![_guard, _errors_guard, _logs_guard]
+    vec![guard, errors_guard, logs_guard]
 }
 
 pub struct LogsFilter {
@@ -97,8 +97,8 @@ impl<T> Filter<T> for LogsFilter {
         }
     }
 
-    fn enabled(&self, _meta: &Metadata<'_>, _cx: &Context<'_, T>) -> bool {
-        _meta.target().contains(clap::crate_name!()) && *_meta.level() <= self.level
+    fn enabled(&self, meta: &Metadata<'_>, _cx: &Context<'_, T>) -> bool {
+        meta.target().contains(clap::crate_name!()) && *meta.level() <= self.level
     }
 }
 
@@ -120,15 +120,15 @@ impl LogChannelWriter {
 
 impl Write for &LogChannelWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.variant {
-            WriterVariant::Log => {
-                self.tx.try_send(AppEvent::Log(buf.to_owned())).unwrap();
-            }
-            WriterVariant::StatusBar => {
-                self.tx
-                    .try_send(AppEvent::StatusBar(String::from_utf8_lossy(buf).to_string()))
-                    .unwrap();
-            }
+        if (match self.variant {
+            WriterVariant::Log => self.tx.try_send(AppEvent::Log(buf.to_owned())),
+            WriterVariant::StatusBar => self
+                .tx
+                .try_send(AppEvent::StatusBar(String::from_utf8_lossy(buf).to_string())),
+        })
+        .is_err()
+        {
+            return Err(io::Error::new(io::ErrorKind::Other, anyhow::anyhow!("test")));
         }
         Ok(buf.len())
     }

@@ -86,7 +86,7 @@ impl std::str::FromStr for Listed {
                             message = "Encountered unknow key/value pair while parsing 'listfiles' command",
                             key,
                             value
-                        )
+                        );
                     }
                 }
             }

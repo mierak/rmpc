@@ -34,7 +34,7 @@ impl BinaryMpdResponse {
                 return Err(MpdError::Mpd(MpdFailureResponse {
                     code: ErrorCode::NoExist,
                     command_list_index: 0,
-                    command: "".to_owned(),
+                    command: String::new(),
                     message: "Empty binary response".to_owned(),
                 }));
             }
@@ -46,11 +46,18 @@ impl BinaryMpdResponse {
                             size = if let Ok(val) = val.parse() {
                                 val
                             } else {
-                                return Err(MpdError::Parse(format!("Expected a digit for size, got: '{}'", val)));
+                                return Err(MpdError::Parse(format!("Expected a digit for size, got: '{val}'")));
                             }
                         }
                         "binary" => {
-                            binary = val.parse().unwrap();
+                            binary = match val.parse() {
+                                Ok(val) => val,
+                                Err(_) => {
+                                    return Err(MpdError::Parse(format!(
+                                        "Expected a digit for number of bytes to read, got: '{val}'"
+                                    )));
+                                }
+                            };
                             start_byte_read = true;
                         }
                         "type" => mime_type = Some(val.to_owned()),
@@ -62,7 +69,7 @@ impl BinaryMpdResponse {
                     }
                     buf.clear();
                 }
-                None => return Err(MpdError::Parse(format!("Expected split to succeed, got: '{}'", buf))),
+                None => return Err(MpdError::Parse(format!("Expected split to succeed, got: '{buf}'"))),
             };
         }
 
@@ -78,7 +85,7 @@ impl BinaryMpdResponse {
                 mime_type,
             })
         } else {
-            Err(MpdError::Generic(format!("Read ended with error: '{}'", buf)))
+            Err(MpdError::Generic(format!("Read ended with error: '{buf}'")))
         }
     }
 }
@@ -127,6 +134,7 @@ where
         trace!(message = "Reading command");
         let mut buf = String::new();
         let mut result = String::new();
+
         loop {
             match read.read_line(&mut buf).await {
                 Ok(0) => return Err(MpdError::ClientClosed),
@@ -188,7 +196,13 @@ mod tests {
 
             let result = MpdResponse::<Volume>::from_read(&mut c).await;
 
-            assert_eq!(result, Err(MpdError::Parse("cannot parse 'lol\n', nested error: 'Invalid value 'lol\n' when parsing Volume - split', command: '".to_string())));
+            assert_eq!(
+                result,
+                Err(MpdError::Parse(
+                    "cannot parse 'lol\n', nested error: 'Invalid value 'lol\n' when parsing Volume - split'"
+                        .to_string()
+                ))
+            );
         }
 
         #[tokio::test]
@@ -312,7 +326,7 @@ mod tests {
                 Err(MpdError::Mpd(MpdFailureResponse {
                     code: ErrorCode::NoExist,
                     command_list_index: 0,
-                    command: "".to_owned(),
+                    command: String::new(),
                     message: "Empty binary response".to_owned()
                 }))
             );

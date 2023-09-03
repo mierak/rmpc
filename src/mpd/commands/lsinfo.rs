@@ -1,5 +1,5 @@
 use super::Song;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 // TODO parsing in general should be redone
 #[derive(Debug, Default)]
@@ -24,15 +24,15 @@ impl std::str::FromStr for Dir {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut dir = Dir {
-            path: "".to_owned(),
-            full_path: "".to_owned(),
-            last_modified: "".to_owned(),
+            path: String::new(),
+            full_path: String::new(),
+            last_modified: String::new(),
         };
         for line in s.lines() {
             match line.split_once(": ") {
                 Some(("directory", val)) => {
                     dir.full_path = val.to_owned();
-                    dir.path = val.split('/').last().unwrap().to_owned();
+                    dir.path = val.split('/').last().context("Failed to parse dir name.")?.to_owned();
                 }
                 Some(("Last-Modified", val)) => dir.last_modified = val.to_owned(),
                 _ => {}
@@ -64,13 +64,15 @@ impl std::str::FromStr for LsInfo {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let r = s.lines().fold(Vec::new(), |mut acc, val| {
-            if val.starts_with("file:") || val.starts_with("directory:") {
-                acc.push(Vec::new());
-            }
-            acc.last_mut().unwrap().push(val);
-            acc
-        });
+        let r = s
+            .lines()
+            .try_fold(Vec::new(), |mut acc, val| -> Result<Vec<Vec<&str>>> {
+                if val.starts_with("file:") || val.starts_with("directory:") {
+                    acc.push(Vec::new());
+                }
+                acc.last_mut().context("")?.push(val);
+                Ok(acc)
+            })?;
 
         Ok(Self(
             r.iter()

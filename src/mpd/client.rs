@@ -9,12 +9,18 @@ use tokio::{
 use tracing::{debug, trace};
 
 use super::{
-    commands::{list::MpdList, status::OnOffOneshot, volume::Bound, *},
+    commands::{
+        list::MpdList, status::OnOffOneshot, volume::Bound, IdleEvents, ListFiles, LsInfo, Song, Songs, Status, Volume,
+        CURRENTSONG_COMMAND, IDLE_COMMAND, PLAYLIST_INFO_COMMAND, STATUS_COMMAND, VOLUME_COMMAND,
+    },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     response::{BinaryMpdResponse, EmptyMpdResponse, MpdResponse},
 };
 
 type MpdResult<T> = Result<T, MpdError>;
+// trait Unpack {
+//     fn unpack(self: Option<T>) ->
+// }
 
 pub struct Client<'a> {
     name: Option<&'a str>,
@@ -50,11 +56,11 @@ impl<'a> Client<'a> {
 
         debug!(message = "MPD client initiazed", handshake = buf.trim());
         Ok(Self {
+            name,
             rx,
             tx,
             reconnect,
             addr,
-            name,
         })
     }
 
@@ -79,12 +85,12 @@ impl<'a> Client<'a> {
     // Queries
     #[tracing::instrument(skip(self))]
     pub async fn idle(&mut self) -> MpdResult<IdleEvents> {
-        Ok(self.execute(IDLE_COMMAND).await?.unwrap())
+        self.execute(IDLE_COMMAND).await?.ok_or(MpdError::ValueExpected)
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn get_volume(&mut self) -> MpdResult<Volume> {
-        Ok(self.execute(VOLUME_COMMAND).await?.unwrap())
+        self.execute(VOLUME_COMMAND).await?.ok_or(MpdError::ValueExpected)
     }
 
     #[tracing::instrument(skip(self))]
@@ -99,7 +105,7 @@ impl<'a> Client<'a> {
 
     #[tracing::instrument(skip(self))]
     pub async fn get_status(&mut self) -> MpdResult<Status> {
-        Ok(self.execute(STATUS_COMMAND).await?.unwrap())
+        self.execute(STATUS_COMMAND).await?.ok_or(MpdError::ValueExpected)
     }
 
     // Playback control
@@ -150,12 +156,14 @@ impl<'a> Client<'a> {
 
     #[tracing::instrument(skip(self))]
     pub async fn repeat(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(format!("repeat {}", enabled as u8).as_bytes()).await
+        self.execute_ok(format!("repeat {}", u8::from(enabled)).as_bytes())
+            .await
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn random(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(format!("random {}", enabled as u8).as_bytes()).await
+        self.execute_ok(format!("random {}", u8::from(enabled)).as_bytes())
+            .await
     }
 
     #[tracing::instrument(skip(self))]
@@ -218,9 +226,12 @@ impl<'a> Client<'a> {
     #[tracing::instrument(skip(self))]
     pub async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
         if let Some(path) = path {
-            Ok(self.execute(format!("lsinfo \"{}\"", path).as_bytes()).await?.unwrap())
+            Ok(self
+                .execute(format!("lsinfo \"{path}\"").as_bytes())
+                .await?
+                .unwrap_or(LsInfo::default()))
         } else {
-            Ok(self.execute(b"lsinfo").await?.unwrap())
+            Ok(self.execute(b"lsinfo").await?.unwrap_or(LsInfo::default()))
         }
     }
 
@@ -228,23 +239,22 @@ impl<'a> Client<'a> {
     pub async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
         if let Some(path) = path {
             Ok(self
-                .execute(format!("listfiles \"{}\"", path).as_bytes())
+                .execute(format!("listfiles \"{path}\"").as_bytes())
                 .await?
-                .unwrap())
+                .unwrap_or(ListFiles::default()))
         } else {
-            Ok(self.execute(b"listfiles").await?.unwrap())
+            Ok(self.execute(b"listfiles").await?.unwrap_or(ListFiles::default()))
         }
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn read_picture(&mut self, path: &str) -> MpdResult<Vec<u8>> {
-        self.execute_binary(format!("readpicture \"{}\"", path).as_bytes())
-            .await
+        self.execute_binary(format!("readpicture \"{path}\"").as_bytes()).await
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn albumart(&mut self, path: &str) -> MpdResult<Vec<u8>> {
-        self.execute_binary(format!("albumart \"{}\"", path).as_bytes()).await
+        self.execute_binary(format!("albumart \"{path}\"").as_bytes()).await
     }
 
     /// This function first invokes [albumart].

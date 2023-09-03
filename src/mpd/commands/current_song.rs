@@ -111,8 +111,7 @@ impl std::str::FromStr for Song {
                 // "musicbrainz_releasegroupid" => resunt.musicbrainz_releasegroupid = Some(value.to_owned()),
                 // "musicbrainz_releasetrackid" => resunt.musicbrainz_releasetrackid = Some(value.to_owned()),
                 // "musicbrainz_workid" => resunt.musicbrainz_workid = Some(value.to_owned()),
-                "time" => {}   // deprecated
-                "format" => {} // ignored
+                "time" | "format" => {} // deprecated or ignored
                 key => resunt.others.push((key.to_owned(), value.to_owned())),
             }
         }

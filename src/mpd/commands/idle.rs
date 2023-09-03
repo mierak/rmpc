@@ -23,6 +23,38 @@ pub enum IdleEvent {
 
 #[derive(Debug)]
 pub struct IdleEvents(pub Vec<IdleEvent>);
+impl TryFrom<String> for IdleEvents {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let mut res = Vec::new();
+
+        for line in value.lines() {
+            let (key, value) = line
+                .split_once(": ")
+                .context(anyhow!("Invalid value '{}' whe parsing IdleEvent", line))?;
+            match (key, value) {
+                (_, "mixer") => res.push(IdleEvent::Mixer),
+                (_, "player") => res.push(IdleEvent::Player),
+                (_, "options") => res.push(IdleEvent::Options),
+                (_, "database") => res.push(IdleEvent::Database),
+                (_, "update") => res.push(IdleEvent::Update),
+                (_, "stored_playlist") => res.push(IdleEvent::StoredPlaylist),
+                (_, "playlist") => res.push(IdleEvent::Playlist),
+                (_, "output") => res.push(IdleEvent::Output),
+                (_, "partition") => res.push(IdleEvent::Partition),
+                (_, "sticker") => res.push(IdleEvent::Sticker),
+                (_, "subscription") => res.push(IdleEvent::Subscription),
+                (_, "message") => res.push(IdleEvent::Message),
+                (_, "neighbor") => res.push(IdleEvent::Neighbor),
+                (_, "mount") => res.push(IdleEvent::Mount),
+                _ => return Err(anyhow!("Cannot parse IdleEvent from string '{}'", value)),
+            };
+        }
+
+        Ok(IdleEvents(res))
+    }
+}
+
 impl std::str::FromStr for IdleEvents {
     type Err = anyhow::Error;
 
