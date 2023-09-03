@@ -58,6 +58,11 @@ impl Screen for DirectoriesScreen {
             ].as_ref())
             .split(area) else { return Ok(()) };
 
+        let preview = List::new(self.next.clone())
+            .block(Block::default().borders(Borders::ALL))
+            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+        frame.render_widget(preview, preview_area);
+
         {
             let (prev_items, prev_state) = self.dirs.previous();
             let prev_items = prev_items.to_listitems();
@@ -77,6 +82,7 @@ impl Screen for DirectoriesScreen {
                 .begin_style(Style::default().fg(Color::White).bg(Color::Black))
                 .end_style(Style::default().fg(Color::White).bg(Color::Black))
                 .thumb_style(Style::default().fg(Color::Blue));
+
             frame.render_stateful_widget(previous, previous_area, &mut prev_state.inner);
             frame.render_stateful_widget(
                 previous_scrollbar,
@@ -116,11 +122,6 @@ impl Screen for DirectoriesScreen {
                 &mut current_state.scrollbar_state,
             );
         }
-
-        let preview = List::new(self.next.clone())
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-        frame.render_widget(preview, preview_area);
 
         Ok(())
     }

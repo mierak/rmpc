@@ -71,6 +71,12 @@ impl Screen for AlbumsScreen {
                          Constraint::Percentage(42),
             ].as_ref())
             .split(area) else { return Ok(()) };
+
+        let preview = List::new(self.next.clone())
+            .block(Block::default().borders(Borders::ALL))
+            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+        frame.render_widget(preview, preview_area);
+
         {
             let (prev_items, prev_state) = self.stack.previous();
             let prev_items = prev_items.to_listitems(false);
@@ -133,11 +139,6 @@ impl Screen for AlbumsScreen {
                 &mut current_state.scrollbar_state,
             );
         }
-
-        let preview = List::new(self.next.clone())
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-        frame.render_widget(preview, preview_area);
 
         Ok(())
     }
