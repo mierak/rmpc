@@ -16,6 +16,7 @@ use crate::{
     mpd::{
         client::Client,
         commands::{lsinfo::FileOrDir, Song},
+        mpd_client::MpdClient,
     },
     state::State,
     ui::{Level, Render, SharedUiState, StatusMessage},

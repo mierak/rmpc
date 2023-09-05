@@ -1,30 +1,23 @@
-use super::Song;
-use anyhow::{Context, Result};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
-pub const COMMAND: &[u8; 12] = b"playlistinfo";
+use super::Song;
+use anyhow::Context;
 
 #[derive(Debug, Default)]
 pub struct Songs(pub Vec<Song>);
 
-impl std::str::FromStr for Songs {
-    type Err = anyhow::Error;
+impl FromMpd for Songs {
+    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut acc = vec![];
-
-        for line in s.lines() {
-            if line.starts_with("file:") {
-                acc.push(String::new());
-            }
-            acc.last_mut()
-                .context("No element in accumulator while parsing PlayListInfo")?
-                .push_str(line);
-            acc.last_mut()
-                .context("No element in accumulator while parsing PlayListInfo")?
-                .push('\n');
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        if key == "file" {
+            self.0.push(Song::default());
         }
-
-        let res = acc.iter().map(|s| Song::from_str(s)).collect::<Result<Vec<Song>>>()?;
-        Ok(Self(res))
+        self.0
+            .last_mut()
+            .context("No element in accumulator while parsing PlayListInfo")?
+            .next_internal(key, value)
     }
 }

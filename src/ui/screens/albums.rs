@@ -1,8 +1,5 @@
 use crate::{
-    mpd::{
-        client::{Client, Filter},
-        commands::Song as MpdSong,
-    },
+    mpd::{client::Client, commands::Song as MpdSong, mpd_client::Filter, mpd_client::MpdClient},
     state::State,
     ui::{screens::directories::FileOrDirExt, Level, Render, SharedUiState, StatusMessage},
 };

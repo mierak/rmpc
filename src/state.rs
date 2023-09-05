@@ -4,6 +4,7 @@ use crate::{
     mpd::{
         client::Client,
         commands::{Song, Songs, Status},
+        mpd_client::MpdClient,
     },
     ui::{modals::Modals, screens::Screens},
 };

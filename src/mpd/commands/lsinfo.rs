@@ -1,7 +1,8 @@
-use super::Song;
-use anyhow::{Context, Result};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
-// TODO parsing in general should be redone
+use super::Song;
+use anyhow::Context;
+
 #[derive(Debug, Default)]
 pub struct LsInfo(pub Vec<FileOrDir>);
 
@@ -11,7 +12,7 @@ pub enum FileOrDir {
     File(Song),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Dir {
     /// this is the full path from mpd root
     pub path: String,
@@ -19,66 +20,44 @@ pub struct Dir {
     pub last_modified: String,
 }
 
-impl std::str::FromStr for Dir {
-    type Err = anyhow::Error;
+impl FromMpd for Dir {
+    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut dir = Dir {
-            path: String::new(),
-            full_path: String::new(),
-            last_modified: String::new(),
-        };
-        for line in s.lines() {
-            match line.split_once(": ") {
-                Some(("directory", val)) => {
-                    dir.full_path = val.to_owned();
-                    dir.path = val.split('/').last().context("Failed to parse dir name.")?.to_owned();
-                }
-                Some(("Last-Modified", val)) => dir.last_modified = val.to_owned(),
-                _ => {}
-            };
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        match key {
+            "directory" => {
+                self.path = value.split('/').last().context("Failed to parse dir name.")?.to_owned();
+                self.full_path = value;
+            }
+            "last-modified" => self.last_modified = value,
+            _ => return Ok(LineHandled::No { value }),
         }
-        Ok(dir)
+        Ok(LineHandled::Yes)
     }
 }
 
-impl std::str::FromStr for FileOrDir {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("file:") {
-            Ok(Self::File(s.parse()?))
-        } else if s.starts_with("directory:") {
-            Ok(Self::Dir(s.parse()?))
-        } else {
-            // TODO: playlists are not handled, we should somehow ignore this
-            // Listing playlists is deprecated use “listplaylists” instead.
-            Err(anyhow::anyhow!(
-                "Parsing FilOrDir failed. Playlists are not handled yet."
-            ))
-        }
+impl FromMpd for LsInfo {
+    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
     }
-}
 
-impl std::str::FromStr for LsInfo {
-    type Err = anyhow::Error;
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        if key == "file" {
+            self.0.push(FileOrDir::File(Song::default()));
+        }
+        if key == "directory" {
+            self.0.push(FileOrDir::Dir(Dir::default()));
+        }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let r = s
-            .lines()
-            .try_fold(Vec::new(), |mut acc, val| -> Result<Vec<Vec<&str>>> {
-                if val.starts_with("file:") || val.starts_with("directory:") {
-                    acc.push(Vec::new());
-                }
-                acc.last_mut().context("")?.push(val);
-                Ok(acc)
-            })?;
-
-        Ok(Self(
-            r.iter()
-                .map(|v| v.join("\n"))
-                .map(|v| v.parse::<FileOrDir>())
-                .collect::<Result<Vec<FileOrDir>>>()?,
-        ))
+        match self
+            .0
+            .last_mut()
+            .context("No element in accumulator while parsing LsInfo")?
+        {
+            FileOrDir::Dir(dir) => dir.next_internal(key, value),
+            FileOrDir::File(song) => song.next_internal(key, value),
+        }
     }
 }

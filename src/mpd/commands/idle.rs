@@ -1,7 +1,5 @@
-use anyhow::anyhow;
-use anyhow::Context;
-
-pub const COMMAND: &[u8; 4] = b"idle";
+use crate::mpd::errors::MpdError;
+use crate::mpd::{FromMpd, LineHandled};
 
 #[derive(Debug)]
 pub enum IdleEvent {
@@ -21,68 +19,32 @@ pub enum IdleEvent {
     Mount,   // the mount list has changed
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct IdleEvents(pub Vec<IdleEvent>);
-impl TryFrom<String> for IdleEvents {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut res = Vec::new();
 
-        for line in value.lines() {
-            let (key, value) = line
-                .split_once(": ")
-                .context(anyhow!("Invalid value '{}' whe parsing IdleEvent", line))?;
-            match (key, value) {
-                (_, "mixer") => res.push(IdleEvent::Mixer),
-                (_, "player") => res.push(IdleEvent::Player),
-                (_, "options") => res.push(IdleEvent::Options),
-                (_, "database") => res.push(IdleEvent::Database),
-                (_, "update") => res.push(IdleEvent::Update),
-                (_, "stored_playlist") => res.push(IdleEvent::StoredPlaylist),
-                (_, "playlist") => res.push(IdleEvent::Playlist),
-                (_, "output") => res.push(IdleEvent::Output),
-                (_, "partition") => res.push(IdleEvent::Partition),
-                (_, "sticker") => res.push(IdleEvent::Sticker),
-                (_, "subscription") => res.push(IdleEvent::Subscription),
-                (_, "message") => res.push(IdleEvent::Message),
-                (_, "neighbor") => res.push(IdleEvent::Neighbor),
-                (_, "mount") => res.push(IdleEvent::Mount),
-                _ => return Err(anyhow!("Cannot parse IdleEvent from string '{}'", value)),
-            };
-        }
-
-        Ok(IdleEvents(res))
+impl FromMpd for IdleEvents {
+    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
     }
-}
 
-impl std::str::FromStr for IdleEvents {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut res = Vec::new();
-
-        for line in s.lines() {
-            let (key, value) = line
-                .split_once(": ")
-                .context(anyhow!("Invalid value '{}' whe parsing IdleEvent", line))?;
-            match (key, value) {
-                (_, "mixer") => res.push(IdleEvent::Mixer),
-                (_, "player") => res.push(IdleEvent::Player),
-                (_, "options") => res.push(IdleEvent::Options),
-                (_, "database") => res.push(IdleEvent::Database),
-                (_, "update") => res.push(IdleEvent::Update),
-                (_, "stored_playlist") => res.push(IdleEvent::StoredPlaylist),
-                (_, "playlist") => res.push(IdleEvent::Playlist),
-                (_, "output") => res.push(IdleEvent::Output),
-                (_, "partition") => res.push(IdleEvent::Partition),
-                (_, "sticker") => res.push(IdleEvent::Sticker),
-                (_, "subscription") => res.push(IdleEvent::Subscription),
-                (_, "message") => res.push(IdleEvent::Message),
-                (_, "neighbor") => res.push(IdleEvent::Neighbor),
-                (_, "mount") => res.push(IdleEvent::Mount),
-                _ => return Err(anyhow!("Cannot parse IdleEvent from string '{}'", s)),
-            };
-        }
-        Ok(Self(res))
+    fn next_internal(&mut self, _key: &str, value: String) -> Result<LineHandled, MpdError> {
+        match value.as_str() {
+            "mixer" => self.0.push(IdleEvent::Mixer),
+            "player" => self.0.push(IdleEvent::Player),
+            "options" => self.0.push(IdleEvent::Options),
+            "database" => self.0.push(IdleEvent::Database),
+            "update" => self.0.push(IdleEvent::Update),
+            "stored_playlist" => self.0.push(IdleEvent::StoredPlaylist),
+            "playlist" => self.0.push(IdleEvent::Playlist),
+            "output" => self.0.push(IdleEvent::Output),
+            "partition" => self.0.push(IdleEvent::Partition),
+            "sticker" => self.0.push(IdleEvent::Sticker),
+            "subscription" => self.0.push(IdleEvent::Subscription),
+            "message" => self.0.push(IdleEvent::Message),
+            "neighbor" => self.0.push(IdleEvent::Neighbor),
+            "mount" => self.0.push(IdleEvent::Mount),
+            _ => return Ok(LineHandled::No { value }),
+        };
+        Ok(LineHandled::Yes)
     }
 }

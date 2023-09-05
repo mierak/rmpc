@@ -3,7 +3,8 @@
     clippy::module_name_repetitions,
     clippy::unused_self,
     clippy::unnested_or_patterns,
-    clippy::match_same_arms
+    clippy::match_same_arms,
+    clippy::manual_let_else
 )]
 use std::{sync::Arc, time::Duration};
 
@@ -21,6 +22,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use ui::Level;
 
 use crate::{
+    mpd::mpd_client::MpdClient,
     ui::Ui,
     utils::macros::{try_cont, try_ret},
 };

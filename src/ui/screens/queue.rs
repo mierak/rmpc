@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::{
-    mpd::{client::Client, commands::State as MpdState},
+    mpd::{client::Client, commands::State as MpdState, mpd_client::MpdClient},
     state::PlayListInfoExt,
     ui::{
         modals::Modals,

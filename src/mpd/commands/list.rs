@@ -1,22 +1,15 @@
-use anyhow::{anyhow, Context, Result};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MpdList(pub Vec<String>);
 
-impl std::str::FromStr for MpdList {
-    type Err = anyhow::Error;
+impl FromMpd for MpdList {
+    fn finish(self) -> Result<Self, MpdError> {
+        Ok(self)
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(MpdList(
-            s.lines()
-                .map(|line| -> Result<String> {
-                    Ok(line
-                        .split_once(": ")
-                        .context(anyhow!("Unable to split value: '{}'", line))?
-                        .1
-                        .to_owned())
-                })
-                .collect::<Result<Vec<String>>>()?,
-        ))
+    fn next_internal(&mut self, _key: &str, value: String) -> Result<LineHandled, MpdError> {
+        self.0.push(value);
+        Ok(LineHandled::Yes)
     }
 }

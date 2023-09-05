@@ -1,6 +1,6 @@
-use anyhow::anyhow;
 use anyhow::Context;
-use anyhow::Result;
+
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 // file: 03 Diode.flac
 // size: 18183774
@@ -33,67 +33,42 @@ pub enum ListingType {
     Dir,
 }
 
-impl std::str::FromStr for ListFiles {
-    type Err = anyhow::Error;
+impl FromMpd for ListFiles {
+    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut acc: Vec<Listed> = Vec::new();
-
-        let mut current = String::new();
-        for (i, line) in s.lines().enumerate() {
-            if line.starts_with("file:") || line.starts_with("directory:") {
-                if i > 0 {
-                    acc.push(current.parse()?);
-                }
-                current = String::new();
-            }
-
-            current.push_str(line);
-            current.push('\n');
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        if key == "file" || key == "directory" {
+            self.0.push(Listed::default());
         }
-        acc.push(current.parse()?);
 
-        Ok(Self(acc))
+        self.0
+            .last_mut()
+            .context("No element in accumulator while parsing ListFiles")?
+            .next_internal(key, value)
     }
 }
 
-impl std::str::FromStr for Listed {
-    type Err = anyhow::Error;
+impl FromMpd for Listed {
+    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut lines = s.lines();
-        let mut val = Listed::default();
-        if let Some(line) = lines.next() {
-            let (key, value) = line
-                .split_once(": ")
-                .context(anyhow!("Invalid value '{}' whe parsing Dir or File for Listed", line))?;
-            if key == "file" {
-                val.kind = ListingType::File;
-            } else if key == "directory" {
-                val.kind = ListingType::Dir;
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        match key {
+            "file" => {
+                self.kind = ListingType::File;
+                self.name = value;
             }
-            val.name = value.to_owned();
-
-            for s in lines {
-                let (key, value) = s
-                    .split_once(": ")
-                    .context(anyhow!("Invalid value '{}' whe parsing ListedFile", line))?;
-                match key {
-                    "size" => val.size = value.parse()?,
-                    "Last-Modified" => val.last_modified = value.to_owned(),
-                    key => {
-                        tracing::warn!(
-                            message = "Encountered unknow key/value pair while parsing 'listfiles' command",
-                            key,
-                            value
-                        );
-                    }
-                }
+            "directory" => {
+                self.kind = ListingType::Dir;
+                self.name = value;
             }
-
-            Ok(val)
-        } else {
-            Err(anyhow!("Invalid value. Cannot parse Listed. '{}'", s))
+            "size" => self.size = value.parse()?,
+            "last-modified" => self.last_modified = value,
+            _ => return Ok(LineHandled::No { value }),
         }
+        Ok(LineHandled::Yes)
     }
 }

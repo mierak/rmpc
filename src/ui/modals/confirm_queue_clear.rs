@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::{
-    mpd::client::Client,
+    mpd::{client::Client, mpd_client::MpdClient},
     state::State,
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };

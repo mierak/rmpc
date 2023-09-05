@@ -1,20 +1,17 @@
 use std::time::Duration;
 
-use anyhow::anyhow;
-use anyhow::Context;
-
-pub const COMMAND: &[u8; 11] = b"currentsong";
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 #[derive(Default, PartialEq, Eq)]
 pub struct Song {
     pub id: u32,
     pub file: String,
-    pub title: Option<String>,      // the song title.
-    pub artist: Option<String>, // the artist name. Its meaning is not well-defined; see “composer” and “performer” for more specific tags.
-    pub album: Option<String>,  // the album name.
-    pub duration: Option<Duration>, // Duration of the current song in seconds.
-    pub pos: u32,               // Duration of the current song in seconds.
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub duration: Option<Duration>,
 
+    // the other less relevant tags are pushed here
     pub others: Vec<(String, String)>,
     // pub name: Option<String>, // a name for this song. This is not the song title. The exact meaning of this tag is not well-defined. It is often used by badly configured internet radio stations with broken tags to squeeze both the artist name and the song title in one tag.
     // pub artistsort: Option<String>, // same as artist, but for sorting. This usually omits prefixes such as “The”.
@@ -53,69 +50,30 @@ impl std::fmt::Debug for Song {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Song {{ file: {}, title: {:?}, id: {}, pos: {} }}",
-            self.file, self.title, self.id, self.pos
+            "Song {{ file: {}, title: {:?}, artist: {:?}, id: {} }}",
+            self.file, self.title, self.artist, self.id
         )
     }
 }
 
-impl std::str::FromStr for Song {
-    type Err = anyhow::Error;
+impl FromMpd for Song {
+    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut resunt = Song::default();
-
-        for line in s.lines() {
-            let (key, value) = line
-                .split_once(": ")
-                .context(anyhow!("Invalid value '{}' whe parsing Song", line))?;
-            match key.to_lowercase().as_str() {
-                "file" => resunt.file = value.to_owned(),
-                "artist" => resunt.artist = Some(value.to_owned()),
-                "album" => resunt.album = Some(value.to_owned()),
-                "title" => resunt.title = Some(value.to_owned()),
-                "id" => resunt.id = value.parse()?,
-                "duration" => {
-                    resunt.duration = Some(Duration::from_secs_f64(value.parse()?));
-                }
-                // "name" => resunt.name = Some(value.to_owned()),
-                // "artistsort" => resunt.artistsort = Some(value.to_owned()),
-                // "albumsort" => resunt.albumsort = Some(value.to_owned()),
-                // "albumartist" => resunt.albumartist = Some(value.to_owned()),
-                // "albumartistsort" => resunt.albumartistsort = Some(value.to_owned()),
-                // "titlesort" => resunt.titlesort = Some(value.to_owned()),
-                // "track" => resunt.track = Some(value.to_owned()),
-                // "genre" => resunt.genre = Some(value.to_owned()),
-                // "mood" => resunt.mood = Some(value.to_owned()),
-                // "date" => resunt.date = Some(value.to_owned()),
-                // "originaldate" => resunt.originaldate = Some(value.to_owned()),
-                // "composer" => resunt.composer = Some(value.to_owned()),
-                // "composersort" => resunt.composersort = Some(value.to_owned()),
-                // "performer" => resunt.performer = Some(value.to_owned()),
-                // "conductor" => resunt.conductor = Some(value.to_owned()),
-                // "work" => resunt.work = Some(value.to_owned()),
-                // "ensemble" => resunt.ensemble = Some(value.to_owned()),
-                // "movement" => resunt.movement = Some(value.to_owned()),
-                // "movementnumber" => resunt.movementnumber = Some(value.to_owned()),
-                // "location" => resunt.location = Some(value.to_owned()),
-                // "grouping" => resunt.grouping = Some(value.to_owned()),
-                // "comment" => resunt.comment = Some(value.to_owned()),
-                // "disc" => resunt.disc = Some(value.to_owned()),
-                // "label" => resunt.label = Some(value.to_owned()),
-                // "pos" => resunt.pos = value.parse()?,
-                // "last-modified" => resunt.label = Some(value.to_owned()),
-                // "musicbrainz_artistid" => resunt.musicbrainz_artistid = Some(value.to_owned()),
-                // "musicbrainz_albumid" => resunt.musicbrainz_albumid = Some(value.to_owned()),
-                // "musicbrainz_albumartistid" => resunt.musicbrainz_albumartistid = Some(value.to_owned()),
-                // "musicbrainz_trackid" => resunt.musicbrainz_trackid = Some(value.to_owned()),
-                // "musicbrainz_releasegroupid" => resunt.musicbrainz_releasegroupid = Some(value.to_owned()),
-                // "musicbrainz_releasetrackid" => resunt.musicbrainz_releasetrackid = Some(value.to_owned()),
-                // "musicbrainz_workid" => resunt.musicbrainz_workid = Some(value.to_owned()),
-                "time" | "format" => {} // deprecated or ignored
-                key => resunt.others.push((key.to_owned(), value.to_owned())),
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        match key {
+            "file" => self.file = value,
+            "artist" => self.artist = Some(value),
+            "album" => self.album = Some(value),
+            "title" => self.title = Some(value),
+            "id" => self.id = value.parse()?,
+            "duration" => {
+                self.duration = Some(Duration::from_secs_f64(value.parse()?));
             }
+            "time" | "format" => {} // deprecated or ignored
+            key => self.others.push((key.to_owned(), value)),
         }
-
-        Ok(resunt)
+        Ok(LineHandled::Yes)
     }
 }

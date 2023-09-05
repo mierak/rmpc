@@ -20,7 +20,10 @@ use tracing::instrument;
 use crate::state::{State, StatusExt};
 use crate::{
     mpd::client::Client,
-    mpd::commands::{volume::Bound, State as MpdState},
+    mpd::{
+        commands::{volume::Bound, State as MpdState},
+        mpd_client::MpdClient,
+    },
     ui::widgets::tabs::Tabs,
 };
 
@@ -122,7 +125,6 @@ macro_rules! screen_call {
 
 macro_rules! modal_call {
     ($self:ident, $modal:ident, $app:ident, $fn:ident($($param:expr),+)) => {
-        // todo unwrap
         match $modal {
             modals::Modals::ConfirmQueueClear => invoke!($self.modals.confirm_queue_clear, $fn, $($param),+),
         }

@@ -1,7 +1,5 @@
-use anyhow::anyhow;
-use anyhow::Context;
-
-pub const COMMAND: &[u8; 6] = b"getvol";
+use crate::mpd::errors::MpdError;
+use crate::mpd::{FromMpd, LineHandled};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Volume(u8);
@@ -36,19 +34,17 @@ pub trait Bound<T> {
     fn dec(&mut self) -> &Self;
 }
 
-impl std::str::FromStr for Volume {
-    type Err = anyhow::Error;
+impl FromMpd for Volume {
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        if key == "volume" {
+            self.0 = value.parse()?;
+            Ok(LineHandled::Yes)
+        } else {
+            Ok(LineHandled::No { value })
+        }
+    }
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let res = s
-            .trim_end()
-            .split_once(' ')
-            .context(anyhow!("Invalid value '{}' when parsing Volume - split", s))?;
-        let res = res
-            .1
-            .parse()
-            .context(anyhow!("Invalid value '{}' when parsing Volume", s))?;
-
-        Ok(Self::new(res))
+    fn finish(self) -> Result<Self, MpdError> {
+        Ok(self)
     }
 }

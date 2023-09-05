@@ -1,11 +1,10 @@
 use std::time::Duration;
 
 use anyhow::anyhow;
-use anyhow::Context;
+
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 use super::Volume;
-
-pub const COMMAND: &[u8; 6] = b"status";
 
 #[derive(Debug, Default)]
 pub struct Status {
@@ -31,6 +30,42 @@ pub struct Status {
     pub audio: Option<String>, // The format emitted by the decoder plugin during playback, format: samplerate:bits:channels. See Global Audio Format for a detailed explanation.
     pub updating_db: Option<u32>, // job id
     pub error: Option<String>, // if there is an error, returns message here
+}
+
+impl FromMpd for Status {
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        match key {
+            "partition" => self.partition = value,
+            "volume" => self.volume = Volume::new(value.parse()?),
+            "repeat" => self.repeat = value != "0",
+            "random" => self.random = value != "0",
+            "single" => self.single = value.parse()?,
+            "consume" => self.consume = value.parse()?,
+            "playlist" => self.playlist = Some(value.parse()?),
+            "playlistlength" => self.playlistlength = value.parse()?,
+            "state" => self.state = value.parse()?,
+            "song" => self.song = Some(value.parse()?),
+            "songid" => self.songid = Some(value.parse()?),
+            "nextsong" => self.nextsong = Some(value.parse()?),
+            "nextsongid" => self.nextsongid = Some(value.parse()?),
+            "elapsed" => self.elapsed = Duration::from_secs_f32(value.parse()?),
+            "duration" => self.duration = Duration::from_secs_f32(value.parse()?),
+            "bitrate" => self.bitrate = Some(value),
+            "xfade" => self.xfade = Some(value.parse()?),
+            "mixrampdb" => self.mixrampdb = Some(value),
+            "mixrampdelay" => self.mixrampdelay = Some(value),
+            "audio" => self.audio = Some(value),
+            "updating_db" => self.updating_db = Some(value.parse()?),
+            "error" => self.error = Some(value),
+            "time" => {} // deprecated
+            _ => return Ok(LineHandled::No { value }),
+        }
+        Ok(LineHandled::Yes)
+    }
+
+    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
+        Ok(self)
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -117,50 +152,5 @@ impl std::str::FromStr for State {
             "pause" => Ok(Self::Pause),
             _ => Err(anyhow!("Invalid State: '{}'", s)),
         }
-    }
-}
-
-impl std::str::FromStr for Status {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut res = Status::default();
-
-        for line in s.lines() {
-            let (key, value) = line
-                .split_once(": ")
-                .context(anyhow!("Invalid value '{}' when parsing Song", line))?;
-            match key.to_lowercase().as_str() {
-                "partition" => res.partition = value.to_owned(),
-                "volume" => res.volume = Volume::new(value.parse()?),
-                "repeat" => res.repeat = value != "0",
-                "random" => res.random = value != "0",
-                "single" => res.single = value.parse()?,
-                "consume" => res.consume = value.parse()?,
-                "playlist" => res.playlist = Some(value.parse()?),
-                "playlistlength" => res.playlistlength = value.parse()?,
-                "state" => res.state = value.parse()?,
-                "song" => res.song = Some(value.parse()?),
-                "songid" => res.songid = Some(value.parse()?),
-                "nextsong" => res.nextsong = Some(value.parse()?),
-                "nextsongid" => res.nextsongid = Some(value.parse()?),
-                "elapsed" => res.elapsed = Duration::from_secs_f32(value.parse()?),
-                "duration" => res.duration = Duration::from_secs_f32(value.parse()?),
-                "bitrate" => res.bitrate = Some(value.to_owned()),
-                "xfade" => res.xfade = Some(value.parse()?),
-                "mixrampdb" => res.mixrampdb = Some(value.to_owned()),
-                "mixrampdelay" => res.mixrampdelay = Some(value.to_owned()),
-                "audio" => res.audio = Some(value.to_owned()),
-                "updating_db" => res.updating_db = Some(value.parse()?),
-                "error" => res.error = Some(value.to_owned()),
-                "time" => {} // deprecated
-                key => tracing::warn!(
-                    message = "Encountered unknow key/value pair while parsing 'listfiles' command",
-                    key,
-                    value
-                ),
-            }
-        }
-        Ok(res)
     }
 }

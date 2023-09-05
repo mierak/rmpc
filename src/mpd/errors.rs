@@ -9,7 +9,7 @@ pub enum MpdError {
     Generic(String),
     ClientClosed,
     Mpd(MpdFailureResponse),
-    ValueExpected,
+    ValueExpected(String),
 }
 
 impl std::error::Error for MpdError {}
@@ -27,7 +27,7 @@ impl Display for MpdError {
             MpdError::Generic(msg) => write!(f, "GenericError: '{msg}'"),
             MpdError::ClientClosed => write!(f, "Client has been already closed."),
             MpdError::Mpd(err) => write!(f, "MpdError: '{err}'"),
-            MpdError::ValueExpected => write!(f, "Expected value from mpd but got nothing"),
+            MpdError::ValueExpected(val) => write!(f, "Expected value from mpd but got '{val}'"),
         }
     }
 }
@@ -134,6 +134,21 @@ enum ParseError {
     NoCommandIndex,
     InvalidCommandIndex,
     NoCurrentCommand,
+}
+impl From<anyhow::Error> for MpdError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Generic(value.to_string())
+    }
+}
+impl From<std::num::ParseIntError> for MpdError {
+    fn from(value: std::num::ParseIntError) -> Self {
+        Self::Parse(value.to_string())
+    }
+}
+impl From<std::num::ParseFloatError> for MpdError {
+    fn from(value: std::num::ParseFloatError) -> Self {
+        Self::Parse(value.to_string())
+    }
 }
 
 impl From<ParseError> for MpdError {
