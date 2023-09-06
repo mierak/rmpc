@@ -18,6 +18,11 @@ impl<T> std::fmt::Debug for MyVec<T> {
         write!(f, "MyVec {{ len={} }}", self.0.len())
     }
 }
+impl<T> MyVec<T> {
+    pub fn as_ref_mut(&mut self) -> &mut Vec<T> {
+        &mut self.0
+    }
+}
 
 pub struct MyVecDeque<T>(pub VecDeque<T>);
 impl<T> std::fmt::Debug for MyVecDeque<T> {

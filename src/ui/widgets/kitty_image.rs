@@ -315,11 +315,9 @@ const GRID: &[&str] = &[
 
 #[derive(Debug)]
 pub struct ImageState {
-    pub idx: u32,
-    pub needs_transfer: bool,
-    pub width: u8,
-    pub height: u16,
-    pub image: Option<MyVec<u8>>,
+    idx: u32,
+    image: Option<MyVec<u8>>,
+    needs_transfer: bool,
 }
 
 impl Default for ImageState {
@@ -327,10 +325,39 @@ impl Default for ImageState {
         Self {
             idx: 0,
             needs_transfer: true,
-            width: 0,
-            height: 0,
             image: None,
         }
+    }
+}
+
+impl ImageState {
+    /// Takes image data in buffer
+    /// Leaves the provided buffer empty if any data were in there
+    pub fn image(&mut self, image: &mut Option<MyVec<u8>>) -> &Self {
+        match (image.as_mut(), &mut self.image) {
+            (Some(ref mut v), None) => {
+                self.image = Some(crate::state::MyVec(std::mem::take(v.as_ref_mut())));
+                self.needs_transfer = true;
+                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.0.len()));
+            }
+            (Some(v), Some(i)) if v.ne(&i) && !v.0.is_empty() => {
+                self.image = Some(crate::state::MyVec(std::mem::take(v.as_ref_mut())));
+                self.needs_transfer = true;
+                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.0.len()));
+            }
+            (Some(v), Some(_)) => {
+                v.as_ref_mut().clear();
+            }
+            // The image is identical, should be in place already
+            (None, None) => {} // Default img should be in place already
+            (None, Some(_)) => {
+                // Show default img
+                self.image = None;
+                self.needs_transfer = true;
+            }
+        }
+
+        self
     }
 }
 

@@ -40,32 +40,6 @@ impl Screen for QueueScreen {
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        match (&mut app.album_art, &mut self.img_state.image) {
-            (Some(ref mut v), None) => {
-                self.img_state.image = Some(crate::state::MyVec(std::mem::take(&mut v.0)));
-                self.img_state.needs_transfer = true;
-                tracing::debug!(
-                    message = "New image received",
-                    size = app.album_art.as_ref().map(|a| a.0.len())
-                );
-            }
-            (Some(a), Some(i)) if a.ne(&i) && !a.0.is_empty() => {
-                self.img_state.image = Some(crate::state::MyVec(std::mem::take(&mut a.0)));
-                self.img_state.needs_transfer = true;
-                tracing::debug!(
-                    message = "New image received",
-                    size = app.album_art.as_ref().map(|a| a.0.len())
-                );
-            }
-            (Some(_), Some(_)) => {} // The image is identical, should be in place already
-            (None, None) => {}       // Default img should be in place already
-            (None, Some(_)) => {
-                // Show default img
-                self.img_state.image = None;
-                self.img_state.needs_transfer = true;
-            }
-        }
-
         let queue_len = app.queue.len().unwrap_or(0);
 
         let [img_section, queue_section] = *Layout::default()
@@ -84,6 +58,7 @@ impl Screen for QueueScreen {
 
         self.scrolling_state.viewport_len(Some(queue_section.height));
         self.scrolling_state.content_len(Some(u16::try_from(queue_len)?));
+        self.img_state.image(&mut app.album_art);
 
         let mut rows = Vec::with_capacity(queue_len);
         if let Some(queue) = app.queue.as_ref() {

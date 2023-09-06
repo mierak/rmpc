@@ -170,6 +170,7 @@ impl<'a> Client<'a> {
             let mut lines = read.lines();
             loop {
                 match Self::read_mpd_line(lines.next_line().await?)? {
+                    // TODO: we get ok when no image simply does not exist, which is a valid state
                     MpdLine::Ok => return Err(MpdError::Generic("Expected binary data but got 'OK'".to_owned())),
                     MpdLine::Value(val) => {
                         let (key, value) = split_line(val)?;
