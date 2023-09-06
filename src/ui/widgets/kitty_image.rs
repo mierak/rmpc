@@ -345,7 +345,7 @@ struct Data {
     img_height: u32,
 }
 impl<'a> KittyImage<'a> {
-    fn create_data_to_transfer(&self, image_data: &[u8], compression: Compression) -> Result<Data> {
+    fn create_data_to_transfer(image_data: &[u8], compression: Compression) -> Result<Data> {
         // todo query cell size and resize exactly
         let image = image::io::Reader::new(Cursor::new(image_data))
             .with_guessed_format()
@@ -372,7 +372,7 @@ impl<'a> KittyImage<'a> {
         })
     }
 
-    fn create_unicode_placeholder_grid(&self, cols: usize, rows: usize, state: &ImageState) -> Result<Text<'static>> {
+    fn create_unicode_placeholder_grid(cols: usize, rows: usize, state: &ImageState) -> Result<Text<'static>> {
         let mut res = String::new();
         for row in GRID.iter().take(rows) {
             for col in GRID.iter().take(cols) {
@@ -385,29 +385,73 @@ impl<'a> KittyImage<'a> {
         Ok(res.into_text()?)
     }
 
+    fn is_inside_tmux() -> bool {
+        std::env::var("TERM_PROGRAM").is_ok_and(|v| !v.is_empty())
+    }
+
+    fn is_tmux_passthrough_enabled() -> Result<bool> {
+        let mut cmd = std::process::Command::new("tmux");
+        let cmd = cmd.args(["show", "-Ap", "allow-passthrough"]);
+        let stdout = cmd.output()?.stdout;
+
+        Ok(String::from_utf8_lossy(&stdout).trim_end().ends_with("on"))
+    }
+
+    fn enable_tmux_passthrough() -> Result<()> {
+        let mut cmd = std::process::Command::new("tmux");
+        let cmd = cmd.args(["set", "-p", "allow-passthrough"]);
+        match cmd.output() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow::anyhow!("Failed to enable tmux passthrough, '{e}'")),
+        }
+    }
+
     fn transfer_data(
-        &self,
         content: &str,
         cols: usize,
         rows: usize,
         img_width: u32,
         img_height: u32,
         state: &mut ImageState,
-    ) {
+    ) -> Result<()> {
         let mut iter = content.chars().peekable();
 
         let first: String = iter.by_ref().take(4096).collect();
 
-        print!(
-            "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
-            state.idx, img_width, img_height, cols, rows, first
-        );
+        if KittyImage::is_inside_tmux() {
+            if !KittyImage::is_tmux_passthrough_enabled()? {
+                KittyImage::enable_tmux_passthrough()?;
+            }
 
-        while iter.peek().is_some() {
-            let chunk: String = iter.by_ref().take(4096).collect();
-            let m = i32::from(iter.peek().is_some());
-            print!("\x1b_Gm={m};{chunk}\x1b\\");
+            // delete all images
+            print!("\x1bPtmux;\x1b\x1b_Ga=d\x1b\x1b\\\x1b\\");
+
+            print!(
+                "\x1bPtmux;\x1b\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\x1b\\\x1b\\",
+                state.idx, img_width, img_height, cols, rows, first
+            );
+
+            while iter.peek().is_some() {
+                let chunk: String = iter.by_ref().take(4096).collect();
+                let m = i32::from(iter.peek().is_some());
+                print!("\x1bPtmux;\x1b\x1b_Gm={m};{chunk}\x1b\x1b\\\x1b\\");
+            }
+        } else {
+            // delete all images
+            print!("\x1b_Ga=d\x1b\\");
+
+            print!(
+                "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
+                state.idx, img_width, img_height, cols, rows, first
+            );
+
+            while iter.peek().is_some() {
+                let chunk: String = iter.by_ref().take(4096).collect();
+                let m = i32::from(iter.peek().is_some());
+                print!("\x1b_Gm={m};{chunk}\x1b\\");
+            }
         }
+        Ok(())
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -441,18 +485,27 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             state.needs_transfer = false;
             state.idx = state.idx.wrapping_add(1);
 
-            // delete all images
-            print!("\x1b_Ga=d\x1b\\");
-
-            match self.create_data_to_transfer(image, Compression::new(6)) {
-                Ok(data) => self.transfer_data(&data.content, width, height, data.img_width, data.img_height, state),
+            match KittyImage::create_data_to_transfer(image, Compression::new(6)) {
+                Ok(data) => {
+                    match KittyImage::transfer_data(
+                        &data.content,
+                        width,
+                        height,
+                        data.img_width,
+                        data.img_height,
+                        state,
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => tracing::error!(message = "Failed to transfer data", error = ?e),
+                    };
+                }
                 Err(e) => {
                     tracing::error!(message = "Failed to transfer image data", error = ?e);
                 }
             }
         }
 
-        match self.create_unicode_placeholder_grid(width, height, state) {
+        match KittyImage::create_unicode_placeholder_grid(width, height, state) {
             Ok(res) => Paragraph::new(res).alignment(Alignment::Center).render(area, buf),
             Err(e) => tracing::error!(message = "Failed to construct unicode placeholder grid", error = ?e),
         };
