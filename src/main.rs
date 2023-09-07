@@ -11,7 +11,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
-use config::{Args, ConfigFile};
+use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
@@ -59,75 +59,89 @@ fn read_cfg(args: &Args) -> Result<Config> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let (tx, rx) = tokio::sync::mpsc::channel::<AppEvent>(1024);
-    let _guards = logging::configure(args.log, &tx.clone());
-    let tx_clone = tx.clone();
-    let (render_tx, render_rx) = tokio::sync::mpsc::channel::<()>(1024);
-    let is_aborted = Arc::new(Mutex::new(false));
-    let config = match read_cfg(&args) {
-        Ok(val) => val,
-        Err(err) => {
-            warn!(message = "Using default config", ?err);
-            ConfigFile::default().into()
+    match &args.command {
+        Some(Command::Config) => {
+            println!(
+                "{}",
+                ron::ser::to_string_pretty(
+                    &ConfigFile::default(),
+                    ron::ser::PrettyConfig::default().depth_limit(3).struct_names(false),
+                )?
+            );
+            return Ok(());
         }
-    };
+        None => {
+            let (tx, rx) = tokio::sync::mpsc::channel::<AppEvent>(1024);
+            let _guards = logging::configure(args.log, &tx.clone());
+            let tx_clone = tx.clone();
+            let (render_tx, render_rx) = tokio::sync::mpsc::channel::<()>(1024);
+            let is_aborted = Arc::new(Mutex::new(false));
+            let config = Box::leak(Box::new(match read_cfg(&args) {
+                Ok(val) => val,
+                Err(err) => {
+                    warn!(message = "Using default config", ?err);
+                    ConfigFile::default().into()
+                }
+            }));
 
-    let mut client = try_ret!(
-        Client::init(config.address, Some("command"), true).await,
-        "Failed to connect to mpd"
-    );
-    let terminal = Arc::new(Mutex::new(try_ret!(ui::setup_terminal(), "Failed to setup terminal")));
-    let state = Arc::new(Mutex::new(try_ret!(
-        state::State::try_new(&mut client, ConfigFile::default().into()).await,
-        "Failed to create app state"
-    )));
-    let ui = Arc::new(Mutex::new(Ui::new(client)));
+            let mut client = try_ret!(
+                Client::init(config.address, Some("command"), true).await,
+                "Failed to connect to mpd"
+            );
+            let terminal = Arc::new(Mutex::new(try_ret!(ui::setup_terminal(), "Failed to setup terminal")));
+            let state = Arc::new(Mutex::new(try_ret!(
+                state::State::try_new(&mut client, config).await,
+                "Failed to create app state"
+            )));
+            let ui = Arc::new(Mutex::new(Ui::new(client)));
 
-    let mut render_loop = RenderLoop::new(Arc::clone(&state), render_tx.clone());
-    if state.lock().await.status.state == mpd::commands::status::State::Play {
-        render_loop.start(config.address).await;
+            let mut render_loop = RenderLoop::new(Arc::clone(&state), render_tx.clone());
+            if state.lock().await.status.state == mpd::commands::status::State::Play {
+                render_loop.start(config.address).await;
+            }
+
+            let main_task = tokio::spawn(main_task(Arc::clone(&ui), Arc::clone(&state), rx, render_tx.clone()));
+            let render_task = tokio::task::spawn(render_task(render_rx, ui, Arc::clone(&state), Arc::clone(&terminal)));
+            let ab = Arc::clone(&is_aborted);
+            let input_task = tokio::task::spawn_blocking(move || event_poll(tx_clone, ab));
+            let idle_task = tokio::task::spawn(idle_task(
+                try_ret!(
+                    Client::init(config.address, Some("idle"), true).await,
+                    "Failed to connect to mpd with idle client"
+                ),
+                try_ret!(
+                    Client::init(config.address, Some("state"), true).await,
+                    "Failed to connect to mpd with state client"
+                ),
+                render_loop,
+                Arc::clone(&state),
+                render_tx.clone(),
+            ));
+
+            let original_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |panic| {
+                crossterm::terminal::disable_raw_mode().expect("Disabling of raw mode to succeed");
+                crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen)
+                    .expect("Exit from alternate screen to succeed");
+                original_hook(panic);
+            }));
+
+            info!(message = "Application initialized successfully", ?config);
+            try_ret!(render_tx.send(()).await, "Failed to render first frame");
+            try_ret!(
+                tokio::select! {
+                    v = idle_task => v,
+                    v = main_task => v,
+                    v = render_task => v,
+                    v = input_task => v,
+                },
+                "A task panicked. This should not happen, please check logs."
+            );
+            *is_aborted.lock().await = true;
+
+            ui::restore_terminal(&mut *terminal.lock().await).expect("Terminal restore to succeed");
+        }
     }
-
-    let main_task = tokio::spawn(main_task(Arc::clone(&ui), Arc::clone(&state), rx, render_tx.clone()));
-    let render_task = tokio::task::spawn(render_task(render_rx, ui, Arc::clone(&state), Arc::clone(&terminal)));
-    let ab = Arc::clone(&is_aborted);
-    let input_task = tokio::task::spawn_blocking(move || event_poll(tx_clone, ab));
-    let idle_task = tokio::task::spawn(idle_task(
-        try_ret!(
-            Client::init(config.address, Some("idle"), true).await,
-            "Failed to connect to mpd with idle client"
-        ),
-        try_ret!(
-            Client::init(config.address, Some("state"), true).await,
-            "Failed to connect to mpd with state client"
-        ),
-        render_loop,
-        Arc::clone(&state),
-        render_tx.clone(),
-    ));
-
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
-        crossterm::terminal::disable_raw_mode().expect("Disabling of raw mode to succeed");
-        crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen)
-            .expect("Exit from alternate screen to succeed");
-        original_hook(panic);
-    }));
-
-    info!("Application initialized successfully");
-    try_ret!(render_tx.send(()).await, "Failed to render first frame");
-    try_ret!(
-        tokio::select! {
-            v = idle_task => v,
-            v = main_task => v,
-            v = render_task => v,
-            v = input_task => v,
-        },
-        "A task panicked. This should not happen, please check logs."
-    );
-    *is_aborted.lock().await = true;
-
-    ui::restore_terminal(&mut *terminal.lock().await).expect("Terminal restore to succeed");
 
     Ok(())
 }
@@ -211,11 +225,13 @@ async fn idle_task(
                         .as_ref()
                         .and_then(|p| p.0.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
                     {
-                        state.album_art = try_cont!(
-                            client.find_album_art(&current_song.file).await,
-                            "Failed to get find album art"
-                        )
-                        .map(state::MyVec);
+                        if !state.config.disable_images {
+                            state.album_art = try_cont!(
+                                client.find_album_art(&current_song.file).await,
+                                "Failed to get find album art"
+                            )
+                            .map(state::MyVec);
+                        }
                     }
                     if state.status.state == mpd::commands::status::State::Play {
                         render_loop.start(state.config.address).await;

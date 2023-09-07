@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use tracing::Level;
@@ -21,6 +21,14 @@ pub struct Args {
     pub config: PathBuf,
     #[arg(short, long, default_value_t = Level::DEBUG)]
     pub log: Level,
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+pub enum Command {
+    /// Prints the default config.
+    Config,
 }
 
 fn get_default_config_path() -> PathBuf {
@@ -47,6 +55,7 @@ pub struct Key {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigFile {
     pub address: String,
+    pub disable_images: Option<bool>,
     pub keybinds: KeyConfigFile,
 }
 
@@ -65,6 +74,7 @@ impl Default for ConfigFile {
         Self {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
+            disable_images: None,
         }
     }
 }
@@ -147,6 +157,7 @@ impl From<ConfigFile> for Config {
     fn from(value: ConfigFile) -> Self {
         Self {
             address: Box::leak(Box::new(value.address)),
+            disable_images: value.disable_images.unwrap_or(false),
             keybinds: KeyConfig {
                 global: value.keybinds.global.into_iter().map(|(k, v)| (v, k)).collect(),
                 albums: value.keybinds.albums.into_iter().map(|(k, v)| (v, k)).collect(),
@@ -168,11 +179,14 @@ impl From<KeyEvent> for Key {
     }
 }
 
+#[derive(Debug)]
 pub struct Config {
     pub address: &'static str,
     pub keybinds: KeyConfig,
+    pub disable_images: bool,
 }
 
+#[derive(Debug)]
 pub struct KeyConfig {
     pub global: HashMap<Key, GlobalAction>,
     pub albums: HashMap<Key, AlbumsActions>,

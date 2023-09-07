@@ -41,12 +41,13 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let queue_len = app.queue.len().unwrap_or(0);
+        let show_image = !app.config.disable_images;
 
         let [img_section, queue_section] = *Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                         Constraint::Percentage(35),
-                         Constraint::Percentage(65),
+                         Constraint::Percentage(if show_image {35 } else {0}),
+                         Constraint::Percentage(if show_image {65 } else {100}),
             ].as_ref()).split(area) else { return Ok(()) };
 
         let [table_header_section, mut queue_section] = *Layout::default()
@@ -58,7 +59,9 @@ impl Screen for QueueScreen {
 
         self.scrolling_state.viewport_len(Some(queue_section.height));
         self.scrolling_state.content_len(Some(u16::try_from(queue_len)?));
-        self.img_state.image(&mut app.album_art);
+        if show_image {
+            self.img_state.image(&mut app.album_art);
+        }
 
         let mut rows = Vec::with_capacity(queue_len);
         if let Some(queue) = app.queue.as_ref() {
@@ -119,11 +122,13 @@ impl Screen for QueueScreen {
             }),
             &mut self.scrolling_state.scrollbar_state,
         );
-        frame.render_stateful_widget(
-            KittyImage::default().block(Block::default().borders(Borders::TOP)),
-            img_section,
-            &mut self.img_state,
-        );
+        if show_image {
+            frame.render_stateful_widget(
+                KittyImage::default().block(Block::default().borders(Borders::TOP)),
+                img_section,
+                &mut self.img_state,
+            );
+        }
 
         Ok(())
     }
