@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Rect},
     Frame,
@@ -29,6 +28,7 @@ pub enum Screens {
 
 #[async_trait]
 pub trait Screen {
+    type Actions;
     fn render<B: Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -59,7 +59,7 @@ pub trait Screen {
 
     async fn handle_key(
         &mut self,
-        key: KeyEvent,
+        action: Self::Actions,
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
@@ -163,6 +163,14 @@ pub mod dirstack {
         pub fn prev(&mut self) {
             self.current.1.prev();
         }
+
+        pub fn next_half_viewport(&mut self) {
+            self.current.1.next_half_viewport();
+        }
+
+        pub fn prev_half_viewport(&mut self) {
+            self.current.1.prev_half_viewport();
+        }
     }
 
     #[derive(Debug, Default)]
@@ -233,6 +241,40 @@ pub mod dirstack {
                     None => 0,
                 };
                 self.select(Some(i));
+            } else {
+                self.select(None);
+            }
+        }
+
+        pub fn next_half_viewport(&mut self) {
+            if let Some(item_count) = self.content_len {
+                if let Some(viewport) = self.viewport_len {
+                    let i = match self.get_selected() {
+                        Some(i) => i
+                            .saturating_add(viewport as usize / 2)
+                            .min(item_count.saturating_sub(1) as usize),
+                        None => 0,
+                    };
+                    self.select(Some(i));
+                } else {
+                    self.select(None);
+                }
+            } else {
+                self.select(None);
+            }
+        }
+
+        pub fn prev_half_viewport(&mut self) {
+            if self.content_len.is_some() {
+                if let Some(viewport) = self.viewport_len {
+                    let i = match self.get_selected() {
+                        Some(i) => i.saturating_sub(viewport as usize / 2).max(0),
+                        None => 0,
+                    };
+                    self.select(Some(i));
+                } else {
+                    self.select(None);
+                }
             } else {
                 self.select(None);
             }

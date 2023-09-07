@@ -22,7 +22,7 @@ pub struct Client<'a> {
     rx: BufReader<OwnedReadHalf>,
     tx: OwnedWriteHalf,
     reconnect: bool,
-    addr: String,
+    addr: &'static str,
 }
 
 impl std::fmt::Debug for Client<'_> {
@@ -38,7 +38,7 @@ impl std::fmt::Debug for Client<'_> {
 #[allow(dead_code)]
 impl<'a> Client<'a> {
     #[tracing::instrument]
-    pub async fn init(addr: String, name: Option<&'a str>, reconnect: bool) -> MpdResult<Client<'a>> {
+    pub async fn init(addr: &'static str, name: Option<&'a str>, reconnect: bool) -> MpdResult<Client<'a>> {
         let stream = TcpStream::connect(&addr).await?;
         let (rx, tx) = stream.into_split();
         let mut rx = BufReader::new(rx);

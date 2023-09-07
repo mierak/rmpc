@@ -4,13 +4,14 @@
     clippy::unused_self,
     clippy::unnested_or_patterns,
     clippy::match_same_arms,
-    clippy::manual_let_else
+    clippy::manual_let_else,
+    clippy::needless_return
 )]
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
-use config::Config;
+use config::{Args, ConfigFile};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
@@ -22,6 +23,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 use ui::Level;
 
 use crate::{
+    config::Config,
     mpd::mpd_client::MpdClient,
     ui::Ui,
     utils::macros::{try_cont, try_ret},
@@ -47,29 +49,43 @@ pub enum AppEvent {
     Log(Vec<u8>),
 }
 
+fn read_cfg(args: &Args) -> Result<Config> {
+    let file = std::fs::File::open(&args.config)?;
+    let read = std::io::BufReader::new(file);
+    let res: ConfigFile = ron::de::from_reader(read)?;
+    Ok(res.into())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let config = Config::parse();
+    let args = Args::parse();
     let (tx, rx) = tokio::sync::mpsc::channel::<AppEvent>(1024);
+    let _guards = logging::configure(args.log, &tx.clone());
     let tx_clone = tx.clone();
     let (render_tx, render_rx) = tokio::sync::mpsc::channel::<()>(1024);
-    let _guards = logging::configure(config.log, &tx.clone());
     let is_aborted = Arc::new(Mutex::new(false));
+    let config = match read_cfg(&args) {
+        Ok(val) => val,
+        Err(err) => {
+            warn!(message = "Using default config", ?err);
+            ConfigFile::default().into()
+        }
+    };
 
     let mut client = try_ret!(
-        Client::init(config.mpd_address.clone(), Some("command"), true).await,
+        Client::init(config.address, Some("command"), true).await,
         "Failed to connect to mpd"
     );
     let terminal = Arc::new(Mutex::new(try_ret!(ui::setup_terminal(), "Failed to setup terminal")));
     let state = Arc::new(Mutex::new(try_ret!(
-        state::State::try_new(&mut client).await,
+        state::State::try_new(&mut client, ConfigFile::default().into()).await,
         "Failed to create app state"
     )));
     let ui = Arc::new(Mutex::new(Ui::new(client)));
 
     let mut render_loop = RenderLoop::new(Arc::clone(&state), render_tx.clone());
     if state.lock().await.status.state == mpd::commands::status::State::Play {
-        render_loop.start().await;
+        render_loop.start(config.address).await;
     }
 
     let main_task = tokio::spawn(main_task(Arc::clone(&ui), Arc::clone(&state), rx, render_tx.clone()));
@@ -78,11 +94,11 @@ async fn main() -> Result<()> {
     let input_task = tokio::task::spawn_blocking(move || event_poll(tx_clone, ab));
     let idle_task = tokio::task::spawn(idle_task(
         try_ret!(
-            Client::init(config.mpd_address.clone(), Some("idle"), true).await,
+            Client::init(config.address, Some("idle"), true).await,
             "Failed to connect to mpd with idle client"
         ),
         try_ret!(
-            Client::init(config.mpd_address.clone(), Some("state"), true).await,
+            Client::init(config.address, Some("state"), true).await,
             "Failed to connect to mpd with state client"
         ),
         render_loop,
@@ -130,8 +146,8 @@ async fn main_task(
 
             match event {
                 AppEvent::UserInput(Event::Key(key)) => match ui.handle_key(key, &mut state).await {
-                    Ok(ui::Render::Yes) => continue,
-                    Ok(ui::Render::No) => {
+                    Ok(ui::Render::No) => continue,
+                    Ok(ui::Render::Yes) => {
                         if let Err(err) = render_sender.send(()).await {
                             error!(messgae = "Failed to send render request", error = ?err);
                         }
@@ -202,7 +218,7 @@ async fn idle_task(
                         .map(state::MyVec);
                     }
                     if state.status.state == mpd::commands::status::State::Play {
-                        render_loop.start().await;
+                        render_loop.start(state.config.address).await;
                     } else {
                         render_loop.stop().await;
                     }
@@ -316,7 +332,7 @@ impl RenderLoop {
         }
     }
 
-    async fn start(&mut self) -> bool {
+    async fn start(&mut self, addr: &'static str) -> bool {
         if self.handle.is_none() {
             debug!("Started update loop");
 
@@ -325,7 +341,7 @@ impl RenderLoop {
 
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             self.handle = Some(tokio::spawn(async move {
-                let mut client = match Client::init("127.0.0.1:6600".to_owned(), Some("status_loop"), true).await {
+                let mut client = match Client::init(addr, Some("status_loop"), true).await {
                     Ok(client) => client,
                     Err(e) => {
                         error!(message = "Unable to start status update loop", ?e);

@@ -10,8 +10,8 @@ ansi-to-tui = "3.1.0"
 anyhow = "1.0.72"
 async-trait = "0.1.73"
 base64 = "0.21.2"
-clap = { version = "4.3.19", features = ["derive", "cargo" ] }
-crossterm = { version = "0.27.0", features = ["event-stream"] }
+clap = { version = "4.3.19", features = ["derive", "cargo", "string" ] }
+crossterm = { version = "0.27.0", features = ["serde"] }
 image = "0.24.7"
 ratatui = { version = "0.23.0", features = ["all-widgets"] }
 serde = { version = "1.0.182", features = ["derive"] }
@@ -24,3 +24,4 @@ tracing-subscriber = { version = "0.3.17", features = ["time", "ansi"] }
 flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
 tracing-appender = "0.2.2"
 itertools = "0.11.0"
+ron = "0.8.1"

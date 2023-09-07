@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Backend, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -42,6 +41,7 @@ impl Default for DirectoriesScreen {
 
 #[async_trait]
 impl Screen for DirectoriesScreen {
+    type Actions = DirectoriesActions;
     fn render<B: Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -142,23 +142,29 @@ impl Screen for DirectoriesScreen {
     #[instrument(skip_all)]
     async fn handle_key(
         &mut self,
-        key: KeyEvent,
+        action: Self::Actions,
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<Render> {
-        match key.code {
-            KeyCode::Char('j') | KeyCode::Down => {
+        match action {
+            DirectoriesActions::Down => {
                 self.dirs.next();
                 self.prepare_preview(_client).await?;
-                return Ok(Render::No);
             }
-            KeyCode::Char('k') | KeyCode::Up => {
+            DirectoriesActions::Up => {
                 self.dirs.prev();
                 self.prepare_preview(_client).await?;
-                return Ok(Render::No);
             }
-            KeyCode::Char('a') => match self.dirs.get_selected() {
+            DirectoriesActions::DownHalf => {
+                self.dirs.next_half_viewport();
+                self.prepare_preview(_client).await?;
+            }
+            DirectoriesActions::UpHalf => {
+                self.dirs.prev_half_viewport();
+                self.prepare_preview(_client).await?;
+            }
+            DirectoriesActions::AddAll => match self.dirs.get_selected() {
                 Some(FileOrDir::Dir(dir)) => {
                     _client.add(&dir.full_path).await?;
                     _shared.status_message = Some(StatusMessage::new(
@@ -179,38 +185,44 @@ impl Screen for DirectoriesScreen {
                 }
                 None => {}
             },
-            KeyCode::Enter | KeyCode::Char('l') => {
-                match self.dirs.get_selected() {
-                    Some(FileOrDir::Dir(dir)) => {
-                        let new_current = _client.lsinfo(Some(&dir.full_path)).await?.0;
-                        self.dirs.push(new_current);
+            DirectoriesActions::Enter => match self.dirs.get_selected() {
+                Some(FileOrDir::Dir(dir)) => {
+                    let new_current = _client.lsinfo(Some(&dir.full_path)).await?.0;
+                    self.dirs.push(new_current);
 
-                        self.prepare_preview(_client).await?;
-                    }
-                    Some(FileOrDir::File(song)) => {
-                        _client.add(&song.file).await?;
-                        _shared.status_message = Some(StatusMessage::new(
-                            format!(
-                                "'{}' by '{}' added to queue",
-                                song.title.as_ref().map_or("Untitled", |v| v.as_str()),
-                                song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
-                            ),
-                            Level::Info,
-                        ));
-                    }
-                    None => {}
+                    self.prepare_preview(_client).await?;
                 }
-                return Ok(Render::No);
-            }
-            KeyCode::Char('h') => {
+                Some(FileOrDir::File(song)) => {
+                    _client.add(&song.file).await?;
+                    _shared.status_message = Some(StatusMessage::new(
+                        format!(
+                            "'{}' by '{}' added to queue",
+                            song.title.as_ref().map_or("Untitled", |v| v.as_str()),
+                            song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
+                        ),
+                        Level::Info,
+                    ));
+                }
+                None => {}
+            },
+            DirectoriesActions::Leave => {
                 self.dirs.pop();
                 self.prepare_preview(_client).await?;
-                return Ok(Render::No);
             }
-            _ => {}
         }
-        Ok(Render::Yes)
+        return Ok(Render::Yes);
     }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum DirectoriesActions {
+    Down,
+    Up,
+    DownHalf,
+    UpHalf,
+    Enter,
+    Leave,
+    AddAll,
 }
 
 impl DirectoriesScreen {

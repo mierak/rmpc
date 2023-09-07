@@ -10,7 +10,6 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -33,6 +32,7 @@ pub struct QueueScreen {
 
 #[async_trait]
 impl Screen for QueueScreen {
+    type Actions = QueueuActions;
     fn render<B: Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -141,29 +141,23 @@ impl Screen for QueueScreen {
 
     async fn handle_key(
         &mut self,
-        key: KeyEvent,
+        action: Self::Actions,
         client: &mut Client<'_>,
         app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<Render> {
-        match key.code {
-            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        match action {
+            QueueuActions::DownHalf => {
                 if !app.queue.is_empty_or_none() {
-                    for _ in 0..5 {
-                        self.scrolling_state.next();
-                    }
+                    self.scrolling_state.next_half_viewport();
                 }
-                return Ok(Render::No);
             }
-            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            QueueuActions::UpHalf => {
                 if !app.queue.is_empty_or_none() {
-                    for _ in 0..5 {
-                        self.scrolling_state.prev();
-                    }
+                    self.scrolling_state.prev_half_viewport();
                 }
-                return Ok(Render::No);
             }
-            KeyCode::Char('d') => {
+            QueueuActions::Delete => {
                 if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                     match client.delete_id(selected_song.id).await {
                         Ok(_) => {}
@@ -173,41 +167,51 @@ impl Screen for QueueScreen {
                     error!("No song selected");
                 }
             }
-            KeyCode::Char('D') => app.visible_modal = Some(Modals::ConfirmQueueClear),
-            KeyCode::Char(' ') if app.status.state == MpdState::Play || app.status.state == MpdState::Pause => {
+            QueueuActions::DeleteAll => app.visible_modal = Some(Modals::ConfirmQueueClear),
+            QueueuActions::TogglePause if app.status.state == MpdState::Play || app.status.state == MpdState::Pause => {
                 client.pause_toggle().await?;
             }
-            KeyCode::Enter => {
+            QueueuActions::Play => {
                 if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                     client.play_id(selected_song.id).await?;
                 }
             }
-            KeyCode::Up | KeyCode::Char('k') => {
+            QueueuActions::Up => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.prev();
                 }
-                return Ok(Render::No);
             }
-            KeyCode::Down | KeyCode::Char('j') => {
+            QueueuActions::Down => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.next();
                 }
-                return Ok(Render::No);
             }
-            KeyCode::Char('G') => {
+            QueueuActions::Bottom => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.last();
                 }
-                return Ok(Render::No);
             }
-            KeyCode::Char('g') => {
+            QueueuActions::Top => {
                 if !app.queue.is_empty_or_none() {
                     self.scrolling_state.first();
                 }
-                return Ok(Render::No);
             }
-            _ => {}
+            QueueuActions::TogglePause => {}
         };
         Ok(Render::Yes)
     }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum QueueuActions {
+    Delete,
+    DeleteAll,
+    Down,
+    DownHalf,
+    Up,
+    UpHalf,
+    Top,
+    Bottom,
+    TogglePause,
+    Play,
 }

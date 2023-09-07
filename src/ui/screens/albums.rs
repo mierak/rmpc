@@ -7,7 +7,6 @@ use crate::{
 use super::{artists::SongOrTagExt, dirstack::DirStack, Screen};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use ratatui::{
     prelude::{Constraint, Layout},
@@ -52,6 +51,8 @@ impl AlbumsScreen {
 
 #[async_trait]
 impl Screen for AlbumsScreen {
+    type Actions = AlbumsActions;
+
     fn render<B: ratatui::prelude::Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -163,32 +164,37 @@ impl Screen for AlbumsScreen {
 
     async fn handle_key(
         &mut self,
-        key: KeyEvent,
+        action: Self::Actions,
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<Render> {
-        match key.code {
-            KeyCode::Char('j') | KeyCode::Down => {
+        match action {
+            AlbumsActions::Down => {
                 self.stack.next();
                 self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-                return Ok(Render::No);
             }
-            KeyCode::Char('k') | KeyCode::Up => {
+            AlbumsActions::Up => {
                 self.stack.prev();
                 self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-                return Ok(Render::No);
             }
-            KeyCode::Char('h') => {
+            AlbumsActions::DownHalf => {
+                self.stack.next_half_viewport();
+                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+            }
+            AlbumsActions::UpHalf => {
+                self.stack.prev_half_viewport();
+                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+            }
+            AlbumsActions::Leave => {
                 self.stack.pop();
                 self.position = match &mut self.position {
                     CurrentPosition::Album(val) => CurrentPosition::Album(val.prev()),
                     CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
                 };
                 self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-                return Ok(Render::No);
             }
-            KeyCode::Char('l') | KeyCode::Enter => {
+            AlbumsActions::Enter => {
                 let idx = self
                     .stack
                     .current()
@@ -211,13 +217,20 @@ impl Screen for AlbumsScreen {
                     }
                 };
                 self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-
-                return Ok(Render::No);
             }
-            _ => {}
-        };
-        Ok(Render::Yes)
+        }
+        return Ok(Render::Yes);
     }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum AlbumsActions {
+    Down,
+    Up,
+    DownHalf,
+    UpHalf,
+    Enter,
+    Leave,
 }
 
 #[derive(Debug)]

@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::{
+    config::Config,
     mpd::{
         client::Client,
         commands::{Song, Songs, Status},
@@ -32,6 +33,7 @@ impl<T> std::fmt::Debug for MyVecDeque<T> {
 }
 
 pub struct State {
+    pub config: Config,
     pub active_tab: Screens,
     pub visible_modal: Option<Modals>,
     pub status: Status,
@@ -56,7 +58,7 @@ impl std::fmt::Debug for State {
 
 impl State {
     #[instrument(ret, skip_all)]
-    pub async fn try_new(client: &mut Client<'_>) -> Result<Self> {
+    pub async fn try_new(client: &mut Client<'_>, config: Config) -> Result<Self> {
         let current_song = client.get_current_song().await?;
         let queue = client.playlist_info().await?;
         let status = client.get_status().await?;
@@ -71,6 +73,7 @@ impl State {
         };
 
         Ok(Self {
+            config,
             active_tab: Screens::default(),
             visible_modal: None,
             status,

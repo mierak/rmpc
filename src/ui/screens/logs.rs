@@ -1,7 +1,6 @@
 use ansi_to_tui::IntoText;
 use anyhow::Result;
 use async_trait::async_trait;
-use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Margin, Rect},
@@ -26,6 +25,7 @@ pub struct LogsScreen {
 
 #[async_trait]
 impl Screen for LogsScreen {
+    type Actions = LogsActions;
     fn render<B: Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -112,34 +112,25 @@ impl Screen for LogsScreen {
 
     async fn handle_key(
         &mut self,
-        key: KeyEvent,
+        action: Self::Actions,
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<Render> {
-        match key.code {
-            KeyCode::Char('j') => {
-                self.scrolling_state.next();
-                return Ok(Render::No);
-            }
-            KeyCode::Char('k') => {
-                self.scrolling_state.prev();
-                return Ok(Render::No);
-            }
-            KeyCode::Char('d') => {
-                for _ in 0..5 {
-                    self.scrolling_state.next();
-                }
-                return Ok(Render::No);
-            }
-            KeyCode::Char('u') => {
-                for _ in 0..5 {
-                    self.scrolling_state.prev();
-                }
-                return Ok(Render::No);
-            }
-            _ => {}
+        match action {
+            LogsActions::Down => self.scrolling_state.next(),
+            LogsActions::Up => self.scrolling_state.prev(),
+            LogsActions::DownHalf => self.scrolling_state.next_half_viewport(),
+            LogsActions::UpHalf => self.scrolling_state.prev_half_viewport(),
         }
         Ok(Render::Yes)
     }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum LogsActions {
+    Down,
+    Up,
+    DownHalf,
+    UpHalf,
 }
