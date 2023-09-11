@@ -21,15 +21,30 @@ impl<'a> ProgressBar<'a> {
         self
     }
 
-    pub const fn fg(mut self, color: Color) -> Self {
+    pub fn fg(mut self, color: Color) -> Self {
         self.elapsed_style = self.elapsed_style.fg(color);
         self.thumb_style = self.thumb_style.fg(color);
         self
     }
 
-    pub const fn bg(mut self, color: Color) -> Self {
-        self.track_style = self.track_style.bg(color);
+    pub fn bg(mut self, color: Color) -> Self {
+        self.track_style = self.track_style.fg(color);
         self.thumb_style = self.thumb_style.bg(color);
+        self
+    }
+
+    pub fn track_char(mut self, track: &'a str) -> Self {
+        self.track_char = track;
+        self
+    }
+
+    pub fn thumb_char(mut self, thumb: &'a str) -> Self {
+        self.thumb_char = thumb;
+        self
+    }
+
+    pub fn elapsed_char(mut self, elapsed: &'a str) -> Self {
+        self.elapsed_char = elapsed;
         self
     }
 }

@@ -1,12 +1,13 @@
 use crate::{
     mpd::{client::Client, commands::Song as MpdSong, mpd_client::Filter, mpd_client::MpdClient},
     state::State,
-    ui::{screens::directories::FileOrDirExt, Level, Render, SharedUiState, StatusMessage},
+    ui::{KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{artists::SongOrTagExt, dirstack::DirStack, Screen};
+use super::{dirstack::DirStack, CommonAction, Screen, SongOrTagExt, ToListItems};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use crossterm::event::KeyEvent;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use ratatui::{
     prelude::{Constraint, Layout},
@@ -34,7 +35,7 @@ impl Default for AlbumsScreen {
 
 impl AlbumsScreen {
     #[instrument]
-    async fn prepare_preview(&mut self, client: &mut Client<'_>) -> Result<Vec<ListItem<'static>>> {
+    async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Vec<ListItem<'static>>> {
         let idx = self
             .stack
             .current()
@@ -43,8 +44,8 @@ impl AlbumsScreen {
             .context("Expected an item to be selected")?;
         let current = &self.stack.current().0[idx];
         Ok(match &self.position {
-            CurrentPosition::Album(val) => val.fetch(client, current).await?.to_listitems(true),
-            CurrentPosition::Song(val) => val.fetch(client, current).await?.to_listitems(),
+            CurrentPosition::Album(val) => val.fetch(client, current).await?.to_listitems(true, state),
+            CurrentPosition::Song(val) => val.fetch(client, current).await?.to_listitems(state),
         })
     }
 }
@@ -57,7 +58,7 @@ impl Screen for AlbumsScreen {
         &mut self,
         frame: &mut Frame<B>,
         area: Rect,
-        _app: &mut State,
+        app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         let [previous_area, current_area, preview_area] = *Layout::default()
@@ -77,7 +78,7 @@ impl Screen for AlbumsScreen {
 
         {
             let (prev_items, prev_state) = self.stack.previous();
-            let prev_items = prev_items.to_listitems(false);
+            let prev_items = prev_items.to_listitems(false, app);
             prev_state.content_len(Some(u16::try_from(prev_items.len())?));
             prev_state.viewport_len(Some(previous_area.height));
 
@@ -106,9 +107,9 @@ impl Screen for AlbumsScreen {
         {
             let (current_items, current_state) = &mut self.stack.current();
             let current_items = if let CurrentPosition::Song(_) = self.position {
-                current_items.to_listitems(true)
+                current_items.to_listitems(true, app)
             } else {
-                current_items.to_listitems(false)
+                current_items.to_listitems(false, app)
             };
             current_state.content_len(Some(u16::try_from(current_items.len())?));
             current_state.viewport_len(Some(current_area.height));
@@ -152,7 +153,10 @@ impl Screen for AlbumsScreen {
             Some(result) => {
                 self.stack = DirStack::new(result.0);
                 self.position = CurrentPosition::default();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+                self.next = self
+                    .prepare_preview(_client, _app)
+                    .await
+                    .context("Cannot prepare preview")?;
             }
             None => {
                 _shared.status_message = Some(StatusMessage::new("No albums found!".to_owned(), Level::Info));
@@ -162,75 +166,119 @@ impl Screen for AlbumsScreen {
         Ok(())
     }
 
-    async fn handle_key(
+    async fn handle_action(
         &mut self,
-        action: Self::Actions,
-        _client: &mut Client<'_>,
-        _app: &mut State,
-        _shared: &mut SharedUiState,
-    ) -> Result<Render> {
-        match action {
-            AlbumsActions::Down => {
-                self.stack.next();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+        event: KeyEvent,
+        client: &mut Client<'_>,
+        app: &mut State,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResult> {
+        if let Some(action) = app.config.keybinds.albums.get(&event.into()) {
+            match action {
+                AlbumsActions::EnterSearch => {
+                    //
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                AlbumsActions::LeaveSearch => {
+                    //
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
-            AlbumsActions::Up => {
-                self.stack.prev();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+            match action {
+                CommonAction::DownHalf => {
+                    self.stack.next_half_viewport();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::UpHalf => {
+                    self.stack.prev_half_viewport();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Up => {
+                    self.stack.prev();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Down => {
+                    self.stack.next();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Bottom => {
+                    self.stack.last();
+                    self.prepare_preview(client, app).await?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Top => {
+                    self.stack.first();
+                    self.prepare_preview(client, app).await?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Right => {
+                    let idx = self
+                        .stack
+                        .current()
+                        .1
+                        .get_selected()
+                        .context("Expected an item to be selected")?;
+                    let current = self.stack.current().0[idx].clone();
+                    self.position = match &mut self.position {
+                        CurrentPosition::Album(val) => {
+                            self.stack.push(val.fetch(client, &current).await?);
+                            CurrentPosition::Song(val.next(current))
+                        }
+                        CurrentPosition::Song(val) => {
+                            val.add_to_queue(client, &current).await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!("'{}' from album '{}' added to queue", current, val.values.album),
+                                Level::Info,
+                            ));
+                            CurrentPosition::Song(val.next())
+                        }
+                    };
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Left => {
+                    self.stack.pop();
+                    self.position = match &mut self.position {
+                        CurrentPosition::Album(val) => CurrentPosition::Album(val.prev()),
+                        CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
+                    };
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
-            AlbumsActions::DownHalf => {
-                self.stack.next_half_viewport();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
-            AlbumsActions::UpHalf => {
-                self.stack.prev_half_viewport();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
-            AlbumsActions::Leave => {
-                self.stack.pop();
-                self.position = match &mut self.position {
-                    CurrentPosition::Album(val) => CurrentPosition::Album(val.prev()),
-                    CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
-                };
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
-            AlbumsActions::Enter => {
-                let idx = self
-                    .stack
-                    .current()
-                    .1
-                    .get_selected()
-                    .context("Expected an item to be selected")?;
-                let current = self.stack.current().0[idx].clone();
-                self.position = match &mut self.position {
-                    CurrentPosition::Album(val) => {
-                        self.stack.push(val.fetch(_client, &current).await?);
-                        CurrentPosition::Song(val.next(current))
-                    }
-                    CurrentPosition::Song(val) => {
-                        val.add_to_queue(_client, &current).await?;
-                        _shared.status_message = Some(StatusMessage::new(
-                            format!("'{}' from album '{}' added to queue", current, val.values.album),
-                            Level::Info,
-                        ));
-                        CurrentPosition::Song(val.next())
-                    }
-                };
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
+        } else {
+            Ok(KeyHandleResult::KeyNotHandled)
         }
-        return Ok(Render::Yes);
     }
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum AlbumsActions {
-    Down,
-    Up,
-    DownHalf,
-    UpHalf,
-    Enter,
-    Leave,
+    EnterSearch,
+    LeaveSearch,
 }
 
 #[derive(Debug)]

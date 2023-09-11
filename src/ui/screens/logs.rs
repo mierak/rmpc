@@ -1,6 +1,7 @@
 use ansi_to_tui::IntoText;
 use anyhow::Result;
 use async_trait::async_trait;
+use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Margin, Rect},
@@ -13,10 +14,10 @@ use ratatui::{
 use crate::{
     mpd::client::Client,
     state::State,
-    ui::{Render, SharedUiState},
+    ui::{KeyHandleResult, SharedUiState},
 };
 
-use super::{dirstack::MyState, Screen};
+use super::{dirstack::MyState, CommonAction, Screen};
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
@@ -110,27 +111,56 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    async fn handle_key(
+    async fn handle_action(
         &mut self,
-        action: Self::Actions,
+        event: KeyEvent,
         _client: &mut Client<'_>,
-        _app: &mut State,
+        app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<Render> {
-        match action {
-            LogsActions::Down => self.scrolling_state.next(),
-            LogsActions::Up => self.scrolling_state.prev(),
-            LogsActions::DownHalf => self.scrolling_state.next_half_viewport(),
-            LogsActions::UpHalf => self.scrolling_state.prev_half_viewport(),
+    ) -> Result<KeyHandleResult> {
+        if let Some(action) = app.config.keybinds.logs.get(&event.into()) {
+            match action {
+                LogsActions::Clear => {
+                    app.logs.0.clear();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+            }
+        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+            match action {
+                CommonAction::DownHalf => {
+                    self.scrolling_state.next_half_viewport();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::UpHalf => {
+                    self.scrolling_state.prev_half_viewport();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Up => {
+                    self.scrolling_state.prev();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Down => {
+                    self.scrolling_state.next();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Bottom => {
+                    self.scrolling_state.last();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Top => {
+                    self.scrolling_state.first();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Right => Ok(KeyHandleResult::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResult::SkipRender),
+            }
+        } else {
+            Ok(KeyHandleResult::KeyNotHandled)
         }
-        Ok(Render::Yes)
     }
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum LogsActions {
-    Down,
-    Up,
-    DownHalf,
-    UpHalf,
+    Clear,
 }

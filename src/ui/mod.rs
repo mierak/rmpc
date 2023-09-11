@@ -17,10 +17,7 @@ use ratatui::{
 use strum::{IntoEnumIterator, VariantNames};
 use tracing::instrument;
 
-use crate::{
-    config::Key,
-    state::{State, StatusExt},
-};
+use crate::state::{State, StatusExt};
 use crate::{
     mpd::client::Client,
     mpd::{
@@ -266,7 +263,12 @@ impl Ui<'_> {
             .style(Style::default().fg(level.to_color()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
         } else {
-            let elapsed_bar = ProgressBar::default().fg(Color::Blue).bg(Color::Black);
+            let elapsed_bar = ProgressBar::default()
+                .fg(Color::Blue)
+                .bg(Color::Black)
+                .elapsed_char(app.config.symbols.progress_bar[0])
+                .thumb_char(app.config.symbols.progress_bar[1])
+                .track_char(app.config.symbols.progress_bar[2]);
             let elapsed_bar = if app.status.duration == Duration::ZERO {
                 elapsed_bar.value(0.0)
             } else {
@@ -293,7 +295,7 @@ impl Ui<'_> {
     }
 
     #[instrument(skip(self, app), fields(screen))]
-    pub async fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<Render> {
+    pub async fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<KeyHandleResult> {
         macro_rules! screen_call_inner {
             ($fn:ident($($param:expr),+)) => {
                 screen_call!(self, app, $fn($($param),+)).await?
@@ -302,100 +304,58 @@ impl Ui<'_> {
         if let Some(modal) = &app.visible_modal {
             return modal_call!(self, modal, app, handle_key(key, &mut self.client, app)).await;
         }
-        if let Some(action) = app.config.keybinds.global.get(&Key {
-            key: key.code,
-            modifiers: key.modifiers,
-        }) {
-            match action {
-                GlobalAction::NextTrack if app.status.state == MpdState::Play => self.client.next().await?,
-                GlobalAction::PreviousTrack if app.status.state == MpdState::Play => self.client.prev().await?,
-                GlobalAction::Stop if app.status.state == MpdState::Play => self.client.stop().await?,
-                GlobalAction::ToggleRepeat => self.client.repeat(!app.status.repeat).await?,
-                GlobalAction::ToggleSingle => self.client.single(app.status.single.cycle()).await?,
-                GlobalAction::ToggleRandom => self.client.random(!app.status.random).await?,
-                // TODO this panics, oneshot consume is only since mpd 0.24 which is not relesed yet
-                // we should validate mpd protocol version when connecting clients
-                GlobalAction::ToggleConsume => self.client.consume(app.status.single.cycle()).await?,
-                GlobalAction::VolumeUp => self.client.set_volume(app.status.volume.inc()).await?,
-                GlobalAction::VolumeDown => self.client.set_volume(app.status.volume.dec()).await?,
-                GlobalAction::SeekForward if app.status.state == MpdState::Play => {
-                    self.client.seek_curr_forwards(5).await?;
-                }
-                GlobalAction::SeekBack if app.status.state == MpdState::Play => {
-                    self.client.seek_curr_backwards(5).await?;
-                }
-                GlobalAction::NextTab => {
-                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                    app.active_tab = app.active_tab.next();
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
-                }
-                GlobalAction::PreviousTab => {
-                    screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+        match screen_call_inner!(handle_action(key, &mut self.client, app, &mut self.shared_state)) {
+            KeyHandleResult::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
+            KeyHandleResult::SkipRender => return Ok(KeyHandleResult::SkipRender),
+            KeyHandleResult::KeyNotHandled => {
+                if let Some(action) = app.config.keybinds.global.get(&key.into()) {
+                    match action {
+                        GlobalAction::NextTrack if app.status.state == MpdState::Play => self.client.next().await?,
+                        GlobalAction::PreviousTrack if app.status.state == MpdState::Play => self.client.prev().await?,
+                        GlobalAction::Stop if app.status.state == MpdState::Play => self.client.stop().await?,
+                        GlobalAction::ToggleRepeat => self.client.repeat(!app.status.repeat).await?,
+                        GlobalAction::ToggleSingle => self.client.single(app.status.single.cycle()).await?,
+                        GlobalAction::ToggleRandom => self.client.random(!app.status.random).await?,
+                        // TODO this panics, oneshot consume is only since mpd 0.24 which is not relesed yet
+                        // we should validate mpd protocol version when connecting clients
+                        GlobalAction::ToggleConsume => self.client.consume(app.status.single.cycle()).await?,
+                        GlobalAction::VolumeUp => self.client.set_volume(app.status.volume.inc()).await?,
+                        GlobalAction::VolumeDown => self.client.set_volume(app.status.volume.dec()).await?,
+                        GlobalAction::SeekForward if app.status.state == MpdState::Play => {
+                            self.client.seek_curr_forwards(5).await?;
+                        }
+                        GlobalAction::SeekBack if app.status.state == MpdState::Play => {
+                            self.client.seek_curr_backwards(5).await?;
+                        }
+                        GlobalAction::NextTab => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
-                    app.active_tab = app.active_tab.prev();
-                    tracing::Span::current().record("screen", app.active_tab.to_string());
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
-                }
-                GlobalAction::NextTrack => {}
-                GlobalAction::PreviousTrack => {}
-                GlobalAction::Stop => {}
-                GlobalAction::SeekBack => {}
-                GlobalAction::SeekForward => {}
-            }
-        } else {
-            tracing::Span::current().record("screen", app.active_tab.to_string());
-            let keys = &app.config.keybinds;
-            match app.active_tab {
-                screens::Screens::Queue => {
-                    if let Some(event) = keys.queue.get(&key.into()) {
-                        return self
-                            .screens
-                            .queue
-                            .handle_key(*event, &mut self.client, app, &mut self.shared_state)
-                            .await;
+                            app.active_tab = app.active_tab.next();
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::PreviousTab => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = app.active_tab.prev();
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::NextTrack => {}
+                        GlobalAction::PreviousTrack => {}
+                        GlobalAction::Stop => {}
+                        GlobalAction::SeekBack => {}
+                        GlobalAction::SeekForward => {}
                     }
-                }
-                screens::Screens::Albums => {
-                    if let Some(event) = keys.albums.get(&key.into()) {
-                        return self
-                            .screens
-                            .albums
-                            .handle_key(*event, &mut self.client, app, &mut self.shared_state)
-                            .await;
-                    }
-                }
-                screens::Screens::Artists => {
-                    if let Some(event) = keys.artists.get(&key.into()) {
-                        return self
-                            .screens
-                            .artists
-                            .handle_key(*event, &mut self.client, app, &mut self.shared_state)
-                            .await;
-                    }
-                }
-                screens::Screens::Directories => {
-                    if let Some(event) = keys.directories.get(&key.into()) {
-                        return self
-                            .screens
-                            .directories
-                            .handle_key(*event, &mut self.client, app, &mut self.shared_state)
-                            .await;
-                    }
-                }
-                screens::Screens::Logs => {
-                    if let Some(event) = keys.logs.get(&key.into()) {
-                        return self
-                            .screens
-                            .logs
-                            .handle_key(*event, &mut self.client, app, &mut self.shared_state)
-                            .await;
-                    }
+                    Ok(KeyHandleResult::SkipRender)
+                } else {
+                    Ok(KeyHandleResult::SkipRender)
                 }
             }
         }
-        return Ok(Render::Yes);
     }
 
     #[instrument(skip_all)]
@@ -444,12 +404,13 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
-/// Yes should be used only in cases when we do not receive idle event from mpd based on our action
-/// as those idle events will trigger render by themselves.
-/// These cases include selecting (not playing!) next/previous song
-pub enum Render {
-    Yes,
-    No,
+pub enum KeyHandleResult {
+    /// Action warrants a render
+    RenderRequested,
+    /// Action does NOT warrant a render
+    SkipRender,
+    /// Event was not handled and should bubble up
+    KeyNotHandled,
 }
 
 trait LevelExt {

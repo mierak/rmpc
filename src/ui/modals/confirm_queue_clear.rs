@@ -13,7 +13,7 @@ use crate::{
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
-use super::{RectExt, Render, SharedUiState};
+use super::{KeyHandleResult, RectExt, SharedUiState};
 
 use super::Modal;
 
@@ -51,7 +51,12 @@ impl Modal for ConfirmQueueClearModal {
         Ok(())
     }
 
-    async fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, _app: &mut State) -> Result<Render> {
+    async fn handle_key(
+        &mut self,
+        key: KeyEvent,
+        _client: &mut Client<'_>,
+        _app: &mut State,
+    ) -> Result<KeyHandleResult> {
         match key.code {
             KeyCode::Char('j') => {
                 if self.button_group.selected == 1 {
@@ -84,6 +89,6 @@ impl Modal for ConfirmQueueClearModal {
             }
             _ => {}
         }
-        Ok(Render::No)
+        Ok(KeyHandleResult::RenderRequested)
     }
 }

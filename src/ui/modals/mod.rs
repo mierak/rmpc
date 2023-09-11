@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{mpd::client::Client, state::State};
 
-use super::{Render, SharedUiState};
+use super::{KeyHandleResult, SharedUiState};
 
 pub mod confirm_queue_clear;
 
@@ -27,7 +27,12 @@ pub trait Modal {
     ) -> Result<()>;
 
     // todo global modal keys (esc, ctrl c)
-    async fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, _app: &mut State) -> Result<Render>;
+    async fn handle_key(
+        &mut self,
+        key: KeyEvent,
+        _client: &mut Client<'_>,
+        _app: &mut State,
+    ) -> Result<KeyHandleResult>;
 }
 
 pub trait RectExt {

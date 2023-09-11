@@ -1,14 +1,21 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Rect},
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::ListItem,
     Frame,
 };
 use strum::{Display, EnumIter, EnumVariantNames};
 
-use crate::{mpd::client::Client, state::State};
+use crate::{
+    mpd::{client::Client, commands::Song},
+    state::State,
+};
 
-use super::{Render, SharedUiState};
+use super::{KeyHandleResult, SharedUiState};
 
 pub mod albums;
 pub mod artists;
@@ -57,13 +64,25 @@ pub trait Screen {
         Ok(())
     }
 
-    async fn handle_key(
+    async fn handle_action(
         &mut self,
-        action: Self::Actions,
+        event: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<Render>;
+    ) -> Result<KeyHandleResult>;
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum CommonAction {
+    Down,
+    Up,
+    DownHalf,
+    UpHalf,
+    Right,
+    Left,
+    Top,
+    Bottom,
 }
 
 impl Screens {
@@ -171,6 +190,14 @@ pub mod dirstack {
         pub fn prev_half_viewport(&mut self) {
             self.current.1.prev_half_viewport();
         }
+
+        pub fn last(&mut self) {
+            self.current.1.last();
+        }
+
+        pub fn first(&mut self) {
+            self.current.1.first();
+        }
     }
 
     #[derive(Debug, Default)]
@@ -179,6 +206,7 @@ pub mod dirstack {
         pub inner: T,
         pub content_len: Option<u16>,
         pub viewport_len: Option<u16>,
+        // pub filter: Option<String>,
     }
 
     impl<T: ScrollingState> MyState<T> {
@@ -193,6 +221,11 @@ pub mod dirstack {
             self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
             self
         }
+
+        // pub fn filter(&mut self, filter: Option<String>) -> &Self {
+        //     self.filter = filter;
+        //     self
+        // }
 
         pub fn first(&mut self) {
             if self.content_len.is_some() {
@@ -329,5 +362,87 @@ pub mod dirstack {
 
             val.previous();
         }
+    }
+}
+
+pub trait ToListItems {
+    fn to_listitems(&self, state: &State) -> Vec<ListItem<'static>>;
+}
+
+impl ToListItems for Song {
+    fn to_listitems(&self, _app: &State) -> Vec<ListItem<'static>> {
+        let key_style = Style::default().fg(Color::Yellow);
+        let separator = Span::from(": ");
+        let start_of_line_spacer = Span::from(" ");
+
+        let title = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Title", key_style),
+            separator.clone(),
+            Span::from(self.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
+        ]);
+        let artist = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Artist", key_style),
+            separator.clone(),
+            Span::from(": "),
+            Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
+        ]);
+        let album = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Album", key_style),
+            separator.clone(),
+            Span::from(self.album.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
+        ]);
+        let duration = Line::from(vec![
+            start_of_line_spacer.clone(),
+            Span::styled("Duration", key_style),
+            separator.clone(),
+            Span::from(
+                self.duration
+                    .as_ref()
+                    .map_or("-".to_owned(), |v| v.as_secs().to_string()),
+            ),
+        ]);
+        let r = vec![title, artist, album, duration];
+        let r = [
+            r,
+            self.others
+                .iter()
+                .map(|(k, v)| {
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled(k.clone(), key_style),
+                        separator.clone(),
+                        Span::from(v.clone()),
+                    ])
+                })
+                .collect(),
+        ]
+        .concat();
+
+        r.into_iter().map(ListItem::new).collect()
+    }
+}
+
+pub trait SongOrTagExt {
+    fn to_listitems(&self, is_song: bool, state: &State) -> Vec<ListItem<'static>>;
+}
+
+impl SongOrTagExt for Vec<String> {
+    fn to_listitems(&self, is_song: bool, state: &State) -> Vec<ListItem<'static>> {
+        self.iter()
+            .map(|val| {
+                ListItem::new(format!(
+                    "{} {}",
+                    if is_song {
+                        state.config.symbols.song
+                    } else {
+                        state.config.symbols.dir
+                    },
+                    if val.is_empty() { "Unknown" } else { val }
+                ))
+            })
+            .collect::<Vec<ListItem>>()
     }
 }

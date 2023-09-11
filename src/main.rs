@@ -5,7 +5,8 @@
     clippy::unnested_or_patterns,
     clippy::match_same_arms,
     clippy::manual_let_else,
-    clippy::needless_return
+    clippy::needless_return,
+    clippy::zero_sized_map_values
 )]
 use std::{sync::Arc, time::Duration};
 
@@ -38,7 +39,7 @@ mod utils;
 
 #[derive(Debug)]
 pub enum AppEvent {
-    UserInput(Event),
+    UserInput(KeyEvent),
     StatusBar(String),
     // TODO there is an issue here
     // if an error is emmited from an ui thread, tracing will notify the thread that it should
@@ -65,7 +66,10 @@ async fn main() -> Result<()> {
                 "{}",
                 ron::ser::to_string_pretty(
                     &ConfigFile::default(),
-                    ron::ser::PrettyConfig::default().depth_limit(3).struct_names(false),
+                    ron::ser::PrettyConfig::default()
+                        .depth_limit(3)
+                        .struct_names(false)
+                        .compact_arrays(true),
                 )?
             );
             return Ok(());
@@ -159,9 +163,10 @@ async fn main_task(
             let mut ui = ui_mutex.lock().await;
 
             match event {
-                AppEvent::UserInput(Event::Key(key)) => match ui.handle_key(key, &mut state).await {
-                    Ok(ui::Render::No) => continue,
-                    Ok(ui::Render::Yes) => {
+                AppEvent::UserInput(key) => match ui.handle_key(key, &mut state).await {
+                    Ok(ui::KeyHandleResult::KeyNotHandled) => continue,
+                    Ok(ui::KeyHandleResult::SkipRender) => continue,
+                    Ok(ui::KeyHandleResult::RenderRequested) => {
                         if let Err(err) = render_sender.send(()).await {
                             error!(messgae = "Failed to send render request", error = ?err);
                         }
@@ -173,7 +178,6 @@ async fn main_task(
                         }
                     }
                 },
-                AppEvent::UserInput(_) => {}
                 AppEvent::StatusBar(message) => {
                     ui.display_message(message, Level::Error);
                 }
@@ -307,16 +311,17 @@ fn event_poll(user_input_tx: Sender<AppEvent>, is_aborted: Arc<Mutex<bool>>) {
                         continue;
                     }
                 };
-                if let Event::Key(KeyEvent {
-                    code: KeyCode::Char('q'),
-                    ..
-                }) = event
-                {
-                    break;
-                }
-
-                if let Err(err) = user_input_tx.try_send(AppEvent::UserInput(event)) {
-                    error!(messgae = "Failed to send user input", error = ?err);
+                match event {
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Char('q'),
+                        ..
+                    }) => break,
+                    Event::Key(key) => {
+                        if let Err(err) = user_input_tx.try_send(AppEvent::UserInput(key)) {
+                            error!(messgae = "Failed to send user input", error = ?err);
+                        }
+                    }
+                    _ => {} // ignore other events
                 }
             }
             Ok(_) => {}

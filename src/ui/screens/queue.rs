@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crossterm::event::KeyEvent;
 
 use crate::{
     mpd::{client::Client, commands::State as MpdState, mpd_client::MpdClient},
@@ -6,7 +7,7 @@ use crate::{
     ui::{
         modals::Modals,
         widgets::kitty_image::{ImageState, KittyImage},
-        DurationExt, Render, SharedUiState,
+        DurationExt, KeyHandleResult, SharedUiState,
     },
 };
 use async_trait::async_trait;
@@ -20,7 +21,7 @@ use tracing::error;
 
 use crate::state::State;
 
-use super::{dirstack::MyState, Screen};
+use super::{dirstack::MyState, CommonAction, Screen};
 
 const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
 
@@ -144,66 +145,88 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    async fn handle_key(
+    async fn handle_action(
         &mut self,
-        action: Self::Actions,
+        event: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<Render> {
-        match action {
-            QueueuActions::DownHalf => {
-                if !app.queue.is_empty_or_none() {
-                    self.scrolling_state.next_half_viewport();
-                }
-            }
-            QueueuActions::UpHalf => {
-                if !app.queue.is_empty_or_none() {
-                    self.scrolling_state.prev_half_viewport();
-                }
-            }
-            QueueuActions::Delete => {
-                if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
-                    match client.delete_id(selected_song.id).await {
-                        Ok(_) => {}
-                        Err(e) => error!("{:?}", e),
+    ) -> Result<KeyHandleResult> {
+        if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
+            match action {
+                QueueuActions::Delete => {
+                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
+                        match client.delete_id(selected_song.id).await {
+                            Ok(_) => {}
+                            Err(e) => error!("{:?}", e),
+                        }
+                    } else {
+                        error!("No song selected");
                     }
-                } else {
-                    error!("No song selected");
+                    Ok(KeyHandleResult::SkipRender)
                 }
-            }
-            QueueuActions::DeleteAll => app.visible_modal = Some(Modals::ConfirmQueueClear),
-            QueueuActions::TogglePause if app.status.state == MpdState::Play || app.status.state == MpdState::Pause => {
-                client.pause_toggle().await?;
-            }
-            QueueuActions::Play => {
-                if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
-                    client.play_id(selected_song.id).await?;
+                QueueuActions::DeleteAll => {
+                    app.visible_modal = Some(Modals::ConfirmQueueClear);
+                    Ok(KeyHandleResult::RenderRequested)
                 }
-            }
-            QueueuActions::Up => {
-                if !app.queue.is_empty_or_none() {
-                    self.scrolling_state.prev();
+                QueueuActions::TogglePause
+                    if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
+                {
+                    client.pause_toggle().await?;
+                    Ok(KeyHandleResult::SkipRender)
                 }
-            }
-            QueueuActions::Down => {
-                if !app.queue.is_empty_or_none() {
-                    self.scrolling_state.next();
+                QueueuActions::Play => {
+                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
+                        client.play_id(selected_song.id).await?;
+                    }
+                    Ok(KeyHandleResult::SkipRender)
                 }
+                QueueuActions::TogglePause => Ok(KeyHandleResult::SkipRender),
             }
-            QueueuActions::Bottom => {
-                if !app.queue.is_empty_or_none() {
-                    self.scrolling_state.last();
+        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+            match action {
+                CommonAction::DownHalf => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.next_half_viewport();
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
                 }
-            }
-            QueueuActions::Top => {
-                if !app.queue.is_empty_or_none() {
-                    self.scrolling_state.first();
+                CommonAction::UpHalf => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.prev_half_viewport();
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
                 }
+                CommonAction::Up => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.prev();
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Down => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.next();
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Bottom => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.last();
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Top => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.first();
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Right => Ok(KeyHandleResult::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResult::SkipRender),
             }
-            QueueuActions::TogglePause => {}
-        };
-        Ok(Render::Yes)
+        } else {
+            Ok(KeyHandleResult::KeyNotHandled)
+        }
     }
 }
 
@@ -211,12 +234,6 @@ impl Screen for QueueScreen {
 pub enum QueueuActions {
     Delete,
     DeleteAll,
-    Down,
-    DownHalf,
-    Up,
-    UpHalf,
-    Top,
-    Bottom,
     TogglePause,
     Play,
 }

@@ -1,11 +1,11 @@
 use std::cmp::Ordering;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
+use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation},
     Frame,
 };
@@ -18,11 +18,10 @@ use crate::{
         mpd_client::MpdClient,
     },
     state::State,
-    ui::{Level, Render, SharedUiState, StatusMessage},
-    utils::macros::try_ret,
+    ui::{KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{dirstack::DirStack, Screen};
+use super::{dirstack::DirStack, CommonAction, Screen, ToListItems};
 
 #[derive(Debug)]
 pub struct DirectoriesScreen {
@@ -46,7 +45,7 @@ impl Screen for DirectoriesScreen {
         &mut self,
         frame: &mut Frame<B>,
         area: Rect,
-        _app: &mut crate::state::State,
+        app: &mut crate::state::State,
         _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let [previous_area, current_area, preview_area] = *Layout::default()
@@ -66,7 +65,7 @@ impl Screen for DirectoriesScreen {
 
         {
             let (prev_items, prev_state) = self.dirs.previous();
-            let prev_items = prev_items.to_listitems();
+            let prev_items = prev_items.to_listitems(app);
             prev_state.content_len(Some(u16::try_from(prev_items.len())?));
             prev_state.viewport_len(Some(previous_area.height));
 
@@ -96,7 +95,7 @@ impl Screen for DirectoriesScreen {
         }
         {
             let (current_items, current_state) = &mut self.dirs.current();
-            let current_items = current_items.to_listitems();
+            let current_items = current_items.to_listitems(app);
             current_state.content_len(Some(u16::try_from(current_items.len())?));
             current_state.viewport_len(Some(current_area.height));
 
@@ -129,123 +128,169 @@ impl Screen for DirectoriesScreen {
 
     async fn before_show(
         &mut self,
-        _client: &mut Client<'_>,
+        client: &mut Client<'_>,
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        self.dirs = DirStack::new(_client.lsinfo(None).await?.0);
-        self.prepare_preview(_client).await?;
+        self.dirs = DirStack::new(client.lsinfo(None).await?.0);
+        self.next = self
+            .prepare_preview(client, _app)
+            .await
+            .context("Cannot prepare preview")?;
 
         Ok(())
     }
 
     #[instrument(skip_all)]
-    async fn handle_key(
+    async fn handle_action(
         &mut self,
-        action: Self::Actions,
-        _client: &mut Client<'_>,
-        _app: &mut State,
-        _shared: &mut SharedUiState,
-    ) -> Result<Render> {
-        match action {
-            DirectoriesActions::Down => {
-                self.dirs.next();
-                self.prepare_preview(_client).await?;
-            }
-            DirectoriesActions::Up => {
-                self.dirs.prev();
-                self.prepare_preview(_client).await?;
-            }
-            DirectoriesActions::DownHalf => {
-                self.dirs.next_half_viewport();
-                self.prepare_preview(_client).await?;
-            }
-            DirectoriesActions::UpHalf => {
-                self.dirs.prev_half_viewport();
-                self.prepare_preview(_client).await?;
-            }
-            DirectoriesActions::AddAll => match self.dirs.get_selected() {
-                Some(FileOrDir::Dir(dir)) => {
-                    _client.add(&dir.full_path).await?;
-                    _shared.status_message = Some(StatusMessage::new(
-                        format!("Directory '{}' added to queue", dir.full_path),
-                        Level::Info,
-                    ));
+        event: KeyEvent,
+        client: &mut Client<'_>,
+        app: &mut State,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResult> {
+        if let Some(action) = app.config.keybinds.directories.get(&event.into()) {
+            match action {
+                DirectoriesActions::AddAll => {
+                    match self.dirs.get_selected() {
+                        Some(FileOrDir::Dir(dir)) => {
+                            client.add(&dir.full_path).await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!("Directory '{}' added to queue", dir.full_path),
+                                Level::Info,
+                            ));
+                        }
+                        Some(FileOrDir::File(song)) => {
+                            client.add(&song.file).await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!(
+                                    "'{}' by '{}' added to queue",
+                                    song.title.as_ref().map_or("Untitled", |v| v.as_str()),
+                                    song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
+                                ),
+                                Level::Info,
+                            ));
+                        }
+                        None => {}
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
                 }
-                Some(FileOrDir::File(song)) => {
-                    _client.add(&song.file).await?;
-                    _shared.status_message = Some(StatusMessage::new(
-                        format!(
-                            "'{}' by '{}' added to queue",
-                            song.title.as_ref().map_or("Untitled", |v| v.as_str()),
-                            song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
-                        ),
-                        Level::Info,
-                    ));
+            }
+        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+            match action {
+                CommonAction::DownHalf => {
+                    self.dirs.next_half_viewport();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
                 }
-                None => {}
-            },
-            DirectoriesActions::Enter => match self.dirs.get_selected() {
-                Some(FileOrDir::Dir(dir)) => {
-                    let new_current = _client.lsinfo(Some(&dir.full_path)).await?.0;
-                    self.dirs.push(new_current);
+                CommonAction::UpHalf => {
+                    self.dirs.prev_half_viewport();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Up => {
+                    self.dirs.prev();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Down => {
+                    self.dirs.next();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Bottom => {
+                    self.dirs.last();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Top => {
+                    self.dirs.first();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Right => {
+                    match self.dirs.get_selected() {
+                        Some(FileOrDir::Dir(dir)) => {
+                            let new_current = client.lsinfo(Some(&dir.full_path)).await?.0;
+                            self.dirs.push(new_current);
 
-                    self.prepare_preview(_client).await?;
+                            self.next = self
+                                .prepare_preview(client, app)
+                                .await
+                                .context("Cannot prepare preview")?;
+                        }
+                        Some(FileOrDir::File(song)) => {
+                            client.add(&song.file).await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!(
+                                    "'{}' by '{}' added to queue",
+                                    song.title.as_ref().map_or("Untitled", |v| v.as_str()),
+                                    song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
+                                ),
+                                Level::Info,
+                            ));
+                        }
+                        None => {}
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
                 }
-                Some(FileOrDir::File(song)) => {
-                    _client.add(&song.file).await?;
-                    _shared.status_message = Some(StatusMessage::new(
-                        format!(
-                            "'{}' by '{}' added to queue",
-                            song.title.as_ref().map_or("Untitled", |v| v.as_str()),
-                            song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
-                        ),
-                        Level::Info,
-                    ));
+                CommonAction::Left => {
+                    self.dirs.pop();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
                 }
-                None => {}
-            },
-            DirectoriesActions::Leave => {
-                self.dirs.pop();
-                self.prepare_preview(_client).await?;
             }
+        } else {
+            Ok(KeyHandleResult::KeyNotHandled)
         }
-        return Ok(Render::Yes);
     }
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum DirectoriesActions {
-    Down,
-    Up,
-    DownHalf,
-    UpHalf,
-    Enter,
-    Leave,
     AddAll,
 }
 
 impl DirectoriesScreen {
-    #[instrument(err, skip(client))]
-    async fn prepare_preview(&mut self, client: &mut Client<'_>) -> Result<()> {
-        if let Some(idx) = self.dirs.current().1.get_selected() {
-            match &self.dirs.current().0[idx] {
-                FileOrDir::Dir(dir) => {
-                    let mut res = try_ret!(
-                        client.lsinfo(Some(&dir.full_path)).await,
-                        "Failed to get lsinfo for dir"
-                    )
-                    .0;
-                    res.sort();
-                    self.next = res.to_listitems();
+    #[instrument(skip(client))]
+    async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Option<Vec<ListItem<'static>>> {
+        let idx = self.dirs.current().1.get_selected()?;
+        match &self.dirs.current().0[idx] {
+            FileOrDir::Dir(dir) => {
+                let mut res = match client.lsinfo(Some(&dir.full_path)).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        tracing::error!(message = "Failed to get lsinfo for dir", error = ?err);
+                        return None;
+                    }
                 }
-                FileOrDir::File(song) => self.next = song.to_listitems(),
+                .0;
+                res.sort();
+                Some(res.to_listitems(state))
             }
-        } else {
-            tracing::error!("Failed to get selected item because none was selected");
-            return Err(anyhow!("Failed to get selected item because none was selected"));
+            FileOrDir::File(song) => Some(song.to_listitems(state)),
         }
-        Ok(())
     }
 }
 
@@ -268,77 +313,20 @@ impl std::cmp::PartialOrd for FileOrDir {
     }
 }
 
-pub trait FileOrDirExt {
-    fn to_listitems(&self) -> Vec<ListItem<'static>>;
-}
-
-impl FileOrDirExt for Vec<FileOrDir> {
-    fn to_listitems(&self) -> Vec<ListItem<'static>> {
+impl ToListItems for Vec<FileOrDir> {
+    fn to_listitems(&self, state: &State) -> Vec<ListItem<'static>> {
         self.iter()
             .map(|val| {
                 let (kind, name) = match val {
                     // cfg
-                    FileOrDir::Dir(v) => (" 📁", v.path.clone()),
-                    FileOrDir::File(v) => (" 🎵", v.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
+                    FileOrDir::Dir(v) => (state.config.symbols.dir, v.path.clone()),
+                    FileOrDir::File(v) => (
+                        state.config.symbols.song,
+                        v.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned(),
+                    ),
                 };
                 ListItem::new(format!("{kind} {name}"))
             })
             .collect::<Vec<ListItem>>()
-    }
-}
-
-impl FileOrDirExt for Song {
-    fn to_listitems(&self) -> Vec<ListItem<'static>> {
-        let key_style = Style::default().fg(Color::Yellow);
-        let separator = Span::from(": ");
-        let start_of_line_spacer = Span::from(" ");
-
-        let title = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Title", key_style),
-            separator.clone(),
-            Span::from(self.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
-        ]);
-        let artist = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Artist", key_style),
-            separator.clone(),
-            Span::from(": "),
-            Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-        ]);
-        let album = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Album", key_style),
-            separator.clone(),
-            Span::from(self.album.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-        ]);
-        let duration = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Duration", key_style),
-            separator.clone(),
-            Span::from(
-                self.duration
-                    .as_ref()
-                    .map_or("-".to_owned(), |v| v.as_secs().to_string()),
-            ),
-        ]);
-        let r = vec![title, artist, album, duration];
-        let r = [
-            r,
-            self.others
-                .iter()
-                .map(|(k, v)| {
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled(k.clone(), key_style),
-                        separator.clone(),
-                        Span::from(v.clone()),
-                    ])
-                })
-                .collect(),
-        ]
-        .concat();
-
-        r.into_iter().map(ListItem::new).collect()
     }
 }

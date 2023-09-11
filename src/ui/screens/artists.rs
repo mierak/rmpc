@@ -5,12 +5,13 @@ use crate::{
         mpd_client::{Filter, MpdClient},
     },
     state::State,
-    ui::{screens::directories::FileOrDirExt, Level, Render, SharedUiState, StatusMessage},
+    ui::{KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{dirstack::DirStack, Screen};
+use super::{dirstack::DirStack, CommonAction, Screen, SongOrTagExt, ToListItems};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use ratatui::{
     prelude::{Constraint, Layout},
@@ -24,6 +25,7 @@ pub struct ArtistsScreen {
     stack: DirStack<String>,
     position: CurrentPosition,
     next: Vec<ListItem<'static>>,
+    filter_input_mode: bool,
 }
 
 impl Default for ArtistsScreen {
@@ -32,12 +34,13 @@ impl Default for ArtistsScreen {
             stack: DirStack::new(Vec::new()),
             position: CurrentPosition::Artist(Position { values: Artist }),
             next: Vec::new(),
+            filter_input_mode: false,
         }
     }
 }
 
 impl ArtistsScreen {
-    async fn prepare_preview(&mut self, client: &mut Client<'_>) -> Result<Vec<ListItem<'static>>> {
+    async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Vec<ListItem<'static>>> {
         let idx = self
             .stack
             .current()
@@ -46,9 +49,9 @@ impl ArtistsScreen {
             .context("Expected an item to be selected")?;
         let current = &self.stack.current().0[idx];
         Ok(match &self.position {
-            CurrentPosition::Artist(val) => val.fetch(client, current).await?.to_listitems(false),
-            CurrentPosition::Album(val) => val.fetch(client, current).await?.to_listitems(true),
-            CurrentPosition::Song(val) => val.fetch(client, current).await?.to_listitems(),
+            CurrentPosition::Artist(val) => val.fetch(client, current).await?.to_listitems(false, state),
+            CurrentPosition::Album(val) => val.fetch(client, current).await?.to_listitems(true, state),
+            CurrentPosition::Song(val) => val.fetch(client, current).await?.to_listitems(state),
         })
     }
 }
@@ -60,7 +63,7 @@ impl Screen for ArtistsScreen {
         &mut self,
         frame: &mut Frame<B>,
         area: Rect,
-        _app: &mut State,
+        app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         let [previous_area, current_area, preview_area] = *Layout::default()
@@ -80,7 +83,7 @@ impl Screen for ArtistsScreen {
 
         {
             let (prev_items, prev_state) = self.stack.previous();
-            let prev_items = prev_items.to_listitems(false);
+            let prev_items = prev_items.to_listitems(false, app);
             prev_state.content_len(Some(u16::try_from(prev_items.len())?));
             prev_state.viewport_len(Some(previous_area.height));
 
@@ -110,15 +113,17 @@ impl Screen for ArtistsScreen {
         {
             let (current_items, current_state) = self.stack.current();
             let current_items = if let CurrentPosition::Song(_) = self.position {
-                current_items.to_listitems(true)
+                current_items.to_listitems(true, app)
             } else {
-                current_items.to_listitems(false)
+                current_items.to_listitems(false, app)
             };
             current_state.content_len(Some(u16::try_from(current_items.len())?));
             current_state.viewport_len(Some(current_area.height));
 
             let current = List::new(current_items)
-                .block(Block::default().borders(Borders::TOP | Borders::BOTTOM))
+                .block(
+                    Block::default().borders(Borders::TOP | Borders::BOTTOM), // .title(current_state.filter.as_ref().map_or(String::new(), Clone::clone)),
+                )
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let current_scrollbar = Scrollbar::default()
                 .orientation(ScrollbarOrientation::VerticalLeft)
@@ -155,7 +160,10 @@ impl Screen for ArtistsScreen {
             Some(result) => {
                 self.stack = DirStack::new(result.0);
                 self.position = CurrentPosition::default();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+                self.next = self
+                    .prepare_preview(_client, _app)
+                    .await
+                    .context("Cannot prepare preview")?;
             }
             None => {
                 _shared.status_message = Some(StatusMessage::new("No artists found!".to_owned(), Level::Info));
@@ -166,80 +174,151 @@ impl Screen for ArtistsScreen {
     }
 
     #[instrument(err)]
-    async fn handle_key(
+    async fn handle_action(
         &mut self,
-        action: Self::Actions,
-        _client: &mut Client<'_>,
-        _app: &mut State,
-        _shared: &mut SharedUiState,
-    ) -> Result<Render> {
-        match action {
-            ArtistsActions::Down => {
-                self.stack.next();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+        event: KeyEvent,
+        client: &mut Client<'_>,
+        app: &mut State,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResult> {
+        if self.filter_input_mode {
+            match event.code {
+                // KeyCode::Char(c) => {
+                //     if let Some(ref mut f) = self.stack.current().1.filter {
+                //         f.push(c);
+                //     } else {
+                //         self.stack.current().1.filter = Some(String::new());
+                //     };
+                //     Ok(KeyHandleResult::RenderRequested)
+                // }
+                // KeyCode::Backspace => {
+                //     if let Some(ref mut f) = self.stack.current().1.filter {
+                //         f.pop();
+                //     };
+                //     Ok(KeyHandleResult::RenderRequested)
+                // }
+                // KeyCode::Enter => {
+                //     self.filter_input_mode = false;
+                //     Ok(KeyHandleResult::RenderRequested)
+                // }
+                // KeyCode::Esc => {
+                //     self.filter_input_mode = false;
+                //     self.stack.current().1.filter = None;
+                //     Ok(KeyHandleResult::RenderRequested)
+                // }
+                _ => Ok(KeyHandleResult::SkipRender),
             }
-            ArtistsActions::Up => {
-                self.stack.prev();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+        } else if let Some(action) = app.config.keybinds.artists.get(&event.into()) {
+            match action {
+                ArtistsActions::EnterSearch => {
+                    self.filter_input_mode = true;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                ArtistsActions::LeaveSearch => {
+                    self.filter_input_mode = false;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
-            ArtistsActions::DownHalf => {
-                self.stack.next_half_viewport();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
+        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+            match action {
+                CommonAction::DownHalf => {
+                    self.stack.next_half_viewport();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::UpHalf => {
+                    self.stack.prev_half_viewport();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Up => {
+                    self.stack.prev();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Down => {
+                    self.stack.next();
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Bottom => {
+                    self.stack.last();
+                    self.prepare_preview(client, app).await?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Top => {
+                    self.stack.first();
+                    self.prepare_preview(client, app).await?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Right => {
+                    let idx = self
+                        .stack
+                        .current()
+                        .1
+                        .get_selected()
+                        .context("Expected an item to be selected")?;
+                    let current = self.stack.current().0[idx].clone();
+                    self.position = match &mut self.position {
+                        CurrentPosition::Artist(val) => {
+                            self.stack.push(val.fetch(client, &current).await?);
+                            CurrentPosition::Album(val.next(current))
+                        }
+                        CurrentPosition::Album(val) => {
+                            self.stack.push(val.fetch(client, &current).await?);
+                            CurrentPosition::Song(val.next(current))
+                        }
+                        CurrentPosition::Song(val) => {
+                            val.add_to_queue(client, &current).await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!("'{}' by '{}' added to queue", current, val.values.artist),
+                                Level::Info,
+                            ));
+                            CurrentPosition::Song(val.next())
+                        }
+                    };
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::Left => {
+                    self.stack.pop();
+                    self.position = match &mut self.position {
+                        CurrentPosition::Artist(val) => CurrentPosition::Artist(val.prev()),
+                        CurrentPosition::Album(val) => CurrentPosition::Artist(val.prev()),
+                        CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
+                    };
+                    self.next = self
+                        .prepare_preview(client, app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
-            ArtistsActions::UpHalf => {
-                self.stack.prev_half_viewport();
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
-            ArtistsActions::Leave => {
-                self.stack.pop();
-                self.position = match &mut self.position {
-                    CurrentPosition::Artist(val) => CurrentPosition::Artist(val.prev()),
-                    CurrentPosition::Album(val) => CurrentPosition::Artist(val.prev()),
-                    CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
-                };
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
-            ArtistsActions::Enter => {
-                let idx = self
-                    .stack
-                    .current()
-                    .1
-                    .get_selected()
-                    .context("Expected an item to be selected")?;
-                let current = self.stack.current().0[idx].clone();
-                self.position = match &mut self.position {
-                    CurrentPosition::Artist(val) => {
-                        self.stack.push(val.fetch(_client, &current).await?);
-                        CurrentPosition::Album(val.next(current))
-                    }
-                    CurrentPosition::Album(val) => {
-                        self.stack.push(val.fetch(_client, &current).await?);
-                        CurrentPosition::Song(val.next(current))
-                    }
-                    CurrentPosition::Song(val) => {
-                        val.add_to_queue(_client, &current).await?;
-                        _shared.status_message = Some(StatusMessage::new(
-                            format!("'{}' by '{}' added to queue", current, val.values.artist),
-                            Level::Info,
-                        ));
-                        CurrentPosition::Song(val.next())
-                    }
-                };
-                self.next = self.prepare_preview(_client).await.context("Cannot prepare preview")?;
-            }
+        } else {
+            Ok(KeyHandleResult::KeyNotHandled)
         }
-        return Ok(Render::Yes);
     }
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum ArtistsActions {
-    Down,
-    Up,
-    DownHalf,
-    UpHalf,
-    Enter,
-    Leave,
+    EnterSearch,
+    LeaveSearch,
 }
 
 #[derive(Debug)]
@@ -371,17 +450,5 @@ impl Position<Song> {
                 },
             ])
             .await?)
-    }
-}
-
-pub trait SongOrTagExt {
-    fn to_listitems(&self, is_song: bool) -> Vec<ListItem<'static>>;
-}
-
-impl SongOrTagExt for Vec<String> {
-    fn to_listitems(&self, is_song: bool) -> Vec<ListItem<'static>> {
-        self.iter()
-            .map(|val| ListItem::new(format!(" {} {val}", if is_song { "🎵" } else { "📁" })))
-            .collect::<Vec<ListItem>>()
     }
 }
