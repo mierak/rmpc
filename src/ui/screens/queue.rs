@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::{
     mpd::{client::Client, commands::State as MpdState, mpd_client::MpdClient},
@@ -29,11 +29,13 @@ const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
 pub struct QueueScreen {
     img_state: ImageState,
     scrolling_state: MyState<TableState>,
+    filter: Option<String>,
+    filter_input_mode: bool,
 }
 
 #[async_trait]
 impl Screen for QueueScreen {
-    type Actions = QueueuActions;
+    type Actions = QueueActions;
     fn render<B: Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -90,8 +92,15 @@ impl Screen for QueueScreen {
                 Constraint::Percentage(15),
             ]);
 
+        let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         let table = Table::new(rows)
-            .block(Block::default().borders(Borders::TOP))
+            .block({
+                let mut b = Block::default().borders(Borders::TOP);
+                if let Some(ref title) = title {
+                    b = b.title(title.blue());
+                }
+                b
+            })
             .widths(&[
                 Constraint::Percentage(15),
                 Constraint::Percentage(35),
@@ -152,9 +161,35 @@ impl Screen for QueueScreen {
         app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResult> {
-        if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
+        if self.filter_input_mode {
+            match event.code {
+                KeyCode::Char(c) => {
+                    if let Some(ref mut f) = self.filter {
+                        f.push(c);
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Backspace => {
+                    if let Some(ref mut f) = self.filter {
+                        f.pop();
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Enter => {
+                    self.filter_input_mode = false;
+                    self.jump_forward(app);
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Esc => {
+                    self.filter_input_mode = false;
+                    self.filter = None;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                _ => Ok(KeyHandleResult::SkipRender),
+            }
+        } else if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
             match action {
-                QueueuActions::Delete => {
+                QueueActions::Delete => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                         match client.delete_id(selected_song.id).await {
                             Ok(_) => {}
@@ -165,23 +200,23 @@ impl Screen for QueueScreen {
                     }
                     Ok(KeyHandleResult::SkipRender)
                 }
-                QueueuActions::DeleteAll => {
+                QueueActions::DeleteAll => {
                     app.visible_modal = Some(Modals::ConfirmQueueClear);
                     Ok(KeyHandleResult::RenderRequested)
                 }
-                QueueuActions::TogglePause
+                QueueActions::TogglePause
                     if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
                 {
                     client.pause_toggle().await?;
                     Ok(KeyHandleResult::SkipRender)
                 }
-                QueueuActions::Play => {
+                QueueActions::Play => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                         client.play_id(selected_song.id).await?;
                     }
                     Ok(KeyHandleResult::SkipRender)
                 }
-                QueueuActions::TogglePause => Ok(KeyHandleResult::SkipRender),
+                QueueActions::TogglePause => Ok(KeyHandleResult::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
@@ -223,6 +258,19 @@ impl Screen for QueueScreen {
                 }
                 CommonAction::Right => Ok(KeyHandleResult::SkipRender),
                 CommonAction::Left => Ok(KeyHandleResult::SkipRender),
+                CommonAction::EnterSearch => {
+                    self.filter_input_mode = true;
+                    self.filter = Some(String::new());
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::NextResult => {
+                    self.jump_forward(app);
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::PreviousResult => {
+                    self.jump_back(app);
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
         } else {
             Ok(KeyHandleResult::KeyNotHandled)
@@ -230,8 +278,46 @@ impl Screen for QueueScreen {
     }
 }
 
+impl QueueScreen {
+    pub fn jump_forward(&mut self, app: &mut crate::state::State) {
+        if let Some(filter) = self.filter.as_ref() {
+            if let Some(selected) = self.scrolling_state.get_selected() {
+                for i in selected + 1..app.queue.len().unwrap_or(0) {
+                    if app.queue.as_ref().is_some_and(|q| {
+                        q.0[i]
+                            .title
+                            .as_ref()
+                            .is_some_and(|v| v.to_lowercase().contains(&filter.to_lowercase()))
+                    }) {
+                        self.scrolling_state.select(Some(i));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn jump_back(&mut self, app: &mut crate::state::State) {
+        if let Some(filter) = self.filter.as_ref() {
+            if let Some(selected) = self.scrolling_state.get_selected() {
+                for i in (0..selected).rev() {
+                    if app.queue.as_ref().is_some_and(|q| {
+                        q.0[i]
+                            .title
+                            .as_ref()
+                            .is_some_and(|v| v.to_lowercase().contains(&filter.to_lowercase()))
+                    }) {
+                        self.scrolling_state.select(Some(i));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum QueueuActions {
+pub enum QueueActions {
     Delete,
     DeleteAll,
     TogglePause,

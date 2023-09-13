@@ -153,6 +153,9 @@ impl Screen for LogsScreen {
                 }
                 CommonAction::Right => Ok(KeyHandleResult::SkipRender),
                 CommonAction::Left => Ok(KeyHandleResult::SkipRender),
+                CommonAction::EnterSearch => Ok(KeyHandleResult::SkipRender),
+                CommonAction::NextResult => Ok(KeyHandleResult::SkipRender),
+                CommonAction::PreviousResult => Ok(KeyHandleResult::SkipRender),
             }
         } else {
             Ok(KeyHandleResult::KeyNotHandled)

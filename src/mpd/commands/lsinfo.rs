@@ -14,8 +14,9 @@ pub enum FileOrDir {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Dir {
-    /// this is the full path from mpd root
+    /// Last segment of the part, the dir name
     pub path: String,
+    /// this is the full path from mpd root
     pub full_path: String,
     pub last_modified: String,
 }

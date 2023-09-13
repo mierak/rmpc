@@ -7,7 +7,7 @@ use crate::{
 use super::{dirstack::DirStack, CommonAction, Screen, SongOrTagExt, ToListItems};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use ratatui::{
     prelude::{Constraint, Layout},
@@ -21,6 +21,7 @@ pub struct AlbumsScreen {
     stack: DirStack<String>,
     position: CurrentPosition,
     next: Vec<ListItem<'static>>,
+    filter_input_mode: bool,
 }
 
 impl Default for AlbumsScreen {
@@ -29,6 +30,7 @@ impl Default for AlbumsScreen {
             stack: DirStack::new(Vec::new()),
             position: CurrentPosition::Album(Position { values: Album }),
             next: Vec::new(),
+            filter_input_mode: false,
         }
     }
 }
@@ -104,6 +106,7 @@ impl Screen for AlbumsScreen {
                 &mut prev_state.scrollbar_state,
             );
         }
+        let title = self.stack.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         {
             let (current_items, current_state) = &mut self.stack.current();
             let current_items = if let CurrentPosition::Song(_) = self.position {
@@ -115,7 +118,13 @@ impl Screen for AlbumsScreen {
             current_state.viewport_len(Some(current_area.height));
 
             let current = List::new(current_items)
-                .block(Block::default().borders(Borders::TOP | Borders::BOTTOM))
+                .block({
+                    let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
+                    if let Some(ref title) = title {
+                        b = b.title(title.blue());
+                    }
+                    b
+                })
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
 
             let current_scrollbar = Scrollbar::default()
@@ -173,16 +182,35 @@ impl Screen for AlbumsScreen {
         app: &mut State,
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResult> {
-        if let Some(action) = app.config.keybinds.albums.get(&event.into()) {
+        if self.filter_input_mode {
+            match event.code {
+                KeyCode::Char(c) => {
+                    if let Some(ref mut f) = self.stack.filter {
+                        f.push(c);
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Backspace => {
+                    if let Some(ref mut f) = self.stack.filter {
+                        f.pop();
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Enter => {
+                    self.filter_input_mode = false;
+                    self.stack.jump_forward();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Esc => {
+                    self.filter_input_mode = false;
+                    self.stack.filter = None;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                _ => Ok(KeyHandleResult::SkipRender),
+            }
+        } else if let Some(action) = app.config.keybinds.albums.get(&event.into()) {
             match action {
-                AlbumsActions::EnterSearch => {
-                    //
-                    Ok(KeyHandleResult::RenderRequested)
-                }
-                AlbumsActions::LeaveSearch => {
-                    //
-                    Ok(KeyHandleResult::RenderRequested)
-                }
+                _ => Ok(KeyHandleResult::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
@@ -268,6 +296,19 @@ impl Screen for AlbumsScreen {
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
+                CommonAction::EnterSearch => {
+                    self.filter_input_mode = true;
+                    self.stack.filter = Some(String::new());
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::NextResult => {
+                    self.stack.jump_forward();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::PreviousResult => {
+                    self.stack.jump_back();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
         } else {
             Ok(KeyHandleResult::KeyNotHandled)
@@ -276,10 +317,7 @@ impl Screen for AlbumsScreen {
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum AlbumsActions {
-    EnterSearch,
-    LeaveSearch,
-}
+pub enum AlbumsActions {}
 
 #[derive(Debug)]
 struct Album;

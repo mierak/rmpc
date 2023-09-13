@@ -110,6 +110,7 @@ impl Screen for ArtistsScreen {
                 &mut prev_state.scrollbar_state,
             );
         }
+        let title = self.stack.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         {
             let (current_items, current_state) = self.stack.current();
             let current_items = if let CurrentPosition::Song(_) = self.position {
@@ -121,9 +122,13 @@ impl Screen for ArtistsScreen {
             current_state.viewport_len(Some(current_area.height));
 
             let current = List::new(current_items)
-                .block(
-                    Block::default().borders(Borders::TOP | Borders::BOTTOM), // .title(current_state.filter.as_ref().map_or(String::new(), Clone::clone)),
-                )
+                .block({
+                    let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
+                    if let Some(ref title) = title {
+                        b = b.title(title.blue());
+                    }
+                    b
+                })
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let current_scrollbar = Scrollbar::default()
                 .orientation(ScrollbarOrientation::VerticalLeft)
@@ -183,41 +188,33 @@ impl Screen for ArtistsScreen {
     ) -> Result<KeyHandleResult> {
         if self.filter_input_mode {
             match event.code {
-                // KeyCode::Char(c) => {
-                //     if let Some(ref mut f) = self.stack.current().1.filter {
-                //         f.push(c);
-                //     } else {
-                //         self.stack.current().1.filter = Some(String::new());
-                //     };
-                //     Ok(KeyHandleResult::RenderRequested)
-                // }
-                // KeyCode::Backspace => {
-                //     if let Some(ref mut f) = self.stack.current().1.filter {
-                //         f.pop();
-                //     };
-                //     Ok(KeyHandleResult::RenderRequested)
-                // }
-                // KeyCode::Enter => {
-                //     self.filter_input_mode = false;
-                //     Ok(KeyHandleResult::RenderRequested)
-                // }
-                // KeyCode::Esc => {
-                //     self.filter_input_mode = false;
-                //     self.stack.current().1.filter = None;
-                //     Ok(KeyHandleResult::RenderRequested)
-                // }
+                KeyCode::Char(c) => {
+                    if let Some(ref mut f) = self.stack.filter {
+                        f.push(c);
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Backspace => {
+                    if let Some(ref mut f) = self.stack.filter {
+                        f.pop();
+                    };
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Enter => {
+                    self.filter_input_mode = false;
+                    self.stack.jump_forward();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                KeyCode::Esc => {
+                    self.filter_input_mode = false;
+                    self.stack.filter = None;
+                    Ok(KeyHandleResult::RenderRequested)
+                }
                 _ => Ok(KeyHandleResult::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.artists.get(&event.into()) {
             match action {
-                ArtistsActions::EnterSearch => {
-                    self.filter_input_mode = true;
-                    Ok(KeyHandleResult::RenderRequested)
-                }
-                ArtistsActions::LeaveSearch => {
-                    self.filter_input_mode = false;
-                    Ok(KeyHandleResult::RenderRequested)
-                }
+                _ => Ok(KeyHandleResult::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
@@ -308,6 +305,19 @@ impl Screen for ArtistsScreen {
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
+                CommonAction::EnterSearch => {
+                    self.filter_input_mode = true;
+                    self.stack.filter = Some(String::new());
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::NextResult => {
+                    self.stack.jump_forward();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                CommonAction::PreviousResult => {
+                    self.stack.jump_back();
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
         } else {
             Ok(KeyHandleResult::KeyNotHandled)
@@ -316,10 +326,7 @@ impl Screen for ArtistsScreen {
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum ArtistsActions {
-    EnterSearch,
-    LeaveSearch,
-}
+pub enum ArtistsActions {}
 
 #[derive(Debug)]
 struct Artist;

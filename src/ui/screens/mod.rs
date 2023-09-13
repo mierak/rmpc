@@ -83,6 +83,9 @@ pub enum CommonAction {
     Left,
     Top,
     Bottom,
+    EnterSearch,
+    NextResult,
+    PreviousResult,
 }
 
 impl Screens {
@@ -110,17 +113,23 @@ impl Screens {
 pub mod dirstack {
     use ratatui::widgets::{ListState, ScrollbarState, TableState};
 
+    use crate::mpd::commands::lsinfo::FileOrDir;
+
     #[derive(Debug)]
-    pub struct DirStack<T: std::fmt::Debug> {
+    pub struct DirStack<T: std::fmt::Debug + MatchesSearch> {
         current: (Vec<T>, MyState<ListState>),
         others: Vec<(Vec<T>, MyState<ListState>)>,
+        pub filter: Option<String>,
+        pub filter_ignore_case: bool,
     }
 
-    impl<T: std::fmt::Debug> DirStack<T> {
+    impl<T: std::fmt::Debug + MatchesSearch> DirStack<T> {
         pub fn new(root: Vec<T>) -> Self {
             let mut result = Self {
                 others: Vec::new(),
                 current: (Vec::new(), MyState::default()),
+                filter: None,
+                filter_ignore_case: true,
             };
             let mut root_state = MyState::default();
 
@@ -156,10 +165,12 @@ pub mod dirstack {
             };
             let current_head = std::mem::replace(&mut self.current, (head, new_state));
             self.others.push(current_head);
+            self.filter = None;
         }
 
         pub fn pop(&mut self) -> Option<(Vec<T>, MyState<ListState>)> {
             if self.others.len() > 1 {
+                self.filter = None;
                 let top = self.others.pop().expect("There should always be at least two elements");
                 Some(std::mem::replace(&mut self.current, top))
             } else {
@@ -198,6 +209,34 @@ pub mod dirstack {
         pub fn first(&mut self) {
             self.current.1.first();
         }
+
+        pub fn jump_forward(&mut self) {
+            if let Some(filter) = self.filter.as_ref() {
+                if let Some(selected) = self.current.1.get_selected() {
+                    for i in selected + 1..self.current.0.len() {
+                        let s = &self.current.0[i];
+                        if s.matches(filter, self.filter_ignore_case) {
+                            self.current.1.select(Some(i));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        pub fn jump_back(&mut self) {
+            if let Some(filter) = self.filter.as_ref() {
+                if let Some(selected) = self.current.1.get_selected() {
+                    for i in (0..selected).rev() {
+                        let s = &self.current.0[i];
+                        if s.matches(filter, self.filter_ignore_case) {
+                            self.current.1.select(Some(i));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[derive(Debug, Default)]
@@ -206,7 +245,6 @@ pub mod dirstack {
         pub inner: T,
         pub content_len: Option<u16>,
         pub viewport_len: Option<u16>,
-        // pub filter: Option<String>,
     }
 
     impl<T: ScrollingState> MyState<T> {
@@ -221,11 +259,6 @@ pub mod dirstack {
             self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
             self
         }
-
-        // pub fn filter(&mut self, filter: Option<String>) -> &Self {
-        //     self.filter = filter;
-        //     self
-        // }
 
         pub fn first(&mut self) {
             if self.content_len.is_some() {
@@ -346,6 +379,39 @@ pub mod dirstack {
 
         fn get_selected_scrolling(&self) -> Option<usize> {
             self.selected()
+        }
+    }
+
+    pub trait MatchesSearch {
+        fn matches(&self, filter: &str, ignorecase: bool) -> bool;
+    }
+
+    impl MatchesSearch for String {
+        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
+            if ignorecase {
+                self.to_lowercase().contains(&filter.to_lowercase())
+            } else {
+                self.contains(filter)
+            }
+        }
+    }
+
+    impl MatchesSearch for FileOrDir {
+        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
+            if ignorecase {
+                match self {
+                    FileOrDir::Dir(dir) => dir.path.to_lowercase().contains(&filter.to_lowercase()),
+                    FileOrDir::File(song) => song
+                        .title
+                        .as_ref()
+                        .is_some_and(|s| s.to_lowercase().contains(&filter.to_lowercase())),
+                }
+            } else {
+                match self {
+                    FileOrDir::Dir(dir) => dir.path.contains(filter),
+                    FileOrDir::File(song) => song.title.as_ref().is_some_and(|s| s.contains(filter)),
+                }
+            }
         }
     }
 

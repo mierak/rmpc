@@ -8,7 +8,7 @@ use tracing::Level;
 use crate::ui::{
     screens::{
         albums::AlbumsActions, artists::ArtistsActions, directories::DirectoriesActions, logs::LogsActions,
-        queue::QueueuActions, CommonAction,
+        queue::QueueActions, CommonAction,
     },
     GlobalAction,
 };
@@ -74,7 +74,7 @@ pub struct KeyConfigFile {
     pub artists: HashMap<ArtistsActions, Key>,
     pub directories: HashMap<DirectoriesActions, Key>,
     pub logs: HashMap<LogsActions, Key>,
-    pub queue: HashMap<QueueuActions, Key>,
+    pub queue: HashMap<QueueActions, Key>,
 }
 
 impl Default for ConfigFile {
@@ -98,6 +98,7 @@ fn default_false() -> bool {
 
 impl Default for KeyConfigFile {
     #[rustfmt::skip]
+    #[allow(unused_imports)]
     fn default() -> Self {
         use GlobalAction as G;
         use CommonAction as C;
@@ -107,52 +108,51 @@ impl Default for KeyConfigFile {
         use KeyCode as K;
         use KeyModifiers as M;
         use LogsActions as L;
-        use QueueuActions as Q;
+        use QueueActions as Q;
         Self {
             global: HashMap::from([
-                (G::NextTrack,     Key { key: K::Char('n'), modifiers: M::NONE }),
-                (G::PreviousTrack, Key { key: K::Char('p'), modifiers: M::NONE }),
-                (G::Stop,          Key { key: K::Char('s'), modifiers: M::NONE }),
-                (G::ToggleRepeat,  Key { key: K::Char('z'), modifiers: M::NONE }),
-                (G::ToggleRandom,  Key { key: K::Char('x'), modifiers: M::NONE }),
-                (G::ToggleSingle,  Key { key: K::Char('c'), modifiers: M::NONE }),
-                (G::SeekForward,   Key { key: K::Char('f'), modifiers: M::NONE }),
-                (G::SeekBack,      Key { key: K::Char('b'), modifiers: M::NONE }),
-                (G::VolumeDown,    Key { key: K::Char(','), modifiers: M::NONE }),
-                (G::VolumeUp,      Key { key: K::Char('.'), modifiers: M::NONE }),
-                (G::NextTab,       Key { key: K::Right,     modifiers: M::NONE }),
-                (G::PreviousTab,   Key { key: K::Left,      modifiers: M::NONE }),
-                (G::ToggleConsume, Key { key: K::Char('v'), modifiers: M::NONE }),
+                (G::NextTrack,        Key { key: K::Char('n'), modifiers: M::NONE }),
+                (G::PreviousTrack,    Key { key: K::Char('p'), modifiers: M::NONE }),
+                (G::Stop,             Key { key: K::Char('s'), modifiers: M::NONE }),
+                (G::ToggleRepeat,     Key { key: K::Char('z'), modifiers: M::NONE }),
+                (G::ToggleRandom,     Key { key: K::Char('x'), modifiers: M::NONE }),
+                (G::ToggleSingle,     Key { key: K::Char('c'), modifiers: M::NONE }),
+                (G::SeekForward,      Key { key: K::Char('f'), modifiers: M::NONE }),
+                (G::SeekBack,         Key { key: K::Char('b'), modifiers: M::NONE }),
+                (G::VolumeDown,       Key { key: K::Char(','), modifiers: M::NONE }),
+                (G::VolumeUp,         Key { key: K::Char('.'), modifiers: M::NONE }),
+                (G::NextTab,          Key { key: K::Right,     modifiers: M::NONE }),
+                (G::PreviousTab,      Key { key: K::Left,      modifiers: M::NONE }),
+                (G::ToggleConsume,    Key { key: K::Char('v'), modifiers: M::NONE }),
             ]),
             navigation: HashMap::from([
-                (C::Down,         Key { key: K::Char('j'), modifiers: M::NONE }),
-                (C::Up,           Key { key: K::Char('k'), modifiers: M::NONE }),
-                (C::Right,        Key { key: K::Char('l'), modifiers: M::NONE }),
-                (C::Left,         Key { key: K::Char('h'), modifiers: M::NONE }),
-                (C::DownHalf,     Key { key: K::Char('d'), modifiers: M::CONTROL }),
-                (C::UpHalf,       Key { key: K::Char('u'), modifiers: M::CONTROL }),
-                (C::Bottom,       Key { key: K::Char('G'), modifiers: M::SHIFT }),
-                (C::Top,          Key { key: K::Char('g'), modifiers: M::NONE }),
+                (C::Down,             Key { key: K::Char('j'), modifiers: M::NONE }),
+                (C::Up,               Key { key: K::Char('k'), modifiers: M::NONE }),
+                (C::Right,            Key { key: K::Char('l'), modifiers: M::NONE }),
+                (C::Left,             Key { key: K::Char('h'), modifiers: M::NONE }),
+                (C::DownHalf,         Key { key: K::Char('d'), modifiers: M::CONTROL }),
+                (C::UpHalf,           Key { key: K::Char('u'), modifiers: M::CONTROL }),
+                (C::Bottom,           Key { key: K::Char('G'), modifiers: M::SHIFT }),
+                (C::Top,              Key { key: K::Char('g'), modifiers: M::NONE }),
+                (C::EnterSearch,      Key { key: K::Char('/'), modifiers: M::NONE }),
+                (C::NextResult,       Key { key: K::Char('n'), modifiers: M::CONTROL }),
+                (C::PreviousResult,   Key { key: K::Char('p'), modifiers: M::CONTROL }),
             ]),
             albums: HashMap::from([
-                (Al::EnterSearch,  Key { key: K::Char('/'), modifiers: M::NONE }),
-                (Al::LeaveSearch,  Key { key: K::Enter,     modifiers: M::NONE }),
             ]),
             artists: HashMap::from([
-                (Ar::EnterSearch,  Key { key: K::Char('/'), modifiers: M::NONE }),
-                (Ar::LeaveSearch,  Key { key: K::Enter,     modifiers: M::NONE }),
             ]),
             directories: HashMap::from([
-                (D::AddAll,        Key { key: K::Char('a'), modifiers: M::NONE }),
+                (D::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
             logs: HashMap::from([
-                (L::Clear,        Key { key: K::Char('D'), modifiers: M::SHIFT }),
+                (L::Clear,            Key { key: K::Char('D'), modifiers: M::SHIFT }),
             ]),
             queue: HashMap::from([
-                (Q::TogglePause,   Key { key: K::Char(' '), modifiers: M::NONE }),
-                (Q::Delete,        Key { key: K::Char('d'), modifiers: M::NONE }),
-                (Q::DeleteAll,     Key { key: K::Char('D'), modifiers: M::SHIFT }),
-                (Q::Play,          Key { key: K::Enter,     modifiers: M::NONE }),
+                (Q::TogglePause,      Key { key: K::Char(' '), modifiers: M::NONE }),
+                (Q::Delete,           Key { key: K::Char('d'), modifiers: M::NONE }),
+                (Q::DeleteAll,        Key { key: K::Char('D'), modifiers: M::SHIFT }),
+                (Q::Play,             Key { key: K::Enter,     modifiers: M::NONE }),
             ]),
         }
     }
@@ -219,7 +219,7 @@ pub struct KeyConfig {
     pub artists: HashMap<Key, ArtistsActions>,
     pub directories: HashMap<Key, DirectoriesActions>,
     pub logs: HashMap<Key, LogsActions>,
-    pub queue: HashMap<Key, QueueuActions>,
+    pub queue: HashMap<Key, QueueActions>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

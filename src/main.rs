@@ -6,7 +6,9 @@
     clippy::match_same_arms,
     clippy::manual_let_else,
     clippy::needless_return,
-    clippy::zero_sized_map_values
+    clippy::zero_sized_map_values,
+    clippy::too_many_lines,
+    clippy::match_single_binding
 )]
 use std::{sync::Arc, time::Duration};
 
