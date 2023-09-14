@@ -1,26 +1,24 @@
 use crate::{
     mpd::{client::Client, commands::Song as MpdSong, mpd_client::Filter, mpd_client::MpdClient},
     state::State,
-    ui::{KeyHandleResult, Level, SharedUiState, StatusMessage},
+    ui::{widgets::browser::Browser, KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{dirstack::DirStack, CommonAction, Screen, SongOrTagExt, ToListItems};
+use super::{
+    browser::{StringOrSong, ToListItems},
+    dirstack::DirStack,
+    CommonAction, Screen,
+};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
-use ratatui::{
-    prelude::{Constraint, Layout},
-    style::{Color, Style, Stylize},
-    widgets::{Block, Borders, List, Scrollbar, ScrollbarOrientation},
-};
 use tracing::instrument;
 
 #[derive(Debug)]
 pub struct AlbumsScreen {
-    stack: DirStack<String>,
+    stack: DirStack<StringOrSong>,
     position: CurrentPosition,
-    next: Vec<ListItem<'static>>,
     filter_input_mode: bool,
 }
 
@@ -29,7 +27,6 @@ impl Default for AlbumsScreen {
         Self {
             stack: DirStack::new(Vec::new()),
             position: CurrentPosition::Album(Position { values: Album }),
-            next: Vec::new(),
             filter_input_mode: false,
         }
     }
@@ -46,8 +43,14 @@ impl AlbumsScreen {
             .context("Expected an item to be selected")?;
         let current = &self.stack.current().0[idx];
         Ok(match &self.position {
-            CurrentPosition::Album(val) => val.fetch(client, current).await?.to_listitems(true, state),
-            CurrentPosition::Song(val) => val.fetch(client, current).await?.to_listitems(state),
+            CurrentPosition::Album(val) => val
+                .fetch(client, current.to_current_value())
+                .await?
+                .to_listitems(&state.config.symbols),
+            CurrentPosition::Song(val) => val
+                .fetch(client, current.to_current_value())
+                .await?
+                .to_listitems(&state.config.symbols),
         })
     }
 }
@@ -63,90 +66,8 @@ impl Screen for AlbumsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let [previous_area, current_area, preview_area] = *Layout::default()
-            .direction(ratatui::prelude::Direction::Horizontal)
-            // cfg
-            .constraints([
-                         Constraint::Percentage(20),
-                         Constraint::Percentage(38),
-                         Constraint::Percentage(42),
-            ].as_ref())
-            .split(area) else { return Ok(()) };
-
-        let preview = List::new(self.next.clone())
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-        frame.render_widget(preview, preview_area);
-
-        {
-            let (prev_items, prev_state) = self.stack.previous();
-            let prev_items = prev_items.to_listitems(false, app);
-            prev_state.content_len(Some(u16::try_from(prev_items.len())?));
-            prev_state.viewport_len(Some(previous_area.height));
-
-            let previous = List::new(prev_items)
-                .block(Block::default().borders(Borders::ALL))
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-
-            let previous_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("↑"))
-                .track_symbol(Some("│"))
-                .end_symbol(Some("↓"))
-                .track_style(Style::default().fg(Color::White).bg(Color::Black))
-                .thumb_style(Style::default().fg(Color::Blue));
-
-            frame.render_stateful_widget(previous, previous_area, &mut prev_state.inner);
-            frame.render_stateful_widget(
-                previous_scrollbar,
-                previous_area.inner(&ratatui::prelude::Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
-                &mut prev_state.scrollbar_state,
-            );
-        }
-        let title = self.stack.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
-        {
-            let (current_items, current_state) = &mut self.stack.current();
-            let current_items = if let CurrentPosition::Song(_) = self.position {
-                current_items.to_listitems(true, app)
-            } else {
-                current_items.to_listitems(false, app)
-            };
-            current_state.content_len(Some(u16::try_from(current_items.len())?));
-            current_state.viewport_len(Some(current_area.height));
-
-            let current = List::new(current_items)
-                .block({
-                    let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
-                    if let Some(ref title) = title {
-                        b = b.title(title.blue());
-                    }
-                    b
-                })
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-
-            let current_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalLeft)
-                .begin_symbol(Some("↑"))
-                .track_symbol(Some("│"))
-                .end_symbol(Some("↓"))
-                .track_style(Style::default().fg(Color::White).bg(Color::Black))
-                .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-                .end_style(Style::default().fg(Color::White).bg(Color::Black))
-                .thumb_style(Style::default().fg(Color::Blue));
-
-            frame.render_stateful_widget(current, current_area, &mut current_state.inner);
-            frame.render_stateful_widget(
-                current_scrollbar,
-                preview_area.inner(&ratatui::prelude::Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
-                &mut current_state.scrollbar_state,
-            );
-        }
+        let w = Browser::new(&app.config.symbols, &app.config.column_widths);
+        frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())
     }
@@ -160,9 +81,9 @@ impl Screen for AlbumsScreen {
     ) -> Result<()> {
         match _client.list_tag("album", None).await.context("Cannot list tags")? {
             Some(result) => {
-                self.stack = DirStack::new(result.0);
+                self.stack = DirStack::new(result.0.into_iter().map(StringOrSong::Dir).collect());
                 self.position = CurrentPosition::default();
-                self.next = self
+                self.stack.next = self
                     .prepare_preview(_client, _app)
                     .await
                     .context("Cannot prepare preview")?;
@@ -216,7 +137,7 @@ impl Screen for AlbumsScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -224,7 +145,7 @@ impl Screen for AlbumsScreen {
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -232,7 +153,7 @@ impl Screen for AlbumsScreen {
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -240,7 +161,7 @@ impl Screen for AlbumsScreen {
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -263,7 +184,7 @@ impl Screen for AlbumsScreen {
                         .1
                         .get_selected()
                         .context("Expected an item to be selected")?;
-                    let current = self.stack.current().0[idx].clone();
+                    let current = self.stack.current().0[idx].to_current_value().to_owned();
                     self.position = match &mut self.position {
                         CurrentPosition::Album(val) => {
                             self.stack.push(val.fetch(client, &current).await?);
@@ -278,7 +199,7 @@ impl Screen for AlbumsScreen {
                             CurrentPosition::Song(val.next())
                         }
                     };
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -290,7 +211,7 @@ impl Screen for AlbumsScreen {
                         CurrentPosition::Album(val) => CurrentPosition::Album(val.prev()),
                         CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
                     };
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -350,12 +271,11 @@ impl Position<Album> {
         Position { values: Album }
     }
 
-    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<String>> {
+    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<StringOrSong>> {
         Ok(client
             .list_tag("title", Some(&[Filter { tag: "album", value }]))
             .await?
-            .unwrap_or_else(|| crate::mpd::commands::list::MpdList(Vec::new()))
-            .0)
+            .map_or(Vec::new(), |v| v.0.into_iter().map(StringOrSong::Song).collect()))
     }
 }
 

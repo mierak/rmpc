@@ -4,9 +4,8 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    prelude::{Backend, Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
-    widgets::{Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation},
+    prelude::{Backend, Rect},
+    widgets::ListItem,
     Frame,
 };
 use tracing::instrument;
@@ -18,15 +17,14 @@ use crate::{
         mpd_client::MpdClient,
     },
     state::State,
-    ui::{KeyHandleResult, Level, SharedUiState, StatusMessage},
+    ui::{widgets::browser::Browser, KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{dirstack::DirStack, CommonAction, Screen, ToListItems};
+use super::{browser::ToListItems, dirstack::DirStack, CommonAction, Screen};
 
 #[derive(Debug)]
 pub struct DirectoriesScreen {
     stack: DirStack<FileOrDir>,
-    next: Vec<ListItem<'static>>,
     filter_input_mode: bool,
 }
 
@@ -34,7 +32,6 @@ impl Default for DirectoriesScreen {
     fn default() -> Self {
         Self {
             stack: DirStack::new(Vec::new()),
-            next: Vec::new(),
             filter_input_mode: false,
         }
     }
@@ -50,87 +47,8 @@ impl Screen for DirectoriesScreen {
         app: &mut crate::state::State,
         _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let [previous_area, current_area, preview_area] = *Layout::default()
-            .direction(ratatui::prelude::Direction::Horizontal)
-            // cfg
-            .constraints([
-                         Constraint::Percentage(20),
-                         Constraint::Percentage(38),
-                         Constraint::Percentage(42),
-            ].as_ref())
-            .split(area) else { return Ok(()) };
-
-        let preview = List::new(self.next.clone())
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-        frame.render_widget(preview, preview_area);
-
-        {
-            let (prev_items, prev_state) = self.stack.previous();
-            let prev_items = prev_items.to_listitems(app);
-            prev_state.content_len(Some(u16::try_from(prev_items.len())?));
-            prev_state.viewport_len(Some(previous_area.height));
-
-            let previous = List::new(prev_items)
-                .block(Block::default().borders(Borders::ALL))
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-
-            let previous_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("↑"))
-                .track_symbol(Some("│"))
-                .end_symbol(Some("↓"))
-                .track_style(Style::default().fg(Color::White).bg(Color::Black))
-                .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-                .end_style(Style::default().fg(Color::White).bg(Color::Black))
-                .thumb_style(Style::default().fg(Color::Blue));
-
-            frame.render_stateful_widget(previous, previous_area, &mut prev_state.inner);
-            frame.render_stateful_widget(
-                previous_scrollbar,
-                previous_area.inner(&ratatui::prelude::Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
-                &mut prev_state.scrollbar_state,
-            );
-        }
-        let title = self.stack.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
-        {
-            let (current_items, current_state) = &mut self.stack.current();
-            let current_items = current_items.to_listitems(app);
-            current_state.content_len(Some(u16::try_from(current_items.len())?));
-            current_state.viewport_len(Some(current_area.height));
-
-            let current = List::new(current_items)
-                .block({
-                    let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
-                    if let Some(ref title) = title {
-                        b = b.title(title.blue());
-                    }
-                    b
-                })
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-
-            let current_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalLeft)
-                .begin_symbol(Some("↑"))
-                .track_symbol(Some("│"))
-                .end_symbol(Some("↓"))
-                .track_style(Style::default().fg(Color::White).bg(Color::Black))
-                .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-                .end_style(Style::default().fg(Color::White).bg(Color::Black))
-                .thumb_style(Style::default().fg(Color::Blue));
-            frame.render_stateful_widget(current, current_area, &mut current_state.inner);
-            frame.render_stateful_widget(
-                current_scrollbar,
-                preview_area.inner(&ratatui::prelude::Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
-                &mut current_state.scrollbar_state,
-            );
-        }
+        let w = Browser::new(&app.config.symbols, &app.config.column_widths);
+        frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())
     }
@@ -142,7 +60,7 @@ impl Screen for DirectoriesScreen {
         _shared: &mut SharedUiState,
     ) -> Result<()> {
         self.stack = DirStack::new(client.lsinfo(None).await?.0);
-        self.next = self
+        self.stack.next = self
             .prepare_preview(client, _app)
             .await
             .context("Cannot prepare preview")?;
@@ -215,7 +133,7 @@ impl Screen for DirectoriesScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -223,7 +141,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -231,7 +149,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -239,7 +157,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -247,7 +165,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -255,7 +173,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -267,7 +185,7 @@ impl Screen for DirectoriesScreen {
                             let new_current = client.lsinfo(Some(&dir.full_path)).await?.0;
                             self.stack.push(new_current);
 
-                            self.next = self
+                            self.stack.next = self
                                 .prepare_preview(client, app)
                                 .await
                                 .context("Cannot prepare preview")?;
@@ -289,7 +207,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Left => {
                     self.stack.pop();
-                    self.next = self
+                    self.stack.next = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -335,9 +253,9 @@ impl DirectoriesScreen {
                 }
                 .0;
                 res.sort();
-                Some(res.to_listitems(state))
+                Some(res.to_listitems(&state.config.symbols))
             }
-            FileOrDir::File(song) => Some(song.to_listitems(state)),
+            FileOrDir::File(song) => Some(song.to_listitems(&state.config.symbols)),
         }
     }
 }
@@ -358,23 +276,5 @@ impl std::cmp::PartialOrd for FileOrDir {
             (FileOrDir::Dir(_), _) => Some(Ordering::Less),
             (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => Some(t1.cmp(t2)),
         }
-    }
-}
-
-impl ToListItems for Vec<FileOrDir> {
-    fn to_listitems(&self, state: &State) -> Vec<ListItem<'static>> {
-        self.iter()
-            .map(|val| {
-                let (kind, name) = match val {
-                    // cfg
-                    FileOrDir::Dir(v) => (state.config.symbols.dir, v.path.clone()),
-                    FileOrDir::File(v) => (
-                        state.config.symbols.song,
-                        v.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned(),
-                    ),
-                };
-                ListItem::new(format!("{kind} {name}"))
-            })
-            .collect::<Vec<ListItem>>()
     }
 }

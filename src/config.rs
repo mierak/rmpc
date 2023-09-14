@@ -61,7 +61,9 @@ pub struct Key {
 pub struct ConfigFile {
     address: String,
     symbols: SymbolsFile,
-    #[serde(default = "default_false")]
+    #[serde(default = "defaults::default_column_widths")]
+    column_widths: Vec<u16>,
+    #[serde(default = "defaults::default_false")]
     disable_images: bool,
     keybinds: KeyConfigFile,
 }
@@ -83,6 +85,7 @@ impl Default for ConfigFile {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
             disable_images: false,
+            column_widths: vec![20, 38, 42],
             symbols: SymbolsFile {
                 progress_bar: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
                 song: " 🎵".to_owned(),
@@ -92,8 +95,14 @@ impl Default for ConfigFile {
     }
 }
 
-fn default_false() -> bool {
-    false
+mod defaults {
+    pub fn default_column_widths() -> Vec<u16> {
+        vec![20, 38, 42]
+    }
+
+    pub fn default_false() -> bool {
+        false
+    }
 }
 
 impl Default for KeyConfigFile {
@@ -164,6 +173,7 @@ impl From<ConfigFile> for Config {
             address: Box::leak(Box::new(value.address)),
             symbols: value.symbols.into(),
             disable_images: value.disable_images,
+            column_widths: [value.column_widths[0], value.column_widths[1], value.column_widths[2]],
             keybinds: KeyConfig {
                 global: value.keybinds.global.into_iter().map(|(k, v)| (v, k)).collect(),
                 navigation: value.keybinds.navigation.into_iter().map(|(k, v)| (v, k)).collect(),
@@ -208,6 +218,7 @@ pub struct Config {
     pub address: &'static str,
     pub symbols: SymbolsConfig,
     pub keybinds: KeyConfig,
+    pub column_widths: [u16; 3],
     pub disable_images: bool,
 }
 

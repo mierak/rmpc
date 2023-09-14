@@ -3,17 +3,11 @@ use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Rect},
-    style::{Color, Style},
-    text::{Line, Span},
-    widgets::ListItem,
     Frame,
 };
 use strum::{Display, EnumIter, EnumVariantNames};
 
-use crate::{
-    mpd::{client::Client, commands::Song},
-    state::State,
-};
+use crate::{mpd::client::Client, state::State};
 
 use super::{KeyHandleResult, SharedUiState};
 
@@ -111,7 +105,7 @@ impl Screens {
 }
 
 pub mod dirstack {
-    use ratatui::widgets::{ListState, ScrollbarState, TableState};
+    use ratatui::widgets::{ListItem, ListState, ScrollbarState, TableState};
 
     use crate::mpd::commands::lsinfo::FileOrDir;
 
@@ -119,6 +113,7 @@ pub mod dirstack {
     pub struct DirStack<T: std::fmt::Debug + MatchesSearch> {
         current: (Vec<T>, MyState<ListState>),
         others: Vec<(Vec<T>, MyState<ListState>)>,
+        pub next: Vec<ListItem<'static>>,
         pub filter: Option<String>,
         pub filter_ignore_case: bool,
     }
@@ -130,6 +125,7 @@ pub mod dirstack {
                 current: (Vec::new(), MyState::default()),
                 filter: None,
                 filter_ignore_case: true,
+                next: Vec::new(),
             };
             let mut root_state = MyState::default();
 
@@ -431,84 +427,139 @@ pub mod dirstack {
     }
 }
 
-pub trait ToListItems {
-    fn to_listitems(&self, state: &State) -> Vec<ListItem<'static>>;
-}
+pub(crate) mod browser {
+    use ratatui::{
+        style::{Color, Style},
+        text::{Line, Span},
+        widgets::ListItem,
+    };
 
-impl ToListItems for Song {
-    fn to_listitems(&self, _app: &State) -> Vec<ListItem<'static>> {
-        let key_style = Style::default().fg(Color::Yellow);
-        let separator = Span::from(": ");
-        let start_of_line_spacer = Span::from(" ");
+    use crate::{
+        config::SymbolsConfig,
+        mpd::commands::{lsinfo::FileOrDir, Song},
+    };
 
-        let title = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Title", key_style),
-            separator.clone(),
-            Span::from(self.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
-        ]);
-        let artist = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Artist", key_style),
-            separator.clone(),
-            Span::from(": "),
-            Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-        ]);
-        let album = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Album", key_style),
-            separator.clone(),
-            Span::from(self.album.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-        ]);
-        let duration = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("Duration", key_style),
-            separator.clone(),
-            Span::from(
-                self.duration
-                    .as_ref()
-                    .map_or("-".to_owned(), |v| v.as_secs().to_string()),
-            ),
-        ]);
-        let r = vec![title, artist, album, duration];
-        let r = [
-            r,
-            self.others
-                .iter()
-                .map(|(k, v)| {
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled(k.clone(), key_style),
-                        separator.clone(),
-                        Span::from(v.clone()),
-                    ])
-                })
-                .collect(),
-        ]
-        .concat();
+    use super::dirstack::MatchesSearch;
 
-        r.into_iter().map(ListItem::new).collect()
+    pub trait ToListItems {
+        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>>;
     }
-}
 
-pub trait SongOrTagExt {
-    fn to_listitems(&self, is_song: bool, state: &State) -> Vec<ListItem<'static>>;
-}
+    impl ToListItems for Song {
+        fn to_listitems(&self, _symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
+            let key_style = Style::default().fg(Color::Yellow);
+            let separator = Span::from(": ");
+            let start_of_line_spacer = Span::from(" ");
 
-impl SongOrTagExt for Vec<String> {
-    fn to_listitems(&self, is_song: bool, state: &State) -> Vec<ListItem<'static>> {
-        self.iter()
-            .map(|val| {
-                ListItem::new(format!(
-                    "{} {}",
-                    if is_song {
-                        state.config.symbols.song
-                    } else {
-                        state.config.symbols.dir
-                    },
-                    if val.is_empty() { "Unknown" } else { val }
-                ))
-            })
-            .collect::<Vec<ListItem>>()
+            let title = Line::from(vec![
+                start_of_line_spacer.clone(),
+                Span::styled("Title", key_style),
+                separator.clone(),
+                Span::from(self.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
+            ]);
+            let artist = Line::from(vec![
+                start_of_line_spacer.clone(),
+                Span::styled("Artist", key_style),
+                separator.clone(),
+                Span::from(": "),
+                Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
+            ]);
+            let album = Line::from(vec![
+                start_of_line_spacer.clone(),
+                Span::styled("Album", key_style),
+                separator.clone(),
+                Span::from(self.album.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
+            ]);
+            let duration = Line::from(vec![
+                start_of_line_spacer.clone(),
+                Span::styled("Duration", key_style),
+                separator.clone(),
+                Span::from(
+                    self.duration
+                        .as_ref()
+                        .map_or("-".to_owned(), |v| v.as_secs().to_string()),
+                ),
+            ]);
+            let r = vec![title, artist, album, duration];
+            let r = [
+                r,
+                self.others
+                    .iter()
+                    .map(|(k, v)| {
+                        Line::from(vec![
+                            start_of_line_spacer.clone(),
+                            Span::styled(k.clone(), key_style),
+                            separator.clone(),
+                            Span::from(v.clone()),
+                        ])
+                    })
+                    .collect(),
+            ]
+            .concat();
+
+            r.into_iter().map(ListItem::new).collect()
+        }
+    }
+
+    impl ToListItems for Vec<FileOrDir> {
+        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
+            self.iter()
+                .map(|val| {
+                    let (kind, name) = match val {
+                        // cfg
+                        FileOrDir::Dir(v) => (symbols.dir, v.path.clone()),
+                        FileOrDir::File(v) => (
+                            symbols.song,
+                            v.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned(),
+                        ),
+                    };
+                    ListItem::new(format!("{kind} {name}"))
+                })
+                .collect::<Vec<ListItem>>()
+        }
+    }
+    #[derive(Debug)]
+    pub(crate) enum StringOrSong {
+        Dir(String),
+        Song(String),
+    }
+
+    impl StringOrSong {
+        pub fn to_current_value(&self) -> &str {
+            match self {
+                StringOrSong::Dir(d) => d,
+                StringOrSong::Song(s) => s,
+            }
+        }
+    }
+
+    impl ToListItems for Vec<StringOrSong> {
+        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
+            self.iter()
+                .map(|val| {
+                    let (kind, name) = match val {
+                        StringOrSong::Dir(v) => (symbols.dir, v),
+                        StringOrSong::Song(s) => (symbols.song, s),
+                    };
+                    ListItem::new(format!("{kind} {name}"))
+                })
+                .collect::<Vec<ListItem>>()
+        }
+    }
+
+    impl MatchesSearch for StringOrSong {
+        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
+            if ignorecase {
+                match self {
+                    StringOrSong::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
+                    StringOrSong::Song(s) => s.to_lowercase().contains(&filter.to_lowercase()),
+                }
+            } else {
+                match self {
+                    StringOrSong::Dir(v) => v.contains(filter),
+                    StringOrSong::Song(s) => s.contains(filter),
+                }
+            }
+        }
     }
 }
