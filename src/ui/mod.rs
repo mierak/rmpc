@@ -27,11 +27,12 @@ use crate::{
     ui::widgets::tabs::Tabs,
 };
 
+#[cfg(debug_assertions)]
+use self::screens::logs::LogsScreen;
 use self::{
     modals::{confirm_queue_clear::ConfirmQueueClearModal, Modal},
     screens::{
-        albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, logs::LogsScreen,
-        queue::QueueScreen, Screen,
+        albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, queue::QueueScreen, Screen,
     },
     widgets::{frame_counter::FrameCounter, progress_bar::ProgressBar},
 };
@@ -99,6 +100,7 @@ struct UiModals {
 #[derive(Debug, Default)]
 struct Screens {
     queue: QueueScreen,
+    #[cfg(debug_assertions)]
     logs: LogsScreen,
     directories: DirectoriesScreen,
     albums: AlbumsScreen,
@@ -115,6 +117,7 @@ macro_rules! screen_call {
     ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
         match $app.active_tab {
             screens::Screens::Queue => invoke!($self.screens.queue, $fn, $($param),+),
+            #[cfg(debug_assertions)]
             screens::Screens::Logs => invoke!($self.screens.logs, $fn, $($param),+),
             screens::Screens::Directories => invoke!($self.screens.directories, $fn, $($param),+),
             screens::Screens::Artists => invoke!($self.screens.artists, $fn, $($param),+),

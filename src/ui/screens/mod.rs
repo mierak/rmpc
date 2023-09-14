@@ -21,6 +21,7 @@ pub mod queue;
 pub enum Screens {
     #[default]
     Queue,
+    #[cfg(debug_assertions)]
     Logs,
     Directories,
     Artists,
@@ -85,7 +86,11 @@ pub enum CommonAction {
 impl Screens {
     pub fn next(self) -> Self {
         match self {
+            #[cfg(debug_assertions)]
             Screens::Queue => Screens::Logs,
+            #[cfg(not(debug_assertions))]
+            Screens::Queue => Screens::Directories,
+            #[cfg(debug_assertions)]
             Screens::Logs => Screens::Directories,
             Screens::Directories => Screens::Artists,
             Screens::Artists => Screens::Albums,
@@ -98,7 +103,11 @@ impl Screens {
             Screens::Queue => Screens::Albums,
             Screens::Albums => Screens::Artists,
             Screens::Artists => Screens::Directories,
+            #[cfg(not(debug_assertions))]
+            Screens::Directories => Screens::Queue,
+            #[cfg(debug_assertions)]
             Screens::Directories => Screens::Logs,
+            #[cfg(debug_assertions)]
             Screens::Logs => Screens::Queue,
         }
     }

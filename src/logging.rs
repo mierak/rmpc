@@ -33,12 +33,14 @@ impl std::io::Write for TestWriter {
 
 pub fn configure(level: Level, tx: &Sender<AppEvent>) -> Vec<WorkerGuard> {
     let error_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::StatusBar)));
-    let logs_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::Log)));
     let file_appender = tracing_appender::rolling::RollingFileAppender::new(Rotation::DAILY, "./", "mpdox.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
     let (non_blocking_errors, errors_guard) = tracing_appender::non_blocking(&*error_writer);
-    let (non_blocking_logs, logs_guard) = tracing_appender::non_blocking(&*logs_writer);
-    tracing_subscriber::registry()
+    #[cfg(debug_assertions)]
+    let mut guards = vec![guard, errors_guard];
+    #[cfg(not(debug_assertions))]
+    let guards = vec![guard, errors_guard];
+    let registry = tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::Layer::default()
                 .with_ansi(false)
@@ -51,7 +53,7 @@ pub fn configure(level: Level, tx: &Sender<AppEvent>) -> Vec<WorkerGuard> {
                     format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"),
                 ))
                 .compact()
-                .with_filter(LogsFilter::new(Level::TRACE)),
+                .with_filter(LogsFilter::new(level)),
         )
         .with(
             tracing_subscriber::fmt::Layer::default()
@@ -60,24 +62,35 @@ pub fn configure(level: Level, tx: &Sender<AppEvent>) -> Vec<WorkerGuard> {
                 .with_level(false)
                 .without_time()
                 .with_filter(LogsFilter::new(Level::ERROR)),
-        )
-        .with(
-            tracing_subscriber::fmt::Layer::default()
-                .with_writer(non_blocking_logs)
-                .with_ansi(true)
-                .with_file(true)
-                .with_target(false)
-                .with_line_number(true)
-                .with_timer(tracing_subscriber::fmt::time::OffsetTime::new(
-                    UtcOffset::UTC,
-                    format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"),
-                ))
-                .compact()
-                .with_filter(LogsFilter::new(level)),
-        )
-        .init();
+        );
+    #[cfg(debug_assertions)]
+    {
+        let logs_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::Log)));
+        let (non_blocking_logs, logs_guard) = tracing_appender::non_blocking(&*logs_writer);
+        guards.push(logs_guard);
+        registry
+            .with(
+                tracing_subscriber::fmt::Layer::default()
+                    .with_writer(non_blocking_logs)
+                    .with_ansi(true)
+                    .with_file(true)
+                    .with_target(false)
+                    .with_line_number(true)
+                    .with_timer(tracing_subscriber::fmt::time::OffsetTime::new(
+                        UtcOffset::UTC,
+                        format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"),
+                    ))
+                    .compact()
+                    .with_filter(LogsFilter::new(level)),
+            )
+            .init();
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        registry.init();
+    }
 
-    vec![guard, errors_guard, logs_guard]
+    guards
 }
 
 pub struct LogsFilter {
