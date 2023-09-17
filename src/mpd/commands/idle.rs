@@ -19,30 +19,27 @@ pub enum IdleEvent {
     Mount,   // the mount list has changed
 }
 
-#[derive(Debug, Default)]
-pub struct IdleEvents(pub Vec<IdleEvent>);
-
-impl FromMpd for IdleEvents {
+impl FromMpd for Vec<IdleEvent> {
     fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
         Ok(self)
     }
 
     fn next_internal(&mut self, _key: &str, value: String) -> Result<LineHandled, MpdError> {
         match value.as_str() {
-            "mixer" => self.0.push(IdleEvent::Mixer),
-            "player" => self.0.push(IdleEvent::Player),
-            "options" => self.0.push(IdleEvent::Options),
-            "database" => self.0.push(IdleEvent::Database),
-            "update" => self.0.push(IdleEvent::Update),
-            "stored_playlist" => self.0.push(IdleEvent::StoredPlaylist),
-            "playlist" => self.0.push(IdleEvent::Playlist),
-            "output" => self.0.push(IdleEvent::Output),
-            "partition" => self.0.push(IdleEvent::Partition),
-            "sticker" => self.0.push(IdleEvent::Sticker),
-            "subscription" => self.0.push(IdleEvent::Subscription),
-            "message" => self.0.push(IdleEvent::Message),
-            "neighbor" => self.0.push(IdleEvent::Neighbor),
-            "mount" => self.0.push(IdleEvent::Mount),
+            "mixer" => self.push(IdleEvent::Mixer),
+            "player" => self.push(IdleEvent::Player),
+            "options" => self.push(IdleEvent::Options),
+            "database" => self.push(IdleEvent::Database),
+            "update" => self.push(IdleEvent::Update),
+            "stored_playlist" => self.push(IdleEvent::StoredPlaylist),
+            "playlist" => self.push(IdleEvent::Playlist),
+            "output" => self.push(IdleEvent::Output),
+            "partition" => self.push(IdleEvent::Partition),
+            "sticker" => self.push(IdleEvent::Sticker),
+            "subscription" => self.push(IdleEvent::Subscription),
+            "message" => self.push(IdleEvent::Message),
+            "neighbor" => self.push(IdleEvent::Neighbor),
+            "mount" => self.push(IdleEvent::Mount),
             _ => return Ok(LineHandled::No { value }),
         };
         Ok(LineHandled::Yes)

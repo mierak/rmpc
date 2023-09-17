@@ -403,9 +403,7 @@ impl<'a> KittyImage<'a> {
         let mut res = String::new();
         for row in GRID.iter().take(rows) {
             for col in GRID.iter().take(cols) {
-                res.push_str(&format!("\x1b[38;5;{}m", state.idx));
-                res.push_str(DELIM);
-                res.push_str(&format!("{row}{col}"));
+                res.push_str(&format!("\x1b[38;5;{}m{DELIM}{row}{col}", state.idx));
             }
             res.push_str("\x1b[39m\n");
         }

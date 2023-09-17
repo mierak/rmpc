@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Default, PartialEq, Eq, Clone)]
 pub struct Song {
     pub id: u32,
     pub file: String,

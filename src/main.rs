@@ -205,7 +205,7 @@ async fn idle_task(
     let mut error_count = 0;
     loop {
         let events = match idle_client.idle().await {
-            Ok(val) => val.0,
+            Ok(val) => val,
             Err(err) => {
                 if error_count > 5 {
                     error!(message = "Unexpected error when receiving idle events", ?err);
@@ -229,7 +229,7 @@ async fn idle_task(
                     if let Some(current_song) = state
                         .queue
                         .as_ref()
-                        .and_then(|p| p.0.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
+                        .and_then(|p| p.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
                     {
                         if !state.config.disable_images {
                             state.album_art = try_cont!(

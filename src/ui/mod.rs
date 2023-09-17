@@ -32,7 +32,8 @@ use self::screens::logs::LogsScreen;
 use self::{
     modals::{confirm_queue_clear::ConfirmQueueClearModal, Modal},
     screens::{
-        albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, queue::QueueScreen, Screen,
+        albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
+        queue::QueueScreen, Screen,
     },
     widgets::{frame_counter::FrameCounter, progress_bar::ProgressBar},
 };
@@ -105,6 +106,7 @@ struct Screens {
     directories: DirectoriesScreen,
     albums: AlbumsScreen,
     artists: ArtistsScreen,
+    playlists: PlaylistsScreen,
 }
 
 macro_rules! invoke {
@@ -122,6 +124,7 @@ macro_rules! screen_call {
             screens::Screens::Directories => invoke!($self.screens.directories, $fn, $($param),+),
             screens::Screens::Artists => invoke!($self.screens.artists, $fn, $($param),+),
             screens::Screens::Albums => invoke!($self.screens.albums, $fn, $($param),+),
+            screens::Screens::Playlists => invoke!($self.screens.playlists, $fn, $($param),+),
         }
     }
 }

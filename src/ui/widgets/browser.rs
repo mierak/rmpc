@@ -6,21 +6,13 @@ use crate::ui::screens::browser::ToListItems;
 use crate::ui::screens::dirstack::{DirStack, MatchesSearch};
 
 #[derive(Debug)]
-pub struct Browser<'a, T>
-where
-    T: MatchesSearch + std::fmt::Debug,
-    Vec<T>: ToListItems,
-{
+pub struct Browser<'a, T> {
     state_type_marker: std::marker::PhantomData<T>,
     pub symbols: &'a SymbolsConfig,
     pub widths: &'a [u16; 3],
 }
 
-impl<'a, T> Browser<'a, T>
-where
-    T: MatchesSearch + std::fmt::Debug,
-    Vec<T>: ToListItems,
-{
+impl<'a, T> Browser<'a, T> {
     pub fn new(symbols: &'a SymbolsConfig, widths: &'a [u16; 3]) -> Self {
         Self {
             symbols,
@@ -48,10 +40,12 @@ where
             ].as_ref())
             .split(area) else { return  };
 
-        let preview = List::new(state.next.clone())
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-        ratatui::widgets::Widget::render(preview, preview_area, buf);
+        {
+            let preview = List::new(state.preview.clone())
+                .block(Block::default().borders(Borders::ALL))
+                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+            ratatui::widgets::Widget::render(preview, preview_area, buf);
+        }
 
         {
             let (prev_items, prev_state) = state.previous();

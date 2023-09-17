@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, path::PathBuf};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -20,12 +20,18 @@ use crate::{
     ui::{widgets::browser::Browser, KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{browser::ToListItems, dirstack::DirStack, CommonAction, Screen};
+use super::{
+    browser::{DirOrSong, DirOrSongInfo, ToListItems},
+    dirstack::DirStack,
+    iter::DirOrSongListItems,
+    CommonAction, Screen, SongExt,
+};
 
 #[derive(Debug)]
 pub struct DirectoriesScreen {
-    stack: DirStack<FileOrDir>,
+    stack: DirStack<DirOrSongInfo>,
     filter_input_mode: bool,
+    path: PathBuf,
 }
 
 impl Default for DirectoriesScreen {
@@ -33,6 +39,7 @@ impl Default for DirectoriesScreen {
         Self {
             stack: DirStack::new(Vec::new()),
             filter_input_mode: false,
+            path: PathBuf::new(),
         }
     }
 }
@@ -59,8 +66,9 @@ impl Screen for DirectoriesScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        self.stack = DirStack::new(client.lsinfo(None).await?.0);
-        self.stack.next = self
+        self.path = PathBuf::new();
+        self.stack = DirStack::new(client.lsinfo(None).await?.0.into_iter().map(Into::into).collect());
+        self.stack.preview = self
             .prepare_preview(client, _app)
             .await
             .context("Cannot prepare preview")?;
@@ -106,21 +114,28 @@ impl Screen for DirectoriesScreen {
             match action {
                 DirectoriesActions::AddAll => {
                     match self.stack.get_selected() {
-                        Some(FileOrDir::Dir(dir)) => {
-                            client.add(&dir.full_path).await?;
-                            shared.status_message = Some(StatusMessage::new(
-                                format!("Directory '{}' added to queue", dir.full_path),
-                                Level::Info,
-                            ));
+                        Some(DirOrSongInfo::Dir(dir)) => {
+                            let mut path_to_add = self.path.clone();
+                            path_to_add.push(dir);
+
+                            if let Some(path) = path_to_add.to_str() {
+                                client.add(path).await?;
+                                shared.status_message = Some(StatusMessage::new(
+                                    format!("Directory '{path}' added to queue"),
+                                    Level::Info,
+                                ));
+                            } else {
+                                tracing::error!(message = "Failed to add directory to queue.", dir = ?path_to_add);
+                                shared.status_message = Some(StatusMessage::new(
+                                    format!("Failed to add directory '{path_to_add:?}' to queue."),
+                                    Level::Error,
+                                ));
+                            }
                         }
-                        Some(FileOrDir::File(song)) => {
+                        Some(DirOrSongInfo::Song(song)) => {
                             client.add(&song.file).await?;
                             shared.status_message = Some(StatusMessage::new(
-                                format!(
-                                    "'{}' by '{}' added to queue",
-                                    song.title.as_ref().map_or("Untitled", |v| v.as_str()),
-                                    song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
-                                ),
+                                format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str(),),
                                 Level::Info,
                             ));
                         }
@@ -133,7 +148,7 @@ impl Screen for DirectoriesScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.stack.next = self
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -141,7 +156,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.stack.next = self
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -149,7 +164,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.stack.next = self
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -157,7 +172,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.stack.next = self
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -165,7 +180,7 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.stack.next = self
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -173,41 +188,46 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.stack.next = self
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Right => {
-                    match self.stack.get_selected() {
-                        Some(FileOrDir::Dir(dir)) => {
-                            let new_current = client.lsinfo(Some(&dir.full_path)).await?.0;
-                            self.stack.push(new_current);
+                    match self.stack.get_selected().context("Expected an item to be selected")? {
+                        DirOrSongInfo::Dir(dir) => {
+                            self.path.push(dir);
+                            let new_current = client.lsinfo(self.path.to_str()).await?.0;
+                            self.stack.push(
+                                new_current
+                                    .into_iter()
+                                    .map(|v| match v {
+                                        FileOrDir::Dir(d) => DirOrSongInfo::Dir(d.path),
+                                        FileOrDir::File(s) => DirOrSongInfo::Song(s),
+                                    })
+                                    .collect(),
+                            );
 
-                            self.stack.next = self
+                            self.stack.preview = self
                                 .prepare_preview(client, app)
                                 .await
                                 .context("Cannot prepare preview")?;
                         }
-                        Some(FileOrDir::File(song)) => {
+                        DirOrSongInfo::Song(song) => {
                             client.add(&song.file).await?;
                             shared.status_message = Some(StatusMessage::new(
-                                format!(
-                                    "'{}' by '{}' added to queue",
-                                    song.title.as_ref().map_or("Untitled", |v| v.as_str()),
-                                    song.artist.as_ref().map_or("Unknown", |v| v.as_str()),
-                                ),
+                                format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str(),),
                                 Level::Info,
                             ));
                         }
-                        None => {}
                     };
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Left => {
                     self.stack.pop();
-                    self.stack.next = self
+                    self.path.pop();
+                    self.stack.preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
@@ -243,8 +263,10 @@ impl DirectoriesScreen {
     async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Option<Vec<ListItem<'static>>> {
         let idx = self.stack.current().1.get_selected()?;
         match &self.stack.current().0[idx] {
-            FileOrDir::Dir(dir) => {
-                let mut res = match client.lsinfo(Some(&dir.full_path)).await {
+            DirOrSongInfo::Dir(dir) => {
+                let mut preview_path = self.path.clone();
+                preview_path.push(dir);
+                let mut res = match client.lsinfo(preview_path.to_str()).await {
                     Ok(val) => val,
                     Err(err) => {
                         tracing::error!(message = "Failed to get lsinfo for dir", error = ?err);
@@ -253,9 +275,19 @@ impl DirectoriesScreen {
                 }
                 .0;
                 res.sort();
-                Some(res.to_listitems(&state.config.symbols))
+                Some(
+                    res.into_iter()
+                        .map(|v| match v {
+                            FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
+                            FileOrDir::File(song) => {
+                                DirOrSong::Song(song.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned())
+                            }
+                        })
+                        .listitems(&state.config.symbols)
+                        .collect(),
+                )
             }
-            FileOrDir::File(song) => Some(song.to_listitems(&state.config.symbols)),
+            DirOrSongInfo::Song(song) => Some(song.to_listitems(&state.config.symbols)),
         }
     }
 }

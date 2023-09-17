@@ -1,4 +1,5 @@
 use crate::{
+    config::SymbolsConfig,
     mpd::{
         client::Client,
         commands::Song as MpdSong,
@@ -9,8 +10,9 @@ use crate::{
 };
 
 use super::{
-    browser::{StringOrSong, ToListItems},
+    browser::{DirOrSong, ToListItems},
     dirstack::DirStack,
+    iter::DirOrSongListItems,
     CommonAction, Screen,
 };
 use anyhow::{Context, Result};
@@ -21,7 +23,7 @@ use tracing::instrument;
 
 #[derive(Debug)]
 pub struct ArtistsScreen {
-    stack: DirStack<StringOrSong>,
+    stack: DirStack<DirOrSong>,
     position: CurrentPosition,
     filter_input_mode: bool,
 }
@@ -37,7 +39,11 @@ impl Default for ArtistsScreen {
 }
 
 impl ArtistsScreen {
-    async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Vec<ListItem<'static>>> {
+    async fn prepare_preview(
+        &mut self,
+        client: &mut Client<'_>,
+        symbols: &SymbolsConfig,
+    ) -> Result<Vec<ListItem<'static>>> {
         let idx = self
             .stack
             .current()
@@ -49,15 +55,19 @@ impl ArtistsScreen {
             CurrentPosition::Artist(val) => val
                 .fetch(client, current.to_current_value())
                 .await?
-                .to_listitems(&state.config.symbols),
+                .listitems(symbols)
+                .collect(),
             CurrentPosition::Album(val) => val
                 .fetch(client, current.to_current_value())
                 .await?
-                .to_listitems(&state.config.symbols),
+                .listitems(symbols)
+                .collect(),
             CurrentPosition::Song(val) => val
                 .fetch(client, current.to_current_value())
                 .await?
-                .to_listitems(&state.config.symbols),
+                .first()
+                .context("Expected to find exactly one song")?
+                .to_listitems(symbols),
         })
     }
 }
@@ -85,19 +95,13 @@ impl Screen for ArtistsScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        match _client.list_tag("artist", None).await.context("Cannot list artists")? {
-            Some(result) => {
-                self.stack = DirStack::new(result.0.into_iter().map(StringOrSong::Dir).collect());
-                self.position = CurrentPosition::default();
-                self.stack.next = self
-                    .prepare_preview(_client, _app)
-                    .await
-                    .context("Cannot prepare preview")?;
-            }
-            None => {
-                _shared.status_message = Some(StatusMessage::new("No artists found!".to_owned(), Level::Info));
-            }
-        };
+        let result = _client.list_tag("artist", None).await.context("Cannot list artists")?;
+        self.stack = DirStack::new(result.0.into_iter().map(DirOrSong::Dir).collect());
+        self.position = CurrentPosition::default();
+        self.stack.preview = self
+            .prepare_preview(_client, &_app.config.symbols)
+            .await
+            .context("Cannot prepare preview")?;
 
         Ok(())
     }
@@ -144,44 +148,44 @@ impl Screen for ArtistsScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.stack.next = self
-                        .prepare_preview(client, app)
+                    self.stack.preview = self
+                        .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.stack.next = self
-                        .prepare_preview(client, app)
+                    self.stack.preview = self
+                        .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.stack.next = self
-                        .prepare_preview(client, app)
+                    self.stack.preview = self
+                        .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.stack.next = self
-                        .prepare_preview(client, app)
+                    self.stack.preview = self
+                        .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.prepare_preview(client, app).await?;
+                    self.prepare_preview(client, &app.config.symbols).await?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.prepare_preview(client, app).await?;
+                    self.prepare_preview(client, &app.config.symbols).await?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 CommonAction::Right => {
@@ -194,11 +198,11 @@ impl Screen for ArtistsScreen {
                     let current = self.stack.current().0[idx].to_current_value().to_owned();
                     self.position = match &mut self.position {
                         CurrentPosition::Artist(val) => {
-                            self.stack.push(val.fetch(client, &current).await?);
+                            self.stack.push(val.fetch(client, &current).await?.collect());
                             CurrentPosition::Album(val.next(current))
                         }
                         CurrentPosition::Album(val) => {
-                            self.stack.push(val.fetch(client, &current).await?);
+                            self.stack.push(val.fetch(client, &current).await?.collect());
                             CurrentPosition::Song(val.next(current))
                         }
                         CurrentPosition::Song(val) => {
@@ -210,8 +214,8 @@ impl Screen for ArtistsScreen {
                             CurrentPosition::Song(val.next())
                         }
                     };
-                    self.stack.next = self
-                        .prepare_preview(client, app)
+                    self.stack.preview = self
+                        .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
@@ -223,8 +227,8 @@ impl Screen for ArtistsScreen {
                         CurrentPosition::Album(val) => CurrentPosition::Artist(val.prev()),
                         CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
                     };
-                    self.stack.next = self
-                        .prepare_preview(client, app)
+                    self.stack.preview = self
+                        .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
                     Ok(KeyHandleResult::RenderRequested)
@@ -291,11 +295,13 @@ impl Position<Artist> {
         Position { values: Artist }
     }
 
-    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<StringOrSong>> {
+    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<impl Iterator<Item = DirOrSong>> {
         Ok(client
             .list_tag("album", Some(&[Filter { tag: "artist", value }]))
             .await?
-            .map_or(Vec::new(), |v| v.0.into_iter().map(StringOrSong::Dir).collect()))
+            .0
+            .into_iter()
+            .map(DirOrSong::Dir))
     }
 }
 impl Position<Album> {
@@ -312,7 +318,7 @@ impl Position<Album> {
         Position { values: Artist }
     }
 
-    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<StringOrSong>> {
+    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<impl Iterator<Item = DirOrSong>> {
         Ok(client
             .list_tag(
                 "title",
@@ -325,7 +331,9 @@ impl Position<Album> {
                 ]),
             )
             .await?
-            .map_or(Vec::new(), |v| v.0.into_iter().map(StringOrSong::Song).collect()))
+            .0
+            .into_iter()
+            .map(DirOrSong::Song))
     }
 }
 
@@ -346,8 +354,9 @@ impl Position<Song> {
         }
     }
 
-    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<MpdSong> {
-        let mut res = client
+    #[instrument(err)]
+    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<MpdSong>> {
+        Ok(client
             .find(&[
                 Filter { tag: "title", value },
                 Filter {
@@ -359,10 +368,7 @@ impl Position<Song> {
                     value: &self.values.album,
                 },
             ])
-            .await?
-            .unwrap_or_else(|| crate::mpd::commands::Songs(Vec::new()))
-            .0;
-        Ok(std::mem::take(&mut res[0]))
+            .await?)
     }
 
     async fn add_to_queue(&self, client: &mut Client<'_>, value: &str) -> Result<()> {

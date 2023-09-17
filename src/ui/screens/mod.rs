@@ -7,7 +7,10 @@ use ratatui::{
 };
 use strum::{Display, EnumIter, EnumVariantNames};
 
-use crate::{mpd::client::Client, state::State};
+use crate::{
+    mpd::{client::Client, commands::Song},
+    state::State,
+};
 
 use super::{KeyHandleResult, SharedUiState};
 
@@ -15,6 +18,7 @@ pub mod albums;
 pub mod artists;
 pub mod directories;
 pub mod logs;
+pub mod playlists;
 pub mod queue;
 
 #[derive(Debug, Display, EnumVariantNames, Default, Clone, Copy, EnumIter, PartialEq)]
@@ -26,6 +30,7 @@ pub enum Screens {
     Directories,
     Artists,
     Albums,
+    Playlists,
 }
 
 #[async_trait]
@@ -94,13 +99,15 @@ impl Screens {
             Screens::Logs => Screens::Directories,
             Screens::Directories => Screens::Artists,
             Screens::Artists => Screens::Albums,
-            Screens::Albums => Screens::Queue,
+            Screens::Albums => Screens::Playlists,
+            Screens::Playlists => Screens::Queue,
         }
     }
 
     pub fn prev(self) -> Self {
         match self {
-            Screens::Queue => Screens::Albums,
+            Screens::Queue => Screens::Playlists,
+            Screens::Playlists => Screens::Albums,
             Screens::Albums => Screens::Artists,
             Screens::Artists => Screens::Directories,
             #[cfg(not(debug_assertions))]
@@ -122,7 +129,7 @@ pub mod dirstack {
     pub struct DirStack<T: std::fmt::Debug + MatchesSearch> {
         current: (Vec<T>, MyState<ListState>),
         others: Vec<(Vec<T>, MyState<ListState>)>,
-        pub next: Vec<ListItem<'static>>,
+        pub preview: Vec<ListItem<'static>>,
         pub filter: Option<String>,
         pub filter_ignore_case: bool,
     }
@@ -134,7 +141,7 @@ pub mod dirstack {
                 current: (Vec::new(), MyState::default()),
                 filter: None,
                 filter_ignore_case: true,
-                next: Vec::new(),
+                preview: Vec::new(),
             };
             let mut root_state = MyState::default();
 
@@ -470,7 +477,6 @@ pub(crate) mod browser {
                 start_of_line_spacer.clone(),
                 Span::styled("Artist", key_style),
                 separator.clone(),
-                Span::from(": "),
                 Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
             ]);
             let album = Line::from(vec![
@@ -528,47 +534,192 @@ pub(crate) mod browser {
         }
     }
     #[derive(Debug)]
-    pub(crate) enum StringOrSong {
+    pub(crate) enum DirOrSong {
         Dir(String),
         Song(String),
     }
 
-    impl StringOrSong {
+    impl DirOrSong {
         pub fn to_current_value(&self) -> &str {
             match self {
-                StringOrSong::Dir(d) => d,
-                StringOrSong::Song(s) => s,
+                DirOrSong::Dir(d) => d,
+                DirOrSong::Song(s) => s,
             }
         }
     }
 
-    impl ToListItems for Vec<StringOrSong> {
+    impl ToListItems for Vec<DirOrSong> {
         fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
             self.iter()
-                .map(|val| {
-                    let (kind, name) = match val {
-                        StringOrSong::Dir(v) => (symbols.dir, v),
-                        StringOrSong::Song(s) => (symbols.song, s),
-                    };
-                    ListItem::new(format!("{kind} {name}"))
+                .flat_map(|val| match val {
+                    DirOrSong::Dir(v) => {
+                        vec![ListItem::new(format!("{} {}", symbols.dir, v.as_str()))]
+                    }
+                    DirOrSong::Song(s) => {
+                        vec![ListItem::new(format!("{} {}", symbols.song, s.as_str()))]
+                    }
                 })
                 .collect::<Vec<ListItem>>()
         }
     }
 
-    impl MatchesSearch for StringOrSong {
+    impl MatchesSearch for DirOrSong {
         fn matches(&self, filter: &str, ignorecase: bool) -> bool {
             if ignorecase {
                 match self {
-                    StringOrSong::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
-                    StringOrSong::Song(s) => s.to_lowercase().contains(&filter.to_lowercase()),
+                    DirOrSong::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
+                    DirOrSong::Song(s) => s.to_lowercase().contains(&filter.to_lowercase()),
                 }
             } else {
                 match self {
-                    StringOrSong::Dir(v) => v.contains(filter),
-                    StringOrSong::Song(s) => s.contains(filter),
+                    DirOrSong::Dir(v) => v.contains(filter),
+                    DirOrSong::Song(s) => s.contains(filter),
                 }
             }
+        }
+    }
+
+    #[derive(Debug)]
+    pub(crate) enum DirOrSongInfo {
+        Dir(String),
+        Song(Song),
+    }
+
+    impl ToListItems for Vec<DirOrSongInfo> {
+        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
+            self.iter()
+                .flat_map(|val| match val {
+                    DirOrSongInfo::Dir(v) => {
+                        vec![ListItem::new(format!("{} {}", symbols.dir, v.as_str()))]
+                    }
+                    DirOrSongInfo::Song(s) => {
+                        vec![ListItem::new(format!(
+                            "{} {}",
+                            symbols.song,
+                            s.title.as_ref().map_or("Untitled", |v| v.as_str())
+                        ))]
+                    }
+                })
+                .collect::<Vec<ListItem>>()
+        }
+    }
+
+    impl MatchesSearch for DirOrSongInfo {
+        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
+            if ignorecase {
+                match self {
+                    DirOrSongInfo::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
+                    DirOrSongInfo::Song(s) => s
+                        .title
+                        .as_ref()
+                        .map_or("Untitled", |v| v.as_str())
+                        .to_lowercase()
+                        .contains(&filter.to_lowercase()),
+                }
+            } else {
+                match self {
+                    DirOrSongInfo::Dir(v) => v.contains(filter),
+                    DirOrSongInfo::Song(s) => s.title.as_ref().map_or("Untitled", |v| v.as_str()).contains(filter),
+                }
+            }
+        }
+    }
+
+    impl From<FileOrDir> for DirOrSongInfo {
+        fn from(value: FileOrDir) -> Self {
+            match value {
+                FileOrDir::Dir(dir) => DirOrSongInfo::Dir(dir.path),
+                FileOrDir::File(song) => DirOrSongInfo::Song(song),
+            }
+        }
+    }
+}
+
+pub trait SongExt {
+    fn title_str(&self) -> &str;
+    fn artist_str(&self) -> &str;
+}
+
+impl SongExt for Song {
+    fn title_str(&self) -> &str {
+        self.title.as_ref().map_or("Untitled", |v| v.as_str())
+    }
+
+    fn artist_str(&self) -> &str {
+        self.artist.as_ref().map_or("Untitled", |v| v.as_str())
+    }
+}
+
+pub mod iter {
+    use ratatui::widgets::ListItem;
+
+    use crate::config::SymbolsConfig;
+
+    use super::browser::{DirOrSong, DirOrSongInfo};
+
+    pub struct BrowserItemInfo<'a, I> {
+        iter: I,
+        symbols: &'a SymbolsConfig,
+    }
+
+    impl<I> Iterator for BrowserItemInfo<'_, I>
+    where
+        I: Iterator<Item = DirOrSongInfo>,
+    {
+        type Item = ListItem<'static>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.iter.next() {
+                Some(v) => match v {
+                    DirOrSongInfo::Dir(v) => Some(ListItem::new(format!("{} {}", self.symbols.dir, v.as_str()))),
+                    DirOrSongInfo::Song(s) => Some(ListItem::new(format!(
+                        "{} {}",
+                        self.symbols.song,
+                        s.title.as_ref().map_or("Untitled", |v| v.as_str())
+                    ))),
+                },
+                None => None,
+            }
+        }
+    }
+
+    pub trait DirOrSongInfoListItems<T> {
+        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItemInfo<T>;
+    }
+    impl<T: Iterator<Item = DirOrSongInfo>> DirOrSongInfoListItems<T> for T {
+        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItemInfo<T> {
+            BrowserItemInfo { iter: self, symbols }
+        }
+    }
+
+    pub struct BrowserItem<'a, I> {
+        iter: I,
+        symbols: &'a SymbolsConfig,
+    }
+
+    impl<I> Iterator for BrowserItem<'_, I>
+    where
+        I: Iterator<Item = DirOrSong>,
+    {
+        type Item = ListItem<'static>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self.iter.next() {
+                Some(v) => match v {
+                    DirOrSong::Dir(v) => Some(ListItem::new(format!("{} {}", self.symbols.dir, v.as_str()))),
+                    DirOrSong::Song(s) => Some(ListItem::new(format!("{} {}", self.symbols.song, s))),
+                },
+                None => None,
+            }
+        }
+    }
+    pub trait DirOrSongListItems<T> {
+        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItem<T>;
+    }
+
+    impl<T: Iterator<Item = DirOrSong>> DirOrSongListItems<T> for T {
+        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItem<T> {
+            BrowserItem { iter: self, symbols }
         }
     }
 }

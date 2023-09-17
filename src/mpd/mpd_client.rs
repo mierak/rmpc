@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use super::{
     client::Client,
     commands::{
-        list::MpdList, status::OnOffOneshot, volume::Bound, IdleEvents, ListFiles, LsInfo, Song, Songs, Status, Volume,
+        list::MpdList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo, Playlist, Song, Status,
+        Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
 };
@@ -13,7 +14,7 @@ type MpdResult<T> = Result<T, MpdError>;
 
 #[async_trait]
 pub trait MpdClient {
-    async fn idle(&mut self) -> MpdResult<IdleEvents>;
+    async fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
     async fn get_volume(&mut self) -> MpdResult<Volume>;
     async fn set_volume(&mut self, volume: &Volume) -> MpdResult<()>;
     async fn get_current_song(&mut self) -> MpdResult<Option<Song>>;
@@ -36,15 +37,18 @@ pub trait MpdClient {
     async fn add(&mut self, path: &str) -> MpdResult<()>;
     async fn clear(&mut self) -> MpdResult<()>;
     async fn delete_id(&mut self, id: u32) -> MpdResult<()>;
-    async fn playlist_info(&mut self) -> MpdResult<Option<Songs>>;
-    async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Songs>>;
+    async fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
+    async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
     async fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
-    async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<Option<MpdList>>;
+    async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
     async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
     async fn read_picture(&mut self, path: &str) -> MpdResult<Vec<u8>>;
     async fn albumart(&mut self, path: &str) -> MpdResult<Vec<u8>>;
+    // Stored playlists
+    async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
+    async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
     /// If no art is still found, but no errors were encountered, None is returned.
@@ -55,7 +59,7 @@ pub trait MpdClient {
 impl MpdClient for Client<'_> {
     // Queries
     #[tracing::instrument(skip(self))]
-    async fn idle(&mut self) -> MpdResult<IdleEvents> {
+    async fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         self.execute("idle").await
     }
 
@@ -162,14 +166,13 @@ impl MpdClient for Client<'_> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn playlist_info(&mut self) -> MpdResult<Option<Songs>> {
+    async fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         self.execute_option("playlistinfo").await
     }
 
     #[tracing::instrument(skip(self))]
-    async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Songs>> {
-        self.execute_option(&format!("find \"({})\"", filter.to_query_str()))
-            .await
+    async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
+        self.execute(&format!("find \"({})\"", filter.to_query_str())).await
     }
 
     #[tracing::instrument(skip(self))]
@@ -179,13 +182,13 @@ impl MpdClient for Client<'_> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<Option<MpdList>> {
+    async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         match filter {
             Some(filter) => {
-                self.execute_option(&format!("list {tag} \"({})\"", filter.to_query_str()))
+                self.execute(&format!("list {tag} \"({})\"", filter.to_query_str()))
                     .await
             }
-            None => self.execute_option(&format!("list {tag}")).await,
+            None => self.execute(&format!("list {tag}")).await,
         }
     }
 
@@ -212,6 +215,14 @@ impl MpdClient for Client<'_> {
         } else {
             Ok(self.execute_option("listfiles").await?.unwrap_or(ListFiles::default()))
         }
+    }
+
+    // Stored playlists
+    async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
+        self.execute("listplaylists").await
+    }
+    async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
+        self.execute(&format!("listplaylistinfo \"{playlist}\"")).await
     }
 
     #[tracing::instrument(skip(self))]

@@ -68,7 +68,7 @@ impl Screen for QueueScreen {
 
         let mut rows = Vec::with_capacity(queue_len);
         if let Some(queue) = app.queue.as_ref() {
-            for song in &queue.0 {
+            for song in queue {
                 let mut row = Row::new(vec![
                     song.artist.as_ref().map_or("-".to_owned(), |v| format!(" {v}")),
                     song.title.as_ref().map_or("-", |v| v).to_owned(),
@@ -284,8 +284,7 @@ impl QueueScreen {
             if let Some(selected) = self.scrolling_state.get_selected() {
                 for i in selected + 1..app.queue.len().unwrap_or(0) {
                     if app.queue.as_ref().is_some_and(|q| {
-                        q.0[i]
-                            .title
+                        q[i].title
                             .as_ref()
                             .is_some_and(|v| v.to_lowercase().contains(&filter.to_lowercase()))
                     }) {
@@ -302,8 +301,7 @@ impl QueueScreen {
             if let Some(selected) = self.scrolling_state.get_selected() {
                 for i in (0..selected).rev() {
                     if app.queue.as_ref().is_some_and(|q| {
-                        q.0[i]
-                            .title
+                        q[i].title
                             .as_ref()
                             .is_some_and(|v| v.to_lowercase().contains(&filter.to_lowercase()))
                     }) {

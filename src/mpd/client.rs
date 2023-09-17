@@ -200,7 +200,7 @@ impl<'a> Client<'a> {
         }
     }
 
-    #[tracing::instrument(skip(read))]
+    #[tracing::instrument(err, skip(read))]
     async fn read<R, A, V>(read: &mut R) -> Result<V, MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
@@ -220,7 +220,7 @@ impl<'a> Client<'a> {
         result.finish()
     }
 
-    #[tracing::instrument(skip(read))]
+    #[tracing::instrument(err, skip(read))]
     async fn read_ok<R>(read: &mut R) -> Result<(), MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
@@ -233,7 +233,7 @@ impl<'a> Client<'a> {
         }
     }
 
-    #[tracing::instrument(skip(read))]
+    #[tracing::instrument(err, skip(read))]
     async fn read_option<R, A, V>(read: &mut R) -> Result<Option<V>, MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
