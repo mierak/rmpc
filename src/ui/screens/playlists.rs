@@ -10,7 +10,12 @@ use crate::{
     ui::{widgets::browser::Browser, KeyHandleResult, Level, SharedUiState, StatusMessage},
 };
 
-use super::{browser::DirOrSongInfo, browser::ToListItems, dirstack::DirStack, CommonAction, Screen, SongExt};
+use super::{
+    browser::{DirOrSongInfo, ToListItems},
+    dirstack::DirStack,
+    iter::DirOrSongInfoListItems,
+    CommonAction, Screen, SongExt,
+};
 
 #[derive(Debug)]
 pub struct PlaylistsScreen {
@@ -45,7 +50,8 @@ impl PlaylistsScreen {
                     .list_playlist_info(d)
                     .await?
                     .into_iter()
-                    .map(|s| ListItem::new(s.title_str().to_owned()))
+                    .map(DirOrSongInfo::Song)
+                    .listitems(&state.config.symbols)
                     .collect();
                 Ok(res)
             }
@@ -64,7 +70,29 @@ impl Screen for PlaylistsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let w = Browser::new(&app.config.symbols, &app.config.column_widths);
+        let prev: Vec<_> = self
+            .stack
+            .previous()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let current: Vec<_> = self
+            .stack
+            .current()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let preview = &self.stack.preview().clone();
+        let w = Browser::new()
+            .widths(&app.config.column_widths)
+            .previous_items(&prev)
+            .current_items(&current)
+            .preview(preview);
+
         frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())

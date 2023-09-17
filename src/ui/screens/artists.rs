@@ -62,12 +62,12 @@ impl ArtistsScreen {
                 .await?
                 .listitems(symbols)
                 .collect(),
-            CurrentPosition::Song(val) => val
-                .fetch(client, current.to_current_value())
-                .await?
-                .first()
-                .context("Expected to find exactly one song")?
-                .to_listitems(symbols),
+            CurrentPosition::Song(val) => {
+                let ret = val.fetch(client, current.to_current_value()).await?;
+                ret.first()
+                    .context("Expected to find exactly one song")?
+                    .to_listitems(symbols)
+            }
         })
     }
 }
@@ -82,7 +82,28 @@ impl Screen for ArtistsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let w = Browser::new(&app.config.symbols, &app.config.column_widths);
+        let prev: Vec<_> = self
+            .stack
+            .previous()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let current: Vec<_> = self
+            .stack
+            .current()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let preview = &self.stack.preview().clone();
+        let w = Browser::new()
+            .widths(&app.config.column_widths)
+            .previous_items(&prev)
+            .current_items(&current)
+            .preview(preview);
         frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())

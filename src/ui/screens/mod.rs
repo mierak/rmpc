@@ -170,6 +170,11 @@ pub mod dirstack {
             (&last.0, &mut last.1)
         }
 
+        /// Returns the element at the second element from the top of the stack
+        pub fn preview(&self) -> &Vec<ListItem<'static>> {
+            &self.preview
+        }
+
         pub fn push(&mut self, head: Vec<T>) {
             let mut new_state = MyState::default();
             if !head.is_empty() {
@@ -495,45 +500,20 @@ pub(crate) mod browser {
                         .map_or("-".to_owned(), |v| v.as_secs().to_string()),
                 ),
             ]);
-            let r = vec![title, artist, album, duration];
-            let r = [
-                r,
-                self.others
-                    .iter()
-                    .map(|(k, v)| {
-                        Line::from(vec![
-                            start_of_line_spacer.clone(),
-                            Span::styled(k.clone(), key_style),
-                            separator.clone(),
-                            Span::from(v.clone()),
-                        ])
-                    })
-                    .collect(),
-            ]
-            .concat();
+            let mut r = vec![title, artist, album, duration];
+            for (k, v) in &self.others {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled(k.clone(), key_style),
+                    separator.clone(),
+                    Span::from(v.clone()),
+                ]));
+            }
 
             r.into_iter().map(ListItem::new).collect()
         }
     }
-
-    impl ToListItems for Vec<FileOrDir> {
-        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
-            self.iter()
-                .map(|val| {
-                    let (kind, name) = match val {
-                        // cfg
-                        FileOrDir::Dir(v) => (symbols.dir, v.path.clone()),
-                        FileOrDir::File(v) => (
-                            symbols.song,
-                            v.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned(),
-                        ),
-                    };
-                    ListItem::new(format!("{kind} {name}"))
-                })
-                .collect::<Vec<ListItem>>()
-        }
-    }
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub(crate) enum DirOrSong {
         Dir(String),
         Song(String),
@@ -545,21 +525,6 @@ pub(crate) mod browser {
                 DirOrSong::Dir(d) => d,
                 DirOrSong::Song(s) => s,
             }
-        }
-    }
-
-    impl ToListItems for Vec<DirOrSong> {
-        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
-            self.iter()
-                .flat_map(|val| match val {
-                    DirOrSong::Dir(v) => {
-                        vec![ListItem::new(format!("{} {}", symbols.dir, v.as_str()))]
-                    }
-                    DirOrSong::Song(s) => {
-                        vec![ListItem::new(format!("{} {}", symbols.song, s.as_str()))]
-                    }
-                })
-                .collect::<Vec<ListItem>>()
         }
     }
 
@@ -579,29 +544,10 @@ pub(crate) mod browser {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub(crate) enum DirOrSongInfo {
         Dir(String),
         Song(Song),
-    }
-
-    impl ToListItems for Vec<DirOrSongInfo> {
-        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
-            self.iter()
-                .flat_map(|val| match val {
-                    DirOrSongInfo::Dir(v) => {
-                        vec![ListItem::new(format!("{} {}", symbols.dir, v.as_str()))]
-                    }
-                    DirOrSongInfo::Song(s) => {
-                        vec![ListItem::new(format!(
-                            "{} {}",
-                            symbols.song,
-                            s.title.as_ref().map_or("Untitled", |v| v.as_str())
-                        ))]
-                    }
-                })
-                .collect::<Vec<ListItem>>()
-        }
     }
 
     impl MatchesSearch for DirOrSongInfo {

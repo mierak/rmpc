@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use super::{
     client::Client,
     commands::{
-        list::MpdList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo, Playlist, Song, Status,
-        Volume,
+        list::MpdList, list_playlist::FileList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo,
+        Playlist, Song, Status, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
 };
@@ -48,6 +48,7 @@ pub trait MpdClient {
     async fn albumart(&mut self, path: &str) -> MpdResult<Vec<u8>>;
     // Stored playlists
     async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
+    async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
     async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
@@ -220,6 +221,9 @@ impl MpdClient for Client<'_> {
     // Stored playlists
     async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.execute("listplaylists").await
+    }
+    async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
+        self.execute(&format!("listplaylist \"{name}\"")).await
     }
     async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
         self.execute(&format!("listplaylistinfo \"{playlist}\"")).await

@@ -1,31 +1,56 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, Scrollbar, ScrollbarOrientation, StatefulWidget};
+use ratatui::widgets::{Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation, StatefulWidget};
 
-use crate::config::SymbolsConfig;
-use crate::ui::screens::browser::ToListItems;
 use crate::ui::screens::dirstack::{DirStack, MatchesSearch};
 
 #[derive(Debug)]
 pub struct Browser<'a, T> {
     state_type_marker: std::marker::PhantomData<T>,
-    pub symbols: &'a SymbolsConfig,
-    pub widths: &'a [u16; 3],
+    widths: &'a [u16; 3],
+    previous: &'a [ListItem<'a>],
+    current: &'a [ListItem<'a>],
+    preview: &'a [ListItem<'a>],
+}
+
+impl<'a, T> Default for Browser<'a, T> {
+    fn default() -> Self {
+        Self {
+            state_type_marker: std::marker::PhantomData,
+            widths: &[20, 38, 42],
+            previous: &[],
+            current: &[],
+            preview: &[],
+        }
+    }
 }
 
 impl<'a, T> Browser<'a, T> {
-    pub fn new(symbols: &'a SymbolsConfig, widths: &'a [u16; 3]) -> Self {
-        Self {
-            symbols,
-            state_type_marker: std::marker::PhantomData,
-            widths,
-        }
+    pub fn new() -> Self {
+        Browser::default()
+    }
+
+    pub fn previous_items(mut self, previous: &'a [ListItem<'_>]) -> Self {
+        self.previous = previous;
+        self
+    }
+    pub fn current_items(mut self, current: &'a [ListItem<'_>]) -> Self {
+        self.current = current;
+        self
+    }
+    pub fn preview(mut self, preview: &'a [ListItem<'_>]) -> Self {
+        self.preview = preview;
+        self
+    }
+
+    pub fn widths(mut self, widths: &'a [u16; 3]) -> Self {
+        self.widths = widths;
+        self
     }
 }
 
 impl<T> StatefulWidget for Browser<'_, T>
 where
     T: MatchesSearch + std::fmt::Debug,
-    Vec<T>: ToListItems,
 {
     type State = DirStack<T>;
 
@@ -41,19 +66,18 @@ where
             .split(area) else { return  };
 
         {
-            let preview = List::new(state.preview.clone())
+            let preview = List::new(self.preview)
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
         {
-            let (prev_items, prev_state) = state.previous();
-            let prev_items = prev_items.to_listitems(self.symbols);
-            prev_state.content_len(Some(u16::try_from(prev_items.len()).unwrap()));
+            let (_, prev_state) = state.previous();
+            prev_state.content_len(Some(u16::try_from(self.previous.len()).unwrap()));
             prev_state.viewport_len(Some(previous_area.height));
 
-            let previous = List::new(prev_items)
+            let previous = List::new(self.previous)
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let previous_scrollbar = Scrollbar::default()
@@ -83,7 +107,7 @@ where
             current_state.content_len(Some(u16::try_from(current_items.len()).unwrap()));
             current_state.viewport_len(Some(current_area.height));
 
-            let current = List::new(current_items.to_listitems(self.symbols))
+            let current = List::new(self.current)
                 .block({
                     let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
                     if let Some(ref title) = title {

@@ -2,6 +2,7 @@ pub mod current_song;
 pub mod idle;
 pub mod list;
 pub mod list_files;
+pub mod list_playlist;
 pub mod list_playlists;
 pub mod lsinfo;
 pub mod playlist_info;

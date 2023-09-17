@@ -23,7 +23,7 @@ use crate::{
 use super::{
     browser::{DirOrSong, DirOrSongInfo, ToListItems},
     dirstack::DirStack,
-    iter::DirOrSongListItems,
+    iter::{DirOrSongInfoListItems, DirOrSongListItems},
     CommonAction, Screen, SongExt,
 };
 
@@ -54,7 +54,28 @@ impl Screen for DirectoriesScreen {
         app: &mut crate::state::State,
         _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let w = Browser::new(&app.config.symbols, &app.config.column_widths);
+        let prev: Vec<_> = self
+            .stack
+            .previous()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let current: Vec<_> = self
+            .stack
+            .current()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let preview = &self.stack.preview().clone();
+        let w = Browser::new()
+            .widths(&app.config.column_widths)
+            .previous_items(&prev)
+            .current_items(&current)
+            .preview(preview);
         frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())

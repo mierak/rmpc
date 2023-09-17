@@ -8,6 +8,7 @@ use crate::{
 use super::{
     browser::{DirOrSong, ToListItems},
     dirstack::DirStack,
+    iter::DirOrSongListItems,
     CommonAction, Screen,
 };
 use anyhow::{Context, Result};
@@ -51,11 +52,14 @@ impl AlbumsScreen {
             CurrentPosition::Album(val) => val
                 .fetch(client, current.to_current_value())
                 .await?
-                .to_listitems(symbols),
-            CurrentPosition::Song(val) => val
-                .fetch(client, current.to_current_value())
-                .await?
-                .to_listitems(symbols),
+                .listitems(symbols)
+                .collect(),
+            CurrentPosition::Song(val) => {
+                let ret = val.fetch(client, current.to_current_value()).await?;
+                ret.first()
+                    .context("Expected to find exactly one song")?
+                    .to_listitems(symbols)
+            }
         })
     }
 }
@@ -71,7 +75,28 @@ impl Screen for AlbumsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let w = Browser::new(&app.config.symbols, &app.config.column_widths);
+        let prev: Vec<_> = self
+            .stack
+            .previous()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let current: Vec<_> = self
+            .stack
+            .current()
+            .0
+            .iter()
+            .cloned()
+            .listitems(&app.config.symbols)
+            .collect();
+        let preview = &self.stack.preview().clone();
+        let w = Browser::new()
+            .widths(&app.config.column_widths)
+            .previous_items(&prev)
+            .current_items(&current)
+            .preview(preview);
         frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())
@@ -186,7 +211,7 @@ impl Screen for AlbumsScreen {
                     let current = self.stack.current().0[idx].to_current_value().to_owned();
                     self.position = match &mut self.position {
                         CurrentPosition::Album(val) => {
-                            self.stack.push(val.fetch(client, &current).await?);
+                            self.stack.push(val.fetch(client, &current).await?.collect());
                             CurrentPosition::Song(val.next(current))
                         }
                         CurrentPosition::Song(val) => {
@@ -270,14 +295,13 @@ impl Position<Album> {
         Position { values: Album }
     }
 
-    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<DirOrSong>> {
+    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<impl Iterator<Item = DirOrSong>> {
         Ok(client
             .list_tag("title", Some(&[Filter { tag: "album", value }]))
             .await?
             .0
             .into_iter()
-            .map(DirOrSong::Song)
-            .collect())
+            .map(DirOrSong::Song))
     }
 }
 
@@ -293,8 +317,8 @@ impl Position<Song> {
         Position { values: Album }
     }
 
-    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<MpdSong> {
-        client
+    async fn fetch(&self, client: &mut Client<'_>, value: &str) -> Result<Vec<MpdSong>> {
+        Ok(client
             .find(&[
                 Filter { tag: "title", value },
                 Filter {
@@ -302,9 +326,7 @@ impl Position<Song> {
                     value: &self.values.album,
                 },
             ])
-            .await?
-            .pop()
-            .context("Expected to find exactly one song")
+            .await?)
     }
 
     async fn add_to_queue(&self, client: &mut Client<'_>, value: &str) -> Result<()> {
