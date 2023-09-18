@@ -314,6 +314,7 @@ fn event_poll(user_input_tx: Sender<AppEvent>, is_aborted: Arc<Mutex<bool>>) {
                     }
                 };
                 match event {
+                    // TODO: this interferes with text input
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('q'),
                         ..

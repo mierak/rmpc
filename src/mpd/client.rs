@@ -77,15 +77,16 @@ impl<'a> Client<'a> {
         Ok(self)
     }
 
-    #[tracing::instrument(skip(self), fields(command = ?command))]
-    pub(super) async fn execute_binary(&mut self, command: &str) -> MpdResult<Vec<u8>> {
+    #[tracing::instrument(skip(self))]
+    pub(super) async fn execute_binary(&mut self, command: &str) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
 
         self.tx
             .write_all(format!("{command} {} \n", buf.len()).as_bytes())
             .await?;
         let _ = match Self::read_binary(&mut self.rx, &mut buf).await {
-            Ok(v) => Ok(v),
+            Ok(Some(v)) => Ok(Some(v)),
+            Ok(None) => return Ok(None),
             Err(MpdError::ClientClosed) if self.reconnect => {
                 self.reconnect().await?;
                 self.tx
@@ -99,17 +100,19 @@ impl<'a> Client<'a> {
             self.tx
                 .write_all(format!("{command} {} \n", buf.len()).as_bytes())
                 .await?;
-            let response = Self::read_binary(&mut self.rx, &mut buf).await?;
-
-            if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
-                trace!(message = "Finshed reading binary response", len = buf.len());
-                break;
+            if let Some(response) = Self::read_binary(&mut self.rx, &mut buf).await? {
+                if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
+                    trace!(message = "Finshed reading binary response", len = buf.len());
+                    break;
+                }
+            } else {
+                return Err(MpdError::ValueExpected("Expected binary data but got none".to_owned()));
             }
         }
-        Ok(buf)
+        Ok(Some(buf))
     }
 
-    #[tracing::instrument(skip(self), fields(command = ?command))]
+    #[tracing::instrument(skip(self))]
     pub(super) async fn execute<T>(&mut self, command: &str) -> MpdResult<T>
     where
         T: FromMpd + FromMpdBuilder<T>,
@@ -161,7 +164,7 @@ impl<'a> Client<'a> {
     async fn read_binary<R: std::fmt::Debug>(
         read: &mut R,
         binary_buf: &mut Vec<u8>,
-    ) -> Result<BinaryMpdResponse, MpdError>
+    ) -> Result<Option<BinaryMpdResponse>, MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
     {
@@ -171,7 +174,10 @@ impl<'a> Client<'a> {
             loop {
                 match Self::read_mpd_line(lines.next_line().await?)? {
                     // TODO: we get ok when no image simply does not exist, which is a valid state
-                    MpdLine::Ok => return Err(MpdError::Generic("Expected binary data but got 'OK'".to_owned())),
+                    MpdLine::Ok => {
+                        tracing::warn!("Expected binary data but got 'OK'");
+                        return Ok(None);
+                    }
                     MpdLine::Value(val) => {
                         let (key, value) = split_line(val)?;
                         match key.to_lowercase().as_ref() {
@@ -195,7 +201,7 @@ impl<'a> Client<'a> {
         let _ = handle.read_to_end(binary_buf).await?;
         let _ = read.read_line(&mut String::new()).await; // MPD prints an empty new line at the end of binary response
         match Self::read_mpd_line(read.lines().next_line().await?)? {
-            MpdLine::Ok => Ok(result),
+            MpdLine::Ok => Ok(Some(result)),
             MpdLine::Value(val) => Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'"))),
         }
     }

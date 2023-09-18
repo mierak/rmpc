@@ -30,7 +30,10 @@ use crate::{
 #[cfg(debug_assertions)]
 use self::screens::logs::LogsScreen;
 use self::{
-    modals::{confirm_queue_clear::ConfirmQueueClearModal, Modal},
+    modals::{
+        confirm_queue_clear::ConfirmQueueClearModal, rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
+        Modal,
+    },
     screens::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
         queue::QueueScreen, Screen,
@@ -97,6 +100,8 @@ impl<'a> Ui<'a> {
 #[derive(Debug, Default)]
 struct UiModals {
     confirm_queue_clear: ConfirmQueueClearModal,
+    save_queue: SaveQueueModal,
+    rename_playlist: RenamePlaylistModal,
 }
 #[derive(Debug, Default)]
 struct Screens {
@@ -133,6 +138,8 @@ macro_rules! modal_call {
     ($self:ident, $modal:ident, $app:ident, $fn:ident($($param:expr),+)) => {
         match $modal {
             modals::Modals::ConfirmQueueClear => invoke!($self.modals.confirm_queue_clear, $fn, $($param),+),
+            modals::Modals::SaveQueue => invoke!($self.modals.save_queue, $fn, $($param),+),
+            modals::Modals::RenamePlaylist => invoke!($self.modals.rename_playlist, $fn, $($param),+),
         }
     }
 }
@@ -308,7 +315,13 @@ impl Ui<'_> {
             }
         }
         if let Some(modal) = &app.visible_modal {
-            return modal_call!(self, modal, app, handle_key(key, &mut self.client, app)).await;
+            return modal_call!(
+                self,
+                modal,
+                app,
+                handle_key(key, &mut self.client, app, &mut self.shared_state)
+            )
+            .await;
         }
 
         match screen_call_inner!(handle_action(key, &mut self.client, app, &mut self.shared_state)) {
@@ -326,8 +339,23 @@ impl Ui<'_> {
                         // TODO this panics, oneshot consume is only since mpd 0.24 which is not relesed yet
                         // we should validate mpd protocol version when connecting clients
                         GlobalAction::ToggleConsume => self.client.consume(app.status.single.cycle()).await?,
-                        GlobalAction::VolumeUp => self.client.set_volume(app.status.volume.inc()).await?,
-                        GlobalAction::VolumeDown => self.client.set_volume(app.status.volume.dec()).await?,
+                        GlobalAction::TogglePause
+                            if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
+                        {
+                            self.client.pause_toggle().await?;
+                            return Ok(KeyHandleResult::SkipRender);
+                        }
+                        GlobalAction::TogglePause => {}
+                        GlobalAction::VolumeUp => {
+                            self.client
+                                .set_volume(app.status.volume.inc_by(app.config.volume_step))
+                                .await?;
+                        }
+                        GlobalAction::VolumeDown => {
+                            self.client
+                                .set_volume(app.status.volume.dec_by(app.config.volume_step))
+                                .await?;
+                        }
                         GlobalAction::SeekForward if app.status.state == MpdState::Play => {
                             self.client.seek_curr_forwards(5).await?;
                         }
@@ -387,6 +415,7 @@ pub enum GlobalAction {
     ToggleSingle,
     ToggleRandom,
     ToggleConsume,
+    TogglePause,
     VolumeUp,
     VolumeDown,
     SeekForward,

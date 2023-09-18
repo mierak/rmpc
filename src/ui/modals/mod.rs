@@ -11,10 +11,14 @@ use crate::{mpd::client::Client, state::State};
 use super::{KeyHandleResult, SharedUiState};
 
 pub mod confirm_queue_clear;
+pub mod rename_playlist;
+pub mod save_queue;
 
 #[derive(Debug)]
 pub enum Modals {
     ConfirmQueueClear,
+    SaveQueue,
+    RenamePlaylist,
 }
 
 #[async_trait]
@@ -32,6 +36,7 @@ pub trait Modal {
         key: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
+        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResult>;
 }
 

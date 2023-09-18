@@ -8,7 +8,7 @@ use tracing::Level;
 use crate::ui::{
     screens::{
         albums::AlbumsActions, artists::ArtistsActions, directories::DirectoriesActions, logs::LogsActions,
-        queue::QueueActions, CommonAction,
+        playlists::PlaylistsActions, queue::QueueActions, CommonAction,
     },
     GlobalAction,
 };
@@ -63,6 +63,8 @@ pub struct ConfigFile {
     symbols: SymbolsFile,
     #[serde(default = "defaults::default_column_widths")]
     column_widths: Vec<u16>,
+    #[serde(default = "defaults::default_volume_step")]
+    volume_step: u8,
     #[serde(default = "defaults::default_false")]
     disable_images: bool,
     keybinds: KeyConfigFile,
@@ -75,6 +77,7 @@ pub struct KeyConfigFile {
     pub albums: HashMap<AlbumsActions, Key>,
     pub artists: HashMap<ArtistsActions, Key>,
     pub directories: HashMap<DirectoriesActions, Key>,
+    pub playlists: HashMap<PlaylistsActions, Key>,
     pub logs: HashMap<LogsActions, Key>,
     pub queue: HashMap<QueueActions, Key>,
 }
@@ -84,6 +87,7 @@ impl Default for ConfigFile {
         Self {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
+            volume_step: 5,
             disable_images: false,
             column_widths: vec![20, 38, 42],
             symbols: SymbolsFile {
@@ -103,6 +107,10 @@ mod defaults {
     pub fn default_false() -> bool {
         false
     }
+
+    pub fn default_volume_step() -> u8 {
+        5
+    }
 }
 
 impl Default for KeyConfigFile {
@@ -114,6 +122,7 @@ impl Default for KeyConfigFile {
         use AlbumsActions as Al;
         use ArtistsActions as Ar;
         use DirectoriesActions as D;
+        use PlaylistsActions as P;
         use KeyCode as K;
         use KeyModifiers as M;
         use LogsActions as L;
@@ -126,6 +135,7 @@ impl Default for KeyConfigFile {
                 (G::ToggleRepeat,     Key { key: K::Char('z'), modifiers: M::NONE }),
                 (G::ToggleRandom,     Key { key: K::Char('x'), modifiers: M::NONE }),
                 (G::ToggleSingle,     Key { key: K::Char('c'), modifiers: M::NONE }),
+                (G::TogglePause,      Key { key: K::Char(' '), modifiers: M::NONE }),
                 (G::SeekForward,      Key { key: K::Char('f'), modifiers: M::NONE }),
                 (G::SeekBack,         Key { key: K::Char('b'), modifiers: M::NONE }),
                 (G::VolumeDown,       Key { key: K::Char(','), modifiers: M::NONE }),
@@ -154,14 +164,18 @@ impl Default for KeyConfigFile {
             directories: HashMap::from([
                 (D::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
+            playlists: HashMap::from([
+                (P::Add,              Key { key: K::Char('a'), modifiers: M::NONE }),
+                (P::DeletePlaylist,   Key { key: K::Char('D'), modifiers: M::SHIFT }),
+            ]),
             logs: HashMap::from([
                 (L::Clear,            Key { key: K::Char('D'), modifiers: M::SHIFT }),
             ]),
             queue: HashMap::from([
-                (Q::TogglePause,      Key { key: K::Char(' '), modifiers: M::NONE }),
                 (Q::Delete,           Key { key: K::Char('d'), modifiers: M::NONE }),
                 (Q::DeleteAll,        Key { key: K::Char('D'), modifiers: M::SHIFT }),
                 (Q::Play,             Key { key: K::Enter,     modifiers: M::NONE }),
+                (Q::Save,             Key { key: K::Char('s'), modifiers: M::CONTROL }),
             ]),
         }
     }
@@ -172,6 +186,7 @@ impl From<ConfigFile> for Config {
         Self {
             address: Box::leak(Box::new(value.address)),
             symbols: value.symbols.into(),
+            volume_step: value.volume_step,
             disable_images: value.disable_images,
             column_widths: [value.column_widths[0], value.column_widths[1], value.column_widths[2]],
             keybinds: KeyConfig {
@@ -180,6 +195,7 @@ impl From<ConfigFile> for Config {
                 albums: value.keybinds.albums.into_iter().map(|(k, v)| (v, k)).collect(),
                 artists: value.keybinds.artists.into_iter().map(|(k, v)| (v, k)).collect(),
                 directories: value.keybinds.directories.into_iter().map(|(k, v)| (v, k)).collect(),
+                playlists: value.keybinds.playlists.into_iter().map(|(k, v)| (v, k)).collect(),
                 logs: value.keybinds.logs.into_iter().map(|(k, v)| (v, k)).collect(),
                 queue: value.keybinds.queue.into_iter().map(|(k, v)| (v, k)).collect(),
             },
@@ -217,6 +233,7 @@ impl From<SymbolsFile> for SymbolsConfig {
 pub struct Config {
     pub address: &'static str,
     pub symbols: SymbolsConfig,
+    pub volume_step: u8,
     pub keybinds: KeyConfig,
     pub column_widths: [u16; 3],
     pub disable_images: bool,
@@ -229,6 +246,7 @@ pub struct KeyConfig {
     pub albums: HashMap<Key, AlbumsActions>,
     pub artists: HashMap<Key, ArtistsActions>,
     pub directories: HashMap<Key, DirectoriesActions>,
+    pub playlists: HashMap<Key, PlaylistsActions>,
     pub logs: HashMap<Key, LogsActions>,
     pub queue: HashMap<Key, QueueActions>,
 }

@@ -56,6 +56,7 @@ impl Modal for ConfirmQueueClearModal {
         key: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
+        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResult> {
         match key.code {
             KeyCode::Char('j') => {

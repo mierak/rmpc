@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::{
-    mpd::{client::Client, commands::State as MpdState, mpd_client::MpdClient},
+    mpd::{client::Client, mpd_client::MpdClient},
     state::PlayListInfoExt,
     ui::{
         modals::Modals,
@@ -204,19 +204,16 @@ impl Screen for QueueScreen {
                     app.visible_modal = Some(Modals::ConfirmQueueClear);
                     Ok(KeyHandleResult::RenderRequested)
                 }
-                QueueActions::TogglePause
-                    if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
-                {
-                    client.pause_toggle().await?;
-                    Ok(KeyHandleResult::SkipRender)
-                }
                 QueueActions::Play => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                         client.play_id(selected_song.id).await?;
                     }
                     Ok(KeyHandleResult::SkipRender)
                 }
-                QueueActions::TogglePause => Ok(KeyHandleResult::SkipRender),
+                QueueActions::Save => {
+                    app.visible_modal = Some(Modals::SaveQueue);
+                    Ok(KeyHandleResult::RenderRequested)
+                }
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
@@ -318,6 +315,6 @@ impl QueueScreen {
 pub enum QueueActions {
     Delete,
     DeleteAll,
-    TogglePause,
     Play,
+    Save,
 }

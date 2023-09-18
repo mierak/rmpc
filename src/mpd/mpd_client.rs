@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use strum::AsRefStr;
 
 use super::{
     client::Client,
@@ -11,6 +12,17 @@ use super::{
 };
 
 type MpdResult<T> = Result<T, MpdError>;
+
+#[derive(AsRefStr)]
+#[allow(dead_code)]
+pub enum SaveMode {
+    #[strum(serialize = "create")]
+    Create,
+    #[strum(serialize = "append")]
+    Append,
+    #[strum(serialize = "replace")]
+    Replace,
+}
 
 #[async_trait]
 pub trait MpdClient {
@@ -44,12 +56,15 @@ pub trait MpdClient {
     // Database
     async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
-    async fn read_picture(&mut self, path: &str) -> MpdResult<Vec<u8>>;
-    async fn albumart(&mut self, path: &str) -> MpdResult<Vec<u8>>;
+    async fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
+    async fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
     // Stored playlists
     async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
     async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
     async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
+    async fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
+    async fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
+    async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
     /// If no art is still found, but no errors were encountered, None is returned.
@@ -229,30 +244,50 @@ impl MpdClient for Client<'_> {
         self.execute(&format!("listplaylistinfo \"{playlist}\"")).await
     }
 
+    async fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("load \"{name}\"")).await
+    }
+    async fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("rm \"{name}\"")).await
+    }
+    /// mode is supported from version 0.24
+    async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
+        if let Some(mode) = mode {
+            self.execute_ok(&format!("save \"{name}\" \"{}\"", mode.as_ref())).await
+        } else {
+            self.execute_ok(&format!("save \"{name}\"")).await
+        }
+    }
+
     #[tracing::instrument(skip(self))]
-    async fn read_picture(&mut self, path: &str) -> MpdResult<Vec<u8>> {
+    async fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
         self.execute_binary(&format!("readpicture \"{path}\"")).await
     }
 
     #[tracing::instrument(skip(self))]
-    async fn albumart(&mut self, path: &str) -> MpdResult<Vec<u8>> {
+    async fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
         self.execute_binary(&format!("albumart \"{path}\"")).await
     }
 
     #[tracing::instrument(skip(self))]
     async fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
         match self.albumart(path).await {
-            Ok(v) => Ok(Some(v)),
-            Err(MpdError::Mpd(MpdFailureResponse {
+            Ok(Some(v)) => Ok(Some(v)),
+            Ok(None)
+            | Err(MpdError::Mpd(MpdFailureResponse {
                 code: ErrorCode::NoExist,
                 ..
             })) => match self.read_picture(path).await {
-                Ok(p) => Ok(Some(p)),
+                Ok(Some(p)) => Ok(Some(p)),
+                Ok(None) => {
+                    tracing::debug!(message = "No album art found, falling back to placeholder image");
+                    Ok(None)
+                }
                 Err(MpdError::Mpd(MpdFailureResponse {
                     code: ErrorCode::NoExist,
                     ..
                 })) => {
-                    tracing::debug!(message = "No album art found, fallback to placeholder image here.");
+                    tracing::debug!(message = "No album art found, falling back to placeholder image");
                     Ok(None)
                 }
                 Err(e) => {

@@ -24,7 +24,11 @@ pub struct PlaylistsScreen {
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum PlaylistsActions {}
+pub enum PlaylistsActions {
+    Add,
+    DeletePlaylist,
+    // Rename,
+}
 
 impl Default for PlaylistsScreen {
     fn default() -> Self {
@@ -153,9 +157,48 @@ impl Screen for PlaylistsScreen {
                 }
                 _ => Ok(KeyHandleResult::SkipRender),
             }
-        } else if let Some(action) = app.config.keybinds.artists.get(&event.into()) {
+        } else if let Some(action) = app.config.keybinds.playlists.get(&event.into()) {
             match action {
-                _ => Ok(KeyHandleResult::SkipRender),
+                PlaylistsActions::Add => {
+                    if let Some(playlist) = self.stack.get_selected() {
+                        match playlist {
+                            DirOrSongInfo::Dir(d) => {
+                                client.load_playlist(d).await?;
+                                shared.status_message = Some(StatusMessage::new(
+                                    format!("Playlist '{d}' added to queue"),
+                                    Level::Info,
+                                ));
+                            }
+                            DirOrSongInfo::Song(s) => {
+                                client.add(&s.file).await?;
+                                shared.status_message = Some(StatusMessage::new(
+                                    format!("'{}' by '{}' added to queue", s.title_str(), s.artist_str()),
+                                    Level::Info,
+                                ));
+                            }
+                        }
+                    } else {
+                        shared.status_message = Some(StatusMessage::new(
+                            "Failed to add playlist/song to current queue because nothing was selected".to_string(),
+                            Level::Error,
+                        ));
+                        tracing::error!(
+                            message = "Failed to add playlist/song to current queue because nothing was selected"
+                        );
+                    }
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                PlaylistsActions::DeletePlaylist => match self.stack.get_selected() {
+                    Some(DirOrSongInfo::Dir(d)) => {
+                        client.delete_playlist(d).await?;
+                        shared.status_message =
+                            Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
+                        // TODO need to refetch playlists
+                        Ok(KeyHandleResult::RenderRequested)
+                    }
+                    Some(_) => Ok(KeyHandleResult::SkipRender),
+                    None => Ok(KeyHandleResult::SkipRender),
+                },
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
