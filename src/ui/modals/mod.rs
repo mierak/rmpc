@@ -8,7 +8,11 @@ use ratatui::{
 
 use crate::{mpd::client::Client, state::State};
 
-use super::{KeyHandleResult, SharedUiState};
+use self::{
+    confirm_queue_clear::ConfirmQueueClearModal, rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
+};
+
+use super::{KeyHandleResultInternal, SharedUiState};
 
 pub mod confirm_queue_clear;
 pub mod rename_playlist;
@@ -16,13 +20,13 @@ pub mod save_queue;
 
 #[derive(Debug)]
 pub enum Modals {
-    ConfirmQueueClear,
-    SaveQueue,
-    RenamePlaylist,
+    ConfirmQueueClear(ConfirmQueueClearModal),
+    SaveQueue(SaveQueueModal),
+    RenamePlaylist(RenamePlaylistModal),
 }
 
 #[async_trait]
-pub trait Modal {
+pub(super) trait Modal {
     fn render<B: Backend>(
         &mut self,
         frame: &mut Frame<B>,
@@ -37,7 +41,7 @@ pub trait Modal {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult>;
+    ) -> Result<KeyHandleResultInternal>;
 }
 
 pub trait RectExt {

@@ -63,6 +63,7 @@ pub trait MpdClient {
     async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
     async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
     async fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
+    async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     async fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
     async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
@@ -249,6 +250,9 @@ impl MpdClient for Client<'_> {
     }
     async fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rm \"{name}\"")).await
+    }
+    async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("rename \"{name}\" \"{new_name}\"")).await
     }
     /// mode is supported from version 0.24
     async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {

@@ -15,7 +15,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::Result;
 use clap::Parser;
 use config::{Args, Command, ConfigFile};
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use tokio::{
@@ -159,15 +159,15 @@ async fn main_task(
     mut event_receiver: tokio::sync::mpsc::Receiver<AppEvent>,
     render_sender: Sender<()>,
 ) {
-    loop {
+    'outer: loop {
         while let Some(event) = event_receiver.recv().await {
             let mut state = state2.lock().await;
             let mut ui = ui_mutex.lock().await;
 
             match event {
                 AppEvent::UserInput(key) => match ui.handle_key(key, &mut state).await {
-                    Ok(ui::KeyHandleResult::KeyNotHandled) => continue,
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
+                    Ok(ui::KeyHandleResult::Quit) => break 'outer,
                     Ok(ui::KeyHandleResult::RenderRequested) => {
                         if let Err(err) = render_sender.send(()).await {
                             error!(messgae = "Failed to send render request", error = ?err);
@@ -313,18 +313,10 @@ fn event_poll(user_input_tx: Sender<AppEvent>, is_aborted: Arc<Mutex<bool>>) {
                         continue;
                     }
                 };
-                match event {
-                    // TODO: this interferes with text input
-                    Event::Key(KeyEvent {
-                        code: KeyCode::Char('q'),
-                        ..
-                    }) => break,
-                    Event::Key(key) => {
-                        if let Err(err) = user_input_tx.try_send(AppEvent::UserInput(key)) {
-                            error!(messgae = "Failed to send user input", error = ?err);
-                        }
+                if let Event::Key(key) = event {
+                    if let Err(err) = user_input_tx.try_send(AppEvent::UserInput(key)) {
+                        error!(messgae = "Failed to send user input", error = ?err);
                     }
-                    _ => {} // ignore other events
                 }
             }
             Ok(_) => {}

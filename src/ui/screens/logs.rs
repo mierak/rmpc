@@ -14,7 +14,7 @@ use ratatui::{
 use crate::{
     mpd::client::Client,
     state::State,
-    ui::{KeyHandleResult, SharedUiState},
+    ui::{KeyHandleResultInternal, SharedUiState},
 };
 
 use super::{dirstack::MyState, CommonAction, Screen};
@@ -117,48 +117,48 @@ impl Screen for LogsScreen {
         _client: &mut Client<'_>,
         app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.logs.get(&event.into()) {
             match action {
                 LogsActions::Clear => {
                     app.logs.0.clear();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.scrolling_state.prev();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.scrolling_state.next();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                CommonAction::Right => Ok(KeyHandleResult::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResult::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResult::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResult::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResult::SkipRender),
+                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
-            Ok(KeyHandleResult::KeyNotHandled)
+            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
     }
 }

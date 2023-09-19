@@ -17,7 +17,7 @@ use crate::{
         mpd_client::MpdClient,
     },
     state::State,
-    ui::{widgets::browser::Browser, KeyHandleResult, Level, SharedUiState, StatusMessage},
+    ui::{widgets::browser::Browser, KeyHandleResultInternal, Level, SharedUiState, StatusMessage},
 };
 
 use super::{
@@ -104,32 +104,32 @@ impl Screen for DirectoriesScreen {
         client: &mut Client<'_>,
         app: &mut State,
         shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             match event.code {
                 KeyCode::Char(c) => {
                     if let Some(ref mut f) = self.stack.filter {
                         f.push(c);
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
                     if let Some(ref mut f) = self.stack.filter {
                         f.pop();
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
                     self.stack.jump_forward();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Esc => {
                     self.filter_input_mode = false;
                     self.stack.filter = None;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResult::SkipRender),
+                _ => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.directories.get(&event.into()) {
             match action {
@@ -162,7 +162,7 @@ impl Screen for DirectoriesScreen {
                         }
                         None => {}
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
@@ -173,7 +173,7 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
@@ -181,7 +181,7 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
@@ -189,7 +189,7 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
@@ -197,7 +197,7 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
@@ -205,7 +205,7 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
@@ -213,7 +213,7 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
                     match self.stack.get_selected().context("Expected an item to be selected")? {
@@ -243,7 +243,7 @@ impl Screen for DirectoriesScreen {
                             ));
                         }
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Left => {
                     self.stack.pop();
@@ -252,24 +252,24 @@ impl Screen for DirectoriesScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
                     self.stack.filter = Some(String::new());
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
                     self.stack.jump_forward();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
                     self.stack.jump_back();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }
         } else {
-            Ok(KeyHandleResult::KeyNotHandled)
+            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
     }
 }

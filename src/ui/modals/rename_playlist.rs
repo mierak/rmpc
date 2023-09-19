@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::{KeyHandleResult, RectExt, SharedUiState};
+use super::{KeyHandleResultInternal, RectExt, SharedUiState};
 
 use super::Modal;
 
@@ -25,7 +25,8 @@ use super::Modal;
 pub struct RenamePlaylistModal {
     button_group: ButtonGroupState,
     input_focused: bool,
-    name: String,
+    playlist_name: String,
+    new_name: String,
 }
 
 impl Default for RenamePlaylistModal {
@@ -33,15 +34,24 @@ impl Default for RenamePlaylistModal {
         Self {
             button_group: ButtonGroupState::default(),
             input_focused: true,
-            name: String::new(),
+            playlist_name: String::new(),
+            new_name: String::new(),
         }
     }
 }
 
 impl RenamePlaylistModal {
+    pub fn new(playlist_name: String) -> Self {
+        Self {
+            new_name: playlist_name.clone(),
+            playlist_name,
+            button_group: ButtonGroupState::default(),
+            input_focused: true,
+        }
+    }
     fn on_hide(&mut self) {
         self.button_group = ButtonGroupState::default();
-        self.name = String::new();
+        self.playlist_name = String::new();
         self.input_focused = true;
     }
 }
@@ -54,9 +64,8 @@ impl Modal for RenamePlaylistModal {
         _app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let block = Block::default().borders(Borders::ALL).title("Save queue as playlist");
-        let text = Paragraph::new("Playlist name:").wrap(Wrap { trim: true });
-        let input = Paragraph::new(self.name.clone())
+        let block = Block::default().borders(Borders::ALL).title("Rename playlist");
+        let input = Paragraph::new(self.new_name.clone())
             .block(Block::default().borders(Borders::ALL).fg(if self.input_focused {
                 Color::Blue
             } else {
@@ -65,9 +74,9 @@ impl Modal for RenamePlaylistModal {
             .fg(Color::White)
             .wrap(Wrap { trim: true });
 
-        let popup_area = frame.size().centered_exact(20, 7);
-        let [text_area,input_area, buttons_area] = *Layout::default()
-            .constraints([Constraint::Length(1), Constraint::Length(3), Constraint::Max(1)].as_ref())
+        let popup_area = frame.size().centered_exact(20, 6);
+        let [input_area, buttons_area] = *Layout::default()
+            .constraints([ Constraint::Length(3), Constraint::Max(1)].as_ref())
             .direction(Direction::Vertical)
             .split(block.inner(popup_area.inner(&Margin {horizontal: 1, vertical: 0}))) else { return Ok(()); };
 
@@ -76,7 +85,6 @@ impl Modal for RenamePlaylistModal {
 
         frame.render_widget(Clear, popup_area);
         frame.render_widget(block, popup_area);
-        frame.render_widget(text, text_area);
         frame.render_widget(input, input_area);
         frame.render_stateful_widget(group, buttons_area, &mut self.button_group);
         Ok(())
@@ -88,43 +96,43 @@ impl Modal for RenamePlaylistModal {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         if self.input_focused {
             return match key.code {
                 KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
                     self.input_focused = false;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Char(c) => {
-                    self.name.push(c);
-                    Ok(KeyHandleResult::RenderRequested)
+                    self.new_name.push(c);
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
-                    self.name.pop();
-                    Ok(KeyHandleResult::RenderRequested)
+                    self.new_name.pop();
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Enter => {
                     if self.button_group.selected == 0 {
-                        _client.save_queue_as_playlist(&self.name, None).await?;
+                        _client.rename_playlist(&self.playlist_name, &self.new_name).await?;
                         _shared.status_message = Some(StatusMessage::new(
-                            format!("Playlist '{}' saved", self.name),
+                            format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
                             Level::Info,
                         ));
                     }
-                    _app.visible_modal = None;
                     self.on_hide();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::Modal(None))
                 }
                 KeyCode::Esc => {
                     self.input_focused = false;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResult::SkipRender),
+                _ => Ok(KeyHandleResultInternal::SkipRender),
             };
         }
         match key.code {
             KeyCode::Char('i') => {
                 self.input_focused = true;
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Char('j') => {
                 if self.button_group.selected == 1 {
@@ -132,6 +140,7 @@ impl Modal for RenamePlaylistModal {
                 } else {
                     self.button_group.selected += 1;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Char('k') => {
                 if self.button_group.selected == 0 {
@@ -139,28 +148,28 @@ impl Modal for RenamePlaylistModal {
                 } else {
                     self.button_group.selected -= 1;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Esc => {
-                _app.visible_modal = None;
                 self.on_hide();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                _app.visible_modal = None;
                 self.on_hide();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Enter => {
                 if self.button_group.selected == 0 {
-                    _client.save_queue_as_playlist(&self.name, None).await?;
+                    _client.rename_playlist(&self.playlist_name, &self.new_name).await?;
                     _shared.status_message = Some(StatusMessage::new(
-                        format!("Playlist '{}' saved", self.name),
+                        format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
                         Level::Info,
                     ));
                 }
-                _app.visible_modal = None;
                 self.on_hide();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
-            _ => {}
+            _ => Ok(KeyHandleResultInternal::RenderRequested),
         }
-        Ok(KeyHandleResult::RenderRequested)
     }
 }

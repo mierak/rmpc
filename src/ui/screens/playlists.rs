@@ -7,7 +7,11 @@ use tracing::instrument;
 use crate::{
     mpd::{client::Client, mpd_client::MpdClient},
     state::State,
-    ui::{widgets::browser::Browser, KeyHandleResult, Level, SharedUiState, StatusMessage},
+    ui::{
+        modals::{rename_playlist::RenamePlaylistModal, Modals},
+        widgets::browser::Browser,
+        KeyHandleResultInternal, Level, SharedUiState, StatusMessage,
+    },
 };
 
 use super::{
@@ -27,7 +31,7 @@ pub struct PlaylistsScreen {
 pub enum PlaylistsActions {
     Add,
     DeletePlaylist,
-    // Rename,
+    Rename,
 }
 
 impl Default for PlaylistsScreen {
@@ -109,13 +113,15 @@ impl Screen for PlaylistsScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        let playlists = _client.list_playlists().await.context("Cannot list playlists")?;
-        self.stack = DirStack::new(
-            playlists
-                .into_iter()
-                .map(|playlist| DirOrSongInfo::Dir(playlist.name))
-                .collect(),
-        );
+        let mut playlists: Vec<_> = _client
+            .list_playlists()
+            .await
+            .context("Cannot list playlists")?
+            .into_iter()
+            .map(|playlist| DirOrSongInfo::Dir(playlist.name))
+            .collect();
+        playlists.sort();
+        self.stack = DirStack::new(playlists);
         self.stack.preview = self
             .prepare_preview(_client, _app)
             .await
@@ -130,32 +136,32 @@ impl Screen for PlaylistsScreen {
         client: &mut Client<'_>,
         app: &mut State,
         shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             match event.code {
                 KeyCode::Char(c) => {
                     if let Some(ref mut f) = self.stack.filter {
                         f.push(c);
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
                     if let Some(ref mut f) = self.stack.filter {
                         f.pop();
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
                     self.stack.jump_forward();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Esc => {
                     self.filter_input_mode = false;
                     self.stack.filter = None;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResult::SkipRender),
+                _ => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.playlists.get(&event.into()) {
             match action {
@@ -186,7 +192,7 @@ impl Screen for PlaylistsScreen {
                             message = "Failed to add playlist/song to current queue because nothing was selected"
                         );
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 PlaylistsActions::DeletePlaylist => match self.stack.get_selected() {
                     Some(DirOrSongInfo::Dir(d)) => {
@@ -194,10 +200,21 @@ impl Screen for PlaylistsScreen {
                         shared.status_message =
                             Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
                         // TODO need to refetch playlists
-                        Ok(KeyHandleResult::RenderRequested)
+                        Ok(KeyHandleResultInternal::RenderRequested)
                     }
-                    Some(_) => Ok(KeyHandleResult::SkipRender),
-                    None => Ok(KeyHandleResult::SkipRender),
+                    Some(_) => Ok(KeyHandleResultInternal::SkipRender),
+                    None => Ok(KeyHandleResultInternal::SkipRender),
+                },
+                PlaylistsActions::Rename => match self.stack.get_selected() {
+                    Some(DirOrSongInfo::Dir(d)) => {
+                        // shared.visible_modal = Some(Modals::RenamePlaylist(RenamePlaylistModal::new(d.clone())));
+                        Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
+                            RenamePlaylistModal::new(d.clone()),
+                        ))))
+                        // Ok(KeyHandleResult::RenderRequested)
+                    }
+                    Some(_) => Ok(KeyHandleResultInternal::SkipRender),
+                    None => Ok(KeyHandleResultInternal::SkipRender),
                 },
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
@@ -208,7 +225,7 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
@@ -216,7 +233,7 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
@@ -224,7 +241,7 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
@@ -232,17 +249,17 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
                     self.prepare_preview(client, app).await?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
                     self.prepare_preview(client, app).await?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
                     let idx = self
@@ -270,7 +287,7 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Left => {
                     self.stack.pop();
@@ -278,24 +295,24 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
                     self.stack.filter = Some(String::new());
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
                     self.stack.jump_forward();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
                     self.stack.jump_back();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }
         } else {
-            Ok(KeyHandleResult::KeyNotHandled)
+            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
     }
 }

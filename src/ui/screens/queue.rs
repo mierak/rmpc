@@ -5,9 +5,9 @@ use crate::{
     mpd::{client::Client, mpd_client::MpdClient},
     state::PlayListInfoExt,
     ui::{
-        modals::Modals,
+        modals::{confirm_queue_clear::ConfirmQueueClearModal, save_queue::SaveQueueModal, Modals},
         widgets::kitty_image::{ImageState, KittyImage},
-        DurationExt, KeyHandleResult, SharedUiState,
+        DurationExt, KeyHandleResultInternal, SharedUiState,
     },
 };
 use async_trait::async_trait;
@@ -160,32 +160,32 @@ impl Screen for QueueScreen {
         client: &mut Client<'_>,
         app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             match event.code {
                 KeyCode::Char(c) => {
                     if let Some(ref mut f) = self.filter {
                         f.push(c);
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
                     if let Some(ref mut f) = self.filter {
                         f.pop();
                     };
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
                     self.jump_forward(app);
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Esc => {
                     self.filter_input_mode = false;
                     self.filter = None;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResult::SkipRender),
+                _ => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
             match action {
@@ -198,21 +198,27 @@ impl Screen for QueueScreen {
                     } else {
                         error!("No song selected");
                     }
-                    Ok(KeyHandleResult::SkipRender)
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::DeleteAll => {
-                    app.visible_modal = Some(Modals::ConfirmQueueClear);
-                    Ok(KeyHandleResult::RenderRequested)
+                    // _shared.visible_modal = Some(Modals::ConfirmQueueClear(ConfirmQueueClearModal::default()));
+                    Ok(KeyHandleResultInternal::Modal(Some(Modals::ConfirmQueueClear(
+                        ConfirmQueueClearModal::default(),
+                    ))))
+                    // Ok(KeyHandleResult::RenderRequested)
                 }
                 QueueActions::Play => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
                         client.play_id(selected_song.id).await?;
                     }
-                    Ok(KeyHandleResult::SkipRender)
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::Save => {
-                    app.visible_modal = Some(Modals::SaveQueue);
-                    Ok(KeyHandleResult::RenderRequested)
+                    // _shared.visible_modal = Some(Modals::SaveQueue(SaveQueueModal::default()));
+                    Ok(KeyHandleResultInternal::Modal(Some(Modals::SaveQueue(
+                        SaveQueueModal::default(),
+                    ))))
+                    // Ok(KeyHandleResult::RenderRequested)
                 }
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
@@ -221,56 +227,56 @@ impl Screen for QueueScreen {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.next_half_viewport();
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.prev_half_viewport();
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.prev();
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.next();
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.last();
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.first();
                     }
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                CommonAction::Right => Ok(KeyHandleResult::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResult::SkipRender),
+                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
                     self.filter = Some(String::new());
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
                     self.jump_forward(app);
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
                     self.jump_back(app);
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }
         } else {
-            Ok(KeyHandleResult::KeyNotHandled)
+            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
     }
 }

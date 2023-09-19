@@ -13,7 +13,7 @@ use crate::{
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
-use super::{KeyHandleResult, RectExt, SharedUiState};
+use super::{KeyHandleResultInternal, RectExt, SharedUiState};
 
 use super::Modal;
 
@@ -57,7 +57,7 @@ impl Modal for ConfirmQueueClearModal {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         match key.code {
             KeyCode::Char('j') => {
                 if self.button_group.selected == 1 {
@@ -65,6 +65,7 @@ impl Modal for ConfirmQueueClearModal {
                 } else {
                     self.button_group.selected += 1;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Char('k') => {
                 if self.button_group.selected == 0 {
@@ -72,24 +73,27 @@ impl Modal for ConfirmQueueClearModal {
                 } else {
                     self.button_group.selected -= 1;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Esc => {
-                _app.visible_modal = None;
+                // _shared.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                _app.visible_modal = None;
+                // _shared.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Enter => {
                 if self.button_group.selected == 0 {
                     _client.clear().await?;
                 }
-                _app.visible_modal = None;
+                // _shared.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
-            _ => {}
+            _ => Ok(KeyHandleResultInternal::SkipRender),
         }
-        Ok(KeyHandleResult::RenderRequested)
     }
 }

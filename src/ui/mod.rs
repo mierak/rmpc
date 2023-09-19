@@ -30,10 +30,7 @@ use crate::{
 #[cfg(debug_assertions)]
 use self::screens::logs::LogsScreen;
 use self::{
-    modals::{
-        confirm_queue_clear::ConfirmQueueClearModal, rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
-        Modal,
-    },
+    modals::{Modal, Modals},
     screens::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
         queue::QueueScreen, Screen,
@@ -82,8 +79,8 @@ pub struct SharedUiState {
 pub struct Ui<'a> {
     client: Client<'a>,
     screens: Screens,
-    modals: UiModals,
     shared_state: SharedUiState,
+    active_modal: Option<Modals>,
 }
 
 impl<'a> Ui<'a> {
@@ -91,18 +88,12 @@ impl<'a> Ui<'a> {
         Self {
             client,
             screens: Screens::default(),
-            modals: UiModals::default(),
             shared_state: SharedUiState::default(),
+            active_modal: None,
         }
     }
 }
 
-#[derive(Debug, Default)]
-struct UiModals {
-    confirm_queue_clear: ConfirmQueueClearModal,
-    save_queue: SaveQueueModal,
-    rename_playlist: RenamePlaylistModal,
-}
 #[derive(Debug, Default)]
 struct Screens {
     queue: QueueScreen,
@@ -130,16 +121,6 @@ macro_rules! screen_call {
             screens::Screens::Artists => invoke!($self.screens.artists, $fn, $($param),+),
             screens::Screens::Albums => invoke!($self.screens.albums, $fn, $($param),+),
             screens::Screens::Playlists => invoke!($self.screens.playlists, $fn, $($param),+),
-        }
-    }
-}
-
-macro_rules! modal_call {
-    ($self:ident, $modal:ident, $app:ident, $fn:ident($($param:expr),+)) => {
-        match $modal {
-            modals::Modals::ConfirmQueueClear => invoke!($self.modals.confirm_queue_clear, $fn, $($param),+),
-            modals::Modals::SaveQueue => invoke!($self.modals.save_queue, $fn, $($param),+),
-            modals::Modals::RenamePlaylist => invoke!($self.modals.rename_playlist, $fn, $($param),+),
         }
     }
 }
@@ -299,12 +280,39 @@ impl Ui<'_> {
         frame.render_widget(tabs, tabs_area);
 
         screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
-        if let Some(modal) = &app.visible_modal {
-            modal_call!(self, modal, app, render(frame, app, &mut self.shared_state))?;
+
+        if let Some(ref mut modal) = self.active_modal {
+            Self::render_modal(modal, frame, app, &mut self.shared_state)?;
         }
         self.shared_state.frame_counter.increment();
 
         Ok(())
+    }
+
+    fn render_modal<B: Backend>(
+        active_modal: &mut modals::Modals,
+        frame: &mut Frame<'_, B>,
+        app: &mut State,
+        shared: &mut SharedUiState,
+    ) -> Result<()> {
+        match active_modal {
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, app, shared),
+            modals::Modals::SaveQueue(ref mut m) => m.render(frame, app, shared),
+            modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, app, shared),
+        }
+    }
+    async fn handle_modal_key(
+        active_modal: &mut modals::Modals,
+        client: &mut Client<'_>,
+        key: KeyEvent,
+        app: &mut State,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        match active_modal {
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app, shared).await,
+            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app, shared).await,
+            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app, shared).await,
+        }
     }
 
     #[instrument(skip(self, app), fields(screen))]
@@ -314,20 +322,25 @@ impl Ui<'_> {
                 screen_call!(self, app, $fn($($param),+)).await?
             }
         }
-        if let Some(modal) = &app.visible_modal {
-            return modal_call!(
-                self,
-                modal,
-                app,
-                handle_key(key, &mut self.client, app, &mut self.shared_state)
-            )
-            .await;
+        if let Some(ref mut modal) = self.active_modal {
+            return match Self::handle_modal_key(modal, &mut self.client, key, app, &mut self.shared_state).await? {
+                KeyHandleResultInternal::Modal(None) => {
+                    self.active_modal = None;
+                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                    Ok(KeyHandleResult::RenderRequested)
+                }
+                r => Ok(r.into()),
+            };
         }
 
         match screen_call_inner!(handle_action(key, &mut self.client, app, &mut self.shared_state)) {
-            KeyHandleResult::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
-            KeyHandleResult::SkipRender => return Ok(KeyHandleResult::SkipRender),
-            KeyHandleResult::KeyNotHandled => {
+            KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
+            KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
+            KeyHandleResultInternal::Modal(modal) => {
+                self.active_modal = modal;
+                return Ok(KeyHandleResult::RenderRequested);
+            }
+            KeyHandleResultInternal::KeyNotHandled => {
                 if let Some(action) = app.config.keybinds.global.get(&key.into()) {
                     match action {
                         GlobalAction::NextTrack if app.status.state == MpdState::Play => self.client.next().await?,
@@ -383,6 +396,7 @@ impl Ui<'_> {
                         GlobalAction::Stop => {}
                         GlobalAction::SeekBack => {}
                         GlobalAction::SeekForward => {}
+                        GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                     }
                     Ok(KeyHandleResult::SkipRender)
                 } else {
@@ -408,6 +422,7 @@ impl Ui<'_> {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum GlobalAction {
+    Quit,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -439,13 +454,33 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
-pub enum KeyHandleResult {
+pub(self) enum KeyHandleResultInternal {
     /// Action warrants a render
     RenderRequested,
     /// Action does NOT warrant a render
     SkipRender,
     /// Event was not handled and should bubble up
     KeyNotHandled,
+    /// Display a modal
+    Modal(Option<Modals>),
+}
+
+pub enum KeyHandleResult {
+    /// Action warrants a render
+    RenderRequested,
+    /// Action does NOT warrant a render
+    SkipRender,
+    /// Exit the application
+    Quit,
+}
+
+impl From<KeyHandleResultInternal> for KeyHandleResult {
+    fn from(value: KeyHandleResultInternal) -> Self {
+        match value {
+            KeyHandleResultInternal::SkipRender => KeyHandleResult::SkipRender,
+            _ => KeyHandleResult::RenderRequested,
+        }
+    }
 }
 
 trait LevelExt {

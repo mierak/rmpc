@@ -129,6 +129,7 @@ impl Default for KeyConfigFile {
         use QueueActions as Q;
         Self {
             global: HashMap::from([
+                (G::Quit,             Key { key: K::Char('q'), modifiers: M::NONE }),
                 (G::NextTrack,        Key { key: K::Char('n'), modifiers: M::NONE }),
                 (G::PreviousTrack,    Key { key: K::Char('p'), modifiers: M::NONE }),
                 (G::Stop,             Key { key: K::Char('s'), modifiers: M::NONE }),
@@ -167,6 +168,7 @@ impl Default for KeyConfigFile {
             playlists: HashMap::from([
                 (P::Add,              Key { key: K::Char('a'), modifiers: M::NONE }),
                 (P::DeletePlaylist,   Key { key: K::Char('D'), modifiers: M::SHIFT }),
+                (P::Rename,           Key { key: K::Char('r'), modifiers: M::NONE }),
             ]),
             logs: HashMap::from([
                 (L::Clear,            Key { key: K::Char('D'), modifiers: M::SHIFT }),

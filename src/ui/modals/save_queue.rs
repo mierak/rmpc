@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::{KeyHandleResult, RectExt, SharedUiState};
+use super::{KeyHandleResultInternal, RectExt, SharedUiState};
 
 use super::Modal;
 
@@ -88,20 +88,20 @@ impl Modal for SaveQueueModal {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<KeyHandleResultInternal> {
         if self.input_focused {
             return match key.code {
                 KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
                     self.input_focused = false;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Char(c) => {
                     self.name.push(c);
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
                     self.name.pop();
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Enter => {
                     if self.button_group.selected == 0 {
@@ -111,20 +111,22 @@ impl Modal for SaveQueueModal {
                             Level::Info,
                         ));
                     }
-                    _app.visible_modal = None;
+                    // _shared.visible_modal = None;
                     self.on_hide();
-                    Ok(KeyHandleResult::RenderRequested)
+                    // Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::Modal(None))
                 }
                 KeyCode::Esc => {
                     self.input_focused = false;
-                    Ok(KeyHandleResult::RenderRequested)
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResult::SkipRender),
+                _ => Ok(KeyHandleResultInternal::SkipRender),
             };
         }
         match key.code {
             KeyCode::Char('i') => {
                 self.input_focused = true;
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Char('j') => {
                 if self.button_group.selected == 1 {
@@ -132,6 +134,7 @@ impl Modal for SaveQueueModal {
                 } else {
                     self.button_group.selected += 1;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Char('k') => {
                 if self.button_group.selected == 0 {
@@ -139,14 +142,17 @@ impl Modal for SaveQueueModal {
                 } else {
                     self.button_group.selected -= 1;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Esc => {
-                _app.visible_modal = None;
+                // _shared.visible_modal = None;
                 self.on_hide();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                _app.visible_modal = None;
+                // _shared.visible_modal = None;
                 self.on_hide();
+                Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Enter => {
                 if self.button_group.selected == 0 {
@@ -156,11 +162,12 @@ impl Modal for SaveQueueModal {
                         Level::Info,
                     ));
                 }
-                _app.visible_modal = None;
+                // _shared.visible_modal = None;
                 self.on_hide();
+                // Ok(KeyHandleResult::RenderRequested)
+                Ok(KeyHandleResultInternal::Modal(None))
             }
-            _ => {}
+            _ => Ok(KeyHandleResultInternal::SkipRender),
         }
-        Ok(KeyHandleResult::RenderRequested)
     }
 }

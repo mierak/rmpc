@@ -173,7 +173,6 @@ impl<'a> Client<'a> {
             let mut lines = read.lines();
             loop {
                 match Self::read_mpd_line(lines.next_line().await?)? {
-                    // TODO: we get ok when no image simply does not exist, which is a valid state
                     MpdLine::Ok => {
                         tracing::warn!("Expected binary data but got 'OK'");
                         return Ok(None);
@@ -206,7 +205,7 @@ impl<'a> Client<'a> {
         }
     }
 
-    #[tracing::instrument(err, skip(read))]
+    #[tracing::instrument(skip(read))]
     async fn read<R, A, V>(read: &mut R) -> Result<V, MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
@@ -226,7 +225,7 @@ impl<'a> Client<'a> {
         result.finish()
     }
 
-    #[tracing::instrument(err, skip(read))]
+    #[tracing::instrument(skip(read))]
     async fn read_ok<R>(read: &mut R) -> Result<(), MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
@@ -239,7 +238,7 @@ impl<'a> Client<'a> {
         }
     }
 
-    #[tracing::instrument(err, skip(read))]
+    #[tracing::instrument(skip(read))]
     async fn read_option<R, A, V>(read: &mut R) -> Result<Option<V>, MpdError>
     where
         R: tokio::io::AsyncBufRead + Unpin,
@@ -564,16 +563,13 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn returns_error_when_unknown_receiving_unexpected_ok() {
+        async fn returns_none_when_unknown_receiving_unexpected_ok() {
             let buf: &[u8] = b"OK\n";
             let mut c = Cursor::new(buf);
 
             let result = Client::read_binary(&mut c, &mut Vec::new()).await;
 
-            assert_eq!(
-                result,
-                Err(MpdError::Generic(String::from("Expected binary data but got 'OK'")))
-            );
+            assert_eq!(result, Ok(None));
         }
 
         #[tokio::test]
@@ -589,11 +585,11 @@ mod tests {
             assert_eq!(buf, bytes);
             assert_eq!(
                 result,
-                Ok(BinaryMpdResponse {
+                Ok(Some(BinaryMpdResponse {
                     bytes_read: 111,
                     size_total: 222,
                     mime_type: Some("image/png".to_owned())
-                })
+                }))
             );
         }
     }

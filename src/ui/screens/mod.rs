@@ -12,7 +12,7 @@ use crate::{
     state::State,
 };
 
-use super::{KeyHandleResult, SharedUiState};
+use super::{KeyHandleResultInternal, SharedUiState};
 
 pub mod albums;
 pub mod artists;
@@ -34,7 +34,7 @@ pub enum Screens {
 }
 
 #[async_trait]
-pub trait Screen {
+pub(super) trait Screen {
     type Actions;
     fn render<B: Backend>(
         &mut self,
@@ -70,7 +70,7 @@ pub trait Screen {
         _client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResult>;
+    ) -> Result<KeyHandleResultInternal>;
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
@@ -449,6 +449,8 @@ pub mod dirstack {
 }
 
 pub(crate) mod browser {
+    use std::cmp::Ordering;
+
     use ratatui::{
         style::{Color, Style},
         text::{Line, Span},
@@ -513,7 +515,7 @@ pub(crate) mod browser {
             r.into_iter().map(ListItem::new).collect()
         }
     }
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) enum DirOrSong {
         Dir(String),
         Song(String),
@@ -544,7 +546,28 @@ pub(crate) mod browser {
         }
     }
 
-    #[derive(Debug, Clone)]
+    impl std::cmp::Ord for DirOrSong {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            match (self, other) {
+                (DirOrSong::Dir(a), DirOrSong::Dir(b)) => a.cmp(b),
+                (_, DirOrSong::Dir(_)) => Ordering::Greater,
+                (DirOrSong::Dir(_), _) => Ordering::Less,
+                (DirOrSong::Song(a), DirOrSong::Song(b)) => a.cmp(b),
+            }
+        }
+    }
+    impl std::cmp::PartialOrd for DirOrSong {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            match (self, other) {
+                (DirOrSong::Dir(a), DirOrSong::Dir(b)) => Some(a.cmp(b)),
+                (_, DirOrSong::Dir(_)) => Some(Ordering::Greater),
+                (DirOrSong::Dir(_), _) => Some(Ordering::Less),
+                (DirOrSong::Song(a), DirOrSong::Song(b)) => Some(a.cmp(b)),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) enum DirOrSongInfo {
         Dir(String),
         Song(Song),
@@ -576,6 +599,31 @@ pub(crate) mod browser {
             match value {
                 FileOrDir::Dir(dir) => DirOrSongInfo::Dir(dir.path),
                 FileOrDir::File(song) => DirOrSongInfo::Song(song),
+            }
+        }
+    }
+
+    impl std::cmp::Ord for DirOrSongInfo {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            match (self, other) {
+                (DirOrSongInfo::Dir(a), DirOrSongInfo::Dir(b)) => a.cmp(b),
+                (_, DirOrSongInfo::Dir(_)) => Ordering::Greater,
+                (DirOrSongInfo::Dir(_), _) => Ordering::Less,
+                (DirOrSongInfo::Song(Song { title: t1, .. }), DirOrSongInfo::Song(Song { title: t2, .. })) => {
+                    t1.cmp(t2)
+                }
+            }
+        }
+    }
+    impl std::cmp::PartialOrd for DirOrSongInfo {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            match (self, other) {
+                (DirOrSongInfo::Dir(a), DirOrSongInfo::Dir(b)) => Some(a.cmp(b)),
+                (_, DirOrSongInfo::Dir(_)) => Some(Ordering::Greater),
+                (DirOrSongInfo::Dir(_), _) => Some(Ordering::Less),
+                (DirOrSongInfo::Song(Song { title: t1, .. }), DirOrSongInfo::Song(Song { title: t2, .. })) => {
+                    Some(t1.cmp(t2))
+                }
             }
         }
     }
@@ -652,7 +700,11 @@ pub mod iter {
         fn next(&mut self) -> Option<Self::Item> {
             match self.iter.next() {
                 Some(v) => match v {
-                    DirOrSong::Dir(v) => Some(ListItem::new(format!("{} {}", self.symbols.dir, v.as_str()))),
+                    DirOrSong::Dir(v) => Some(ListItem::new(format!(
+                        "{} {}",
+                        self.symbols.dir,
+                        if v.is_empty() { "Untitled" } else { v.as_str() }
+                    ))),
                     DirOrSong::Song(s) => Some(ListItem::new(format!("{} {}", self.symbols.song, s))),
                 },
                 None => None,
