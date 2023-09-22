@@ -120,7 +120,7 @@ impl Screen for QueueScreen {
             .thumb_style(Style::default().fg(Color::Blue));
 
         frame.render_widget(header_table, table_header_section);
-        frame.render_stateful_widget(table, queue_section, &mut self.scrolling_state.inner);
+        frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 
         queue_section.y = queue_section.y.saturating_add(1);
         queue_section.height = queue_section.height.saturating_sub(1);
@@ -130,7 +130,7 @@ impl Screen for QueueScreen {
                 vertical: 0,
                 horizontal: 0,
             }),
-            &mut self.scrolling_state.scrollbar_state,
+            self.scrolling_state.as_scrollbar_state_ref(),
         );
         if show_image {
             frame.render_stateful_widget(
@@ -149,8 +149,12 @@ impl Screen for QueueScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        self.scrolling_state
-            .select(_app.queue.get_by_id(_app.status.songid).map(|v| v.0));
+        let to_select = match _app.queue.get_by_id(_app.status.songid) {
+            Some(selected) => Some(selected.0),
+            None if !_app.queue.is_empty_or_none() => Some(0),
+            None => None,
+        };
+        self.scrolling_state.select(to_select);
         Ok(())
     }
 
@@ -190,7 +194,7 @@ impl Screen for QueueScreen {
         } else if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
             match action {
                 QueueActions::Delete => {
-                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
+                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
                         match client.delete_id(selected_song.id).await {
                             Ok(_) => {}
                             Err(e) => error!("{:?}", e),
@@ -208,7 +212,7 @@ impl Screen for QueueScreen {
                     // Ok(KeyHandleResult::RenderRequested)
                 }
                 QueueActions::Play => {
-                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.inner.selected()) {
+                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
                         client.play_id(selected_song.id).await?;
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
@@ -274,6 +278,7 @@ impl Screen for QueueScreen {
                     self.jump_back(app);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
+                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

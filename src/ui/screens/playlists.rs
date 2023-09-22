@@ -84,7 +84,7 @@ impl Screen for PlaylistsScreen {
     ) -> Result<()> {
         let prev: Vec<_> = self
             .stack
-            .previous()
+            .get_previous()
             .0
             .iter()
             .cloned()
@@ -92,13 +92,13 @@ impl Screen for PlaylistsScreen {
             .collect();
         let current: Vec<_> = self
             .stack
-            .current()
+            .get_current()
             .0
             .iter()
             .cloned()
             .listitems(&app.config.symbols)
             .collect();
-        let preview = self.stack.preview();
+        let preview = self.stack.get_preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
@@ -126,10 +126,11 @@ impl Screen for PlaylistsScreen {
             .collect();
         playlists.sort();
         self.stack = DirStack::new(playlists);
-        self.stack.preview = self
+        let preview = self
             .prepare_preview(_client, _app)
             .await
             .context("Cannot prepare preview")?;
+        self.stack.preview(preview);
         Ok(())
     }
 
@@ -152,10 +153,11 @@ impl Screen for PlaylistsScreen {
                         .collect();
                     playlists.sort();
                     self.stack.replace_current(playlists);
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(_client, _app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                 }
                 DirOrSongInfo::Song(_) => {
                     if let Some(DirOrSongInfo::Dir(playlist)) = self.stack.get_previous_selected() {
@@ -234,19 +236,16 @@ impl Screen for PlaylistsScreen {
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                PlaylistsActions::Delete => match self.stack.get_selected() {
-                    Some(DirOrSongInfo::Dir(d)) => {
+                PlaylistsActions::Delete => match self.stack.get_selected_with_idx() {
+                    Some((DirOrSongInfo::Dir(d), _)) => {
                         client.delete_playlist(d).await?;
                         shared.status_message =
                             Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
                         self.refresh(client, app, shared).await?;
                         Ok(KeyHandleResultInternal::RenderRequested)
                     }
-                    Some(DirOrSongInfo::Song(s)) => {
+                    Some((DirOrSongInfo::Song(s), idx)) => {
                         let Some(DirOrSongInfo::Dir(playlist)) = self.stack.get_previous_selected() else {
-                            return Ok(KeyHandleResultInternal::SkipRender);
-                        };
-                        let Some(idx) = self.stack.current.1.get_selected() else {
                             return Ok(KeyHandleResultInternal::SkipRender);
                         };
                         client
@@ -273,34 +272,38 @@ impl Screen for PlaylistsScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     self.refresh(client, app, shared).await?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
@@ -317,12 +320,12 @@ impl Screen for PlaylistsScreen {
                 CommonAction::Right => {
                     let idx = self
                         .stack
-                        .current()
+                        .get_current()
                         .1
                         .get_selected()
                         .context("Expected an item to be selected")?;
 
-                    match &self.stack.current().0[idx] {
+                    match &self.stack.get_current().0[idx] {
                         DirOrSongInfo::Dir(playlist) => {
                             let info = client.list_playlist_info(playlist).await?;
                             self.stack.push(info.into_iter().map(DirOrSongInfo::Song).collect());
@@ -336,18 +339,20 @@ impl Screen for PlaylistsScreen {
                         }
                     }
 
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Left => {
                     self.stack.pop();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
@@ -363,6 +368,7 @@ impl Screen for PlaylistsScreen {
                     self.stack.jump_back();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
+                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

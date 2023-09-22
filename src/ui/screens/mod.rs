@@ -96,6 +96,7 @@ pub enum CommonAction {
     EnterSearch,
     NextResult,
     PreviousResult,
+    Select,
 }
 
 impl Screens {
@@ -137,9 +138,9 @@ pub mod dirstack {
 
     #[derive(Debug)]
     pub struct DirStack<T: std::fmt::Debug + MatchesSearch> {
-        pub current: (Vec<T>, MyState<ListState>),
+        current: (Vec<T>, MyState<ListState>),
         others: Vec<(Vec<T>, MyState<ListState>)>,
-        pub preview: Option<Vec<ListItem<'static>>>,
+        preview: Option<Vec<ListItem<'static>>>,
         pub filter: Option<String>,
         pub filter_ignore_case: bool,
     }
@@ -167,12 +168,12 @@ pub mod dirstack {
         }
 
         /// Returns the element at the top of the stack
-        pub fn current(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
+        pub fn get_current(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
             (&self.current.0, &mut self.current.1)
         }
 
         /// Returns the element at the second element from the top of the stack
-        pub fn previous(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
+        pub fn get_previous(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
             let last = self
                 .others
                 .last_mut()
@@ -181,8 +182,14 @@ pub mod dirstack {
         }
 
         /// Returns the element at the second element from the top of the stack
-        pub fn preview(&self) -> Option<&Vec<ListItem<'static>>> {
+        pub fn get_preview(&self) -> Option<&Vec<ListItem<'static>>> {
             self.preview.as_ref()
+        }
+
+        /// Returns the element at the second element from the top of the stack
+        pub fn preview(&mut self, preview: Option<Vec<ListItem<'static>>>) -> &Self {
+            self.preview = preview;
+            self
         }
 
         pub fn replace_current(&mut self, new_current: Vec<T>) {
@@ -217,6 +224,14 @@ pub mod dirstack {
         pub fn get_selected(&self) -> Option<&T> {
             if let Some(sel) = self.current.1.get_selected() {
                 self.current.0.get(sel)
+            } else {
+                None
+            }
+        }
+
+        pub fn get_selected_with_idx(&self) -> Option<(&T, usize)> {
+            if let Some(sel) = self.current.1.get_selected() {
+                self.current.0.get(sel).map(|v| (v, sel))
             } else {
                 None
             }
@@ -289,8 +304,8 @@ pub mod dirstack {
 
     #[derive(Debug, Default)]
     pub struct MyState<T: ScrollingState> {
-        pub scrollbar_state: ScrollbarState,
-        pub inner: T,
+        scrollbar_state: ScrollbarState,
+        inner: T,
         pub content_len: Option<u16>,
         pub viewport_len: Option<u16>,
     }
@@ -399,6 +414,14 @@ pub mod dirstack {
         pub fn get_selected(&self) -> Option<usize> {
             self.inner.get_selected_scrolling()
         }
+
+        pub fn as_render_state_ref(&mut self) -> &mut T {
+            &mut self.inner
+        }
+
+        pub fn as_scrollbar_state_ref(&mut self) -> &mut ScrollbarState {
+            &mut self.scrollbar_state
+        }
     }
 
     pub trait ScrollingState {
@@ -470,7 +493,7 @@ pub mod dirstack {
             assert!(val.pop().is_some());
             assert!(val.pop().is_none());
 
-            val.previous();
+            val.get_previous();
         }
     }
 }

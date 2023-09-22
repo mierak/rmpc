@@ -74,7 +74,7 @@ impl Screen for AlbumsScreen {
     ) -> Result<()> {
         let prev: Vec<_> = self
             .stack
-            .previous()
+            .get_previous()
             .0
             .iter()
             .cloned()
@@ -82,13 +82,13 @@ impl Screen for AlbumsScreen {
             .collect();
         let current: Vec<_> = self
             .stack
-            .current()
+            .get_current()
             .0
             .iter()
             .cloned()
             .listitems(&app.config.symbols)
             .collect();
-        let preview = &self.stack.preview();
+        let preview = self.stack.get_preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
@@ -109,10 +109,11 @@ impl Screen for AlbumsScreen {
         let result = _client.list_tag("album", None).await.context("Cannot list tags")?;
         self.stack = DirStack::new(result.0.into_iter().map(DirOrSong::Dir).collect());
         self.position = CurrentPosition::default();
-        self.stack.preview = self
+        let preview = self
             .prepare_preview(_client, &_app.config.symbols)
             .await
             .context("Cannot prepare preview")?;
+        self.stack.preview(preview);
 
         Ok(())
     }
@@ -158,34 +159,38 @@ impl Screen for AlbumsScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
@@ -201,11 +206,11 @@ impl Screen for AlbumsScreen {
                 CommonAction::Right => {
                     let idx = self
                         .stack
-                        .current()
+                        .get_current()
                         .1
                         .get_selected()
                         .context("Expected an item to be selected")?;
-                    let current = self.stack.current().0[idx].to_current_value().to_owned();
+                    let current = self.stack.get_current().0[idx].to_current_value().to_owned();
                     self.position = match &mut self.position {
                         CurrentPosition::Album(val) => {
                             self.stack.push(val.fetch(client, &current).await?.collect());
@@ -220,10 +225,11 @@ impl Screen for AlbumsScreen {
                             CurrentPosition::Song(val.next())
                         }
                     };
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Left => {
@@ -232,10 +238,11 @@ impl Screen for AlbumsScreen {
                         CurrentPosition::Album(val) => CurrentPosition::Album(val.prev()),
                         CurrentPosition::Song(val) => CurrentPosition::Album(val.prev()),
                     };
-                    self.stack.preview = self
+                    let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
@@ -251,6 +258,7 @@ impl Screen for AlbumsScreen {
                     self.stack.jump_back();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
+                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

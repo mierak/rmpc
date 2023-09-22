@@ -44,7 +44,7 @@ impl Screen for LogsScreen {
             .map(|(idx, l)| -> Result<_> {
                 match l {
                     Ok(mut val) => {
-                        if self.scrolling_state.inner.selected().is_some_and(|v| v == idx) {
+                        if self.scrolling_state.get_selected().is_some_and(|v| v == idx) {
                             val.patch_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
                         }
                         Ok(ListItem::new(val))
@@ -88,14 +88,14 @@ impl Screen for LogsScreen {
                 )),
         );
 
-        frame.render_stateful_widget(logs_wg, content, &mut self.scrolling_state.inner);
+        frame.render_stateful_widget(logs_wg, content, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             scrollbar,
             scroll.inner(&Margin {
                 vertical: 1,
                 horizontal: 0,
             }),
-            &mut self.scrolling_state.scrollbar_state,
+            self.scrolling_state.as_scrollbar_state_ref(),
         );
 
         Ok(())
@@ -156,6 +156,7 @@ impl Screen for LogsScreen {
                 CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

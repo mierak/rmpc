@@ -73,7 +73,7 @@ where
         }
 
         {
-            let (_, prev_state) = state.previous();
+            let (_, prev_state) = state.get_previous();
             prev_state.content_len(Some(u16::try_from(self.previous.len()).unwrap()));
             prev_state.viewport_len(Some(previous_area.height));
 
@@ -90,7 +90,7 @@ where
                 .end_style(Style::default().fg(Color::White).bg(Color::Black))
                 .thumb_style(Style::default().fg(Color::Blue));
 
-            ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, &mut prev_state.inner);
+            ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 previous_scrollbar,
                 previous_area.inner(&ratatui::prelude::Margin {
@@ -98,12 +98,12 @@ where
                     horizontal: 0,
                 }),
                 buf,
-                &mut prev_state.scrollbar_state,
+                prev_state.as_scrollbar_state_ref(),
             );
         }
         let title = state.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         {
-            let (current_items, current_state) = state.current();
+            let (current_items, current_state) = state.get_current();
             current_state.content_len(Some(u16::try_from(current_items.len()).unwrap()));
             current_state.viewport_len(Some(current_area.height));
 
@@ -126,7 +126,7 @@ where
                 .end_style(Style::default().fg(Color::White).bg(Color::Black))
                 .thumb_style(Style::default().fg(Color::Blue));
 
-            ratatui::widgets::StatefulWidget::render(current, current_area, buf, &mut current_state.inner);
+            ratatui::widgets::StatefulWidget::render(current, current_area, buf, current_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 current_scrollbar,
                 preview_area.inner(&ratatui::prelude::Margin {
@@ -134,7 +134,7 @@ where
                     horizontal: 0,
                 }),
                 buf,
-                &mut current_state.scrollbar_state,
+                current_state.as_scrollbar_state_ref(),
             );
         }
     }

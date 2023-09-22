@@ -56,7 +56,7 @@ impl Screen for DirectoriesScreen {
     ) -> anyhow::Result<()> {
         let prev: Vec<_> = self
             .stack
-            .previous()
+            .get_previous()
             .0
             .iter()
             .cloned()
@@ -64,13 +64,13 @@ impl Screen for DirectoriesScreen {
             .collect();
         let current: Vec<_> = self
             .stack
-            .current()
+            .get_current()
             .0
             .iter()
             .cloned()
             .listitems(&app.config.symbols)
             .collect();
-        let preview = &self.stack.preview();
+        let preview = self.stack.get_preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
@@ -89,7 +89,8 @@ impl Screen for DirectoriesScreen {
     ) -> Result<()> {
         self.path = PathBuf::new();
         self.stack = DirStack::new(client.lsinfo(None).await?.0.into_iter().map(Into::into).collect());
-        self.stack.preview = self.prepare_preview(client, _app).await;
+        let preview = self.prepare_preview(client, _app).await;
+        self.stack.preview(preview);
 
         Ok(())
     }
@@ -166,32 +167,38 @@ impl Screen for DirectoriesScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
@@ -209,7 +216,8 @@ impl Screen for DirectoriesScreen {
                                     .collect(),
                             );
 
-                            self.stack.preview = self.prepare_preview(client, app).await;
+                            let preview = self.prepare_preview(client, app).await;
+                            self.stack.preview(preview);
                         }
                         DirOrSongInfo::Song(song) => {
                             client.add(&song.file).await?;
@@ -224,7 +232,8 @@ impl Screen for DirectoriesScreen {
                 CommonAction::Left => {
                     self.stack.pop();
                     self.path.pop();
-                    self.stack.preview = self.prepare_preview(client, app).await;
+                    let preview = self.prepare_preview(client, app).await;
+                    self.stack.preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
@@ -240,6 +249,7 @@ impl Screen for DirectoriesScreen {
                     self.stack.jump_back();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
+                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
