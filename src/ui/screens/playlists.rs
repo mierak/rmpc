@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -7,7 +9,7 @@ use tracing::instrument;
 use crate::{
     mpd::{
         client::Client,
-        mpd_client::{MpdClient, SingleOrRange},
+        mpd_client::{MpdClient, Ranges, SingleOrRange},
     },
     state::State,
     ui::{
@@ -60,8 +62,8 @@ impl PlaylistsScreen {
                         .await?
                         .into_iter()
                         .map(DirOrSongInfo::Song)
-                        .listitems(&state.config.symbols)
-                        .collect();
+                        .listitems(&state.config.symbols, &BTreeSet::default())
+                        .collect::<Vec<ListItem<'static>>>();
                     Ok(Some(res))
                 }
                 DirOrSongInfo::Song(s) => Ok(Some(s.to_listitems(&state.config.symbols))),
@@ -82,21 +84,19 @@ impl Screen for PlaylistsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let prev: Vec<_> = self
-            .stack
-            .get_previous()
+        let prev = self.stack.get_previous();
+        let prev: Vec<_> = prev
             .0
             .iter()
             .cloned()
-            .listitems(&app.config.symbols)
+            .listitems(&app.config.symbols, prev.1.get_marked())
             .collect();
-        let current: Vec<_> = self
-            .stack
-            .get_current()
+        let current = self.stack.get_current();
+        let current: Vec<_> = current
             .0
             .iter()
             .cloned()
-            .listitems(&app.config.symbols)
+            .listitems(&app.config.symbols, current.1.get_marked())
             .collect();
         let preview = self.stack.get_preview();
         let w = Browser::new()
@@ -168,6 +168,7 @@ impl Screen for PlaylistsScreen {
                 }
             };
         }
+        self.stack.unmark_all();
         Ok(())
     }
 
@@ -241,21 +242,32 @@ impl Screen for PlaylistsScreen {
                         client.delete_playlist(d).await?;
                         shared.status_message =
                             Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
-                        self.refresh(client, app, shared).await?;
                         Ok(KeyHandleResultInternal::RenderRequested)
                     }
                     Some((DirOrSongInfo::Song(s), idx)) => {
                         let Some(DirOrSongInfo::Dir(playlist)) = self.stack.get_previous_selected() else {
                             return Ok(KeyHandleResultInternal::SkipRender);
                         };
-                        client
-                            .delete_from_playlist(playlist, SingleOrRange::single(idx))
-                            .await?;
-                        shared.status_message = Some(StatusMessage::new(
-                            format!("Song '{}' deleted from playlist '{playlist}'", s.title_str()),
-                            Level::Info,
-                        ));
-                        self.refresh(client, app, shared).await?;
+                        if self.stack.get_current_marked().is_empty() {
+                            client
+                                .delete_from_playlist(playlist, &SingleOrRange::single(idx))
+                                .await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!("Song '{}' deleted from playlist '{playlist}'", s.title_str()),
+                                Level::Info,
+                            ));
+                            self.refresh(client, app, shared).await?;
+                        } else {
+                            let ranges: Ranges = self.stack.get_current_marked().into();
+                            for range in ranges.0.iter().rev() {
+                                client.delete_from_playlist(playlist, range).await?;
+                                shared.status_message = Some(StatusMessage::new(
+                                    format!("Songs in ranges '{ranges}' deleted from playlist '{playlist}'",),
+                                    Level::Info,
+                                ));
+                            }
+                            self.refresh(client, app, shared).await?;
+                        }
                         Ok(KeyHandleResultInternal::SkipRender)
                     }
                     None => Ok(KeyHandleResultInternal::SkipRender),
@@ -304,7 +316,6 @@ impl Screen for PlaylistsScreen {
                         .await
                         .context("Cannot prepare preview")?;
                     self.stack.preview(preview);
-                    self.refresh(client, app, shared).await?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
@@ -368,7 +379,11 @@ impl Screen for PlaylistsScreen {
                     self.stack.jump_back();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
+                CommonAction::Select => {
+                    self.stack.toggle_mark_selected();
+                    self.stack.next();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

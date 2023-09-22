@@ -49,6 +49,7 @@ pub struct SymbolsFile {
     progress_bar: Vec<String>,
     song: String,
     dir: String,
+    marker: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -92,8 +93,9 @@ impl Default for ConfigFile {
             column_widths: vec![20, 38, 42],
             symbols: SymbolsFile {
                 progress_bar: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
-                song: " 🎵".to_owned(),
-                dir: " 📁".to_owned(),
+                song: "🎵".to_owned(),
+                dir: "📁".to_owned(),
+                marker: "".to_owned(),
             },
         }
     }
@@ -228,6 +230,7 @@ impl From<SymbolsFile> for SymbolsConfig {
             ],
             song: Box::leak(Box::new(value.song)),
             dir: Box::leak(Box::new(value.dir)),
+            marker: Box::leak(Box::new(value.marker)),
         }
     }
 }
@@ -259,4 +262,5 @@ pub struct SymbolsConfig {
     pub progress_bar: [&'static str; 3],
     pub song: &'static str,
     pub dir: &'static str,
+    pub marker: &'static str,
 }

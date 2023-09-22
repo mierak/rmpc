@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::{
     config::SymbolsConfig,
     mpd::{client::Client, commands::Song as MpdSong, mpd_client::Filter, mpd_client::MpdClient},
@@ -46,7 +48,7 @@ impl AlbumsScreen {
                 CurrentPosition::Album(val) => val
                     .fetch(client, current.to_current_value())
                     .await?
-                    .listitems(symbols)
+                    .listitems(symbols, &BTreeSet::default())
                     .collect(),
                 CurrentPosition::Song(val) => {
                     let ret = val.fetch(client, current.to_current_value()).await?;
@@ -72,21 +74,19 @@ impl Screen for AlbumsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let prev: Vec<_> = self
-            .stack
-            .get_previous()
+        let prev = self.stack.get_previous();
+        let prev: Vec<_> = prev
             .0
             .iter()
             .cloned()
-            .listitems(&app.config.symbols)
+            .listitems(&app.config.symbols, prev.1.get_marked())
             .collect();
-        let current: Vec<_> = self
-            .stack
-            .get_current()
+        let current = self.stack.get_current();
+        let current: Vec<_> = current
             .0
             .iter()
             .cloned()
-            .listitems(&app.config.symbols)
+            .listitems(&app.config.symbols, current.1.get_marked())
             .collect();
         let preview = self.stack.get_preview();
         let w = Browser::new()

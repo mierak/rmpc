@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, path::PathBuf};
+use std::{cmp::Ordering, collections::BTreeSet, path::PathBuf};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -54,21 +54,19 @@ impl Screen for DirectoriesScreen {
         app: &mut crate::state::State,
         _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let prev: Vec<_> = self
-            .stack
-            .get_previous()
+        let prev = self.stack.get_previous();
+        let prev: Vec<_> = prev
             .0
             .iter()
             .cloned()
-            .listitems(&app.config.symbols)
+            .listitems(&app.config.symbols, prev.1.get_marked())
             .collect();
-        let current: Vec<_> = self
-            .stack
-            .get_current()
+        let current = self.stack.get_current();
+        let current: Vec<_> = current
             .0
             .iter()
             .cloned()
-            .listitems(&app.config.symbols)
+            .listitems(&app.config.symbols, current.1.get_marked())
             .collect();
         let preview = self.stack.get_preview();
         let w = Browser::new()
@@ -286,7 +284,7 @@ impl DirectoriesScreen {
                                 DirOrSong::Song(song.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned())
                             }
                         })
-                        .listitems(&state.config.symbols)
+                        .listitems(&state.config.symbols, &BTreeSet::default())
                         .collect(),
                 )
             }

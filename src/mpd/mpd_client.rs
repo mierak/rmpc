@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use strum::AsRefStr;
@@ -65,7 +67,7 @@ pub trait MpdClient {
     async fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
     async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     async fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
-    async fn delete_from_playlist(&mut self, playlist_name: &str, songs: SingleOrRange) -> MpdResult<()>;
+    async fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange) -> MpdResult<()>;
     async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
@@ -256,8 +258,8 @@ impl MpdClient for Client<'_> {
     async fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rm \"{name}\"")).await
     }
-    async fn delete_from_playlist(&mut self, playlist_name: &str, songs: SingleOrRange) -> MpdResult<()> {
-        self.execute_ok(&format!("playlistdelete \"{playlist_name}\" {songs}"))
+    async fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
+        self.execute_ok(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
             .await
     }
     #[tracing::instrument(skip(self))]
@@ -318,10 +320,13 @@ impl MpdClient for Client<'_> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct SingleOrRange {
-    start: usize,
-    end: Option<usize>,
+    pub start: usize,
+    pub end: Option<usize>,
 }
+
+pub struct Ranges(pub Vec<SingleOrRange>);
 
 #[allow(dead_code)]
 impl SingleOrRange {
@@ -331,15 +336,117 @@ impl SingleOrRange {
     pub fn range(start: usize, end: usize) -> Self {
         Self { start, end: Some(end) }
     }
+    pub fn as_mpd_range(&self) -> String {
+        if let Some(end) = self.end {
+            format!("\"{}:{}\"", self.start, end)
+        } else {
+            format!("\"{}\"", self.start)
+        }
+    }
 }
 
-impl std::fmt::Display for SingleOrRange {
+impl std::fmt::Display for Ranges {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(end) = self.end {
-            write!(f, "\"{}:{}\"", self.start, end)
-        } else {
-            write!(f, "\"{}\"", self.start)
+        let mut iter = self.0.iter().peekable();
+        while let Some(range) = iter.next() {
+            if let Some(end) = range.end {
+                write!(f, "[{}:{}]", range.start, end)?;
+            } else {
+                write!(f, "[{}]", range.start)?;
+            }
+            if iter.peek().is_some() {
+                write!(f, ", ")?;
+            }
         }
+        Ok(())
+    }
+}
+
+// TODO: rework
+impl From<&BTreeSet<usize>> for Ranges {
+    fn from(value: &BTreeSet<usize>) -> Self {
+        let res = value
+            .iter()
+            .fold(vec![Vec::default()], |mut acc: Vec<Vec<usize>>, val| {
+                let last = acc.last_mut().expect("There should always be at least one element. Using malformed range could potentionally result in loss of data se better to panic here.");
+                if last.is_empty() || last.last().is_some_and(|v| v == &(val - 1)) {
+                    last.push(*val);
+                } else {
+                    acc.push(vec![*val]);
+                }
+                acc
+            });
+        Ranges(
+            res.iter()
+                .filter_map(|range| {
+                    if range.is_empty() {
+                        None
+                    } else if range.len() == 1 {
+                        Some(SingleOrRange {
+                            start: range[0],
+                            end: None,
+                        })
+                    } else {
+                        Some(SingleOrRange {
+                            start: range[0],
+                            end: Some(range[range.len() - 1] + 1),
+                        })
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
+#[cfg(test)]
+mod ranges_tests {
+    use std::collections::BTreeSet;
+
+    use super::{Ranges, SingleOrRange};
+
+    #[test]
+    fn simply_works() {
+        let input = &BTreeSet::from([20, 1, 2, 3, 10, 16, 21, 22, 23, 24, 15, 25]);
+
+        let result: Ranges = input.into();
+        let result = result.0;
+
+        assert_eq!(result[0], SingleOrRange { start: 1, end: Some(4) });
+        assert_eq!(result[1], SingleOrRange { start: 10, end: None });
+        assert_eq!(
+            result[2],
+            SingleOrRange {
+                start: 15,
+                end: Some(17)
+            }
+        );
+        assert_eq!(
+            result[3],
+            SingleOrRange {
+                start: 20,
+                end: Some(26)
+            }
+        );
+    }
+
+    #[test]
+    fn empty_set() {
+        let input = &BTreeSet::new();
+
+        let result: Ranges = input.into();
+        let result = result.0;
+
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn single_value() {
+        let input = &BTreeSet::from([5]);
+
+        let result: Ranges = input.into();
+        let result = result.0;
+
+        assert_eq!(result[0], SingleOrRange { start: 5, end: None });
     }
 }
 

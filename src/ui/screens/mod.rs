@@ -132,6 +132,8 @@ impl Screens {
 }
 
 pub mod dirstack {
+    use std::{collections::BTreeSet, ops::SubAssign};
+
     use ratatui::widgets::{ListItem, ListState, ScrollbarState, TableState};
 
     use crate::mpd::commands::lsinfo::FileOrDir;
@@ -145,6 +147,7 @@ pub mod dirstack {
         pub filter_ignore_case: bool,
     }
 
+    #[allow(dead_code)]
     impl<T: std::fmt::Debug + MatchesSearch> DirStack<T> {
         pub fn new(root: Vec<T>) -> Self {
             let mut result = Self {
@@ -249,6 +252,40 @@ pub mod dirstack {
             }
         }
 
+        pub fn get_current_marked(&self) -> &BTreeSet<usize> {
+            &self.current.1.marked
+        }
+
+        pub fn get_previous_marked(&self) -> &BTreeSet<usize> {
+            let previous = self
+                .others
+                .last()
+                .expect("Previous items to always containt at least one item. This should have been handled in pop()");
+            &previous.1.marked
+        }
+
+        pub fn unmark_all(&mut self) {
+            self.current.1.unmark_all();
+        }
+
+        pub fn toggle_mark_selected(&mut self) {
+            if let Some(sel) = self.current.1.get_selected() {
+                self.current.1.toggle_mark(sel);
+            }
+        }
+
+        pub fn mark_selected(&mut self) {
+            if let Some(sel) = self.current.1.get_selected() {
+                self.current.1.mark(sel);
+            }
+        }
+
+        pub fn unmark_selected(&mut self) {
+            if let Some(sel) = self.current.1.get_selected() {
+                self.current.1.unmark(sel);
+            }
+        }
+
         pub fn next(&mut self) {
             self.current.1.next();
         }
@@ -300,16 +337,25 @@ pub mod dirstack {
                 }
             }
         }
+
+        pub fn remove(&mut self, idx: usize) {
+            if idx < self.current.0.len() {
+                self.current.0.remove(idx);
+            }
+            self.current.1.remove(idx);
+        }
     }
 
     #[derive(Debug, Default)]
     pub struct MyState<T: ScrollingState> {
         scrollbar_state: ScrollbarState,
         inner: T,
+        marked: BTreeSet<usize>,
         pub content_len: Option<u16>,
         pub viewport_len: Option<u16>,
     }
 
+    #[allow(dead_code)]
     impl<T: ScrollingState> MyState<T> {
         pub fn viewport_len(&mut self, viewport_len: Option<u16>) -> &Self {
             self.viewport_len = viewport_len;
@@ -409,6 +455,61 @@ pub mod dirstack {
         pub fn select(&mut self, idx: Option<usize>) {
             self.inner.select_scrolling(idx);
             self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0) as u16);
+        }
+
+        #[allow(clippy::comparison_chain)]
+        pub fn remove(&mut self, idx: usize) {
+            match self.content_len {
+                Some(len) if idx >= len.into() => return,
+                None => return,
+                Some(ref mut len) => {
+                    self.marked = std::mem::take(&mut self.marked)
+                        .into_iter()
+                        .filter_map(|val| {
+                            if val < idx {
+                                Some(val)
+                            } else if val > idx {
+                                Some(val - 1)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    len.sub_assign(1);
+                    let len: usize = (*len).into();
+                    if self.get_selected().is_some_and(|selected| selected >= len) {
+                        self.last();
+                    }
+                }
+            }
+        }
+
+        pub fn unmark_all(&mut self) -> &mut Self {
+            self.marked.clear();
+            self
+        }
+
+        pub fn mark(&mut self, idx: usize) -> &mut Self {
+            self.marked.insert(idx);
+            self
+        }
+
+        pub fn unmark(&mut self, idx: usize) -> &mut Self {
+            self.marked.remove(&idx);
+            self
+        }
+
+        pub fn toggle_mark(&mut self, idx: usize) -> &mut Self {
+            if self.marked.contains(&idx) {
+                self.marked.remove(&idx);
+            } else {
+                self.marked.insert(idx);
+            }
+            self
+        }
+
+        pub fn get_marked(&self) -> &BTreeSet<usize> {
+            &self.marked
         }
 
         pub fn get_selected(&self) -> Option<usize> {
@@ -695,7 +796,13 @@ impl SongExt for Song {
 }
 
 pub mod iter {
-    use ratatui::widgets::ListItem;
+    use std::{collections::BTreeSet, ops::AddAssign};
+
+    use ratatui::{
+        style::{Color, Style},
+        text::{Line, Span},
+        widgets::ListItem,
+    };
 
     use crate::config::SymbolsConfig;
 
@@ -704,6 +811,8 @@ pub mod iter {
     pub struct BrowserItemInfo<'a, I> {
         iter: I,
         symbols: &'a SymbolsConfig,
+        marked: &'a BTreeSet<usize>,
+        count: usize,
     }
 
     impl<I> Iterator for BrowserItemInfo<'_, I>
@@ -713,32 +822,50 @@ pub mod iter {
         type Item = ListItem<'static>;
 
         fn next(&mut self) -> Option<Self::Item> {
-            match self.iter.next() {
-                Some(v) => match v {
-                    DirOrSongInfo::Dir(v) => Some(ListItem::new(format!("{} {}", self.symbols.dir, v.as_str()))),
-                    DirOrSongInfo::Song(s) => Some(ListItem::new(format!(
-                        "{} {}",
-                        self.symbols.song,
-                        s.title.as_ref().map_or("Untitled", |v| v.as_str())
-                    ))),
-                },
+            let result = match self.iter.next() {
+                Some(v) => {
+                    let marker_span = if self.marked.contains(&self.count) {
+                        Span::styled(self.symbols.marker, Style::default().fg(Color::Blue))
+                    } else {
+                        Span::from(" ".repeat(self.symbols.marker.chars().count()))
+                    };
+
+                    let value = match v {
+                        DirOrSongInfo::Dir(v) => format!("{} {}", self.symbols.dir, v.as_str()),
+                        DirOrSongInfo::Song(s) => format!(
+                            "{} {}",
+                            self.symbols.song,
+                            s.title.as_ref().map_or("Untitled", |v| v.as_str())
+                        ),
+                    };
+                    Some(ListItem::new(Line::from(vec![marker_span, Span::from(value)])))
+                }
                 None => None,
-            }
+            };
+            self.count.add_assign(1);
+            result
         }
     }
 
     pub trait DirOrSongInfoListItems<T> {
-        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItemInfo<T>;
+        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItemInfo<'a, T>;
     }
     impl<T: Iterator<Item = DirOrSongInfo>> DirOrSongInfoListItems<T> for T {
-        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItemInfo<T> {
-            BrowserItemInfo { iter: self, symbols }
+        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItemInfo<'a, T> {
+            BrowserItemInfo {
+                iter: self,
+                count: 0,
+                symbols,
+                marked,
+            }
         }
     }
 
     pub struct BrowserItem<'a, I> {
         iter: I,
+        count: usize,
         symbols: &'a SymbolsConfig,
+        marked: &'a BTreeSet<usize>,
     }
 
     impl<I> Iterator for BrowserItem<'_, I>
@@ -748,26 +875,41 @@ pub mod iter {
         type Item = ListItem<'static>;
 
         fn next(&mut self) -> Option<Self::Item> {
-            match self.iter.next() {
-                Some(v) => match v {
-                    DirOrSong::Dir(v) => Some(ListItem::new(format!(
-                        "{} {}",
-                        self.symbols.dir,
-                        if v.is_empty() { "Untitled" } else { v.as_str() }
-                    ))),
-                    DirOrSong::Song(s) => Some(ListItem::new(format!("{} {}", self.symbols.song, s))),
-                },
+            let result = match self.iter.next() {
+                Some(v) => {
+                    let marker_span = if self.marked.contains(&self.count) {
+                        Span::styled(self.symbols.marker, Style::default().fg(Color::Blue))
+                    } else {
+                        Span::from(" ".repeat(self.symbols.marker.chars().count()))
+                    };
+                    let value = match v {
+                        DirOrSong::Dir(v) => format!(
+                            "{} {}",
+                            self.symbols.dir,
+                            if v.is_empty() { "Untitled" } else { v.as_str() }
+                        ),
+                        DirOrSong::Song(s) => format!("{} {}", self.symbols.song, s),
+                    };
+                    Some(ListItem::new(Line::from(vec![marker_span, Span::from(value)])))
+                }
                 None => None,
-            }
+            };
+            self.count.add_assign(1);
+            result
         }
     }
     pub trait DirOrSongListItems<T> {
-        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItem<T>;
+        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItem<'a, T>;
     }
 
     impl<T: Iterator<Item = DirOrSong>> DirOrSongListItems<T> for T {
-        fn listitems(self, symbols: &SymbolsConfig) -> BrowserItem<T> {
-            BrowserItem { iter: self, symbols }
+        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItem<'a, T> {
+            BrowserItem {
+                iter: self,
+                count: 0,
+                symbols,
+                marked,
+            }
         }
     }
 }
