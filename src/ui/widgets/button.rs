@@ -55,6 +55,7 @@ impl<'a> Widget for Button<'a> {
 #[derive(Default, Debug)]
 pub struct ButtonGroupState {
     pub selected: usize,
+    button_conut: usize,
 }
 
 #[derive(Debug)]
@@ -132,5 +133,27 @@ impl<'a> ButtonGroup<'a> {
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
+    }
+}
+
+impl ButtonGroupState {
+    pub fn button_count(&mut self, count: usize) -> &Self {
+        self.button_conut = count;
+        self
+    }
+
+    pub fn next(&mut self) {
+        self.selected = self.selected.saturating_add(1);
+        if self.selected > self.button_conut - 1 {
+            self.selected = 0;
+        }
+    }
+
+    pub fn prev(&mut self) {
+        if self.selected == 0 {
+            self.selected = self.button_conut - 1;
+        } else {
+            self.selected = self.selected.saturating_sub(1);
+        }
     }
 }

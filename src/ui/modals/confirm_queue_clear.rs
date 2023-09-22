@@ -17,7 +17,7 @@ use super::{KeyHandleResultInternal, RectExt, SharedUiState};
 
 use super::Modal;
 
-#[derive(Debug, Default)]
+#[derive(Default, Debug)]
 pub struct ConfirmQueueClearModal {
     button_group: ButtonGroupState,
 }
@@ -39,10 +39,9 @@ impl Modal for ConfirmQueueClearModal {
             .direction(Direction::Vertical)
             .split(block.inner(popup_area.inner(&Margin {horizontal: 1, vertical: 0}))) else { return Ok(()); };
 
-        let group = ButtonGroup::default().buttons(vec![
-            Button::default().label("Clear"),
-            Button::default().label("Cancel"),
-        ]);
+        let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
+        self.button_group.button_count(buttons.len());
+        let group = ButtonGroup::default().buttons(buttons);
 
         frame.render_widget(Clear, popup_area);
         frame.render_widget(block, popup_area);
@@ -60,28 +59,18 @@ impl Modal for ConfirmQueueClearModal {
     ) -> Result<KeyHandleResultInternal> {
         match key.code {
             KeyCode::Char('j') => {
-                if self.button_group.selected == 1 {
-                    self.button_group.selected = 0;
-                } else {
-                    self.button_group.selected += 1;
-                }
+                self.button_group.next();
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Char('k') => {
-                if self.button_group.selected == 0 {
-                    self.button_group.selected = 1;
-                } else {
-                    self.button_group.selected -= 1;
-                }
+                self.button_group.prev();
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             KeyCode::Esc => {
-                // _shared.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
                 Ok(KeyHandleResultInternal::Modal(None))
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                // _shared.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
                 Ok(KeyHandleResultInternal::Modal(None))
             }
@@ -89,7 +78,6 @@ impl Modal for ConfirmQueueClearModal {
                 if self.button_group.selected == 0 {
                     _client.clear().await?;
                 }
-                // _shared.visible_modal = None;
                 self.button_group = ButtonGroupState::default();
                 Ok(KeyHandleResultInternal::Modal(None))
             }

@@ -64,6 +64,16 @@ pub(super) trait Screen {
         Ok(())
     }
 
+    /// Used to keep the current state but refresh data
+    async fn refresh(
+        &mut self,
+        _client: &mut Client<'_>,
+        _app: &mut crate::state::State,
+        _shared: &mut SharedUiState,
+    ) -> Result<()> {
+        Ok(())
+    }
+
     async fn handle_action(
         &mut self,
         event: KeyEvent,
@@ -127,9 +137,9 @@ pub mod dirstack {
 
     #[derive(Debug)]
     pub struct DirStack<T: std::fmt::Debug + MatchesSearch> {
-        current: (Vec<T>, MyState<ListState>),
+        pub current: (Vec<T>, MyState<ListState>),
         others: Vec<(Vec<T>, MyState<ListState>)>,
-        pub preview: Vec<ListItem<'static>>,
+        pub preview: Option<Vec<ListItem<'static>>>,
         pub filter: Option<String>,
         pub filter_ignore_case: bool,
     }
@@ -141,7 +151,7 @@ pub mod dirstack {
                 current: (Vec::new(), MyState::default()),
                 filter: None,
                 filter_ignore_case: true,
-                preview: Vec::new(),
+                preview: None,
             };
             let mut root_state = MyState::default();
 
@@ -171,8 +181,17 @@ pub mod dirstack {
         }
 
         /// Returns the element at the second element from the top of the stack
-        pub fn preview(&self) -> &Vec<ListItem<'static>> {
-            &self.preview
+        pub fn preview(&self) -> Option<&Vec<ListItem<'static>>> {
+            self.preview.as_ref()
+        }
+
+        pub fn replace_current(&mut self, new_current: Vec<T>) {
+            if new_current.is_empty() {
+                self.current.1.select(None);
+            } else if self.current.1.get_selected().is_some_and(|v| v > new_current.len() - 1) {
+                self.current.1.select(Some(new_current.len() - 1));
+            }
+            self.current.0 = new_current;
         }
 
         pub fn push(&mut self, head: Vec<T>) {
@@ -198,6 +217,18 @@ pub mod dirstack {
         pub fn get_selected(&self) -> Option<&T> {
             if let Some(sel) = self.current.1.get_selected() {
                 self.current.0.get(sel)
+            } else {
+                None
+            }
+        }
+
+        pub fn get_previous_selected(&self) -> Option<&T> {
+            let previous = self
+                .others
+                .last()
+                .expect("Previous items to always containt at least one item. This should have been handled in pop()");
+            if let Some(sel) = previous.1.get_selected() {
+                previous.0.get(sel)
             } else {
                 None
             }
@@ -298,14 +329,14 @@ pub mod dirstack {
                 let i = match self.get_selected() {
                     Some(i) => {
                         if i >= item_count.saturating_sub(1) as usize {
-                            0
+                            Some(0)
                         } else {
-                            i + 1
+                            Some(i + 1)
                         }
                     }
-                    None => 0,
+                    None => None,
                 };
-                self.select(Some(i));
+                self.select(i);
             } else {
                 self.select(None);
             }
@@ -316,14 +347,14 @@ pub mod dirstack {
                 let i = match self.get_selected() {
                     Some(i) => {
                         if i == 0 {
-                            item_count.saturating_sub(1) as usize
+                            Some(item_count.saturating_sub(1) as usize)
                         } else {
-                            i - 1
+                            Some(i - 1)
                         }
                     }
-                    None => 0,
+                    None => None,
                 };
-                self.select(Some(i));
+                self.select(i);
             } else {
                 self.select(None);
             }
@@ -332,13 +363,10 @@ pub mod dirstack {
         pub fn next_half_viewport(&mut self) {
             if let Some(item_count) = self.content_len {
                 if let Some(viewport) = self.viewport_len {
-                    let i = match self.get_selected() {
-                        Some(i) => i
-                            .saturating_add(viewport as usize / 2)
-                            .min(item_count.saturating_sub(1) as usize),
-                        None => 0,
-                    };
-                    self.select(Some(i));
+                    self.select(self.get_selected().map(|i| {
+                        i.saturating_add(viewport as usize / 2)
+                            .min(item_count.saturating_sub(1) as usize)
+                    }));
                 } else {
                     self.select(None);
                 }
@@ -350,11 +378,10 @@ pub mod dirstack {
         pub fn prev_half_viewport(&mut self) {
             if self.content_len.is_some() {
                 if let Some(viewport) = self.viewport_len {
-                    let i = match self.get_selected() {
-                        Some(i) => i.saturating_sub(viewport as usize / 2).max(0),
-                        None => 0,
-                    };
-                    self.select(Some(i));
+                    self.select(
+                        self.get_selected()
+                            .map(|i| i.saturating_sub(viewport as usize / 2).max(0)),
+                    );
                 } else {
                     self.select(None);
                 }

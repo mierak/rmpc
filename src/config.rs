@@ -167,7 +167,7 @@ impl Default for KeyConfigFile {
             ]),
             playlists: HashMap::from([
                 (P::Add,              Key { key: K::Char('a'), modifiers: M::NONE }),
-                (P::DeletePlaylist,   Key { key: K::Char('D'), modifiers: M::SHIFT }),
+                (P::Delete,           Key { key: K::Char('D'), modifiers: M::SHIFT }),
                 (P::Rename,           Key { key: K::Char('r'), modifiers: M::NONE }),
             ]),
             logs: HashMap::from([

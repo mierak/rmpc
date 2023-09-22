@@ -13,7 +13,7 @@ use super::{
 
 type MpdResult<T> = Result<T, MpdError>;
 
-#[derive(AsRefStr)]
+#[derive(AsRefStr, Debug)]
 #[allow(dead_code)]
 pub enum SaveMode {
     #[strum(serialize = "create")]
@@ -65,6 +65,7 @@ pub trait MpdClient {
     async fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
     async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     async fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
+    async fn delete_from_playlist(&mut self, playlist_name: &str, songs: SingleOrRange) -> MpdResult<()>;
     async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
@@ -235,26 +236,36 @@ impl MpdClient for Client<'_> {
     }
 
     // Stored playlists
+    #[tracing::instrument(skip(self))]
     async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.execute("listplaylists").await
     }
+    #[tracing::instrument(skip(self))]
     async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
         self.execute(&format!("listplaylist \"{name}\"")).await
     }
+    #[tracing::instrument(skip(self))]
     async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
         self.execute(&format!("listplaylistinfo \"{playlist}\"")).await
     }
-
+    #[tracing::instrument(skip(self))]
     async fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("load \"{name}\"")).await
     }
+    #[tracing::instrument(skip(self))]
     async fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rm \"{name}\"")).await
     }
+    async fn delete_from_playlist(&mut self, playlist_name: &str, songs: SingleOrRange) -> MpdResult<()> {
+        self.execute_ok(&format!("playlistdelete \"{playlist_name}\" {songs}"))
+            .await
+    }
+    #[tracing::instrument(skip(self))]
     async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rename \"{name}\" \"{new_name}\"")).await
     }
     /// mode is supported from version 0.24
+    #[tracing::instrument(skip(self))]
     async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
         if let Some(mode) = mode {
             self.execute_ok(&format!("save \"{name}\" \"{}\"", mode.as_ref())).await
@@ -303,6 +314,31 @@ impl MpdClient for Client<'_> {
                 tracing::error!(message = "Failed to read picture", error = ?e);
                 Ok(None)
             }
+        }
+    }
+}
+
+pub struct SingleOrRange {
+    start: usize,
+    end: Option<usize>,
+}
+
+#[allow(dead_code)]
+impl SingleOrRange {
+    pub fn single(idx: usize) -> Self {
+        Self { start: idx, end: None }
+    }
+    pub fn range(start: usize, end: usize) -> Self {
+        Self { start, end: Some(end) }
+    }
+}
+
+impl std::fmt::Display for SingleOrRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(end) = self.end {
+            write!(f, "\"{}:{}\"", self.start, end)
+        } else {
+            write!(f, "\"{}\"", self.start)
         }
     }
 }

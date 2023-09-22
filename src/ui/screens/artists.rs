@@ -43,32 +43,29 @@ impl ArtistsScreen {
         &mut self,
         client: &mut Client<'_>,
         symbols: &SymbolsConfig,
-    ) -> Result<Vec<ListItem<'static>>> {
-        let idx = self
-            .stack
-            .current()
-            .1
-            .get_selected()
-            .context("Expected an item to be selected")?;
-        let current = &self.stack.current().0[idx];
-        Ok(match &self.position {
-            CurrentPosition::Artist(val) => val
-                .fetch(client, current.to_current_value())
-                .await?
-                .listitems(symbols)
-                .collect(),
-            CurrentPosition::Album(val) => val
-                .fetch(client, current.to_current_value())
-                .await?
-                .listitems(symbols)
-                .collect(),
-            CurrentPosition::Song(val) => {
-                let ret = val.fetch(client, current.to_current_value()).await?;
-                ret.first()
-                    .context("Expected to find exactly one song")?
-                    .to_listitems(symbols)
-            }
-        })
+    ) -> Result<Option<Vec<ListItem<'static>>>> {
+        if let Some(current) = self.stack.get_selected() {
+            Ok(Some(match &self.position {
+                CurrentPosition::Artist(val) => val
+                    .fetch(client, current.to_current_value())
+                    .await?
+                    .listitems(symbols)
+                    .collect(),
+                CurrentPosition::Album(val) => val
+                    .fetch(client, current.to_current_value())
+                    .await?
+                    .listitems(symbols)
+                    .collect(),
+                CurrentPosition::Song(val) => {
+                    let ret = val.fetch(client, current.to_current_value()).await?;
+                    ret.first()
+                        .context("Expected to find exactly one song")?
+                        .to_listitems(symbols)
+                }
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -98,12 +95,12 @@ impl Screen for ArtistsScreen {
             .cloned()
             .listitems(&app.config.symbols)
             .collect();
-        let preview = &self.stack.preview().clone();
+        let preview = &self.stack.preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
             .current_items(&current)
-            .preview(preview);
+            .preview(preview.cloned());
         frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())

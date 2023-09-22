@@ -70,12 +70,12 @@ impl Screen for DirectoriesScreen {
             .cloned()
             .listitems(&app.config.symbols)
             .collect();
-        let preview = &self.stack.preview().clone();
+        let preview = &self.stack.preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
             .current_items(&current)
-            .preview(preview);
+            .preview(preview.cloned());
         frame.render_stateful_widget(w, area, &mut self.stack);
 
         Ok(())
@@ -89,10 +89,7 @@ impl Screen for DirectoriesScreen {
     ) -> Result<()> {
         self.path = PathBuf::new();
         self.stack = DirStack::new(client.lsinfo(None).await?.0.into_iter().map(Into::into).collect());
-        self.stack.preview = self
-            .prepare_preview(client, _app)
-            .await
-            .context("Cannot prepare preview")?;
+        self.stack.preview = self.prepare_preview(client, _app).await;
 
         Ok(())
     }
@@ -169,50 +166,32 @@ impl Screen for DirectoriesScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
@@ -230,10 +209,7 @@ impl Screen for DirectoriesScreen {
                                     .collect(),
                             );
 
-                            self.stack.preview = self
-                                .prepare_preview(client, app)
-                                .await
-                                .context("Cannot prepare preview")?;
+                            self.stack.preview = self.prepare_preview(client, app).await;
                         }
                         DirOrSongInfo::Song(song) => {
                             client.add(&song.file).await?;
@@ -248,10 +224,7 @@ impl Screen for DirectoriesScreen {
                 CommonAction::Left => {
                     self.stack.pop();
                     self.path.pop();
-                    self.stack.preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    self.stack.preview = self.prepare_preview(client, app).await;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
@@ -282,9 +255,8 @@ pub enum DirectoriesActions {
 impl DirectoriesScreen {
     #[instrument(skip(client))]
     async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Option<Vec<ListItem<'static>>> {
-        let idx = self.stack.current().1.get_selected()?;
-        match &self.stack.current().0[idx] {
-            DirOrSongInfo::Dir(dir) => {
+        match &self.stack.get_selected() {
+            Some(DirOrSongInfo::Dir(dir)) => {
                 let mut preview_path = self.path.clone();
                 preview_path.push(dir);
                 let mut res = match client.lsinfo(preview_path.to_str()).await {
@@ -308,7 +280,8 @@ impl DirectoriesScreen {
                         .collect(),
                 )
             }
-            DirOrSongInfo::Song(song) => Some(song.to_listitems(&state.config.symbols)),
+            Some(DirOrSongInfo::Song(song)) => Some(song.to_listitems(&state.config.symbols)),
+            None => None,
         }
     }
 }

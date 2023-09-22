@@ -5,7 +5,10 @@ use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use tracing::instrument;
 
 use crate::{
-    mpd::{client::Client, mpd_client::MpdClient},
+    mpd::{
+        client::Client,
+        mpd_client::{MpdClient, SingleOrRange},
+    },
     state::State,
     ui::{
         modals::{rename_playlist::RenamePlaylistModal, Modals},
@@ -30,7 +33,7 @@ pub struct PlaylistsScreen {
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum PlaylistsActions {
     Add,
-    DeletePlaylist,
+    Delete,
     Rename,
 }
 
@@ -44,26 +47,27 @@ impl Default for PlaylistsScreen {
 }
 
 impl PlaylistsScreen {
-    async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Vec<ListItem<'static>>> {
-        let idx = self
-            .stack
-            .current()
-            .1
-            .get_selected()
-            .context("Expected an item to be selected")?;
-        let current = &self.stack.current().0[idx];
-        match current {
-            DirOrSongInfo::Dir(d) => {
-                let res = client
-                    .list_playlist_info(d)
-                    .await?
-                    .into_iter()
-                    .map(DirOrSongInfo::Song)
-                    .listitems(&state.config.symbols)
-                    .collect();
-                Ok(res)
+    async fn prepare_preview(
+        &mut self,
+        client: &mut Client<'_>,
+        state: &State,
+    ) -> Result<Option<Vec<ListItem<'static>>>> {
+        if let Some(current) = self.stack.get_selected() {
+            match current {
+                DirOrSongInfo::Dir(d) => {
+                    let res = client
+                        .list_playlist_info(d)
+                        .await?
+                        .into_iter()
+                        .map(DirOrSongInfo::Song)
+                        .listitems(&state.config.symbols)
+                        .collect();
+                    Ok(Some(res))
+                }
+                DirOrSongInfo::Song(s) => Ok(Some(s.to_listitems(&state.config.symbols))),
             }
-            DirOrSongInfo::Song(s) => Ok(s.to_listitems(&state.config.symbols)),
+        } else {
+            Ok(None)
         }
     }
 }
@@ -94,12 +98,12 @@ impl Screen for PlaylistsScreen {
             .cloned()
             .listitems(&app.config.symbols)
             .collect();
-        let preview = &self.stack.preview().clone();
+        let preview = self.stack.preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
             .current_items(&current)
-            .preview(preview);
+            .preview(preview.cloned());
 
         frame.render_stateful_widget(w, area, &mut self.stack);
 
@@ -126,6 +130,42 @@ impl Screen for PlaylistsScreen {
             .prepare_preview(_client, _app)
             .await
             .context("Cannot prepare preview")?;
+        Ok(())
+    }
+
+    #[instrument(err)]
+    async fn refresh(
+        &mut self,
+        _client: &mut Client<'_>,
+        _app: &mut crate::state::State,
+        _shared: &mut SharedUiState,
+    ) -> Result<()> {
+        if let Some(ref mut selected) = self.stack.get_selected() {
+            match selected {
+                DirOrSongInfo::Dir(_) => {
+                    let mut playlists: Vec<_> = _client
+                        .list_playlists()
+                        .await
+                        .context("Cannot list playlists")?
+                        .into_iter()
+                        .map(|playlist| DirOrSongInfo::Dir(playlist.name))
+                        .collect();
+                    playlists.sort();
+                    self.stack.replace_current(playlists);
+                    self.stack.preview = self
+                        .prepare_preview(_client, _app)
+                        .await
+                        .context("Cannot prepare preview")?;
+                }
+                DirOrSongInfo::Song(_) => {
+                    if let Some(DirOrSongInfo::Dir(playlist)) = self.stack.get_previous_selected() {
+                        let info = _client.list_playlist_info(playlist).await?;
+                        self.stack
+                            .replace_current(info.into_iter().map(DirOrSongInfo::Song).collect());
+                    }
+                }
+            };
+        }
         Ok(())
     }
 
@@ -194,25 +234,37 @@ impl Screen for PlaylistsScreen {
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                PlaylistsActions::DeletePlaylist => match self.stack.get_selected() {
+                PlaylistsActions::Delete => match self.stack.get_selected() {
                     Some(DirOrSongInfo::Dir(d)) => {
                         client.delete_playlist(d).await?;
                         shared.status_message =
                             Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
-                        // TODO need to refetch playlists
+                        self.refresh(client, app, shared).await?;
                         Ok(KeyHandleResultInternal::RenderRequested)
                     }
-                    Some(_) => Ok(KeyHandleResultInternal::SkipRender),
+                    Some(DirOrSongInfo::Song(s)) => {
+                        let Some(DirOrSongInfo::Dir(playlist)) = self.stack.get_previous_selected() else {
+                            return Ok(KeyHandleResultInternal::SkipRender);
+                        };
+                        let Some(idx) = self.stack.current.1.get_selected() else {
+                            return Ok(KeyHandleResultInternal::SkipRender);
+                        };
+                        client
+                            .delete_from_playlist(playlist, SingleOrRange::single(idx))
+                            .await?;
+                        shared.status_message = Some(StatusMessage::new(
+                            format!("Song '{}' deleted from playlist '{playlist}'", s.title_str()),
+                            Level::Info,
+                        ));
+                        self.refresh(client, app, shared).await?;
+                        Ok(KeyHandleResultInternal::SkipRender)
+                    }
                     None => Ok(KeyHandleResultInternal::SkipRender),
                 },
                 PlaylistsActions::Rename => match self.stack.get_selected() {
-                    Some(DirOrSongInfo::Dir(d)) => {
-                        // shared.visible_modal = Some(Modals::RenamePlaylist(RenamePlaylistModal::new(d.clone())));
-                        Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
-                            RenamePlaylistModal::new(d.clone()),
-                        ))))
-                        // Ok(KeyHandleResult::RenderRequested)
-                    }
+                    Some(DirOrSongInfo::Dir(d)) => Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
+                        RenamePlaylistModal::new(d.clone()),
+                    )))),
                     Some(_) => Ok(KeyHandleResultInternal::SkipRender),
                     None => Ok(KeyHandleResultInternal::SkipRender),
                 },
@@ -249,6 +301,7 @@ impl Screen for PlaylistsScreen {
                         .prepare_preview(client, app)
                         .await
                         .context("Cannot prepare preview")?;
+                    self.refresh(client, app, shared).await?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {

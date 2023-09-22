@@ -326,7 +326,7 @@ impl Ui<'_> {
             return match Self::handle_modal_key(modal, &mut self.client, key, app, &mut self.shared_state).await? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.active_modal = None;
-                    screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                    screen_call_inner!(refresh(&mut self.client, app, &mut self.shared_state));
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 r => Ok(r.into()),

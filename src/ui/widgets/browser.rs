@@ -9,7 +9,7 @@ pub struct Browser<'a, T> {
     widths: &'a [u16; 3],
     previous: &'a [ListItem<'a>],
     current: &'a [ListItem<'a>],
-    preview: &'a [ListItem<'a>],
+    preview: Option<Vec<ListItem<'a>>>,
 }
 
 impl<'a, T> Default for Browser<'a, T> {
@@ -19,7 +19,7 @@ impl<'a, T> Default for Browser<'a, T> {
             widths: &[20, 38, 42],
             previous: &[],
             current: &[],
-            preview: &[],
+            preview: None,
         }
     }
 }
@@ -37,7 +37,7 @@ impl<'a, T> Browser<'a, T> {
         self.current = current;
         self
     }
-    pub fn preview(mut self, preview: &'a [ListItem<'_>]) -> Self {
+    pub fn preview(mut self, preview: Option<Vec<ListItem<'a>>>) -> Self {
         self.preview = preview;
         self
     }
@@ -66,7 +66,7 @@ where
             .split(area) else { return  };
 
         {
-            let preview = List::new(self.preview)
+            let preview = List::new(self.preview.unwrap_or(Vec::new()))
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
