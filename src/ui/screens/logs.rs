@@ -36,7 +36,6 @@ impl Screen for LogsScreen {
     ) -> anyhow::Result<()> {
         let lines: Vec<_> = app
             .logs
-            .0
             .iter()
             .map(|l| -> Result<_> { Ok(l.into_text()?.lines) })
             .flatten_ok()
@@ -119,7 +118,7 @@ impl Screen for LogsScreen {
         if let Some(action) = app.config.keybinds.logs.get(&event.into()) {
             match action {
                 LogsActions::Clear => {
-                    app.logs.0.clear();
+                    app.logs.clear();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }

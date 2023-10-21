@@ -25,3 +25,4 @@ flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false 
 tracing-appender = "0.2.2"
 itertools = "0.11.0"
 ron = "0.8.1"
+derive_more = { version = "0.99.17", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }

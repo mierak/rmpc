@@ -2,9 +2,10 @@ use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 use super::Song;
 use anyhow::Context;
+use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
-#[derive(Debug, Default)]
-pub struct LsInfo(pub Vec<FileOrDir>);
+#[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
+pub struct LsInfo(Vec<FileOrDir>);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FileOrDir {

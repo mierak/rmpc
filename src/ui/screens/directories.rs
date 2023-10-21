@@ -80,7 +80,6 @@ impl Screen for DirectoriesScreen {
             client
                 .lsinfo(None)
                 .await?
-                .0
                 .into_iter()
                 .map(Into::into)
                 .collect::<Vec<_>>(),
@@ -204,7 +203,7 @@ impl Screen for DirectoriesScreen {
 
                     match selected {
                         DirOrSongInfo::Dir(_) => {
-                            let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str())).await?.0;
+                            let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str())).await?;
                             let res = new_current
                                 .into_iter()
                                 .map(|v| match v {
@@ -268,14 +267,14 @@ impl DirectoriesScreen {
                     tracing::error!("Failed to move deeper inside dir. Next path is None");
                     return None;
                 };
-                let mut res = match client.lsinfo(Some(&next_path.join("/").to_string())).await {
+                let mut res: Vec<FileOrDir> = match client.lsinfo(Some(&next_path.join("/").to_string())).await {
                     Ok(val) => val,
                     Err(err) => {
                         tracing::error!(message = "Failed to get lsinfo for dir", error = ?err);
                         return None;
                     }
                 }
-                .0;
+                .into();
                 res.sort();
                 Some(
                     res.into_iter()

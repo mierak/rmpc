@@ -1,11 +1,12 @@
 use anyhow::Context;
+use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 // file: 03 Diode.flac
 // size: 18183774
 // Last-Modified: 2022-12-24T13:02:09Z
-#[derive(Debug, Default)]
+#[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct ListFiles(Vec<Listed>);
 #[derive(Debug, Default)]
 pub struct Listed {
@@ -13,17 +14,6 @@ pub struct Listed {
     pub name: String,
     pub size: u64,
     pub last_modified: String, // TODO timestamp?
-}
-
-#[allow(dead_code)]
-impl ListFiles {
-    pub fn value(&self) -> &Vec<Listed> {
-        &self.0
-    }
-
-    pub fn value_mut(&mut self) -> &mut Vec<Listed> {
-        &mut self.0
-    }
 }
 
 #[derive(Debug, Default)]

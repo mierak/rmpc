@@ -1,7 +1,15 @@
+use derive_more::{AsMut, AsRef, Into, IntoIterator};
+
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
-#[derive(Debug, Default)]
-pub struct MpdList(pub Vec<String>);
+#[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
+pub struct MpdList(Vec<String>);
+
+impl From<Vec<String>> for MpdList {
+    fn from(value: Vec<String>) -> Self {
+        MpdList(value)
+    }
+}
 
 impl FromMpd for MpdList {
     fn finish(self) -> Result<Self, MpdError> {

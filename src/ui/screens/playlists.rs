@@ -251,7 +251,7 @@ impl Screen for PlaylistsScreen {
                             self.refresh(client, app, shared).await?;
                         } else {
                             let ranges: Ranges = self.stack.current().marked().into();
-                            for range in ranges.0.iter().rev() {
+                            for range in ranges.iter().rev() {
                                 client.delete_from_playlist(playlist, range).await?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("Songs in ranges '{ranges}' deleted from playlist '{playlist}'",),

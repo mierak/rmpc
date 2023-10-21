@@ -336,17 +336,17 @@ impl ImageState {
     pub fn image(&mut self, image: &mut Option<MyVec<u8>>) -> &Self {
         match (image.as_mut(), &mut self.image) {
             (Some(ref mut v), None) => {
-                self.image = Some(crate::state::MyVec(std::mem::take(v.as_ref_mut())));
+                self.image = Some(crate::state::MyVec::new(std::mem::take(v.as_mut())));
                 self.needs_transfer = true;
-                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.0.len()));
+                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.len()));
             }
-            (Some(v), Some(i)) if v.ne(&i) && !v.0.is_empty() => {
-                self.image = Some(crate::state::MyVec(std::mem::take(v.as_ref_mut())));
+            (Some(v), Some(i)) if v.ne(&i) && !v.is_empty() => {
+                self.image = Some(crate::state::MyVec::new(std::mem::take(v.as_mut())));
                 self.needs_transfer = true;
-                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.0.len()));
+                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.len()));
             }
             (Some(v), Some(_)) => {
-                v.as_ref_mut().clear();
+                v.as_mut().clear();
             }
             // The image is identical, should be in place already
             (None, None) => {} // Default img should be in place already
@@ -499,8 +499,8 @@ impl<'a> StatefulWidget for KittyImage<'a> {
         };
         let image = match &state.image {
             None => DEFAULT_ART,
-            Some(data) if data.0.is_empty() => DEFAULT_ART,
-            Some(data) => data.0.as_slice(),
+            Some(data) if data.is_empty() => DEFAULT_ART,
+            Some(data) => data.as_slice(),
         };
 
         let height = area.height as usize;

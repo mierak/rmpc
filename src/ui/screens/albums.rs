@@ -2,7 +2,13 @@ use std::collections::BTreeSet;
 
 use crate::{
     config::SymbolsConfig,
-    mpd::{client::Client, commands::Song as MpdSong, errors::MpdError, mpd_client::Filter, mpd_client::MpdClient},
+    mpd::{
+        client::Client,
+        commands::Song as MpdSong,
+        errors::MpdError,
+        mpd_client::Filter,
+        mpd_client::{MpdClient, Tag},
+    },
     state::State,
     ui::{
         utils::dirstack::{AsPath, DirStack},
@@ -103,8 +109,8 @@ impl Screen for AlbumsScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        let result = _client.list_tag("album", None).await.context("Cannot list tags")?;
-        self.stack = DirStack::new(result.0.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
+        let result = _client.list_tag(Tag::Album, None).await.context("Cannot list tags")?;
+        self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
         let preview = self
             .prepare_preview(_client, &_app.config.symbols)
             .await
@@ -156,11 +162,11 @@ impl Screen for AlbumsScreen {
                                 client
                                     .find_add(&[
                                         Filter {
-                                            tag: "title",
+                                            tag: Tag::Title,
                                             value: current,
                                         },
                                         Filter {
-                                            tag: "album",
+                                            tag: Tag::Album,
                                             value: album.as_str(),
                                         },
                                     ])
@@ -174,7 +180,7 @@ impl Screen for AlbumsScreen {
                             [] => {
                                 client
                                     .find_add(&[Filter {
-                                        tag: "album",
+                                        tag: Tag::Album,
                                         value: current,
                                     }])
                                     .await?;
@@ -309,14 +315,13 @@ pub enum AlbumsActions {
 async fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
         .list_tag(
-            "title",
+            Tag::Title,
             Some(&[Filter {
-                tag: "album",
+                tag: Tag::Album,
                 value: album,
             }]),
         )
         .await?
-        .0
         .into_iter()
         .map(DirOrSong::Song))
 }
@@ -326,11 +331,11 @@ async fn find_songs(client: &mut Client<'_>, album: &str, file: &str) -> Result<
     client
         .find(&[
             Filter {
-                tag: "title",
+                tag: Tag::Title,
                 value: file,
             },
             Filter {
-                tag: "album",
+                tag: Tag::Album,
                 value: album,
             },
         ])
@@ -342,11 +347,11 @@ async fn add_song(client: &mut Client<'_>, album: &str, file: &str) -> Result<()
     client
         .find_add(&[
             Filter {
-                tag: "title",
+                tag: Tag::Title,
                 value: file,
             },
             Filter {
-                tag: "album",
+                tag: Tag::Album,
                 value: album,
             },
         ])

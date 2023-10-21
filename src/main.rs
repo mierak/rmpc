@@ -184,9 +184,9 @@ async fn main_task(
                     ui.display_message(message, Level::Error);
                 }
                 AppEvent::Log(msg) => {
-                    state.logs.0.push_back(msg);
-                    if state.logs.0.len() > 1000 {
-                        state.logs.0.pop_front();
+                    state.logs.push_back(msg);
+                    if state.logs.len() > 1000 {
+                        state.logs.pop_front();
                     }
                 }
             }
@@ -236,7 +236,7 @@ async fn idle_task(
                                 client.find_album_art(&current_song.file).await,
                                 "Failed to get find album art"
                             )
-                            .map(state::MyVec);
+                            .map(state::MyVec::new);
                         }
                     }
                     if state.status.state == mpd::commands::status::State::Play {

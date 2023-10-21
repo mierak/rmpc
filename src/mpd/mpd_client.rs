@@ -2,7 +2,8 @@ use std::collections::BTreeSet;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use strum::AsRefStr;
+use derive_more::Deref;
+use strum::{AsRefStr, Display};
 
 use super::{
     client::Client,
@@ -54,7 +55,7 @@ pub trait MpdClient {
     async fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
     async fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
-    async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
+    async fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
     async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
@@ -202,7 +203,7 @@ impl MpdClient for Client<'_> {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn list_tag(&mut self, tag: &str, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
+    async fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         match filter {
             Some(filter) => {
                 self.execute(&format!("list {tag} \"({})\"", filter.to_query_str()))
@@ -326,7 +327,8 @@ pub struct SingleOrRange {
     pub end: Option<usize>,
 }
 
-pub struct Ranges(pub Vec<SingleOrRange>);
+#[derive(Deref)]
+pub struct Ranges(Vec<SingleOrRange>);
 
 #[allow(dead_code)]
 impl SingleOrRange {
@@ -463,9 +465,18 @@ impl StrExt for &str {
     }
 }
 
+// TODO: fill out the rest of the tags eventually
+#[derive(Debug, Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum Tag {
+    Artist,
+    Album,
+    Title,
+}
+
 #[derive(Debug)]
 pub struct Filter<'a> {
-    pub tag: &'a str,
+    pub tag: Tag,
     pub value: &'a str,
 }
 trait FilterExt {
@@ -500,14 +511,14 @@ mod strext_tests {
 
 #[cfg(test)]
 mod filter_tests {
-    use crate::mpd::mpd_client::FilterExt;
+    use crate::mpd::mpd_client::{FilterExt, Tag};
 
     use super::Filter;
 
     #[test]
     fn single_value() {
         let input: &[Filter<'_>] = &[Filter {
-            tag: "artist",
+            tag: Tag::Artist,
             value: "mrs singer",
         }];
 
@@ -518,11 +529,11 @@ mod filter_tests {
     fn multiple_values() {
         let input: &[Filter<'_>] = &[
             Filter {
-                tag: "album",
+                tag: Tag::Album,
                 value: "the greatest",
             },
             Filter {
-                tag: "artist",
+                tag: Tag::Artist,
                 value: "mrs singer",
             },
         ];

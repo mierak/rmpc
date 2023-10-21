@@ -10,25 +10,28 @@ use crate::{
     ui::screens::Screens,
 };
 use anyhow::Result;
+use derive_more::{AsMut, AsRef, Deref, DerefMut};
 use tracing::instrument;
 
-#[derive(Clone, PartialEq)]
-pub struct MyVec<T>(pub Vec<T>);
-impl<T> std::fmt::Debug for MyVec<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MyVec {{ len={} }}", self.0.len())
+#[derive(Clone, PartialEq, AsRef, AsMut, Deref)]
+pub struct MyVec<T>(Vec<T>);
+
+impl<T> MyVec<T> {
+    pub fn new(value: Vec<T>) -> Self {
+        Self(value)
     }
 }
-impl<T> MyVec<T> {
-    pub fn as_ref_mut(&mut self) -> &mut Vec<T> {
-        &mut self.0
+impl<T> std::fmt::Debug for MyVec<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MyVec {{ len={} }}", self.len())
     }
 }
 
-pub struct MyVecDeque<T>(pub VecDeque<T>);
+#[derive(Deref, DerefMut)]
+pub struct MyVecDeque<T>(VecDeque<T>);
 impl<T> std::fmt::Debug for MyVecDeque<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MyVecDeque {{ len={} }}", self.0.len())
+        write!(f, "MyVecDeque {{ len={} }}", self.len())
     }
 }
 
@@ -49,7 +52,7 @@ impl std::fmt::Debug for State {
             f,
             "State {{ active_tab: {}, logs_count: {}, queue_len: {:?}}}",
             self.active_tab,
-            self.logs.0.len(),
+            self.logs.len(),
             self.queue.as_ref().map(std::vec::Vec::len)
         )
     }
