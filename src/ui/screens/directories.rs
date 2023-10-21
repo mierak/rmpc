@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::BTreeSet, path::PathBuf};
+use std::{cmp::Ordering, collections::BTreeSet};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -17,31 +17,22 @@ use crate::{
         mpd_client::MpdClient,
     },
     state::State,
-    ui::{widgets::browser::Browser, KeyHandleResultInternal, Level, SharedUiState, StatusMessage},
+    ui::{
+        utils::dirstack::DirStack, widgets::browser::Browser, KeyHandleResultInternal, Level, SharedUiState,
+        StatusMessage,
+    },
 };
 
 use super::{
     browser::{DirOrSong, DirOrSongInfo, ToListItems},
-    dirstack::DirStack,
     iter::{DirOrSongInfoListItems, DirOrSongListItems},
     CommonAction, Screen, SongExt,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DirectoriesScreen {
     stack: DirStack<DirOrSongInfo>,
     filter_input_mode: bool,
-    path: PathBuf,
-}
-
-impl Default for DirectoriesScreen {
-    fn default() -> Self {
-        Self {
-            stack: DirStack::new(Vec::new()),
-            filter_input_mode: false,
-            path: PathBuf::new(),
-        }
-    }
 }
 
 #[async_trait]
@@ -54,21 +45,21 @@ impl Screen for DirectoriesScreen {
         app: &mut crate::state::State,
         _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let prev = self.stack.get_previous();
+        let prev = self.stack.previous();
         let prev: Vec<_> = prev
-            .0
+            .items
             .iter()
             .cloned()
-            .listitems(&app.config.symbols, prev.1.get_marked())
+            .listitems(&app.config.symbols, prev.state.get_marked())
             .collect();
-        let current = self.stack.get_current();
+        let current = self.stack.current();
         let current: Vec<_> = current
-            .0
+            .items
             .iter()
             .cloned()
-            .listitems(&app.config.symbols, current.1.get_marked())
+            .listitems(&app.config.symbols, current.state.get_marked())
             .collect();
-        let preview = self.stack.get_preview();
+        let preview = self.stack.preview();
         let w = Browser::new()
             .widths(&app.config.column_widths)
             .previous_items(&prev)
@@ -85,10 +76,17 @@ impl Screen for DirectoriesScreen {
         _app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        self.path = PathBuf::new();
-        self.stack = DirStack::new(client.lsinfo(None).await?.0.into_iter().map(Into::into).collect());
+        self.stack = DirStack::new(
+            client
+                .lsinfo(None)
+                .await?
+                .0
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<_>>(),
+        );
         let preview = self.prepare_preview(client, _app).await;
-        self.stack.preview(preview);
+        self.stack.set_preview(preview);
 
         Ok(())
     }
@@ -117,7 +115,7 @@ impl Screen for DirectoriesScreen {
                 }
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
-                    self.stack.jump_forward();
+                    self.stack.jump_next_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Esc => {
@@ -130,24 +128,19 @@ impl Screen for DirectoriesScreen {
         } else if let Some(action) = app.config.keybinds.directories.get(&event.into()) {
             match action {
                 DirectoriesActions::AddAll => {
-                    match self.stack.get_selected() {
-                        Some(DirOrSongInfo::Dir(dir)) => {
-                            let mut path_to_add = self.path.clone();
-                            path_to_add.push(dir);
+                    match self.stack.current().selected() {
+                        Some(DirOrSongInfo::Dir(_)) => {
+                            let Some(next_path) = self.stack.next_path() else {
+                                tracing::error!("Failed to move deeper inside dir. Next path is None");
+                                return Ok(KeyHandleResultInternal::RenderRequested);
+                            };
+                            let next_path = next_path.join("/").to_string();
 
-                            if let Some(path) = path_to_add.to_str() {
-                                client.add(path).await?;
-                                shared.status_message = Some(StatusMessage::new(
-                                    format!("Directory '{path}' added to queue"),
-                                    Level::Info,
-                                ));
-                            } else {
-                                tracing::error!(message = "Failed to add directory to queue.", dir = ?path_to_add);
-                                shared.status_message = Some(StatusMessage::new(
-                                    format!("Failed to add directory '{path_to_add:?}' to queue."),
-                                    Level::Error,
-                                ));
-                            }
+                            client.add(&next_path).await?;
+                            shared.status_message = Some(StatusMessage::new(
+                                format!("Directory '{next_path}' added to queue"),
+                                Level::Info,
+                            ));
                         }
                         Some(DirOrSongInfo::Song(song)) => {
                             client.add(&song.file).await?;
@@ -166,56 +159,63 @@ impl Screen for DirectoriesScreen {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
-                    match self.stack.get_selected().context("Expected an item to be selected")? {
-                        DirOrSongInfo::Dir(dir) => {
-                            self.path.push(dir);
-                            let new_current = client.lsinfo(self.path.to_str()).await?.0;
-                            self.stack.push(
-                                new_current
-                                    .into_iter()
-                                    .map(|v| match v {
-                                        FileOrDir::Dir(d) => DirOrSongInfo::Dir(d.path),
-                                        FileOrDir::File(s) => DirOrSongInfo::Song(s),
-                                    })
-                                    .collect(),
-                            );
+                    let Some(selected) = self.stack.current().selected() else {
+                        tracing::error!("Failed to move deeper inside dir. Current value is None");
+                        return Ok(KeyHandleResultInternal::RenderRequested);
+                    };
+                    let Some(next_path) = self.stack.next_path() else {
+                        tracing::error!("Failed to move deeper inside dir. Next path is None");
+                        return Ok(KeyHandleResultInternal::RenderRequested);
+                    };
+
+                    match selected {
+                        DirOrSongInfo::Dir(_) => {
+                            let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str())).await?.0;
+                            let res = new_current
+                                .into_iter()
+                                .map(|v| match v {
+                                    FileOrDir::Dir(d) => DirOrSongInfo::Dir(d.path),
+                                    FileOrDir::File(s) => DirOrSongInfo::Song(s),
+                                })
+                                .collect();
+                            self.stack.push(res);
 
                             let preview = self.prepare_preview(client, app).await;
-                            self.stack.preview(preview);
+                            self.stack.set_preview(preview);
                         }
                         DirOrSongInfo::Song(song) => {
                             client.add(&song.file).await?;
@@ -229,9 +229,8 @@ impl Screen for DirectoriesScreen {
                 }
                 CommonAction::Left => {
                     self.stack.pop();
-                    self.path.pop();
                     let preview = self.prepare_preview(client, app).await;
-                    self.stack.preview(preview);
+                    self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::EnterSearch => {
@@ -240,11 +239,11 @@ impl Screen for DirectoriesScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.stack.jump_forward();
+                    self.stack.jump_next_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.stack.jump_back();
+                    self.stack.jump_previous_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
@@ -263,11 +262,13 @@ pub enum DirectoriesActions {
 impl DirectoriesScreen {
     #[instrument(skip(client))]
     async fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Option<Vec<ListItem<'static>>> {
-        match &self.stack.get_selected() {
-            Some(DirOrSongInfo::Dir(dir)) => {
-                let mut preview_path = self.path.clone();
-                preview_path.push(dir);
-                let mut res = match client.lsinfo(preview_path.to_str()).await {
+        match &self.stack.current().selected() {
+            Some(DirOrSongInfo::Dir(_)) => {
+                let Some(next_path) = self.stack.next_path() else {
+                    tracing::error!("Failed to move deeper inside dir. Next path is None");
+                    return None;
+                };
+                let mut res = match client.lsinfo(Some(&next_path.join("/").to_string())).await {
                     Ok(val) => val,
                     Err(err) => {
                         tracing::error!(message = "Failed to get lsinfo for dir", error = ?err);
@@ -305,10 +306,6 @@ impl std::cmp::Ord for FileOrDir {
 }
 impl std::cmp::PartialOrd for FileOrDir {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (_, FileOrDir::Dir(_)) => Some(Ordering::Greater),
-            (FileOrDir::Dir(_), _) => Some(Ordering::Less),
-            (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => Some(t1.cmp(t2)),
-        }
+        Some(self.cmp(other))
     }
 }

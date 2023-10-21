@@ -14,14 +14,14 @@ use ratatui::{
 use crate::{
     mpd::client::Client,
     state::State,
-    ui::{KeyHandleResultInternal, SharedUiState},
+    ui::{utils::dirstack::DirState, KeyHandleResultInternal, SharedUiState},
 };
 
-use super::{dirstack::MyState, CommonAction, Screen};
+use super::{CommonAction, Screen};
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
-    scrolling_state: MyState<ListState>,
+    scrolling_state: DirState<ListState>,
 }
 
 #[async_trait]
@@ -65,14 +65,12 @@ impl Screen for LogsScreen {
             .thumb_style(Style::default().fg(Color::Blue));
 
         let [content, scroll] = *Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-               Constraint::Percentage(100),
-               Constraint::Min(0),
-        ].as_ref())
-            .split(area) else {
-                return Ok(())
-            };
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(100), Constraint::Min(0)].as_ref())
+            .split(area)
+        else {
+            return Ok(());
+        };
 
         let content_len = lines.len();
         self.scrolling_state.content_len(Some(u16::try_from(content_len)?));

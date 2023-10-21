@@ -7,7 +7,7 @@ pub mod commands;
 pub mod errors;
 pub mod mpd_client;
 
-pub(self) trait FromMpd
+trait FromMpd
 where
     Self: std::marker::Sized,
 {
@@ -37,11 +37,11 @@ pub(self) fn split_line(mut line: String) -> Result<(String, String), MpdError> 
     Ok((line, value))
 }
 
-pub(self) enum LineHandled {
+enum LineHandled {
     Yes,
     No { value: String },
 }
-pub(self) trait FromMpdBuilder<T: FromMpd> {
+trait FromMpdBuilder<T: FromMpd> {
     fn create() -> T;
 }
 

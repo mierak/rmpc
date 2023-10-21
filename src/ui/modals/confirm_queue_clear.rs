@@ -37,7 +37,13 @@ impl Modal for ConfirmQueueClearModal {
         let [text_area, buttons_area] = *Layout::default()
             .constraints([Constraint::Length(3), Constraint::Max(1)].as_ref())
             .direction(Direction::Vertical)
-            .split(block.inner(popup_area.inner(&Margin {horizontal: 1, vertical: 0}))) else { return Ok(()); };
+            .split(block.inner(popup_area.inner(&Margin {
+                horizontal: 1,
+                vertical: 0,
+            })))
+        else {
+            return Ok(());
+        };
 
         let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
         self.button_group.button_count(buttons.len());

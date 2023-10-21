@@ -6,6 +6,7 @@ use crate::{
     state::PlayListInfoExt,
     ui::{
         modals::{confirm_queue_clear::ConfirmQueueClearModal, save_queue::SaveQueueModal, Modals},
+        utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
         DurationExt, KeyHandleResultInternal, SharedUiState,
     },
@@ -21,14 +22,14 @@ use tracing::error;
 
 use crate::state::State;
 
-use super::{dirstack::MyState, CommonAction, Screen};
+use super::{CommonAction, Screen};
 
 const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
 
 #[derive(Debug, Default)]
 pub struct QueueScreen {
     img_state: ImageState,
-    scrolling_state: MyState<TableState>,
+    scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
 }
@@ -48,17 +49,25 @@ impl Screen for QueueScreen {
 
         let [img_section, queue_section] = *Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                         Constraint::Percentage(if show_image {35 } else {0}),
-                         Constraint::Percentage(if show_image {65 } else {100}),
-            ].as_ref()).split(area) else { return Ok(()) };
+            .constraints(
+                [
+                    Constraint::Percentage(if show_image { 35 } else { 0 }),
+                    Constraint::Percentage(if show_image { 65 } else { 100 }),
+                ]
+                .as_ref(),
+            )
+            .split(area)
+        else {
+            return Ok(());
+        };
 
         let [table_header_section, mut queue_section] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                         Constraint::Min(2),
-                         Constraint::Percentage(100),
-            ].as_ref()).split(queue_section) else { return Ok(()) };
+            .constraints([Constraint::Min(2), Constraint::Percentage(100)].as_ref())
+            .split(queue_section)
+        else {
+            return Ok(());
+        };
 
         self.scrolling_state.viewport_len(Some(queue_section.height));
         self.scrolling_state.content_len(Some(u16::try_from(queue_len)?));
@@ -196,7 +205,7 @@ impl Screen for QueueScreen {
                 QueueActions::Delete => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
                         match client.delete_id(selected_song.id).await {
-                            Ok(_) => {}
+                            Ok(()) => {}
                             Err(e) => error!("{:?}", e),
                         }
                     } else {

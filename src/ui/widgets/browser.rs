@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation, StatefulWidget};
 
-use crate::ui::screens::dirstack::{DirStack, MatchesSearch};
+use crate::ui::utils::dirstack::{AsPath, Dir, DirStack, MatchesSearch};
 
 #[derive(Debug)]
 pub struct Browser<'a, T> {
@@ -50,7 +50,7 @@ impl<'a, T> Browser<'a, T> {
 
 impl<T> StatefulWidget for Browser<'_, T>
 where
-    T: MatchesSearch + std::fmt::Debug,
+    T: MatchesSearch + std::fmt::Debug + AsPath,
 {
     type State = DirStack<T>;
 
@@ -58,22 +58,28 @@ where
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
         let [previous_area, current_area, preview_area] = *Layout::default()
             .direction(ratatui::prelude::Direction::Horizontal)
-            .constraints([
-                         Constraint::Percentage(self.widths[0]),
-                         Constraint::Percentage(self.widths[1]),
-                         Constraint::Percentage(self.widths[2]),
-            ].as_ref())
-            .split(area) else { return  };
+            .constraints(
+                [
+                    Constraint::Percentage(self.widths[0]),
+                    Constraint::Percentage(self.widths[1]),
+                    Constraint::Percentage(self.widths[2]),
+                ]
+                .as_ref(),
+            )
+            .split(area)
+        else {
+            return;
+        };
 
         {
-            let preview = List::new(self.preview.unwrap_or(Vec::new()))
+            let preview = List::new(self.preview.unwrap_or_default())
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
         {
-            let (_, prev_state) = state.get_previous();
+            let prev_state = &mut state.previous_mut().state;
             prev_state.content_len(Some(u16::try_from(self.previous.len()).unwrap()));
             prev_state.viewport_len(Some(previous_area.height));
 
@@ -103,9 +109,9 @@ where
         }
         let title = state.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         {
-            let (current_items, current_state) = state.get_current();
-            current_state.content_len(Some(u16::try_from(current_items.len()).unwrap()));
-            current_state.viewport_len(Some(current_area.height));
+            let Dir { items, state } = state.current_mut();
+            state.content_len(Some(u16::try_from(items.len()).unwrap()));
+            state.viewport_len(Some(current_area.height));
 
             let current = List::new(self.current)
                 .block({
@@ -126,7 +132,7 @@ where
                 .end_style(Style::default().fg(Color::White).bg(Color::Black))
                 .thumb_style(Style::default().fg(Color::Blue));
 
-            ratatui::widgets::StatefulWidget::render(current, current_area, buf, current_state.as_render_state_ref());
+            ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 current_scrollbar,
                 preview_area.inner(&ratatui::prelude::Margin {
@@ -134,7 +140,7 @@ where
                     horizontal: 0,
                 }),
                 buf,
-                current_state.as_scrollbar_state_ref(),
+                state.as_scrollbar_state_ref(),
             );
         }
     }

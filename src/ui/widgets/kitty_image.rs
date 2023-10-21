@@ -520,7 +520,7 @@ impl<'a> StatefulWidget for KittyImage<'a> {
                         data.img_height,
                         state,
                     ) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(e) => tracing::error!(message = "Failed to transfer data", error = ?e),
                     };
                 }

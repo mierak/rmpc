@@ -131,473 +131,7 @@ impl Screens {
     }
 }
 
-pub mod dirstack {
-    use std::{collections::BTreeSet, ops::SubAssign};
-
-    use ratatui::widgets::{ListItem, ListState, ScrollbarState, TableState};
-
-    use crate::mpd::commands::lsinfo::FileOrDir;
-
-    #[derive(Debug)]
-    pub struct DirStack<T: std::fmt::Debug + MatchesSearch> {
-        current: (Vec<T>, MyState<ListState>),
-        others: Vec<(Vec<T>, MyState<ListState>)>,
-        preview: Option<Vec<ListItem<'static>>>,
-        pub filter: Option<String>,
-        pub filter_ignore_case: bool,
-    }
-
-    #[allow(dead_code)]
-    impl<T: std::fmt::Debug + MatchesSearch> DirStack<T> {
-        pub fn new(root: Vec<T>) -> Self {
-            let mut result = Self {
-                others: Vec::new(),
-                current: (Vec::new(), MyState::default()),
-                filter: None,
-                filter_ignore_case: true,
-                preview: None,
-            };
-            let mut root_state = MyState::default();
-
-            result.push(Vec::new());
-
-            if !root.is_empty() {
-                root_state.select(Some(0));
-                // root.sort();
-            };
-
-            result.current = (root, root_state);
-            result
-        }
-
-        /// Returns the element at the top of the stack
-        pub fn get_current(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
-            (&self.current.0, &mut self.current.1)
-        }
-
-        /// Returns the element at the second element from the top of the stack
-        pub fn get_previous(&mut self) -> (&Vec<T>, &mut MyState<ListState>) {
-            let last = self
-                .others
-                .last_mut()
-                .expect("Previous items to always containt at least one item. This should have been handled in pop()");
-            (&last.0, &mut last.1)
-        }
-
-        /// Returns the element at the second element from the top of the stack
-        pub fn get_preview(&self) -> Option<&Vec<ListItem<'static>>> {
-            self.preview.as_ref()
-        }
-
-        /// Returns the element at the second element from the top of the stack
-        pub fn preview(&mut self, preview: Option<Vec<ListItem<'static>>>) -> &Self {
-            self.preview = preview;
-            self
-        }
-
-        pub fn replace_current(&mut self, new_current: Vec<T>) {
-            if new_current.is_empty() {
-                self.current.1.select(None);
-            } else if self.current.1.get_selected().is_some_and(|v| v > new_current.len() - 1) {
-                self.current.1.select(Some(new_current.len() - 1));
-            }
-            self.current.0 = new_current;
-        }
-
-        pub fn push(&mut self, head: Vec<T>) {
-            let mut new_state = MyState::default();
-            if !head.is_empty() {
-                new_state.select(Some(0));
-            };
-            let current_head = std::mem::replace(&mut self.current, (head, new_state));
-            self.others.push(current_head);
-            self.filter = None;
-        }
-
-        pub fn pop(&mut self) -> Option<(Vec<T>, MyState<ListState>)> {
-            if self.others.len() > 1 {
-                self.filter = None;
-                let top = self.others.pop().expect("There should always be at least two elements");
-                Some(std::mem::replace(&mut self.current, top))
-            } else {
-                None
-            }
-        }
-
-        pub fn get_selected(&self) -> Option<&T> {
-            if let Some(sel) = self.current.1.get_selected() {
-                self.current.0.get(sel)
-            } else {
-                None
-            }
-        }
-
-        pub fn get_selected_with_idx(&self) -> Option<(&T, usize)> {
-            if let Some(sel) = self.current.1.get_selected() {
-                self.current.0.get(sel).map(|v| (v, sel))
-            } else {
-                None
-            }
-        }
-
-        pub fn get_previous_selected(&self) -> Option<&T> {
-            let previous = self
-                .others
-                .last()
-                .expect("Previous items to always containt at least one item. This should have been handled in pop()");
-            if let Some(sel) = previous.1.get_selected() {
-                previous.0.get(sel)
-            } else {
-                None
-            }
-        }
-
-        pub fn get_current_marked(&self) -> &BTreeSet<usize> {
-            &self.current.1.marked
-        }
-
-        pub fn get_previous_marked(&self) -> &BTreeSet<usize> {
-            let previous = self
-                .others
-                .last()
-                .expect("Previous items to always containt at least one item. This should have been handled in pop()");
-            &previous.1.marked
-        }
-
-        pub fn unmark_all(&mut self) {
-            self.current.1.unmark_all();
-        }
-
-        pub fn toggle_mark_selected(&mut self) {
-            if let Some(sel) = self.current.1.get_selected() {
-                self.current.1.toggle_mark(sel);
-            }
-        }
-
-        pub fn mark_selected(&mut self) {
-            if let Some(sel) = self.current.1.get_selected() {
-                self.current.1.mark(sel);
-            }
-        }
-
-        pub fn unmark_selected(&mut self) {
-            if let Some(sel) = self.current.1.get_selected() {
-                self.current.1.unmark(sel);
-            }
-        }
-
-        pub fn next(&mut self) {
-            self.current.1.next();
-        }
-
-        pub fn prev(&mut self) {
-            self.current.1.prev();
-        }
-
-        pub fn next_half_viewport(&mut self) {
-            self.current.1.next_half_viewport();
-        }
-
-        pub fn prev_half_viewport(&mut self) {
-            self.current.1.prev_half_viewport();
-        }
-
-        pub fn last(&mut self) {
-            self.current.1.last();
-        }
-
-        pub fn first(&mut self) {
-            self.current.1.first();
-        }
-
-        pub fn jump_forward(&mut self) {
-            if let Some(filter) = self.filter.as_ref() {
-                if let Some(selected) = self.current.1.get_selected() {
-                    for i in selected + 1..self.current.0.len() {
-                        let s = &self.current.0[i];
-                        if s.matches(filter, self.filter_ignore_case) {
-                            self.current.1.select(Some(i));
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        pub fn jump_back(&mut self) {
-            if let Some(filter) = self.filter.as_ref() {
-                if let Some(selected) = self.current.1.get_selected() {
-                    for i in (0..selected).rev() {
-                        let s = &self.current.0[i];
-                        if s.matches(filter, self.filter_ignore_case) {
-                            self.current.1.select(Some(i));
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        pub fn remove(&mut self, idx: usize) {
-            if idx < self.current.0.len() {
-                self.current.0.remove(idx);
-            }
-            self.current.1.remove(idx);
-        }
-    }
-
-    #[derive(Debug, Default)]
-    pub struct MyState<T: ScrollingState> {
-        scrollbar_state: ScrollbarState,
-        inner: T,
-        marked: BTreeSet<usize>,
-        pub content_len: Option<u16>,
-        pub viewport_len: Option<u16>,
-    }
-
-    #[allow(dead_code)]
-    impl<T: ScrollingState> MyState<T> {
-        pub fn viewport_len(&mut self, viewport_len: Option<u16>) -> &Self {
-            self.viewport_len = viewport_len;
-            self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
-            self
-        }
-
-        pub fn content_len(&mut self, content_len: Option<u16>) -> &Self {
-            self.content_len = content_len;
-            self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
-            self
-        }
-
-        pub fn first(&mut self) {
-            if self.content_len.is_some() {
-                self.select(Some(0));
-            } else {
-                self.select(None);
-            }
-        }
-
-        pub fn last(&mut self) {
-            if let Some(item_count) = self.content_len {
-                self.select(Some(item_count.saturating_sub(1) as usize));
-            } else {
-                self.select(None);
-            }
-        }
-
-        pub fn next(&mut self) {
-            if let Some(item_count) = self.content_len {
-                let i = match self.get_selected() {
-                    Some(i) => {
-                        if i >= item_count.saturating_sub(1) as usize {
-                            Some(0)
-                        } else {
-                            Some(i + 1)
-                        }
-                    }
-                    None => None,
-                };
-                self.select(i);
-            } else {
-                self.select(None);
-            }
-        }
-
-        pub fn prev(&mut self) {
-            if let Some(item_count) = self.content_len {
-                let i = match self.get_selected() {
-                    Some(i) => {
-                        if i == 0 {
-                            Some(item_count.saturating_sub(1) as usize)
-                        } else {
-                            Some(i - 1)
-                        }
-                    }
-                    None => None,
-                };
-                self.select(i);
-            } else {
-                self.select(None);
-            }
-        }
-
-        pub fn next_half_viewport(&mut self) {
-            if let Some(item_count) = self.content_len {
-                if let Some(viewport) = self.viewport_len {
-                    self.select(self.get_selected().map(|i| {
-                        i.saturating_add(viewport as usize / 2)
-                            .min(item_count.saturating_sub(1) as usize)
-                    }));
-                } else {
-                    self.select(None);
-                }
-            } else {
-                self.select(None);
-            }
-        }
-
-        pub fn prev_half_viewport(&mut self) {
-            if self.content_len.is_some() {
-                if let Some(viewport) = self.viewport_len {
-                    self.select(
-                        self.get_selected()
-                            .map(|i| i.saturating_sub(viewport as usize / 2).max(0)),
-                    );
-                } else {
-                    self.select(None);
-                }
-            } else {
-                self.select(None);
-            }
-        }
-
-        #[allow(clippy::cast_possible_truncation)]
-        pub fn select(&mut self, idx: Option<usize>) {
-            self.inner.select_scrolling(idx);
-            self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0) as u16);
-        }
-
-        #[allow(clippy::comparison_chain)]
-        pub fn remove(&mut self, idx: usize) {
-            match self.content_len {
-                Some(len) if idx >= len.into() => return,
-                None => return,
-                Some(ref mut len) => {
-                    self.marked = std::mem::take(&mut self.marked)
-                        .into_iter()
-                        .filter_map(|val| {
-                            if val < idx {
-                                Some(val)
-                            } else if val > idx {
-                                Some(val - 1)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    len.sub_assign(1);
-                    let len: usize = (*len).into();
-                    if self.get_selected().is_some_and(|selected| selected >= len) {
-                        self.last();
-                    }
-                }
-            }
-        }
-
-        pub fn unmark_all(&mut self) -> &mut Self {
-            self.marked.clear();
-            self
-        }
-
-        pub fn mark(&mut self, idx: usize) -> &mut Self {
-            self.marked.insert(idx);
-            self
-        }
-
-        pub fn unmark(&mut self, idx: usize) -> &mut Self {
-            self.marked.remove(&idx);
-            self
-        }
-
-        pub fn toggle_mark(&mut self, idx: usize) -> &mut Self {
-            if self.marked.contains(&idx) {
-                self.marked.remove(&idx);
-            } else {
-                self.marked.insert(idx);
-            }
-            self
-        }
-
-        pub fn get_marked(&self) -> &BTreeSet<usize> {
-            &self.marked
-        }
-
-        pub fn get_selected(&self) -> Option<usize> {
-            self.inner.get_selected_scrolling()
-        }
-
-        pub fn as_render_state_ref(&mut self) -> &mut T {
-            &mut self.inner
-        }
-
-        pub fn as_scrollbar_state_ref(&mut self) -> &mut ScrollbarState {
-            &mut self.scrollbar_state
-        }
-    }
-
-    pub trait ScrollingState {
-        fn select_scrolling(&mut self, idx: Option<usize>);
-        fn get_selected_scrolling(&self) -> Option<usize>;
-    }
-
-    impl ScrollingState for TableState {
-        fn select_scrolling(&mut self, idx: Option<usize>) {
-            self.select(idx);
-        }
-
-        fn get_selected_scrolling(&self) -> Option<usize> {
-            self.selected()
-        }
-    }
-
-    impl ScrollingState for ListState {
-        fn select_scrolling(&mut self, idx: Option<usize>) {
-            self.select(idx);
-        }
-
-        fn get_selected_scrolling(&self) -> Option<usize> {
-            self.selected()
-        }
-    }
-
-    pub trait MatchesSearch {
-        fn matches(&self, filter: &str, ignorecase: bool) -> bool;
-    }
-
-    impl MatchesSearch for String {
-        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-            if ignorecase {
-                self.to_lowercase().contains(&filter.to_lowercase())
-            } else {
-                self.contains(filter)
-            }
-        }
-    }
-
-    impl MatchesSearch for FileOrDir {
-        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-            if ignorecase {
-                match self {
-                    FileOrDir::Dir(dir) => dir.path.to_lowercase().contains(&filter.to_lowercase()),
-                    FileOrDir::File(song) => song
-                        .title
-                        .as_ref()
-                        .is_some_and(|s| s.to_lowercase().contains(&filter.to_lowercase())),
-                }
-            } else {
-                match self {
-                    FileOrDir::Dir(dir) => dir.path.contains(filter),
-                    FileOrDir::File(song) => song.title.as_ref().is_some_and(|s| s.contains(filter)),
-                }
-            }
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::DirStack;
-
-        #[test]
-        fn leaves_at_least_one_element_in_others() {
-            let mut val: DirStack<String> = DirStack::new(Vec::new());
-            val.push(Vec::new());
-            assert!(val.pop().is_some());
-            assert!(val.pop().is_none());
-
-            val.get_previous();
-        }
-    }
-}
+pub mod dirstack {}
 
 pub(crate) mod browser {
     use std::cmp::Ordering;
@@ -611,9 +145,8 @@ pub(crate) mod browser {
     use crate::{
         config::SymbolsConfig,
         mpd::commands::{lsinfo::FileOrDir, Song},
+        ui::utils::dirstack::{AsPath, MatchesSearch},
     };
-
-    use super::dirstack::MatchesSearch;
 
     pub trait ToListItems {
         fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>>;
@@ -672,11 +205,21 @@ pub(crate) mod browser {
         Song(String),
     }
 
-    impl DirOrSong {
-        pub fn to_current_value(&self) -> &str {
-            match self {
-                DirOrSong::Dir(d) => d,
-                DirOrSong::Song(s) => s,
+    impl MatchesSearch for FileOrDir {
+        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
+            if ignorecase {
+                match self {
+                    FileOrDir::Dir(dir) => dir.path.to_lowercase().contains(&filter.to_lowercase()),
+                    FileOrDir::File(song) => song
+                        .title
+                        .as_ref()
+                        .is_some_and(|s| s.to_lowercase().contains(&filter.to_lowercase())),
+                }
+            } else {
+                match self {
+                    FileOrDir::Dir(dir) => dir.path.contains(filter),
+                    FileOrDir::File(song) => song.title.as_ref().is_some_and(|s| s.contains(filter)),
+                }
             }
         }
     }
@@ -697,6 +240,15 @@ pub(crate) mod browser {
         }
     }
 
+    impl AsPath for DirOrSong {
+        fn as_path(&self) -> Option<&str> {
+            match self {
+                DirOrSong::Dir(d) => Some(d),
+                DirOrSong::Song(s) => Some(s),
+            }
+        }
+    }
+
     impl std::cmp::Ord for DirOrSong {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             match (self, other) {
@@ -709,12 +261,7 @@ pub(crate) mod browser {
     }
     impl std::cmp::PartialOrd for DirOrSong {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            match (self, other) {
-                (DirOrSong::Dir(a), DirOrSong::Dir(b)) => Some(a.cmp(b)),
-                (_, DirOrSong::Dir(_)) => Some(Ordering::Greater),
-                (DirOrSong::Dir(_), _) => Some(Ordering::Less),
-                (DirOrSong::Song(a), DirOrSong::Song(b)) => Some(a.cmp(b)),
-            }
+            Some(self.cmp(other))
         }
     }
 
@@ -745,6 +292,15 @@ pub(crate) mod browser {
         }
     }
 
+    impl AsPath for DirOrSongInfo {
+        fn as_path(&self) -> Option<&str> {
+            match self {
+                DirOrSongInfo::Dir(d) => Some(d),
+                DirOrSongInfo::Song(s) => s.title.as_deref(),
+            }
+        }
+    }
+
     impl From<FileOrDir> for DirOrSongInfo {
         fn from(value: FileOrDir) -> Self {
             match value {
@@ -768,14 +324,7 @@ pub(crate) mod browser {
     }
     impl std::cmp::PartialOrd for DirOrSongInfo {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            match (self, other) {
-                (DirOrSongInfo::Dir(a), DirOrSongInfo::Dir(b)) => Some(a.cmp(b)),
-                (_, DirOrSongInfo::Dir(_)) => Some(Ordering::Greater),
-                (DirOrSongInfo::Dir(_), _) => Some(Ordering::Less),
-                (DirOrSongInfo::Song(Song { title: t1, .. }), DirOrSongInfo::Song(Song { title: t2, .. })) => {
-                    Some(t1.cmp(t2))
-                }
-            }
+            Some(self.cmp(other))
         }
     }
 }

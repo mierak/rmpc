@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
 
             let mut render_loop = RenderLoop::new(Arc::clone(&state), render_tx.clone());
             if state.lock().await.status.state == mpd::commands::status::State::Play {
-                render_loop.start(config.address).await;
+                render_loop.start(config.address);
             }
 
             let main_task = tokio::spawn(main_task(Arc::clone(&ui), Arc::clone(&state), rx, render_tx.clone()));
@@ -240,7 +240,7 @@ async fn idle_task(
                         }
                     }
                     if state.status.state == mpd::commands::status::State::Play {
-                        render_loop.start(state.config.address).await;
+                        render_loop.start(state.config.address);
                     } else {
                         render_loop.stop().await;
                     }
@@ -348,7 +348,7 @@ impl RenderLoop {
         }
     }
 
-    async fn start(&mut self, addr: &'static str) -> bool {
+    fn start(&mut self, addr: &'static str) -> bool {
         if self.handle.is_none() {
             debug!("Started update loop");
 

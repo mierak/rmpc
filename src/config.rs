@@ -162,8 +162,10 @@ impl Default for KeyConfigFile {
                 (C::Select,           Key { key: K::Char(' '), modifiers: M::NONE }),
             ]),
             albums: HashMap::from([
+                (Al::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
             artists: HashMap::from([
+                (Ar::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
             directories: HashMap::from([
                 (D::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),

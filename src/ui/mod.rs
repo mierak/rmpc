@@ -40,6 +40,7 @@ use self::{
 
 pub mod modals;
 pub mod screens;
+pub mod utils;
 pub mod widgets;
 
 #[derive(Debug)]
@@ -138,33 +139,76 @@ impl Ui<'_> {
         }
         let [title_area, tabs_area, content_area, bar_area] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Length(2), Constraint::Percentage(100), Constraint::Min(1)].as_ref())
-            .split(frame.size()) else { return Ok(()) };
+            .constraints(
+                [
+                    Constraint::Length(2),
+                    Constraint::Length(2),
+                    Constraint::Percentage(100),
+                    Constraint::Min(1),
+                ]
+                .as_ref(),
+            )
+            .split(frame.size())
+        else {
+            return Ok(());
+        };
 
         let [title_left_area, title_ceter_area, title_right_area] = *Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(
-                    [
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(60),
-                        Constraint::Percentage(20),
-                    ].as_ref(),
-                ) .split(title_area) else { return Ok(()) };
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(60),
+                    Constraint::Percentage(20),
+                ]
+                .as_ref(),
+            )
+            .split(title_area)
+        else {
+            return Ok(());
+        };
 
         let [song_name_area, song_info_area] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(title_ceter_area.height/2), Constraint::Length(title_ceter_area.height/2)].as_ref())
-            .split(title_ceter_area) else { return Ok(()) };
+            .constraints(
+                [
+                    Constraint::Length(title_ceter_area.height / 2),
+                    Constraint::Length(title_ceter_area.height / 2),
+                ]
+                .as_ref(),
+            )
+            .split(title_ceter_area)
+        else {
+            return Ok(());
+        };
 
         let [volume_area, states_area] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(title_ceter_area.height/2), Constraint::Length(title_ceter_area.height/2)].as_ref())
-            .split(title_right_area) else { return Ok(()) };
+            .constraints(
+                [
+                    Constraint::Length(title_ceter_area.height / 2),
+                    Constraint::Length(title_ceter_area.height / 2),
+                ]
+                .as_ref(),
+            )
+            .split(title_right_area)
+        else {
+            return Ok(());
+        };
 
         let [status_area, elapsed_area] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(title_ceter_area.height/2), Constraint::Length(title_ceter_area.height/2)].as_ref())
-            .split(title_left_area) else { return Ok(()) };
+            .constraints(
+                [
+                    Constraint::Length(title_ceter_area.height / 2),
+                    Constraint::Length(title_ceter_area.height / 2),
+                ]
+                .as_ref(),
+            )
+            .split(title_left_area)
+        else {
+            return Ok(());
+        };
 
         let tab_names = screens::Screens::VARIANTS
             .iter()
@@ -454,7 +498,7 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
-pub(self) enum KeyHandleResultInternal {
+enum KeyHandleResultInternal {
     /// Action warrants a render
     RenderRequested,
     /// Action does NOT warrant a render
@@ -498,7 +542,7 @@ impl LevelExt for Level {
     }
 }
 
-pub(self) trait DurationExt {
+trait DurationExt {
     fn to_string(&self) -> String;
 }
 
@@ -510,7 +554,7 @@ impl DurationExt for Duration {
     }
 }
 
-pub(self) trait BoolExt {
+trait BoolExt {
     fn to_onoff(&self) -> &'static str;
 }
 
