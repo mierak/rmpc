@@ -5,7 +5,7 @@ pub mod macros {
                 Ok(x) => x,
                 Err(e) => {
                     tracing::error!(message = $msg, error = ?e);
-                    return Err(anyhow::anyhow!("Message: '{}', inner error: '{}'", $msg, e))
+                    return Err(anyhow::anyhow!("Message: '{}', inner error: '{:?}'", $msg, e))
                 },
             }
         };
@@ -21,6 +21,7 @@ pub mod macros {
             }
         };
     }
+    #[allow(unused_imports)]
     pub(crate) use try_cont;
     pub(crate) use try_ret;
 }

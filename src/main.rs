@@ -8,9 +8,10 @@
     clippy::needless_return,
     clippy::zero_sized_map_values,
     clippy::too_many_lines,
-    clippy::match_single_binding
+    clippy::match_single_binding,
+    unused_macros
 )]
-use std::{sync::Arc, time::Duration};
+use std::{ops::Sub, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
@@ -18,19 +19,14 @@ use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
-use tokio::{
-    sync::{mpsc::Sender, Mutex},
-    task::JoinHandle,
+use tokio::sync::{
+    mpsc::{error::TryRecvError, Sender},
+    oneshot::Receiver,
 };
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{error, info, instrument, trace, warn};
 use ui::Level;
 
-use crate::{
-    config::Config,
-    mpd::mpd_client::MpdClient,
-    ui::Ui,
-    utils::macros::{try_cont, try_ret},
-};
+use crate::{config::Config, mpd::mpd_client::MpdClient, ui::Ui, utils::macros::try_ret};
 
 mod config;
 mod logging;
@@ -50,6 +46,9 @@ pub enum AppEvent {
     // Maybe it could be solved if we can rerender only the status bar since it already is
     // in the shared ui part
     Log(Vec<u8>),
+    IdleEvent(IdleEvent),
+    RequestStatusUpdate,
+    RequestRender,
 }
 
 fn read_cfg(args: &Args) -> Result<Config> {
@@ -79,9 +78,6 @@ async fn main() -> Result<()> {
         None => {
             let (tx, rx) = tokio::sync::mpsc::channel::<AppEvent>(1024);
             let _guards = logging::configure(args.log, &tx.clone());
-            let tx_clone = tx.clone();
-            let (render_tx, render_rx) = tokio::sync::mpsc::channel::<()>(1024);
-            let is_aborted = Arc::new(Mutex::new(false));
             let config = Box::leak(Box::new(match read_cfg(&args) {
                 Ok(val) => val,
                 Err(err) => {
@@ -90,38 +86,44 @@ async fn main() -> Result<()> {
                 }
             }));
 
+            try_ret!(tx.send(AppEvent::RequestRender).await, "Failed to render first frame");
+
             let mut client = try_ret!(
                 Client::init(config.address, Some("command"), true).await,
                 "Failed to connect to mpd"
             );
-            let terminal = Arc::new(Mutex::new(try_ret!(ui::setup_terminal(), "Failed to setup terminal")));
-            let state = Arc::new(Mutex::new(try_ret!(
+            let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
+            let state = try_ret!(
                 state::State::try_new(&mut client, config).await,
                 "Failed to create app state"
-            )));
-            let ui = Arc::new(Mutex::new(Ui::new(client)));
+            );
 
-            let mut render_loop = RenderLoop::new(Arc::clone(&state), render_tx.clone());
-            if state.lock().await.status.state == mpd::commands::status::State::Play {
-                render_loop.start(config.address);
+            let mut render_loop = RenderLoop::new(tx.clone());
+            if state.status.state == mpd::commands::status::State::Play {
+                render_loop.start().await?;
             }
 
-            let main_task = tokio::spawn(main_task(Arc::clone(&ui), Arc::clone(&state), rx, render_tx.clone()));
-            let render_task = tokio::task::spawn(render_task(render_rx, ui, Arc::clone(&state), Arc::clone(&terminal)));
-            let ab = Arc::clone(&is_aborted);
-            let input_task = tokio::task::spawn_blocking(move || event_poll(tx_clone, ab));
-            let idle_task = tokio::task::spawn(idle_task(
-                try_ret!(
-                    Client::init(config.address, Some("idle"), true).await,
-                    "Failed to connect to mpd with idle client"
-                ),
+            let (endtx, endrx) = tokio::sync::oneshot::channel::<()>();
+
+            let tx_clone = tx.clone();
+            let _input_task = tokio::task::spawn_blocking(move || input_poll_task(tx_clone, endrx));
+            let main_task = tokio::spawn(main_task(
+                Ui::new(client),
+                state,
+                rx,
                 try_ret!(
                     Client::init(config.address, Some("state"), true).await,
                     "Failed to connect to mpd with state client"
                 ),
                 render_loop,
-                Arc::clone(&state),
-                render_tx.clone(),
+                terminal,
+            ));
+            let idle_task = tokio::task::spawn(idle_task(
+                try_ret!(
+                    Client::init(config.address, Some("idle"), true).await,
+                    "Failed to connect to mpd with idle client"
+                ),
+                tx,
             ));
 
             let original_hook = std::panic::take_hook();
@@ -133,19 +135,14 @@ async fn main() -> Result<()> {
             }));
 
             info!(message = "Application initialized successfully", ?config);
-            try_ret!(render_tx.send(()).await, "Failed to render first frame");
             try_ret!(
                 tokio::select! {
                     v = idle_task => v,
                     v = main_task => v,
-                    v = render_task => v,
-                    v = input_task => v,
                 },
                 "A task panicked. This should not happen, please check logs."
             );
-            *is_aborted.lock().await = true;
-
-            ui::restore_terminal(&mut *terminal.lock().await).expect("Terminal restore to succeed");
+            try_ret!(endtx.send(()), "Failed to notify event task.");
         }
     }
 
@@ -153,35 +150,46 @@ async fn main() -> Result<()> {
 }
 
 #[instrument(skip_all)]
-async fn main_task(
-    ui_mutex: Arc<Mutex<Ui<'static>>>,
-    state2: Arc<Mutex<state::State>>,
+async fn main_task<B: Backend + std::io::Write>(
+    mut ui: Ui<'static>,
+    mut state: state::State,
     mut event_receiver: tokio::sync::mpsc::Receiver<AppEvent>,
-    render_sender: Sender<()>,
+    mut client: Client<'_>,
+    mut render_loop: RenderLoop,
+    mut terminal: Terminal<B>,
 ) {
-    'outer: loop {
-        while let Some(event) = event_receiver.recv().await {
-            let mut state = state2.lock().await;
-            let mut ui = ui_mutex.lock().await;
+    let mut render_wanted = false;
+    let max_fps = 30f64;
+    let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
+    let mut last_render = tokio::time::Instant::now().sub(Duration::from_secs(10));
 
+    loop {
+        let now = tokio::time::Instant::now();
+        let event = if render_wanted {
+            tokio::select! {
+                () = tokio::time::sleep(min_frame_duration.checked_sub(now - last_render).unwrap_or(Duration::ZERO)) => None,
+                v = event_receiver.recv() => v,
+            }
+        } else {
+            event_receiver.recv().await
+        };
+
+        if let Some(event) = event {
             match event {
                 AppEvent::UserInput(key) => match ui.handle_key(key, &mut state).await {
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
-                    Ok(ui::KeyHandleResult::Quit) => break 'outer,
+                    Ok(ui::KeyHandleResult::Quit) => break,
                     Ok(ui::KeyHandleResult::RenderRequested) => {
-                        if let Err(err) = render_sender.send(()).await {
-                            error!(messgae = "Failed to send render request", error = ?err);
-                        }
+                        render_wanted = true;
                     }
                     Err(err) => {
                         error!(message = "Key handler failed", ?err);
-                        if let Err(err) = render_sender.send(()).await {
-                            error!(messgae = "Failed to send render request", error = ?err);
-                        }
+                        render_wanted = true;
                     }
                 },
                 AppEvent::StatusBar(message) => {
                     ui.display_message(message, Level::Error);
+                    render_wanted = true;
                 }
                 AppEvent::Log(msg) => {
                     state.logs.push_back(msg);
@@ -189,19 +197,98 @@ async fn main_task(
                         state.logs.pop_front();
                     }
                 }
+                AppEvent::IdleEvent(event) => {
+                    if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop).await {
+                        error!(messgae = "Failed handle idle event", error = ?err);
+                    }
+                    render_wanted = true;
+                }
+                AppEvent::RequestStatusUpdate => {
+                    match client.get_status().await {
+                        Ok(status) => state.status = status,
+                        Err(err) => {
+                            error!(message = "Unable to send render command from status update loop", ?err);
+                        }
+                    };
+                    render_wanted = true;
+                }
+                AppEvent::RequestRender => {
+                    render_wanted = true;
+                }
             }
         }
+        if render_wanted {
+            let till_next_frame = min_frame_duration.saturating_sub(now.duration_since(last_render));
+            if till_next_frame != Duration::ZERO {
+                continue;
+            }
+            terminal
+                .draw(|frame| {
+                    if let Err(err) = ui.render(frame, &mut state) {
+                        error!(message = "Failed to render a frame", error = ?err);
+                    };
+                })
+                .expect("Expected render to succeed");
+            last_render = now;
+            render_wanted = false;
+        }
     }
+
+    ui::restore_terminal(&mut terminal).expect("Terminal restore to succeed");
+}
+
+#[instrument]
+async fn handle_idle_event(
+    event: IdleEvent,
+    state: &mut state::State,
+    client: &mut Client<'_>,
+    render_loop: &mut RenderLoop,
+) -> Result<()> {
+    match event {
+        IdleEvent::Mixer => state.status.volume = try_ret!(client.get_volume().await, "Failed to get volume"),
+        IdleEvent::Player => {
+            state.current_song = try_ret!(client.get_current_song().await, "Failed get current song");
+            state.status = try_ret!(client.get_status().await, "Failed get status");
+            if let Some(current_song) = state
+                .queue
+                .as_ref()
+                .and_then(|p| p.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
+            {
+                if !state.config.disable_images {
+                    state.album_art = try_ret!(
+                        client.find_album_art(&current_song.file).await,
+                        "Failed to get find album art"
+                    )
+                    .map(state::MyVec::new);
+                }
+            }
+            if state.status.state == mpd::commands::status::State::Play {
+                render_loop.start().await?;
+            } else {
+                render_loop.stop().await?;
+            }
+        }
+        IdleEvent::Options => state.status = try_ret!(client.get_status().await, "Failed to get status"),
+        IdleEvent::Playlist => state.queue = try_ret!(client.playlist_info().await, "Failed to get playlist"),
+        // TODO: handle these events eventually ?
+        IdleEvent::Database => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Update => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Output => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Partition => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Sticker => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Subscription => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Message => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Neighbor => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::Mount => warn!(message = "Received unhandled event", ?event),
+        IdleEvent::StoredPlaylist => {
+            warn!(message = "Received unhandled event", ?event);
+        }
+    };
+    Ok(())
 }
 
 #[instrument(skip_all, fields(events))]
-async fn idle_task(
-    mut idle_client: Client<'_>,
-    mut client: Client<'_>,
-    mut render_loop: RenderLoop,
-    state1: Arc<Mutex<state::State>>,
-    render_sender: Sender<()>,
-) {
+async fn idle_task(mut idle_client: Client<'_>, sender: Sender<AppEvent>) {
     let mut error_count = 0;
     loop {
         let events = match idle_client.idle().await {
@@ -219,89 +306,18 @@ async fn idle_task(
         };
 
         for event in events {
-            let mut state = state1.lock().await;
             trace!(message = "Received idle event", idle_event = ?event);
-            match event {
-                IdleEvent::Mixer => state.status.volume = try_cont!(client.get_volume().await, "Failed to get volume"),
-                IdleEvent::Player => {
-                    state.current_song = try_cont!(client.get_current_song().await, "Failed get current song");
-                    state.status = try_cont!(client.get_status().await, "Failed get status");
-                    if let Some(current_song) = state
-                        .queue
-                        .as_ref()
-                        .and_then(|p| p.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
-                    {
-                        if !state.config.disable_images {
-                            state.album_art = try_cont!(
-                                client.find_album_art(&current_song.file).await,
-                                "Failed to get find album art"
-                            )
-                            .map(state::MyVec::new);
-                        }
-                    }
-                    if state.status.state == mpd::commands::status::State::Play {
-                        render_loop.start(state.config.address);
-                    } else {
-                        render_loop.stop().await;
-                    }
-                }
-                IdleEvent::Options => state.status = try_cont!(client.get_status().await, "Failed to get status"),
-                IdleEvent::Playlist => state.queue = try_cont!(client.playlist_info().await, "Failed to get playlist"),
-                // TODO: handle these events eventually ?
-                IdleEvent::Database => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Update => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Output => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Partition => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Sticker => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Subscription => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Message => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Neighbor => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::Mount => warn!(message = "Received unhandled event", ?event),
-                IdleEvent::StoredPlaylist => {
-                    warn!(message = "Received unhandled event", ?event);
-                }
-            };
+            if let Err(err) = sender.send(AppEvent::IdleEvent(event)).await {
+                error!(messgae = "Failed to send app event", error = ?err);
+            }
         }
-        if let Err(err) = render_sender.send(()).await {
-            tracing::warn!(message = "Failed to send render request", ?err);
-        };
     }
 }
 
 #[instrument(skip_all)]
-async fn render_task<B: Backend>(
-    mut render_rx: tokio::sync::mpsc::Receiver<()>,
-    ui: Arc<Mutex<Ui<'_>>>,
-    state: Arc<Mutex<state::State>>,
-    terminal: Arc<Mutex<Terminal<B>>>,
-) {
-    {
-        let mut state = state.lock().await;
-        let mut ui = ui.lock().await;
-        if let Err(err) = ui.before_show(&mut state).await {
-            error!(message = "Failed to render a frame!!!", error = ?err);
-        };
-    }
-
-    while let Some(()) = render_rx.recv().await {
-        let mut state = state.lock().await;
-        let mut ui = ui.lock().await;
-        let mut terminal = terminal.lock().await;
-        terminal
-            .draw(|frame| {
-                if let Err(err) = ui.render(frame, &mut state) {
-                    error!(message = "Failed to render a frame!!!", error = ?err);
-                };
-            })
-            .expect("Expected render to succeed");
-    }
-}
-
-#[instrument(skip_all)]
-fn event_poll(user_input_tx: Sender<AppEvent>, is_aborted: Arc<Mutex<bool>>) {
+fn input_poll_task(user_input_tx: Sender<AppEvent>, mut end: Receiver<()>) {
     loop {
-        if *is_aborted.blocking_lock() {
-            debug!(message = "Event poll loop ended because it was aborted");
+        if let Ok(()) = end.try_recv() {
             break;
         }
         match crossterm::event::poll(Duration::from_millis(250)) {
@@ -325,91 +341,57 @@ fn event_poll(user_input_tx: Sender<AppEvent>, is_aborted: Arc<Mutex<bool>>) {
     }
 }
 
+enum LoopEvent {
+    Start,
+    Stop,
+}
+
 #[derive(Debug)]
 struct RenderLoop {
-    state: Arc<Mutex<state::State>>,
-    render_sender: tokio::sync::mpsc::Sender<()>,
-    handle: Option<JoinHandle<()>>,
+    event_tx: tokio::sync::mpsc::Sender<LoopEvent>,
 }
 
 impl RenderLoop {
-    fn new(state: Arc<Mutex<state::State>>, render_sender: tokio::sync::mpsc::Sender<()>) -> Self {
-        Self {
-            state,
-            render_sender,
-            handle: None,
+    fn new(render_sender: tokio::sync::mpsc::Sender<AppEvent>) -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<LoopEvent>(32);
+
+        // send stop event at the start to not start the loop immedietally
+        if let Err(err) = tx.try_send(LoopEvent::Stop) {
+            error!(messgae = "Failed to properly initialize status update loop", error = ?err);
         }
-    }
 
-    #[instrument(skip(self))]
-    async fn render_now(&mut self) {
-        if (self.render_sender.send(()).await).is_err() {
-            error!("Unable to send render command from status update loop");
-        }
-    }
-
-    fn start(&mut self, addr: &'static str) -> bool {
-        if self.handle.is_none() {
-            debug!("Started update loop");
-
-            let state = Arc::clone(&self.state);
-            let sender = self.render_sender.clone();
-
+        tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
-            self.handle = Some(tokio::spawn(async move {
-                let mut client = match Client::init(addr, Some("status_loop"), true).await {
-                    Ok(client) => client,
-                    Err(e) => {
-                        error!(message = "Unable to start status update loop", ?e);
-                        return;
-                    }
-                };
-                debug!("Started status update loop");
-                let mut error_count: u8 = 0;
-                loop {
-                    interval.tick().await;
-                    let mut state = state.lock().await;
-                    let status = client.get_status().await;
-                    match status {
-                        Ok(status) => {
-                            state.status = status;
-                            if (sender.send(()).await).is_err() {
-                                error_count += 1;
-                                error!(
-                                    message = "Unable to send render command from status update loop",
-                                    error_count
-                                );
-                            }
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            loop {
+                match rx.try_recv() {
+                    Ok(LoopEvent::Stop) => loop {
+                        if let Some(LoopEvent::Start) = rx.recv().await {
+                            break;
                         }
-                        Err(err) => {
-                            error_count += 1;
-                            error!(
-                                message = "Unable to send render command from status update loop",
-                                ?err,
-                                error_count
-                            );
-                        }
+                    },
+                    Err(TryRecvError::Disconnected) => {
+                        error!("Render loop channel is disconnected");
                     }
-                    if error_count > 5 {
-                        error!(
-                            message = "Status update loop cancelled after retries were exhausted",
-                            error_count
-                        );
-                        break;
-                    }
+                    Ok(LoopEvent::Start) | Err(TryRecvError::Empty) => {} // continue with the update loop
                 }
-            }));
-            true
-        } else {
-            false
-        }
+
+                interval.tick().await;
+                if let Err(err) = render_sender.send(AppEvent::RequestStatusUpdate).await {
+                    error!(messgae = "Failed to send status update request", error = ?err);
+                }
+            }
+        });
+        Self { event_tx: tx }
+    }
+
+    async fn start(&mut self) -> Result<()> {
+        Ok(self.event_tx.send(LoopEvent::Start).await?)
     }
 
     #[instrument(skip(self))]
-    async fn stop(&mut self) {
-        if let Some(handle) = &self.handle {
-            handle.abort();
-            self.handle = None;
-        }
+    async fn stop(&mut self) -> Result<()> {
+        Ok(self.event_tx.send(LoopEvent::Stop).await?)
     }
 }
