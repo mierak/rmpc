@@ -170,13 +170,6 @@ impl<T: std::fmt::Debug + MatchesSearch + AsPath> DirStack<T> {
             }
         }
     }
-
-    pub fn remove(&mut self, idx: usize) {
-        if idx < self.current.items.len() {
-            self.current.items.remove(idx);
-        }
-        self.current.state.remove(idx);
-    }
 }
 
 #[derive(Debug)]
@@ -253,6 +246,22 @@ impl<T: std::fmt::Debug + MatchesSearch> Dir<T> {
             self.state.unmark(sel)
         } else {
             false
+        }
+    }
+
+    pub fn remove(&mut self, idx: usize) {
+        if idx < self.items.len() {
+            self.items.remove(idx);
+        }
+        self.state.remove(idx);
+    }
+
+    pub fn remove_all_marked(&mut self) {
+        for i in 0..self.items.len() {
+            if self.state.marked.contains(&i) {
+                self.items.remove(i);
+                self.state.remove(i);
+            }
         }
     }
 }
@@ -658,13 +667,16 @@ mod dir_test {
     use super::{Dir, DirState};
 
     fn create_subject() -> Dir<String> {
-        Dir {
+        let mut res = Dir {
             items: vec!["a", "b", "c", "d", "f"]
                 .into_iter()
                 .map(ToOwned::to_owned)
                 .collect(),
             state: DirState::default(),
-        }
+        };
+        res.state.content_len(Some(res.items.len() as u16));
+        res.state.viewport_len(Some(res.items.len() as u16));
+        res
     }
 
     mod selected {
@@ -830,6 +842,34 @@ mod dir_test {
             subject.replace(vec!["q", "w"].into_iter().map(ToOwned::to_owned).collect());
 
             assert_eq!(subject.selected().unwrap(), "w");
+        }
+    }
+
+    mod remove {
+        use std::collections::BTreeSet;
+
+        use crate::ui::utils::dirstack::dir_test::create_subject;
+
+        #[test]
+        fn does_nothing_when_outside_range() {
+            let mut subject = create_subject();
+            subject.state.mark(2);
+            subject.state.mark(3);
+
+            subject.remove(5);
+
+            assert_eq!(subject.marked(), &BTreeSet::from([2, 3]));
+        }
+
+        #[test]
+        fn removes_item() {
+            let mut subject = create_subject();
+            subject.state.mark(2);
+            subject.state.mark(3);
+
+            subject.remove(2);
+
+            assert_eq!(subject.marked(), &BTreeSet::from([3]));
         }
     }
 }

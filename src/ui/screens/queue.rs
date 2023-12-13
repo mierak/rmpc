@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
+use strum::Display;
 
 use crate::{
     mpd::{client::Client, mpd_client::MpdClient},
@@ -331,7 +332,7 @@ impl QueueScreen {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum QueueActions {
     Delete,
     DeleteAll,

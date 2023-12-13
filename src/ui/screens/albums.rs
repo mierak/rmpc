@@ -26,6 +26,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
+use strum::Display;
 use tracing::instrument;
 
 #[derive(Debug, Default)]
@@ -298,7 +299,11 @@ impl Screen for AlbumsScreen {
                     self.stack.jump_previous_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
+                CommonAction::Select => {
+                    self.stack.current_mut().toggle_mark_selected();
+                    self.stack.next();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
@@ -306,7 +311,7 @@ impl Screen for AlbumsScreen {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum AlbumsActions {
     AddAll,
 }

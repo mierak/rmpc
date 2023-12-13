@@ -8,6 +8,7 @@ use ratatui::{
     widgets::ListItem,
     Frame,
 };
+use strum::Display;
 use tracing::instrument;
 
 use crate::{
@@ -245,7 +246,11 @@ impl Screen for DirectoriesScreen {
                     self.stack.jump_previous_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
+                CommonAction::Select => {
+                    self.stack.current_mut().toggle_mark_selected();
+                    self.stack.next();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
@@ -253,7 +258,7 @@ impl Screen for DirectoriesScreen {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum DirectoriesActions {
     AddAll,
 }

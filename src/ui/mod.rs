@@ -14,7 +14,7 @@ use ratatui::{
     widgets::{Borders, Paragraph},
     Frame, Terminal,
 };
-use strum::{IntoEnumIterator, VariantNames};
+use strum::{Display, IntoEnumIterator, VariantNames};
 use tracing::instrument;
 
 use crate::state::{State, StatusExt};
@@ -464,7 +464,7 @@ impl Ui<'_> {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum GlobalAction {
     Quit,
     NextTrack,

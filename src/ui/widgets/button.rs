@@ -143,6 +143,7 @@ impl ButtonGroupState {
     }
 
     pub fn next(&mut self) {
+        // todo handle empty buttons
         self.selected = self.selected.saturating_add(1);
         if self.selected > self.button_conut - 1 {
             self.selected = 0;

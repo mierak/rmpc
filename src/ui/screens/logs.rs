@@ -10,6 +10,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation},
     Frame,
 };
+use strum::Display;
 
 use crate::{
     mpd::client::Client,
@@ -161,7 +162,7 @@ impl Screen for LogsScreen {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum LogsActions {
     Clear,
 }

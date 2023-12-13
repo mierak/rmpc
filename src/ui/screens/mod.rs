@@ -83,7 +83,7 @@ pub(super) trait Screen {
     ) -> Result<KeyHandleResultInternal>;
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum CommonAction {
     Down,
     Up,

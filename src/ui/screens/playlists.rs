@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
+use strum::Display;
 use tracing::instrument;
 
 use crate::{
@@ -32,7 +33,7 @@ pub struct PlaylistsScreen {
     filter_input_mode: bool,
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum PlaylistsActions {
     Add,
     Delete,
@@ -227,6 +228,32 @@ impl Screen for PlaylistsScreen {
                             message = "Failed to add playlist/song to current queue because nothing was selected"
                         );
                     }
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                PlaylistsActions::Delete if !self.stack.current().marked().is_empty() => {
+                    for idx in self.stack.current().marked() {
+                        let item = &self.stack.current().items[*idx];
+                        match item {
+                            DirOrSongInfo::Dir(d) => {
+                                client.delete_playlist(d).await?;
+                                shared.status_message =
+                                    Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
+                            }
+                            DirOrSongInfo::Song(s) => {
+                                let Some(DirOrSongInfo::Dir(playlist)) = self.stack.previous().selected() else {
+                                    return Ok(KeyHandleResultInternal::SkipRender);
+                                };
+                                client
+                                    .delete_from_playlist(playlist, &SingleOrRange::single(*idx))
+                                    .await?;
+                                shared.status_message = Some(StatusMessage::new(
+                                    format!("Song '{}' deleted from playlist '{playlist}'", s.title_str()),
+                                    Level::Info,
+                                ));
+                            }
+                        }
+                    }
+                    self.stack.current_mut().remove_all_marked();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 PlaylistsActions::Delete => match self.stack.current().selected_with_idx() {
