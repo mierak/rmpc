@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
@@ -21,11 +20,7 @@ use crate::{
     },
 };
 
-use super::{
-    browser::{DirOrSongInfo, ToListItems},
-    iter::DirOrSongInfoListItems,
-    CommonAction, Screen, SongExt,
-};
+use super::{browser::DirOrSongInfo, iter::DirOrSongInfoListItems, CommonAction, Screen, SongExt};
 
 #[derive(Debug, Default)]
 pub struct PlaylistsScreen {
@@ -41,24 +36,19 @@ pub enum PlaylistsActions {
 }
 
 impl PlaylistsScreen {
-    async fn prepare_preview(
-        &mut self,
-        client: &mut Client<'_>,
-        state: &State,
-    ) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {
         if let Some(current) = self.stack.current().selected() {
             match current {
                 DirOrSongInfo::Dir(d) => {
                     let res = client
-                        .list_playlist_info(d)
-                        .await?
+                        .list_playlist_info(d)?
                         .into_iter()
                         .map(DirOrSongInfo::Song)
                         .listitems(&state.config.symbols, &BTreeSet::default())
                         .collect::<Vec<ListItem<'static>>>();
                     Ok(Some(res))
                 }
-                DirOrSongInfo::Song(s) => Ok(Some(s.to_listitems(&state.config.symbols))),
+                DirOrSongInfo::Song(s) => Ok(Some(s.to_listitems(&state.config.symbols).collect())),
             }
         } else {
             Ok(None)
@@ -66,7 +56,6 @@ impl PlaylistsScreen {
     }
 }
 
-#[async_trait]
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;
     fn render<B: ratatui::prelude::Backend>(
@@ -103,57 +92,49 @@ impl Screen for PlaylistsScreen {
     }
 
     #[instrument(err)]
-    async fn before_show(
+    fn before_show(
         &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
+        client: &mut Client<'_>,
+        app: &mut crate::state::State,
+        shared: &mut SharedUiState,
     ) -> Result<()> {
-        let mut playlists: Vec<_> = _client
+        let mut playlists: Vec<_> = client
             .list_playlists()
-            .await
             .context("Cannot list playlists")?
             .into_iter()
             .map(|playlist| DirOrSongInfo::Dir(playlist.name))
             .collect();
         playlists.sort();
         self.stack = DirStack::new(playlists);
-        let preview = self
-            .prepare_preview(_client, _app)
-            .await
-            .context("Cannot prepare preview")?;
+        let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
         self.stack.set_preview(preview);
         Ok(())
     }
 
     #[instrument(err)]
-    async fn refresh(
+    fn refresh(
         &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
+        client: &mut Client<'_>,
+        app: &mut crate::state::State,
+        shared: &mut SharedUiState,
     ) -> Result<()> {
         if let Some(ref mut selected) = self.stack.current().selected() {
             match selected {
                 DirOrSongInfo::Dir(_) => {
-                    let mut playlists: Vec<_> = _client
+                    let mut playlists: Vec<_> = client
                         .list_playlists()
-                        .await
                         .context("Cannot list playlists")?
                         .into_iter()
                         .map(|playlist| DirOrSongInfo::Dir(playlist.name))
                         .collect();
                     playlists.sort();
                     self.stack.current_mut().replace(playlists);
-                    let preview = self
-                        .prepare_preview(_client, _app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                 }
                 DirOrSongInfo::Song(_) => {
                     if let Some(DirOrSongInfo::Dir(playlist)) = self.stack.previous().selected() {
-                        let info = _client.list_playlist_info(playlist).await?;
+                        let info = client.list_playlist_info(playlist)?;
                         self.stack
                             .current_mut()
                             .replace(info.into_iter().map(DirOrSongInfo::Song).collect());
@@ -166,7 +147,7 @@ impl Screen for PlaylistsScreen {
     }
 
     #[instrument(err)]
-    async fn handle_action(
+    fn handle_action(
         &mut self,
         event: KeyEvent,
         client: &mut Client<'_>,
@@ -205,14 +186,14 @@ impl Screen for PlaylistsScreen {
                     if let Some(playlist) = self.stack.current().selected() {
                         match playlist {
                             DirOrSongInfo::Dir(d) => {
-                                client.load_playlist(d).await?;
+                                client.load_playlist(d)?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("Playlist '{d}' added to queue"),
                                     Level::Info,
                                 ));
                             }
                             DirOrSongInfo::Song(s) => {
-                                client.add(&s.file).await?;
+                                client.add(&s.file)?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("'{}' by '{}' added to queue", s.title_str(), s.artist_str()),
                                     Level::Info,
@@ -235,7 +216,7 @@ impl Screen for PlaylistsScreen {
                         let item = &self.stack.current().items[*idx];
                         match item {
                             DirOrSongInfo::Dir(d) => {
-                                client.delete_playlist(d).await?;
+                                client.delete_playlist(d)?;
                                 shared.status_message =
                                     Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
                             }
@@ -243,9 +224,7 @@ impl Screen for PlaylistsScreen {
                                 let Some(DirOrSongInfo::Dir(playlist)) = self.stack.previous().selected() else {
                                     return Ok(KeyHandleResultInternal::SkipRender);
                                 };
-                                client
-                                    .delete_from_playlist(playlist, &SingleOrRange::single(*idx))
-                                    .await?;
+                                client.delete_from_playlist(playlist, &SingleOrRange::single(*idx))?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("Song '{}' deleted from playlist '{playlist}'", s.title_str()),
                                     Level::Info,
@@ -258,7 +237,7 @@ impl Screen for PlaylistsScreen {
                 }
                 PlaylistsActions::Delete => match self.stack.current().selected_with_idx() {
                     Some((DirOrSongInfo::Dir(d), _)) => {
-                        client.delete_playlist(d).await?;
+                        client.delete_playlist(d)?;
                         shared.status_message =
                             Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
                         Ok(KeyHandleResultInternal::RenderRequested)
@@ -268,24 +247,22 @@ impl Screen for PlaylistsScreen {
                             return Ok(KeyHandleResultInternal::SkipRender);
                         };
                         if self.stack.current().marked().is_empty() {
-                            client
-                                .delete_from_playlist(playlist, &SingleOrRange::single(idx))
-                                .await?;
+                            client.delete_from_playlist(playlist, &SingleOrRange::single(idx))?;
                             shared.status_message = Some(StatusMessage::new(
                                 format!("Song '{}' deleted from playlist '{playlist}'", s.title_str()),
                                 Level::Info,
                             ));
-                            self.refresh(client, app, shared).await?;
+                            self.refresh(client, app, shared)?;
                         } else {
                             let ranges: Ranges = self.stack.current().marked().into();
                             for range in ranges.iter().rev() {
-                                client.delete_from_playlist(playlist, range).await?;
+                                client.delete_from_playlist(playlist, range)?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("Songs in ranges '{ranges}' deleted from playlist '{playlist}'",),
                                     Level::Info,
                                 ));
                             }
-                            self.refresh(client, app, shared).await?;
+                            self.refresh(client, app, shared)?;
                         }
                         Ok(KeyHandleResultInternal::SkipRender)
                     }
@@ -303,48 +280,36 @@ impl Screen for PlaylistsScreen {
             match action {
                 CommonAction::DownHalf => {
                     self.stack.next_half_viewport();
-                    let preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     self.stack.prev_half_viewport();
-                    let preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
                     self.stack.prev();
-                    let preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     self.stack.next();
-                    let preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.prepare_preview(client, app).await?;
+                    self.prepare_preview(client, app)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.prepare_preview(client, app).await?;
+                    self.prepare_preview(client, app)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
@@ -355,11 +320,11 @@ impl Screen for PlaylistsScreen {
 
                     match selected {
                         DirOrSongInfo::Dir(playlist) => {
-                            let info = client.list_playlist_info(playlist).await?;
+                            let info = client.list_playlist_info(playlist)?;
                             self.stack.push(info.into_iter().map(DirOrSongInfo::Song).collect());
                         }
                         DirOrSongInfo::Song(song) => {
-                            client.add(&song.file).await?;
+                            client.add(&song.file)?;
                             shared.status_message = Some(StatusMessage::new(
                                 format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
                                 Level::Info,
@@ -367,19 +332,13 @@ impl Screen for PlaylistsScreen {
                         }
                     }
 
-                    let preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Left => {
                     self.stack.pop();
-                    let preview = self
-                        .prepare_preview(client, app)
-                        .await
-                        .context("Cannot prepare preview")?;
+                    let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }

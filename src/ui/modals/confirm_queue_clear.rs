@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Margin},
@@ -22,7 +21,6 @@ pub struct ConfirmQueueClearModal {
     button_group: ButtonGroupState,
 }
 
-#[async_trait]
 impl Modal for ConfirmQueueClearModal {
     fn render<B: Backend>(
         &mut self,
@@ -56,10 +54,10 @@ impl Modal for ConfirmQueueClearModal {
         Ok(())
     }
 
-    async fn handle_key(
+    fn handle_key(
         &mut self,
         key: KeyEvent,
-        _client: &mut Client<'_>,
+        client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
@@ -82,7 +80,7 @@ impl Modal for ConfirmQueueClearModal {
             }
             KeyCode::Enter => {
                 if self.button_group.selected == 0 {
-                    _client.clear().await?;
+                    client.clear()?;
                 }
                 self.button_group = ButtonGroupState::default();
                 Ok(KeyHandleResultInternal::Modal(None))

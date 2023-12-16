@@ -11,7 +11,7 @@
     clippy::match_single_binding,
     unused_macros
 )]
-use std::{ops::Sub, time::Duration};
+use std::{ops::Sub, sync::mpsc::TryRecvError, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
@@ -19,10 +19,6 @@ use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
-use tokio::sync::{
-    mpsc::{error::TryRecvError, Sender},
-    oneshot::Receiver,
-};
 use tracing::{error, info, instrument, trace, warn};
 use ui::Level;
 
@@ -58,8 +54,7 @@ fn read_cfg(args: &Args) -> Result<Config> {
     Ok(res.into())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = Args::parse();
     match &args.command {
         Some(Command::Config) => {
@@ -76,7 +71,7 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         None => {
-            let (tx, rx) = tokio::sync::mpsc::channel::<AppEvent>(1024);
+            let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             let _guards = logging::configure(args.log, &tx.clone());
             let config = Box::leak(Box::new(match read_cfg(&args) {
                 Ok(val) => val,
@@ -86,45 +81,49 @@ async fn main() -> Result<()> {
                 }
             }));
 
-            try_ret!(tx.send(AppEvent::RequestRender).await, "Failed to render first frame");
+            try_ret!(tx.send(AppEvent::RequestRender), "Failed to render first frame");
 
             let mut client = try_ret!(
-                Client::init(config.address, Some("command"), true).await,
+                Client::init(config.address, Some("command"), true),
                 "Failed to connect to mpd"
             );
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
-            let state = try_ret!(
-                state::State::try_new(&mut client, config).await,
-                "Failed to create app state"
-            );
+            let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");
 
             let mut render_loop = RenderLoop::new(tx.clone());
             if state.status.state == mpd::commands::status::State::Play {
-                render_loop.start().await?;
+                render_loop.start()?;
             }
 
-            let (endtx, endrx) = tokio::sync::oneshot::channel::<()>();
-
             let tx_clone = tx.clone();
-            let _input_task = tokio::task::spawn_blocking(move || input_poll_task(tx_clone, endrx));
-            let main_task = tokio::spawn(main_task(
-                Ui::new(client),
-                state,
-                rx,
-                try_ret!(
-                    Client::init(config.address, Some("state"), true).await,
-                    "Failed to connect to mpd with state client"
-                ),
-                render_loop,
-                terminal,
-            ));
-            let idle_task = tokio::task::spawn(idle_task(
-                try_ret!(
-                    Client::init(config.address, Some("idle"), true).await,
-                    "Failed to connect to mpd with idle client"
-                ),
-                tx,
-            ));
+
+            std::thread::Builder::new()
+                .name("input poll".to_owned())
+                .spawn(|| input_poll_task(tx_clone))?;
+            let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
+                main_task(
+                    Ui::new(client),
+                    state,
+                    rx,
+                    try_ret!(
+                        Client::init(config.address, Some("state"), true),
+                        "Failed to connect to mpd with state client"
+                    ),
+                    render_loop,
+                    terminal,
+                );
+                Ok(())
+            })?;
+            std::thread::Builder::new().name("idle task".to_owned()).spawn(|| {
+                idle_task(
+                    try_ret!(
+                        Client::init(config.address, Some("idle"), true),
+                        "Failed to connect to mpd with idle client"
+                    ),
+                    tx,
+                );
+                Ok(())
+            })?;
 
             let original_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {
@@ -135,14 +134,8 @@ async fn main() -> Result<()> {
             }));
 
             info!(message = "Application initialized successfully", ?config);
-            try_ret!(
-                tokio::select! {
-                    v = idle_task => v,
-                    v = main_task => v,
-                },
-                "A task panicked. This should not happen, please check logs."
-            );
-            try_ret!(endtx.send(()), "Failed to notify event task.");
+
+            let _ = main_task.join().expect("Main task to not fail");
         }
     }
 
@@ -150,10 +143,10 @@ async fn main() -> Result<()> {
 }
 
 #[instrument(skip_all)]
-async fn main_task<B: Backend + std::io::Write>(
+fn main_task<B: Backend + std::io::Write>(
     mut ui: Ui<'static>,
     mut state: state::State,
-    mut event_receiver: tokio::sync::mpsc::Receiver<AppEvent>,
+    event_receiver: std::sync::mpsc::Receiver<AppEvent>,
     mut client: Client<'_>,
     mut render_loop: RenderLoop,
     mut terminal: Terminal<B>,
@@ -161,22 +154,33 @@ async fn main_task<B: Backend + std::io::Write>(
     let mut render_wanted = false;
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
-    let mut last_render = tokio::time::Instant::now().sub(Duration::from_secs(10));
+    let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
 
     loop {
-        let now = tokio::time::Instant::now();
+        let now = std::time::Instant::now();
+        std::thread::sleep(
+            min_frame_duration
+                .checked_sub(now - last_render)
+                .unwrap_or(Duration::ZERO),
+        );
+
         let event = if render_wanted {
-            tokio::select! {
-                () = tokio::time::sleep(min_frame_duration.checked_sub(now - last_render).unwrap_or(Duration::ZERO)) => None,
-                v = event_receiver.recv() => v,
+            match event_receiver.recv_timeout(
+                min_frame_duration
+                    .checked_sub(now - last_render)
+                    .unwrap_or(Duration::ZERO),
+            ) {
+                Ok(v) => Some(v),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => None,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => None,
             }
         } else {
-            event_receiver.recv().await
+            event_receiver.recv().ok()
         };
 
         if let Some(event) = event {
             match event {
-                AppEvent::UserInput(key) => match ui.handle_key(key, &mut state).await {
+                AppEvent::UserInput(key) => match ui.handle_key(key, &mut state) {
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
                     Ok(ui::KeyHandleResult::Quit) => break,
                     Ok(ui::KeyHandleResult::RenderRequested) => {
@@ -198,13 +202,13 @@ async fn main_task<B: Backend + std::io::Write>(
                     }
                 }
                 AppEvent::IdleEvent(event) => {
-                    if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop).await {
-                        error!(messgae = "Failed handle idle event", error = ?err);
+                    if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
+                        error!(message = "Failed handle idle event", error = ?err);
                     }
                     render_wanted = true;
                 }
                 AppEvent::RequestStatusUpdate => {
-                    match client.get_status().await {
+                    match client.get_status() {
                         Ok(status) => state.status = status,
                         Err(err) => {
                             error!(message = "Unable to send render command from status update loop", ?err);
@@ -238,17 +242,17 @@ async fn main_task<B: Backend + std::io::Write>(
 }
 
 #[instrument]
-async fn handle_idle_event(
+fn handle_idle_event(
     event: IdleEvent,
     state: &mut state::State,
     client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
 ) -> Result<()> {
     match event {
-        IdleEvent::Mixer => state.status.volume = try_ret!(client.get_volume().await, "Failed to get volume"),
+        IdleEvent::Mixer => state.status.volume = try_ret!(client.get_volume(), "Failed to get volume"),
         IdleEvent::Player => {
-            state.current_song = try_ret!(client.get_current_song().await, "Failed get current song");
-            state.status = try_ret!(client.get_status().await, "Failed get status");
+            state.current_song = try_ret!(client.get_current_song(), "Failed get current song");
+            state.status = try_ret!(client.get_status(), "Failed get status");
             if let Some(current_song) = state
                 .queue
                 .as_ref()
@@ -256,20 +260,21 @@ async fn handle_idle_event(
             {
                 if !state.config.disable_images {
                     state.album_art = try_ret!(
-                        client.find_album_art(&current_song.file).await,
+                        client.find_album_art(&current_song.file),
                         "Failed to get find album art"
                     )
                     .map(state::MyVec::new);
                 }
             }
+
             if state.status.state == mpd::commands::status::State::Play {
-                render_loop.start().await?;
+                render_loop.start()?;
             } else {
-                render_loop.stop().await?;
+                render_loop.stop()?;
             }
         }
-        IdleEvent::Options => state.status = try_ret!(client.get_status().await, "Failed to get status"),
-        IdleEvent::Playlist => state.queue = try_ret!(client.playlist_info().await, "Failed to get playlist"),
+        IdleEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
+        IdleEvent::Playlist => state.queue = try_ret!(client.playlist_info(), "Failed to get playlist"),
         // TODO: handle these events eventually ?
         IdleEvent::Database => warn!(message = "Received unhandled event", ?event),
         IdleEvent::Update => warn!(message = "Received unhandled event", ?event),
@@ -288,10 +293,10 @@ async fn handle_idle_event(
 }
 
 #[instrument(skip_all, fields(events))]
-async fn idle_task(mut idle_client: Client<'_>, sender: Sender<AppEvent>) {
+fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEvent>) {
     let mut error_count = 0;
     loop {
-        let events = match idle_client.idle().await {
+        let events = match idle_client.idle() {
             Ok(val) => val,
             Err(err) => {
                 if error_count > 5 {
@@ -300,38 +305,35 @@ async fn idle_task(mut idle_client: Client<'_>, sender: Sender<AppEvent>) {
                 }
                 warn!(message = "Unexpected error when receiving idle events", ?err);
                 error_count += 1;
-                tokio::time::sleep(Duration::from_secs(error_count)).await;
+                std::thread::sleep(Duration::from_secs(error_count));
                 continue;
             }
         };
 
         for event in events {
             trace!(message = "Received idle event", idle_event = ?event);
-            if let Err(err) = sender.send(AppEvent::IdleEvent(event)).await {
-                error!(messgae = "Failed to send app event", error = ?err);
+            if let Err(err) = sender.send(AppEvent::IdleEvent(event)) {
+                error!(message = "Failed to send app event", error = ?err);
             }
         }
     }
 }
 
 #[instrument(skip_all)]
-fn input_poll_task(user_input_tx: Sender<AppEvent>, mut end: Receiver<()>) {
+fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
     loop {
-        if let Ok(()) = end.try_recv() {
-            break;
-        }
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(true) => {
                 let event = match crossterm::event::read() {
                     Ok(e) => e,
                     Err(err) => {
-                        warn!(messgae = "Failed to read input event", error = ?err);
+                        warn!(message = "Failed to read input event", error = ?err);
                         continue;
                     }
                 };
                 if let Event::Key(key) = event {
-                    if let Err(err) = user_input_tx.try_send(AppEvent::UserInput(key)) {
-                        error!(messgae = "Failed to send user input", error = ?err);
+                    if let Err(err) = user_input_tx.send(AppEvent::UserInput(key)) {
+                        error!(messge = "Failed to send user input", error = ?err);
                     }
                 }
             }
@@ -348,26 +350,23 @@ enum LoopEvent {
 
 #[derive(Debug)]
 struct RenderLoop {
-    event_tx: tokio::sync::mpsc::Sender<LoopEvent>,
+    event_tx: std::sync::mpsc::Sender<LoopEvent>,
 }
 
 impl RenderLoop {
-    fn new(render_sender: tokio::sync::mpsc::Sender<AppEvent>) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<LoopEvent>(32);
+    fn new(render_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
+        let (tx, rx) = std::sync::mpsc::channel::<LoopEvent>();
 
         // send stop event at the start to not start the loop immedietally
-        if let Err(err) = tx.try_send(LoopEvent::Stop) {
-            error!(messgae = "Failed to properly initialize status update loop", error = ?err);
+        if let Err(err) = tx.send(LoopEvent::Stop) {
+            error!(message = "Failed to properly initialize status update loop", error = ?err);
         }
 
-        tokio::task::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
+        std::thread::spawn(move || {
             loop {
                 match rx.try_recv() {
                     Ok(LoopEvent::Stop) => loop {
-                        if let Some(LoopEvent::Start) = rx.recv().await {
+                        if let Ok(LoopEvent::Start) = rx.try_recv() {
                             break;
                         }
                     },
@@ -377,21 +376,21 @@ impl RenderLoop {
                     Ok(LoopEvent::Start) | Err(TryRecvError::Empty) => {} // continue with the update loop
                 }
 
-                interval.tick().await;
-                if let Err(err) = render_sender.send(AppEvent::RequestStatusUpdate).await {
-                    error!(messgae = "Failed to send status update request", error = ?err);
+                std::thread::sleep(Duration::from_secs(1));
+                if let Err(err) = render_sender.send(AppEvent::RequestStatusUpdate) {
+                    error!(message = "Failed to send status update request", error = ?err);
                 }
             }
         });
         Self { event_tx: tx }
     }
 
-    async fn start(&mut self) -> Result<()> {
-        Ok(self.event_tx.send(LoopEvent::Start).await?)
+    fn start(&mut self) -> Result<()> {
+        Ok(self.event_tx.send(LoopEvent::Start)?)
     }
 
     #[instrument(skip(self))]
-    async fn stop(&mut self) -> Result<()> {
-        Ok(self.event_tx.send(LoopEvent::Stop).await?)
+    fn stop(&mut self) -> Result<()> {
+        Ok(self.event_tx.send(LoopEvent::Stop)?)
     }
 }

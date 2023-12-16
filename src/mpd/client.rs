@@ -1,13 +1,10 @@
-use std::str::FromStr;
+use std::{
+    io::{BufRead, BufReader, Read, Write},
+    net::TcpStream,
+    str::FromStr,
+};
 
 use anyhow::Result;
-use tokio::{
-    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::{
-        tcp::{OwnedReadHalf, OwnedWriteHalf},
-        TcpStream,
-    },
-};
 use tracing::{debug, trace};
 
 use super::{
@@ -19,8 +16,8 @@ type MpdResult<T> = Result<T, MpdError>;
 
 pub struct Client<'a> {
     name: Option<&'a str>,
-    rx: BufReader<OwnedReadHalf>,
-    tx: OwnedWriteHalf,
+    rx: BufReader<TcpStream>,
+    stream: TcpStream,
     reconnect: bool,
     addr: &'static str,
 }
@@ -38,69 +35,61 @@ impl std::fmt::Debug for Client<'_> {
 #[allow(dead_code)]
 impl<'a> Client<'a> {
     #[tracing::instrument]
-    pub async fn init(addr: &'static str, name: Option<&'a str>, reconnect: bool) -> MpdResult<Client<'a>> {
-        let stream = TcpStream::connect(&addr).await?;
-        let (rx, tx) = stream.into_split();
-        let mut rx = BufReader::new(rx);
+    pub fn init(addr: &'static str, name: Option<&'a str>, reconnect: bool) -> MpdResult<Client<'a>> {
+        let stream = TcpStream::connect(addr)?;
+        let mut rx = BufReader::new(stream.try_clone()?);
 
         let mut buf = String::new();
-        rx.read_line(&mut buf).await?;
+        rx.read_line(&mut buf)?;
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
         };
-
         debug!(message = "MPD client initiazed", handshake = buf.trim());
+
         Ok(Self {
             name,
             rx,
-            tx,
+            stream,
             reconnect,
             addr,
         })
     }
 
     #[tracing::instrument]
-    async fn reconnect(&mut self) -> MpdResult<&Client> {
-        let stream = TcpStream::connect(&self.addr).await?;
-        let (rx, tx) = stream.into_split();
-        let mut rx = BufReader::new(rx);
+    fn reconnect(&mut self) -> MpdResult<&Client> {
+        let stream = TcpStream::connect(self.addr)?;
+        let mut rx = BufReader::new(stream.try_clone()?);
 
         let mut buf = String::new();
-        rx.read_line(&mut buf).await?;
+        rx.read_line(&mut buf)?;
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
         };
         self.rx = rx;
-        self.tx = tx;
+        self.stream = stream;
 
         debug!(message = "MPD client reconnected", handshake = buf.trim(),);
         Ok(self)
     }
 
     #[tracing::instrument(skip(self))]
-    pub(super) async fn execute_binary(&mut self, command: &str) -> MpdResult<Option<Vec<u8>>> {
+    pub(super) fn execute_binary(&mut self, command: &str) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
 
-        self.tx
-            .write_all(format!("{command} {} \n", buf.len()).as_bytes())
-            .await?;
-        let _ = match Self::read_binary(&mut self.rx, &mut buf).await {
+        self.write_command(&format!("{command} {}", buf.len()))?;
+        let _ = match Self::read_binary(&mut self.rx, &mut buf) {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) => return Ok(None),
             Err(MpdError::ClientClosed) if self.reconnect => {
-                self.reconnect().await?;
-                self.tx
-                    .write_all(format!("{command} {} \n", buf.len()).as_bytes())
-                    .await?;
-                Self::read_binary(&mut self.rx, &mut buf).await
+                self.reconnect()?;
+                self.write_command(&format!("{command} {}", buf.len()))?;
+                Self::read_binary(&mut self.rx, &mut buf)
             }
             Err(e) => Err(e),
         };
         loop {
-            self.tx
-                .write_all(format!("{command} {} \n", buf.len()).as_bytes())
-                .await?;
-            if let Some(response) = Self::read_binary(&mut self.rx, &mut buf).await? {
+            self.write_command(&format!("{command} {}", buf.len()))?;
+            if let Some(response) = Self::read_binary(&mut self.rx, &mut buf)? {
                 if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
                     trace!(message = "Finshed reading binary response", len = buf.len());
                     break;
@@ -113,66 +102,65 @@ impl<'a> Client<'a> {
     }
 
     #[tracing::instrument(skip(self))]
-    pub(super) async fn execute<T>(&mut self, command: &str) -> MpdResult<T>
+    pub(super) fn execute<T>(&mut self, command: &str) -> MpdResult<T>
     where
         T: FromMpd + FromMpdBuilder<T>,
     {
-        self.tx.write_all([command, "\n"].concat().as_bytes()).await?;
-        match Self::read::<BufReader<OwnedReadHalf>, T, T>(&mut self.rx).await {
+        self.write_command(command)?;
+        match Self::read::<BufReader<TcpStream>, T, T>(&mut self.rx) {
             Ok(v) => Ok(v),
             Err(MpdError::ClientClosed) => {
-                self.reconnect().await?;
-                self.tx.write_all([command, "\n"].concat().as_bytes()).await?;
-                Self::read::<BufReader<OwnedReadHalf>, T, T>(&mut self.rx).await
+                self.reconnect()?;
+                self.write_command(command)?;
+                Self::read::<BufReader<TcpStream>, T, T>(&mut self.rx)
             }
             Err(e) => Err(e),
         }
     }
 
     #[tracing::instrument(skip(self), fields(command = ?command))]
-    pub(super) async fn execute_option<T>(&mut self, command: &str) -> MpdResult<Option<T>>
+    pub(super) fn execute_option<T>(&mut self, command: &str) -> MpdResult<Option<T>>
     where
         T: FromMpd + FromMpdBuilder<T>,
     {
-        self.tx.write_all([command, "\n"].concat().as_bytes()).await?;
-        match Self::read_option::<BufReader<OwnedReadHalf>, T, T>(&mut self.rx).await {
+        self.write_command(command)?;
+        match Self::read_option::<BufReader<TcpStream>, T, T>(&mut self.rx) {
             Ok(v) => Ok(v),
             Err(MpdError::ClientClosed) => {
-                self.reconnect().await?;
-                self.tx.write_all([command, "\n"].concat().as_bytes()).await?;
-                Self::read_option::<BufReader<OwnedReadHalf>, T, T>(&mut self.rx).await
+                self.reconnect()?;
+                self.write_command(command)?;
+                Self::read_option::<BufReader<TcpStream>, T, T>(&mut self.rx)
             }
             Err(e) => Err(e),
         }
     }
 
     #[tracing::instrument(skip(self), fields(command = ?command))]
-    pub(super) async fn execute_ok(&mut self, command: &str) -> MpdResult<()> {
-        self.tx.write_all([command, "\n"].concat().as_bytes()).await?;
-        match Self::read_ok(&mut self.rx).await {
+    pub(super) fn execute_ok(&mut self, command: &str) -> MpdResult<()> {
+        self.write_command(command)?;
+        match Self::read_ok(&mut self.rx) {
             Ok(v) => Ok(v),
             Err(MpdError::ClientClosed) => {
-                self.reconnect().await?;
-                self.tx.write_all([command, "\n"].concat().as_bytes()).await?;
-                Self::read_ok(&mut self.rx).await
+                self.reconnect()?;
+                self.write_command(command)?;
+                Self::read_ok(&mut self.rx)
             }
             Err(e) => Err(e),
         }
     }
 
     #[tracing::instrument(skip(read, binary_buf), fields(buf_len = binary_buf.len()))]
-    async fn read_binary<R: std::fmt::Debug>(
+    fn read_binary<R: std::fmt::Debug>(
         read: &mut R,
         binary_buf: &mut Vec<u8>,
     ) -> Result<Option<BinaryMpdResponse>, MpdError>
     where
-        R: tokio::io::AsyncBufRead + Unpin,
+        R: std::io::BufRead,
     {
         let mut result = BinaryMpdResponse::default();
         {
-            let mut lines = read.lines();
             loop {
-                match Self::read_mpd_line(lines.next_line().await?)? {
+                match Self::read_mpd_line(read)? {
                     MpdLine::Ok => {
                         tracing::warn!("Expected binary data but got 'OK'");
                         return Ok(None);
@@ -197,26 +185,25 @@ impl<'a> Client<'a> {
             }
         }
         let mut handle = read.take(result.bytes_read);
-        let _ = handle.read_to_end(binary_buf).await?;
-        let _ = read.read_line(&mut String::new()).await; // MPD prints an empty new line at the end of binary response
-        match Self::read_mpd_line(read.lines().next_line().await?)? {
+        let _ = handle.read_to_end(binary_buf)?;
+        let _ = read.read_line(&mut String::new()); // MPD prints an empty new line at the end of binary response
+        match Self::read_mpd_line(read)? {
             MpdLine::Ok => Ok(Some(result)),
             MpdLine::Value(val) => Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'"))),
         }
     }
 
     #[tracing::instrument(skip(read))]
-    async fn read<R, A, V>(read: &mut R) -> Result<V, MpdError>
+    fn read<R, A, V>(read: &mut R) -> Result<V, MpdError>
     where
-        R: tokio::io::AsyncBufRead + Unpin,
+        R: std::io::BufRead,
         V: FromMpd,
         A: FromMpdBuilder<V>,
     {
         trace!(message = "Reading command");
         let mut result = A::create();
-        let mut lines = read.lines();
         loop {
-            match Self::read_mpd_line(lines.next_line().await?)? {
+            match Self::read_mpd_line(read)? {
                 MpdLine::Ok => break,
                 MpdLine::Value(val) => result.next(val)?,
             };
@@ -226,31 +213,29 @@ impl<'a> Client<'a> {
     }
 
     #[tracing::instrument(skip(read))]
-    async fn read_ok<R>(read: &mut R) -> Result<(), MpdError>
+    fn read_ok<R>(read: &mut R) -> Result<(), MpdError>
     where
-        R: tokio::io::AsyncBufRead + Unpin,
+        R: std::io::BufRead,
     {
         trace!(message = "Reading command");
-        let mut lines = read.lines();
-        match Self::read_mpd_line(lines.next_line().await?)? {
+        match Self::read_mpd_line(read)? {
             MpdLine::Ok => Ok(()),
             MpdLine::Value(val) => Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'"))),
         }
     }
 
     #[tracing::instrument(skip(read))]
-    async fn read_option<R, A, V>(read: &mut R) -> Result<Option<V>, MpdError>
+    fn read_option<R, A, V>(read: &mut R) -> Result<Option<V>, MpdError>
     where
-        R: tokio::io::AsyncBufRead + Unpin,
+        R: std::io::BufRead,
         V: FromMpd,
         A: FromMpdBuilder<V>,
     {
         trace!(message = "Reading command");
         let mut result = A::create();
-        let mut lines = read.lines();
         let mut found_any = false;
         loop {
-            match Self::read_mpd_line(lines.next_line().await?)? {
+            match Self::read_mpd_line(read)? {
                 MpdLine::Ok => break,
                 MpdLine::Value(val) => {
                     found_any = true;
@@ -266,18 +251,33 @@ impl<'a> Client<'a> {
         }
     }
 
-    fn read_mpd_line(line: Option<String>) -> Result<MpdLine, MpdError> {
-        if let Some(line) = line {
-            if line.starts_with("OK") || line.starts_with("list_OK") {
-                return Ok(MpdLine::Ok);
+    fn write_command(&mut self, command: &str) -> Result<(), MpdError> {
+        if let Err(e) = self.stream.write_all([command, "\n"].concat().as_bytes()) {
+            if e.kind() == std::io::ErrorKind::BrokenPipe {
+                self.reconnect()?;
+                self.stream.write_all([command, "\n"].concat().as_bytes())?;
             }
-            if line.starts_with("ACK") {
-                return Err(MpdError::Mpd(MpdFailureResponse::from_str(&line)?));
-            }
-            Ok(MpdLine::Value(line))
-        } else {
-            Err(MpdError::ClientClosed)
         }
+        Ok(())
+    }
+
+    fn read_mpd_line<R: std::io::BufRead>(read: &mut R) -> Result<MpdLine, MpdError> {
+        let mut line = String::new();
+
+        match read.read_line(&mut line) {
+            Ok(v) => Ok(v),
+            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Err(MpdError::ClientClosed),
+            _ => Err(MpdError::ClientClosed),
+        }?;
+
+        if line.starts_with("OK") || line.starts_with("list_OK") {
+            return Ok(MpdLine::Ok);
+        }
+        if line.starts_with("ACK") {
+            return Err(MpdError::Mpd(MpdFailureResponse::from_str(&line)?));
+        }
+        line.pop(); // pop the new line
+        Ok(MpdLine::Value(line))
     }
 }
 
@@ -323,27 +323,29 @@ mod tests {
     }
 
     mod read_mpd_line {
+        use std::io::Cursor;
+
         use crate::mpd::{
             client::{Client, MpdLine},
             errors::{ErrorCode, MpdError, MpdFailureResponse},
         };
 
-        #[tokio::test]
-        async fn returns_ok() {
-            let result = Client::read_mpd_line(Some("OK enenene".to_owned()));
+        #[test]
+        fn returns_ok() {
+            let result = Client::read_mpd_line(&mut Cursor::new("OK enenene".to_owned()));
 
             assert_eq!(Ok(MpdLine::Ok), result);
         }
 
-        #[tokio::test]
-        async fn returns_ok_for_list_ok() {
-            let result = Client::read_mpd_line(Some("list_OK enenene".to_owned()));
+        #[test]
+        fn returns_ok_for_list_ok() {
+            let result = Client::read_mpd_line(&mut Cursor::new("list_OK enenene".to_owned()));
 
             assert_eq!(Ok(MpdLine::Ok), result);
         }
 
-        #[tokio::test]
-        async fn returns_mpd_err() {
+        #[test]
+        fn returns_mpd_err() {
             let err = MpdFailureResponse {
                 code: ErrorCode::PlayerSync,
                 command_list_index: 2,
@@ -351,14 +353,27 @@ mod tests {
                 message: "error message boi".to_string(),
             };
 
-            let result = Client::read_mpd_line(Some("ACK [55@2] {some_cmd} error message boi".to_owned()));
+            let result = Client::read_mpd_line(&mut Cursor::new("ACK [55@2] {some_cmd} error message boi".to_owned()));
 
             assert_eq!(Err(MpdError::Mpd(err)), result);
         }
 
-        #[tokio::test]
-        async fn returns_client_closed() {
-            let result = Client::read_mpd_line(None);
+        #[test]
+        fn returns_client_closed_on_broken_pipe() {
+            struct Mock;
+            impl std::io::BufRead for Mock {
+                fn consume(&mut self, _amt: usize) {}
+                fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                    Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+                }
+            }
+            impl std::io::Read for Mock {
+                fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+                }
+            }
+
+            let result = Client::read_mpd_line(&mut Mock);
 
             assert_eq!(Err(MpdError::ClientClosed), result);
         }
@@ -372,12 +387,12 @@ mod tests {
 
         use super::*;
 
-        #[tokio::test]
-        async fn parses_correct_response() {
+        #[test]
+        fn parses_correct_response() {
             let buf: &[u8] = b"val_b: a\nval_a: 5\nOK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(
                 result,
@@ -388,18 +403,18 @@ mod tests {
             );
         }
 
-        #[tokio::test]
-        async fn returns_parse_error() {
+        #[test]
+        fn returns_parse_error() {
             let buf: &[u8] = b"fail: lol\nOK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(result, Err(MpdError::Generic(String::from("intentional fail"))));
         }
 
-        #[tokio::test]
-        async fn returns_mpd_error() {
+        #[test]
+        fn returns_mpd_error() {
             let buf: &[u8] = b"ACK [55@2] {some_cmd} error message boi\n";
             let err = MpdFailureResponse {
                 code: ErrorCode::PlayerSync,
@@ -409,7 +424,7 @@ mod tests {
             };
             let mut c = Cursor::new(buf);
 
-            let result = Client::read::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -422,12 +437,12 @@ mod tests {
 
         use super::*;
 
-        #[tokio::test]
-        async fn parses_correct_response() {
+        #[test]
+        fn parses_correct_response() {
             let buf: &[u8] = b"val_b: a\nval_a: 5\nOK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(
                 result,
@@ -438,28 +453,28 @@ mod tests {
             );
         }
 
-        #[tokio::test]
-        async fn returns_none() {
+        #[test]
+        fn returns_none() {
             let buf: &[u8] = b"OK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(result, Ok(None));
         }
 
-        #[tokio::test]
-        async fn returns_parse_error() {
+        #[test]
+        fn returns_parse_error() {
             let buf: &[u8] = b"fail: lol\nOK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(result, Err(MpdError::Generic(String::from("intentional fail"))));
         }
 
-        #[tokio::test]
-        async fn returns_mpd_error() {
+        #[test]
+        fn returns_mpd_error() {
             let buf: &[u8] = b"ACK [55@2] {some_cmd} error message boi\n";
             let err = MpdFailureResponse {
                 code: ErrorCode::PlayerSync,
@@ -469,7 +484,7 @@ mod tests {
             };
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c).await;
+            let result = Client::read_option::<Cursor<&[u8]>, TestMpdObject, TestMpdObject>(&mut c);
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -483,18 +498,18 @@ mod tests {
 
         use super::*;
 
-        #[tokio::test]
-        async fn parses_correct_response() {
+        #[test]
+        fn parses_correct_response() {
             let buf: &[u8] = b"OK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_ok(&mut c).await;
+            let result = Client::read_ok(&mut c);
 
             assert_eq!(result, Ok(()));
         }
 
-        #[tokio::test]
-        async fn returns_mpd_error() {
+        #[test]
+        fn returns_mpd_error() {
             let buf: &[u8] = b"ACK [55@2] {some_cmd} error message boi\n";
             let err = MpdFailureResponse {
                 code: ErrorCode::PlayerSync,
@@ -504,17 +519,17 @@ mod tests {
             };
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_ok(&mut c).await;
+            let result = Client::read_ok(&mut c);
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
 
-        #[tokio::test]
-        async fn returns_error_when_receiving_value() {
+        #[test]
+        fn returns_error_when_receiving_value() {
             let buf: &[u8] = b"idc\nOK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_ok(&mut c).await;
+            let result = Client::read_ok(&mut c);
 
             assert_eq!(
                 result,
@@ -531,8 +546,8 @@ mod tests {
             errors::{ErrorCode, MpdError, MpdFailureResponse},
         };
 
-        #[tokio::test]
-        async fn returns_mpd_error() {
+        #[test]
+        fn returns_mpd_error() {
             let buf: &[u8] = b"ACK [55@2] {some_cmd} error message boi\n";
             let err = MpdFailureResponse {
                 code: ErrorCode::PlayerSync,
@@ -542,17 +557,17 @@ mod tests {
             };
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_binary(&mut c, &mut Vec::new()).await;
+            let result = Client::read_binary(&mut c, &mut Vec::new());
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
 
-        #[tokio::test]
-        async fn returns_error_when_unknown_receiving_value() {
+        #[test]
+        fn returns_error_when_unknown_receiving_value() {
             let buf: &[u8] = b"idc: value\nOK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_binary(&mut c, &mut Vec::new()).await;
+            let result = Client::read_binary(&mut c, &mut Vec::new());
 
             assert_eq!(
                 result,
@@ -562,25 +577,25 @@ mod tests {
             );
         }
 
-        #[tokio::test]
-        async fn returns_none_when_unknown_receiving_unexpected_ok() {
+        #[test]
+        fn returns_none_when_unknown_receiving_unexpected_ok() {
             let buf: &[u8] = b"OK\n";
             let mut c = Cursor::new(buf);
 
-            let result = Client::read_binary(&mut c, &mut Vec::new()).await;
+            let result = Client::read_binary(&mut c, &mut Vec::new());
 
             assert_eq!(result, Ok(None));
         }
 
-        #[tokio::test]
-        async fn returns_success() {
+        #[test]
+        fn returns_success() {
             let bytes = &[0; 111];
             let buf: &[u8] = b"size: 222\ntype: image/png\nbinary: 111\n";
             let buf_end: &[u8] = b"\nOK\n";
             let mut c = Cursor::new([buf, bytes, buf_end].concat());
 
             let mut buf = Vec::new();
-            let result = Client::read_binary(&mut c, &mut buf).await;
+            let result = Client::read_binary(&mut c, &mut buf);
 
             assert_eq!(buf, bytes);
             assert_eq!(

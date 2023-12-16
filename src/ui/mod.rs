@@ -57,7 +57,7 @@ pub enum Level {
 pub struct StatusMessage {
     pub message: String,
     pub level: Level,
-    pub created: tokio::time::Instant,
+    pub created: std::time::Instant,
 }
 
 impl StatusMessage {
@@ -65,7 +65,7 @@ impl StatusMessage {
         Self {
             message,
             level,
-            created: tokio::time::Instant::now(),
+            created: std::time::Instant::now(),
         }
     }
 }
@@ -345,7 +345,7 @@ impl Ui<'_> {
             modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, app, shared),
         }
     }
-    async fn handle_modal_key(
+    fn handle_modal_key(
         active_modal: &mut modals::Modals,
         client: &mut Client<'_>,
         key: KeyEvent,
@@ -353,21 +353,21 @@ impl Ui<'_> {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app, shared).await,
-            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app, shared).await,
-            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app, shared).await,
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app, shared),
+            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app, shared),
+            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app, shared),
         }
     }
 
     #[instrument(skip(self, app), fields(screen))]
-    pub async fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<KeyHandleResult> {
+    pub fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<KeyHandleResult> {
         macro_rules! screen_call_inner {
             ($fn:ident($($param:expr),+)) => {
-                screen_call!(self, app, $fn($($param),+)).await?
+                screen_call!(self, app, $fn($($param),+))?
             }
         }
         if let Some(ref mut modal) = self.active_modal {
-            return match Self::handle_modal_key(modal, &mut self.client, key, app, &mut self.shared_state).await? {
+            return match Self::handle_modal_key(modal, &mut self.client, key, app, &mut self.shared_state)? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.active_modal = None;
                     screen_call_inner!(refresh(&mut self.client, app, &mut self.shared_state));
@@ -387,37 +387,35 @@ impl Ui<'_> {
             KeyHandleResultInternal::KeyNotHandled => {
                 if let Some(action) = app.config.keybinds.global.get(&key.into()) {
                     match action {
-                        GlobalAction::NextTrack if app.status.state == MpdState::Play => self.client.next().await?,
-                        GlobalAction::PreviousTrack if app.status.state == MpdState::Play => self.client.prev().await?,
-                        GlobalAction::Stop if app.status.state == MpdState::Play => self.client.stop().await?,
-                        GlobalAction::ToggleRepeat => self.client.repeat(!app.status.repeat).await?,
-                        GlobalAction::ToggleSingle => self.client.single(app.status.single.cycle()).await?,
-                        GlobalAction::ToggleRandom => self.client.random(!app.status.random).await?,
+                        GlobalAction::NextTrack if app.status.state == MpdState::Play => self.client.next()?,
+                        GlobalAction::PreviousTrack if app.status.state == MpdState::Play => self.client.prev()?,
+                        GlobalAction::Stop if app.status.state == MpdState::Play => self.client.stop()?,
+                        GlobalAction::ToggleRepeat => self.client.repeat(!app.status.repeat)?,
+                        GlobalAction::ToggleSingle => self.client.single(app.status.single.cycle())?,
+                        GlobalAction::ToggleRandom => self.client.random(!app.status.random)?,
                         // TODO this panics, oneshot consume is only since mpd 0.24 which is not relesed yet
                         // we should validate mpd protocol version when connecting clients
-                        GlobalAction::ToggleConsume => self.client.consume(app.status.single.cycle()).await?,
+                        GlobalAction::ToggleConsume => self.client.consume(app.status.single.cycle())?,
                         GlobalAction::TogglePause
                             if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
                         {
-                            self.client.pause_toggle().await?;
+                            self.client.pause_toggle()?;
                             return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::TogglePause => {}
                         GlobalAction::VolumeUp => {
                             self.client
-                                .set_volume(app.status.volume.inc_by(app.config.volume_step))
-                                .await?;
+                                .set_volume(app.status.volume.inc_by(app.config.volume_step))?;
                         }
                         GlobalAction::VolumeDown => {
                             self.client
-                                .set_volume(app.status.volume.dec_by(app.config.volume_step))
-                                .await?;
+                                .set_volume(app.status.volume.dec_by(app.config.volume_step))?;
                         }
                         GlobalAction::SeekForward if app.status.state == MpdState::Play => {
-                            self.client.seek_curr_forwards(5).await?;
+                            self.client.seek_curr_forwards(5)?;
                         }
                         GlobalAction::SeekBack if app.status.state == MpdState::Play => {
-                            self.client.seek_curr_backwards(5).await?;
+                            self.client.seek_curr_backwards(5)?;
                         }
                         GlobalAction::NextTab => {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
@@ -452,14 +450,14 @@ impl Ui<'_> {
 
     #[instrument(skip_all)]
     pub async fn before_show(&mut self, app: &mut State) -> Result<()> {
-        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state)).await
+        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state))
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {
         self.shared_state.status_message = Some(StatusMessage {
             message,
             level,
-            created: tokio::time::Instant::now(),
+            created: std::time::Instant::now(),
         });
     }
 }

@@ -17,13 +17,8 @@ use crate::{
     },
 };
 
-use super::{
-    browser::{DirOrSong, ToListItems},
-    iter::DirOrSongListItems,
-    CommonAction, Screen,
-};
+use super::{browser::DirOrSong, iter::DirOrSongListItems, CommonAction, Screen};
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
@@ -37,7 +32,7 @@ pub struct AlbumsScreen {
 
 impl AlbumsScreen {
     #[instrument]
-    async fn prepare_preview(
+    fn prepare_preview(
         &mut self,
         client: &mut Client<'_>,
         symbols: &SymbolsConfig,
@@ -46,15 +41,14 @@ impl AlbumsScreen {
             if let Some(Some(current)) = self.stack.current().selected().map(AsPath::as_path) {
                 match self.stack.path() {
                     [album] => Some(
-                        find_songs(client, album, current)
-                            .await?
+                        find_songs(client, album, current)?
                             .first()
                             .context("Expected to find exactly one song")?
-                            .to_listitems(symbols),
+                            .to_listitems(symbols)
+                            .collect(),
                     ),
                     [] => Some(
-                        list_titles(client, current)
-                            .await?
+                        list_titles(client, current)?
                             .listitems(symbols, &BTreeSet::default())
                             .collect(),
                     ),
@@ -67,7 +61,6 @@ impl AlbumsScreen {
     }
 }
 
-#[async_trait]
 impl Screen for AlbumsScreen {
     type Actions = AlbumsActions;
 
@@ -104,24 +97,23 @@ impl Screen for AlbumsScreen {
     }
 
     #[instrument(err)]
-    async fn before_show(
+    fn before_show(
         &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
+        client: &mut Client<'_>,
+        app: &mut crate::state::State,
+        shared: &mut SharedUiState,
     ) -> Result<()> {
-        let result = _client.list_tag(Tag::Album, None).await.context("Cannot list tags")?;
+        let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
         self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
         let preview = self
-            .prepare_preview(_client, &_app.config.symbols)
-            .await
+            .prepare_preview(client, &app.config.symbols)
             .context("Cannot prepare preview")?;
         self.stack.set_preview(preview);
 
         Ok(())
     }
 
-    async fn handle_action(
+    fn handle_action(
         &mut self,
         event: KeyEvent,
         client: &mut Client<'_>,
@@ -160,18 +152,16 @@ impl Screen for AlbumsScreen {
                     if let Some(Some(current)) = self.stack.current().selected().map(AsPath::as_path) {
                         match self.stack.path() {
                             [album] => {
-                                client
-                                    .find_add(&[
-                                        Filter {
-                                            tag: Tag::Title,
-                                            value: current,
-                                        },
-                                        Filter {
-                                            tag: Tag::Album,
-                                            value: album.as_str(),
-                                        },
-                                    ])
-                                    .await?;
+                                client.find_add(&[
+                                    Filter {
+                                        tag: Tag::Title,
+                                        value: current,
+                                    },
+                                    Filter {
+                                        tag: Tag::Album,
+                                        value: album.as_str(),
+                                    },
+                                ])?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("'{current}' from album '{album}' added to queue"),
                                     Level::Info,
@@ -179,12 +169,10 @@ impl Screen for AlbumsScreen {
                                 Ok(KeyHandleResultInternal::RenderRequested)
                             }
                             [] => {
-                                client
-                                    .find_add(&[Filter {
-                                        tag: Tag::Album,
-                                        value: current,
-                                    }])
-                                    .await?;
+                                client.find_add(&[Filter {
+                                    tag: Tag::Album,
+                                    value: current,
+                                }])?;
                                 shared.status_message = Some(StatusMessage::new(
                                     format!("Album '{current}' added to queue"),
                                     Level::Info,
@@ -204,7 +192,6 @@ impl Screen for AlbumsScreen {
                     self.stack.next_half_viewport();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
-                        .await
                         .context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -213,7 +200,6 @@ impl Screen for AlbumsScreen {
                     self.stack.prev_half_viewport();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
-                        .await
                         .context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -222,7 +208,6 @@ impl Screen for AlbumsScreen {
                     self.stack.prev();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
-                        .await
                         .context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -231,19 +216,18 @@ impl Screen for AlbumsScreen {
                     self.stack.next();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
-                        .await
                         .context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
                     self.stack.last();
-                    self.prepare_preview(client, &app.config.symbols).await?;
+                    self.prepare_preview(client, &app.config.symbols)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
                     self.stack.first();
-                    self.prepare_preview(client, &app.config.symbols).await?;
+                    self.prepare_preview(client, &app.config.symbols)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Right => {
@@ -258,21 +242,20 @@ impl Screen for AlbumsScreen {
 
                     match self.stack.path() {
                         [album] => {
-                            add_song(client, album, value).await?;
+                            add_song(client, album, value)?;
                             shared.status_message = Some(StatusMessage::new(
                                 format!("'{value}' from album '{album}' added to queue"),
                                 Level::Info,
                             ));
                         }
                         [] => {
-                            let res = list_titles(client, value).await?;
+                            let res = list_titles(client, value)?;
                             self.stack.push(res.collect());
                         }
                         _ => tracing::error!("Unexpected nesting in Artists dir structure"),
                     }
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
-                        .await
                         .context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -281,7 +264,6 @@ impl Screen for AlbumsScreen {
                     self.stack.pop();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
-                        .await
                         .context("Cannot prepare preview")?;
                     self.stack.set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -317,7 +299,7 @@ pub enum AlbumsActions {
 }
 
 #[tracing::instrument]
-async fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
+fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
         .list_tag(
             Tag::Title,
@@ -325,40 +307,35 @@ async fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterat
                 tag: Tag::Album,
                 value: album,
             }]),
-        )
-        .await?
+        )?
         .into_iter()
         .map(DirOrSong::Song))
 }
 
 #[tracing::instrument]
-async fn find_songs(client: &mut Client<'_>, album: &str, file: &str) -> Result<Vec<MpdSong>, MpdError> {
-    client
-        .find(&[
-            Filter {
-                tag: Tag::Title,
-                value: file,
-            },
-            Filter {
-                tag: Tag::Album,
-                value: album,
-            },
-        ])
-        .await
+fn find_songs(client: &mut Client<'_>, album: &str, file: &str) -> Result<Vec<MpdSong>, MpdError> {
+    client.find(&[
+        Filter {
+            tag: Tag::Title,
+            value: file,
+        },
+        Filter {
+            tag: Tag::Album,
+            value: album,
+        },
+    ])
 }
 
 #[tracing::instrument]
-async fn add_song(client: &mut Client<'_>, album: &str, file: &str) -> Result<(), MpdError> {
-    client
-        .find_add(&[
-            Filter {
-                tag: Tag::Title,
-                value: file,
-            },
-            Filter {
-                tag: Tag::Album,
-                value: album,
-            },
-        ])
-        .await
+fn add_song(client: &mut Client<'_>, album: &str, file: &str) -> Result<(), MpdError> {
+    client.find_add(&[
+        Filter {
+            tag: Tag::Title,
+            value: file,
+        },
+        Filter {
+            tag: Tag::Album,
+            value: album,
+        },
+    ])
 }

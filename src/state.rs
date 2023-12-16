@@ -60,16 +60,16 @@ impl std::fmt::Debug for State {
 
 impl State {
     #[instrument(ret, skip_all)]
-    pub async fn try_new(client: &mut Client<'_>, config: &'static Config) -> Result<Self> {
-        let current_song = client.get_current_song().await?;
-        let queue = client.playlist_info().await?;
-        let status = client.get_status().await?;
+    pub fn try_new(client: &mut Client<'_>, config: &'static Config) -> Result<Self> {
+        let current_song = client.get_current_song()?;
+        let queue = client.playlist_info()?;
+        let status = client.get_status()?;
 
         let album_art = if let Some(song) = queue
             .as_ref()
             .and_then(|p| p.iter().find(|s| status.songid.is_some_and(|i| i == s.id)))
         {
-            client.find_album_art(&song.file).await?.map(MyVec)
+            client.find_album_art(&song.file)?.map(MyVec)
         } else {
             None
         };

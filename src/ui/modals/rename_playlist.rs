@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Margin},
@@ -56,7 +55,6 @@ impl RenamePlaylistModal {
     }
 }
 
-#[async_trait]
 impl Modal for RenamePlaylistModal {
     fn render<B: Backend>(
         &mut self,
@@ -97,10 +95,10 @@ impl Modal for RenamePlaylistModal {
         Ok(())
     }
 
-    async fn handle_key(
+    fn handle_key(
         &mut self,
         key: KeyEvent,
-        _client: &mut Client<'_>,
+        client: &mut Client<'_>,
         _app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
@@ -120,7 +118,7 @@ impl Modal for RenamePlaylistModal {
                 }
                 KeyCode::Enter => {
                     if self.button_group.selected == 0 && self.playlist_name != self.new_name {
-                        _client.rename_playlist(&self.playlist_name, &self.new_name).await?;
+                        client.rename_playlist(&self.playlist_name, &self.new_name)?;
                         _shared.status_message = Some(StatusMessage::new(
                             format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
                             Level::Info,
@@ -159,7 +157,7 @@ impl Modal for RenamePlaylistModal {
             }
             KeyCode::Enter => {
                 if self.button_group.selected == 0 && self.playlist_name != self.new_name {
-                    _client.rename_playlist(&self.playlist_name, &self.new_name).await?;
+                    client.rename_playlist(&self.playlist_name, &self.new_name)?;
                     _shared.status_message = Some(StatusMessage::new(
                         format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
                         Level::Info,

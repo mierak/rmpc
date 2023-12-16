@@ -1,6 +1,5 @@
 use ansi_to_tui::IntoText;
 use anyhow::Result;
-use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
@@ -25,7 +24,6 @@ pub struct LogsScreen {
     scrolling_state: DirState<ListState>,
 }
 
-#[async_trait]
 impl Screen for LogsScreen {
     type Actions = LogsActions;
     fn render<B: Backend>(
@@ -99,7 +97,7 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    async fn before_show(
+    fn before_show(
         &mut self,
         _client: &mut Client<'_>,
         _app: &mut crate::state::State,
@@ -109,7 +107,7 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    async fn handle_action(
+    fn handle_action(
         &mut self,
         event: KeyEvent,
         _client: &mut Client<'_>,

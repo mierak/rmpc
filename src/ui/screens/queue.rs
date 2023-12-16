@@ -12,7 +12,6 @@ use crate::{
         DurationExt, KeyHandleResultInternal, SharedUiState,
     },
 };
-use async_trait::async_trait;
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -35,7 +34,6 @@ pub struct QueueScreen {
     filter_input_mode: bool,
 }
 
-#[async_trait]
 impl Screen for QueueScreen {
     type Actions = QueueActions;
     fn render<B: Backend>(
@@ -153,22 +151,22 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    async fn before_show(
+    fn before_show(
         &mut self,
         _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
+        app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        let to_select = match _app.queue.get_by_id(_app.status.songid) {
+        let to_select = match app.queue.get_by_id(app.status.songid) {
             Some(selected) => Some(selected.0),
-            None if !_app.queue.is_empty_or_none() => Some(0),
+            None if !app.queue.is_empty_or_none() => Some(0),
             None => None,
         };
         self.scrolling_state.select(to_select);
         Ok(())
     }
 
-    async fn handle_action(
+    fn handle_action(
         &mut self,
         event: KeyEvent,
         client: &mut Client<'_>,
@@ -205,7 +203,7 @@ impl Screen for QueueScreen {
             match action {
                 QueueActions::Delete => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
-                        match client.delete_id(selected_song.id).await {
+                        match client.delete_id(selected_song.id) {
                             Ok(()) => {}
                             Err(e) => error!("{:?}", e),
                         }
@@ -214,26 +212,18 @@ impl Screen for QueueScreen {
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
-                QueueActions::DeleteAll => {
-                    // _shared.visible_modal = Some(Modals::ConfirmQueueClear(ConfirmQueueClearModal::default()));
-                    Ok(KeyHandleResultInternal::Modal(Some(Modals::ConfirmQueueClear(
-                        ConfirmQueueClearModal::default(),
-                    ))))
-                    // Ok(KeyHandleResult::RenderRequested)
-                }
+                QueueActions::DeleteAll => Ok(KeyHandleResultInternal::Modal(Some(Modals::ConfirmQueueClear(
+                    ConfirmQueueClearModal::default(),
+                )))),
                 QueueActions::Play => {
                     if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
-                        client.play_id(selected_song.id).await?;
+                        client.play_id(selected_song.id)?;
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
-                QueueActions::Save => {
-                    // _shared.visible_modal = Some(Modals::SaveQueue(SaveQueueModal::default()));
-                    Ok(KeyHandleResultInternal::Modal(Some(Modals::SaveQueue(
-                        SaveQueueModal::default(),
-                    ))))
-                    // Ok(KeyHandleResult::RenderRequested)
-                }
+                QueueActions::Save => Ok(KeyHandleResultInternal::Modal(Some(Modals::SaveQueue(
+                    SaveQueueModal::default(),
+                )))),
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {

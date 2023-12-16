@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use anyhow::Result;
-use async_trait::async_trait;
 use derive_more::Deref;
 use strum::{AsRefStr, Display};
 
@@ -27,275 +26,266 @@ pub enum SaveMode {
     Replace,
 }
 
-#[async_trait]
 pub trait MpdClient {
-    async fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
-    async fn get_volume(&mut self) -> MpdResult<Volume>;
-    async fn set_volume(&mut self, volume: &Volume) -> MpdResult<()>;
-    async fn get_current_song(&mut self) -> MpdResult<Option<Song>>;
-    async fn get_status(&mut self) -> MpdResult<Status>;
+    fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
+    fn get_volume(&mut self) -> MpdResult<Volume>;
+    fn set_volume(&mut self, volume: &Volume) -> MpdResult<()>;
+    fn get_current_song(&mut self) -> MpdResult<Option<Song>>;
+    fn get_status(&mut self) -> MpdResult<Status>;
     // Playback control
-    async fn pause_toggle(&mut self) -> MpdResult<()>;
-    async fn next(&mut self) -> MpdResult<()>;
-    async fn prev(&mut self) -> MpdResult<()>;
-    async fn play_pos(&mut self, pos: u32) -> MpdResult<()>;
-    async fn play(&mut self) -> MpdResult<()>;
-    async fn play_id(&mut self, id: u32) -> MpdResult<()>;
-    async fn stop(&mut self) -> MpdResult<()>;
-    async fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()>;
-    async fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()>;
-    async fn repeat(&mut self, enabled: bool) -> MpdResult<()>;
-    async fn random(&mut self, enabled: bool) -> MpdResult<()>;
-    async fn single(&mut self, single: OnOffOneshot) -> MpdResult<()>;
-    async fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()>;
+    fn pause_toggle(&mut self) -> MpdResult<()>;
+    fn next(&mut self) -> MpdResult<()>;
+    fn prev(&mut self) -> MpdResult<()>;
+    fn play_pos(&mut self, pos: u32) -> MpdResult<()>;
+    fn play(&mut self) -> MpdResult<()>;
+    fn play_id(&mut self, id: u32) -> MpdResult<()>;
+    fn stop(&mut self) -> MpdResult<()>;
+    fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()>;
+    fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()>;
+    fn repeat(&mut self, enabled: bool) -> MpdResult<()>;
+    fn random(&mut self, enabled: bool) -> MpdResult<()>;
+    fn single(&mut self, single: OnOffOneshot) -> MpdResult<()>;
+    fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()>;
     // Current queue
-    async fn add(&mut self, path: &str) -> MpdResult<()>;
-    async fn clear(&mut self) -> MpdResult<()>;
-    async fn delete_id(&mut self, id: u32) -> MpdResult<()>;
-    async fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
-    async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
-    async fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
-    async fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
+    fn add(&mut self, path: &str) -> MpdResult<()>;
+    fn clear(&mut self) -> MpdResult<()>;
+    fn delete_id(&mut self, id: u32) -> MpdResult<()>;
+    fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
+    fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
+    fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
+    fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
-    async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
-    async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
-    async fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
-    async fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
+    fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
+    fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
+    fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
+    fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
     // Stored playlists
-    async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
-    async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
-    async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
-    async fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
-    async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
-    async fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
-    async fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange) -> MpdResult<()>;
-    async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
+    fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
+    fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
+    fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
+    fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
+    fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
+    fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
+    fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange) -> MpdResult<()>;
+    fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
     /// If no art is still found, but no errors were encountered, None is returned.
-    async fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
+    fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
 }
 
-#[async_trait]
 impl MpdClient for Client<'_> {
     // Queries
     #[tracing::instrument(skip(self))]
-    async fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
-        self.execute("idle").await
+    fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
+        self.execute("idle")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn get_volume(&mut self) -> MpdResult<Volume> {
-        self.execute("getvol").await
+    fn get_volume(&mut self) -> MpdResult<Volume> {
+        self.execute("getvol")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn set_volume(&mut self, volume: &Volume) -> MpdResult<()> {
-        self.execute_ok(&format!("setvol {}", volume.value())).await
+    fn set_volume(&mut self, volume: &Volume) -> MpdResult<()> {
+        self.execute_ok(&format!("setvol {}", volume.value()))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
-        self.execute_option("currentsong").await
+    fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
+        self.execute_option("currentsong")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn get_status(&mut self) -> MpdResult<Status> {
-        self.execute("status").await
+    fn get_status(&mut self) -> MpdResult<Status> {
+        self.execute("status")
     }
 
     // Playback control
     #[tracing::instrument(skip(self))]
-    async fn pause_toggle(&mut self) -> MpdResult<()> {
-        self.execute_ok("pause").await
+    fn pause_toggle(&mut self) -> MpdResult<()> {
+        self.execute_ok("pause")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn next(&mut self) -> MpdResult<()> {
-        self.execute_ok("next").await
+    fn next(&mut self) -> MpdResult<()> {
+        self.execute_ok("next")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn prev(&mut self) -> MpdResult<()> {
-        self.execute_ok("previous").await
+    fn prev(&mut self) -> MpdResult<()> {
+        self.execute_ok("previous")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn play_pos(&mut self, pos: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("play {pos}")).await
+    fn play_pos(&mut self, pos: u32) -> MpdResult<()> {
+        self.execute_ok(&format!("play {pos}"))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn play(&mut self) -> MpdResult<()> {
-        self.execute_ok("play").await
+    fn play(&mut self) -> MpdResult<()> {
+        self.execute_ok("play")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn play_id(&mut self, id: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("playid {id}")).await
+    fn play_id(&mut self, id: u32) -> MpdResult<()> {
+        self.execute_ok(&format!("playid {id}"))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn stop(&mut self) -> MpdResult<()> {
-        self.execute_ok("stop").await
+    fn stop(&mut self) -> MpdResult<()> {
+        self.execute_ok("stop")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("seekcur +{time_sec}")).await
+    fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()> {
+        self.execute_ok(&format!("seekcur +{time_sec}"))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("seekcur -{time_sec}")).await
+    fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()> {
+        self.execute_ok(&format!("seekcur -{time_sec}"))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn repeat(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(&format!("repeat {}", u8::from(enabled))).await
+    fn repeat(&mut self, enabled: bool) -> MpdResult<()> {
+        self.execute_ok(&format!("repeat {}", u8::from(enabled)))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn random(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(&format!("random {}", u8::from(enabled))).await
+    fn random(&mut self, enabled: bool) -> MpdResult<()> {
+        self.execute_ok(&format!("random {}", u8::from(enabled)))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn single(&mut self, single: OnOffOneshot) -> MpdResult<()> {
-        self.execute_ok(&format!("single {}", single.to_mpd_value())).await
+    fn single(&mut self, single: OnOffOneshot) -> MpdResult<()> {
+        self.execute_ok(&format!("single {}", single.to_mpd_value()))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()> {
-        self.execute_ok(&format!("consume {}", consume.to_mpd_value())).await
+    fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()> {
+        self.execute_ok(&format!("consume {}", consume.to_mpd_value()))
     }
 
     // Current queue
     #[tracing::instrument(skip(self))]
-    async fn add(&mut self, path: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("add \"{path}\"")).await
+    fn add(&mut self, path: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("add \"{path}\""))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn clear(&mut self) -> MpdResult<()> {
-        self.execute_ok("clear").await
+    fn clear(&mut self) -> MpdResult<()> {
+        self.execute_ok("clear")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn delete_id(&mut self, id: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("deleteid \"{id}\"")).await
+    fn delete_id(&mut self, id: u32) -> MpdResult<()> {
+        self.execute_ok(&format!("deleteid \"{id}\""))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
-        self.execute_option("playlistinfo").await
+    fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
+        self.execute_option("playlistinfo")
     }
 
     #[tracing::instrument(skip(self))]
-    async fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
-        self.execute(&format!("find \"({})\"", filter.to_query_str())).await
+    fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
+        self.execute(&format!("find \"({})\"", filter.to_query_str()))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
+    fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
         self.execute_ok(&format!("findadd \"({})\"", filter.to_query_str()))
-            .await
     }
 
     #[tracing::instrument(skip(self))]
-    async fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
+    fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         match filter {
-            Some(filter) => {
-                self.execute(&format!("list {tag} \"({})\"", filter.to_query_str()))
-                    .await
-            }
-            None => self.execute(&format!("list {tag}")).await,
+            Some(filter) => self.execute(&format!("list {tag} \"({})\"", filter.to_query_str())),
+            None => self.execute(&format!("list {tag}")),
         }
     }
 
     // Database
     #[tracing::instrument(skip(self))]
-    async fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
+    fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
         if let Some(path) = path {
             Ok(self
-                .execute_option(&format!("lsinfo \"{path}\""))
-                .await?
+                .execute_option(&format!("lsinfo \"{path}\""))?
                 .unwrap_or(LsInfo::default()))
         } else {
-            Ok(self.execute_option("lsinfo").await?.unwrap_or(LsInfo::default()))
+            Ok(self.execute_option("lsinfo")?.unwrap_or(LsInfo::default()))
         }
     }
 
     #[tracing::instrument(skip(self))]
-    async fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
+    fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
         if let Some(path) = path {
             Ok(self
-                .execute_option(&format!("listfiles \"{path}\""))
-                .await?
+                .execute_option(&format!("listfiles \"{path}\""))?
                 .unwrap_or(ListFiles::default()))
         } else {
-            Ok(self.execute_option("listfiles").await?.unwrap_or(ListFiles::default()))
+            Ok(self.execute_option("listfiles")?.unwrap_or(ListFiles::default()))
         }
     }
 
     // Stored playlists
     #[tracing::instrument(skip(self))]
-    async fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
-        self.execute("listplaylists").await
+    fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
+        self.execute("listplaylists")
     }
     #[tracing::instrument(skip(self))]
-    async fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
-        self.execute(&format!("listplaylist \"{name}\"")).await
+    fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
+        self.execute(&format!("listplaylist \"{name}\""))
     }
     #[tracing::instrument(skip(self))]
-    async fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
-        self.execute(&format!("listplaylistinfo \"{playlist}\"")).await
+    fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
+        self.execute(&format!("listplaylistinfo \"{playlist}\""))
     }
     #[tracing::instrument(skip(self))]
-    async fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("load \"{name}\"")).await
+    fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("load \"{name}\""))
     }
     #[tracing::instrument(skip(self))]
-    async fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("rm \"{name}\"")).await
+    fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("rm \"{name}\""))
     }
-    async fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
+    fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
         self.execute_ok(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
-            .await
     }
     #[tracing::instrument(skip(self))]
-    async fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("rename \"{name}\" \"{new_name}\"")).await
+    fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
+        self.execute_ok(&format!("rename \"{name}\" \"{new_name}\""))
     }
     /// mode is supported from version 0.24
     #[tracing::instrument(skip(self))]
-    async fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
+    fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
         if let Some(mode) = mode {
-            self.execute_ok(&format!("save \"{name}\" \"{}\"", mode.as_ref())).await
+            self.execute_ok(&format!("save \"{name}\" \"{}\"", mode.as_ref()))
         } else {
-            self.execute_ok(&format!("save \"{name}\"")).await
+            self.execute_ok(&format!("save \"{name}\""))
         }
     }
 
     #[tracing::instrument(skip(self))]
-    async fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.execute_binary(&format!("readpicture \"{path}\"")).await
+    fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+        self.execute_binary(&format!("readpicture \"{path}\""))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.execute_binary(&format!("albumart \"{path}\"")).await
+    fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+        self.execute_binary(&format!("albumart \"{path}\""))
     }
 
     #[tracing::instrument(skip(self))]
-    async fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        match self.albumart(path).await {
+    fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+        match self.albumart(path) {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None)
             | Err(MpdError::Mpd(MpdFailureResponse {
                 code: ErrorCode::NoExist,
                 ..
-            })) => match self.read_picture(path).await {
+            })) => match self.read_picture(path) {
                 Ok(Some(p)) => Ok(Some(p)),
                 Ok(None) => {
                     tracing::debug!(message = "No album art found, falling back to placeholder image");

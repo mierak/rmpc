@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Constraint, Direction, Layout, Rect},
@@ -25,7 +24,6 @@ pub enum Modals {
     RenamePlaylist(RenamePlaylistModal),
 }
 
-#[async_trait]
 pub(super) trait Modal {
     fn render<B: Backend>(
         &mut self,
@@ -35,7 +33,7 @@ pub(super) trait Modal {
     ) -> Result<()>;
 
     // todo global modal keys (esc, ctrl c)
-    async fn handle_key(
+    fn handle_key(
         &mut self,
         key: KeyEvent,
         _client: &mut Client<'_>,

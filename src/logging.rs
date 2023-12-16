@@ -4,7 +4,6 @@ use std::{
 };
 
 use time::{macros::format_description, UtcOffset};
-use tokio::sync::mpsc::Sender;
 use tracing::{subscriber::Interest, Level, Metadata};
 use tracing_appender::{non_blocking::WorkerGuard, rolling::Rotation};
 use tracing_subscriber::{
@@ -31,7 +30,7 @@ impl std::io::Write for TestWriter {
     }
 }
 
-pub fn configure(level: Level, tx: &Sender<AppEvent>) -> Vec<WorkerGuard> {
+pub fn configure(level: Level, tx: &std::sync::mpsc::Sender<AppEvent>) -> Vec<WorkerGuard> {
     let error_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::StatusBar)));
     let file_appender = tracing_appender::rolling::RollingFileAppender::new(Rotation::DAILY, "./", "mpdox.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
@@ -121,12 +120,12 @@ pub enum WriterVariant {
 }
 
 pub struct LogChannelWriter {
-    tx: tokio::sync::mpsc::Sender<AppEvent>,
+    tx: std::sync::mpsc::Sender<AppEvent>,
     variant: WriterVariant,
 }
 
 impl LogChannelWriter {
-    pub fn new(tx: tokio::sync::mpsc::Sender<AppEvent>, variant: WriterVariant) -> Self {
+    pub fn new(tx: std::sync::mpsc::Sender<AppEvent>, variant: WriterVariant) -> Self {
         Self { tx, variant }
     }
 }
@@ -134,10 +133,10 @@ impl LogChannelWriter {
 impl Write for &LogChannelWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if (match self.variant {
-            WriterVariant::Log => self.tx.try_send(AppEvent::Log(buf.to_owned())),
+            WriterVariant::Log => self.tx.send(AppEvent::Log(buf.to_owned())),
             WriterVariant::StatusBar => self
                 .tx
-                .try_send(AppEvent::StatusBar(String::from_utf8_lossy(buf).to_string())),
+                .send(AppEvent::StatusBar(String::from_utf8_lossy(buf).to_string())),
         })
         .is_err()
         {

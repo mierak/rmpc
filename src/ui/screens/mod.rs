@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Backend, Rect},
@@ -33,7 +32,6 @@ pub enum Screens {
     Playlists,
 }
 
-#[async_trait]
 pub(super) trait Screen {
     type Actions;
     fn render<B: Backend>(
@@ -45,7 +43,7 @@ pub(super) trait Screen {
     ) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    async fn on_hide(
+    fn on_hide(
         &mut self,
         _client: &mut Client<'_>,
         _app: &mut crate::state::State,
@@ -55,7 +53,7 @@ pub(super) trait Screen {
     }
 
     /// For work that needs to be done BEFORE the first render
-    async fn before_show(
+    fn before_show(
         &mut self,
         _client: &mut Client<'_>,
         _app: &mut crate::state::State,
@@ -65,7 +63,7 @@ pub(super) trait Screen {
     }
 
     /// Used to keep the current state but refresh data
-    async fn refresh(
+    fn refresh(
         &mut self,
         _client: &mut Client<'_>,
         _app: &mut crate::state::State,
@@ -74,7 +72,7 @@ pub(super) trait Screen {
         Ok(())
     }
 
-    async fn handle_action(
+    fn handle_action(
         &mut self,
         event: KeyEvent,
         _client: &mut Client<'_>,
@@ -148,12 +146,8 @@ pub(crate) mod browser {
         ui::utils::dirstack::{AsPath, MatchesSearch},
     };
 
-    pub trait ToListItems {
-        fn to_listitems(&self, symbols: &SymbolsConfig) -> Vec<ListItem<'static>>;
-    }
-
-    impl ToListItems for Song {
-        fn to_listitems(&self, _symbols: &SymbolsConfig) -> Vec<ListItem<'static>> {
+    impl Song {
+        pub(crate) fn to_listitems(&self, _symbols: &SymbolsConfig) -> impl Iterator<Item = ListItem<'static>> {
             let key_style = Style::default().fg(Color::Yellow);
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
@@ -196,7 +190,7 @@ pub(crate) mod browser {
                 ]));
             }
 
-            r.into_iter().map(ListItem::new).collect()
+            r.into_iter().map(ListItem::new)
         }
     }
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -399,6 +393,7 @@ pub mod iter {
     pub trait DirOrSongInfoListItems<T> {
         fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItemInfo<'a, T>;
     }
+
     impl<T: Iterator<Item = DirOrSongInfo>> DirOrSongInfoListItems<T> for T {
         fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItemInfo<'a, T> {
             BrowserItemInfo {
@@ -447,6 +442,7 @@ pub mod iter {
             result
         }
     }
+
     pub trait DirOrSongListItems<T> {
         fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItem<'a, T>;
     }
