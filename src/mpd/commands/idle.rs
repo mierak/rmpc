@@ -1,7 +1,7 @@
 use crate::mpd::errors::MpdError;
 use crate::mpd::{FromMpd, LineHandled};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum IdleEvent {
     Player, // the player has been started, stopped or seeked or tags of the currently playing song have changed (e.g. received from stream)
     Mixer,  // the volume has been changed

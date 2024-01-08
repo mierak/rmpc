@@ -68,8 +68,8 @@ impl Screen for QueueScreen {
             return Ok(());
         };
 
-        self.scrolling_state.viewport_len(Some(queue_section.height));
-        self.scrolling_state.content_len(Some(u16::try_from(queue_len)?));
+        self.scrolling_state.set_viewport_len(Some(queue_section.height));
+        self.scrolling_state.set_content_len(Some(u16::try_from(queue_len)?));
         if show_image {
             self.img_state.image(&mut app.album_art);
         }

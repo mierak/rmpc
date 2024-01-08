@@ -37,6 +37,8 @@ impl<'a> Client<'a> {
     #[tracing::instrument]
     pub fn init(addr: &'static str, name: Option<&'a str>, reconnect: bool) -> MpdResult<Client<'a>> {
         let stream = TcpStream::connect(addr)?;
+        stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
         let mut rx = BufReader::new(stream.try_clone()?);
 
         let mut buf = String::new();
@@ -58,6 +60,8 @@ impl<'a> Client<'a> {
     #[tracing::instrument]
     fn reconnect(&mut self) -> MpdResult<&Client> {
         let stream = TcpStream::connect(self.addr)?;
+        stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
         let mut rx = BufReader::new(stream.try_clone()?);
 
         let mut buf = String::new();
@@ -68,8 +72,18 @@ impl<'a> Client<'a> {
         self.rx = rx;
         self.stream = stream;
 
-        debug!(message = "MPD client reconnected", handshake = buf.trim(),);
+        debug!(message = "MPD client reconnected", handshake = buf.trim(), self.name);
         Ok(self)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub fn set_read_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
+        self.stream.set_read_timeout(timeout)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub fn set_write_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
+        self.stream.set_write_timeout(timeout)
     }
 
     #[tracing::instrument(skip(self))]
@@ -264,11 +278,15 @@ impl<'a> Client<'a> {
     fn read_mpd_line<R: std::io::BufRead>(read: &mut R) -> Result<MpdLine, MpdError> {
         let mut line = String::new();
 
-        match read.read_line(&mut line) {
+        let bytes_read = match read.read_line(&mut line) {
             Ok(v) => Ok(v),
             Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Err(MpdError::ClientClosed),
             _ => Err(MpdError::ClientClosed),
         }?;
+
+        if bytes_read == 0 {
+            return Err(MpdError::ClientClosed);
+        }
 
         if line.starts_with("OK") || line.starts_with("list_OK") {
             return Ok(MpdLine::Ok);

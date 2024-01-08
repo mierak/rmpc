@@ -71,8 +71,8 @@ impl Screen for LogsScreen {
         };
 
         let content_len = lines.len();
-        self.scrolling_state.content_len(Some(u16::try_from(content_len)?));
-        self.scrolling_state.viewport_len(Some(content.height));
+        self.scrolling_state.set_content_len(Some(u16::try_from(content_len)?));
+        self.scrolling_state.set_viewport_len(Some(content.height));
 
         let logs_wg = List::new(lines).block(
             Block::default()

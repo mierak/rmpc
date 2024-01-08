@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::{
     config::SymbolsConfig,
     mpd::{
@@ -11,13 +9,13 @@ use crate::{
     },
     state::State,
     ui::{
-        utils::dirstack::{AsPath, DirStack},
+        utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
         KeyHandleResultInternal, Level, SharedUiState, StatusMessage,
     },
 };
 
-use super::{browser::DirOrSong, iter::DirOrSongListItems, CommonAction, Screen};
+use super::{browser::DirOrSong, CommonAction, Screen};
 use anyhow::{Context, Result};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
@@ -38,18 +36,18 @@ impl AlbumsScreen {
         symbols: &SymbolsConfig,
     ) -> Result<Option<Vec<ListItem<'static>>>> {
         Ok(
-            if let Some(Some(current)) = self.stack.current().selected().map(AsPath::as_path) {
+            if let Some(Some(current)) = self.stack.current().selected().map(DirStackItem::as_path) {
                 match self.stack.path() {
                     [album] => Some(
                         find_songs(client, album, current)?
                             .first()
                             .context("Expected to find exactly one song")?
-                            .to_listitems(symbols)
+                            .to_preview(symbols)
                             .collect(),
                     ),
                     [] => Some(
                         list_titles(client, current)?
-                            .listitems(symbols, &BTreeSet::default())
+                            .map(|v| v.to_list_item(symbols, false))
                             .collect(),
                     ),
                     _ => None,
@@ -71,27 +69,11 @@ impl Screen for AlbumsScreen {
         app: &mut State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let prev = self.stack.previous();
-        let prev: Vec<_> = prev
-            .items
-            .iter()
-            .cloned()
-            .listitems(&app.config.symbols, prev.state.get_marked())
-            .collect();
-        let current = self.stack.current();
-        let current: Vec<_> = current
-            .items
-            .iter()
-            .cloned()
-            .listitems(&app.config.symbols, current.state.get_marked())
-            .collect();
-        let preview = self.stack.preview();
-        let w = Browser::new()
-            .widths(&app.config.column_widths)
-            .previous_items(&prev)
-            .current_items(&current)
-            .preview(preview.cloned());
-        frame.render_stateful_widget(w, area, &mut self.stack);
+        frame.render_stateful_widget(
+            Browser::new(&app.config.symbols).set_widths(&app.config.column_widths),
+            area,
+            &mut self.stack,
+        );
 
         Ok(())
     }
@@ -123,25 +105,25 @@ impl Screen for AlbumsScreen {
         if self.filter_input_mode {
             match event.code {
                 KeyCode::Char(c) => {
-                    if let Some(ref mut f) = self.stack.filter {
+                    if let Some(ref mut f) = self.stack.current_mut().filter {
                         f.push(c);
                     };
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
-                    if let Some(ref mut f) = self.stack.filter {
+                    if let Some(ref mut f) = self.stack.current_mut().filter {
                         f.pop();
                     };
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
-                    self.stack.jump_next_matching();
+                    self.stack.current_mut().jump_next_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Esc => {
                     self.filter_input_mode = false;
-                    self.stack.filter = None;
+                    self.stack.current_mut().filter = None;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -149,7 +131,7 @@ impl Screen for AlbumsScreen {
         } else if let Some(action) = app.config.keybinds.albums.get(&event.into()) {
             match action {
                 AlbumsActions::AddAll => {
-                    if let Some(Some(current)) = self.stack.current().selected().map(AsPath::as_path) {
+                    if let Some(Some(current)) = self.stack.current().selected().map(DirStackItem::as_path) {
                         match self.stack.path() {
                             [album] => {
                                 client.find_add(&[
@@ -189,7 +171,7 @@ impl Screen for AlbumsScreen {
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::DownHalf => {
-                    self.stack.next_half_viewport();
+                    self.stack.current_mut().next_half_viewport();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .context("Cannot prepare preview")?;
@@ -197,7 +179,7 @@ impl Screen for AlbumsScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
-                    self.stack.prev_half_viewport();
+                    self.stack.current_mut().prev_half_viewport();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .context("Cannot prepare preview")?;
@@ -205,7 +187,7 @@ impl Screen for AlbumsScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.stack.prev();
+                    self.stack.current_mut().prev();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .context("Cannot prepare preview")?;
@@ -213,7 +195,7 @@ impl Screen for AlbumsScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.stack.next();
+                    self.stack.current_mut().next();
                     let preview = self
                         .prepare_preview(client, &app.config.symbols)
                         .context("Cannot prepare preview")?;
@@ -221,12 +203,12 @@ impl Screen for AlbumsScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
-                    self.stack.last();
+                    self.stack.current_mut().last();
                     self.prepare_preview(client, &app.config.symbols)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
-                    self.stack.first();
+                    self.stack.current_mut().first();
                     self.prepare_preview(client, &app.config.symbols)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
@@ -270,20 +252,20 @@ impl Screen for AlbumsScreen {
                 }
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
-                    self.stack.filter = Some(String::new());
+                    self.stack.current_mut().filter = Some(String::new());
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.stack.jump_next_matching();
+                    self.stack.current_mut().jump_next_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.stack.jump_previous_matching();
+                    self.stack.current_mut().jump_previous_matching();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => {
                     self.stack.current_mut().toggle_mark_selected();
-                    self.stack.next();
+                    self.stack.current_mut().next();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }

@@ -52,6 +52,7 @@ pub trait MpdClient {
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
+    fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>>;
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
@@ -191,6 +192,13 @@ impl MpdClient for Client<'_> {
     #[tracing::instrument(skip(self))]
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         self.execute(&format!("find \"({})\"", filter.to_query_str()))
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
+        Ok(self
+            .execute::<Vec<Song>>(&format!("find \"({})\"", filter.to_query_str()))?
+            .pop())
     }
 
     #[tracing::instrument(skip(self))]
@@ -462,6 +470,7 @@ pub enum Tag {
     Artist,
     Album,
     Title,
+    File,
 }
 
 #[derive(Debug)]
@@ -469,6 +478,13 @@ pub struct Filter<'a> {
     pub tag: Tag,
     pub value: &'a str,
 }
+
+impl<'a> Filter<'a> {
+    pub fn new(tag: Tag, value: &'a str) -> Self {
+        Self { tag, value }
+    }
+}
+
 trait FilterExt {
     fn to_query_str(&self) -> String;
 }

@@ -114,16 +114,15 @@ fn main() -> Result<()> {
                 );
                 Ok(())
             })?;
-            std::thread::Builder::new().name("idle task".to_owned()).spawn(|| {
-                idle_task(
-                    try_ret!(
-                        Client::init(config.address, Some("idle"), true),
-                        "Failed to connect to mpd with idle client"
-                    ),
-                    tx,
-                );
-                Ok(())
-            })?;
+
+            let mut idle_client = try_ret!(
+                Client::init(config.address, Some("idle"), true),
+                "Failed to connect to mpd with idle client"
+            );
+            idle_client.set_read_timeout(None)?;
+            std::thread::Builder::new()
+                .name("idle task".to_owned())
+                .spawn(|| idle_task(idle_client, tx))?;
 
             let original_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {
@@ -203,7 +202,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::IdleEvent(event) => {
                     if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
-                        error!(message = "Failed handle idle event", error = ?err);
+                        error!(message = "Failed handle idle event", error = ?err, event = ?event);
                     }
                     render_wanted = true;
                 }

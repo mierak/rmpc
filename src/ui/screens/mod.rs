@@ -143,11 +143,10 @@ pub(crate) mod browser {
     use crate::{
         config::SymbolsConfig,
         mpd::commands::{lsinfo::FileOrDir, Song},
-        ui::utils::dirstack::{AsPath, MatchesSearch},
     };
 
     impl Song {
-        pub(crate) fn to_listitems(&self, _symbols: &SymbolsConfig) -> impl Iterator<Item = ListItem<'static>> {
+        pub(crate) fn to_preview(&self, _symbols: &SymbolsConfig) -> impl Iterator<Item = ListItem<'static>> {
             let key_style = Style::default().fg(Color::Yellow);
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
@@ -199,50 +198,6 @@ pub(crate) mod browser {
         Song(String),
     }
 
-    impl MatchesSearch for FileOrDir {
-        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-            if ignorecase {
-                match self {
-                    FileOrDir::Dir(dir) => dir.path.to_lowercase().contains(&filter.to_lowercase()),
-                    FileOrDir::File(song) => song
-                        .title
-                        .as_ref()
-                        .is_some_and(|s| s.to_lowercase().contains(&filter.to_lowercase())),
-                }
-            } else {
-                match self {
-                    FileOrDir::Dir(dir) => dir.path.contains(filter),
-                    FileOrDir::File(song) => song.title.as_ref().is_some_and(|s| s.contains(filter)),
-                }
-            }
-        }
-    }
-
-    impl MatchesSearch for DirOrSong {
-        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-            if ignorecase {
-                match self {
-                    DirOrSong::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
-                    DirOrSong::Song(s) => s.to_lowercase().contains(&filter.to_lowercase()),
-                }
-            } else {
-                match self {
-                    DirOrSong::Dir(v) => v.contains(filter),
-                    DirOrSong::Song(s) => s.contains(filter),
-                }
-            }
-        }
-    }
-
-    impl AsPath for DirOrSong {
-        fn as_path(&self) -> Option<&str> {
-            match self {
-                DirOrSong::Dir(d) => Some(d),
-                DirOrSong::Song(s) => Some(s),
-            }
-        }
-    }
-
     impl std::cmp::Ord for DirOrSong {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             match (self, other) {
@@ -259,66 +214,12 @@ pub(crate) mod browser {
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub(crate) enum DirOrSongInfo {
-        Dir(String),
-        Song(Song),
-    }
-
-    impl MatchesSearch for DirOrSongInfo {
-        fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-            if ignorecase {
-                match self {
-                    DirOrSongInfo::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
-                    DirOrSongInfo::Song(s) => s
-                        .title
-                        .as_ref()
-                        .map_or("Untitled", |v| v.as_str())
-                        .to_lowercase()
-                        .contains(&filter.to_lowercase()),
-                }
-            } else {
-                match self {
-                    DirOrSongInfo::Dir(v) => v.contains(filter),
-                    DirOrSongInfo::Song(s) => s.title.as_ref().map_or("Untitled", |v| v.as_str()).contains(filter),
-                }
-            }
-        }
-    }
-
-    impl AsPath for DirOrSongInfo {
-        fn as_path(&self) -> Option<&str> {
-            match self {
-                DirOrSongInfo::Dir(d) => Some(d),
-                DirOrSongInfo::Song(s) => s.title.as_deref(),
-            }
-        }
-    }
-
-    impl From<FileOrDir> for DirOrSongInfo {
+    impl From<FileOrDir> for DirOrSong {
         fn from(value: FileOrDir) -> Self {
             match value {
-                FileOrDir::Dir(dir) => DirOrSongInfo::Dir(dir.path),
-                FileOrDir::File(song) => DirOrSongInfo::Song(song),
+                FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
+                FileOrDir::File(song) => DirOrSong::Song(song.file),
             }
-        }
-    }
-
-    impl std::cmp::Ord for DirOrSongInfo {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            match (self, other) {
-                (DirOrSongInfo::Dir(a), DirOrSongInfo::Dir(b)) => a.cmp(b),
-                (_, DirOrSongInfo::Dir(_)) => Ordering::Greater,
-                (DirOrSongInfo::Dir(_), _) => Ordering::Less,
-                (DirOrSongInfo::Song(Song { title: t1, .. }), DirOrSongInfo::Song(Song { title: t2, .. })) => {
-                    t1.cmp(t2)
-                }
-            }
-        }
-    }
-    impl std::cmp::PartialOrd for DirOrSongInfo {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
         }
     }
 }
@@ -338,123 +239,14 @@ impl SongExt for Song {
     }
 }
 
-pub mod iter {
-    use std::{collections::BTreeSet, ops::AddAssign};
+pub(crate) trait StringExt {
+    fn file_name(&self) -> &str;
+}
 
-    use ratatui::{
-        style::{Color, Style},
-        text::{Line, Span},
-        widgets::ListItem,
-    };
-
-    use crate::config::SymbolsConfig;
-
-    use super::browser::{DirOrSong, DirOrSongInfo};
-
-    pub struct BrowserItemInfo<'a, I> {
-        iter: I,
-        symbols: &'a SymbolsConfig,
-        marked: &'a BTreeSet<usize>,
-        count: usize,
-    }
-
-    impl<I> Iterator for BrowserItemInfo<'_, I>
-    where
-        I: Iterator<Item = DirOrSongInfo>,
-    {
-        type Item = ListItem<'static>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            let result = match self.iter.next() {
-                Some(v) => {
-                    let marker_span = if self.marked.contains(&self.count) {
-                        Span::styled(self.symbols.marker, Style::default().fg(Color::Blue))
-                    } else {
-                        Span::from(" ".repeat(self.symbols.marker.chars().count()))
-                    };
-
-                    let value = match v {
-                        DirOrSongInfo::Dir(v) => format!("{} {}", self.symbols.dir, v.as_str()),
-                        DirOrSongInfo::Song(s) => format!(
-                            "{} {}",
-                            self.symbols.song,
-                            s.title.as_ref().map_or("Untitled", |v| v.as_str())
-                        ),
-                    };
-                    Some(ListItem::new(Line::from(vec![marker_span, Span::from(value)])))
-                }
-                None => None,
-            };
-            self.count.add_assign(1);
-            result
-        }
-    }
-
-    pub trait DirOrSongInfoListItems<T> {
-        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItemInfo<'a, T>;
-    }
-
-    impl<T: Iterator<Item = DirOrSongInfo>> DirOrSongInfoListItems<T> for T {
-        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItemInfo<'a, T> {
-            BrowserItemInfo {
-                iter: self,
-                count: 0,
-                symbols,
-                marked,
-            }
-        }
-    }
-
-    pub struct BrowserItem<'a, I> {
-        iter: I,
-        count: usize,
-        symbols: &'a SymbolsConfig,
-        marked: &'a BTreeSet<usize>,
-    }
-
-    impl<I> Iterator for BrowserItem<'_, I>
-    where
-        I: Iterator<Item = DirOrSong>,
-    {
-        type Item = ListItem<'static>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            let result = match self.iter.next() {
-                Some(v) => {
-                    let marker_span = if self.marked.contains(&self.count) {
-                        Span::styled(self.symbols.marker, Style::default().fg(Color::Blue))
-                    } else {
-                        Span::from(" ".repeat(self.symbols.marker.chars().count()))
-                    };
-                    let value = match v {
-                        DirOrSong::Dir(v) => format!(
-                            "{} {}",
-                            self.symbols.dir,
-                            if v.is_empty() { "Untitled" } else { v.as_str() }
-                        ),
-                        DirOrSong::Song(s) => format!("{} {}", self.symbols.song, s),
-                    };
-                    Some(ListItem::new(Line::from(vec![marker_span, Span::from(value)])))
-                }
-                None => None,
-            };
-            self.count.add_assign(1);
-            result
-        }
-    }
-
-    pub trait DirOrSongListItems<T> {
-        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItem<'a, T>;
-    }
-
-    impl<T: Iterator<Item = DirOrSong>> DirOrSongListItems<T> for T {
-        fn listitems<'a>(self, symbols: &'a SymbolsConfig, marked: &'a BTreeSet<usize>) -> BrowserItem<'a, T> {
-            BrowserItem {
-                iter: self,
-                count: 0,
-                symbols,
-                marked,
-            }
-        }
+impl StringExt for String {
+    fn file_name(&self) -> &str {
+        self.rsplit('/')
+            .next()
+            .map_or(self, |v| v.split('.').next().unwrap_or(v))
     }
 }

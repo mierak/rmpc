@@ -12,7 +12,6 @@ pub mod volume;
 pub use self::current_song::Song;
 pub use self::idle::IdleEvent;
 pub use self::list_files::ListFiles;
-pub use self::list_files::Listed;
 pub use self::list_playlists::Playlist;
 pub use self::lsinfo::LsInfo;
 pub use self::status::State;

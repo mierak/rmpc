@@ -259,7 +259,7 @@ pub struct KeyConfig {
     pub queue: HashMap<Key, QueueActions>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct SymbolsConfig {
     pub progress_bar: [&'static str; 3],
     pub song: &'static str,

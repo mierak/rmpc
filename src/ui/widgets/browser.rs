@@ -1,48 +1,27 @@
+use itertools::Itertools;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, ListItem, Scrollbar, ScrollbarOrientation, StatefulWidget};
+use ratatui::widgets::{Block, Borders, List, Scrollbar, ScrollbarOrientation, StatefulWidget};
 
-use crate::ui::utils::dirstack::{AsPath, Dir, DirStack, MatchesSearch};
+use crate::config::SymbolsConfig;
+use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
 
 #[derive(Debug)]
-pub struct Browser<'a, T> {
+pub struct Browser<'a, T: std::fmt::Debug + DirStackItem> {
     state_type_marker: std::marker::PhantomData<T>,
     widths: &'a [u16; 3],
-    previous: &'a [ListItem<'a>],
-    current: &'a [ListItem<'a>],
-    preview: Option<Vec<ListItem<'a>>>,
+    symbols: &'a SymbolsConfig,
 }
 
-impl<'a, T> Default for Browser<'a, T> {
-    fn default() -> Self {
+impl<'a, T: std::fmt::Debug + DirStackItem> Browser<'a, T> {
+    pub fn new(symbols: &'a SymbolsConfig) -> Self {
         Self {
             state_type_marker: std::marker::PhantomData,
             widths: &[20, 38, 42],
-            previous: &[],
-            current: &[],
-            preview: None,
+            symbols,
         }
     }
-}
 
-impl<'a, T> Browser<'a, T> {
-    pub fn new() -> Self {
-        Browser::default()
-    }
-
-    pub fn previous_items(mut self, previous: &'a [ListItem<'_>]) -> Self {
-        self.previous = previous;
-        self
-    }
-    pub fn current_items(mut self, current: &'a [ListItem<'_>]) -> Self {
-        self.current = current;
-        self
-    }
-    pub fn preview(mut self, preview: Option<Vec<ListItem<'a>>>) -> Self {
-        self.preview = preview;
-        self
-    }
-
-    pub fn widths(mut self, widths: &'a [u16; 3]) -> Self {
+    pub fn set_widths(mut self, widths: &'a [u16; 3]) -> Self {
         self.widths = widths;
         self
     }
@@ -50,12 +29,28 @@ impl<'a, T> Browser<'a, T> {
 
 impl<T> StatefulWidget for Browser<'_, T>
 where
-    T: MatchesSearch + std::fmt::Debug + AsPath,
+    T: std::fmt::Debug + DirStackItem,
 {
     type State = DirStack<T>;
 
     #[allow(clippy::unwrap_used)]
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
+        let previous = state
+            .previous()
+            .items
+            .iter()
+            .enumerate()
+            .map(|(idx, v)| v.to_list_item(self.symbols, state.previous().marked().contains(&idx)))
+            .collect_vec();
+        let current = state
+            .current()
+            .items
+            .iter()
+            .enumerate()
+            .map(|(idx, v)| v.to_list_item(self.symbols, state.current().marked().contains(&idx)))
+            .collect_vec();
+        let preview = state.preview().cloned();
+
         let [previous_area, current_area, preview_area] = *Layout::default()
             .direction(ratatui::prelude::Direction::Horizontal)
             .constraints(
@@ -72,7 +67,7 @@ where
         };
 
         {
-            let preview = List::new(self.preview.unwrap_or_default())
+            let preview = List::new(preview.unwrap_or_default())
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
@@ -80,10 +75,10 @@ where
 
         {
             let prev_state = &mut state.previous_mut().state;
-            prev_state.content_len(Some(u16::try_from(self.previous.len()).unwrap()));
-            prev_state.viewport_len(Some(previous_area.height));
+            prev_state.set_content_len(Some(u16::try_from(previous.len()).unwrap()));
+            prev_state.set_viewport_len(Some(previous_area.height));
 
-            let previous = List::new(self.previous)
+            let previous = List::new(previous)
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let previous_scrollbar = Scrollbar::default()
@@ -107,13 +102,13 @@ where
                 prev_state.as_scrollbar_state_ref(),
             );
         }
-        let title = state.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
+        let title = state.current().filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         {
-            let Dir { items, state } = state.current_mut();
-            state.content_len(Some(u16::try_from(items.len()).unwrap()));
-            state.viewport_len(Some(current_area.height));
+            let Dir { items, state, .. } = state.current_mut();
+            state.set_content_len(Some(u16::try_from(items.len()).unwrap()));
+            state.set_viewport_len(Some(current_area.height));
 
-            let current = List::new(self.current)
+            let current = List::new(current)
                 .block({
                     let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
                     if let Some(ref title) = title {
