@@ -26,6 +26,17 @@ impl<'a, T: std::fmt::Debug + DirStackItem> Browser<'a, T> {
         self
     }
 }
+const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
+    top_right: symbols::line::NORMAL.horizontal_down,
+    bottom_right: symbols::line::NORMAL.horizontal_up,
+    ..symbols::border::PLAIN
+};
+
+const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
+    bottom_right: symbols::line::NORMAL.horizontal_up,
+    top_right: symbols::line::NORMAL.horizontal_down,
+    ..symbols::border::PLAIN
+};
 
 impl<T> StatefulWidget for Browser<'_, T>
 where
@@ -68,7 +79,7 @@ where
 
         {
             let preview = List::new(preview.unwrap_or_default())
-                .block(Block::default().borders(Borders::ALL))
+                .block(Block::default().borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
@@ -79,7 +90,7 @@ where
             prev_state.set_viewport_len(Some(previous_area.height.into()));
 
             let previous = List::new(previous)
-                .block(Block::default().borders(Borders::ALL))
+                .block(Block::default().borders(Borders::ALL).border_set(LEFT_COLUMN_SYMBOLS))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let previous_scrollbar = Scrollbar::default()
                 .orientation(ScrollbarOrientation::VerticalRight)
@@ -110,7 +121,9 @@ where
 
             let current = List::new(current)
                 .block({
-                    let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
+                    let mut b = Block::default()
+                        .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
+                        .border_set(MIDDLE_COLUMN_SYMBOLS);
                     if let Some(ref title) = title {
                         b = b.title(title.clone().blue());
                     }
@@ -118,7 +131,7 @@ where
                 })
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let current_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalLeft)
+                .orientation(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("↑"))
                 .track_symbol(Some("│"))
                 .end_symbol(Some("↓"))
@@ -130,7 +143,7 @@ where
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 current_scrollbar,
-                preview_area.inner(&ratatui::prelude::Margin {
+                current_area.inner(&ratatui::prelude::Margin {
                     vertical: 1,
                     horizontal: 0,
                 }),

@@ -378,22 +378,13 @@ impl<'a> KittyImage<'a> {
         height: usize,
         compression: Compression,
     ) -> Result<Data> {
-        // TODO: handle notes on window_size()
-        // probably abstract the use of crossterm
-        // take care to query the terminal size on every image change
-        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
-        let cell_width = size.width / size.columns;
-        let cell_height = size.height / size.rows;
+        let (w, h) = KittyImage::get_image_size(width, height)?;
         let image = image::io::Reader::new(Cursor::new(image_data))
             .with_guessed_format()
             .context("Unable to guess image format")?
             .decode()
             .context("Unable to decode image")?
-            .resize(
-                (cell_width as usize * width) as u32,
-                (cell_height as usize * height) as u32,
-                image::imageops::FilterType::Lanczos3,
-            );
+            .resize(w, h, image::imageops::FilterType::Lanczos3);
 
         let binding = image.to_rgba8();
         let rgba = binding.as_raw();
@@ -411,6 +402,23 @@ impl<'a> KittyImage<'a> {
             img_width: image.width(),
             img_height: image.height(),
         })
+    }
+
+    fn get_image_size(area_width: usize, area_height: usize) -> Result<(u32, u32)> {
+        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
+        let w = if size.width == 0 {
+            800
+        } else {
+            let cell_width = size.width / size.columns;
+            (cell_width as usize * area_width) as u32
+        };
+        let h = if size.height == 0 {
+            600
+        } else {
+            let cell_height = size.height / size.rows;
+            (cell_height as usize * area_height) as u32
+        };
+        Ok((w, h))
     }
 
     fn create_unicode_placeholder_grid(cols: usize, rows: usize, state: &ImageState) -> Result<Text<'static>> {
