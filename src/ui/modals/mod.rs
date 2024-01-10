@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    prelude::{Backend, Constraint, Direction, Layout, Rect},
+    prelude::{Constraint, Direction, Layout, Rect},
     Frame,
 };
 
@@ -25,9 +25,9 @@ pub enum Modals {
 }
 
 pub(super) trait Modal {
-    fn render<B: Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         _app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()>;

@@ -31,7 +31,7 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
 
         if !root.is_empty() {
             root_state.select(Some(0));
-            root_state.set_content_len(Some(root.len() as u16));
+            root_state.set_content_len(Some(root.len()));
             result.current.items = root;
         };
 
@@ -93,7 +93,7 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
         if !head.is_empty() {
             new_state.select(Some(0));
         };
-        new_state.set_content_len(Some(head.len() as u16));
+        new_state.set_content_len(Some(head.len()));
 
         if let Some(Some(current)) = self.current().selected().map(DirStackItem::as_path) {
             self.path.push(current.to_owned());

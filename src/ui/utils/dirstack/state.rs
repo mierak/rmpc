@@ -9,19 +9,19 @@ pub struct DirState<T: ScrollingState> {
     scrollbar_state: ScrollbarState,
     inner: T,
     pub marked: BTreeSet<usize>,
-    content_len: Option<u16>,
-    viewport_len: Option<u16>,
+    content_len: Option<usize>,
+    viewport_len: Option<usize>,
 }
 
 #[allow(dead_code)]
 impl<T: ScrollingState> DirState<T> {
-    pub fn set_viewport_len(&mut self, viewport_len: Option<u16>) -> &Self {
+    pub fn set_viewport_len(&mut self, viewport_len: Option<usize>) -> &Self {
         self.viewport_len = viewport_len;
         self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
         self
     }
 
-    pub fn set_content_len(&mut self, content_len: Option<u16>) -> &Self {
+    pub fn set_content_len(&mut self, content_len: Option<usize>) -> &Self {
         self.content_len = content_len;
         self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
         self
@@ -38,7 +38,7 @@ impl<T: ScrollingState> DirState<T> {
     pub fn last(&mut self) {
         if let Some(item_count) = self.content_len {
             if item_count > 0 {
-                self.select(Some(item_count.saturating_sub(1) as usize));
+                self.select(Some(item_count.saturating_sub(1)));
             } else {
                 self.select(None);
             }
@@ -51,7 +51,7 @@ impl<T: ScrollingState> DirState<T> {
         if let Some(item_count) = self.content_len {
             let i = match self.get_selected() {
                 Some(i) => {
-                    if i >= item_count.saturating_sub(1) as usize {
+                    if i >= item_count.saturating_sub(1) {
                         Some(0)
                     } else {
                         Some(i + 1)
@@ -71,12 +71,12 @@ impl<T: ScrollingState> DirState<T> {
             let i = match self.get_selected() {
                 Some(i) => {
                     if i == 0 {
-                        Some(item_count.saturating_sub(1) as usize)
+                        Some(item_count.saturating_sub(1))
                     } else {
                         Some(i - 1)
                     }
                 }
-                None if item_count > 0 => Some(item_count.saturating_sub(1) as usize),
+                None if item_count > 0 => Some(item_count.saturating_sub(1)),
                 None => None,
             };
             self.select(i);
@@ -88,10 +88,10 @@ impl<T: ScrollingState> DirState<T> {
     pub fn next_half_viewport(&mut self) {
         if let Some(item_count) = self.content_len {
             if let Some(viewport) = self.viewport_len {
-                self.select(self.get_selected().map(|i| {
-                    i.saturating_add(viewport as usize / 2)
-                        .min(item_count.saturating_sub(1) as usize)
-                }));
+                self.select(
+                    self.get_selected()
+                        .map(|i| i.saturating_add(viewport / 2).min(item_count.saturating_sub(1))),
+                );
             } else {
                 self.select(None);
             }
@@ -103,10 +103,7 @@ impl<T: ScrollingState> DirState<T> {
     pub fn prev_half_viewport(&mut self) {
         if self.content_len.is_some() {
             if let Some(viewport) = self.viewport_len {
-                self.select(
-                    self.get_selected()
-                        .map(|i| i.saturating_sub(viewport as usize / 2).max(0)),
-                );
+                self.select(self.get_selected().map(|i| i.saturating_sub(viewport / 2).max(0)));
             } else {
                 self.select(None);
             }
@@ -116,15 +113,15 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     pub fn select(&mut self, idx: Option<usize>) {
-        let idx = idx.map(|idx| idx.max(0).min(self.content_len.unwrap_or(0) as usize));
+        let idx = idx.map(|idx| idx.max(0).min(self.content_len.unwrap_or(0)));
         self.inner.select_scrolling(idx);
-        self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0) as u16);
+        self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0));
     }
 
     #[allow(clippy::comparison_chain)]
     pub fn remove(&mut self, idx: usize) {
         match self.content_len {
-            Some(len) if idx >= len.into() => return,
+            Some(len) if idx >= len => return,
             None => return,
             Some(ref mut len) => {
                 self.marked = std::mem::take(&mut self.marked)
@@ -140,7 +137,7 @@ impl<T: ScrollingState> DirState<T> {
                     })
                     .collect();
                 len.sub_assign(1);
-                let len: usize = (*len).into();
+                let len: usize = *len;
                 if self.get_selected().is_some_and(|selected| selected >= len) {
                     self.last();
                 }

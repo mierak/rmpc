@@ -29,9 +29,9 @@ pub struct ArtistsScreen {
 
 impl Screen for ArtistsScreen {
     type Actions = ArtistsActions;
-fn render<B: ratatui::prelude::Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         area: Rect,
         app: &mut State,
         _shared_state: &mut SharedUiState,

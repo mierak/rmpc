@@ -33,7 +33,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         } else {
             self.state.select(Some(0));
         }
-        self.state.set_content_len(Some(new_current.len() as u16));
+        self.state.set_content_len(Some(new_current.len()));
         self.items = new_current;
     }
 
@@ -169,8 +169,8 @@ mod tests {
             filter: None,
             filter_ignore_case: true,
         };
-        res.state.set_content_len(Some(res.items.len() as u16));
-        res.state.set_viewport_len(Some(res.items.len() as u16));
+        res.state.set_content_len(Some(res.items.len()));
+        res.state.set_viewport_len(Some(res.items.len()));
         res
     }
 
@@ -378,7 +378,7 @@ mod tests {
                 ..Default::default()
             };
             val.state.set_viewport_len(Some(2));
-            val.state.set_content_len(Some(val.items.len() as u16));
+            val.state.set_content_len(Some(val.items.len()));
             val.state.select(Some(0));
 
             val.filter = Some("a".to_string());
@@ -403,7 +403,7 @@ mod tests {
                     .collect(),
                 ..Default::default()
             };
-            val.state.set_content_len(Some(val.items.len() as u16));
+            val.state.set_content_len(Some(val.items.len()));
             val.state.set_viewport_len(Some(2));
             val.state.select(Some(4));
 

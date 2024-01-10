@@ -34,9 +34,9 @@ pub enum Screens {
 
 pub(super) trait Screen {
     type Actions;
-    fn render<B: ratatui::backend::Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         area: Rect,
         app: &mut crate::state::State,
         shared_state: &mut SharedUiState,

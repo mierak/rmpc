@@ -128,7 +128,7 @@ macro_rules! screen_call {
 
 impl Ui<'_> {
     #[instrument(skip_all)]
-    pub fn render<B: Backend>(&mut self, frame: &mut Frame<B>, app: &mut crate::state::State) -> Result<()> {
+    pub fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
         if self
             .shared_state
             .status_message
@@ -338,9 +338,9 @@ impl Ui<'_> {
         Ok(())
     }
 
-    fn render_modal<B: ratatui::backend::Backend>(
+    fn render_modal(
         active_modal: &mut modals::Modals,
-        frame: &mut Frame<'_, B>,
+        frame: &mut Frame<'_>,
         app: &mut State,
         shared: &mut SharedUiState,
     ) -> Result<()> {

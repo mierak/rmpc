@@ -3,7 +3,7 @@ use anyhow::Result;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
-    prelude::{Backend, Constraint, Direction, Layout, Margin, Rect},
+    prelude::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::Span,
     widgets::{Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation},
@@ -26,9 +26,9 @@ pub struct LogsScreen {
 
 impl Screen for LogsScreen {
     type Actions = LogsActions;
-    fn render<B: Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         area: Rect,
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
@@ -71,8 +71,8 @@ impl Screen for LogsScreen {
         };
 
         let content_len = lines.len();
-        self.scrolling_state.set_content_len(Some(u16::try_from(content_len)?));
-        self.scrolling_state.set_viewport_len(Some(content.height));
+        self.scrolling_state.set_content_len(Some(content_len));
+        self.scrolling_state.set_viewport_len(Some(content.height.into()));
 
         let logs_wg = List::new(lines).block(
             Block::default()

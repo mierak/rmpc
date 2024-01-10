@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    prelude::{Backend, Constraint, Direction, Layout, Margin},
+    prelude::{Constraint, Direction, Layout, Margin},
     style::{Color, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
@@ -56,9 +56,9 @@ impl RenamePlaylistModal {
 }
 
 impl Modal for RenamePlaylistModal {
-    fn render<B: Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         _app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {

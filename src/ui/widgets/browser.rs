@@ -75,8 +75,8 @@ where
 
         {
             let prev_state = &mut state.previous_mut().state;
-            prev_state.set_content_len(Some(u16::try_from(previous.len()).unwrap()));
-            prev_state.set_viewport_len(Some(previous_area.height));
+            prev_state.set_content_len(Some(previous.len()));
+            prev_state.set_viewport_len(Some(previous_area.height.into()));
 
             let previous = List::new(previous)
                 .block(Block::default().borders(Borders::ALL))
@@ -105,14 +105,14 @@ where
         let title = state.current().filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         {
             let Dir { items, state, .. } = state.current_mut();
-            state.set_content_len(Some(u16::try_from(items.len()).unwrap()));
-            state.set_viewport_len(Some(current_area.height));
+            state.set_content_len(Some(items.len()));
+            state.set_viewport_len(Some(current_area.height.into()));
 
             let current = List::new(current)
                 .block({
                     let mut b = Block::default().borders(Borders::TOP | Borders::BOTTOM);
                     if let Some(ref title) = title {
-                        b = b.title(title.blue());
+                        b = b.title(title.clone().blue());
                     }
                     b
                 })

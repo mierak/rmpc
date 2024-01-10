@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use ratatui::{
-    prelude::{Backend, Constraint, Direction, Layout, Rect},
+    prelude::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Row, Scrollbar, ScrollbarOrientation, Table, TableState},
     Frame,
@@ -36,9 +36,9 @@ pub struct QueueScreen {
 
 impl Screen for QueueScreen {
     type Actions = QueueActions;
-    fn render<B: Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         area: Rect,
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
@@ -68,8 +68,8 @@ impl Screen for QueueScreen {
             return Ok(());
         };
 
-        self.scrolling_state.set_viewport_len(Some(queue_section.height));
-        self.scrolling_state.set_content_len(Some(u16::try_from(queue_len)?));
+        self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
+        self.scrolling_state.set_content_len(Some(queue_len));
         if show_image {
             self.img_state.image(&mut app.album_art);
         }
@@ -105,7 +105,7 @@ impl Screen for QueueScreen {
             .block({
                 let mut b = Block::default().borders(Borders::TOP);
                 if let Some(ref title) = title {
-                    b = b.title(title.blue());
+                    b = b.title(title.clone().blue());
                 }
                 b
             })
@@ -163,8 +163,7 @@ impl Screen for QueueScreen {
                 .as_ref()
                 .and_then(|queue| queue.iter().enumerate().find(|(_, song)| song.id == songid))
                 .map(|v| v.0);
-            self.scrolling_state
-                .set_content_len(app.queue.len().map(|v| v.try_into().unwrap_or(0)));
+            self.scrolling_state.set_content_len(app.queue.len());
             self.scrolling_state.select(idx);
         }
 

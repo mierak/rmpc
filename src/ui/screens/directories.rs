@@ -2,11 +2,7 @@ use std::cmp::Ordering;
 
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use ratatui::{
-    prelude::{Backend, Rect},
-    widgets::ListItem,
-    Frame,
-};
+use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
 use tracing::instrument;
 
@@ -34,9 +30,9 @@ pub struct DirectoriesScreen {
 
 impl Screen for DirectoriesScreen {
     type Actions = DirectoriesActions;
-    fn render<B: Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         area: Rect,
         app: &mut crate::state::State,
         _state: &mut SharedUiState,

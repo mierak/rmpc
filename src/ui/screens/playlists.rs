@@ -32,9 +32,9 @@ pub enum PlaylistsActions {}
 
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;
-fn render<B: ratatui::prelude::Backend>(
+    fn render(
         &mut self,
-        frame: &mut Frame<B>,
+        frame: &mut Frame,
         area: Rect,
         app: &mut State,
         _shared_state: &mut SharedUiState,
