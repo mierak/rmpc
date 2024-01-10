@@ -12,7 +12,7 @@ base64 = "0.21.2"
 clap = { version = "4.3.19", features = ["derive", "cargo", "string" ] }
 crossterm = { version = "0.27.0", features = ["serde"] }
 image = "0.24.7"
-ratatui = { version = "0.24.0", features = ["all-widgets"] }
+ratatui = { version = "0.25.0", features = ["all-widgets"] }
 serde = { version = "1.0.182", features = ["derive"] }
 strum = { version = "0.25.0", features = ["derive"] }
 time = { version = "0.3.25", features = ["macros", "local-offset"] }

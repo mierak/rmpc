@@ -90,18 +90,18 @@ impl Screen for QueueScreen {
             }
         }
 
-        let header_table = Table::new([])
+        let column_widths = [
+            Constraint::Percentage(15),
+            Constraint::Percentage(35),
+            Constraint::Percentage(35),
+            Constraint::Percentage(15),
+        ];
+        let header_table = Table::new([], column_widths)
             .header(Row::new(TABLE_HEADER.to_vec()))
-            .widths(&[
-                Constraint::Percentage(15),
-                Constraint::Percentage(35),
-                Constraint::Percentage(35),
-                Constraint::Percentage(15),
-            ])
             .block(Block::default().borders(Borders::TOP));
 
         let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
-        let table = Table::new(rows)
+        let table = Table::new(rows, column_widths)
             .block({
                 let mut b = Block::default().borders(Borders::TOP);
                 if let Some(ref title) = title {
@@ -109,12 +109,6 @@ impl Screen for QueueScreen {
                 }
                 b
             })
-            .widths(&[
-                Constraint::Percentage(15),
-                Constraint::Percentage(35),
-                Constraint::Percentage(35),
-                Constraint::Percentage(15),
-            ])
             .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
 
         let scrollbar = Scrollbar::default()
