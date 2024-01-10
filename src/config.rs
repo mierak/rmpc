@@ -160,20 +160,17 @@ impl Default for KeyConfigFile {
                 (C::NextResult,       Key { key: K::Char('n'), modifiers: M::CONTROL }),
                 (C::PreviousResult,   Key { key: K::Char('N'), modifiers: M::SHIFT }),
                 (C::Select,           Key { key: K::Char(' '), modifiers: M::NONE }),
+                (C::Add,              Key { key: K::Char('a'), modifiers: M::NONE }),
+                (C::Delete,           Key { key: K::Char('D'), modifiers: M::SHIFT }),
+                (C::Rename,           Key { key: K::Char('r'), modifiers: M::NONE }),
             ]),
             albums: HashMap::from([
-                (Al::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
             artists: HashMap::from([
-                (Ar::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
             directories: HashMap::from([
-                (D::AddAll,           Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
             playlists: HashMap::from([
-                (P::Add,              Key { key: K::Char('a'), modifiers: M::NONE }),
-                (P::Delete,           Key { key: K::Char('D'), modifiers: M::SHIFT }),
-                (P::Rename,           Key { key: K::Char('r'), modifiers: M::NONE }),
             ]),
             logs: HashMap::from([
                 (L::Clear,            Key { key: K::Char('D'), modifiers: M::SHIFT }),

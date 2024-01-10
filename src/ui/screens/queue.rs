@@ -92,13 +92,13 @@ impl Screen for QueueScreen {
 
         let header_table = Table::new([])
             .header(Row::new(TABLE_HEADER.to_vec()))
-            .block(Block::default().borders(Borders::TOP))
             .widths(&[
                 Constraint::Percentage(15),
                 Constraint::Percentage(35),
                 Constraint::Percentage(35),
                 Constraint::Percentage(15),
-            ]);
+            ])
+            .block(Block::default().borders(Borders::TOP));
 
         let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         let table = Table::new(rows)
@@ -157,12 +157,17 @@ impl Screen for QueueScreen {
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
-        let to_select = match app.queue.get_by_id(app.status.songid) {
-            Some(selected) => Some(selected.0),
-            None if !app.queue.is_empty_or_none() => Some(0),
-            None => None,
-        };
-        self.scrolling_state.select(to_select);
+        if let Some(songid) = app.status.songid {
+            let idx = app
+                .queue
+                .as_ref()
+                .and_then(|queue| queue.iter().enumerate().find(|(_, song)| song.id == songid))
+                .map(|v| v.0);
+            self.scrolling_state
+                .set_content_len(app.queue.len().map(|v| v.try_into().unwrap_or(0)));
+            self.scrolling_state.select(idx);
+        }
+
         Ok(())
     }
 
@@ -278,7 +283,10 @@ impl Screen for QueueScreen {
                     self.jump_back(app);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
+                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

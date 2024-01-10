@@ -152,7 +152,10 @@ impl Screen for LogsScreen {
                 CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::RenderRequested),
+                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

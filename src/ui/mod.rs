@@ -265,10 +265,15 @@ impl Ui<'_> {
         .alignment(Alignment::Center);
 
         // left
+        // no rendered frames in release mode
+        #[cfg(debug_assertions)]
         let status = Paragraph::new(format!(
             "[{}] {} rendered frames",
             app.status.state, self.shared_state.frame_counter.frame_count
         ));
+        #[cfg(not(debug_assertions))]
+        let status = Paragraph::new(format!("[{}]", app.status.state));
+
         let elapsed = Paragraph::new(format!(
             "{}/{}{}",
             app.status.elapsed.to_string(),
@@ -333,7 +338,7 @@ impl Ui<'_> {
         Ok(())
     }
 
-    fn render_modal<B: Backend>(
+    fn render_modal<B: ratatui::backend::Backend>(
         active_modal: &mut modals::Modals,
         frame: &mut Frame<'_, B>,
         app: &mut State,
@@ -449,7 +454,7 @@ impl Ui<'_> {
     }
 
     #[instrument(skip_all)]
-    pub async fn before_show(&mut self, app: &mut State) -> Result<()> {
+    pub fn before_show(&mut self, app: &mut State) -> Result<()> {
         screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state))
     }
 

@@ -1,9 +1,6 @@
-use anyhow::Result;
-use crossterm::event::KeyEvent;
-use ratatui::{
-    prelude::{Backend, Rect},
-    Frame,
-};
+use anyhow::{Context, Result};
+use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
@@ -11,7 +8,10 @@ use crate::{
     state::State,
 };
 
-use super::{KeyHandleResultInternal, SharedUiState};
+use super::{
+    utils::dirstack::{DirStack, DirStackItem},
+    KeyHandleResultInternal, SharedUiState,
+};
 
 pub mod albums;
 pub mod artists;
@@ -34,7 +34,7 @@ pub enum Screens {
 
 pub(super) trait Screen {
     type Actions;
-    fn render<B: Backend>(
+    fn render<B: ratatui::backend::Backend>(
         &mut self,
         frame: &mut Frame<B>,
         area: Rect,
@@ -95,6 +95,9 @@ pub enum CommonAction {
     NextResult,
     PreviousResult,
     Select,
+    Add,
+    Delete,
+    Rename,
 }
 
 impl Screens {
@@ -198,6 +201,15 @@ pub(crate) mod browser {
         Song(String),
     }
 
+    impl DirOrSong {
+        pub fn value(&self) -> &str {
+            match self {
+                DirOrSong::Dir(v) => v,
+                DirOrSong::Song(v) => v,
+            }
+        }
+    }
+
     impl std::cmp::Ord for DirOrSong {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             match (self, other) {
@@ -248,5 +260,172 @@ impl StringExt for String {
         self.rsplit('/')
             .next()
             .map_or(self, |v| v.split('.').next().unwrap_or(v))
+    }
+}
+
+#[allow(unused)]
+trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
+    fn stack(&self) -> &DirStack<T>;
+    fn stack_mut(&mut self) -> &mut DirStack<T>;
+    fn set_filter_input_mode_active(&mut self, active: bool);
+    fn is_filter_input_mode_active(&self) -> bool;
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()>;
+    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>>;
+    fn add(&self, item: &T, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal>;
+    fn delete(
+        &self,
+        item: &T,
+        index: usize,
+        client: &mut Client<'_>,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        Ok(KeyHandleResultInternal::SkipRender)
+    }
+    fn rename(&self, item: &T, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
+        Ok(KeyHandleResultInternal::SkipRender)
+    }
+    fn handle_filter_input(&mut self, event: KeyEvent) {
+        match event.code {
+            KeyCode::Char(c) => {
+                if let Some(ref mut f) = self.stack_mut().current_mut().filter {
+                    f.push(c);
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut f) = self.stack_mut().current_mut().filter {
+                    f.pop();
+                };
+            }
+            KeyCode::Enter => {
+                self.set_filter_input_mode_active(false);
+                self.stack_mut().current_mut().jump_next_matching();
+            }
+            KeyCode::Esc => {
+                self.set_filter_input_mode_active(false);
+                self.stack_mut().current_mut().filter = None;
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_common_action(
+        &mut self,
+        action: CommonAction,
+        client: &mut Client<'_>,
+        app: &mut State,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        match action {
+            CommonAction::DownHalf => {
+                self.stack_mut().current_mut().next_half_viewport();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::UpHalf => {
+                self.stack_mut().current_mut().prev_half_viewport();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Up => {
+                self.stack_mut().current_mut().prev();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Down => {
+                self.stack_mut().current_mut().next();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Bottom => {
+                self.stack_mut().current_mut().last();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Top => {
+                self.stack_mut().current_mut().first();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Right => {
+                self.next(client, shared)?;
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Left => {
+                self.stack_mut().pop();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::EnterSearch => {
+                self.set_filter_input_mode_active(true);
+                self.stack_mut().current_mut().filter = Some(String::new());
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::NextResult => {
+                self.stack_mut().current_mut().jump_next_matching();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::PreviousResult => {
+                self.stack_mut().current_mut().jump_previous_matching();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Select => {
+                self.stack_mut().current_mut().toggle_mark_selected();
+                self.stack_mut().current_mut().next();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Add if !self.stack().current().marked().is_empty() => {
+                for idx in self.stack().current().marked().iter().rev() {
+                    let item = &self.stack().current().items[*idx];
+                    self.add(item, client, shared)?;
+                }
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Add => {
+                if let Some(item) = self.stack().current().selected() {
+                    self.add(item, client, shared)
+                } else {
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+            }
+            CommonAction::Delete if !self.stack().current().marked().is_empty() => {
+                for idx in self.stack().current().marked().iter().rev() {
+                    let item = &self.stack().current().items[*idx];
+                    self.delete(item, *idx, client, shared)?;
+                }
+                self.refresh(client, app, shared)?;
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::Delete => {
+                if let Some((item, index)) = self.stack().current().selected_with_idx() {
+                    self.delete(item, index, client, shared)?;
+                    self.refresh(client, app, shared)?;
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                } else {
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+            }
+            CommonAction::Rename => {
+                if let Some(item) = self.stack().current().selected() {
+                    self.rename(item, client, shared)
+                } else {
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+            }
+        }
     }
 }

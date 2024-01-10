@@ -474,14 +474,43 @@ pub enum Tag {
 }
 
 #[derive(Debug)]
-pub struct Filter<'a> {
-    pub tag: Tag,
-    pub value: &'a str,
+#[allow(dead_code)]
+pub enum FilterKind {
+    Exact,
+    StartsWith,
 }
 
+#[derive(Debug)]
+pub struct Filter<'a> {
+    tag: Tag,
+    value: &'a str,
+    kind: FilterKind,
+}
+
+#[allow(dead_code)]
 impl<'a> Filter<'a> {
     pub fn new(tag: Tag, value: &'a str) -> Self {
-        Self { tag, value }
+        Self {
+            tag,
+            value,
+            kind: FilterKind::Exact,
+        }
+    }
+
+    pub fn new_with_kind(tag: Tag, value: &'a str, kind: FilterKind) -> Self {
+        Self { tag, value, kind }
+    }
+
+    pub fn with_type(&mut self, t: FilterKind) -> &mut Self {
+        self.kind = t;
+        self
+    }
+
+    fn to_query_str(&self) -> String {
+        match self.kind {
+            FilterKind::Exact => format!("{} == '{}'", self.tag, self.value.escape()),
+            FilterKind::StartsWith => format!("{} =~ '^{}'", self.tag, self.value.escape()),
+        }
     }
 }
 
@@ -490,16 +519,14 @@ trait FilterExt {
 }
 impl FilterExt for &[Filter<'_>] {
     fn to_query_str(&self) -> String {
-        self.iter()
-            .enumerate()
-            .fold(String::new(), |mut acc, (idx, Filter { tag, value })| {
-                if idx > 0 {
-                    acc.push_str(&format!(" AND ({tag} == '{}')", value.escape()));
-                } else {
-                    acc.push_str(&format!("({tag} == '{}')", value.escape()));
-                }
-                acc
-            })
+        self.iter().enumerate().fold(String::new(), |mut acc, (idx, filter)| {
+            if idx > 0 {
+                acc.push_str(&format!(" AND ({})", filter.to_query_str()));
+            } else {
+                acc.push_str(&format!("({})", filter.to_query_str()));
+            }
+            acc
+        })
     }
 }
 
@@ -517,31 +544,29 @@ mod strext_tests {
 
 #[cfg(test)]
 mod filter_tests {
-    use crate::mpd::mpd_client::{FilterExt, Tag};
+    use crate::mpd::mpd_client::{FilterExt, FilterKind, Tag};
 
     use super::Filter;
 
     #[test]
     fn single_value() {
-        let input: &[Filter<'_>] = &[Filter {
-            tag: Tag::Artist,
-            value: "mrs singer",
-        }];
+        let input: &[Filter<'_>] = &[Filter::new(Tag::Artist, "mrs singer")];
 
         assert_eq!(input.to_query_str(), "(artist == 'mrs singer')");
     }
 
     #[test]
+    fn starts_with() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
+
+        assert_eq!(input.to_query_str(), "(artist =~ '^mrs singer')");
+    }
+
+    #[test]
     fn multiple_values() {
         let input: &[Filter<'_>] = &[
-            Filter {
-                tag: Tag::Album,
-                value: "the greatest",
-            },
-            Filter {
-                tag: Tag::Artist,
-                value: "mrs singer",
-            },
+            Filter::new(Tag::Album, "the greatest"),
+            Filter::new(Tag::Artist, "mrs singer"),
         ];
 
         assert_eq!(

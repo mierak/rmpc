@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
+use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
 use tracing::instrument;
@@ -7,7 +8,7 @@ use tracing::instrument;
 use crate::{
     mpd::{
         client::Client,
-        mpd_client::{Filter, MpdClient, Ranges, SingleOrRange, Tag},
+        mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
     state::State,
     ui::{
@@ -18,7 +19,7 @@ use crate::{
     },
 };
 
-use super::{browser::DirOrSong, CommonAction, Screen, SongExt};
+use super::{browser::DirOrSong, BrowserScreen, Screen, SongExt};
 
 #[derive(Debug, Default)]
 pub struct PlaylistsScreen {
@@ -27,62 +28,11 @@ pub struct PlaylistsScreen {
 }
 
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum PlaylistsActions {
-    Add,
-    Delete,
-    Rename,
-}
-
-impl PlaylistsScreen {
-    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<()> {
-        if let Some(current) = self.stack.current().selected() {
-            let p = match current {
-                DirOrSong::Dir(d) => client
-                    .list_playlist(d)?
-                    .into_iter()
-                    .map(DirOrSong::Song)
-                    .map(|s| s.to_list_item(&state.config.symbols, false))
-                    .collect::<Vec<ListItem<'static>>>(),
-                DirOrSong::Song(file) => client
-                    .find_one(&[Filter::new(Tag::File, file)])?
-                    .context(anyhow!("File '{file}' was listed but not found"))?
-                    .to_preview(&state.config.symbols)
-                    .collect(),
-            };
-            self.stack.set_preview(Some(p));
-        }
-        Ok(())
-    }
-
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
-        let Some(selected) = self.stack.current().selected() else {
-            tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
-        };
-
-        match selected {
-            DirOrSong::Dir(playlist) => {
-                let info = client.list_playlist(playlist)?;
-                self.stack.push(info.into_iter().map(DirOrSong::Song).collect());
-            }
-            DirOrSong::Song(song) => {
-                client.add(song)?;
-                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, song)]) {
-                    shared.status_message = Some(StatusMessage::new(
-                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
-                        Level::Info,
-                    ));
-                }
-            }
-        }
-
-        return Ok(());
-    }
-}
+pub enum PlaylistsActions {}
 
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;
-    fn render<B: ratatui::prelude::Backend>(
+fn render<B: ratatui::prelude::Backend>(
         &mut self,
         frame: &mut Frame<B>,
         area: Rect,
@@ -151,192 +101,148 @@ impl Screen for PlaylistsScreen {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            match event.code {
-                KeyCode::Char(c) => {
-                    if let Some(ref mut f) = self.stack.current_mut().filter {
-                        f.push(c);
-                    }
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                KeyCode::Backspace => {
-                    if let Some(ref mut f) = self.stack.current_mut().filter {
-                        f.pop();
-                    };
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                KeyCode::Enter => {
-                    self.filter_input_mode = false;
-                    self.stack.current_mut().jump_next_matching();
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                KeyCode::Esc => {
-                    self.filter_input_mode = false;
-                    self.stack.current_mut().filter = None;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
-            }
-        } else if let Some(action) = app.config.keybinds.playlists.get(&event.into()) {
-            match action {
-                PlaylistsActions::Add => {
-                    if let Some(playlist) = self.stack.current().selected() {
-                        match playlist {
-                            DirOrSong::Dir(d) => {
-                                client.load_playlist(d)?;
-                                shared.status_message = Some(StatusMessage::new(
-                                    format!("Playlist '{d}' added to queue"),
-                                    Level::Info,
-                                ));
-                            }
-                            DirOrSong::Song(s) => {
-                                client.add(s)?;
-                                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, s)]) {
-                                    shared.status_message = Some(StatusMessage::new(
-                                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
-                                        Level::Info,
-                                    ));
-                                }
-                            }
-                        }
-                    } else {
-                        shared.status_message = Some(StatusMessage::new(
-                            "Failed to add playlist/song to current queue because nothing was selected".to_string(),
-                            Level::Error,
-                        ));
-                        tracing::error!(
-                            message = "Failed to add playlist/song to current queue because nothing was selected"
-                        );
-                    }
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                PlaylistsActions::Delete if !self.stack.current().marked().is_empty() => {
-                    for idx in self.stack.current().marked() {
-                        let item = &self.stack.current().items[*idx];
-                        match item {
-                            DirOrSong::Dir(d) => {
-                                client.delete_playlist(d)?;
-                                shared.status_message =
-                                    Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
-                            }
-                            DirOrSong::Song(s) => {
-                                let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {
-                                    return Ok(KeyHandleResultInternal::SkipRender);
-                                };
-                                client.delete_from_playlist(playlist, &SingleOrRange::single(*idx))?;
-                                shared.status_message = Some(StatusMessage::new(
-                                    format!("File '{s}' deleted from playlist '{playlist}'"),
-                                    Level::Info,
-                                ));
-                            }
-                        }
-                    }
-                    self.refresh(client, app, shared)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                PlaylistsActions::Delete => match self.stack.current().selected_with_idx() {
-                    Some((DirOrSong::Dir(d), _)) => {
-                        client.delete_playlist(d)?;
-                        shared.status_message =
-                            Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
-                        self.refresh(client, app, shared)?;
-                        Ok(KeyHandleResultInternal::RenderRequested)
-                    }
-                    Some((DirOrSong::Song(s), idx)) => {
-                        let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {
-                            return Ok(KeyHandleResultInternal::SkipRender);
-                        };
-                        if self.stack.current().marked().is_empty() {
-                            client.delete_from_playlist(playlist, &SingleOrRange::single(idx))?;
-                            shared.status_message = Some(StatusMessage::new(
-                                format!("File '{s}' deleted from playlist '{playlist}'"),
-                                Level::Info,
-                            ));
-                        } else {
-                            let ranges: Ranges = self.stack.current().marked().into();
-                            for range in ranges.iter().rev() {
-                                client.delete_from_playlist(playlist, range)?;
-                                shared.status_message = Some(StatusMessage::new(
-                                    format!("Songs in ranges '{ranges}' deleted from playlist '{playlist}'",),
-                                    Level::Info,
-                                ));
-                            }
-                        }
-                        self.refresh(client, app, shared)?;
-                        Ok(KeyHandleResultInternal::SkipRender)
-                    }
-                    None => Ok(KeyHandleResultInternal::SkipRender),
-                },
-                PlaylistsActions::Rename => match self.stack.current().selected() {
-                    Some(DirOrSong::Dir(d)) => Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
-                        RenamePlaylistModal::new(d.clone()),
-                    )))),
-                    Some(_) => Ok(KeyHandleResultInternal::SkipRender),
-                    None => Ok(KeyHandleResultInternal::SkipRender),
-                },
-            }
+            self.handle_filter_input(event);
+            Ok(KeyHandleResultInternal::RenderRequested)
+        } else if let Some(_action) = app.config.keybinds.playlists.get(&event.into()) {
+            Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
-            match action {
-                CommonAction::DownHalf => {
-                    self.stack.current_mut().next_half_viewport();
-                    self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::UpHalf => {
-                    self.stack.current_mut().prev_half_viewport();
-                    self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Up => {
-                    self.stack.current_mut().prev();
-                    self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Down => {
-                    self.stack.current_mut().next();
-                    self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Bottom => {
-                    self.stack.current_mut().last();
-                    self.prepare_preview(client, app)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Top => {
-                    self.stack.current_mut().first();
-                    self.prepare_preview(client, app)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Right => {
-                    self.next(client, shared)?;
-                    self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Left => {
-                    self.stack.pop();
-                    self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::EnterSearch => {
-                    self.filter_input_mode = true;
-                    self.stack.current_mut().filter = Some(String::new());
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::NextResult => {
-                    self.stack.current_mut().jump_next_matching();
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::PreviousResult => {
-                    self.stack.current_mut().jump_previous_matching();
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::Select => {
-                    self.stack.current_mut().toggle_mark_selected();
-                    self.stack.current_mut().next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-            }
+            self.handle_common_action(*action, client, app, shared)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
+    }
+}
+
+impl BrowserScreen<DirOrSong> for PlaylistsScreen {
+    fn stack(&self) -> &DirStack<DirOrSong> {
+        &self.stack
+    }
+
+    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong> {
+        &mut self.stack
+    }
+
+    fn set_filter_input_mode_active(&mut self, active: bool) {
+        self.filter_input_mode = active;
+    }
+
+    fn is_filter_input_mode_active(&self) -> bool {
+        self.filter_input_mode
+    }
+
+    fn delete(
+        &self,
+        item: &DirOrSong,
+        index: usize,
+        client: &mut Client<'_>,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        match item {
+            DirOrSong::Dir(d) => {
+                client.delete_playlist(d)?;
+                shared.status_message = Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            DirOrSong::Song(s) => {
+                let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {
+                    return Ok(KeyHandleResultInternal::SkipRender);
+                };
+                client.delete_from_playlist(playlist, &SingleOrRange::single(index))?;
+                shared.status_message = Some(StatusMessage::new(
+                    format!("File '{s}' deleted from playlist '{playlist}'"),
+                    Level::Info,
+                ));
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+        }
+    }
+
+    fn add(
+        &self,
+        item: &DirOrSong,
+        client: &mut Client<'_>,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        match item {
+            DirOrSong::Dir(d) => {
+                client.load_playlist(d)?;
+                shared.status_message = Some(StatusMessage::new(
+                    format!("Playlist '{d}' added to queue"),
+                    Level::Info,
+                ));
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            DirOrSong::Song(s) => {
+                client.add(s)?;
+                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, s)]) {
+                    shared.status_message = Some(StatusMessage::new(
+                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
+                        Level::Info,
+                    ));
+                }
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+        }
+    }
+
+    fn rename(
+        &self,
+        item: &DirOrSong,
+        _client: &mut Client<'_>,
+        _shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        match item {
+            DirOrSong::Dir(d) => Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
+                RenamePlaylistModal::new(d.clone()),
+            )))),
+            DirOrSong::Song(_) => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
+        let stack = self.stack_mut();
+        let Some(selected) = stack.current().selected() else {
+            tracing::error!("Failed to move deeper inside dir. Current value is None");
+            return Ok(());
+        };
+
+        match selected {
+            DirOrSong::Dir(playlist) => {
+                let info = client.list_playlist(playlist)?;
+                stack.push(info.into_iter().map(DirOrSong::Song).collect());
+            }
+            DirOrSong::Song(song) => {
+                client.add(song)?;
+                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, song)]) {
+                    shared.status_message = Some(StatusMessage::new(
+                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
+                        Level::Info,
+                    ));
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
+    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {
+        self.stack()
+            .current()
+            .selected()
+            .map_or(Ok(None), |current| -> Result<_> {
+                Ok(Some(match current {
+                    DirOrSong::Dir(d) => client
+                        .list_playlist(d)?
+                        .into_iter()
+                        .map(DirOrSong::Song)
+                        .map(|s| s.to_list_item(&state.config.symbols, false))
+                        .collect_vec(),
+                    DirOrSong::Song(file) => client
+                        .find_one(&[Filter::new(Tag::File, file)])?
+                        .context(anyhow!("File '{file}' was listed but not found"))?
+                        .to_preview(&state.config.symbols)
+                        .collect_vec(),
+                }))
+            })
     }
 }

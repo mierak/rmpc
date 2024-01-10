@@ -154,6 +154,7 @@ fn main_task<B: Backend + std::io::Write>(
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
+    ui.before_show(&mut state).expect("Initial render init to succeed");
 
     loop {
         let now = std::time::Instant::now();

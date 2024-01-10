@@ -372,14 +372,28 @@ struct Data {
     img_height: u32,
 }
 impl<'a> KittyImage<'a> {
-    fn create_data_to_transfer(image_data: &[u8], compression: Compression) -> Result<Data> {
-        // todo query cell size and resize exactly
+    fn create_data_to_transfer(
+        image_data: &[u8],
+        width: usize,
+        height: usize,
+        compression: Compression,
+    ) -> Result<Data> {
+        // TODO: handle notes on window_size()
+        // probably abstract the use of crossterm
+        // take care to query the terminal size on every image change
+        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
+        let cell_width = size.width / size.columns;
+        let cell_height = size.height / size.rows;
         let image = image::io::Reader::new(Cursor::new(image_data))
             .with_guessed_format()
             .context("Unable to guess image format")?
             .decode()
             .context("Unable to decode image")?
-            .resize(800, 600, image::imageops::FilterType::Lanczos3);
+            .resize(
+                (cell_width as usize * width) as u32,
+                (cell_height as usize * height) as u32,
+                image::imageops::FilterType::Lanczos3,
+            );
 
         let binding = image.to_rgba8();
         let rgba = binding.as_raw();
@@ -510,7 +524,7 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             state.needs_transfer = false;
             state.idx = state.idx.wrapping_add(1);
 
-            match KittyImage::create_data_to_transfer(image, Compression::new(6)) {
+            match KittyImage::create_data_to_transfer(image, width, height, Compression::new(6)) {
                 Ok(data) => {
                     match KittyImage::transfer_data(
                         &data.content,
