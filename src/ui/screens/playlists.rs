@@ -200,23 +200,48 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack().current().selected() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
         match selected {
             DirOrSong::Dir(playlist) => {
                 let info = client.list_playlist(playlist)?;
                 self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            DirOrSong::Song(_song) => {
-                self.add(selected, client, shared)?;
+            DirOrSong::Song(_song) => self.add(selected, client, shared),
+        }
+    }
+
+    fn move_selected(
+        &mut self,
+        direction: super::MoveDirection,
+        client: &mut Client<'_>,
+        _shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        let Some((selected, idx)) = self.stack().current().selected_with_idx() else {
+            tracing::error!("Failed to move playlist. No playlist selected");
+            return Ok(KeyHandleResultInternal::SkipRender);
+        };
+        let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {
+            return Ok(KeyHandleResultInternal::SkipRender);
+        };
+
+        match selected {
+            DirOrSong::Dir(_) => {}
+            DirOrSong::Song(_) => {
+                let new_idx = match direction {
+                    super::MoveDirection::Up => idx.saturating_sub(1),
+                    super::MoveDirection::Down => (idx + 1).min(self.stack().current().items.len() - 1),
+                };
+                client.move_in_playlist(playlist, &SingleOrRange::single(idx), new_idx)?;
+                self.stack.current_mut().state.select(Some(new_idx));
             }
         }
-
-        return Ok(());
+        Ok(KeyHandleResultInternal::SkipRender)
     }
 
     fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {

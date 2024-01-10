@@ -52,6 +52,7 @@ pub trait MpdClient {
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
+    fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()>;
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>>;
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
@@ -68,6 +69,8 @@ pub trait MpdClient {
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
     fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange) -> MpdResult<()>;
+    fn move_in_playlist(&mut self, playlist_name: &str, range: &SingleOrRange, target_position: usize)
+        -> MpdResult<()>;
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
@@ -185,6 +188,11 @@ impl MpdClient for Client<'_> {
     }
 
     #[tracing::instrument(skip(self))]
+    fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
+        self.execute_ok(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
+    }
+
+    #[tracing::instrument(skip(self))]
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         self.execute_option("playlistinfo")
     }
@@ -258,9 +266,23 @@ impl MpdClient for Client<'_> {
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rm \"{name}\""))
     }
+    #[tracing::instrument(skip(self))]
     fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
         self.execute_ok(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
     }
+    #[tracing::instrument(skip(self))]
+    fn move_in_playlist(
+        &mut self,
+        playlist_name: &str,
+        range: &SingleOrRange,
+        target_position: usize,
+    ) -> MpdResult<()> {
+        self.execute_ok(&format!(
+            "playlistmove \"{playlist_name}\" {} {target_position}",
+            range.as_mpd_range()
+        ))
+    }
+
     #[tracing::instrument(skip(self))]
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rename \"{name}\" \"{new_name}\""))
@@ -315,6 +337,24 @@ impl MpdClient for Client<'_> {
                 tracing::error!(message = "Failed to read picture", error = ?e);
                 Ok(None)
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum QueueMoveTarget {
+    RelativeAdd(usize),
+    RelativeSub(usize),
+    Absolute(usize),
+}
+
+impl QueueMoveTarget {
+    fn as_mpd_str(&self) -> String {
+        match self {
+            QueueMoveTarget::RelativeAdd(v) => format!("+{v}"),
+            QueueMoveTarget::RelativeSub(v) => format!("-{v}"),
+            QueueMoveTarget::Absolute(v) => format!("{v}"),
         }
     }
 }

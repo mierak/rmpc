@@ -187,25 +187,31 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
         }
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(current) = self.stack.current().selected() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
         let Some(value) = current.as_path() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
         match self.stack.path() {
-            [_artist, _album] => {
-                self.add(current, client, shared)?;
+            [_artist, _album] => self.add(current, client, shared),
+            [artist] => {
+                self.stack.push(list_titles(client, artist, value)?.collect());
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            [artist] => self.stack.push(list_titles(client, artist, value)?.collect()),
-            [] => self.stack.push(list_albums(client, value)?.collect()),
-            _ => tracing::error!("Unexpected nesting in Artists dir structure"),
+            [] => {
+                self.stack.push(list_albums(client, value)?.collect());
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            _ => {
+                tracing::error!("Unexpected nesting in Artists dir structure");
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
         }
-        Ok(())
     }
 
     fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {

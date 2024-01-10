@@ -85,6 +85,8 @@ pub(super) trait Screen {
 pub enum CommonAction {
     Down,
     Up,
+    MoveDown,
+    MoveUp,
     DownHalf,
     UpHalf,
     Right,
@@ -263,13 +265,26 @@ impl StringExt for String {
     }
 }
 
+enum MoveDirection {
+    Up,
+    Down,
+}
+
 #[allow(unused)]
 trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn stack(&self) -> &DirStack<T>;
     fn stack_mut(&mut self) -> &mut DirStack<T>;
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()>;
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal>;
+    fn move_selected(
+        &mut self,
+        direction: MoveDirection,
+        client: &mut Client<'_>,
+        shared: &mut SharedUiState,
+    ) -> Result<KeyHandleResultInternal> {
+        Ok(KeyHandleResultInternal::SkipRender)
+    }
     fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>>;
     fn add(&self, item: &T, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal>;
     fn delete(
@@ -316,18 +331,6 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match action {
-            CommonAction::DownHalf => {
-                self.stack_mut().current_mut().next_half_viewport();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            CommonAction::UpHalf => {
-                self.stack_mut().current_mut().prev_half_viewport();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev();
                 let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
@@ -336,6 +339,28 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             }
             CommonAction::Down => {
                 self.stack_mut().current_mut().next();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::MoveUp => {
+                let res = self.move_selected(MoveDirection::Up, client, shared)?;
+                self.refresh(client, app, shared)?;
+                Ok(res)
+            }
+            CommonAction::MoveDown => {
+                let res = self.move_selected(MoveDirection::Down, client, shared)?;
+                self.refresh(client, app, shared)?;
+                Ok(res)
+            }
+            CommonAction::DownHalf => {
+                self.stack_mut().current_mut().next_half_viewport();
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::UpHalf => {
+                self.stack_mut().current_mut().prev_half_viewport();
                 let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -353,10 +378,10 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Right => {
-                self.next(client, shared)?;
+                let res = self.next(client, shared)?;
                 let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+                Ok(res)
             }
             CommonAction::Left => {
                 self.stack_mut().pop();

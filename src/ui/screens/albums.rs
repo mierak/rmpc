@@ -120,27 +120,28 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         self.filter_input_mode
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(current) = self.stack.current().selected() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
         let Some(value) = current.as_path() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
         match self.stack.path() {
-            [_album] => {
-                self.add(current, client, shared)?;
-            }
+            [_album] => self.add(current, client, shared),
             [] => {
                 let res = list_titles(client, value)?;
                 self.stack.push(res.collect());
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            _ => tracing::error!("Unexpected nesting in Artists dir structure"),
+            _ => {
+                tracing::error!("Unexpected nesting in Artists dir structure");
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
         }
-        Ok(())
     }
 
     fn add(

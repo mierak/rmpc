@@ -152,14 +152,14 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         Ok(KeyHandleResultInternal::RenderRequested)
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
+    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack.current().selected() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
         let Some(next_path) = self.stack.next_path() else {
             tracing::error!("Failed to move deeper inside dir. Next path is None");
-            return Ok(());
+            return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
         match selected {
@@ -173,12 +173,10 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     })
                     .collect();
                 self.stack.push(res);
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            t @ DirOrSong::Song(_) => {
-                self.add(t, client, shared)?;
-            }
-        };
-        Ok(())
+            t @ DirOrSong::Song(_) => self.add(t, client, shared),
+        }
     }
 
     fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {

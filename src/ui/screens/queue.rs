@@ -3,7 +3,10 @@ use crossterm::event::{KeyCode, KeyEvent};
 use strum::Display;
 
 use crate::{
-    mpd::{client::Client, mpd_client::MpdClient},
+    mpd::{
+        client::Client,
+        mpd_client::{MpdClient, QueueMoveTarget},
+    },
     state::PlayListInfoExt,
     ui::{
         modals::{confirm_queue_clear::ConfirmQueueClearModal, save_queue::SaveQueueModal, Modals},
@@ -225,18 +228,6 @@ impl Screen for QueueScreen {
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
-                CommonAction::DownHalf => {
-                    if !app.queue.is_empty_or_none() {
-                        self.scrolling_state.next_half_viewport();
-                    }
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                CommonAction::UpHalf => {
-                    if !app.queue.is_empty_or_none() {
-                        self.scrolling_state.prev_half_viewport();
-                    }
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
                 CommonAction::Up => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.prev();
@@ -246,6 +237,52 @@ impl Screen for QueueScreen {
                 CommonAction::Down => {
                     if !app.queue.is_empty_or_none() {
                         self.scrolling_state.next();
+                    }
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                CommonAction::MoveUp => {
+                    if app.queue.is_empty_or_none() {
+                        return Ok(KeyHandleResultInternal::SkipRender);
+                    }
+
+                    let Some(idx) = self.scrolling_state.get_selected() else {
+                        return Ok(KeyHandleResultInternal::SkipRender);
+                    };
+                    let Some(selected) = app.queue.get_selected(Some(idx)) else {
+                        return Ok(KeyHandleResultInternal::SkipRender);
+                    };
+
+                    let new_idx = idx.saturating_sub(1);
+                    client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
+                    self.scrolling_state.select(Some(new_idx));
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+                CommonAction::MoveDown => {
+                    if app.queue.is_empty_or_none() {
+                        return Ok(KeyHandleResultInternal::SkipRender);
+                    }
+
+                    let Some(idx) = self.scrolling_state.get_selected() else {
+                        return Ok(KeyHandleResultInternal::SkipRender);
+                    };
+                    let Some(selected) = app.queue.get_selected(Some(idx)) else {
+                        return Ok(KeyHandleResultInternal::SkipRender);
+                    };
+
+                    let new_idx = (idx + 1).min(app.queue.len().unwrap_or(1) - 1);
+                    client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
+                    self.scrolling_state.select(Some(new_idx));
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+                CommonAction::DownHalf => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.next_half_viewport();
+                    }
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                CommonAction::UpHalf => {
+                    if !app.queue.is_empty_or_none() {
+                        self.scrolling_state.prev_half_viewport();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }

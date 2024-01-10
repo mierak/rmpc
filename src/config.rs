@@ -148,8 +148,10 @@ impl Default for KeyConfigFile {
                 (G::ToggleConsume,    Key { key: K::Char('v'), modifiers: M::NONE }),
             ]),
             navigation: HashMap::from([
-                (C::Down,             Key { key: K::Char('j'), modifiers: M::NONE }),
                 (C::Up,               Key { key: K::Char('k'), modifiers: M::NONE }),
+                (C::Down,             Key { key: K::Char('j'), modifiers: M::NONE }),
+                (C::MoveUp,           Key { key: K::Char('K'), modifiers: M::SHIFT }),
+                (C::MoveDown,         Key { key: K::Char('J'), modifiers: M::SHIFT }),
                 (C::Right,            Key { key: K::Char('l'), modifiers: M::NONE }),
                 (C::Left,             Key { key: K::Char('h'), modifiers: M::NONE }),
                 (C::DownHalf,         Key { key: K::Char('d'), modifiers: M::CONTROL }),
