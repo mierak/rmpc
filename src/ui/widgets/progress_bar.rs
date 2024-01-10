@@ -120,9 +120,9 @@ mod tests {
 
         wg.render(area, &mut buf);
 
-        assert_eq!(buf.get(0, 0).symbol, "B");
-        assert_eq!(buf.get(1, 0).symbol, "B");
-        assert_eq!(buf.get(2, 0).symbol, "B");
+        assert_eq!(buf.get(0, 0).symbol(), "B");
+        assert_eq!(buf.get(1, 0).symbol(), "B");
+        assert_eq!(buf.get(2, 0).symbol(), "B");
     }
 
     #[test]
@@ -142,9 +142,9 @@ mod tests {
 
         wg.render(area, &mut buf);
 
-        assert_eq!(buf.get(0, 0).symbol, "E");
-        assert_eq!(buf.get(1, 0).symbol, "E");
-        assert_eq!(buf.get(2, 0).symbol, "E");
+        assert_eq!(buf.get(0, 0).symbol(), "E");
+        assert_eq!(buf.get(1, 0).symbol(), "E");
+        assert_eq!(buf.get(2, 0).symbol(), "E");
     }
 
     #[test]
@@ -164,8 +164,8 @@ mod tests {
 
         wg.render(area, &mut buf);
 
-        assert_eq!(buf.get(0, 0).symbol, "E");
-        assert_eq!(buf.get(1, 0).symbol, "T");
-        assert_eq!(buf.get(2, 0).symbol, "B");
+        assert_eq!(buf.get(0, 0).symbol(), "E");
+        assert_eq!(buf.get(1, 0).symbol(), "T");
+        assert_eq!(buf.get(2, 0).symbol(), "B");
     }
 }

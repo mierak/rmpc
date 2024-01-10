@@ -7,19 +7,19 @@ edition = "2021"
 
 [dependencies]
 ansi-to-tui = "3.1.0"
-anyhow = "1.0.72"
-base64 = "0.21.2"
-clap = { version = "4.3.19", features = ["derive", "cargo", "string" ] }
+anyhow = "1.0.79"
+base64 = "0.21.6"
+clap = { version = "4.4.14", features = ["derive", "cargo", "string" ] }
 crossterm = { version = "0.27.0", features = ["serde"] }
 image = "0.24.7"
 ratatui = { version = "0.25.0", features = ["all-widgets"] }
-serde = { version = "1.0.182", features = ["derive"] }
+serde = { version = "1.0.195", features = ["derive"] }
 strum = { version = "0.25.0", features = ["derive"] }
-time = { version = "0.3.25", features = ["macros", "local-offset"] }
-tracing = { version = "0.1.37", features = [] }
-tracing-subscriber = { version = "0.3.17", features = ["time", "ansi"] }
-flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
-tracing-appender = "0.2.2"
+time = { version = "0.3.31", features = ["macros", "local-offset"] }
+tracing = { version = "0.1.40", features = [] }
+tracing-subscriber = { version = "0.3.18", features = ["time", "ansi"] }
+flate2 = { version = "1.0.28", features = ["zlib-ng"], default-features = false }
+tracing-appender = "0.2.3"
 itertools = "0.11.0"
 ron = "0.8.1"
 derive_more = { version = "0.99.17", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }

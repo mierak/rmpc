@@ -198,13 +198,8 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
         };
 
         match self.stack.path() {
-            [artist, album] => {
-                add_song(client, artist, album, value)?;
-
-                shared.status_message = Some(StatusMessage::new(
-                    format!("'{value}' by '{artist}' added to queue"),
-                    Level::Info,
-                ));
+            [_artist, _album] => {
+                self.add(current, client, shared)?;
             }
             [artist] => self.stack.push(list_titles(client, artist, value)?.collect()),
             [] => self.stack.push(list_albums(client, value)?.collect()),

@@ -131,12 +131,8 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         };
 
         match self.stack.path() {
-            [album] => {
-                add_song(client, album, value)?;
-                shared.status_message = Some(StatusMessage::new(
-                    format!("'{value}' from album '{album}' added to queue"),
-                    Level::Info,
-                ));
+            [_album] => {
+                self.add(current, client, shared)?;
             }
             [] => {
                 let res = list_titles(client, value)?;

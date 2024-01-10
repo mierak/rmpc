@@ -174,14 +174,8 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     .collect();
                 self.stack.push(res);
             }
-            DirOrSong::Song(file) => {
-                client.add(file)?;
-                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, file)]) {
-                    shared.status_message = Some(StatusMessage::new(
-                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
-                        Level::Info,
-                    ));
-                }
+            t @ DirOrSong::Song(_) => {
+                self.add(t, client, shared)?;
             }
         };
         Ok(())

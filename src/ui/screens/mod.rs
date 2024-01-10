@@ -259,7 +259,7 @@ impl StringExt for String {
     fn file_name(&self) -> &str {
         self.rsplit('/')
             .next()
-            .map_or(self, |v| v.split('.').next().unwrap_or(v))
+            .map_or(self, |v| v.rsplit_once('.').map_or(v, |v| v.0))
     }
 }
 

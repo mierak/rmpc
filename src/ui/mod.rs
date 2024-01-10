@@ -267,12 +267,18 @@ impl Ui<'_> {
         // left
         // no rendered frames in release mode
         #[cfg(debug_assertions)]
-        let status = Paragraph::new(format!(
-            "[{}] {} rendered frames",
-            app.status.state, self.shared_state.frame_counter.frame_count
+        let status = Paragraph::new(Span::styled(
+            format!(
+                "[{}] {} rendered frames",
+                app.status.state, self.shared_state.frame_counter.frame_count
+            ),
+            Style::default().yellow(),
         ));
         #[cfg(not(debug_assertions))]
-        let status = Paragraph::new(format!("[{}]", app.status.state));
+        let status = Paragraph::new(Span::styled(
+            format!("[{}]", app.status.state),
+            Style::default().yellow(),
+        ));
 
         let elapsed = Paragraph::new(format!(
             "{}/{}{}",

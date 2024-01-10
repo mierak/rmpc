@@ -63,7 +63,8 @@ impl Screen for PlaylistsScreen {
             .collect();
         playlists.sort();
         self.stack = DirStack::new(playlists);
-        self.prepare_preview(client, app).context("Cannot prepare preview")?;
+        let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+        self.stack.set_preview(preview);
         Ok(())
     }
 
@@ -200,8 +201,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
     }
 
     fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<()> {
-        let stack = self.stack_mut();
-        let Some(selected) = stack.current().selected() else {
+        let Some(selected) = self.stack().current().selected() else {
             tracing::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
         };
@@ -209,16 +209,10 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         match selected {
             DirOrSong::Dir(playlist) => {
                 let info = client.list_playlist(playlist)?;
-                stack.push(info.into_iter().map(DirOrSong::Song).collect());
+                self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
             }
-            DirOrSong::Song(song) => {
-                client.add(song)?;
-                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, song)]) {
-                    shared.status_message = Some(StatusMessage::new(
-                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
-                        Level::Info,
-                    ));
-                }
+            DirOrSong::Song(_song) => {
+                self.add(selected, client, shared)?;
             }
         }
 
