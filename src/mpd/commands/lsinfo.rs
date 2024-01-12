@@ -34,6 +34,7 @@ impl FromMpd for Dir {
                 self.full_path = value;
             }
             "last-modified" => self.last_modified = value,
+            "playlists" => {} // ignore, deprecated
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
