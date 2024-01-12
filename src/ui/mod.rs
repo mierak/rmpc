@@ -354,6 +354,7 @@ impl Ui<'_> {
             modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, app, shared),
             modals::Modals::SaveQueue(ref mut m) => m.render(frame, app, shared),
             modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, app, shared),
+            modals::Modals::AddToPlaylist(ref mut m) => m.render(frame, app, shared),
         }
     }
     fn handle_modal_key(
@@ -367,6 +368,7 @@ impl Ui<'_> {
             modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app, shared),
             modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app, shared),
             modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app, shared),
+            modals::Modals::AddToPlaylist(ref mut m) => m.handle_key(key, client, app, shared),
         }
     }
 

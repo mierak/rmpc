@@ -8,11 +8,13 @@ use ratatui::{
 use crate::{mpd::client::Client, state::State};
 
 use self::{
-    confirm_queue_clear::ConfirmQueueClearModal, rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
+    add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
+    rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
 };
 
 use super::{KeyHandleResultInternal, SharedUiState};
 
+pub mod add_to_playlist;
 pub mod confirm_queue_clear;
 pub mod rename_playlist;
 pub mod save_queue;
@@ -22,6 +24,7 @@ pub enum Modals {
     ConfirmQueueClear(ConfirmQueueClearModal),
     SaveQueue(SaveQueueModal),
     RenamePlaylist(RenamePlaylistModal),
+    AddToPlaylist(AddToPlaylistModal),
 }
 
 pub(super) trait Modal {

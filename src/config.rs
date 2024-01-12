@@ -182,6 +182,7 @@ impl Default for KeyConfigFile {
                 (Q::DeleteAll,        Key { key: K::Char('D'), modifiers: M::SHIFT }),
                 (Q::Play,             Key { key: K::Enter,     modifiers: M::NONE }),
                 (Q::Save,             Key { key: K::Char('s'), modifiers: M::CONTROL }),
+                (Q::AddToPlaylist,    Key { key: K::Char('a'), modifiers: M::NONE }),
             ]),
         }
     }

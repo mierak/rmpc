@@ -62,7 +62,8 @@ pub struct ButtonGroupState {
 pub struct ButtonGroup<'a> {
     buttons: Vec<Button<'a>>,
     block: Option<Block<'a>>,
-    style: Style,
+    active_style: Style,
+    inactive_style: Style,
     direction: Direction,
 }
 
@@ -71,7 +72,8 @@ impl<'a> Default for ButtonGroup<'a> {
         Self {
             buttons: Vec::new(),
             block: None,
-            style: Style::default(),
+            active_style: Style::default().reversed(),
+            inactive_style: Style::default(),
             direction: Direction::Horizontal,
         }
     }
@@ -81,7 +83,7 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
     type State = ButtonGroupState;
 
     fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
-        buf.set_style(area, self.style);
+        buf.set_style(area, self.inactive_style);
         let area = match self.block.take() {
             Some(b) => {
                 let inner_area = b.inner(area);
@@ -105,8 +107,7 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
         self.buttons.into_iter().enumerate().for_each(|(idx, button)| {
             let mut button = button;
             if idx == state.selected {
-                let style = button.style;
-                button = button.style(style.reversed());
+                button = button.style(self.active_style);
             }
             button.render(chunks[idx], buf);
         });
@@ -130,14 +131,22 @@ impl<'a> ButtonGroup<'a> {
         self
     }
 
-    pub fn style(mut self, style: Style) -> Self {
-        self.style = style;
+    pub fn active_style(mut self, style: Style) -> Self {
+        self.active_style = style;
+        self
+    }
+    pub fn inactive_style(mut self, style: Style) -> Self {
+        self.inactive_style = style;
         self
     }
 }
 
 impl ButtonGroupState {
-    pub fn button_count(&mut self, count: usize) -> &Self {
+    pub fn button_count(&mut self) -> usize {
+        self.button_conut
+    }
+
+    pub fn set_button_count(&mut self, count: usize) -> &Self {
         self.button_conut = count;
         self
     }
@@ -156,5 +165,13 @@ impl ButtonGroupState {
         } else {
             self.selected = self.selected.saturating_sub(1);
         }
+    }
+
+    pub fn first(&mut self) {
+        self.selected = 0;
+    }
+
+    pub fn last(&mut self) {
+        self.selected = self.button_conut.saturating_sub(1);
     }
 }

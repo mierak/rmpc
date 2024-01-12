@@ -71,6 +71,7 @@ pub trait MpdClient {
     fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange) -> MpdResult<()>;
     fn move_in_playlist(&mut self, playlist_name: &str, range: &SingleOrRange, target_position: usize)
         -> MpdResult<()>;
+    fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()>;
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [albumart].
     /// If no album art is fonud it invokes [readpicture].
@@ -281,6 +282,16 @@ impl MpdClient for Client<'_> {
             "playlistmove \"{playlist_name}\" {} {target_position}",
             range.as_mpd_range()
         ))
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()> {
+        match target_position {
+            Some(target_position) => {
+                self.execute_ok(&format!(r#"playlistadd "{playlist_name}" "{uri}" {target_position}"#))
+            }
+            None => self.execute_ok(&format!(r#"playlistadd "{playlist_name}" "{uri}""#)),
+        }
     }
 
     #[tracing::instrument(skip(self))]

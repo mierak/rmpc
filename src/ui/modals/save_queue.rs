@@ -76,7 +76,7 @@ impl Modal for SaveQueueModal {
         };
 
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
-        self.button_group.button_count(buttons.len());
+        self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default().buttons(buttons);
 
         frame.render_widget(Clear, popup_area);

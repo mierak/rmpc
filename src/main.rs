@@ -366,7 +366,7 @@ impl RenderLoop {
             loop {
                 match rx.try_recv() {
                     Ok(LoopEvent::Stop) => loop {
-                        if let Ok(LoopEvent::Start) = rx.try_recv() {
+                        if let Ok(LoopEvent::Start) = rx.recv() {
                             break;
                         }
                     },

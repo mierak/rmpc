@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
+use itertools::Itertools;
 use strum::Display;
 
 use crate::{
@@ -9,7 +10,10 @@ use crate::{
     },
     state::PlayListInfoExt,
     ui::{
-        modals::{confirm_queue_clear::ConfirmQueueClearModal, save_queue::SaveQueueModal, Modals},
+        modals::{
+            add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
+            save_queue::SaveQueueModal, Modals,
+        },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
         DurationExt, KeyHandleResultInternal, SharedUiState,
@@ -225,6 +229,21 @@ impl Screen for QueueScreen {
                 QueueActions::Save => Ok(KeyHandleResultInternal::Modal(Some(Modals::SaveQueue(
                     SaveQueueModal::default(),
                 )))),
+                QueueActions::AddToPlaylist => {
+                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
+                        let playlists = client
+                            .list_playlists()?
+                            .into_iter()
+                            .map(|v| v.name)
+                            .sorted()
+                            .collect_vec();
+                        Ok(KeyHandleResultInternal::Modal(Some(Modals::AddToPlaylist(
+                            AddToPlaylistModal::new(selected_song.file.clone(), playlists),
+                        ))))
+                    } else {
+                        Ok(KeyHandleResultInternal::SkipRender)
+                    }
+                }
             }
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
@@ -366,4 +385,5 @@ pub enum QueueActions {
     DeleteAll,
     Play,
     Save,
+    AddToPlaylist,
 }
