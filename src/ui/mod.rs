@@ -35,7 +35,7 @@ use self::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
         queue::QueueScreen, Screen,
     },
-    widgets::{frame_counter::FrameCounter, progress_bar::ProgressBar},
+    widgets::progress_bar::ProgressBar,
 };
 
 pub mod modals;
@@ -73,7 +73,7 @@ impl StatusMessage {
 #[derive(Debug, Default)]
 pub struct SharedUiState {
     pub status_message: Option<StatusMessage>,
-    pub frame_counter: FrameCounter,
+    pub frame_counter: u32,
 }
 
 #[derive(Debug)]
@@ -129,6 +129,7 @@ macro_rules! screen_call {
 impl Ui<'_> {
     #[instrument(skip_all)]
     pub fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
+        self.shared_state.frame_counter.add_assign(1);
         if self
             .shared_state
             .status_message
@@ -270,7 +271,7 @@ impl Ui<'_> {
         let status = Paragraph::new(Span::styled(
             format!(
                 "[{}] {} rendered frames",
-                app.status.state, self.shared_state.frame_counter.frame_count
+                app.status.state, self.shared_state.frame_counter
             ),
             Style::default().yellow(),
         ));
@@ -339,7 +340,6 @@ impl Ui<'_> {
         if let Some(ref mut modal) = self.active_modal {
             Self::render_modal(modal, frame, app, &mut self.shared_state)?;
         }
-        self.shared_state.frame_counter.increment();
 
         Ok(())
     }
