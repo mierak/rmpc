@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::{Context, Result};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
@@ -255,6 +257,7 @@ impl SongExt for Song {
 
 pub(crate) trait StringExt {
     fn file_name(&self) -> &str;
+    fn ellipsize(&self, max_len: usize) -> Cow<str>;
 }
 
 impl StringExt for String {
@@ -262,6 +265,14 @@ impl StringExt for String {
         self.rsplit('/')
             .next()
             .map_or(self, |v| v.rsplit_once('.').map_or(v, |v| v.0))
+    }
+
+    fn ellipsize(&self, max_len: usize) -> Cow<str> {
+        if self.chars().count() > max_len {
+            Cow::Owned(format!("{}...", self.chars().take(max_len - 3).collect::<String>()))
+        } else {
+            Cow::Borrowed(self)
+        }
     }
 }
 

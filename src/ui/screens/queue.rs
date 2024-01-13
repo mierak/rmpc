@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
@@ -29,7 +31,7 @@ use tracing::error;
 
 use crate::state::State;
 
-use super::{CommonAction, Screen};
+use super::{CommonAction, Screen, StringExt};
 
 const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
 
@@ -81,14 +83,34 @@ impl Screen for QueueScreen {
             self.img_state.image(&mut app.album_art);
         }
 
+        let column_widths = [
+            Constraint::Percentage(15),
+            Constraint::Percentage(35),
+            Constraint::Percentage(35),
+            Constraint::Percentage(15),
+        ];
+        let [artist_col, title_col, album_col, _] =
+            *Layout::new(Direction::Horizontal, column_widths).split(table_header_section)
+        else {
+            return Ok(());
+        };
+
         let mut rows = Vec::with_capacity(queue_len);
         if let Some(queue) = app.queue.as_ref() {
             for song in queue {
                 let mut row = Row::new(vec![
-                    song.artist.as_ref().map_or("-".to_owned(), |v| format!(" {v}")),
-                    song.title.as_ref().map_or("-", |v| v).to_owned(),
-                    song.album.as_ref().map_or("-", |v| v).to_owned(),
-                    song.duration.as_ref().map_or("-".to_string(), DurationExt::to_string),
+                    song.artist
+                        .as_ref()
+                        .map_or(Cow::Borrowed("-"), |v| v.ellipsize(artist_col.width.into())),
+                    song.title
+                        .as_ref()
+                        .map_or(Cow::Borrowed("-"), |v| v.ellipsize(title_col.width.into())),
+                    song.album
+                        .as_ref()
+                        .map_or(Cow::Borrowed("-"), |v| v.ellipsize(album_col.width.into())),
+                    song.duration
+                        .as_ref()
+                        .map_or(Cow::Borrowed("-"), |v| Cow::Owned(v.to_string())),
                 ]);
                 if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
                     row = row.style(Style::default().fg(Color::Blue));
@@ -97,12 +119,6 @@ impl Screen for QueueScreen {
             }
         }
 
-        let column_widths = [
-            Constraint::Percentage(15),
-            Constraint::Percentage(35),
-            Constraint::Percentage(35),
-            Constraint::Percentage(15),
-        ];
         let header_table = Table::new([], column_widths)
             .header(Row::new(TABLE_HEADER.to_vec()))
             .block(Block::default().borders(Borders::TOP));
