@@ -46,6 +46,10 @@ where
 
     #[allow(clippy::unwrap_used)]
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
+        let scrollbar_margin = Margin {
+            vertical: 0,
+            horizontal: 0,
+        };
         let previous = state
             .previous()
             .items
@@ -79,7 +83,7 @@ where
 
         {
             let preview = List::new(preview.unwrap_or_default())
-                .block(Block::default().borders(Borders::RIGHT | Borders::TOP | Borders::BOTTOM))
+                .block(Block::default().borders(Borders::TOP))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
@@ -90,7 +94,11 @@ where
             prev_state.set_viewport_len(Some(previous_area.height.into()));
 
             let previous = List::new(previous)
-                .block(Block::default().borders(Borders::ALL).border_set(LEFT_COLUMN_SYMBOLS))
+                .block(
+                    Block::default()
+                        .borders(Borders::RIGHT | Borders::TOP)
+                        .border_set(LEFT_COLUMN_SYMBOLS),
+                )
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             let previous_scrollbar = Scrollbar::default()
                 .orientation(ScrollbarOrientation::VerticalRight)
@@ -105,10 +113,7 @@ where
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 previous_scrollbar,
-                previous_area.inner(&ratatui::prelude::Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
+                previous_area.inner(&scrollbar_margin),
                 buf,
                 prev_state.as_scrollbar_state_ref(),
             );
@@ -122,7 +127,7 @@ where
             let current = List::new(current)
                 .block({
                     let mut b = Block::default()
-                        .borders(Borders::TOP | Borders::BOTTOM | Borders::RIGHT)
+                        .borders(Borders::TOP | Borders::RIGHT)
                         .border_set(MIDDLE_COLUMN_SYMBOLS);
                     if let Some(ref title) = title {
                         b = b.title(title.clone().blue());
@@ -143,10 +148,7 @@ where
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 current_scrollbar,
-                current_area.inner(&ratatui::prelude::Margin {
-                    vertical: 1,
-                    horizontal: 0,
-                }),
+                current_area.inner(&scrollbar_margin),
                 buf,
                 state.as_scrollbar_state_ref(),
             );
