@@ -11,6 +11,7 @@ use super::{
         Playlist, Song, Status, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
+    version::Version,
 };
 
 type MpdResult<T> = Result<T, MpdError>;
@@ -169,7 +170,14 @@ impl MpdClient for Client<'_> {
 
     #[tracing::instrument(skip(self))]
     fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()> {
-        self.execute_ok(&format!("consume {}", consume.to_mpd_value()))
+        tracing::debug!(version = ?self.version, consume = ?consume);
+        if self.version < Version::new(0, 24, 0) && matches!(consume, OnOffOneshot::Oneshot) {
+            Err(MpdError::UnsupportedMpdVersion(
+                "consume oneshot can be used since MPD 0.24.0",
+            ))
+        } else {
+            self.execute_ok(&format!("consume {}", consume.to_mpd_value()))
+        }
     }
 
     // Current queue
@@ -298,10 +306,15 @@ impl MpdClient for Client<'_> {
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
         self.execute_ok(&format!("rename \"{name}\" \"{new_name}\""))
     }
-    /// mode is supported from version 0.24
+
     #[tracing::instrument(skip(self))]
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
         if let Some(mode) = mode {
+            if self.version < Version::new(0, 24, 0) {
+                return Err(MpdError::UnsupportedMpdVersion(
+                    "save mode can be used since MPD 0.24.0",
+                ));
+            }
             self.execute_ok(&format!("save \"{name}\" \"{}\"", mode.as_ref()))
         } else {
             self.execute_ok(&format!("save \"{name}\""))

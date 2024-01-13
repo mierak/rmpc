@@ -6,6 +6,7 @@ pub mod client;
 pub mod commands;
 pub mod errors;
 pub mod mpd_client;
+pub mod version;
 
 trait FromMpd
 where

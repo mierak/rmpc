@@ -10,6 +10,7 @@ pub enum MpdError {
     ClientClosed,
     Mpd(MpdFailureResponse),
     ValueExpected(String),
+    UnsupportedMpdVersion(&'static str),
 }
 
 impl std::error::Error for MpdError {}
@@ -28,6 +29,7 @@ impl Display for MpdError {
             MpdError::ClientClosed => write!(f, "Client has been already closed."),
             MpdError::Mpd(err) => write!(f, "MpdError: '{err}'"),
             MpdError::ValueExpected(val) => write!(f, "Expected value from mpd but got '{val}'"),
+            MpdError::UnsupportedMpdVersion(val) => write!(f, "Unsupported mpd version: '{val}'"),
         }
     }
 }

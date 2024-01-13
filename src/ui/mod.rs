@@ -1,4 +1,4 @@
-use std::{io::Stdout, time::Duration};
+use std::{io::Stdout, ops::AddAssign, time::Duration};
 
 use ansi_to_tui::IntoText;
 use anyhow::{Context, Result};
@@ -17,7 +17,6 @@ use ratatui::{
 use strum::{Display, IntoEnumIterator, VariantNames};
 use tracing::instrument;
 
-use crate::state::{State, StatusExt};
 use crate::{
     mpd::client::Client,
     mpd::{
@@ -25,6 +24,10 @@ use crate::{
         mpd_client::MpdClient,
     },
     ui::widgets::tabs::Tabs,
+};
+use crate::{
+    mpd::version::Version,
+    state::{State, StatusExt},
 };
 
 #[cfg(debug_assertions)]
@@ -406,9 +409,12 @@ impl Ui<'_> {
                         GlobalAction::ToggleRepeat => self.client.repeat(!app.status.repeat)?,
                         GlobalAction::ToggleSingle => self.client.single(app.status.single.cycle())?,
                         GlobalAction::ToggleRandom => self.client.random(!app.status.random)?,
-                        // TODO this panics, oneshot consume is only since mpd 0.24 which is not relesed yet
-                        // we should validate mpd protocol version when connecting clients
-                        GlobalAction::ToggleConsume => self.client.consume(app.status.single.cycle())?,
+                        GlobalAction::ToggleConsume if self.client.version < Version::new(0, 24, 0) => {
+                            self.client.consume(app.status.consume.cycle_pre_mpd_24())?;
+                        }
+                        GlobalAction::ToggleConsume => {
+                            self.client.consume(app.status.consume.cycle())?;
+                        }
                         GlobalAction::TogglePause
                             if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
                         {

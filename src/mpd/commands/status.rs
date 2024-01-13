@@ -92,6 +92,15 @@ impl OnOffOneshot {
             OnOffOneshot::Oneshot => OnOffOneshot::On,
         }
     }
+
+    pub fn cycle_pre_mpd_24(&self) -> Self {
+        match self {
+            OnOffOneshot::On => OnOffOneshot::Off,
+            OnOffOneshot::Off => OnOffOneshot::On,
+            OnOffOneshot::Oneshot => OnOffOneshot::Off,
+        }
+    }
+
     pub fn to_mpd_value(&self) -> &'static str {
         match self {
             OnOffOneshot::On => "1",

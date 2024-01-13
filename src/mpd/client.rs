@@ -9,7 +9,9 @@ use tracing::{debug, trace};
 
 use super::{
     errors::{MpdError, MpdFailureResponse},
-    split_line, FromMpd, FromMpdBuilder,
+    split_line,
+    version::Version,
+    FromMpd, FromMpdBuilder,
 };
 
 type MpdResult<T> = Result<T, MpdError>;
@@ -20,6 +22,7 @@ pub struct Client<'a> {
     stream: TcpStream,
     reconnect: bool,
     addr: &'static str,
+    pub version: Version,
 }
 
 impl std::fmt::Debug for Client<'_> {
@@ -46,7 +49,17 @@ impl<'a> Client<'a> {
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
         };
-        debug!(message = "MPD client initiazed", handshake = buf.trim());
+        let Some(version): Option<Version> = buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok()) else {
+            return Err(MpdError::Generic(format!(
+                "Handshake validation failed. Cannot parse version from '{buf}'"
+            )));
+        };
+
+        debug!(
+            message = "MPD client initiazed",
+            handshake = buf.trim(),
+            version = version.to_string()
+        );
 
         Ok(Self {
             name,
@@ -54,6 +67,7 @@ impl<'a> Client<'a> {
             stream,
             reconnect,
             addr,
+            version,
         })
     }
 
@@ -69,10 +83,23 @@ impl<'a> Client<'a> {
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
         };
+
+        let Some(version): Option<Version> = buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok()) else {
+            return Err(MpdError::Generic(format!(
+                "Handshake validation failed. Cannot parse version from '{buf}'"
+            )));
+        };
+
         self.rx = rx;
         self.stream = stream;
+        self.version = version;
 
-        debug!(message = "MPD client reconnected", handshake = buf.trim(), self.name);
+        debug!(
+            message = "MPD client initiazed",
+            handshake = buf.trim(),
+            version = version.to_string()
+        );
+
         Ok(self)
     }
 

@@ -288,7 +288,6 @@ fn handle_idle_event(
                 render_loop.start()?;
             } else {
                 render_loop.stop()?;
-                state.album_art = None;
             }
         }
         IdleEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
