@@ -87,6 +87,15 @@ fn main() -> Result<()> {
                 Client::init(config.address, Some("command"), true),
                 "Failed to connect to mpd"
             );
+
+            let display_image_warn = if !config.disable_images && !utils::kitty::check_kitty_support()? {
+                warn!(message = "Images are enabled but kitty image protocol is not supported by your terminal, disabling images");
+                config.disable_images = true;
+                true
+            } else {
+                false
+            };
+
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
             let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");
 
@@ -96,13 +105,21 @@ fn main() -> Result<()> {
             }
 
             let tx_clone = tx.clone();
+            let mut ui = Ui::new(client);
+            if display_image_warn {
+                ui.display_message(
+                    "Images are enabled but kitty image protocol is not supported by your terminal, disabling images"
+                        .to_owned(),
+                    Level::Warn,
+                );
+            }
 
             std::thread::Builder::new()
                 .name("input poll".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
                 main_task(
-                    Ui::new(client),
+                    ui,
                     state,
                     rx,
                     try_ret!(

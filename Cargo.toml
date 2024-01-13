@@ -23,3 +23,4 @@ tracing-appender = "0.2.3"
 itertools = "0.11.0"
 ron = "0.8.1"
 derive_more = { version = "0.99.17", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }
+rustix = { version = "0.38.30", features = ["termios", "stdio"] }

@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Block, Paragraph, StatefulWidget, Widget},
 };
 
-use crate::state::MyVec;
+use crate::{state::MyVec, utils::tmux};
 const DEFAULT_ART: &[u8; 6214] = include_bytes!("../../../assets/note.jpg");
 const DELIM: &str = "\u{10EEEE}";
 const GRID: &[&str] = &[
@@ -432,65 +432,28 @@ impl<'a> KittyImage<'a> {
         Ok(res.into_text()?)
     }
 
-    fn is_inside_tmux() -> bool {
-        std::env::var("TERM_PROGRAM").is_ok_and(|v| !v.is_empty())
-    }
-
-    fn is_tmux_passthrough_enabled() -> Result<bool> {
-        let mut cmd = std::process::Command::new("tmux");
-        let cmd = cmd.args(["show", "-Ap", "allow-passthrough"]);
-        let stdout = cmd.output()?.stdout;
-
-        Ok(String::from_utf8_lossy(&stdout).trim_end().ends_with("on"))
-    }
-
-    fn enable_tmux_passthrough() -> Result<()> {
-        let mut cmd = std::process::Command::new("tmux");
-        let cmd = cmd.args(["set", "-p", "allow-passthrough"]);
-        match cmd.output() {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow::anyhow!("Failed to enable tmux passthrough, '{e}'")),
-        }
-    }
-
-    fn transfer_data(
-        content: &str,
-        cols: usize,
-        rows: usize,
-        img_width: u32,
-        img_height: u32,
-        state: &mut ImageState,
-    ) -> Result<()> {
+    fn transfer_data(content: &str, cols: usize, rows: usize, img_width: u32, img_height: u32, state: &mut ImageState) {
         let mut iter = content.chars().peekable();
 
         let first: String = iter.by_ref().take(4096).collect();
+        let delete_all_images = "\x1b_Ga=d\x1b\\";
+        let virtual_image_placement = &format!(
+            "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
+            state.idx, img_width, img_height, cols, rows, first
+        );
 
-        if KittyImage::is_inside_tmux() {
-            if !KittyImage::is_tmux_passthrough_enabled()? {
-                KittyImage::enable_tmux_passthrough()?;
-            }
-
-            // delete all images
-            print!("\x1bPtmux;\x1b\x1b_Ga=d\x1b\x1b\\\x1b\\");
-
-            print!(
-                "\x1bPtmux;\x1b\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\x1b\\\x1b\\",
-                state.idx, img_width, img_height, cols, rows, first
-            );
+        if tmux::is_inside_tmux() {
+            tmux::wrap_print(delete_all_images);
+            tmux::wrap_print(virtual_image_placement);
 
             while iter.peek().is_some() {
                 let chunk: String = iter.by_ref().take(4096).collect();
                 let m = i32::from(iter.peek().is_some());
-                print!("\x1bPtmux;\x1b\x1b_Gm={m};{chunk}\x1b\x1b\\\x1b\\");
+                tmux::wrap_print(&format!("\x1b_Gm={m};{chunk}\x1b\\"));
             }
         } else {
-            // delete all images
-            print!("\x1b_Ga=d\x1b\\");
-
-            print!(
-                "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
-                state.idx, img_width, img_height, cols, rows, first
-            );
+            print!("{delete_all_images}");
+            print!("{virtual_image_placement}");
 
             while iter.peek().is_some() {
                 let chunk: String = iter.by_ref().take(4096).collect();
@@ -498,7 +461,6 @@ impl<'a> KittyImage<'a> {
                 print!("\x1b_Gm={m};{chunk}\x1b\\");
             }
         }
-        Ok(())
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -534,21 +496,9 @@ impl<'a> StatefulWidget for KittyImage<'a> {
 
             match KittyImage::create_data_to_transfer(image, width, height, Compression::new(6)) {
                 Ok(data) => {
-                    match KittyImage::transfer_data(
-                        &data.content,
-                        width,
-                        height,
-                        data.img_width,
-                        data.img_height,
-                        state,
-                    ) {
-                        Ok(()) => {}
-                        Err(e) => tracing::error!(message = "Failed to transfer data", error = ?e),
-                    };
+                    KittyImage::transfer_data(&data.content, width, height, data.img_width, data.img_height, state);
                 }
-                Err(e) => {
-                    tracing::error!(message = "Failed to transfer image data", error = ?e);
-                }
+                Err(e) => tracing::error!(message = "Failed to transfer image data", error = ?e),
             }
         }
 
