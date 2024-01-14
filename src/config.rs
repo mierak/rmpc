@@ -165,6 +165,9 @@ impl Default for KeyConfigFile {
                 (C::Add,              Key { key: K::Char('a'), modifiers: M::NONE }),
                 (C::Delete,           Key { key: K::Char('D'), modifiers: M::SHIFT }),
                 (C::Rename,           Key { key: K::Char('r'), modifiers: M::NONE }),
+                (C::Close,            Key { key: K::Char('c'), modifiers: M::CONTROL }),
+                (C::Confirm,          Key { key: K::Enter,     modifiers: M::NONE }),
+                (C::FocusInput,       Key { key: K::Char('i'), modifiers: M::NONE }),
             ]),
             albums: HashMap::from([
             ]),

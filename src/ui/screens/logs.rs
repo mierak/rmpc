@@ -158,6 +158,9 @@ impl Screen for LogsScreen {
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

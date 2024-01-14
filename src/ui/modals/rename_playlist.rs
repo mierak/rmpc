@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
     style::{Color, Stylize},
@@ -11,6 +11,7 @@ use crate::{
     mpd::{client::Client, mpd_client::MpdClient},
     state::State,
     ui::{
+        screens::CommonAction,
         widgets::button::{Button, ButtonGroup, ButtonGroupState},
         Level, StatusMessage,
     },
@@ -99,15 +100,27 @@ impl Modal for RenamePlaylistModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        _app: &mut State,
+        app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
+        let action = app.config.keybinds.navigation.get(&key.into());
         if self.input_focused {
-            return match key.code {
-                KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
-                    self.input_focused = false;
-                    Ok(KeyHandleResultInternal::RenderRequested)
+            if let Some(CommonAction::Close) = action {
+                self.input_focused = false;
+                return Ok(KeyHandleResultInternal::RenderRequested);
+            } else if let Some(CommonAction::Confirm) = action {
+                if self.button_group.selected == 0 && self.playlist_name != self.new_name {
+                    client.rename_playlist(&self.playlist_name, &self.new_name)?;
+                    _shared.status_message = Some(StatusMessage::new(
+                        format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
+                        Level::Info,
+                    ));
                 }
+                self.on_hide();
+                return Ok(KeyHandleResultInternal::Modal(None));
+            }
+
+            match key.code {
                 KeyCode::Char(c) => {
                     self.new_name.push(c);
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -116,7 +129,23 @@ impl Modal for RenamePlaylistModal {
                     self.new_name.pop();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                KeyCode::Enter => {
+                _ => Ok(KeyHandleResultInternal::SkipRender),
+            }
+        } else if let Some(action) = action {
+            match action {
+                CommonAction::Down => {
+                    self.button_group.next();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                CommonAction::Up => {
+                    self.button_group.next();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                CommonAction::Close => {
+                    self.on_hide();
+                    Ok(KeyHandleResultInternal::Modal(None))
+                }
+                CommonAction::Confirm => {
                     if self.button_group.selected == 0 && self.playlist_name != self.new_name {
                         client.rename_playlist(&self.playlist_name, &self.new_name)?;
                         _shared.status_message = Some(StatusMessage::new(
@@ -127,46 +156,28 @@ impl Modal for RenamePlaylistModal {
                     self.on_hide();
                     Ok(KeyHandleResultInternal::Modal(None))
                 }
-                KeyCode::Esc => {
-                    self.input_focused = false;
+                CommonAction::FocusInput => {
+                    self.input_focused = true;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
-            };
-        }
-        match key.code {
-            KeyCode::Char('i') => {
-                self.input_focused = true;
-                Ok(KeyHandleResultInternal::RenderRequested)
+                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
             }
-            KeyCode::Char('j') => {
-                self.button_group.next();
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            KeyCode::Char('k') => {
-                self.button_group.prev();
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            KeyCode::Esc => {
-                self.on_hide();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.on_hide();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            KeyCode::Enter => {
-                if self.button_group.selected == 0 && self.playlist_name != self.new_name {
-                    client.rename_playlist(&self.playlist_name, &self.new_name)?;
-                    _shared.status_message = Some(StatusMessage::new(
-                        format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
-                        Level::Info,
-                    ));
-                }
-                self.on_hide();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            _ => Ok(KeyHandleResultInternal::RenderRequested),
+        } else {
+            Ok(KeyHandleResultInternal::SkipRender)
         }
     }
 }

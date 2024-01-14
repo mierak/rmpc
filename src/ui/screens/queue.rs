@@ -352,6 +352,9 @@ impl Screen for QueueScreen {
                 CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // queue has its own binding for play
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
@@ -9,7 +9,10 @@ use ratatui::{
 use crate::{
     mpd::{client::Client, mpd_client::MpdClient},
     state::State,
-    ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
+    ui::{
+        screens::CommonAction,
+        widgets::button::{Button, ButtonGroup, ButtonGroupState},
+    },
 };
 
 use super::{KeyHandleResultInternal, RectExt, SharedUiState};
@@ -58,34 +61,49 @@ impl Modal for ConfirmQueueClearModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        _app: &mut State,
+        app: &mut State,
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
-        match key.code {
-            KeyCode::Char('j') => {
-                self.button_group.next();
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            KeyCode::Char('k') => {
-                self.button_group.prev();
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            KeyCode::Esc => {
-                self.button_group = ButtonGroupState::default();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.button_group = ButtonGroupState::default();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            KeyCode::Enter => {
-                if self.button_group.selected == 0 {
-                    client.clear()?;
+        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
+            match action {
+                CommonAction::Down => {
+                    self.button_group.next();
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                self.button_group = ButtonGroupState::default();
-                Ok(KeyHandleResultInternal::Modal(None))
+                CommonAction::Up => {
+                    self.button_group.prev();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                CommonAction::Close => {
+                    self.button_group = ButtonGroupState::default();
+                    Ok(KeyHandleResultInternal::Modal(None))
+                }
+                CommonAction::Confirm => {
+                    if self.button_group.selected == 0 {
+                        client.clear()?;
+                    }
+                    self.button_group = ButtonGroupState::default();
+                    Ok(KeyHandleResultInternal::Modal(None))
+                }
+                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
+        } else {
+            Ok(KeyHandleResultInternal::SkipRender)
         }
     }
 }

@@ -1,4 +1,3 @@
-use crossterm::event::{KeyCode, KeyModifiers};
 use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
@@ -10,6 +9,7 @@ use ratatui::{
 use crate::{
     mpd::mpd_client::MpdClient,
     ui::{
+        screens::CommonAction,
         utils::dirstack::DirState,
         widgets::button::{Button, ButtonGroup, ButtonGroupState},
     },
@@ -134,82 +134,97 @@ impl Modal for AddToPlaylistModal {
         &mut self,
         key: crossterm::event::KeyEvent,
         client: &mut crate::mpd::client::Client<'_>,
-        _app: &mut crate::state::State,
+        app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> anyhow::Result<KeyHandleResultInternal> {
-        match key.code {
-            KeyCode::Char('j') => {
-                match self.focused {
-                    FocusedComponent::Playlists => {
-                        if self
-                            .scrolling_state
-                            .get_selected()
-                            .is_some_and(|s| s == self.playlists.len() - 1)
-                        {
-                            self.focused = FocusedComponent::Buttons;
-                            self.button_group.first();
-                        } else {
-                            self.scrolling_state.next();
+        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
+            match action {
+                CommonAction::Down => {
+                    match self.focused {
+                        FocusedComponent::Playlists => {
+                            if self
+                                .scrolling_state
+                                .get_selected()
+                                .is_some_and(|s| s == self.playlists.len() - 1)
+                            {
+                                self.focused = FocusedComponent::Buttons;
+                                self.button_group.first();
+                            } else {
+                                self.scrolling_state.next();
+                            }
+                        }
+                        FocusedComponent::Buttons => {
+                            if self.button_group.selected == self.button_group.button_count() - 1 {
+                                self.focused = FocusedComponent::Playlists;
+                                self.scrolling_state.first();
+                            } else {
+                                self.button_group.next();
+                            }
                         }
                     }
-                    FocusedComponent::Buttons => {
-                        if self.button_group.selected == self.button_group.button_count() - 1 {
-                            self.focused = FocusedComponent::Playlists;
-                            self.scrolling_state.first();
-                        } else {
-                            self.button_group.next();
-                        }
-                    }
-                }
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            KeyCode::Char('k') => {
-                match self.focused {
-                    FocusedComponent::Playlists => {
-                        if self.scrolling_state.get_selected().is_some_and(|s| s == 0) {
-                            self.focused = FocusedComponent::Buttons;
-                            self.button_group.last();
-                        } else {
-                            self.scrolling_state.prev();
-                        }
-                    }
-                    FocusedComponent::Buttons => {
-                        if self.button_group.selected == 0 {
-                            self.focused = FocusedComponent::Playlists;
-                            self.scrolling_state.last();
-                        } else {
-                            self.button_group.prev();
-                        }
-                    }
-                }
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            KeyCode::Esc => {
-                self.button_group = ButtonGroupState::default();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.button_group = ButtonGroupState::default();
-                Ok(KeyHandleResultInternal::Modal(None))
-            }
-            KeyCode::Enter => match self.focused {
-                FocusedComponent::Playlists => {
-                    self.focused = FocusedComponent::Buttons;
-                    self.button_group.first();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                FocusedComponent::Buttons if self.button_group.selected == 0 => {
-                    if let Some(selected) = self.scrolling_state.get_selected() {
-                        client.add_to_playlist(&self.playlists[selected], &self.uri, None)?;
+                CommonAction::Up => {
+                    match self.focused {
+                        FocusedComponent::Playlists => {
+                            if self.scrolling_state.get_selected().is_some_and(|s| s == 0) {
+                                self.focused = FocusedComponent::Buttons;
+                                self.button_group.last();
+                            } else {
+                                self.scrolling_state.prev();
+                            }
+                        }
+                        FocusedComponent::Buttons => {
+                            if self.button_group.selected == 0 {
+                                self.focused = FocusedComponent::Playlists;
+                                self.scrolling_state.last();
+                            } else {
+                                self.button_group.prev();
+                            }
+                        }
                     }
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                FocusedComponent::Buttons => {
+                CommonAction::Confirm => match self.focused {
+                    FocusedComponent::Playlists => {
+                        self.focused = FocusedComponent::Buttons;
+                        self.button_group.first();
+                        Ok(KeyHandleResultInternal::RenderRequested)
+                    }
+                    FocusedComponent::Buttons if self.button_group.selected == 0 => {
+                        if let Some(selected) = self.scrolling_state.get_selected() {
+                            client.add_to_playlist(&self.playlists[selected], &self.uri, None)?;
+                        }
+                        Ok(KeyHandleResultInternal::Modal(None))
+                    }
+                    FocusedComponent::Buttons => {
+                        self.button_group = ButtonGroupState::default();
+                        Ok(KeyHandleResultInternal::Modal(None))
+                    }
+                },
+                CommonAction::Close => {
                     self.button_group = ButtonGroupState::default();
                     Ok(KeyHandleResultInternal::Modal(None))
                 }
-            },
-            _ => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
+            }
+        } else {
+            Ok(KeyHandleResultInternal::SkipRender)
         }
     }
 }

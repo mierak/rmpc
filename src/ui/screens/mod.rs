@@ -102,6 +102,9 @@ pub enum CommonAction {
     Add,
     Delete,
     Rename,
+    Close,
+    Confirm,
+    FocusInput,
 }
 
 impl Screens {
@@ -462,6 +465,9 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
             }
+            CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
+            CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender), // todo out?
+            CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // todo next?
         }
     }
 }
