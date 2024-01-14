@@ -284,12 +284,16 @@ impl Ui<'_> {
             Style::default().yellow(),
         ));
 
-        let elapsed = Paragraph::new(format!(
-            "{}/{}{}",
-            app.status.elapsed.to_string(),
-            app.status.duration.to_string(),
-            app.status.bitrate()
-        ))
+        let elapsed = if app.config.status_update_interval_ms.is_some() {
+            Paragraph::new(format!(
+                "{}/{}{}",
+                app.status.elapsed.to_string(),
+                app.status.duration.to_string(),
+                app.status.bitrate()
+            ))
+        } else {
+            Paragraph::new(format!("{}{}", app.status.duration.to_string(), app.status.bitrate()))
+        }
         .style(Style::default().fg(Color::Gray));
 
         let song_info = Paragraph::new(app.current_song.as_ref().map_or(Line::default(), |v| {
@@ -315,7 +319,7 @@ impl Ui<'_> {
             .alignment(ratatui::prelude::Alignment::Center)
             .style(Style::default().fg(level.to_color()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
-        } else {
+        } else if app.config.status_update_interval_ms.is_some() {
             let elapsed_bar = ProgressBar::default()
                 .fg(Color::Blue)
                 .bg(Color::Black)

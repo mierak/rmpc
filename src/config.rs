@@ -68,6 +68,8 @@ pub struct ConfigFile {
     volume_step: u8,
     #[serde(default = "defaults::default_false")]
     disable_images: bool,
+    #[serde(default = "defaults::default_progress_update_interval_ms")]
+    status_update_interval_ms: Option<u64>,
     keybinds: KeyConfigFile,
 }
 
@@ -91,6 +93,7 @@ impl Default for ConfigFile {
             volume_step: 5,
             disable_images: false,
             column_widths: vec![20, 38, 42],
+            status_update_interval_ms: Some(1000),
             symbols: SymbolsFile {
                 progress_bar: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
                 song: "🎵".to_owned(),
@@ -112,6 +115,11 @@ mod defaults {
 
     pub fn default_volume_step() -> u8 {
         5
+    }
+
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn default_progress_update_interval_ms() -> Option<u64> {
+        Some(1000)
     }
 }
 
@@ -199,6 +207,7 @@ impl From<ConfigFile> for Config {
             volume_step: value.volume_step,
             disable_images: value.disable_images,
             column_widths: [value.column_widths[0], value.column_widths[1], value.column_widths[2]],
+            status_update_interval_ms: value.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: KeyConfig {
                 global: value.keybinds.global.into_iter().map(|(k, v)| (v, k)).collect(),
                 navigation: value.keybinds.navigation.into_iter().map(|(k, v)| (v, k)).collect(),
@@ -248,6 +257,7 @@ pub struct Config {
     pub keybinds: KeyConfig,
     pub column_widths: [u16; 3],
     pub disable_images: bool,
+    pub status_update_interval_ms: Option<u64>,
 }
 
 #[derive(Debug)]

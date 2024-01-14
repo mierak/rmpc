@@ -99,7 +99,7 @@ fn main() -> Result<()> {
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
             let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");
 
-            let mut render_loop = RenderLoop::new(tx.clone());
+            let mut render_loop = RenderLoop::new(tx.clone(), config);
             if state.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             }
@@ -367,11 +367,11 @@ enum LoopEvent {
 
 #[derive(Debug)]
 struct RenderLoop {
-    event_tx: std::sync::mpsc::Sender<LoopEvent>,
+    event_tx: Option<std::sync::mpsc::Sender<LoopEvent>>,
 }
 
 impl RenderLoop {
-    fn new(render_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
+    fn new(render_sender: std::sync::mpsc::Sender<AppEvent>, config: &Config) -> Self {
         let (tx, rx) = std::sync::mpsc::channel::<LoopEvent>();
 
         // send stop event at the start to not start the loop immedietally
@@ -379,6 +379,9 @@ impl RenderLoop {
             error!(message = "Failed to properly initialize status update loop", error = ?err);
         }
 
+        let Some(update_interval) = config.status_update_interval_ms.map(Duration::from_millis) else {
+            return Self { event_tx: None };
+        };
         std::thread::spawn(move || {
             loop {
                 match rx.try_recv() {
@@ -393,21 +396,29 @@ impl RenderLoop {
                     Ok(LoopEvent::Start) | Err(TryRecvError::Empty) => {} // continue with the update loop
                 }
 
-                std::thread::sleep(Duration::from_secs(1));
+                std::thread::sleep(update_interval);
                 if let Err(err) = render_sender.send(AppEvent::RequestStatusUpdate) {
                     error!(message = "Failed to send status update request", error = ?err);
                 }
             }
         });
-        Self { event_tx: tx }
+        Self { event_tx: Some(tx) }
     }
 
     fn start(&mut self) -> Result<()> {
-        Ok(self.event_tx.send(LoopEvent::Start)?)
+        if let Some(tx) = &self.event_tx {
+            Ok(tx.send(LoopEvent::Start)?)
+        } else {
+            Ok(())
+        }
     }
 
     #[instrument(skip(self))]
     fn stop(&mut self) -> Result<()> {
-        Ok(self.event_tx.send(LoopEvent::Stop)?)
+        if let Some(tx) = &self.event_tx {
+            Ok(tx.send(LoopEvent::Stop)?)
+        } else {
+            Ok(())
+        }
     }
 }
