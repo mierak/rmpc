@@ -485,7 +485,7 @@ impl Ui<'_> {
     }
 }
 
-#[derive(Debug, Display, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Display, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum GlobalAction {
     Quit,
     NextTrack,
