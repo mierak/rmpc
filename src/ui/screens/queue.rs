@@ -1,11 +1,10 @@
-use std::borrow::Cow;
-
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
 use strum::Display;
 
 use crate::{
+    config::Config,
     mpd::{
         client::Client,
         mpd_client::{MpdClient, QueueMoveTarget},
@@ -18,12 +17,13 @@ use crate::{
         },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
-        DurationExt, KeyHandleResultInternal, SharedUiState,
+        KeyHandleResultInternal, SharedUiState,
     },
 };
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
+    text::Line,
     widgets::{Block, Borders, Row, Scrollbar, ScrollbarOrientation, Table, TableState},
     Frame,
 };
@@ -31,9 +31,7 @@ use tracing::error;
 
 use crate::state::State;
 
-use super::{CommonAction, Screen, StringExt};
-
-const TABLE_HEADER: &[&str] = &[" Artist", "Title", "Album", "Duration"];
+use super::{CommonAction, Screen, SongExt};
 
 #[derive(Debug, Default)]
 pub struct QueueScreen {
@@ -41,6 +39,26 @@ pub struct QueueScreen {
     scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
+    header: Vec<&'static str>,
+    column_widths: Vec<Constraint>,
+}
+
+impl QueueScreen {
+    pub fn new(config: &Config) -> Self {
+        Self {
+            img_state: ImageState::default(),
+            scrolling_state: DirState::default(),
+            filter: None,
+            filter_input_mode: false,
+            header: config.ui.song_table_format.iter().map(|v| v.label).collect_vec(),
+            column_widths: config
+                .ui
+                .song_table_format
+                .iter()
+                .map(|v| Constraint::Percentage(v.width_percent))
+                .collect_vec(),
+        }
+    }
 }
 
 impl Screen for QueueScreen {
@@ -69,9 +87,10 @@ impl Screen for QueueScreen {
             return Ok(());
         };
 
+        let header_height = if app.config.ui.show_song_table_header { 2 } else { 0 };
         let [table_header_section, mut queue_section] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(2), Constraint::Percentage(100)].as_ref())
+            .constraints([Constraint::Min(header_height), Constraint::Percentage(100)].as_ref())
             .split(queue_section)
         else {
             return Ok(());
@@ -83,50 +102,39 @@ impl Screen for QueueScreen {
             self.img_state.image(&mut app.album_art);
         }
 
-        let column_widths = [
-            Constraint::Percentage(15),
-            Constraint::Percentage(35),
-            Constraint::Percentage(35),
-            Constraint::Percentage(15),
-        ];
-        let [artist_col, title_col, album_col, _] =
-            *Layout::new(Direction::Horizontal, column_widths).split(table_header_section)
-        else {
-            return Ok(());
-        };
+        let widths = Layout::new(Direction::Horizontal, self.column_widths.clone()).split(table_header_section);
 
-        let mut rows = Vec::with_capacity(queue_len);
-        if let Some(queue) = app.queue.as_ref() {
-            for song in queue {
-                let mut row = Row::new(vec![
-                    song.artist
-                        .as_ref()
-                        .map_or(Cow::Borrowed("-"), |v| v.ellipsize(artist_col.width.into())),
-                    song.title
-                        .as_ref()
-                        .map_or(Cow::Borrowed("-"), |v| v.ellipsize(title_col.width.into())),
-                    song.album
-                        .as_ref()
-                        .map_or(Cow::Borrowed("-"), |v| v.ellipsize(album_col.width.into())),
-                    song.duration
-                        .as_ref()
-                        .map_or(Cow::Borrowed("-"), |v| Cow::Owned(v.to_string())),
-                ]);
-                if app.status.songid.as_ref().is_some_and(|v| *v == song.id) {
-                    row = row.style(Style::default().fg(Color::Blue));
-                }
-                rows.push(row);
-            }
+        let table_items = app
+            .queue
+            .as_ref()
+            .map(|queue| {
+                queue
+                    .iter()
+                    .map(|song| {
+                        Row::new(app.config.ui.song_table_format.iter().enumerate().map(|(idx, v)| {
+                            Line::from(
+                                song.get_property_ellipsized(v.prop, widths[idx].width.into())
+                                    .into_owned()
+                                    .fg(v.color),
+                            )
+                            .alignment(v.alignment.into())
+                        }))
+                    })
+                    .collect_vec()
+            })
+            .unwrap_or_default();
+
+        if app.config.ui.show_song_table_header {
+            let header_table = Table::new([], self.column_widths.clone())
+                .header(Row::new(self.header.iter().copied()))
+                .block(Block::default().borders(Borders::TOP));
+            frame.render_widget(header_table, table_header_section);
         }
 
-        let header_table = Table::new([], column_widths)
-            .header(Row::new(TABLE_HEADER.to_vec()))
-            .block(Block::default().borders(Borders::TOP));
-
         let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
-        let table = Table::new(rows, column_widths)
+        let table = Table::new(table_items, self.column_widths.clone())
             .block({
-                let mut b = Block::default().borders(Borders::TOP);
+                let mut b = Block::default().borders(Borders::TOP | Borders::RIGHT);
                 if let Some(ref title) = title {
                     b = b.title(title.clone().blue());
                 }
@@ -144,7 +152,6 @@ impl Screen for QueueScreen {
             .end_style(Style::default().fg(Color::White).bg(Color::Black))
             .thumb_style(Style::default().fg(Color::Blue));
 
-        frame.render_widget(header_table, table_header_section);
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 
         queue_section.y = queue_section.y.saturating_add(1);

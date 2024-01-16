@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
@@ -12,7 +12,7 @@ pub struct Song {
     pub duration: Option<Duration>,
 
     // the other less relevant tags are pushed here
-    pub others: Vec<(String, String)>,
+    pub others: HashMap<String, String>,
     // pub name: Option<String>, // a name for this song. This is not the song title. The exact meaning of this tag is not well-defined. It is often used by badly configured internet radio stations with broken tags to squeeze both the artist name and the song title in one tag.
     // pub artistsort: Option<String>, // same as artist, but for sorting. This usually omits prefixes such as “The”.
     // pub albumsort: Option<String>,  // same as album, but for sorting.
@@ -46,6 +46,7 @@ pub struct Song {
     // pub musicbrainz_workid: Option<String>, // the work id in the MusicBrainz database.
     // pub last_modified: Option<String>, // ISO 8601
 }
+
 impl std::fmt::Debug for Song {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -72,7 +73,9 @@ impl FromMpd for Song {
                 self.duration = Some(Duration::from_secs_f64(value.parse()?));
             }
             "time" | "format" => {} // deprecated or ignored
-            key => self.others.push((key.to_owned(), value)),
+            key => {
+                self.others.insert(key.to_owned(), value);
+            }
         }
         Ok(LineHandled::Yes)
     }

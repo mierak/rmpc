@@ -6,13 +6,14 @@ use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
+    config::SongProperty,
     mpd::{client::Client, commands::Song},
     state::State,
 };
 
 use super::{
     utils::dirstack::{DirStack, DirStackItem},
-    KeyHandleResultInternal, SharedUiState,
+    DurationExt, KeyHandleResultInternal, SharedUiState,
 };
 
 pub mod albums;
@@ -246,6 +247,8 @@ pub(crate) mod browser {
 pub trait SongExt {
     fn title_str(&self) -> &str;
     fn artist_str(&self) -> &str;
+    fn get_property(&self, prop: SongProperty) -> Cow<str>;
+    fn get_property_ellipsized(&self, prop: SongProperty, max_len: usize) -> Cow<str>;
 }
 
 impl SongExt for Song {
@@ -255,6 +258,64 @@ impl SongExt for Song {
 
     fn artist_str(&self) -> &str {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
+    }
+
+    fn get_property(&self, prop: SongProperty) -> Cow<str> {
+        match prop {
+            SongProperty::Duration => self
+                .duration
+                .as_ref()
+                .map_or(Cow::Borrowed("-"), |v| Cow::Owned(v.to_string())),
+            SongProperty::Filename => Cow::Borrowed(&self.file),
+            SongProperty::Artist => self.artist.as_ref().map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+            SongProperty::AlbumArtist => self
+                .others
+                .get("albumartist")
+                .map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+            SongProperty::Title => self.title.as_ref().map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+            SongProperty::Album => self.album.as_ref().map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+            SongProperty::Date => self.others.get("date").map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+            SongProperty::Genre => self
+                .others
+                .get("genre")
+                .map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+            SongProperty::Comment => self
+                .others
+                .get("comment")
+                .map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+        }
+    }
+
+    fn get_property_ellipsized(&self, prop: SongProperty, max_len: usize) -> Cow<str> {
+        match prop {
+            SongProperty::Duration => self
+                .duration
+                .as_ref()
+                .map_or(Cow::Borrowed("-"), |v| Cow::Owned(v.to_string())),
+            SongProperty::Filename => self.file.ellipsize(max_len),
+            SongProperty::Artist => self
+                .artist
+                .as_ref()
+                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+            SongProperty::AlbumArtist => self
+                .others
+                .get("albumartist")
+                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+            SongProperty::Title => self.title.as_ref().map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+            SongProperty::Album => self.album.as_ref().map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+            SongProperty::Date => self
+                .others
+                .get("date")
+                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+            SongProperty::Genre => self
+                .others
+                .get("genre")
+                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+            SongProperty::Comment => self
+                .others
+                .get("comment")
+                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+        }
     }
 }
 
@@ -272,7 +333,10 @@ impl StringExt for String {
 
     fn ellipsize(&self, max_len: usize) -> Cow<str> {
         if self.chars().count() > max_len {
-            Cow::Owned(format!("{}...", self.chars().take(max_len - 3).collect::<String>()))
+            Cow::Owned(format!(
+                "{}...",
+                self.chars().take(max_len.saturating_sub(3)).collect::<String>()
+            ))
         } else {
             Cow::Borrowed(self)
         }

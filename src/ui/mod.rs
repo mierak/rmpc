@@ -18,6 +18,7 @@ use strum::{Display, IntoEnumIterator, VariantNames};
 use tracing::instrument;
 
 use crate::{
+    config::Config,
     mpd::client::Client,
     mpd::{
         commands::{volume::Bound, State as MpdState},
@@ -88,10 +89,10 @@ pub struct Ui<'a> {
 }
 
 impl<'a> Ui<'a> {
-    pub fn new(client: Client<'a>) -> Ui<'a> {
+    pub fn new(client: Client<'a>, config: &Config) -> Ui<'a> {
         Self {
             client,
-            screens: Screens::default(),
+            screens: Screens::new(config),
             shared_state: SharedUiState::default(),
             active_modal: None,
         }
@@ -107,6 +108,20 @@ struct Screens {
     albums: AlbumsScreen,
     artists: ArtistsScreen,
     playlists: PlaylistsScreen,
+}
+
+impl Screens {
+    fn new(config: &Config) -> Self {
+        Self {
+            queue: QueueScreen::new(config),
+            #[cfg(debug_assertions)]
+            logs: LogsScreen::default(),
+            directories: DirectoriesScreen::default(),
+            albums: AlbumsScreen::default(),
+            artists: ArtistsScreen::default(),
+            playlists: PlaylistsScreen::default(),
+        }
+    }
 }
 
 macro_rules! invoke {

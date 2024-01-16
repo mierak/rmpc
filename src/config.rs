@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
+use strum::Display;
 use tracing::Level;
 
 use crate::ui::{
@@ -27,7 +28,7 @@ pub struct Args {
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 pub enum Command {
-    /// Prints the default config.
+    /// Prints the default config. Can be used to bootstrap your config file.
     Config,
 }
 
@@ -90,6 +91,32 @@ pub struct ProgressBarConfigFile {
     thumb_colors: Option<(String, String)>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+pub enum Alignment {
+    Left,
+    Right,
+    Center,
+}
+
+impl From<Alignment> for ratatui::layout::Alignment {
+    fn from(value: Alignment) -> Self {
+        match value {
+            Alignment::Left => Self::Left,
+            Alignment::Right => Self::Right,
+            Alignment::Center => Self::Center,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SongTableColumnFile {
+    prop: SongProperty,
+    label: Option<String>,
+    width_percent: u16,
+    color: Option<String>,
+    alignment: Option<Alignment>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UiConfigFile {
     symbols: SymbolsFile,
@@ -100,6 +127,8 @@ pub struct UiConfigFile {
     background_color_modal: Option<String>,
     volume_color: Option<String>,
     status_color: Option<String>,
+    show_song_table_header: bool,
+    song_table_format: Vec<SongTableColumnFile>,
 }
 
 impl Default for UiConfigFile {
@@ -121,6 +150,37 @@ impl Default for UiConfigFile {
                 dir: "📁".to_owned(),
                 marker: "".to_owned(),
             },
+            show_song_table_header: true,
+            song_table_format: vec![
+                SongTableColumnFile {
+                    prop: SongProperty::Artist,
+                    label: None,
+                    width_percent: 20,
+                    color: None,
+                    alignment: None,
+                },
+                SongTableColumnFile {
+                    prop: SongProperty::Title,
+                    label: None,
+                    width_percent: 35,
+                    color: None,
+                    alignment: None,
+                },
+                SongTableColumnFile {
+                    prop: SongProperty::Album,
+                    label: None,
+                    width_percent: 30,
+                    color: Some("white".to_string()),
+                    alignment: None,
+                },
+                SongTableColumnFile {
+                    prop: SongProperty::Duration,
+                    label: None,
+                    width_percent: 15,
+                    color: None,
+                    alignment: Some(Alignment::Right),
+                },
+            ],
         }
     }
 }
@@ -350,6 +410,10 @@ impl TryFrom<UiConfigFile> for UiConfig {
             .map(Into::<Color>::into)
             .or(bg_color);
 
+        if value.song_table_format.iter().map(|v| v.width_percent).sum::<u16>() > 100 {
+            anyhow::bail!("Song table format width percent sum is greater than 100");
+        }
+
         Ok(Self {
             background_color: bg_color,
             background_color_modal: modal_bg_color,
@@ -375,6 +439,23 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 thumb_colors: progress_bar_color_thumb,
                 track_colors: progress_bar_color_track,
             },
+            show_song_table_header: value.show_song_table_header,
+            song_table_format: value
+                .song_table_format
+                .into_iter()
+                .map(|v| SongTableColumn {
+                    prop: v.prop,
+                    label: Box::leak(Box::new(v.label.unwrap_or_else(|| v.prop.to_string()))),
+                    width_percent: v.width_percent,
+                    alignment: v.alignment.unwrap_or(Alignment::Left),
+                    color: v
+                        .color
+                        .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+                        .transpose()
+                        .unwrap_or_default()
+                        .map_or_else(|| Color::White, Into::into),
+                })
+                .collect(),
         })
     }
 }
@@ -435,6 +516,30 @@ pub struct UiConfig {
     pub volume_color: Color,
     pub status_color: Color,
     pub progress_bar: ProgressBarConfig,
+    pub show_song_table_header: bool,
+    pub song_table_format: Vec<SongTableColumn>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct SongTableColumn {
+    pub prop: SongProperty,
+    pub label: &'static str,
+    pub width_percent: u16,
+    pub color: Color,
+    pub alignment: Alignment,
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, Display)]
+pub enum SongProperty {
+    Duration,
+    Filename,
+    Artist,
+    AlbumArtist,
+    Title,
+    Album,
+    Date,
+    Genre,
+    Comment,
 }
 
 impl TryFrom<&[u8]> for crate::config::ConfigColor {

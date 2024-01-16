@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             }
 
             let tx_clone = tx.clone();
-            let mut ui = Ui::new(client);
+            let mut ui = Ui::new(client, state.config);
             if display_image_warn {
                 ui.display_message(
                     "Images are enabled but kitty image protocol is not supported by your terminal, disabling images"
