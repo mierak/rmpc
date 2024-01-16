@@ -77,6 +77,7 @@ impl Screen for LogsScreen {
         let logs_wg = List::new(lines).block(
             Block::default()
                 .borders(Borders::TOP)
+                .border_style(Style::default().fg(app.config.ui.borders_color))
                 .style(Style::default().fg(Color::Gray))
                 .title(Span::styled(
                     format!("Logs: {content_len}"),

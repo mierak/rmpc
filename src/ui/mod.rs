@@ -246,7 +246,7 @@ impl Ui<'_> {
                     .0,
             )
             .divider("")
-            .block(ratatui::widgets::Block::default().borders(Borders::TOP))
+            .block(ratatui::widgets::Block::default().borders(Borders::TOP).border_style(Style::default().fg(app.config.ui.borders_color)))
             .highlight_style(Style::default().fg(Color::Black).bg(Color::Blue));
 
         // right

@@ -98,6 +98,7 @@ impl Modal for AddToPlaylistModal {
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(app.config.ui.borders_color))
                 .title("Select a playlist"),
         );
 
@@ -119,7 +120,12 @@ impl Modal for AddToPlaylistModal {
                 FocusedComponent::Playlists => Style::default().reversed(),
                 FocusedComponent::Buttons => active_highlight_style,
             })
-            .block(Block::default().borders(Borders::ALL).border_set(BUTTON_GROUP_SYMBOLS));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(BUTTON_GROUP_SYMBOLS)
+                    .border_style(Style::default().fg(app.config.ui.borders_color)),
+            );
 
         frame.render_stateful_widget(playlists, list_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(

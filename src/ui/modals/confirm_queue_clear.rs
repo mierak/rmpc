@@ -32,7 +32,10 @@ impl Modal for ConfirmQueueClearModal {
         app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let block = Block::default().borders(Borders::ALL).title("Clear the queue?");
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(app.config.ui.borders_color))
+            .title("Clear the queue?");
         let text = Paragraph::new("Are you sure you want to clear the queue?").wrap(Wrap { trim: true });
 
         let popup_area = frame.size().centered_exact(20, 7);

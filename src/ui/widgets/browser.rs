@@ -10,6 +10,7 @@ pub struct Browser<'a, T: std::fmt::Debug + DirStackItem> {
     state_type_marker: std::marker::PhantomData<T>,
     widths: &'a [u16; 3],
     symbols: &'a SymbolsConfig,
+    border_style: Style,
 }
 
 impl<'a, T: std::fmt::Debug + DirStackItem> Browser<'a, T> {
@@ -18,11 +19,17 @@ impl<'a, T: std::fmt::Debug + DirStackItem> Browser<'a, T> {
             state_type_marker: std::marker::PhantomData,
             widths: &[20, 38, 42],
             symbols,
+            border_style: Style::default(),
         }
     }
 
     pub fn set_widths(mut self, widths: &'a [u16; 3]) -> Self {
         self.widths = widths;
+        self
+    }
+
+    pub fn set_border_style(mut self, border_style: Style) -> Self {
+        self.border_style = border_style;
         self
     }
 }
@@ -83,7 +90,7 @@ where
 
         {
             let preview = List::new(preview.unwrap_or_default())
-                .block(Block::default().borders(Borders::TOP))
+                .block(Block::default().borders(Borders::TOP).border_style(self.border_style))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
@@ -97,6 +104,7 @@ where
                 .block(
                     Block::default()
                         .borders(Borders::RIGHT | Borders::TOP)
+                        .border_style(self.border_style)
                         .border_set(LEFT_COLUMN_SYMBOLS),
                 )
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
@@ -128,6 +136,7 @@ where
                 .block({
                     let mut b = Block::default()
                         .borders(Borders::TOP | Borders::RIGHT)
+                        .border_style(self.border_style)
                         .border_set(MIDDLE_COLUMN_SYMBOLS);
                     if let Some(ref title) = title {
                         b = b.title(title.clone().blue());

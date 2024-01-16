@@ -53,14 +53,18 @@ impl Modal for SaveQueueModal {
         app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
-        let block = Block::default().borders(Borders::ALL).title("Save queue as playlist");
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(app.config.ui.borders_color))
+            .title("Save queue as playlist");
         let text = Paragraph::new("Playlist name:").wrap(Wrap { trim: true });
         let input = Paragraph::new(self.name.clone())
-            .block(Block::default().borders(Borders::ALL).fg(if self.input_focused {
-                Color::Blue
-            } else {
-                Color::White
-            }))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(app.config.ui.borders_color))
+                    .fg(if self.input_focused { Color::Blue } else { Color::White }),
+            )
             .fg(Color::White)
             .wrap(Wrap { trim: true });
 

@@ -64,6 +64,7 @@ pub struct UiConfigFile {
     pub(super) browser_column_widths: Vec<u16>,
     pub(super) background_color: Option<String>,
     pub(super) background_color_modal: Option<String>,
+    pub(super) borders_color: Option<String>,
     pub(super) current_song_color: Option<String>,
     pub(super) volume_color: Option<String>,
     pub(super) status_color: Option<String>,
@@ -76,6 +77,7 @@ pub struct UiConfig {
     pub disable_images: bool,
     pub background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
+    pub borders_color: Color,
     pub current_song_color: Color,
     pub column_widths: [u16; 3],
     pub symbols: SymbolsConfig,
@@ -145,6 +147,7 @@ impl Default for UiConfigFile {
             disable_images: false,
             background_color: Some("black".to_string()),
             background_color_modal: None,
+            borders_color: Some("white".to_string()),
             current_song_color: Some("blue".to_string()),
             browser_column_widths: vec![20, 38, 42],
             volume_color: Some("blue".to_string()),
@@ -328,6 +331,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
             .transpose()?
             .map(Into::<Color>::into)
             .or(bg_color);
+        let borders_color = value
+            .borders_color
+            .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+            .transpose()?
+            .map_or(Color::White, Into::<Color>::into);
 
         if value.song_table_format.iter().map(|v| v.width_percent).sum::<u16>() > 100 {
             anyhow::bail!("Song table format width percent sum is greater than 100");
@@ -337,6 +345,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             disable_images: value.disable_images,
             background_color: bg_color,
             background_color_modal: modal_bg_color,
+            borders_color,
             current_song_color: value
                 .current_song_color
                 .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))

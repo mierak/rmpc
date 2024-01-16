@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
-use ratatui::{prelude::Rect, widgets::ListItem, Frame};
+use ratatui::{prelude::Rect, style::Style, widgets::ListItem, Frame};
 use strum::Display;
 use tracing::instrument;
 
@@ -40,7 +40,9 @@ impl Screen for PlaylistsScreen {
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         frame.render_stateful_widget(
-            Browser::new(&app.config.ui.symbols).set_widths(&app.config.ui.column_widths),
+            Browser::new(&app.config.ui.symbols)
+                .set_widths(&app.config.ui.column_widths)
+                .set_border_style(Style::default().fg(app.config.ui.borders_color)),
             area,
             &mut self.stack,
         );

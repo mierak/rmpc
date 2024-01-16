@@ -132,14 +132,20 @@ impl Screen for QueueScreen {
         if app.config.ui.show_song_table_header {
             let header_table = Table::new([], self.column_widths.clone())
                 .header(Row::new(self.header.iter().copied()))
-                .block(Block::default().borders(Borders::TOP));
+                .block(
+                    Block::default()
+                        .borders(Borders::TOP)
+                        .border_style(Style::default().fg(app.config.ui.borders_color)),
+                );
             frame.render_widget(header_table, table_header_section);
         }
 
         let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         let table = Table::new(table_items, self.column_widths.clone())
             .block({
-                let mut b = Block::default().borders(Borders::TOP | Borders::RIGHT);
+                let mut b = Block::default()
+                    .borders(Borders::TOP | Borders::RIGHT)
+                    .border_style(Style::default().fg(app.config.ui.borders_color));
                 if let Some(ref title) = title {
                     b = b.title(title.clone().blue());
                 }
@@ -171,7 +177,11 @@ impl Screen for QueueScreen {
         );
         if show_image {
             frame.render_stateful_widget(
-                KittyImage::default().block(Block::default().borders(Borders::TOP)),
+                KittyImage::default().block(
+                    Block::default()
+                        .borders(Borders::TOP)
+                        .border_style(Style::default().fg(app.config.ui.borders_color)),
+                ),
                 img_section,
                 &mut self.img_state,
             );
