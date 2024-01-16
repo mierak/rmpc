@@ -56,6 +56,8 @@ pub struct SongTableColumn {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UiConfigFile {
+    #[serde(default = "defaults::default_false")]
+    pub(super) disable_images: bool,
     pub(super) symbols: SymbolsFile,
     pub(super) progress_bar: ProgressBarConfigFile,
     #[serde(default = "defaults::default_column_widths")]
@@ -71,6 +73,7 @@ pub struct UiConfigFile {
 
 #[derive(Debug)]
 pub struct UiConfig {
+    pub disable_images: bool,
     pub background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
     pub current_song_color: Color,
@@ -139,6 +142,7 @@ impl From<Alignment> for ratatui::layout::Alignment {
 impl Default for UiConfigFile {
     fn default() -> Self {
         Self {
+            disable_images: false,
             background_color: Some("black".to_string()),
             background_color_modal: None,
             current_song_color: Some("blue".to_string()),
@@ -330,6 +334,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         }
 
         Ok(Self {
+            disable_images: value.disable_images,
             background_color: bg_color,
             background_color_modal: modal_bg_color,
             current_song_color: value

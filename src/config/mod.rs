@@ -62,8 +62,6 @@ pub struct ConfigFile {
     address: String,
     #[serde(default = "defaults::default_volume_step")]
     volume_step: u8,
-    #[serde(default = "defaults::default_false")]
-    disable_images: bool,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
     keybinds: KeyConfigFile,
@@ -88,7 +86,6 @@ impl Default for ConfigFile {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
             volume_step: 5,
-            disable_images: false,
             status_update_interval_ms: Some(1000),
             ui: Some(UiConfigFile::default()),
         }
@@ -179,7 +176,6 @@ impl TryFrom<ConfigFile> for Config {
             ui: value.ui.unwrap_or_default().try_into()?,
             address: Box::leak(Box::new(value.address)),
             volume_step: value.volume_step,
-            disable_images: value.disable_images,
             status_update_interval_ms: value.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: value.keybinds.into(),
         })
@@ -221,7 +217,6 @@ pub struct Config {
     pub address: &'static str,
     pub volume_step: u8,
     pub keybinds: KeyConfig,
-    pub disable_images: bool,
     pub status_update_interval_ms: Option<u64>,
     pub ui: UiConfig,
 }

@@ -71,7 +71,7 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let queue_len = app.queue.len().unwrap_or(0);
-        let show_image = !app.config.disable_images;
+        let show_image = !app.config.ui.disable_images;
 
         let [img_section, queue_section] = *Layout::default()
             .direction(Direction::Horizontal)
