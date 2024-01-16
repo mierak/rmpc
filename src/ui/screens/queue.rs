@@ -103,6 +103,7 @@ impl Screen for QueueScreen {
         }
 
         let widths = Layout::new(Direction::Horizontal, self.column_widths.clone()).split(table_header_section);
+        let formats = &app.config.ui.song_table_format;
 
         let table_items = app
             .queue
@@ -111,13 +112,17 @@ impl Screen for QueueScreen {
                 queue
                     .iter()
                     .map(|song| {
-                        Row::new(app.config.ui.song_table_format.iter().enumerate().map(|(idx, v)| {
-                            Line::from(
-                                song.get_property_ellipsized(v.prop, widths[idx].width.into())
-                                    .into_owned()
-                                    .fg(v.color),
-                            )
-                            .alignment(v.alignment.into())
+                        let is_current = app.status.songid.as_ref().is_some_and(|v| *v == song.id);
+                        Row::new((0..formats.len()).map(|i| {
+                            let song = song
+                                .get_property_ellipsized(formats[i].prop, widths[i].width.into())
+                                .into_owned();
+                            let song = if is_current {
+                                song.bold().fg(app.config.ui.current_song_color)
+                            } else {
+                                song.fg(formats[i].color)
+                            };
+                            Line::from(song).alignment(formats[i].alignment.into())
                         }))
                     })
                     .collect_vec()

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use itertools::Itertools;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use strum::Display;
@@ -61,6 +62,7 @@ pub struct UiConfigFile {
     pub(super) browser_column_widths: Vec<u16>,
     pub(super) background_color: Option<String>,
     pub(super) background_color_modal: Option<String>,
+    pub(super) current_song_color: Option<String>,
     pub(super) volume_color: Option<String>,
     pub(super) status_color: Option<String>,
     pub(super) show_song_table_header: bool,
@@ -71,6 +73,7 @@ pub struct UiConfigFile {
 pub struct UiConfig {
     pub background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
+    pub current_song_color: Color,
     pub column_widths: [u16; 3],
     pub symbols: SymbolsConfig,
     pub volume_color: Color,
@@ -138,6 +141,7 @@ impl Default for UiConfigFile {
         Self {
             background_color: Some("black".to_string()),
             background_color_modal: None,
+            current_song_color: Some("blue".to_string()),
             browser_column_widths: vec![20, 38, 42],
             volume_color: Some("blue".to_string()),
             status_color: Some("yellow".to_string()),
@@ -328,6 +332,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
         Ok(Self {
             background_color: bg_color,
             background_color_modal: modal_bg_color,
+            current_song_color: value
+                .current_song_color
+                .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+                .transpose()?
+                .map_or_else(|| Color::Blue, Into::into),
             symbols: value.symbols.into(),
             column_widths: [
                 value.browser_column_widths[0],
@@ -358,19 +367,20 @@ impl TryFrom<UiConfigFile> for UiConfig {
             song_table_format: value
                 .song_table_format
                 .into_iter()
-                .map(|v| SongTableColumn {
-                    prop: v.prop,
-                    label: Box::leak(Box::new(v.label.unwrap_or_else(|| v.prop.to_string()))),
-                    width_percent: v.width_percent,
-                    alignment: v.alignment.unwrap_or(Alignment::Left),
-                    color: v
-                        .color
-                        .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
-                        .transpose()
-                        .unwrap_or_default()
-                        .map_or_else(|| Color::White, Into::into),
+                .map(|v| -> Result<_> {
+                    Ok(SongTableColumn {
+                        prop: v.prop,
+                        label: Box::leak(Box::new(v.label.unwrap_or_else(|| v.prop.to_string()))),
+                        width_percent: v.width_percent,
+                        alignment: v.alignment.unwrap_or(Alignment::Left),
+                        color: v
+                            .color
+                            .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+                            .transpose()?
+                            .map_or_else(|| Color::White, Into::into),
+                    })
                 })
-                .collect(),
+                .try_collect()?,
         })
     }
 }
