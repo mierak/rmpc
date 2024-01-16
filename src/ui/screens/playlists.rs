@@ -40,7 +40,7 @@ impl Screen for PlaylistsScreen {
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         frame.render_stateful_widget(
-            Browser::new(&app.config.symbols).set_widths(&app.config.column_widths),
+            Browser::new(&app.config.ui.symbols).set_widths(&app.config.ui.column_widths),
             area,
             &mut self.stack,
         );
@@ -254,12 +254,12 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                         .list_playlist(d)?
                         .into_iter()
                         .map(DirOrSong::Song)
-                        .map(|s| s.to_list_item(&state.config.symbols, false))
+                        .map(|s| s.to_list_item(&state.config.ui.symbols, false))
                         .collect_vec(),
                     DirOrSong::Song(file) => client
                         .find_one(&[Filter::new(Tag::File, file)])?
                         .context(anyhow!("File '{file}' was listed but not found"))?
-                        .to_preview(&state.config.symbols)
+                        .to_preview(&state.config.ui.symbols)
                         .collect_vec(),
                 }))
             })

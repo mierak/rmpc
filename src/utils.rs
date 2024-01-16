@@ -21,8 +21,16 @@ pub mod macros {
             }
         };
     }
+    macro_rules! println_var {
+        ( $e:expr ) => {
+            println!("{}", $e);
+        };
+    }
+    #[allow(unused_imports)]
+    pub(crate) use println_var;
     #[allow(unused_imports)]
     pub(crate) use try_cont;
+    #[allow(unused_imports)]
     pub(crate) use try_ret;
 }
 

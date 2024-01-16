@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
-    style::{Color, Stylize},
+    style::{Color, Style, Stylize},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
@@ -50,7 +50,7 @@ impl Modal for SaveQueueModal {
     fn render(
         &mut self,
         frame: &mut Frame,
-        _app: &mut crate::state::State,
+        app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         let block = Block::default().borders(Borders::ALL).title("Save queue as playlist");
@@ -65,6 +65,10 @@ impl Modal for SaveQueueModal {
             .wrap(Wrap { trim: true });
 
         let popup_area = frame.size().centered_exact(20, 7);
+        frame.render_widget(Clear, popup_area);
+        if let Some(bg_color) = app.config.ui.background_color_modal {
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
+        }
         let [text_area, input_area, buttons_area] = *Layout::default()
             .constraints([Constraint::Length(1), Constraint::Length(3), Constraint::Max(1)].as_ref())
             .direction(Direction::Vertical)
@@ -80,7 +84,6 @@ impl Modal for SaveQueueModal {
         self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default().buttons(buttons);
 
-        frame.render_widget(Clear, popup_area);
         frame.render_widget(block, popup_area);
         frame.render_widget(text, text_area);
         frame.render_widget(input, input_area);

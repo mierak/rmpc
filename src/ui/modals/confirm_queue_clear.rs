@@ -2,6 +2,7 @@ use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
+    style::Style,
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
@@ -28,13 +29,17 @@ impl Modal for ConfirmQueueClearModal {
     fn render(
         &mut self,
         frame: &mut Frame,
-        _app: &mut crate::state::State,
+        app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         let block = Block::default().borders(Borders::ALL).title("Clear the queue?");
         let text = Paragraph::new("Are you sure you want to clear the queue?").wrap(Wrap { trim: true });
 
         let popup_area = frame.size().centered_exact(20, 7);
+        frame.render_widget(Clear, popup_area);
+        if let Some(bg_color) = app.config.ui.background_color_modal {
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
+        }
         let [text_area, buttons_area] = *Layout::default()
             .constraints([Constraint::Length(3), Constraint::Max(1)].as_ref())
             .direction(Direction::Vertical)
@@ -50,7 +55,6 @@ impl Modal for ConfirmQueueClearModal {
         self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default().buttons(buttons);
 
-        frame.render_widget(Clear, popup_area);
         frame.render_widget(block, popup_area);
         frame.render_widget(text, text_area);
         frame.render_stateful_widget(group, buttons_area, &mut self.button_group);

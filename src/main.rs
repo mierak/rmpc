@@ -51,7 +51,7 @@ fn read_cfg(args: &Args) -> Result<Config> {
     let file = std::fs::File::open(&args.config)?;
     let read = std::io::BufReader::new(file);
     let res: ConfigFile = ron::de::from_reader(read)?;
-    Ok(res.into())
+    res.try_into()
 }
 
 fn main() -> Result<()> {
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
                 Ok(val) => val,
                 Err(err) => {
                     warn!(message = "Using default config", ?err);
-                    ConfigFile::default().into()
+                    ConfigFile::default().try_into()?
                 }
             }));
 

@@ -1,7 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
 
@@ -46,7 +48,6 @@ fn get_default_config_path() -> PathBuf {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SymbolsFile {
-    progress_bar: Vec<String>,
     song: String,
     dir: String,
     marker: String,
@@ -58,12 +59,75 @@ pub struct Key {
     pub modifiers: KeyModifiers,
 }
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum ConfigColor {
+    Reset,
+    Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    Gray,
+    DarkGray,
+    LightRed,
+    LightGreen,
+    LightYellow,
+    LightBlue,
+    LightMagenta,
+    LightCyan,
+    White,
+    Rgb(u8, u8, u8),
+    Indexed(u8),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProgressBarConfigFile {
+    symbols: Vec<String>,
+    track_colors: Option<(String, String)>,
+    elapsed_colors: Option<(String, String)>,
+    thumb_colors: Option<(String, String)>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UiConfigFile {
+    symbols: SymbolsFile,
+    progress_bar: ProgressBarConfigFile,
+    #[serde(default = "defaults::default_column_widths")]
+    column_widths: Vec<u16>,
+    background_color: Option<String>,
+    background_color_modal: Option<String>,
+    volume_color: Option<String>,
+    status_color: Option<String>,
+}
+
+impl Default for UiConfigFile {
+    fn default() -> Self {
+        Self {
+            background_color: Some("black".to_string()),
+            background_color_modal: None,
+            column_widths: vec![20, 38, 42],
+            volume_color: Some("blue".to_string()),
+            status_color: Some("yellow".to_string()),
+            progress_bar: ProgressBarConfigFile {
+                symbols: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
+                track_colors: Some(("black".to_string(), "black".to_string())),
+                elapsed_colors: Some(("blue".to_string(), "black".to_string())),
+                thumb_colors: Some(("blue".to_string(), "black".to_string())),
+            },
+            symbols: SymbolsFile {
+                song: "🎵".to_owned(),
+                dir: "📁".to_owned(),
+                marker: "".to_owned(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigFile {
     address: String,
-    symbols: SymbolsFile,
-    #[serde(default = "defaults::default_column_widths")]
-    column_widths: Vec<u16>,
     #[serde(default = "defaults::default_volume_step")]
     volume_step: u8,
     #[serde(default = "defaults::default_false")]
@@ -71,6 +135,7 @@ pub struct ConfigFile {
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
     keybinds: KeyConfigFile,
+    ui: Option<UiConfigFile>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -92,14 +157,8 @@ impl Default for ConfigFile {
             keybinds: KeyConfigFile::default(),
             volume_step: 5,
             disable_images: false,
-            column_widths: vec![20, 38, 42],
             status_update_interval_ms: Some(1000),
-            symbols: SymbolsFile {
-                progress_bar: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
-                song: "🎵".to_owned(),
-                dir: "📁".to_owned(),
-                marker: "".to_owned(),
-            },
+            ui: Some(UiConfigFile::default()),
         }
     }
 }
@@ -199,17 +258,18 @@ impl Default for KeyConfigFile {
     }
 }
 
-impl From<ConfigFile> for Config {
-    fn from(value: ConfigFile) -> Self {
-        Self {
+impl TryFrom<ConfigFile> for Config {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ConfigFile) -> Result<Self, Self::Error> {
+        Ok(Self {
+            ui: value.ui.unwrap_or_default().try_into()?,
             address: Box::leak(Box::new(value.address)),
-            symbols: value.symbols.into(),
             volume_step: value.volume_step,
             disable_images: value.disable_images,
-            column_widths: [value.column_widths[0], value.column_widths[1], value.column_widths[2]],
             status_update_interval_ms: value.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: value.keybinds.into(),
-        }
+        })
     }
 }
 
@@ -243,17 +303,85 @@ impl From<KeyEvent> for Key {
     }
 }
 
+impl TryFrom<UiConfigFile> for UiConfig {
+    type Error = anyhow::Error;
+
+    fn try_from(mut value: UiConfigFile) -> Result<Self, Self::Error> {
+        let elapsed = std::mem::take(&mut value.progress_bar.symbols[0]);
+        let thumb = std::mem::take(&mut value.progress_bar.symbols[1]);
+        let track = std::mem::take(&mut value.progress_bar.symbols[2]);
+        let progress_bar_color_track = value.progress_bar.track_colors.map_or_else(
+            || Ok((Color::Black, Color::Black)),
+            |v: (String, String)| -> Result<(Color, Color)> {
+                let r = (v.0.as_bytes().try_into(), v.1.as_bytes().try_into());
+                let r: (ConfigColor, ConfigColor) = (r.0?, r.1?);
+                let r = (r.0.into(), r.1.into());
+                Ok(r)
+            },
+        )?;
+        let progress_bar_color_elapsed = value.progress_bar.elapsed_colors.map_or_else(
+            || Ok((Color::Blue, Color::Black)),
+            |v: (String, String)| -> Result<(Color, Color)> {
+                let r = (v.0.as_bytes().try_into(), v.1.as_bytes().try_into());
+                let r: (ConfigColor, ConfigColor) = (r.0?, r.1?);
+                let r = (r.0.into(), r.1.into());
+                Ok(r)
+            },
+        )?;
+        let progress_bar_color_thumb = value.progress_bar.thumb_colors.map_or_else(
+            || Ok((Color::Blue, Color::Black)),
+            |v: (String, String)| -> Result<(Color, Color)> {
+                let r = (v.0.as_bytes().try_into(), v.1.as_bytes().try_into());
+                let r: (ConfigColor, ConfigColor) = (r.0?, r.1?);
+                let r = (r.0.into(), r.1.into());
+                Ok(r)
+            },
+        )?;
+
+        let bg_color = value
+            .background_color
+            .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+            .transpose()?
+            .map(Into::into);
+        let modal_bg_color = value
+            .background_color_modal
+            .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+            .transpose()?
+            .map(Into::<Color>::into)
+            .or(bg_color);
+
+        Ok(Self {
+            background_color: bg_color,
+            background_color_modal: modal_bg_color,
+            symbols: value.symbols.into(),
+            column_widths: [value.column_widths[0], value.column_widths[1], value.column_widths[2]],
+            volume_color: value
+                .volume_color
+                .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+                .transpose()?
+                .map_or_else(|| Color::Blue, Into::into),
+            status_color: value
+                .status_color
+                .map(|v| TryInto::<ConfigColor>::try_into(v.as_bytes()))
+                .transpose()?
+                .map_or_else(|| Color::Yellow, Into::into),
+            progress_bar: ProgressBarConfig {
+                symbols: [
+                    Box::leak(Box::new(elapsed)),
+                    Box::leak(Box::new(thumb)),
+                    Box::leak(Box::new(track)),
+                ],
+                elapsed_colors: progress_bar_color_elapsed,
+                thumb_colors: progress_bar_color_thumb,
+                track_colors: progress_bar_color_track,
+            },
+        })
+    }
+}
+
 impl From<SymbolsFile> for SymbolsConfig {
-    fn from(mut value: SymbolsFile) -> Self {
-        let elapsed = std::mem::take(&mut value.progress_bar[0]);
-        let thumb = std::mem::take(&mut value.progress_bar[1]);
-        let track = std::mem::take(&mut value.progress_bar[2]);
+    fn from(value: SymbolsFile) -> Self {
         Self {
-            progress_bar: [
-                Box::leak(Box::new(elapsed)),
-                Box::leak(Box::new(thumb)),
-                Box::leak(Box::new(track)),
-            ],
             song: Box::leak(Box::new(value.song)),
             dir: Box::leak(Box::new(value.dir)),
             marker: Box::leak(Box::new(value.marker)),
@@ -264,12 +392,11 @@ impl From<SymbolsFile> for SymbolsConfig {
 #[derive(Debug)]
 pub struct Config {
     pub address: &'static str,
-    pub symbols: SymbolsConfig,
     pub volume_step: u8,
     pub keybinds: KeyConfig,
-    pub column_widths: [u16; 3],
     pub disable_images: bool,
     pub status_update_interval_ms: Option<u64>,
+    pub ui: UiConfig,
 }
 
 #[derive(Debug)]
@@ -284,10 +411,163 @@ pub struct KeyConfig {
     pub queue: HashMap<Key, QueueActions>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Default)]
 pub struct SymbolsConfig {
-    pub progress_bar: [&'static str; 3],
     pub song: &'static str,
     pub dir: &'static str,
     pub marker: &'static str,
+}
+
+#[derive(Debug)]
+pub struct ProgressBarConfig {
+    pub symbols: [&'static str; 3],
+    pub track_colors: (Color, Color),
+    pub elapsed_colors: (Color, Color),
+    pub thumb_colors: (Color, Color),
+}
+
+#[derive(Debug)]
+pub struct UiConfig {
+    pub background_color: Option<Color>,
+    pub background_color_modal: Option<Color>,
+    pub column_widths: [u16; 3],
+    pub symbols: SymbolsConfig,
+    pub volume_color: Color,
+    pub status_color: Color,
+    pub progress_bar: ProgressBarConfig,
+}
+
+impl TryFrom<&[u8]> for crate::config::ConfigColor {
+    type Error = anyhow::Error;
+
+    fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
+        match input {
+            b"reset" => Ok(Self::Reset),
+            b"black" => Ok(Self::Black),
+            b"red" => Ok(Self::Red),
+            b"green" => Ok(Self::Green),
+            b"yellow" => Ok(Self::Yellow),
+            b"blue" => Ok(Self::Blue),
+            b"magenta" => Ok(Self::Magenta),
+            b"cyan" => Ok(Self::Cyan),
+            b"gray" => Ok(Self::Gray),
+            b"dark_gray" => Ok(Self::DarkGray),
+            b"light_red" => Ok(Self::LightRed),
+            b"light_green" => Ok(Self::LightGreen),
+            b"light_yellow" => Ok(Self::LightYellow),
+            b"light_blue" => Ok(Self::LightBlue),
+            b"light_magenta" => Ok(Self::LightMagenta),
+            b"light_cyan" => Ok(Self::LightCyan),
+            b"white" => Ok(Self::White),
+            s if input.len() == 7 && input.first().is_some_and(|v| v == &b'#') => {
+                let r = u8::from_str_radix(
+                    std::str::from_utf8(&s[1..3]).context("Failed to get str for red color value")?,
+                    16,
+                )
+                .context("Failed to parse red color value")?;
+                let g = u8::from_str_radix(
+                    std::str::from_utf8(&s[3..5]).context("Failed to get str for green color value")?,
+                    16,
+                )
+                .context("Failed to parse green color value")?;
+                let b = u8::from_str_radix(
+                    std::str::from_utf8(&s[5..7]).context("Failed to get str for blue color value")?,
+                    16,
+                )
+                .context("Failed to parse blue color value")?;
+
+                Ok(Self::Rgb(r, g, b))
+            }
+            s if s.starts_with(b"rgb(") => {
+                let mut colors =
+                    std::str::from_utf8(s.strip_prefix(b"rgb(").context("")?.strip_suffix(b")").context("")?)?
+                        .splitn(3, ',');
+                let r = colors.next().context("")?.parse::<u8>().context("")?;
+                let g = colors.next().context("")?.parse::<u8>().context("")?;
+                let b = colors.next().context("")?.parse::<u8>().context("")?;
+                Ok(Self::Rgb(r, g, b))
+            }
+            s => {
+                if let Ok(v) = std::str::from_utf8(s)?.parse::<u8>() {
+                    Ok(Self::Indexed(v))
+                } else {
+                    Err(anyhow::anyhow!("Invalid color format '{s:?}'"))
+                }
+            }
+        }
+    }
+}
+
+impl From<crate::config::ConfigColor> for Color {
+    fn from(value: crate::config::ConfigColor) -> Self {
+        match value {
+            crate::config::ConfigColor::Reset => Color::Reset,
+            crate::config::ConfigColor::Black => Color::Black,
+            crate::config::ConfigColor::Red => Color::Red,
+            crate::config::ConfigColor::Green => Color::Green,
+            crate::config::ConfigColor::Yellow => Color::Yellow,
+            crate::config::ConfigColor::Blue => Color::Blue,
+            crate::config::ConfigColor::Magenta => Color::Magenta,
+            crate::config::ConfigColor::Cyan => Color::Cyan,
+            crate::config::ConfigColor::Gray => Color::Gray,
+            crate::config::ConfigColor::DarkGray => Color::DarkGray,
+            crate::config::ConfigColor::LightRed => Color::LightRed,
+            crate::config::ConfigColor::LightGreen => Color::LightGreen,
+            crate::config::ConfigColor::LightYellow => Color::LightYellow,
+            crate::config::ConfigColor::LightBlue => Color::LightBlue,
+            crate::config::ConfigColor::LightMagenta => Color::LightMagenta,
+            crate::config::ConfigColor::LightCyan => Color::LightCyan,
+            crate::config::ConfigColor::White => Color::White,
+            crate::config::ConfigColor::Rgb(r, g, b) => Color::Rgb(r, g, b),
+            crate::config::ConfigColor::Indexed(v) => Color::Indexed(v),
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use crate::config::ConfigColor;
+
+    #[test]
+    fn hex_value() {
+        let input: &[u8] = b"#ff00ff";
+        let result = ConfigColor::try_from(input).unwrap();
+        assert_eq!(result, ConfigColor::Rgb(255, 0, 255));
+    }
+
+    #[test]
+    fn invalid_hex_value() {
+        let input: &[u8] = b"#ff00f";
+        let result = ConfigColor::try_from(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rgb_value() {
+        let input: &[u8] = b"rgb(255,0,255)";
+        let result = ConfigColor::try_from(input).unwrap();
+        assert_eq!(result, ConfigColor::Rgb(255, 0, 255));
+    }
+
+    #[test]
+    fn invalid_rgb_value() {
+        let input: &[u8] = b"rgb(255,0,256)";
+        let result = ConfigColor::try_from(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn indexed_value() {
+        let input: &[u8] = b"255";
+        let result = ConfigColor::try_from(input).unwrap();
+        assert_eq!(result, ConfigColor::Indexed(255));
+    }
+
+    #[test]
+    fn invalid_indexed_value() {
+        let input: &[u8] = b"256";
+        let result = ConfigColor::try_from(input);
+        assert!(result.is_err());
+    }
 }

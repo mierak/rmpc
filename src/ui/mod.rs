@@ -11,7 +11,7 @@ use ratatui::{
     prelude::{Alignment, Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
 use strum::{Display, IntoEnumIterator, VariantNames};
@@ -132,6 +132,9 @@ macro_rules! screen_call {
 impl Ui<'_> {
     #[instrument(skip_all)]
     pub fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
+        if let Some(bg_color) = app.config.ui.background_color {
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
+        }
         self.shared_state.frame_counter.add_assign(1);
         if self
             .shared_state
@@ -235,7 +238,7 @@ impl Ui<'_> {
         let volume = crate::ui::widgets::volume::Volume::default()
             .value(*app.status.volume.value())
             .alignment(Alignment::Right)
-            .style(Style::default().fg(Color::Blue));
+            .style(Style::default().fg(app.config.ui.volume_color));
 
         let on_style = Style::default().fg(Color::Gray);
         let off_style = Style::default().fg(Color::DarkGray);
@@ -276,12 +279,12 @@ impl Ui<'_> {
                 "[{}] {} rendered frames",
                 app.status.state, self.shared_state.frame_counter
             ),
-            Style::default().yellow(),
+            Style::default().fg(app.config.ui.status_color),
         ));
         #[cfg(not(debug_assertions))]
         let status = Paragraph::new(Span::styled(
             format!("[{}]", app.status.state),
-            Style::default().yellow(),
+            Style::default().fg(app.config.ui.status_color),
         ));
 
         let elapsed = if app.config.status_update_interval_ms.is_some() {
@@ -321,11 +324,33 @@ impl Ui<'_> {
             frame.render_widget(status_bar, bar_area);
         } else if app.config.status_update_interval_ms.is_some() {
             let elapsed_bar = ProgressBar::default()
-                .fg(Color::Blue)
-                .bg(Color::Black)
-                .elapsed_char(app.config.symbols.progress_bar[0])
-                .thumb_char(app.config.symbols.progress_bar[1])
-                .track_char(app.config.symbols.progress_bar[2]);
+                .thumb_style(
+                    Style::default().fg(app.config.ui.progress_bar.thumb_colors.0).bg(app
+                        .config
+                        .ui
+                        .progress_bar
+                        .thumb_colors
+                        .1),
+                )
+                .track_style(
+                    Style::default().fg(app.config.ui.progress_bar.track_colors.0).bg(app
+                        .config
+                        .ui
+                        .progress_bar
+                        .track_colors
+                        .1),
+                )
+                .elapsed_style(
+                    Style::default().fg(app.config.ui.progress_bar.elapsed_colors.0).bg(app
+                        .config
+                        .ui
+                        .progress_bar
+                        .elapsed_colors
+                        .1),
+                )
+                .elapsed_char(app.config.ui.progress_bar.symbols[0])
+                .thumb_char(app.config.ui.progress_bar.symbols[1])
+                .track_char(app.config.ui.progress_bar.symbols[2]);
             let elapsed_bar = if app.status.duration == Duration::ZERO {
                 elapsed_bar.value(0.0)
             } else {

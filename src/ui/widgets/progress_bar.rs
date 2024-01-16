@@ -15,6 +15,7 @@ pub struct ProgressBar<'a> {
     thumb_style: Style,
 }
 
+#[allow(dead_code)]
 impl<'a> ProgressBar<'a> {
     pub fn value(mut self, val: f32) -> Self {
         self.value = val;
@@ -45,6 +46,21 @@ impl<'a> ProgressBar<'a> {
 
     pub fn elapsed_char(mut self, elapsed: &'a str) -> Self {
         self.elapsed_char = elapsed;
+        self
+    }
+
+    pub fn elapsed_style(mut self, style: Style) -> Self {
+        self.elapsed_style = style;
+        self
+    }
+
+    pub fn track_style(mut self, style: Style) -> Self {
+        self.track_style = style;
+        self
+    }
+
+    pub fn thumb_style(mut self, style: Style) -> Self {
+        self.thumb_style = style;
         self
     }
 }

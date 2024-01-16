@@ -62,11 +62,16 @@ impl Modal for AddToPlaylistModal {
     fn render(
         &mut self,
         frame: &mut ratatui::Frame,
-        _app: &mut crate::state::State,
+        app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let active_highlight_style = Style::default().bg(Color::Blue).fg(Color::Black).bold();
         let popup_area = frame.size().centered_exact(35, 15);
+        frame.render_widget(Clear, popup_area);
+        if let Some(bg_color) = app.config.ui.background_color_modal {
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
+        }
+
         let [list_area, buttons_area] = *Layout::default()
             .constraints([Constraint::Length(3), Constraint::Max(3)].as_ref())
             .direction(Direction::Vertical)
@@ -116,7 +121,6 @@ impl Modal for AddToPlaylistModal {
             })
             .block(Block::default().borders(Borders::ALL).border_set(BUTTON_GROUP_SYMBOLS));
 
-        frame.render_widget(Clear, popup_area);
         frame.render_stateful_widget(playlists, list_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             scrollbar,

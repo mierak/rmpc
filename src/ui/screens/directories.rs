@@ -38,7 +38,7 @@ impl Screen for DirectoriesScreen {
         _state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         frame.render_stateful_widget(
-            Browser::new(&app.config.symbols).set_widths(&app.config.column_widths),
+            Browser::new(&app.config.ui.symbols).set_widths(&app.config.ui.column_widths),
             area,
             &mut self.stack,
         );
@@ -203,13 +203,13 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                                 DirOrSong::Song(song.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned())
                             }
                         })
-                        .map(|v| v.to_list_item(&state.config.symbols, false))
+                        .map(|v| v.to_list_item(&state.config.ui.symbols, false))
                         .collect(),
                 ))
             }
             Some(DirOrSong::Song(file)) => Ok(client
                 .find_one(&[Filter::new(Tag::File, file)])?
-                .map(|v| v.to_preview(&state.config.symbols).collect())),
+                .map(|v| v.to_preview(&state.config.ui.symbols).collect())),
             None => Ok(None),
         }
     }

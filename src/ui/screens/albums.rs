@@ -39,7 +39,7 @@ impl Screen for AlbumsScreen {
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         frame.render_stateful_widget(
-            Browser::new(&app.config.symbols).set_widths(&app.config.column_widths),
+            Browser::new(&app.config.ui.symbols).set_widths(&app.config.ui.column_widths),
             area,
             &mut self.stack,
         );
@@ -185,11 +185,11 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
                 Ok(match self.stack.path() {
                     [album] => find_songs(client, album, current)?
                         .first()
-                        .map(|v| v.to_preview(&state.config.symbols))
+                        .map(|v| v.to_preview(&state.config.ui.symbols))
                         .map(std::iter::Iterator::collect),
                     [] => Some(
                         list_titles(client, current)?
-                            .map(|v| v.to_list_item(&state.config.symbols, false))
+                            .map(|v| v.to_list_item(&state.config.ui.symbols, false))
                             .collect_vec(),
                     ),
                     _ => None,
