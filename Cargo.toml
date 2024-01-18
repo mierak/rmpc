@@ -25,3 +25,4 @@ ron = "0.8.1"
 derive_more = { version = "0.99.17", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }
 rustix = { version = "0.38.30", features = ["termios", "stdio"] }
 test-case = "3.3.1"
+bitflags = { version = "2.4.2", features = ["serde"] }

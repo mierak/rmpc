@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-use super::{color::FgBgColorsExt, FgBgColors, FgBgColorsFile};
+use super::{color::FgBgColorsExt, Style, StyleFile};
 
 #[derive(Debug)]
 pub struct ScrollbarConfig {
@@ -13,30 +13,39 @@ pub struct ScrollbarConfig {
     /// Fourth symbol is used for the scrollbar down button
     pub symbols: [&'static str; 4],
     /// Fall sback to border color for foreground and default color for background
-    pub track_colors: FgBgColors,
+    pub track_style: Style,
     /// Fall sback to border color for foreground and default color for background
-    pub ends_colors: FgBgColors,
+    pub ends_style: Style,
     // Falls back to blue for foreground and default color for background
-    pub thumb_colors: FgBgColors,
+    pub thumb_style: Style,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScrollbarConfigFile {
     pub(super) symbols: Vec<String>,
-    pub(super) track_colors: Option<FgBgColorsFile>,
-    pub(super) ends_colors: Option<FgBgColorsFile>,
-    pub(super) thumb_colors: Option<FgBgColorsFile>,
+    pub(super) track_style: Option<StyleFile>,
+    pub(super) ends_style: Option<StyleFile>,
+    pub(super) thumb_style: Option<StyleFile>,
 }
 
 impl Default for ScrollbarConfigFile {
     fn default() -> Self {
         Self {
             symbols: vec!["║".to_owned(), "█".to_owned(), "▲".to_owned(), "▼".to_owned()],
-            track_colors: Some(FgBgColorsFile { fg: None, bg: None }),
-            ends_colors: Some(FgBgColorsFile { fg: None, bg: None }),
-            thumb_colors: Some(FgBgColorsFile {
-                fg: Some("blue".to_string()),
-                bg: None,
+            track_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: None,
+            }),
+            ends_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: None,
+            }),
+            thumb_style: Some(StyleFile {
+                fg_color: Some("blue".to_string()),
+                bg_color: None,
+                modifiers: None,
             }),
         }
     }
@@ -56,9 +65,9 @@ impl ScrollbarConfigFile {
                 Box::leak(Box::new(sb_up)),
                 Box::leak(Box::new(sb_down)),
             ],
-            ends_colors: self.ends_colors.to_config_or(fallback_color, Color::Reset)?,
-            thumb_colors: self.thumb_colors.to_config_or(Color::Blue, Color::Reset)?,
-            track_colors: self.track_colors.to_config_or(fallback_color, Color::Reset)?,
+            ends_style: self.ends_style.to_config_or(fallback_color, Color::Reset)?,
+            thumb_style: self.thumb_style.to_config_or(Color::Blue, Color::Reset)?,
+            track_style: self.track_style.to_config_or(fallback_color, Color::Reset)?,
         })
     }
 }
@@ -66,8 +75,8 @@ impl ScrollbarConfigFile {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::needless_pass_by_value)]
 mod tests {
-    use crate::config::ui::{scrollbar::ScrollbarConfigFile, FgBgColors, FgBgColorsFile};
-    use ratatui::style::Color as RC;
+    use crate::config::ui::{color::Modifiers, scrollbar::ScrollbarConfigFile, Style, StyleFile};
+    use ratatui::style::{Color as RC, Modifier as RM};
     use test_case::test_case;
 
     #[test]
@@ -82,99 +91,183 @@ mod tests {
         assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned()]);
     }
 
-    #[test_case(None,         None,         FgBgColors { fg: RC::Blue, bg: RC::Reset }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), FgBgColors { fg: RC::Blue, bg: RC::Reset }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), FgBgColors { fg: RC::Red,  bg: RC::Blue }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         FgBgColors { fg: RC::Cyan, bg: RC::Reset }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), FgBgColors { fg: RC::Blue, bg: RC::Gray }   ; "correctly maps when only bg is provided")]
-    fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: FgBgColors) {
+    #[test_case(None,         None,         Style { fg_color: RC::Blue, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::Blue, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,  bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan, bg_color: RC::Reset, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style { fg_color: RC::Blue, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
         let input = ScrollbarConfigFile {
-            thumb_colors: match (c1, c2) {
+            thumb_style: match (c1, c2) {
                 (Some("none"), Some("none")) => None,
-                (Some(c1), Some(c2)) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: Some(c2.to_string()),
+                (Some(c1), Some(c2)) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (Some(c1), None) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
+                (Some(c1), None) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: None,
+                    modifiers: None,
                 }),
-                (None, Some(c2)) => Some(FgBgColorsFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
+                (None, Some(c2)) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (None, None) => Some(FgBgColorsFile { fg: None, bg: None }),
+                (None, None) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: None,
+                    modifiers: None,
+                }),
             },
             ..Default::default()
         };
 
         let result = input.into_config(fallback).unwrap();
 
-        assert_eq!(result.thumb_colors, expected);
+        assert_eq!(result.thumb_style, expected);
     }
 
-    #[test_case(None,         None,         FgBgColors { fg: RC::DarkGray, bg: RC::Reset }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), FgBgColors { fg: RC::DarkGray, bg: RC::Reset }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), FgBgColors { fg: RC::Red,      bg: RC::Blue }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         FgBgColors { fg: RC::Cyan,     bg: RC::Reset }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), FgBgColors { fg: RC::DarkGray, bg: RC::Gray }   ; "correctly maps when only bg is provided")]
-    fn ends_colors_test(c1: Option<&str>, c2: Option<&str>, expected: FgBgColors) {
+    #[test_case(None,         None,         Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,      bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan,     bg_color: RC::Reset, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style { fg_color: RC::DarkGray, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    fn ends_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
         let input = ScrollbarConfigFile {
-            ends_colors: match (c1, c2) {
+            ends_style: match (c1, c2) {
                 (Some("none"), Some("none")) => None,
-                (Some(c1), Some(c2)) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: Some(c2.to_string()),
+                (Some(c1), Some(c2)) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (Some(c1), None) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
+                (Some(c1), None) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: None,
+                    modifiers: None,
                 }),
-                (None, Some(c2)) => Some(FgBgColorsFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
+                (None, Some(c2)) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (None, None) => Some(FgBgColorsFile { fg: None, bg: None }),
+                (None, None) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: None,
+                    modifiers: None,
+                }),
             },
             ..Default::default()
         };
 
         let result = input.into_config(fallback).unwrap();
 
-        assert_eq!(result.ends_colors, expected);
+        assert_eq!(result.ends_style, expected);
     }
 
-    #[test_case(None,         None,         FgBgColors { fg: RC::DarkGray, bg: RC::Reset }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), FgBgColors { fg: RC::DarkGray, bg: RC::Reset }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), FgBgColors { fg: RC::Red,      bg: RC::Blue }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         FgBgColors { fg: RC::Cyan,     bg: RC::Reset }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), FgBgColors { fg: RC::DarkGray, bg: RC::Gray }   ; "correctly maps when only bg is provided")]
-    fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: FgBgColors) {
+    #[test_case(None,         None,         Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,      bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan,     bg_color: RC::Reset, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style { fg_color: RC::DarkGray, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
         let input = ScrollbarConfigFile {
-            track_colors: match (c1, c2) {
+            track_style: match (c1, c2) {
                 (Some("none"), Some("none")) => None,
-                (Some(c1), Some(c2)) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: Some(c2.to_string()),
+                (Some(c1), Some(c2)) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (Some(c1), None) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
+                (Some(c1), None) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: None,
+                    modifiers: None,
                 }),
-                (None, Some(c2)) => Some(FgBgColorsFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
+                (None, Some(c2)) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (None, None) => Some(FgBgColorsFile { fg: None, bg: None }),
+                (None, None) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: None,
+                    modifiers: None,
+                }),
             },
             ..Default::default()
         };
 
         let result = input.into_config(fallback).unwrap();
 
-        assert_eq!(result.track_colors, expected);
+        assert_eq!(result.track_style, expected);
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn thumb_modifiers(input: Modifiers, expected: RM) {
+        let input = ScrollbarConfigFile {
+            thumb_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: Some(input),
+            }),
+            ..Default::default()
+        };
+
+        let result = input.into_config(RC::Blue).unwrap();
+
+        assert_eq!(result.thumb_style.modifiers, expected);
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn ends_modifiers(input: Modifiers, expected: RM) {
+        let input = ScrollbarConfigFile {
+            ends_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: Some(input),
+            }),
+            ..Default::default()
+        };
+
+        let result = input.into_config(RC::Blue).unwrap();
+
+        assert_eq!(result.ends_style.modifiers, expected);
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn track_modifiers(input: Modifiers, expected: RM) {
+        let input = ScrollbarConfigFile {
+            track_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: Some(input),
+            }),
+            ..Default::default()
+        };
+
+        let result = input.into_config(RC::Blue).unwrap();
+
+        assert_eq!(result.track_style.modifiers, expected);
     }
 }

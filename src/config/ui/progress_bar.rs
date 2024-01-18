@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-use super::{color::FgBgColorsExt, FgBgColors, FgBgColorsFile};
+use super::{color::FgBgColorsExt, Style, StyleFile};
 
 #[derive(Debug)]
 pub struct ProgressBarConfig {
@@ -13,37 +13,40 @@ pub struct ProgressBarConfig {
     pub symbols: [&'static str; 3],
     /// Fall sback to black for foreground and default color for background
     /// For transparent track you should set the track symbol to empty string
-    pub track_colors: FgBgColors,
+    pub track_style: Style,
     /// Fall sback to blue for foreground and black for background
-    pub elapsed_colors: FgBgColors,
+    pub elapsed_style: Style,
     /// Thumb at the end of the elapsed part of the progress bar
     /// Fall sback to blue for foreground and black for background
-    pub thumb_colors: FgBgColors,
+    pub thumb_style: Style,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProgressBarConfigFile {
     pub(super) symbols: Vec<String>,
-    pub(super) track_colors: Option<FgBgColorsFile>,
-    pub(super) elapsed_colors: Option<FgBgColorsFile>,
-    pub(super) thumb_colors: Option<FgBgColorsFile>,
+    pub(super) track_style: Option<StyleFile>,
+    pub(super) elapsed_style: Option<StyleFile>,
+    pub(super) thumb_style: Option<StyleFile>,
 }
 
 impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
             symbols: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
-            track_colors: Some(FgBgColorsFile {
-                fg: Some("black".to_string()),
-                bg: Some("default".to_string()),
+            track_style: Some(StyleFile {
+                fg_color: Some("black".to_string()),
+                bg_color: Some("default".to_string()),
+                modifiers: None,
             }),
-            elapsed_colors: Some(FgBgColorsFile {
-                fg: Some("blue".to_string()),
-                bg: Some("default".to_string()),
+            elapsed_style: Some(StyleFile {
+                fg_color: Some("blue".to_string()),
+                bg_color: Some("default".to_string()),
+                modifiers: None,
             }),
-            thumb_colors: Some(FgBgColorsFile {
-                fg: Some("blue".to_string()),
-                bg: Some("black".to_string()),
+            thumb_style: Some(StyleFile {
+                fg_color: Some("blue".to_string()),
+                bg_color: Some("black".to_string()),
+                modifiers: None,
             }),
         }
     }
@@ -61,9 +64,9 @@ impl ProgressBarConfigFile {
                 Box::leak(Box::new(thumb)),
                 Box::leak(Box::new(track)),
             ],
-            elapsed_colors: self.elapsed_colors.to_config_or(Color::Blue, Color::Black)?,
-            thumb_colors: self.thumb_colors.to_config_or(Color::Blue, Color::Black)?,
-            track_colors: self.track_colors.to_config_or(Color::Black, Color::Black)?,
+            elapsed_style: self.elapsed_style.to_config_or(Color::Blue, Color::Black)?,
+            thumb_style: self.thumb_style.to_config_or(Color::Blue, Color::Black)?,
+            track_style: self.track_style.to_config_or(Color::Black, Color::Black)?,
         })
     }
 }
@@ -71,8 +74,8 @@ impl ProgressBarConfigFile {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::needless_pass_by_value)]
 mod tests {
-    use crate::config::ui::{progress_bar::ProgressBarConfigFile, FgBgColors, FgBgColorsFile};
-    use ratatui::style::Color as RC;
+    use crate::config::ui::{color::Modifiers, progress_bar::ProgressBarConfigFile, Style, StyleFile};
+    use ratatui::style::{Color as RC, Modifier as RM};
     use test_case::test_case;
 
     #[test]
@@ -87,96 +90,180 @@ mod tests {
         assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned()]);
     }
 
-    #[test_case(None,         None,         FgBgColors { fg: RC::Blue, bg: RC::Black }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), FgBgColors { fg: RC::Blue, bg: RC::Black }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), FgBgColors { fg: RC::Red,  bg: RC::Blue }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         FgBgColors { fg: RC::Cyan, bg: RC::Black }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), FgBgColors { fg: RC::Blue, bg: RC::Gray }   ; "correctly maps when only bg is provided")]
-    fn elapsed_colors_test(c1: Option<&str>, c2: Option<&str>, expected: FgBgColors) {
+    #[test_case(None,         None,         Style { fg_color: RC::Blue, bg_color: RC::Black, modifiers: RM::default() }  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::Blue, bg_color: RC::Black, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,  bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan, bg_color: RC::Black, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style { fg_color: RC::Blue, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    fn elapsed_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let input = ProgressBarConfigFile {
-            elapsed_colors: match (c1, c2) {
+            elapsed_style: match (c1, c2) {
                 (Some("none"), Some("none")) => None,
-                (Some(c1), Some(c2)) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: Some(c2.to_string()),
+                (Some(c1), Some(c2)) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (Some(c1), None) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
+                (Some(c1), None) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: None,
+                    modifiers: None,
                 }),
-                (None, Some(c2)) => Some(FgBgColorsFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
+                (None, Some(c2)) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (None, None) => Some(FgBgColorsFile { fg: None, bg: None }),
+                (None, None) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: None,
+                    modifiers: None,
+                }),
             },
             ..Default::default()
         };
 
         let result = input.into_config().unwrap();
 
-        assert_eq!(result.elapsed_colors, expected);
+        assert_eq!(result.elapsed_style, expected);
     }
 
-    #[test_case(None,         None,         FgBgColors { fg: RC::Black, bg: RC::Black }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), FgBgColors { fg: RC::Black, bg: RC::Black }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), FgBgColors { fg: RC::Red,   bg: RC::Blue }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         FgBgColors { fg: RC::Cyan,  bg: RC::Black }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), FgBgColors { fg: RC::Black, bg: RC::Gray }   ; "correctly maps when only bg is provided")]
-    fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: FgBgColors) {
+    #[test_case(None,         None,         Style { fg_color: RC::Black, bg_color: RC::Black, modifiers: RM::default() }  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::Black, bg_color: RC::Black, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,   bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan,  bg_color: RC::Black, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style { fg_color: RC::Black, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let input = ProgressBarConfigFile {
-            track_colors: match (c1, c2) {
+            track_style: match (c1, c2) {
                 (Some("none"), Some("none")) => None,
-                (Some(c1), Some(c2)) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: Some(c2.to_string()),
+                (Some(c1), Some(c2)) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (Some(c1), None) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
+                (Some(c1), None) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: None,
+                    modifiers: None,
                 }),
-                (None, Some(c2)) => Some(FgBgColorsFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
+                (None, Some(c2)) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (None, None) => Some(FgBgColorsFile { fg: None, bg: None }),
+                (None, None) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: None,
+                    modifiers: None,
+                }),
             },
             ..Default::default()
         };
 
         let result = input.into_config().unwrap();
 
-        assert_eq!(result.track_colors, expected);
+        assert_eq!(result.track_style, expected);
     }
 
-    #[test_case(None,         None,         FgBgColors { fg: RC::Blue, bg: RC::Black }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), FgBgColors { fg: RC::Blue, bg: RC::Black }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), FgBgColors { fg: RC::Red,  bg: RC::Blue }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         FgBgColors { fg: RC::Cyan, bg: RC::Black }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), FgBgColors { fg: RC::Blue, bg: RC::Gray }   ; "correctly maps when only bg is provided")]
-    fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: FgBgColors) {
+    #[test_case(None,         None,         Style { fg_color: RC::Blue, bg_color: RC::Black, modifiers: RM::default() }  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::Blue, bg_color: RC::Black, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,  bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan, bg_color: RC::Black, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style { fg_color: RC::Blue, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let input = ProgressBarConfigFile {
-            thumb_colors: match (c1, c2) {
+            thumb_style: match (c1, c2) {
                 (Some("none"), Some("none")) => None,
-                (Some(c1), Some(c2)) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: Some(c2.to_string()),
+                (Some(c1), Some(c2)) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (Some(c1), None) => Some(FgBgColorsFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
+                (Some(c1), None) => Some(StyleFile {
+                    fg_color: Some(c1.to_string()),
+                    bg_color: None,
+                    modifiers: None,
                 }),
-                (None, Some(c2)) => Some(FgBgColorsFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
+                (None, Some(c2)) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: Some(c2.to_string()),
+                    modifiers: None,
                 }),
-                (None, None) => Some(FgBgColorsFile { fg: None, bg: None }),
+                (None, None) => Some(StyleFile {
+                    fg_color: None,
+                    bg_color: None,
+                    modifiers: None,
+                }),
             },
             ..Default::default()
         };
 
         let result = input.into_config().unwrap();
 
-        assert_eq!(result.thumb_colors, expected);
+        assert_eq!(result.thumb_style, expected);
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn track_modifiers(input: Modifiers, expected: RM) {
+        let input = ProgressBarConfigFile {
+            track_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: Some(input),
+            }),
+            ..Default::default()
+        };
+
+        let result = input.into_config().unwrap();
+
+        assert_eq!(result.track_style.modifiers, expected);
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn thumb_modifiers(input: Modifiers, expected: RM) {
+        let input = ProgressBarConfigFile {
+            thumb_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: Some(input),
+            }),
+            ..Default::default()
+        };
+
+        let result = input.into_config().unwrap();
+
+        assert_eq!(result.thumb_style.modifiers, expected);
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn elapsed_modifiers(input: Modifiers, expected: RM) {
+        let input = ProgressBarConfigFile {
+            elapsed_style: Some(StyleFile {
+                fg_color: None,
+                bg_color: None,
+                modifiers: Some(input),
+            }),
+            ..Default::default()
+        };
+
+        let result = input.into_config().unwrap();
+
+        assert_eq!(result.elapsed_style.modifiers, expected);
     }
 }

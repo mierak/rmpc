@@ -17,7 +17,7 @@ mod progress_bar;
 mod queue_table;
 mod scrollbar;
 
-pub use color::{ConfigColor, FgBgColors, FgBgColorsFile};
+pub use color::{ConfigColor, Style, StyleFile};
 
 #[derive(Debug)]
 pub struct UiConfig {
@@ -26,8 +26,8 @@ pub struct UiConfig {
     pub background_color_modal: Option<Color>,
     pub borders_color: Color,
     pub current_song_color: Color,
-    pub highlight_colors: FgBgColors,
-    pub highlight_border_colors: FgBgColors,
+    pub highlight_style: Style,
+    pub highlight_border_style: Style,
     pub column_widths: [u16; 3],
     pub symbols: SymbolsConfig,
     pub volume_color: Color,
@@ -51,8 +51,8 @@ pub struct UiConfigFile {
     pub(super) background_color_modal: Option<String>,
     pub(super) borders_color: Option<String>,
     pub(super) current_song_color: Option<String>,
-    pub(super) highlight_colors: Option<FgBgColorsFile>,
-    pub(super) highlight_border_colors: Option<FgBgColorsFile>,
+    pub(super) highlight_style: Option<StyleFile>,
+    pub(super) highlight_border_style: Option<StyleFile>,
     pub(super) volume_color: Option<String>,
     pub(super) status_color: Option<String>,
     pub(super) show_song_table_header: bool,
@@ -67,13 +67,15 @@ impl Default for UiConfigFile {
             background_color_modal: None,
             borders_color: Some("blue".to_string()),
             current_song_color: Some("blue".to_string()),
-            highlight_colors: Some(FgBgColorsFile {
-                fg: Some("black".to_string()),
-                bg: Some("blue".to_string()),
+            highlight_style: Some(StyleFile {
+                fg_color: Some("black".to_string()),
+                bg_color: Some("blue".to_string()),
+                modifiers: None,
             }),
-            highlight_border_colors: Some(FgBgColorsFile {
-                fg: Some("red".to_string()),
-                bg: None,
+            highlight_border_style: Some(StyleFile {
+                fg_color: Some("red".to_string()),
+                bg_color: None,
+                modifiers: None,
             }),
             browser_column_widths: vec![20, 38, 42],
             volume_color: Some("blue".to_string()),
@@ -161,8 +163,8 @@ impl TryFrom<UiConfigFile> for UiConfig {
             current_song_color: StringColor(value.current_song_color).to_color()?.unwrap_or(Color::Red),
             volume_color: StringColor(value.volume_color).to_color()?.unwrap_or(Color::Blue),
             status_color: StringColor(value.status_color).to_color()?.unwrap_or(Color::Yellow),
-            highlight_colors: value.highlight_colors.to_config_or(Color::Black, Color::Blue)?,
-            highlight_border_colors: value.highlight_border_colors.to_config_or(Color::Red, Color::Reset)?,
+            highlight_style: value.highlight_style.to_config_or(Color::Black, Color::Blue)?,
+            highlight_border_style: value.highlight_border_style.to_config_or(Color::Red, Color::Reset)?,
             disable_images: value.disable_images,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,

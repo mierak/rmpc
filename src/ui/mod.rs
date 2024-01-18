@@ -39,7 +39,6 @@ use self::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
         queue::QueueScreen, Screen,
     },
-    widgets::progress_bar::ProgressBar,
 };
 
 pub mod modals;
@@ -246,8 +245,8 @@ impl Ui<'_> {
                     .0,
             )
             .divider("")
-            .block(ratatui::widgets::Block::default().borders(Borders::TOP).border_style(Style::default().fg(app.config.ui.borders_color)))
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::Blue));
+            .block(ratatui::widgets::Block::default().borders(Borders::TOP).border_style(app.config.as_border_style()))
+            .highlight_style(app.config.as_highlight_style());
 
         // right
         let volume = crate::ui::widgets::volume::Volume::default()
@@ -338,26 +337,7 @@ impl Ui<'_> {
             .style(Style::default().fg(level.to_color()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
         } else if app.config.status_update_interval_ms.is_some() {
-            let progress_bar_colors = &app.config.ui.progress_bar;
-            let elapsed_bar = ProgressBar::default()
-                .thumb_style(
-                    Style::default()
-                        .fg(progress_bar_colors.thumb_colors.fg)
-                        .bg(progress_bar_colors.thumb_colors.bg),
-                )
-                .track_style(
-                    Style::default()
-                        .fg(progress_bar_colors.track_colors.fg)
-                        .bg(progress_bar_colors.track_colors.bg),
-                )
-                .elapsed_style(
-                    Style::default()
-                        .fg(progress_bar_colors.elapsed_colors.fg)
-                        .bg(progress_bar_colors.elapsed_colors.bg),
-                )
-                .elapsed_char(app.config.ui.progress_bar.symbols[0])
-                .thumb_char(app.config.ui.progress_bar.symbols[1])
-                .track_char(app.config.ui.progress_bar.symbols[2]);
+            let elapsed_bar = app.config.as_styled_progress_bar();
             let elapsed_bar = if app.status.duration == Duration::ZERO {
                 elapsed_bar.value(0.0)
             } else {
@@ -624,20 +604,45 @@ impl BoolExt for bool {
 impl Config {
     fn as_highlight_style(&self) -> ratatui::style::Style {
         Style::default()
-            .fg(self.ui.highlight_colors.fg)
-            .bg(self.ui.highlight_colors.bg)
-            .bold()
+            .fg(self.ui.highlight_style.fg_color)
+            .bg(self.ui.highlight_style.bg_color)
+            .add_modifier(self.ui.highlight_style.modifiers)
     }
 
     fn as_highlight_border_style(&self) -> ratatui::style::Style {
-        tracing::debug!("Highlight border style: {:?}", self.ui.highlight_border_colors);
+        tracing::debug!("Highlight border style: {:?}", self.ui.highlight_border_style);
         Style::default()
-            .fg(self.ui.highlight_border_colors.fg)
-            .bg(self.ui.highlight_border_colors.bg)
+            .fg(self.ui.highlight_border_style.fg_color)
+            .bg(self.ui.highlight_border_style.bg_color)
+            .add_modifier(self.ui.highlight_border_style.modifiers)
     }
 
     fn as_border_style(&self) -> ratatui::style::Style {
         Style::default().fg(self.ui.borders_color)
+        // .add_modifier(self.ui.borders_color.modifiers.unwrap_or(Modifier::empty()))
+    }
+
+    fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {
+        let progress_bar_colors = &self.ui.progress_bar;
+        widgets::progress_bar::ProgressBar::default()
+            .thumb_style(
+                Style::default()
+                    .fg(progress_bar_colors.thumb_style.fg_color)
+                    .bg(progress_bar_colors.thumb_style.bg_color),
+            )
+            .track_style(
+                Style::default()
+                    .fg(progress_bar_colors.track_style.fg_color)
+                    .bg(progress_bar_colors.track_style.bg_color),
+            )
+            .elapsed_style(
+                Style::default()
+                    .fg(progress_bar_colors.elapsed_style.fg_color)
+                    .bg(progress_bar_colors.elapsed_style.bg_color),
+            )
+            .elapsed_char(self.ui.progress_bar.symbols[0])
+            .thumb_char(self.ui.progress_bar.symbols[1])
+            .track_char(self.ui.progress_bar.symbols[2])
     }
 
     fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
@@ -649,23 +654,27 @@ impl Config {
             .end_symbol(Some(self.ui.scrollbar.symbols[3]))
             .track_style(
                 Style::default()
-                    .fg(self.ui.scrollbar.track_colors.fg)
-                    .bg(self.ui.scrollbar.track_colors.bg),
+                    .fg(self.ui.scrollbar.track_style.fg_color)
+                    .bg(self.ui.scrollbar.track_style.bg_color)
+                    .add_modifier(self.ui.scrollbar.track_style.modifiers),
             )
             .begin_style(
                 Style::default()
-                    .fg(self.ui.scrollbar.ends_colors.fg)
-                    .bg(self.ui.scrollbar.ends_colors.bg),
+                    .fg(self.ui.scrollbar.ends_style.fg_color)
+                    .bg(self.ui.scrollbar.ends_style.bg_color)
+                    .add_modifier(self.ui.scrollbar.ends_style.modifiers),
             )
             .end_style(
                 Style::default()
-                    .fg(self.ui.scrollbar.ends_colors.fg)
-                    .bg(self.ui.scrollbar.ends_colors.bg),
+                    .fg(self.ui.scrollbar.ends_style.fg_color)
+                    .bg(self.ui.scrollbar.ends_style.bg_color)
+                    .add_modifier(self.ui.scrollbar.ends_style.modifiers),
             )
             .thumb_style(
                 Style::default()
-                    .fg(self.ui.scrollbar.thumb_colors.fg)
-                    .bg(self.ui.scrollbar.thumb_colors.bg),
+                    .fg(self.ui.scrollbar.thumb_style.fg_color)
+                    .bg(self.ui.scrollbar.thumb_style.bg_color)
+                    .add_modifier(self.ui.scrollbar.thumb_style.modifiers),
             )
     }
 }

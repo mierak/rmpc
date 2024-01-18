@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
+use bitflags::bitflags;
 use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
 
 pub(super) trait FgBgColorsExt {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<FgBgColors>;
+    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<Style>;
 }
 
 pub(super) struct StringColor(pub Option<String>);
@@ -14,47 +15,69 @@ impl StringColor {
     }
 }
 
+// TODO rename to style
 #[derive(Debug, PartialEq, Eq)]
-pub struct FgBgColors {
-    pub fg: RColor,
-    pub bg: RColor,
+pub struct Style {
+    pub fg_color: RColor,
+    pub bg_color: RColor,
+    pub modifiers: ratatui::style::Modifier,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct FgBgColorsFile {
-    pub(super) fg: Option<String>,
-    pub(super) bg: Option<String>,
+pub struct StyleFile {
+    pub(super) fg_color: Option<String>,
+    pub(super) bg_color: Option<String>,
+    pub(super) modifiers: Option<Modifiers>,
 }
 
 #[allow(clippy::similar_names)]
-impl FgBgColorsExt for FgBgColorsFile {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<FgBgColors> {
-        let fg: Option<ConfigColor> = self.fg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+impl FgBgColorsExt for StyleFile {
+    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<Style> {
+        let fg: Option<ConfigColor> = self.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
         let fg: RColor = fg.map_or(default_fg, Into::into);
 
-        let bg: Option<ConfigColor> = self.bg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+        let bg: Option<ConfigColor> = self.bg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
         let bg: RColor = bg.map_or(default_bg, Into::into);
 
-        Ok(FgBgColors { fg, bg })
+        let modifiers = self
+            .modifiers
+            .as_ref()
+            .map_or(ratatui::style::Modifier::empty(), Into::into);
+
+        Ok(Style {
+            fg_color: fg,
+            bg_color: bg,
+            modifiers,
+        })
     }
 }
 
 #[allow(clippy::similar_names)]
-impl FgBgColorsExt for Option<FgBgColorsFile> {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<FgBgColors> {
+impl FgBgColorsExt for Option<StyleFile> {
+    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<Style> {
         match self {
             Some(val) => {
-                let fg: Option<ConfigColor> = val.fg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+                let fg: Option<ConfigColor> = val.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
                 let fg: RColor = fg.map_or(default_fg, Into::into);
 
-                let bg: Option<ConfigColor> = val.bg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+                let bg: Option<ConfigColor> = val.bg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
                 let bg: RColor = bg.map_or(default_bg, Into::into);
 
-                Ok(FgBgColors { fg, bg })
+                let modifiers = val
+                    .modifiers
+                    .as_ref()
+                    .map_or(ratatui::style::Modifier::empty(), Into::into);
+
+                Ok(Style {
+                    fg_color: fg,
+                    bg_color: bg,
+                    modifiers,
+                })
             }
-            None => Ok(FgBgColors {
-                fg: default_fg,
-                bg: default_bg,
+            None => Ok(Style {
+                fg_color: default_fg,
+                bg_color: default_bg,
+                modifiers: ratatui::style::Modifier::empty(),
             }),
         }
     }
@@ -122,6 +145,30 @@ impl TryFrom<&[u8]> for crate::config::ConfigColor {
     }
 }
 
+bitflags! {
+    #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct Modifiers: u16 {
+        const Bold       = 0b0000_0000_0001;
+        const Dim        = 0b0000_0000_0010;
+        const Italic     = 0b0000_0000_0100;
+        const Underlined = 0b0000_0000_1000;
+        const Reversed   = 0b0000_0100_0000;
+        const CrossedOut = 0b0001_0000_0000;
+    }
+}
+
+impl From<Modifiers> for ratatui::style::Modifier {
+    fn from(value: Modifiers) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&Modifiers> for ratatui::style::Modifier {
+    fn from(value: &Modifiers) -> Self {
+        Self::from_bits_retain(value.bits())
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ConfigColor {
     Reset,
@@ -175,7 +222,9 @@ impl From<crate::config::ConfigColor> for RColor {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::config::ConfigColor;
+    use crate::config::{ui::color::Modifiers, ConfigColor};
+    use ratatui::style::Modifier as RM;
+    use test_case::test_case;
 
     #[test]
     #[rustfmt::skip]
@@ -240,5 +289,31 @@ mod tests {
         let input: &[u8] = b"256";
         let result = ConfigColor::try_from(input);
         assert!(result.is_err());
+    }
+
+    #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
+    #[test_case(Modifiers::Dim,        RM::DIM; "dim")]
+    #[test_case(Modifiers::Italic,     RM::ITALIC; "italic")]
+    #[test_case(Modifiers::Underlined, RM::UNDERLINED; "underlined")]
+    #[test_case(Modifiers::Reversed,   RM::REVERSED; "reversed")]
+    #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
+    fn single_modifiers(input: Modifiers, expected: RM) {
+        let result: RM = input.into();
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn modifiers_group1() {
+        let result: RM = (Modifiers::Bold | Modifiers::Dim | Modifiers::Italic).into();
+
+        assert_eq!(result, RM::BOLD | RM::DIM | RM::ITALIC);
+    }
+
+    #[test]
+    fn modifiers_group2() {
+        let result: RM = (Modifiers::Underlined | Modifiers::Reversed | Modifiers::CrossedOut).into();
+
+        assert_eq!(result, RM::UNDERLINED | RM::REVERSED | RM::CROSSED_OUT);
     }
 }
