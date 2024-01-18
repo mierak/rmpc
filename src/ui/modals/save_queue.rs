@@ -63,7 +63,7 @@ impl Modal for SaveQueueModal {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(if self.input_focused {
-                        app.config.as_highlight_border_style()
+                        app.config.ui.highlight_border_style
                     } else {
                         app.config.as_border_style()
                     }),

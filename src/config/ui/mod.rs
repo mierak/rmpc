@@ -1,10 +1,10 @@
 use anyhow::Result;
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
 use self::{
-    color::{FgBgColorsExt, StringColor},
+    color::{FgBgColorsExt, Modifiers, StringColor},
     progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
     queue_table::{QueueTableColumns, QueueTableColumnsFile, SongTableColumn},
     scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
@@ -17,7 +17,7 @@ mod progress_bar;
 mod queue_table;
 mod scrollbar;
 
-pub use color::{ConfigColor, Style, StyleFile};
+pub use color::{ConfigColor, StyleFile};
 
 #[derive(Debug)]
 pub struct UiConfig {
@@ -28,6 +28,8 @@ pub struct UiConfig {
     pub current_song_color: Color,
     pub highlight_style: Style,
     pub highlight_border_style: Style,
+    pub active_tab_style: Style,
+    pub inactive_tab_style: Style,
     pub column_widths: [u16; 3],
     pub symbols: SymbolsConfig,
     pub volume_color: Color,
@@ -49,6 +51,8 @@ pub struct UiConfigFile {
     pub(super) browser_column_widths: Vec<u16>,
     pub(super) background_color: Option<String>,
     pub(super) background_color_modal: Option<String>,
+    pub(super) active_tab_style: Option<StyleFile>,
+    pub(super) inactive_tab_style: Option<StyleFile>,
     pub(super) borders_color: Option<String>,
     pub(super) current_song_color: Option<String>,
     pub(super) highlight_style: Option<StyleFile>,
@@ -73,7 +77,17 @@ impl Default for UiConfigFile {
                 modifiers: None,
             }),
             highlight_border_style: Some(StyleFile {
-                fg_color: Some("red".to_string()),
+                fg_color: Some("blue".to_string()),
+                bg_color: None,
+                modifiers: None,
+            }),
+            active_tab_style: Some(StyleFile {
+                fg_color: Some("black".to_string()),
+                bg_color: Some("blue".to_string()),
+                modifiers: Some(Modifiers::Bold),
+            }),
+            inactive_tab_style: Some(StyleFile {
+                fg_color: None,
                 bg_color: None,
                 modifiers: None,
             }),
@@ -165,6 +179,8 @@ impl TryFrom<UiConfigFile> for UiConfig {
             status_color: StringColor(value.status_color).to_color()?.unwrap_or(Color::Yellow),
             highlight_style: value.highlight_style.to_config_or(Color::Black, Color::Blue)?,
             highlight_border_style: value.highlight_border_style.to_config_or(Color::Red, Color::Reset)?,
+            active_tab_style: value.active_tab_style.to_config_or(Color::Black, Color::Blue)?,
+            inactive_tab_style: value.inactive_tab_style.to_config_or(Color::Reset, Color::Reset)?,
             disable_images: value.disable_images,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,

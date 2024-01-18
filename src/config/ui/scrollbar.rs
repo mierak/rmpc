@@ -1,8 +1,8 @@
 use anyhow::Result;
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 
-use super::{color::FgBgColorsExt, Style, StyleFile};
+use super::{color::FgBgColorsExt, StyleFile};
 
 #[derive(Debug)]
 pub struct ScrollbarConfig {
@@ -91,11 +91,11 @@ mod tests {
         assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned()]);
     }
 
-    #[test_case(None,         None,         Style { fg_color: RC::Blue, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::Blue, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,  bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan, bg_color: RC::Reset, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), Style { fg_color: RC::Blue, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::Blue).bg(RC::Reset)  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue).bg(RC::Reset)  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Reset)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style::default().fg(RC::Blue).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
         let input = ScrollbarConfigFile {
@@ -130,11 +130,11 @@ mod tests {
         assert_eq!(result.thumb_style, expected);
     }
 
-    #[test_case(None,         None,         Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,      bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan,     bg_color: RC::Reset, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), Style { fg_color: RC::DarkGray, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Reset)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style::default().fg(RC::DarkGray).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn ends_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
         let input = ScrollbarConfigFile {
@@ -169,11 +169,11 @@ mod tests {
         assert_eq!(result.ends_style, expected);
     }
 
-    #[test_case(None,         None,         Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style { fg_color: RC::DarkGray, bg_color: RC::Reset, modifiers: RM::default() }  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style { fg_color: RC::Red,      bg_color: RC::Blue, modifiers: RM::default() }   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style { fg_color: RC::Cyan,     bg_color: RC::Reset, modifiers: RM::default() }  ; "correctly maps when only fg is provided")]
-    #[test_case(None,         Some("gray"), Style { fg_color: RC::DarkGray, bg_color: RC::Gray, modifiers: RM::default() }   ; "correctly maps when only bg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Reset)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         Some("gray"), Style::default().fg(RC::DarkGray).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
         let input = ScrollbarConfigFile {
@@ -226,7 +226,10 @@ mod tests {
 
         let result = input.into_config(RC::Blue).unwrap();
 
-        assert_eq!(result.thumb_style.modifiers, expected);
+        assert_eq!(
+            result.thumb_style.add_modifier,
+            Style::default().add_modifier(expected).add_modifier
+        );
     }
 
     #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
@@ -247,7 +250,10 @@ mod tests {
 
         let result = input.into_config(RC::Blue).unwrap();
 
-        assert_eq!(result.ends_style.modifiers, expected);
+        assert_eq!(
+            result.ends_style.add_modifier,
+            Style::default().add_modifier(expected).add_modifier
+        );
     }
 
     #[test_case(Modifiers::Bold,       RM::BOLD; "bold")]
@@ -268,6 +274,9 @@ mod tests {
 
         let result = input.into_config(RC::Blue).unwrap();
 
-        assert_eq!(result.track_style.modifiers, expected);
+        assert_eq!(
+            result.track_style.add_modifier,
+            Style::default().add_modifier(expected).add_modifier
+        );
     }
 }

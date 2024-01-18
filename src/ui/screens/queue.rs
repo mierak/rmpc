@@ -151,7 +151,7 @@ impl Screen for QueueScreen {
                 }
                 b
             })
-            .highlight_style(app.config.as_highlight_style());
+            .highlight_style(app.config.ui.highlight_style);
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 

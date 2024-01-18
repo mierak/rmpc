@@ -4,7 +4,7 @@ use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
 
 pub(super) trait FgBgColorsExt {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<Style>;
+    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<ratatui::style::Style>;
 }
 
 pub(super) struct StringColor(pub Option<String>);
@@ -13,14 +13,6 @@ impl StringColor {
         let fg: Option<ConfigColor> = self.0.as_ref().map(|v| v.as_bytes().try_into()).transpose()?;
         Ok(fg.map(std::convert::Into::into))
     }
-}
-
-// TODO rename to style
-#[derive(Debug, PartialEq, Eq)]
-pub struct Style {
-    pub fg_color: RColor,
-    pub bg_color: RColor,
-    pub modifiers: ratatui::style::Modifier,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,7 +24,7 @@ pub struct StyleFile {
 
 #[allow(clippy::similar_names)]
 impl FgBgColorsExt for StyleFile {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<Style> {
+    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<ratatui::style::Style> {
         let fg: Option<ConfigColor> = self.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
         let fg: RColor = fg.map_or(default_fg, Into::into);
 
@@ -44,17 +36,13 @@ impl FgBgColorsExt for StyleFile {
             .as_ref()
             .map_or(ratatui::style::Modifier::empty(), Into::into);
 
-        Ok(Style {
-            fg_color: fg,
-            bg_color: bg,
-            modifiers,
-        })
+        Ok(ratatui::style::Style::default().fg(fg).bg(bg).add_modifier(modifiers))
     }
 }
 
 #[allow(clippy::similar_names)]
 impl FgBgColorsExt for Option<StyleFile> {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<Style> {
+    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<ratatui::style::Style> {
         match self {
             Some(val) => {
                 let fg: Option<ConfigColor> = val.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
@@ -68,17 +56,9 @@ impl FgBgColorsExt for Option<StyleFile> {
                     .as_ref()
                     .map_or(ratatui::style::Modifier::empty(), Into::into);
 
-                Ok(Style {
-                    fg_color: fg,
-                    bg_color: bg,
-                    modifiers,
-                })
+                Ok(ratatui::style::Style::default().fg(fg).bg(bg).add_modifier(modifiers))
             }
-            None => Ok(Style {
-                fg_color: default_fg,
-                bg_color: default_bg,
-                modifiers: ratatui::style::Modifier::empty(),
-            }),
+            None => Ok(ratatui::style::Style::default().fg(default_fg).bg(default_bg)),
         }
     }
 }

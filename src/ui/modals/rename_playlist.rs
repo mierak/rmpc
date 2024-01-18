@@ -69,11 +69,13 @@ impl Modal for RenamePlaylistModal {
             .title("Rename playlist");
         let input = Paragraph::new(self.new_name.clone())
             .block(
-                Block::default().borders(Borders::ALL).border_style(
-                    app.config
-                        .as_border_style()
-                        .fg(if self.input_focused { Color::Blue } else { Color::White }),
-                ),
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(if self.input_focused {
+                        app.config.ui.highlight_border_style
+                    } else {
+                        app.config.as_border_style()
+                    }),
             )
             .fg(Color::White)
             .wrap(Wrap { trim: true });

@@ -246,7 +246,8 @@ impl Ui<'_> {
             )
             .divider("")
             .block(ratatui::widgets::Block::default().borders(Borders::TOP).border_style(app.config.as_border_style()))
-            .highlight_style(app.config.as_highlight_style());
+            .style(app.config.ui.inactive_tab_style)
+            .highlight_style(app.config.ui.active_tab_style);
 
         // right
         let volume = crate::ui::widgets::volume::Volume::default()
@@ -602,44 +603,16 @@ impl BoolExt for bool {
 }
 
 impl Config {
-    fn as_highlight_style(&self) -> ratatui::style::Style {
-        Style::default()
-            .fg(self.ui.highlight_style.fg_color)
-            .bg(self.ui.highlight_style.bg_color)
-            .add_modifier(self.ui.highlight_style.modifiers)
-    }
-
-    fn as_highlight_border_style(&self) -> ratatui::style::Style {
-        tracing::debug!("Highlight border style: {:?}", self.ui.highlight_border_style);
-        Style::default()
-            .fg(self.ui.highlight_border_style.fg_color)
-            .bg(self.ui.highlight_border_style.bg_color)
-            .add_modifier(self.ui.highlight_border_style.modifiers)
-    }
-
     fn as_border_style(&self) -> ratatui::style::Style {
         Style::default().fg(self.ui.borders_color)
-        // .add_modifier(self.ui.borders_color.modifiers.unwrap_or(Modifier::empty()))
     }
 
     fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {
         let progress_bar_colors = &self.ui.progress_bar;
         widgets::progress_bar::ProgressBar::default()
-            .thumb_style(
-                Style::default()
-                    .fg(progress_bar_colors.thumb_style.fg_color)
-                    .bg(progress_bar_colors.thumb_style.bg_color),
-            )
-            .track_style(
-                Style::default()
-                    .fg(progress_bar_colors.track_style.fg_color)
-                    .bg(progress_bar_colors.track_style.bg_color),
-            )
-            .elapsed_style(
-                Style::default()
-                    .fg(progress_bar_colors.elapsed_style.fg_color)
-                    .bg(progress_bar_colors.elapsed_style.bg_color),
-            )
+            .thumb_style(progress_bar_colors.thumb_style)
+            .track_style(progress_bar_colors.track_style)
+            .elapsed_style(progress_bar_colors.elapsed_style)
             .elapsed_char(self.ui.progress_bar.symbols[0])
             .thumb_char(self.ui.progress_bar.symbols[1])
             .track_char(self.ui.progress_bar.symbols[2])
@@ -652,29 +625,9 @@ impl Config {
             .thumb_symbol(self.ui.scrollbar.symbols[1])
             .begin_symbol(Some(self.ui.scrollbar.symbols[2]))
             .end_symbol(Some(self.ui.scrollbar.symbols[3]))
-            .track_style(
-                Style::default()
-                    .fg(self.ui.scrollbar.track_style.fg_color)
-                    .bg(self.ui.scrollbar.track_style.bg_color)
-                    .add_modifier(self.ui.scrollbar.track_style.modifiers),
-            )
-            .begin_style(
-                Style::default()
-                    .fg(self.ui.scrollbar.ends_style.fg_color)
-                    .bg(self.ui.scrollbar.ends_style.bg_color)
-                    .add_modifier(self.ui.scrollbar.ends_style.modifiers),
-            )
-            .end_style(
-                Style::default()
-                    .fg(self.ui.scrollbar.ends_style.fg_color)
-                    .bg(self.ui.scrollbar.ends_style.bg_color)
-                    .add_modifier(self.ui.scrollbar.ends_style.modifiers),
-            )
-            .thumb_style(
-                Style::default()
-                    .fg(self.ui.scrollbar.thumb_style.fg_color)
-                    .bg(self.ui.scrollbar.thumb_style.bg_color)
-                    .add_modifier(self.ui.scrollbar.thumb_style.modifiers),
-            )
+            .track_style(self.ui.scrollbar.track_style)
+            .begin_style(self.ui.scrollbar.ends_style)
+            .end_style(self.ui.scrollbar.ends_style)
+            .thumb_style(self.ui.scrollbar.thumb_style)
     }
 }
