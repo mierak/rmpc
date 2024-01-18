@@ -604,7 +604,7 @@ impl BoolExt for bool {
 
 impl Config {
     fn as_border_style(&self) -> ratatui::style::Style {
-        Style::default().fg(self.ui.borders_color)
+        self.ui.borders_style
     }
 
     fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {

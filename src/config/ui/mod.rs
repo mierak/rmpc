@@ -24,7 +24,7 @@ pub struct UiConfig {
     pub disable_images: bool,
     pub background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
-    pub borders_color: Color,
+    pub borders_style: Style,
     pub current_song_color: Color,
     pub highlight_style: Style,
     pub highlight_border_style: Style,
@@ -53,7 +53,7 @@ pub struct UiConfigFile {
     pub(super) background_color_modal: Option<String>,
     pub(super) active_tab_style: Option<StyleFile>,
     pub(super) inactive_tab_style: Option<StyleFile>,
-    pub(super) borders_color: Option<String>,
+    pub(super) borders_style: Option<StyleFile>,
     pub(super) current_song_color: Option<String>,
     pub(super) highlight_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
@@ -69,7 +69,11 @@ impl Default for UiConfigFile {
             disable_images: false,
             background_color: None,
             background_color_modal: None,
-            borders_color: Some("blue".to_string()),
+            borders_style: Some(StyleFile {
+                fg_color: Some("blue".to_string()),
+                bg_color: None,
+                modifiers: None,
+            }),
             current_song_color: Some("blue".to_string()),
             highlight_style: Some(StyleFile {
                 fg_color: Some("black".to_string()),
@@ -168,23 +172,25 @@ impl TryFrom<UiConfigFile> for UiConfig {
     fn try_from(value: UiConfigFile) -> Result<Self, Self::Error> {
         let bg_color = StringColor(value.background_color).to_color()?;
         let modal_bg_color = StringColor(value.background_color_modal).to_color()?.or(bg_color);
-        let borders_color = StringColor(value.borders_color).to_color()?.unwrap_or(Color::White);
+        let fallback_border_fg = Color::White;
 
         Ok(Self {
             background_color: bg_color,
             background_color_modal: modal_bg_color,
-            borders_color,
+            borders_style: value.borders_style.to_config_or(fallback_border_fg, Color::Reset)?,
             current_song_color: StringColor(value.current_song_color).to_color()?.unwrap_or(Color::Red),
             volume_color: StringColor(value.volume_color).to_color()?.unwrap_or(Color::Blue),
             status_color: StringColor(value.status_color).to_color()?.unwrap_or(Color::Yellow),
             highlight_style: value.highlight_style.to_config_or(Color::Black, Color::Blue)?,
             highlight_border_style: value.highlight_border_style.to_config_or(Color::Red, Color::Reset)?,
             active_tab_style: value.active_tab_style.to_config_or(Color::Black, Color::Blue)?,
-            inactive_tab_style: value.inactive_tab_style.to_config_or(Color::Reset, Color::Reset)?,
+            inactive_tab_style: value
+                .inactive_tab_style
+                .to_config_or(Color::Reset, bg_color.unwrap_or(Color::Reset))?,
             disable_images: value.disable_images,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,
-            scrollbar: value.scrollbar.into_config(borders_color)?,
+            scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
             progress_bar: value.progress_bar.into_config()?,
             column_widths: [
                 value.browser_column_widths[0],
