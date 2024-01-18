@@ -22,9 +22,9 @@ use crate::{
 };
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Stylize},
+    style::Stylize,
     text::Line,
-    widgets::{Block, Borders, Row, Scrollbar, ScrollbarOrientation, Table, TableState},
+    widgets::{Block, Borders, Row, Table, TableState},
     Frame,
 };
 use tracing::error;
@@ -135,7 +135,7 @@ impl Screen for QueueScreen {
                 .block(
                     Block::default()
                         .borders(Borders::TOP)
-                        .border_style(Style::default().fg(app.config.ui.borders_color)),
+                        .border_style(app.config.as_border_style()),
                 );
             frame.render_widget(header_table, table_header_section);
         }
@@ -145,30 +145,20 @@ impl Screen for QueueScreen {
             .block({
                 let mut b = Block::default()
                     .borders(Borders::TOP | Borders::RIGHT)
-                    .border_style(Style::default().fg(app.config.ui.borders_color));
+                    .border_style(app.config.as_border_style().bold());
                 if let Some(ref title) = title {
                     b = b.title(title.clone().blue());
                 }
                 b
             })
-            .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-
-        let scrollbar = Scrollbar::default()
-            .orientation(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("↑"))
-            .track_symbol(Some("│"))
-            .end_symbol(Some("↓"))
-            .track_style(Style::default().fg(Color::White).bg(Color::Black))
-            .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-            .end_style(Style::default().fg(Color::White).bg(Color::Black))
-            .thumb_style(Style::default().fg(Color::Blue));
+            .highlight_style(app.config.as_highlight_style());
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 
         queue_section.y = queue_section.y.saturating_add(1);
         queue_section.height = queue_section.height.saturating_sub(1);
         frame.render_stateful_widget(
-            scrollbar,
+            app.config.as_styled_scrollbar(),
             queue_section.inner(&ratatui::prelude::Margin {
                 vertical: 0,
                 horizontal: 0,
@@ -180,7 +170,7 @@ impl Screen for QueueScreen {
                 KittyImage::default().block(
                     Block::default()
                         .borders(Borders::TOP)
-                        .border_style(Style::default().fg(app.config.ui.borders_color)),
+                        .border_style(app.config.as_border_style()),
                 ),
                 img_section,
                 &mut self.img_state,

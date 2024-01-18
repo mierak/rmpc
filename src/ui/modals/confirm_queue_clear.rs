@@ -34,7 +34,7 @@ impl Modal for ConfirmQueueClearModal {
     ) -> Result<()> {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(app.config.ui.borders_color))
+            .border_style(app.config.as_border_style())
             .title("Clear the queue?");
         let text = Paragraph::new("Are you sure you want to clear the queue?").wrap(Wrap { trim: true });
 

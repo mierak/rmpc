@@ -17,7 +17,7 @@ use super::{browser::DirOrSong, BrowserScreen, Screen};
 use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
-use ratatui::{prelude::Rect, style::Style, widgets::ListItem, Frame};
+use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
 use tracing::instrument;
 
@@ -37,9 +37,9 @@ impl Screen for ArtistsScreen {
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         frame.render_stateful_widget(
-            Browser::new(&app.config.ui.symbols)
+            Browser::new(app.config)
                 .set_widths(&app.config.ui.column_widths)
-                .set_border_style(Style::default().fg(app.config.ui.borders_color)),
+                .set_border_style(app.config.as_border_style()),
             area,
             &mut self.stack,
         );

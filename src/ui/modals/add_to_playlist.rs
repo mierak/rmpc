@@ -1,9 +1,9 @@
 use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
-    style::{Color, Style, Stylize},
+    style::{Style, Stylize},
     symbols,
-    widgets::{Block, Borders, Clear, List, ListState, Scrollbar, ScrollbarOrientation},
+    widgets::{Block, Borders, Clear, List, ListState},
 };
 
 use crate::{
@@ -65,7 +65,6 @@ impl Modal for AddToPlaylistModal {
         app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let active_highlight_style = Style::default().bg(Color::Blue).fg(Color::Black).bold();
         let popup_area = frame.size().centered_exact(35, 15);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.ui.background_color_modal {
@@ -93,24 +92,14 @@ impl Modal for AddToPlaylistModal {
         )
         .highlight_style(match self.focused {
             FocusedComponent::Buttons => Style::default().reversed(),
-            FocusedComponent::Playlists => active_highlight_style,
+            FocusedComponent::Playlists => app.config.as_highlight_style(),
         })
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-                .border_style(Style::default().fg(app.config.ui.borders_color))
+                .border_style(app.config.as_border_style())
                 .title("Select a playlist"),
         );
-
-        let scrollbar = Scrollbar::default()
-            .orientation(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("↑"))
-            .track_symbol(Some("│"))
-            .end_symbol(Some("↓"))
-            .track_style(Style::default().fg(Color::White).bg(Color::Black))
-            .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-            .end_style(Style::default().fg(Color::White).bg(Color::Black))
-            .thumb_style(Style::default().fg(Color::Blue));
 
         let buttons = vec![Button::default().label("Add"), Button::default().label("Cancel")];
         self.button_group.set_button_count(buttons.len());
@@ -118,20 +107,20 @@ impl Modal for AddToPlaylistModal {
             .buttons(buttons)
             .active_style(match self.focused {
                 FocusedComponent::Playlists => Style::default().reversed(),
-                FocusedComponent::Buttons => active_highlight_style,
+                FocusedComponent::Buttons => app.config.as_highlight_style(),
             })
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(Style::default().fg(app.config.ui.borders_color)),
+                    .border_style(app.config.as_border_style()),
             );
 
         frame.render_stateful_widget(playlists, list_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
-            scrollbar,
+            app.config.as_styled_scrollbar(),
             list_area.inner(&Margin {
-                vertical: 1,
+                vertical: 0,
                 horizontal: 0,
             }),
             self.scrolling_state.as_scrollbar_state_ref(),

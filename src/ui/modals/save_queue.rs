@@ -55,15 +55,18 @@ impl Modal for SaveQueueModal {
     ) -> Result<()> {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(app.config.ui.borders_color))
+            .border_style(app.config.as_border_style())
             .title("Save queue as playlist");
         let text = Paragraph::new("Playlist name:").wrap(Wrap { trim: true });
         let input = Paragraph::new(self.name.clone())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(app.config.ui.borders_color))
-                    .fg(if self.input_focused { Color::Blue } else { Color::White }),
+                    .border_style(if self.input_focused {
+                        app.config.as_highlight_border_style()
+                    } else {
+                        app.config.as_border_style()
+                    }),
             )
             .fg(Color::White)
             .wrap(Wrap { trim: true });

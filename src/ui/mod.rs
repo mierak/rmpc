@@ -338,30 +338,22 @@ impl Ui<'_> {
             .style(Style::default().fg(level.to_color()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
         } else if app.config.status_update_interval_ms.is_some() {
+            let progress_bar_colors = &app.config.ui.progress_bar;
             let elapsed_bar = ProgressBar::default()
                 .thumb_style(
-                    Style::default().fg(app.config.ui.progress_bar.thumb_colors.0).bg(app
-                        .config
-                        .ui
-                        .progress_bar
-                        .thumb_colors
-                        .1),
+                    Style::default()
+                        .fg(progress_bar_colors.thumb_colors.fg)
+                        .bg(progress_bar_colors.thumb_colors.bg),
                 )
                 .track_style(
-                    Style::default().fg(app.config.ui.progress_bar.track_colors.0).bg(app
-                        .config
-                        .ui
-                        .progress_bar
-                        .track_colors
-                        .1),
+                    Style::default()
+                        .fg(progress_bar_colors.track_colors.fg)
+                        .bg(progress_bar_colors.track_colors.bg),
                 )
                 .elapsed_style(
-                    Style::default().fg(app.config.ui.progress_bar.elapsed_colors.0).bg(app
-                        .config
-                        .ui
-                        .progress_bar
-                        .elapsed_colors
-                        .1),
+                    Style::default()
+                        .fg(progress_bar_colors.elapsed_colors.fg)
+                        .bg(progress_bar_colors.elapsed_colors.bg),
                 )
                 .elapsed_char(app.config.ui.progress_bar.symbols[0])
                 .thumb_char(app.config.ui.progress_bar.symbols[1])
@@ -626,5 +618,54 @@ impl BoolExt for bool {
         } else {
             "Off"
         }
+    }
+}
+
+impl Config {
+    fn as_highlight_style(&self) -> ratatui::style::Style {
+        Style::default()
+            .fg(self.ui.highlight_colors.fg)
+            .bg(self.ui.highlight_colors.bg)
+            .bold()
+    }
+
+    fn as_highlight_border_style(&self) -> ratatui::style::Style {
+        tracing::debug!("Highlight border style: {:?}", self.ui.highlight_border_colors);
+        Style::default()
+            .fg(self.ui.highlight_border_colors.fg)
+            .bg(self.ui.highlight_border_colors.bg)
+    }
+
+    fn as_border_style(&self) -> ratatui::style::Style {
+        Style::default().fg(self.ui.borders_color)
+    }
+
+    fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
+        ratatui::widgets::Scrollbar::default()
+            .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+            .track_symbol(Some(self.ui.scrollbar.symbols[0]))
+            .thumb_symbol(self.ui.scrollbar.symbols[1])
+            .begin_symbol(Some(self.ui.scrollbar.symbols[2]))
+            .end_symbol(Some(self.ui.scrollbar.symbols[3]))
+            .track_style(
+                Style::default()
+                    .fg(self.ui.scrollbar.track_colors.fg)
+                    .bg(self.ui.scrollbar.track_colors.bg),
+            )
+            .begin_style(
+                Style::default()
+                    .fg(self.ui.scrollbar.ends_colors.fg)
+                    .bg(self.ui.scrollbar.ends_colors.bg),
+            )
+            .end_style(
+                Style::default()
+                    .fg(self.ui.scrollbar.ends_colors.fg)
+                    .bg(self.ui.scrollbar.ends_colors.bg),
+            )
+            .thumb_style(
+                Style::default()
+                    .fg(self.ui.scrollbar.thumb_colors.fg)
+                    .bg(self.ui.scrollbar.thumb_colors.bg),
+            )
     }
 }

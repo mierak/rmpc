@@ -35,7 +35,6 @@ pub(super) trait Modal {
         _shared_state: &mut SharedUiState,
     ) -> Result<()>;
 
-    // todo global modal keys (esc, ctrl c)
     fn handle_key(
         &mut self,
         key: KeyEvent,

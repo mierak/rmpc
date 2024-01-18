@@ -1,24 +1,24 @@
 use itertools::Itertools;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, Scrollbar, ScrollbarOrientation, StatefulWidget};
+use ratatui::widgets::{Block, Borders, List, StatefulWidget};
 
-use crate::config::SymbolsConfig;
+use crate::config::Config;
 use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
 
 #[derive(Debug)]
 pub struct Browser<'a, T: std::fmt::Debug + DirStackItem> {
     state_type_marker: std::marker::PhantomData<T>,
     widths: &'a [u16; 3],
-    symbols: &'a SymbolsConfig,
+    config: &'a Config,
     border_style: Style,
 }
 
 impl<'a, T: std::fmt::Debug + DirStackItem> Browser<'a, T> {
-    pub fn new(symbols: &'a SymbolsConfig) -> Self {
+    pub fn new(config: &'a Config) -> Self {
         Self {
             state_type_marker: std::marker::PhantomData,
             widths: &[20, 38, 42],
-            symbols,
+            config,
             border_style: Style::default(),
         }
     }
@@ -62,14 +62,14 @@ where
             .items
             .iter()
             .enumerate()
-            .map(|(idx, v)| v.to_list_item(self.symbols, state.previous().marked().contains(&idx)))
+            .map(|(idx, v)| v.to_list_item(&self.config.ui.symbols, state.previous().marked().contains(&idx)))
             .collect_vec();
         let current = state
             .current()
             .items
             .iter()
             .enumerate()
-            .map(|(idx, v)| v.to_list_item(self.symbols, state.current().marked().contains(&idx)))
+            .map(|(idx, v)| v.to_list_item(&self.config.ui.symbols, state.current().marked().contains(&idx)))
             .collect_vec();
         let preview = state.preview().cloned();
 
@@ -108,19 +108,10 @@ where
                         .border_set(LEFT_COLUMN_SYMBOLS),
                 )
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-            let previous_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("↑"))
-                .track_symbol(Some("│"))
-                .end_symbol(Some("↓"))
-                .track_style(Style::default().fg(Color::White).bg(Color::Black))
-                .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-                .end_style(Style::default().fg(Color::White).bg(Color::Black))
-                .thumb_style(Style::default().fg(Color::Blue));
 
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
-                previous_scrollbar,
+                self.config.as_styled_scrollbar(),
                 previous_area.inner(&scrollbar_margin),
                 buf,
                 prev_state.as_scrollbar_state_ref(),
@@ -144,19 +135,10 @@ where
                     b
                 })
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
-            let current_scrollbar = Scrollbar::default()
-                .orientation(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("↑"))
-                .track_symbol(Some("│"))
-                .end_symbol(Some("↓"))
-                .track_style(Style::default().fg(Color::White).bg(Color::Black))
-                .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-                .end_style(Style::default().fg(Color::White).bg(Color::Black))
-                .thumb_style(Style::default().fg(Color::Blue));
 
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
-                current_scrollbar,
+                self.config.as_styled_scrollbar(),
                 current_area.inner(&scrollbar_margin),
                 buf,
                 state.as_scrollbar_state_ref(),

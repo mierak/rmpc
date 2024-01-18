@@ -4,9 +4,9 @@ use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Modifier, Style},
     text::Span,
-    widgets::{Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation},
+    widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
 use strum::Display;
@@ -43,7 +43,7 @@ impl Screen for LogsScreen {
                 match l {
                     Ok(mut val) => {
                         if self.scrolling_state.get_selected().is_some_and(|v| v == idx) {
-                            val.patch_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+                            val.patch_style(app.config.as_highlight_style());
                         }
                         Ok(ListItem::new(val))
                     }
@@ -52,15 +52,7 @@ impl Screen for LogsScreen {
             })
             .try_collect()?;
 
-        let scrollbar = Scrollbar::default()
-            .orientation(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("↑"))
-            .track_symbol(Some("│"))
-            .end_symbol(Some("↓"))
-            .track_style(Style::default().fg(Color::White).bg(Color::Black))
-            .begin_style(Style::default().fg(Color::White).bg(Color::Black))
-            .end_style(Style::default().fg(Color::White).bg(Color::Black))
-            .thumb_style(Style::default().fg(Color::Blue));
+        let scrollbar = app.config.as_styled_scrollbar();
 
         let [content, scroll] = *Layout::default()
             .direction(Direction::Horizontal)
@@ -77,8 +69,7 @@ impl Screen for LogsScreen {
         let logs_wg = List::new(lines).block(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(Style::default().fg(app.config.ui.borders_color))
-                .style(Style::default().fg(Color::Gray))
+                .border_style(app.config.as_border_style())
                 .title(Span::styled(
                     format!("Logs: {content_len}"),
                     Style::default().add_modifier(Modifier::BOLD),
