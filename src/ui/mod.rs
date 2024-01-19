@@ -231,6 +231,12 @@ impl Ui<'_> {
             return Ok(());
         };
 
+        if let Some(header_bg_color) = app.config.ui.header_background_color {
+            let mut rect = title_area;
+            rect.height += tabs_area.height;
+            frame.render_widget(Block::default().style(Style::default().bg(header_bg_color)), rect);
+        }
+
         let tab_names = screens::Screens::VARIANTS
             .iter()
             .map(|e| format!("{: ^13}", format!("{e}")))

@@ -71,7 +71,7 @@ impl Screen for LogsScreen {
                 .borders(Borders::TOP)
                 .border_style(app.config.as_border_style())
                 .title(Span::styled(
-                    format!("Logs: {content_len}"),
+                    format!("Logs: {content_len} "),
                     Style::default().add_modifier(Modifier::BOLD),
                 )),
         );

@@ -23,6 +23,7 @@ pub use color::{ConfigColor, StyleFile};
 pub struct UiConfig {
     pub disable_images: bool,
     pub background_color: Option<Color>,
+    pub header_background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
     pub borders_style: Style,
     pub current_song_color: Color,
@@ -50,6 +51,7 @@ pub struct UiConfigFile {
     #[serde(default = "defaults::default_column_widths")]
     pub(super) browser_column_widths: Vec<u16>,
     pub(super) background_color: Option<String>,
+    pub(super) header_background_color: Option<String>,
     pub(super) background_color_modal: Option<String>,
     pub(super) active_tab_style: Option<StyleFile>,
     pub(super) inactive_tab_style: Option<StyleFile>,
@@ -68,6 +70,7 @@ impl Default for UiConfigFile {
         Self {
             disable_images: false,
             background_color: None,
+            header_background_color: None,
             background_color_modal: None,
             borders_style: Some(StyleFile {
                 fg_color: Some("blue".to_string()),
@@ -78,7 +81,7 @@ impl Default for UiConfigFile {
             highlight_style: Some(StyleFile {
                 fg_color: Some("black".to_string()),
                 bg_color: Some("blue".to_string()),
-                modifiers: None,
+                modifiers: Some(Modifiers::Bold),
             }),
             highlight_border_style: Some(StyleFile {
                 fg_color: Some("blue".to_string()),
@@ -172,11 +175,13 @@ impl TryFrom<UiConfigFile> for UiConfig {
     fn try_from(value: UiConfigFile) -> Result<Self, Self::Error> {
         let bg_color = StringColor(value.background_color).to_color()?;
         let modal_bg_color = StringColor(value.background_color_modal).to_color()?.or(bg_color);
+        let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
         let fallback_border_fg = Color::White;
 
         Ok(Self {
             background_color: bg_color,
             background_color_modal: modal_bg_color,
+            header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             current_song_color: StringColor(value.current_song_color).to_color()?.unwrap_or(Color::Red),
             volume_color: StringColor(value.volume_color).to_color()?.unwrap_or(Color::Blue),
@@ -188,7 +193,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             active_tab_style: value
                 .active_tab_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-            inactive_tab_style: value.inactive_tab_style.to_config_or(None, bg_color)?,
+            inactive_tab_style: value.inactive_tab_style.to_config_or(None, header_bg_color)?,
             disable_images: value.disable_images,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,

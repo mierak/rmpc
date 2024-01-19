@@ -34,18 +34,18 @@ impl Default for ProgressBarConfigFile {
         Self {
             symbols: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
             track_style: Some(StyleFile {
-                fg_color: Some("black".to_string()),
-                bg_color: Some("default".to_string()),
+                fg_color: Some("#1e2030".to_string()),
+                bg_color: None,
                 modifiers: None,
             }),
             elapsed_style: Some(StyleFile {
                 fg_color: Some("blue".to_string()),
-                bg_color: Some("default".to_string()),
+                bg_color: None,
                 modifiers: None,
             }),
             thumb_style: Some(StyleFile {
                 fg_color: Some("blue".to_string()),
-                bg_color: Some("black".to_string()),
+                bg_color: Some("#1e2030".to_string()),
                 modifiers: None,
             }),
         }
