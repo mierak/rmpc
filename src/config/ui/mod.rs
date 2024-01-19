@@ -177,16 +177,18 @@ impl TryFrom<UiConfigFile> for UiConfig {
         Ok(Self {
             background_color: bg_color,
             background_color_modal: modal_bg_color,
-            borders_style: value.borders_style.to_config_or(fallback_border_fg, Color::Reset)?,
+            borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             current_song_color: StringColor(value.current_song_color).to_color()?.unwrap_or(Color::Red),
             volume_color: StringColor(value.volume_color).to_color()?.unwrap_or(Color::Blue),
             status_color: StringColor(value.status_color).to_color()?.unwrap_or(Color::Yellow),
-            highlight_style: value.highlight_style.to_config_or(Color::Black, Color::Blue)?,
-            highlight_border_style: value.highlight_border_style.to_config_or(Color::Red, Color::Reset)?,
-            active_tab_style: value.active_tab_style.to_config_or(Color::Black, Color::Blue)?,
-            inactive_tab_style: value
-                .inactive_tab_style
-                .to_config_or(Color::Reset, bg_color.unwrap_or(Color::Reset))?,
+            highlight_style: value
+                .highlight_style
+                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+            highlight_border_style: value.highlight_border_style.to_config_or(Some(Color::Blue), None)?,
+            active_tab_style: value
+                .active_tab_style
+                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+            inactive_tab_style: value.inactive_tab_style.to_config_or(None, bg_color)?,
             disable_images: value.disable_images,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,

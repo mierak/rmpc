@@ -65,9 +65,9 @@ impl ScrollbarConfigFile {
                 Box::leak(Box::new(sb_up)),
                 Box::leak(Box::new(sb_down)),
             ],
-            ends_style: self.ends_style.to_config_or(fallback_color, Color::Reset)?,
-            thumb_style: self.thumb_style.to_config_or(Color::Blue, Color::Reset)?,
-            track_style: self.track_style.to_config_or(fallback_color, Color::Reset)?,
+            ends_style: self.ends_style.to_config_or(Some(fallback_color), None)?,
+            thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
+            track_style: self.track_style.to_config_or(Some(fallback_color), None)?,
         })
     }
 }
@@ -91,10 +91,10 @@ mod tests {
         assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned()]);
     }
 
-    #[test_case(None,         None,         Style::default().fg(RC::Blue).bg(RC::Reset)  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue).bg(RC::Reset)  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Reset)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::Blue)                ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue)                ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)    ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan)                ; "correctly maps when only fg is provided")]
     #[test_case(None,         Some("gray"), Style::default().fg(RC::Blue).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
@@ -130,10 +130,10 @@ mod tests {
         assert_eq!(result.thumb_style, expected);
     }
 
-    #[test_case(None,         None,         Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Reset)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::DarkGray)                ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::DarkGray)                ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)        ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan)                    ; "correctly maps when only fg is provided")]
     #[test_case(None,         Some("gray"), Style::default().fg(RC::DarkGray).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn ends_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;
@@ -169,10 +169,10 @@ mod tests {
         assert_eq!(result.ends_style, expected);
     }
 
-    #[test_case(None,         None,         Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::DarkGray).bg(RC::Reset)  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Reset)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::DarkGray)                ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::DarkGray)                ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)        ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan)                    ; "correctly maps when only fg is provided")]
     #[test_case(None,         Some("gray"), Style::default().fg(RC::DarkGray).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let fallback = RC::DarkGray;

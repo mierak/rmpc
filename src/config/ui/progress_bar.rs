@@ -64,9 +64,9 @@ impl ProgressBarConfigFile {
                 Box::leak(Box::new(thumb)),
                 Box::leak(Box::new(track)),
             ],
-            elapsed_style: self.elapsed_style.to_config_or(Color::Blue, Color::Black)?,
-            thumb_style: self.thumb_style.to_config_or(Color::Blue, Color::Black)?,
-            track_style: self.track_style.to_config_or(Color::Black, Color::Black)?,
+            elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
+            thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
+            track_style: self.track_style.to_config_or(Some(Color::Black), None)?,
         })
     }
 }
@@ -90,10 +90,10 @@ mod tests {
         assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned()]);
     }
 
-    #[test_case(None,         None,         Style::default().fg(RC::Blue).bg(RC::Black)  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue).bg(RC::Black)  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Black)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::Blue)                ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue)                ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)    ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan)                ; "correctly maps when only fg is provided")]
     #[test_case(None,         Some("gray"), Style::default().fg(RC::Blue).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn elapsed_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let input = ProgressBarConfigFile {
@@ -128,10 +128,10 @@ mod tests {
         assert_eq!(result.elapsed_style, expected);
     }
 
-    #[test_case(None,         None,         Style::default().fg(RC::Black).bg(RC::Black)  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Black).bg(RC::Black)  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Black)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::Black)                ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Black)                ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)     ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan)                 ; "correctly maps when only fg is provided")]
     #[test_case(None,         Some("gray"), Style::default().fg(RC::Black).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn track_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let input = ProgressBarConfigFile {
@@ -166,10 +166,10 @@ mod tests {
         assert_eq!(result.track_style, expected);
     }
 
-    #[test_case(None,         None,         Style::default().fg(RC::Blue).bg(RC::Black)  ; "uses default colors")]
-    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue).bg(RC::Black)  ; "uses default colors when whole value is None")]
-    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)   ; "correctly maps provided colors")]
-    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan).bg(RC::Black)  ; "correctly maps when only fg is provided")]
+    #[test_case(None,         None,         Style::default().fg(RC::Blue)                ; "uses default colors")]
+    #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue)                ; "uses default colors when whole value is None")]
+    #[test_case(Some("red"),  Some("blue"), Style::default().fg(RC::Red).bg(RC::Blue)    ; "correctly maps provided colors")]
+    #[test_case(Some("cyan"), None,         Style::default().fg(RC::Cyan)                ; "correctly maps when only fg is provided")]
     #[test_case(None,         Some("gray"), Style::default().fg(RC::Blue).bg(RC::Gray)   ; "correctly maps when only bg is provided")]
     fn thumb_colors_test(c1: Option<&str>, c2: Option<&str>, expected: Style) {
         let input = ProgressBarConfigFile {

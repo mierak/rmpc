@@ -4,7 +4,7 @@ use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
 
 pub(super) trait FgBgColorsExt {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<ratatui::style::Style>;
+    fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style>;
 }
 
 pub(super) struct StringColor(pub Option<String>);
@@ -24,41 +24,65 @@ pub struct StyleFile {
 
 #[allow(clippy::similar_names)]
 impl FgBgColorsExt for StyleFile {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<ratatui::style::Style> {
+    fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style> {
         let fg: Option<ConfigColor> = self.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
-        let fg: RColor = fg.map_or(default_fg, Into::into);
+        let fg: Option<RColor> = fg.map(Into::into).or(default_fg);
 
         let bg: Option<ConfigColor> = self.bg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
-        let bg: RColor = bg.map_or(default_bg, Into::into);
+        let bg: Option<RColor> = bg.map(Into::into).or(default_bg);
 
         let modifiers = self
             .modifiers
             .as_ref()
             .map_or(ratatui::style::Modifier::empty(), Into::into);
 
-        Ok(ratatui::style::Style::default().fg(fg).bg(bg).add_modifier(modifiers))
+        let mut result = ratatui::style::Style::default();
+        if let Some(fg) = fg {
+            result = result.fg(fg);
+        }
+        if let Some(bg) = bg {
+            result = result.bg(bg);
+        }
+
+        Ok(result.add_modifier(modifiers))
     }
 }
 
 #[allow(clippy::similar_names)]
 impl FgBgColorsExt for Option<StyleFile> {
-    fn to_config_or(&self, default_fg: RColor, default_bg: RColor) -> Result<ratatui::style::Style> {
+    fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style> {
         match self {
             Some(val) => {
                 let fg: Option<ConfigColor> = val.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
-                let fg: RColor = fg.map_or(default_fg, Into::into);
+                let fg: Option<RColor> = fg.map(Into::into).or(default_fg);
 
                 let bg: Option<ConfigColor> = val.bg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
-                let bg: RColor = bg.map_or(default_bg, Into::into);
+                let bg: Option<RColor> = bg.map(Into::into).or(default_bg);
 
                 let modifiers = val
                     .modifiers
                     .as_ref()
                     .map_or(ratatui::style::Modifier::empty(), Into::into);
 
-                Ok(ratatui::style::Style::default().fg(fg).bg(bg).add_modifier(modifiers))
+                let mut result = ratatui::style::Style::default();
+                if let Some(fg) = fg {
+                    result = result.fg(fg);
+                }
+                if let Some(bg) = bg {
+                    result = result.bg(bg);
+                }
+                Ok(result.add_modifier(modifiers))
             }
-            None => Ok(ratatui::style::Style::default().fg(default_fg).bg(default_bg)),
+            None => {
+                let mut result = ratatui::style::Style::default();
+                if let Some(fg) = default_fg {
+                    result = result.fg(fg);
+                }
+                if let Some(bg) = default_bg {
+                    result = result.bg(bg);
+                }
+                Ok(result)
+            }
         }
     }
 }
