@@ -24,7 +24,7 @@ use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
     style::Stylize,
     text::Line,
-    widgets::{Block, Borders, Row, Table, TableState},
+    widgets::{Block, Borders, Padding, Row, Table, TableState},
     Frame,
 };
 use tracing::error;
@@ -87,7 +87,7 @@ impl Screen for QueueScreen {
             return Ok(());
         };
 
-        let header_height = if app.config.ui.show_song_table_header { 2 } else { 0 };
+        let header_height = u16::from(app.config.ui.show_song_table_header);
         let [table_header_section, mut queue_section] = *Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(header_height), Constraint::Percentage(100)].as_ref())
@@ -132,11 +132,7 @@ impl Screen for QueueScreen {
         if app.config.ui.show_song_table_header {
             let header_table = Table::new([], self.column_widths.clone())
                 .header(Row::new(self.header.iter().copied()))
-                .block(
-                    Block::default()
-                        .borders(Borders::TOP)
-                        .border_style(app.config.as_border_style()),
-                );
+                .block(app.config.as_header_table_block());
             frame.render_widget(header_table, table_header_section);
         }
 
@@ -144,7 +140,8 @@ impl Screen for QueueScreen {
         let table = Table::new(table_items, self.column_widths.clone())
             .block({
                 let mut b = Block::default()
-                    .borders(Borders::TOP | Borders::RIGHT)
+                    .borders(Borders::TOP)
+                    .padding(Padding::new(0, 1, 0, 0))
                     .border_style(app.config.as_border_style().bold());
                 if let Some(ref title) = title {
                     b = b.title(title.clone().blue());
@@ -167,11 +164,7 @@ impl Screen for QueueScreen {
         );
         if show_image {
             frame.render_stateful_widget(
-                KittyImage::default().block(
-                    Block::default()
-                        .borders(Borders::TOP)
-                        .border_style(app.config.as_border_style()),
-                ),
+                KittyImage::default().block(Block::default().border_style(app.config.as_border_style())),
                 img_section,
                 &mut self.img_state,
             );

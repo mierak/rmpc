@@ -68,7 +68,7 @@ impl FromMpd for Status {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum State {
     Play,
     #[default]
@@ -76,7 +76,7 @@ pub enum State {
     Pause,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum OnOffOneshot {
     On,
     #[default]
@@ -85,7 +85,7 @@ pub enum OnOffOneshot {
 }
 
 impl OnOffOneshot {
-    pub fn cycle(&self) -> Self {
+    pub fn cycle(self) -> Self {
         match self {
             OnOffOneshot::On => OnOffOneshot::Off,
             OnOffOneshot::Off => OnOffOneshot::Oneshot,
@@ -93,7 +93,7 @@ impl OnOffOneshot {
         }
     }
 
-    pub fn cycle_pre_mpd_24(&self) -> Self {
+    pub fn cycle_pre_mpd_24(self) -> Self {
         match self {
             OnOffOneshot::On => OnOffOneshot::Off,
             OnOffOneshot::Off => OnOffOneshot::On,
@@ -101,7 +101,7 @@ impl OnOffOneshot {
         }
     }
 
-    pub fn to_mpd_value(&self) -> &'static str {
+    pub fn to_mpd_value(self) -> &'static str {
         match self {
             OnOffOneshot::On => "1",
             OnOffOneshot::Off => "0",

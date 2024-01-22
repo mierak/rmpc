@@ -66,16 +66,7 @@ impl Screen for LogsScreen {
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(content.height.into()));
 
-        let logs_wg = List::new(lines).block(
-            Block::default()
-                .borders(Borders::TOP)
-                .border_style(app.config.as_border_style())
-                .title(Span::styled(
-                    format!("Logs: {content_len} "),
-                    Style::default().add_modifier(Modifier::BOLD),
-                )),
-        );
-
+        let logs_wg = List::new(lines);
         frame.render_stateful_widget(logs_wg, content, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             scrollbar,

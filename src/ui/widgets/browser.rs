@@ -90,7 +90,7 @@ where
 
         {
             let preview = List::new(preview.unwrap_or_default())
-                .block(Block::default().borders(Borders::TOP).border_style(self.border_style))
+                .block(Block::default().border_style(self.border_style))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
@@ -103,7 +103,7 @@ where
             let previous = List::new(previous)
                 .block(
                     Block::default()
-                        .borders(Borders::RIGHT | Borders::TOP)
+                        .borders(Borders::RIGHT)
                         .border_style(self.border_style)
                         .border_set(LEFT_COLUMN_SYMBOLS),
                 )
@@ -126,7 +126,7 @@ where
             let current = List::new(current)
                 .block({
                     let mut b = Block::default()
-                        .borders(Borders::TOP | Borders::RIGHT)
+                        .borders(Borders::RIGHT)
                         .border_style(self.border_style)
                         .border_set(MIDDLE_COLUMN_SYMBOLS);
                     if let Some(ref title) = title {

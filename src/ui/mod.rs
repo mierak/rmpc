@@ -8,13 +8,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::{Alignment, Backend, Constraint, CrosstermBackend, Direction, Layout},
-    style::{Color, Style, Stylize},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Padding, Paragraph},
     Frame, Terminal,
 };
-use strum::{Display, IntoEnumIterator, VariantNames};
+use strum::Display;
 use tracing::instrument;
 
 use crate::{
@@ -24,7 +23,6 @@ use crate::{
         commands::{volume::Bound, State as MpdState},
         mpd_client::MpdClient,
     },
-    ui::widgets::tabs::Tabs,
 };
 use crate::{
     mpd::version::Version,
@@ -39,6 +37,7 @@ use self::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
         queue::QueueScreen, Screen,
     },
+    widgets::header::Header,
 };
 
 pub mod modals;
@@ -158,178 +157,32 @@ impl Ui<'_> {
         {
             self.shared_state.status_message = None;
         }
-        let [title_area, tabs_area, content_area, bar_area] = *Layout::default()
+
+        let [title_area, content_area, bar_area] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(2),
-                    Constraint::Length(2),
-                    Constraint::Percentage(100),
-                    Constraint::Min(1),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Length(5), Constraint::Percentage(100), Constraint::Min(1)].as_ref())
             .split(frame.size())
         else {
             return Ok(());
         };
 
-        let [title_left_area, title_ceter_area, title_right_area] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(60),
-                    Constraint::Percentage(20),
-                ]
-                .as_ref(),
-            )
-            .split(title_area)
-        else {
-            return Ok(());
-        };
+        let header = Header::new(app.config, app.active_tab)
+            .set_title(app.current_song.as_ref().and_then(|s| s.title.as_deref()))
+            .set_album(app.current_song.as_ref().and_then(|s| s.album.as_deref()))
+            .set_artist(app.current_song.as_ref().and_then(|s| s.artist.as_deref()))
+            .set_volume(*app.status.volume.value())
+            .set_repeat(app.status.repeat)
+            .set_random(app.status.random)
+            .set_single(app.status.single)
+            .set_consume(app.status.consume)
+            .set_active_tab(app.active_tab)
+            .set_elapsed(app.status.elapsed.to_string())
+            .set_duration(app.status.duration.to_string())
+            .set_frame_count(self.shared_state.frame_counter)
+            .set_state(app.status.state)
+            .set_bitrate(app.status.bitrate());
 
-        let [song_name_area, song_info_area] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(title_ceter_area.height / 2),
-                    Constraint::Length(title_ceter_area.height / 2),
-                ]
-                .as_ref(),
-            )
-            .split(title_ceter_area)
-        else {
-            return Ok(());
-        };
-
-        let [volume_area, states_area] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(title_ceter_area.height / 2),
-                    Constraint::Length(title_ceter_area.height / 2),
-                ]
-                .as_ref(),
-            )
-            .split(title_right_area)
-        else {
-            return Ok(());
-        };
-
-        let [status_area, elapsed_area] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(title_ceter_area.height / 2),
-                    Constraint::Length(title_ceter_area.height / 2),
-                ]
-                .as_ref(),
-            )
-            .split(title_left_area)
-        else {
-            return Ok(());
-        };
-
-        if let Some(header_bg_color) = app.config.ui.header_background_color {
-            let mut rect = title_area;
-            rect.height += tabs_area.height;
-            frame.render_widget(Block::default().style(Style::default().bg(header_bg_color)), rect);
-        }
-
-        let tab_names = screens::Screens::VARIANTS
-            .iter()
-            .map(|e| format!("{: ^13}", format!("{e}")))
-            .collect::<Vec<String>>();
-
-        let tabs = Tabs::new(tab_names)
-            .select(
-                screens::Screens::iter()
-                    .enumerate()
-                    .find(|(_, t)| t == &app.active_tab)
-                    .context("No active tab found. This really should not happen since we iterate over all the enum values as provided by strum.")?
-                    .0,
-            )
-            .divider("")
-            .block(ratatui::widgets::Block::default().borders(Borders::TOP).border_style(app.config.as_border_style()))
-            .style(app.config.ui.inactive_tab_style)
-            .highlight_style(app.config.ui.active_tab_style);
-
-        // right
-        let volume = crate::ui::widgets::volume::Volume::default()
-            .value(*app.status.volume.value())
-            .alignment(Alignment::Right)
-            .style(Style::default().fg(app.config.ui.volume_color));
-
-        let on_style = Style::default().fg(Color::Gray);
-        let off_style = Style::default().fg(Color::DarkGray);
-        let separator = Span::styled(" / ", on_style);
-        let states = Paragraph::new(Line::from(vec![
-            Span::styled("Repeat", if app.status.repeat { on_style } else { off_style }),
-            separator.clone(),
-            Span::styled("Random", if app.status.random { on_style } else { off_style }),
-            separator.clone(),
-            match app.status.consume {
-                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Consume", on_style),
-                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Consume", off_style),
-                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(C)", on_style),
-            },
-            separator,
-            match app.status.single {
-                crate::mpd::commands::status::OnOffOneshot::On => Span::styled("Single", on_style),
-                crate::mpd::commands::status::OnOffOneshot::Off => Span::styled("Single", off_style),
-                crate::mpd::commands::status::OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", on_style),
-            },
-        ]))
-        .alignment(Alignment::Right);
-
-        // center
-        let song_name = Paragraph::new(
-            app.current_song
-                .as_ref()
-                .map_or("No song", |v| v.title.as_ref().map_or("No song", |v| v.as_str())),
-        )
-        .style(Style::default().bold())
-        .alignment(Alignment::Center);
-
-        // left
-        // no rendered frames in release mode
-        #[cfg(debug_assertions)]
-        let status = Paragraph::new(Span::styled(
-            format!(
-                "[{}] {} rendered frames",
-                app.status.state, self.shared_state.frame_counter
-            ),
-            Style::default().fg(app.config.ui.status_color),
-        ));
-        #[cfg(not(debug_assertions))]
-        let status = Paragraph::new(Span::styled(
-            format!("[{}]", app.status.state),
-            Style::default().fg(app.config.ui.status_color),
-        ));
-
-        let elapsed = if app.config.status_update_interval_ms.is_some() {
-            Paragraph::new(format!(
-                "{}/{}{}",
-                app.status.elapsed.to_string(),
-                app.status.duration.to_string(),
-                app.status.bitrate()
-            ))
-        } else {
-            Paragraph::new(format!("{}{}", app.status.duration.to_string(), app.status.bitrate()))
-        }
-        .style(Style::default().fg(Color::Gray));
-
-        let song_info = Paragraph::new(app.current_song.as_ref().map_or(Line::default(), |v| {
-            let artist = v.artist.as_ref().map_or("Unknown", |v| v.as_str());
-            let album = v.album.as_ref().map_or("Unknown Album", |v| v.as_str());
-            Line::from(vec![
-                Span::styled(artist, Style::default().fg(Color::Yellow)),
-                Span::styled(" - ", Style::default().bold()),
-                Span::styled(album, Style::default().fg(Color::LightBlue)),
-            ])
-        }))
-        .alignment(Alignment::Center);
+        frame.render_widget(header, title_area);
 
         if let Some(StatusMessage {
             ref message, ref level, ..
@@ -352,14 +205,6 @@ impl Ui<'_> {
             };
             frame.render_widget(elapsed_bar, bar_area);
         }
-
-        frame.render_widget(states, states_area);
-        frame.render_widget(status, status_area);
-        frame.render_widget(elapsed, elapsed_area);
-        frame.render_widget(volume, volume_area);
-        frame.render_widget(song_name, song_name_area);
-        frame.render_widget(song_info, song_info_area);
-        frame.render_widget(tabs, tabs_area);
 
         screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
 
@@ -609,6 +454,16 @@ impl BoolExt for bool {
 }
 
 impl Config {
+    fn as_header_table_block(&self) -> ratatui::widgets::Block {
+        Block::default().border_style(self.as_border_style())
+    }
+
+    fn as_tabs_block(&self) -> ratatui::widgets::Block {
+        ratatui::widgets::Block::default()
+            .borders(Borders::TOP | Borders::BOTTOM)
+            .border_style(self.as_border_style())
+    }
+
     fn as_border_style(&self) -> ratatui::style::Style {
         self.ui.borders_style
     }
