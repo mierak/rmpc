@@ -411,6 +411,11 @@ pub enum GlobalAction {
     SeekBack,
     NextTab,
     PreviousTab,
+    QueueTab,
+    DirectoriesTab,
+    ArtistsTab,
+    AlbumsTab,
+    PlaylistsTab,
 }
 
 pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>) -> Result<()> {

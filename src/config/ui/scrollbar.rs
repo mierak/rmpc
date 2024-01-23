@@ -31,7 +31,7 @@ pub struct ScrollbarConfigFile {
 impl Default for ScrollbarConfigFile {
     fn default() -> Self {
         Self {
-            symbols: vec!["║".to_owned(), "█".to_owned(), "▲".to_owned(), "▼".to_owned()],
+            symbols: vec!["│".to_owned(), "█".to_owned(), "▲".to_owned(), "▼".to_owned()],
             track_style: Some(StyleFile {
                 fg_color: None,
                 bg_color: None,

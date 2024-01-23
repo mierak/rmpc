@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ratatui::{
-    prelude::{Constraint, Direction, Layout, Margin},
+    prelude::{Constraint, Direction, Layout},
     style::{Style, Stylize},
     symbols,
     widgets::{Block, Borders, Clear, List, ListState},
@@ -53,9 +53,7 @@ impl AddToPlaylistModal {
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.vertical_left,
     top_left: symbols::line::NORMAL.vertical_right,
-    bottom_left: symbols::line::NORMAL.bottom_left,
-    bottom_right: symbols::line::NORMAL.bottom_right,
-    ..symbols::border::PLAIN
+    ..symbols::border::ROUNDED
 };
 
 impl Modal for AddToPlaylistModal {
@@ -65,7 +63,7 @@ impl Modal for AddToPlaylistModal {
         app: &mut crate::state::State,
         _shared_state: &mut SharedUiState,
     ) -> anyhow::Result<()> {
-        let popup_area = frame.size().centered_exact(35, 15);
+        let popup_area = frame.size().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.ui.background_color_modal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
@@ -97,10 +95,11 @@ impl Modal for AddToPlaylistModal {
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .border_set(symbols::border::ROUNDED)
                 .border_style(app.config.as_border_style())
-                .title("Select a playlist"),
+                .title_alignment(ratatui::prelude::Alignment::Center)
+                .title("Select a playlist".bold()),
         );
-
         let buttons = vec![Button::default().label("Add"), Button::default().label("Cancel")];
         self.button_group.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
@@ -116,13 +115,13 @@ impl Modal for AddToPlaylistModal {
                     .border_style(app.config.as_border_style()),
             );
 
+        let scrollbar_area = Block::default()
+            .padding(ratatui::widgets::Padding::new(0, 0, 1, 0))
+            .inner(list_area);
         frame.render_stateful_widget(playlists, list_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
-            list_area.inner(&Margin {
-                vertical: 0,
-                horizontal: 0,
-            }),
+            scrollbar_area,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
         frame.render_stateful_widget(button_group, buttons_area, &mut self.button_group);

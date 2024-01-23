@@ -3,6 +3,7 @@ use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin},
     style::Style,
+    symbols::{self, border},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
@@ -20,6 +21,12 @@ use super::{KeyHandleResultInternal, RectExt, SharedUiState};
 
 use super::Modal;
 
+const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
+    top_right: symbols::line::NORMAL.vertical_left,
+    top_left: symbols::line::NORMAL.vertical_right,
+    ..symbols::border::ROUNDED
+};
+
 #[derive(Default, Debug)]
 pub struct ConfirmQueueClearModal {
     button_group: ButtonGroupState,
@@ -33,33 +40,47 @@ impl Modal for ConfirmQueueClearModal {
         _shared_state: &mut SharedUiState,
     ) -> Result<()> {
         let block = Block::default()
-            .borders(Borders::ALL)
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .border_set(border::ROUNDED)
             .border_style(app.config.as_border_style())
+            .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Clear the queue?");
         let text = Paragraph::new("Are you sure you want to clear the queue?").wrap(Wrap { trim: true });
 
-        let popup_area = frame.size().centered_exact(20, 7);
+        let popup_area = frame.size().centered_exact(45, 5);
         frame.render_widget(Clear, popup_area);
+
         if let Some(bg_color) = app.config.ui.background_color_modal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
         let [text_area, buttons_area] = *Layout::default()
-            .constraints([Constraint::Length(3), Constraint::Max(1)].as_ref())
+            .constraints([Constraint::Length(2), Constraint::Max(3)].as_ref())
             .direction(Direction::Vertical)
-            .split(block.inner(popup_area.inner(&Margin {
-                horizontal: 1,
-                vertical: 0,
-            })))
+            .split(popup_area)
         else {
             return Ok(());
         };
 
         let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
         self.button_group.set_button_count(buttons.len());
-        let group = ButtonGroup::default().buttons(buttons);
+        let group = ButtonGroup::default()
+            .active_style(app.config.ui.highlight_style)
+            .buttons(buttons)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(BUTTON_GROUP_SYMBOLS)
+                    .border_style(app.config.as_border_style()),
+            );
 
-        frame.render_widget(block, popup_area);
-        frame.render_widget(text, text_area);
+        frame.render_widget(
+            text,
+            block.inner(popup_area).inner(&Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
+        frame.render_widget(block, text_area);
         frame.render_stateful_widget(group, buttons_area, &mut self.button_group);
         Ok(())
     }

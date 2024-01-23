@@ -81,9 +81,9 @@ impl RectExt for Rect {
             .direction(Direction::Vertical)
             .constraints(
                 [
-                    Constraint::Percentage((100 - height) / 2),
-                    Constraint::Min(height),
-                    Constraint::Percentage((100 - height) / 2),
+                    Constraint::Length((self.height.saturating_sub(height)) / 2),
+                    Constraint::Length(height),
+                    Constraint::Length((self.height.saturating_sub(height)) / 2),
                 ]
                 .as_ref(),
             )
@@ -93,12 +93,55 @@ impl RectExt for Rect {
             .direction(Direction::Horizontal)
             .constraints(
                 [
-                    Constraint::Percentage((100 - width) / 2),
-                    Constraint::Min(width),
-                    Constraint::Percentage((100 - width) / 2),
+                    Constraint::Length((self.width.saturating_sub(width)) / 2),
+                    Constraint::Length(width),
+                    Constraint::Length((self.width.saturating_sub(width)) / 2),
                 ]
                 .as_ref(),
             )
             .split(popup_layout[1])[1]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::prelude::Rect;
+
+    use super::RectExt;
+
+    #[test]
+    fn exact() {
+        let input = Rect {
+            x: 25,
+            y: 25,
+            width: 250,
+            height: 250,
+        };
+
+        let result = input.centered_exact(60, 50);
+
+        assert_eq!(
+            result,
+            Rect {
+                x: 120,
+                y: 125,
+                width: 60,
+                height: 50,
+            }
+        );
+    }
+
+    #[test]
+    fn exact_width_exceeded_gives_max_possible_size() {
+        let input = Rect {
+            x: 25,
+            y: 25,
+            width: 10,
+            height: 10,
+        };
+
+        let result = input.centered_exact(60, 50);
+
+        assert_eq!(result, input);
     }
 }

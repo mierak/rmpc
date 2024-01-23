@@ -10,6 +10,7 @@ pub mod app_tabs;
 pub mod browser;
 pub mod button;
 pub mod header;
+pub mod input;
 pub mod kitty_image;
 pub mod progress_bar;
 pub mod tabs;
