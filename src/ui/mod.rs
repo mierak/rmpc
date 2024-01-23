@@ -320,6 +320,51 @@ impl Ui<'_> {
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
+                        GlobalAction::QueueTab if !matches!(app.active_tab, screens::Screens::Queue) => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = screens::Screens::Queue;
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::DirectoriesTab if !matches!(app.active_tab, screens::Screens::Directories) => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = screens::Screens::Directories;
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::ArtistsTab if !matches!(app.active_tab, screens::Screens::Artists) => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = screens::Screens::Artists;
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::AlbumsTab if !matches!(app.active_tab, screens::Screens::Albums) => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = screens::Screens::Albums;
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::PlaylistsTab if !matches!(app.active_tab, screens::Screens::Playlists) => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = screens::Screens::Playlists;
+                            tracing::Span::current().record("screen", app.active_tab.to_string());
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::QueueTab => {}
+                        GlobalAction::DirectoriesTab => {}
+                        GlobalAction::ArtistsTab => {}
+                        GlobalAction::AlbumsTab => {}
+                        GlobalAction::PlaylistsTab => {}
                         GlobalAction::NextTrack => {}
                         GlobalAction::PreviousTrack => {}
                         GlobalAction::Stop => {}

@@ -72,6 +72,11 @@ impl Default for KeyConfigFile {
                 (G::NextTab,          vec![Key { key: K::Right,     modifiers: M::NONE }]),
                 (G::PreviousTab,      vec![Key { key: K::Left,      modifiers: M::NONE }]),
                 (G::ToggleConsume,    vec![Key { key: K::Char('v'), modifiers: M::NONE }]),
+                (G::QueueTab,         vec![Key { key: K::Char('1'), modifiers: M::NONE }]),
+                (G::DirectoriesTab,   vec![Key { key: K::Char('2'), modifiers: M::NONE }]),
+                (G::ArtistsTab,       vec![Key { key: K::Char('3'), modifiers: M::NONE }]),
+                (G::AlbumsTab,        vec![Key { key: K::Char('4'), modifiers: M::NONE }]),
+                (G::PlaylistsTab,     vec![Key { key: K::Char('5'), modifiers: M::NONE }]),
             ]),
             navigation: HashMap::from([
                 (C::Up,               vec![Key { key: K::Char('k'), modifiers: M::NONE }]),
