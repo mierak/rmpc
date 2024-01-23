@@ -10,7 +10,7 @@ use crossterm::{
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Padding, Paragraph},
+    widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
 use strum::Display;
@@ -158,9 +158,16 @@ impl Ui<'_> {
             self.shared_state.status_message = None;
         }
 
-        let [title_area, content_area, bar_area] = *Layout::default()
+        let [header_area, content_area, bar_area] = *Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(5), Constraint::Percentage(100), Constraint::Min(1)].as_ref())
+            .constraints(
+                [
+                    Constraint::Length(if app.config.ui.draw_borders { 5 } else { 3 }),
+                    Constraint::Percentage(100),
+                    Constraint::Min(1),
+                ]
+                .as_ref(),
+            )
             .split(frame.size())
         else {
             return Ok(());
@@ -182,7 +189,7 @@ impl Ui<'_> {
             .set_state(app.status.state)
             .set_bitrate(app.status.bitrate());
 
-        frame.render_widget(header, title_area);
+        frame.render_widget(header, header_area);
 
         if let Some(StatusMessage {
             ref message, ref level, ..
@@ -505,10 +512,20 @@ impl BoolExt for bool {
 
 impl Config {
     fn as_header_table_block(&self) -> ratatui::widgets::Block {
+        if !self.ui.draw_borders {
+            return ratatui::widgets::Block::default();
+        }
         Block::default().border_style(self.as_border_style())
     }
 
     fn as_tabs_block(&self) -> ratatui::widgets::Block {
+        // if !self.ui.borders {
+        //     return ratatui::widgets::Block::default().padding(Padding::new(0, 0, 1, 1));
+        // }
+        if !self.ui.draw_borders {
+            return ratatui::widgets::Block::default()/* .padding(Padding::new(0, 0, 1, 1)) */;
+        }
+
         ratatui::widgets::Block::default()
             .borders(Borders::TOP | Borders::BOTTOM)
             .border_style(self.as_border_style())

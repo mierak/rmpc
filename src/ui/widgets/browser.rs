@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, StatefulWidget};
+use ratatui::widgets::{Block, Borders, List, Padding, StatefulWidget};
 
 use crate::config::Config;
 use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
@@ -90,7 +90,6 @@ where
 
         {
             let preview = List::new(preview.unwrap_or_default())
-                .block(Block::default().border_style(self.border_style))
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
@@ -100,14 +99,19 @@ where
             prev_state.set_content_len(Some(previous.len()));
             prev_state.set_viewport_len(Some(previous_area.height.into()));
 
-            let previous = List::new(previous)
-                .block(
+            let mut previous = List::new(previous);
+            if self.config.ui.draw_borders {
+                previous = previous.block(
                     Block::default()
                         .borders(Borders::RIGHT)
                         .border_style(self.border_style)
+                        .padding(Padding::new(0, 2, 0, 0))
                         .border_set(LEFT_COLUMN_SYMBOLS),
-                )
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+                );
+            } else {
+                previous = previous.block(Block::default().padding(Padding::new(1, 2, 0, 0)));
+            };
+            previous = previous.highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
 
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
@@ -125,14 +129,17 @@ where
 
             let current = List::new(current)
                 .block({
-                    let mut b = Block::default()
-                        .borders(Borders::RIGHT)
-                        .border_style(self.border_style)
-                        .border_set(MIDDLE_COLUMN_SYMBOLS);
+                    let mut b = Block::default();
+                    if self.config.ui.draw_borders {
+                        b = b
+                            .borders(Borders::RIGHT)
+                            .border_style(self.border_style)
+                            .border_set(MIDDLE_COLUMN_SYMBOLS);
+                    }
                     if let Some(ref title) = title {
                         b = b.title(title.clone().blue());
                     }
-                    b
+                    b.padding(Padding::new(1, 2, 0, 0))
                 })
                 .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
 

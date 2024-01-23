@@ -70,8 +70,12 @@ impl DirStackItem for DirOrSong {
         };
 
         let value = match self {
-            DirOrSong::Dir(v) => format!("{} {}", symbols.dir, if v.is_empty() { "Untitled" } else { v.as_str() }),
-            DirOrSong::Song(s) => format!("{} {}", symbols.song, s.file_name()),
+            DirOrSong::Dir(v) => format!(
+                " {} {}",
+                symbols.dir,
+                if v.is_empty() { "Untitled" } else { v.as_str() }
+            ),
+            DirOrSong::Song(s) => format!(" {} {}", symbols.song, s.file_name()),
         };
         ListItem::new(Line::from(vec![marker_span, Span::from(value)]))
     }

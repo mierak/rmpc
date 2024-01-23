@@ -4,9 +4,7 @@ use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Margin, Rect},
-    style::{Modifier, Style},
-    text::Span,
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::{List, ListItem, ListState},
     Frame,
 };
 use strum::Display;

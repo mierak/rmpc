@@ -140,9 +140,11 @@ impl Screen for QueueScreen {
         let table = Table::new(table_items, self.column_widths.clone())
             .block({
                 let mut b = Block::default()
-                    .borders(Borders::TOP)
                     .padding(Padding::new(0, 1, 0, 0))
                     .border_style(app.config.as_border_style().bold());
+                if app.config.ui.show_song_table_header {
+                    b = b.borders(Borders::TOP);
+                }
                 if let Some(ref title) = title {
                     b = b.title(title.clone().blue());
                 }
@@ -179,14 +181,16 @@ impl Screen for QueueScreen {
         app: &mut crate::state::State,
         _shared: &mut SharedUiState,
     ) -> Result<()> {
+        self.scrolling_state.set_content_len(app.queue.len());
         if let Some(songid) = app.status.songid {
             let idx = app
                 .queue
                 .as_ref()
                 .and_then(|queue| queue.iter().enumerate().find(|(_, song)| song.id == songid))
                 .map(|v| v.0);
-            self.scrolling_state.set_content_len(app.queue.len());
             self.scrolling_state.select(idx);
+        } else if app.queue.len().is_some() {
+            self.scrolling_state.select(Some(0));
         }
 
         Ok(())

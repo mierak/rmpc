@@ -22,6 +22,7 @@ pub use color::{ConfigColor, StyleFile};
 #[derive(Debug)]
 pub struct UiConfig {
     pub disable_images: bool,
+    pub draw_borders: bool,
     pub background_color: Option<Color>,
     pub header_background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
@@ -45,6 +46,8 @@ pub struct UiConfig {
 pub struct UiConfigFile {
     #[serde(default = "defaults::default_false")]
     pub(super) disable_images: bool,
+    #[serde(default = "defaults::default_true")]
+    pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
     pub(super) progress_bar: ProgressBarConfigFile,
     pub(super) scrollbar: ScrollbarConfigFile,
@@ -69,6 +72,8 @@ impl Default for UiConfigFile {
     fn default() -> Self {
         Self {
             disable_images: false,
+            draw_borders: true,
+            show_song_table_header: true,
             background_color: None,
             header_background_color: None,
             background_color_modal: None,
@@ -108,7 +113,6 @@ impl Default for UiConfigFile {
                 dir: "📁".to_owned(),
                 marker: "".to_owned(),
             },
-            show_song_table_header: true,
             song_table_format: QueueTableColumnsFile::default(),
         }
     }
@@ -174,13 +178,13 @@ impl TryFrom<UiConfigFile> for UiConfig {
     #[allow(clippy::similar_names)]
     fn try_from(value: UiConfigFile) -> Result<Self, Self::Error> {
         let bg_color = StringColor(value.background_color).to_color()?;
-        let modal_bg_color = StringColor(value.background_color_modal).to_color()?.or(bg_color);
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
         let fallback_border_fg = Color::White;
 
         Ok(Self {
             background_color: bg_color,
-            background_color_modal: modal_bg_color,
+            draw_borders: value.draw_borders,
+            background_color_modal: StringColor(value.background_color_modal).to_color()?.or(bg_color),
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             current_song_color: StringColor(value.current_song_color).to_color()?.unwrap_or(Color::Red),
