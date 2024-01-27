@@ -1,23 +1,25 @@
 use anyhow::Result;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
-use strum::Display;
 
 use self::{
-    color::{FgBgColorsExt, Modifiers, StringColor},
+    header::{HeaderConfig, HeaderConfigFile},
     progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
     queue_table::{QueueTableColumns, QueueTableColumnsFile, SongTableColumn},
     scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
+    style::{Modifiers, StringColor, ToConfigOr},
 };
 
-use super::defaults;
-
-mod color;
+mod header;
 mod progress_bar;
+pub mod properties;
 mod queue_table;
 mod scrollbar;
+mod style;
 
-pub use color::{ConfigColor, StyleFile};
+pub use style::{ConfigColor, StyleFile};
+
+use super::defaults;
 
 #[derive(Debug)]
 pub struct UiConfig {
@@ -27,7 +29,7 @@ pub struct UiConfig {
     pub header_background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
     pub borders_style: Style,
-    pub current_song_color: Color,
+    pub current_song_style: Style,
     pub highlight_style: Style,
     pub highlight_border_style: Style,
     pub active_tab_style: Style,
@@ -40,6 +42,7 @@ pub struct UiConfig {
     pub scrollbar: ScrollbarConfig,
     pub show_song_table_header: bool,
     pub song_table_format: Vec<SongTableColumn>,
+    pub header: HeaderConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,13 +62,14 @@ pub struct UiConfigFile {
     pub(super) active_tab_style: Option<StyleFile>,
     pub(super) inactive_tab_style: Option<StyleFile>,
     pub(super) borders_style: Option<StyleFile>,
-    pub(super) current_song_color: Option<String>,
+    pub(super) current_song_style: Option<StyleFile>,
     pub(super) highlight_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
     pub(super) volume_color: Option<String>,
     pub(super) status_color: Option<String>,
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
+    pub(super) header: HeaderConfigFile,
 }
 
 impl Default for UiConfigFile {
@@ -78,29 +82,33 @@ impl Default for UiConfigFile {
             header_background_color: None,
             background_color_modal: None,
             borders_style: Some(StyleFile {
-                fg_color: Some("blue".to_string()),
-                bg_color: None,
+                fg: Some("blue".to_string()),
+                bg: None,
                 modifiers: None,
             }),
-            current_song_color: Some("blue".to_string()),
+            current_song_style: Some(StyleFile {
+                fg: Some("blue".to_string()),
+                bg: None,
+                modifiers: Some(Modifiers::Bold),
+            }),
             highlight_style: Some(StyleFile {
-                fg_color: Some("black".to_string()),
-                bg_color: Some("blue".to_string()),
+                fg: Some("black".to_string()),
+                bg: Some("blue".to_string()),
                 modifiers: Some(Modifiers::Bold),
             }),
             highlight_border_style: Some(StyleFile {
-                fg_color: Some("blue".to_string()),
-                bg_color: None,
+                fg: Some("blue".to_string()),
+                bg: None,
                 modifiers: None,
             }),
             active_tab_style: Some(StyleFile {
-                fg_color: Some("black".to_string()),
-                bg_color: Some("blue".to_string()),
+                fg: Some("black".to_string()),
+                bg: Some("blue".to_string()),
                 modifiers: Some(Modifiers::Bold),
             }),
             inactive_tab_style: Some(StyleFile {
-                fg_color: None,
-                bg_color: None,
+                fg: None,
+                bg: None,
                 modifiers: None,
             }),
             browser_column_widths: vec![20, 38, 42],
@@ -114,6 +122,7 @@ impl Default for UiConfigFile {
                 marker: "".to_owned(),
             },
             song_table_format: QueueTableColumnsFile::default(),
+            header: HeaderConfigFile::default(),
         }
     }
 }
@@ -142,36 +151,6 @@ impl From<SymbolsFile> for SymbolsConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, Display)]
-pub enum SongProperty {
-    Duration,
-    Filename,
-    Artist,
-    AlbumArtist,
-    Title,
-    Album,
-    Date,
-    Genre,
-    Comment,
-}
-
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
-pub enum Alignment {
-    Left,
-    Right,
-    Center,
-}
-
-impl From<Alignment> for ratatui::layout::Alignment {
-    fn from(value: Alignment) -> Self {
-        match value {
-            Alignment::Left => Self::Left,
-            Alignment::Right => Self::Right,
-            Alignment::Center => Self::Center,
-        }
-    }
-}
-
 impl TryFrom<UiConfigFile> for UiConfig {
     type Error = anyhow::Error;
 
@@ -187,7 +166,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             background_color_modal: StringColor(value.background_color_modal).to_color()?.or(bg_color),
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
-            current_song_color: StringColor(value.current_song_color).to_color()?.unwrap_or(Color::Red),
+            current_song_style: value.current_song_style.to_config_or(Some(Color::Red), None)?,
             volume_color: StringColor(value.volume_color).to_color()?.unwrap_or(Color::Blue),
             status_color: StringColor(value.status_color).to_color()?.unwrap_or(Color::Yellow),
             highlight_style: value
@@ -209,6 +188,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 value.browser_column_widths[2],
             ],
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
+            header: value.header.try_into()?,
         })
     }
 }

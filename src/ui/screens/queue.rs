@@ -23,7 +23,6 @@ use crate::{
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
     style::Stylize,
-    text::Line,
     widgets::{Block, Borders, Padding, Row, Table, TableState},
     Frame,
 };
@@ -31,7 +30,7 @@ use tracing::error;
 
 use crate::state::State;
 
-use super::{CommonAction, Screen, SongExt};
+use super::{CommonAction, Screen};
 
 #[derive(Debug, Default)]
 pub struct QueueScreen {
@@ -113,17 +112,20 @@ impl Screen for QueueScreen {
                     .iter()
                     .map(|song| {
                         let is_current = app.status.songid.as_ref().is_some_and(|v| *v == song.id);
-                        Row::new((0..formats.len()).map(|i| {
-                            let song = song
-                                .get_property_ellipsized(formats[i].prop, widths[i].width.into())
-                                .into_owned();
-                            let song = if is_current {
-                                song.bold().fg(app.config.ui.current_song_color)
-                            } else {
-                                song.fg(formats[i].color)
-                            };
-                            Line::from(song).alignment(formats[i].alignment.into())
-                        }))
+                        let mut row = Row::new((0..formats.len()).map(|i| {
+                            let mut column = formats[i]
+                                .prop
+                                .as_line_ellipsized(song, widths[i].width.into())
+                                .alignment(formats[i].alignment.into());
+                            if is_current {
+                                column.patch_style(app.config.ui.current_song_style);
+                            }
+                            column
+                        }));
+                        if is_current {
+                            row = row.style(app.config.ui.current_song_style);
+                        };
+                        row
                     })
                     .collect_vec()
             })

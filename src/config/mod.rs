@@ -7,8 +7,7 @@ use tracing::Level;
 
 mod defaults;
 mod keys;
-mod ui;
-pub use self::ui::{SongProperty, SymbolsConfig};
+pub mod ui;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},

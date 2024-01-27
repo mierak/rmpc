@@ -2,17 +2,26 @@ use std::borrow::Cow;
 
 use anyhow::{Context, Result};
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{prelude::Rect, widgets::ListItem, Frame};
+use ratatui::{
+    prelude::Rect,
+    text::{Line, Span},
+    widgets::ListItem,
+    Frame,
+};
 use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
-    config::SongProperty,
-    mpd::{client::Client, commands::Song},
+    config::ui::properties::{SongProperty, StatusProperty, WidgetProperty},
+    mpd::{
+        client::Client,
+        commands::{status::OnOffOneshot, volume::Bound, Song, Status},
+    },
     state::State,
 };
 
 use super::{
     utils::dirstack::{DirStack, DirStackItem},
+    widgets::volume::Volume,
     DurationExt, KeyHandleResultInternal, SharedUiState,
 };
 
@@ -152,7 +161,7 @@ pub(crate) mod browser {
     };
 
     use crate::{
-        config::SymbolsConfig,
+        config::ui::SymbolsConfig,
         mpd::commands::{lsinfo::FileOrDir, Song},
     };
 
@@ -247,8 +256,6 @@ pub(crate) mod browser {
 pub trait SongExt {
     fn title_str(&self) -> &str;
     fn artist_str(&self) -> &str;
-    fn get_property(&self, prop: SongProperty) -> Cow<str>;
-    fn get_property_ellipsized(&self, prop: SongProperty, max_len: usize) -> Cow<str>;
 }
 
 impl SongExt for Song {
@@ -259,62 +266,133 @@ impl SongExt for Song {
     fn artist_str(&self) -> &str {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
     }
+}
 
-    fn get_property(&self, prop: SongProperty) -> Cow<str> {
-        match prop {
-            SongProperty::Duration => self
-                .duration
+impl WidgetProperty {
+    pub fn as_spans<'a>(&self, status: &'a Status) -> Vec<Span<'a>> {
+        match *self {
+            WidgetProperty::Volume { style } => vec![Span::styled(Volume::get_str(*status.volume.value()), style)],
+            WidgetProperty::States {
+                active_style,
+                inactive_style,
+                separator_style,
+            } => {
+                let separator = Span::styled(" / ", separator_style);
+                vec![
+                    if status.repeat {
+                        Span::styled("Repeat", active_style)
+                    } else {
+                        Span::styled("Repeat", inactive_style)
+                    },
+                    separator.clone(),
+                    if status.random {
+                        Span::styled("Random", active_style)
+                    } else {
+                        Span::styled("Random", inactive_style)
+                    },
+                    separator.clone(),
+                    match status.consume {
+                        OnOffOneshot::On => Span::styled("Consume", active_style),
+                        OnOffOneshot::Off => Span::styled("Consume", inactive_style),
+                        OnOffOneshot::Oneshot => Span::styled("Oneshot(C)", active_style),
+                    },
+                    separator,
+                    match status.single {
+                        OnOffOneshot::On => Span::styled("Single", active_style),
+                        OnOffOneshot::Off => Span::styled("Single", inactive_style),
+                        OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", active_style),
+                    },
+                ]
+            }
+        }
+    }
+}
+
+impl StatusProperty {
+    pub fn as_span<'state>(&self, status: &'state Status) -> Span<'state> {
+        match *self {
+            StatusProperty::State { style } => Span::styled(status.state.to_string(), style),
+            StatusProperty::Duration { style } => Span::styled(status.duration.to_string(), style),
+            StatusProperty::Elapsed { style } => Span::styled(status.elapsed.to_string(), style),
+            StatusProperty::Volume { style } => Span::styled(status.volume.value().to_string(), style),
+            StatusProperty::Repeat { style } => Span::styled(if status.repeat { "On" } else { "Off" }, style),
+            StatusProperty::Random { style } => Span::styled(if status.random { "On" } else { "Off" }, style),
+            StatusProperty::Consume { style } => Span::styled(status.consume.to_string(), style),
+            StatusProperty::Single { style } => Span::styled(status.single.to_string(), style),
+            StatusProperty::Bitrate { style, default } => status
+                .bitrate
                 .as_ref()
-                .map_or(Cow::Borrowed("-"), |v| Cow::Owned(v.to_string())),
-            SongProperty::Filename => Cow::Borrowed(&self.file),
-            SongProperty::Artist => self.artist.as_ref().map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
-            SongProperty::AlbumArtist => self
-                .others
-                .get("albumartist")
-                .map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
-            SongProperty::Title => self.title.as_ref().map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
-            SongProperty::Album => self.album.as_ref().map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
-            SongProperty::Date => self.others.get("date").map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
-            SongProperty::Genre => self
-                .others
-                .get("genre")
-                .map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
-            SongProperty::Comment => self
-                .others
-                .get("comment")
-                .map_or(Cow::Borrowed("-"), |v| Cow::Borrowed(v)),
+                .map_or_else(|| Span::styled(default, style), |v| Span::styled(v.to_string(), style)),
+            StatusProperty::Crossfade { style, default } => status
+                .xfade
+                .as_ref()
+                .map_or_else(|| Span::styled(default, style), |v| Span::styled(v.to_string(), style)),
+        }
+    }
+}
+
+impl SongProperty {
+    pub fn as_span_opt<'song>(&self, song: Option<&'song Song>) -> Span<'song> {
+        match (self, song) {
+            (SongProperty::Filename { style }, None) => Span::styled("", *style),
+            (SongProperty::Title { style, default }, None) => Span::styled(*default, *style),
+            (SongProperty::Artist { style, default }, None) => Span::styled(*default, *style),
+            (SongProperty::Album { style, default }, None) => Span::styled(*default, *style),
+            (SongProperty::Duration { style, default }, None) => Span::styled(*default, *style),
+            (SongProperty::Other { style, default, .. }, None) => Span::styled(*default, *style),
+            (SongProperty::Filename { style }, Some(song)) => Span::styled(song.file.as_str(), *style),
+            (SongProperty::Title { default, style }, Some(song)) => {
+                Span::styled(song.title.as_ref().map_or_else(|| *default, |v| v.as_str()), *style)
+            }
+            (SongProperty::Artist { default, style }, Some(song)) => {
+                Span::styled(song.artist.as_ref().map_or_else(|| *default, |v| v.as_str()), *style)
+            }
+            (SongProperty::Album { default, style }, Some(song)) => {
+                Span::styled(song.album.as_ref().map_or_else(|| *default, |v| v.as_str()), *style)
+            }
+            (SongProperty::Duration { default, style }, Some(song)) => Span::styled(
+                song.duration
+                    .map_or_else(|| Cow::Borrowed(*default), |v| Cow::Owned(v.to_string())),
+                *style,
+            ),
+            (SongProperty::Other { name, default, style }, Some(song)) => {
+                Span::styled(song.others.get(*name).map_or_else(|| *default, |v| v), *style)
+            }
         }
     }
 
-    fn get_property_ellipsized(&self, prop: SongProperty, max_len: usize) -> Cow<str> {
-        match prop {
-            SongProperty::Duration => self
-                .duration
-                .as_ref()
-                .map_or(Cow::Borrowed("-"), |v| Cow::Owned(v.to_string())),
-            SongProperty::Filename => self.file.ellipsize(max_len),
-            SongProperty::Artist => self
-                .artist
-                .as_ref()
-                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
-            SongProperty::AlbumArtist => self
-                .others
-                .get("albumartist")
-                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
-            SongProperty::Title => self.title.as_ref().map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
-            SongProperty::Album => self.album.as_ref().map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
-            SongProperty::Date => self
-                .others
-                .get("date")
-                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
-            SongProperty::Genre => self
-                .others
-                .get("genre")
-                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
-            SongProperty::Comment => self
-                .others
-                .get("comment")
-                .map_or(Cow::Borrowed("-"), |v| v.ellipsize(max_len)),
+    pub fn as_line_ellipsized<'song>(&self, song: &'song Song, max_len: usize) -> Line<'song> {
+        match self {
+            SongProperty::Filename { style } => Line::styled(song.file.ellipsize(max_len), *style),
+            SongProperty::Title { default, style } => Line::styled(
+                song.title
+                    .as_ref()
+                    .map_or_else(|| Cow::Borrowed(*default), |v| v.ellipsize(max_len)),
+                *style,
+            ),
+            SongProperty::Artist { default, style } => Line::styled(
+                song.artist
+                    .as_ref()
+                    .map_or_else(|| Cow::Borrowed(*default), |v| v.ellipsize(max_len)),
+                *style,
+            ),
+            SongProperty::Album { default, style } => Line::styled(
+                song.album
+                    .as_ref()
+                    .map_or_else(|| Cow::Borrowed(*default), |v| v.ellipsize(max_len)),
+                *style,
+            ),
+            SongProperty::Duration { default, style } => Line::styled(
+                song.duration
+                    .map_or_else(|| Cow::Borrowed(*default), |v| Cow::Owned(v.to_string())),
+                *style,
+            ),
+            SongProperty::Other { name, default, style } => Line::styled(
+                song.others
+                    .get(*name)
+                    .map_or_else(|| Cow::Borrowed(*default), |v| Cow::Owned(v.to_string())),
+                *style,
+            ),
         }
     }
 }

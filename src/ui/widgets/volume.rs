@@ -50,6 +50,13 @@ impl<'a> Volume<'a> {
     }
 }
 
+impl Volume<'_> {
+    pub fn get_str(value: u8) -> String {
+        let i = value / 13;
+        format!("Volume: {:<7} {:>3}%", CHARS[0..i as usize].join(""), value)
+    }
+}
+
 impl Widget for Volume<'_> {
     fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let area = match self.block.take() {

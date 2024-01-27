@@ -120,21 +120,3 @@ impl PlayListInfoExt for Option<Vec<Song>> {
         self.as_ref().map(std::vec::Vec::len)
     }
 }
-
-pub trait StatusExt {
-    fn bitrate(&self) -> String;
-}
-impl StatusExt for Status {
-    fn bitrate(&self) -> String {
-        match &self.bitrate {
-            Some(val) => {
-                if val == "0" {
-                    String::new()
-                } else {
-                    format!(" ({val} kbps)")
-                }
-            }
-            None => String::new(),
-        }
-    }
-}

@@ -23,7 +23,7 @@ pub struct Status {
     pub nextsongid: Option<u32>,      // playlist songid of the next song to be played
     pub elapsed: Duration, // Total time elapsed within the current song in seconds, but with higher resolution.
     pub duration: Duration, // Duration of the current song in seconds.
-    pub bitrate: Option<String>, // instantaneous bitrate in kbps
+    pub bitrate: Option<u32>, // instantaneous bitrate in kbps
     pub xfade: Option<u32>, // crossfade in seconds (see Cross-Fading)
     pub mixrampdb: Option<String>, // mixramp threshold in dB
     pub mixrampdelay: Option<String>, // mixrampdelay in seconds
@@ -50,7 +50,7 @@ impl FromMpd for Status {
             "nextsongid" => self.nextsongid = Some(value.parse()?),
             "elapsed" => self.elapsed = Duration::from_secs_f32(value.parse()?),
             "duration" => self.duration = Duration::from_secs_f32(value.parse()?),
-            "bitrate" => self.bitrate = Some(value),
+            "bitrate" if value != "0" => self.bitrate = Some(value.parse()?),
             "xfade" => self.xfade = Some(value.parse()?),
             "mixrampdb" => self.mixrampdb = Some(value),
             "mixrampdelay" => self.mixrampdelay = Some(value),
@@ -118,7 +118,7 @@ impl std::fmt::Display for OnOffOneshot {
             match self {
                 OnOffOneshot::On => "On",
                 OnOffOneshot::Off => "Off",
-                OnOffOneshot::Oneshot => "Oneshot",
+                OnOffOneshot::Oneshot => "OS",
             }
         )?;
         Ok(())

@@ -19,6 +19,7 @@ use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
+use ron::extensions::Extensions;
 use tracing::{error, info, instrument, trace, warn};
 use ui::Level;
 
@@ -65,7 +66,12 @@ fn main() -> Result<()> {
                     ron::ser::PrettyConfig::default()
                         .depth_limit(3)
                         .struct_names(false)
-                        .compact_arrays(true),
+                        .compact_arrays(true)
+                        .extensions(
+                            Extensions::IMPLICIT_SOME
+                                | Extensions::UNWRAP_NEWTYPES
+                                | Extensions::UNWRAP_VARIANT_NEWTYPES
+                        ),
                 )?
             );
             return Ok(());

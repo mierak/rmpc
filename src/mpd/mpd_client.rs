@@ -74,8 +74,8 @@ pub trait MpdClient {
         -> MpdResult<()>;
     fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()>;
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
-    /// This function first invokes [albumart].
-    /// If no album art is fonud it invokes [readpicture].
+    /// This function first invokes [`Self::albumart`].
+    /// If no album art is fonud it invokes [`Self::read_picture`].
     /// If no art is still found, but no errors were encountered, None is returned.
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
 }

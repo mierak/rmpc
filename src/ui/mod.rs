@@ -24,10 +24,7 @@ use crate::{
         mpd_client::MpdClient,
     },
 };
-use crate::{
-    mpd::version::Version,
-    state::{State, StatusExt},
-};
+use crate::{mpd::version::Version, state::State};
 
 #[cfg(debug_assertions)]
 use self::screens::logs::LogsScreen;
@@ -173,21 +170,7 @@ impl Ui<'_> {
             return Ok(());
         };
 
-        let header = Header::new(app.config, app.active_tab)
-            .set_title(app.current_song.as_ref().and_then(|s| s.title.as_deref()))
-            .set_album(app.current_song.as_ref().and_then(|s| s.album.as_deref()))
-            .set_artist(app.current_song.as_ref().and_then(|s| s.artist.as_deref()))
-            .set_volume(*app.status.volume.value())
-            .set_repeat(app.status.repeat)
-            .set_random(app.status.random)
-            .set_single(app.status.single)
-            .set_consume(app.status.consume)
-            .set_active_tab(app.active_tab)
-            .set_elapsed(app.status.elapsed.to_string())
-            .set_duration(app.status.duration.to_string())
-            .set_frame_count(self.shared_state.frame_counter)
-            .set_state(app.status.state)
-            .set_bitrate(app.status.bitrate());
+        let header = Header::new(app.config, app.active_tab, &app.status).set_song(app.current_song.as_ref());
 
         frame.render_widget(header, header_area);
 
@@ -212,6 +195,12 @@ impl Ui<'_> {
             };
             frame.render_widget(elapsed_bar, bar_area);
         }
+
+        #[cfg(debug_assertions)]
+        frame.render_widget(
+            Paragraph::new(format!("{} frames", self.shared_state.frame_counter)),
+            bar_area,
+        );
 
         screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
 

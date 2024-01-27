@@ -1,22 +1,20 @@
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-use super::{color::StringColor, Alignment, SongProperty};
+use super::properties::{Alignment, SongProperty, SongPropertyFile};
+use super::StyleFile;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SongTableColumnFile {
     /// Property to display in the column
     /// Can be one of: Duration, Filename, Artist, AlbumArtist, Title, Album, Date, Genre or Comment    
-    pub(super) prop: SongProperty,
+    pub(super) prop: SongPropertyFile,
     /// Label to display in the column header
     /// If not set, the property name will be used
     pub(super) label: Option<String>,
     /// Width of the column in percent
     pub(super) width_percent: u16,
-    /// Foreground color of the column
-    pub(super) color: Option<String>,
     /// Text alignment of the text in the column
     pub(super) alignment: Option<Alignment>,
 }
@@ -26,7 +24,6 @@ pub struct SongTableColumn {
     pub prop: SongProperty,
     pub label: &'static str,
     pub width_percent: u16,
-    pub color: Color,
     pub alignment: Alignment,
 }
 
@@ -40,31 +37,43 @@ impl Default for QueueTableColumnsFile {
     fn default() -> Self {
         QueueTableColumnsFile(vec![
             SongTableColumnFile {
-                prop: SongProperty::Artist,
+                prop: SongPropertyFile::Artist {
+                    style: None,
+                    default: "Unknown".to_string(),
+                },
                 label: None,
                 width_percent: 20,
-                color: None,
                 alignment: None,
             },
             SongTableColumnFile {
-                prop: SongProperty::Title,
+                prop: SongPropertyFile::Title {
+                    style: None,
+                    default: "Unknown".to_string(),
+                },
                 label: None,
                 width_percent: 35,
-                color: None,
                 alignment: None,
             },
             SongTableColumnFile {
-                prop: SongProperty::Album,
+                prop: SongPropertyFile::Album {
+                    style: Some(StyleFile {
+                        fg: Some("white".to_string()),
+                        bg: None,
+                        modifiers: None,
+                    }),
+                    default: "Unknown Album".to_string(),
+                },
                 label: None,
                 width_percent: 30,
-                color: Some("white".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
-                prop: SongProperty::Duration,
+                prop: SongPropertyFile::Duration {
+                    style: None,
+                    default: "-".to_string(),
+                },
                 label: None,
                 width_percent: 15,
-                color: None,
                 alignment: Some(Alignment::Right),
             },
         ])
@@ -84,12 +93,12 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                 .0
                 .into_iter()
                 .map(|v| -> Result<_> {
+                    let prop: SongProperty = v.prop.try_into()?;
                     Ok(SongTableColumn {
-                        prop: v.prop,
-                        label: Box::leak(Box::new(v.label.unwrap_or_else(|| v.prop.to_string()))),
+                        prop,
+                        label: Box::leak(Box::new(v.label.unwrap_or_else(|| prop.to_string()))),
                         width_percent: v.width_percent,
                         alignment: v.alignment.unwrap_or(Alignment::Left),
-                        color: StringColor(v.color).to_color()?.unwrap_or(Color::White),
                     })
                 })
                 .try_collect()?,

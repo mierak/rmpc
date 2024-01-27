@@ -1,9 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use bitflags::bitflags;
 use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
 
-pub(super) trait FgBgColorsExt {
+pub(super) trait ToConfigOr {
     fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style>;
 }
 
@@ -17,18 +17,18 @@ impl StringColor {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StyleFile {
-    pub(super) fg_color: Option<String>,
-    pub(super) bg_color: Option<String>,
+    pub(super) fg: Option<String>,
+    pub(super) bg: Option<String>,
     pub(super) modifiers: Option<Modifiers>,
 }
 
 #[allow(clippy::similar_names)]
-impl FgBgColorsExt for StyleFile {
+impl ToConfigOr for StyleFile {
     fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style> {
-        let fg: Option<ConfigColor> = self.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+        let fg: Option<ConfigColor> = self.fg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
         let fg: Option<RColor> = fg.map(Into::into).or(default_fg);
 
-        let bg: Option<ConfigColor> = self.bg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+        let bg: Option<ConfigColor> = self.bg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
         let bg: Option<RColor> = bg.map(Into::into).or(default_bg);
 
         let modifiers = self
@@ -49,14 +49,14 @@ impl FgBgColorsExt for StyleFile {
 }
 
 #[allow(clippy::similar_names)]
-impl FgBgColorsExt for Option<StyleFile> {
+impl ToConfigOr for Option<StyleFile> {
     fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style> {
         match self {
             Some(val) => {
-                let fg: Option<ConfigColor> = val.fg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+                let fg: Option<ConfigColor> = val.fg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
                 let fg: Option<RColor> = fg.map(Into::into).or(default_fg);
 
-                let bg: Option<ConfigColor> = val.bg_color.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+                let bg: Option<ConfigColor> = val.bg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
                 let bg: Option<RColor> = bg.map(Into::into).or(default_bg);
 
                 let modifiers = val
@@ -139,10 +139,14 @@ impl TryFrom<&[u8]> for crate::config::ConfigColor {
                 Ok(Self::Rgb(r, g, b))
             }
             s => {
-                if let Ok(v) = std::str::from_utf8(s)?.parse::<u8>() {
-                    Ok(Self::Indexed(v))
+                if let Ok(s) = std::str::from_utf8(s) {
+                    if let Ok(v) = s.parse::<u8>() {
+                        Ok(Self::Indexed(v))
+                    } else {
+                        bail!("Invalid color format '{s}'")
+                    }
                 } else {
-                    Err(anyhow::anyhow!("Invalid color format '{s:?}'"))
+                    bail!("Invalid color format '{s:?}'")
                 }
             }
         }
@@ -226,7 +230,7 @@ impl From<crate::config::ConfigColor> for RColor {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::config::{ui::color::Modifiers, ConfigColor};
+    use crate::config::{ui::style::Modifiers, ConfigColor};
     use ratatui::style::Modifier as RM;
     use test_case::test_case;
 

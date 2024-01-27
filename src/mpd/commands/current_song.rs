@@ -10,7 +10,6 @@ pub struct Song {
     pub artist: Option<String>,
     pub album: Option<String>,
     pub duration: Option<Duration>,
-
     // the other less relevant tags are pushed here
     pub others: HashMap<String, String>,
     // pub name: Option<String>, // a name for this song. This is not the song title. The exact meaning of this tag is not well-defined. It is often used by badly configured internet radio stations with broken tags to squeeze both the artist name and the song title in one tag.
