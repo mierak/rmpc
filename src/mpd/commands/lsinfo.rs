@@ -5,7 +5,7 @@ use anyhow::Context;
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
 #[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
-pub struct LsInfo(Vec<FileOrDir>);
+pub struct LsInfo(pub Vec<FileOrDir>);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FileOrDir {
@@ -23,10 +23,6 @@ pub struct Dir {
 }
 
 impl FromMpd for Dir {
-    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "directory" => {
@@ -42,10 +38,6 @@ impl FromMpd for Dir {
 }
 
 impl FromMpd for LsInfo {
-    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         if key == "file" {
             self.0.push(FileOrDir::File(Song::default()));

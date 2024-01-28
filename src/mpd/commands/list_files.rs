@@ -24,10 +24,6 @@ pub enum ListingType {
 }
 
 impl FromMpd for ListFiles {
-    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         if key == "file" || key == "directory" {
             self.0.push(Listed::default());
@@ -41,10 +37,6 @@ impl FromMpd for ListFiles {
 }
 
 impl FromMpd for Listed {
-    fn finish(self) -> std::result::Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "file" => {

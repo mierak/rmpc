@@ -57,10 +57,6 @@ impl std::fmt::Debug for Song {
 }
 
 impl FromMpd for Song {
-    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "file" => self.file = value,

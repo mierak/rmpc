@@ -9,10 +9,6 @@ pub struct Playlist {
 }
 
 impl FromMpd for Playlist {
-    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "playlist" => {
@@ -26,10 +22,6 @@ impl FromMpd for Playlist {
 }
 
 impl FromMpd for Vec<Playlist> {
-    fn finish(self) -> Result<Self, MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         if key == "playlist" {
             self.push(Playlist::default());

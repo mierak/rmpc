@@ -40,7 +40,7 @@ fn get_default_config_path() -> PathBuf {
     } else {
         return path;
     }
-    path.push("mpdox");
+    path.push(env!("CARGO_CRATE_NAME"));
     path.push("config.ron");
     return path;
 }

@@ -6,13 +6,13 @@ pub mod client;
 pub mod commands;
 pub mod errors;
 pub mod mpd_client;
+pub mod proto_client;
 pub mod version;
 
 trait FromMpd
 where
     Self: std::marker::Sized,
 {
-    fn finish(self) -> Result<Self, MpdError>;
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError>;
 
     #[instrument(skip(self))]
@@ -41,13 +41,4 @@ pub(self) fn split_line(mut line: String) -> Result<(String, String), MpdError> 
 enum LineHandled {
     Yes,
     No { value: String },
-}
-trait FromMpdBuilder<T: FromMpd> {
-    fn create() -> T;
-}
-
-impl<T: FromMpd + Default> FromMpdBuilder<T> for T {
-    fn create() -> T {
-        T::default()
-    }
 }

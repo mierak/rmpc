@@ -6,10 +6,6 @@ use crate::mpd::{FromMpd, LineHandled};
 pub struct FileList(Vec<String>);
 
 impl FromMpd for FileList {
-    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(
         &mut self,
         key: &str,
@@ -20,7 +16,7 @@ impl FromMpd for FileList {
                 self.0.push(value);
                 Ok(LineHandled::Yes)
             }
-            _ => return Ok(LineHandled::No { value }),
+            _ => Ok(LineHandled::No { value }),
         }
     }
 }

@@ -55,8 +55,4 @@ impl FromMpd for Volume {
             Ok(LineHandled::No { value })
         }
     }
-
-    fn finish(self) -> Result<Self, MpdError> {
-        Ok(self)
-    }
 }

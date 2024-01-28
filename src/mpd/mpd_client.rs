@@ -11,6 +11,7 @@ use super::{
         Playlist, Song, Status, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
+    proto_client::ProtoClient,
     version::Version,
 };
 
@@ -84,88 +85,94 @@ impl MpdClient for Client<'_> {
     // Queries
     #[tracing::instrument(skip(self))]
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
-        self.execute("idle")
+        self.send("idle").and_then(ProtoClient::read_response)
     }
 
     #[tracing::instrument(skip(self))]
     fn get_volume(&mut self) -> MpdResult<Volume> {
-        self.execute("getvol")
+        self.send("getvol").and_then(ProtoClient::read_response)
     }
 
     #[tracing::instrument(skip(self))]
     fn set_volume(&mut self, volume: &Volume) -> MpdResult<()> {
-        self.execute_ok(&format!("setvol {}", volume.value()))
+        self.send(&format!("setvol {}", volume.value()))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
-        self.execute_option("currentsong")
+        self.send("currentsong").and_then(ProtoClient::read_opt_response)
     }
 
     #[tracing::instrument(skip(self))]
     fn get_status(&mut self) -> MpdResult<Status> {
-        self.execute("status")
+        self.send("status").and_then(ProtoClient::read_response)
     }
 
     // Playback control
     #[tracing::instrument(skip(self))]
     fn pause_toggle(&mut self) -> MpdResult<()> {
-        self.execute_ok("pause")
+        self.send("pause").and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn next(&mut self) -> MpdResult<()> {
-        self.execute_ok("next")
+        self.send("next").and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn prev(&mut self) -> MpdResult<()> {
-        self.execute_ok("previous")
+        self.send("previous").and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn play_pos(&mut self, pos: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("play {pos}"))
+        self.send(&format!("play {pos}")).and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn play(&mut self) -> MpdResult<()> {
-        self.execute_ok("play")
+        self.send("play").and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn play_id(&mut self, id: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("playid {id}"))
+        self.send(&format!("playid {id}")).and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn stop(&mut self) -> MpdResult<()> {
-        self.execute_ok("stop")
+        self.send("stop").and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("seekcur +{time_sec}"))
+        self.send(&format!("seekcur +{time_sec}"))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("seekcur -{time_sec}"))
+        self.send(&format!("seekcur -{time_sec}"))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn repeat(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(&format!("repeat {}", u8::from(enabled)))
+        self.send(&format!("repeat {}", u8::from(enabled)))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn random(&mut self, enabled: bool) -> MpdResult<()> {
-        self.execute_ok(&format!("random {}", u8::from(enabled)))
+        self.send(&format!("random {}", u8::from(enabled)))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn single(&mut self, single: OnOffOneshot) -> MpdResult<()> {
-        self.execute_ok(&format!("single {}", single.to_mpd_value()))
+        self.send(&format!("single {}", single.to_mpd_value()))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
@@ -176,108 +183,123 @@ impl MpdClient for Client<'_> {
                 "consume oneshot can be used since MPD 0.24.0",
             ))
         } else {
-            self.execute_ok(&format!("consume {}", consume.to_mpd_value()))
+            self.send(&format!("consume {}", consume.to_mpd_value()))
+                .and_then(ProtoClient::read_ok)
         }
     }
 
     // Current queue
     #[tracing::instrument(skip(self))]
     fn add(&mut self, path: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("add \"{path}\""))
+        self.send(&format!("add \"{path}\"")).and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn clear(&mut self) -> MpdResult<()> {
-        self.execute_ok("clear")
+        self.send("clear").and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn delete_id(&mut self, id: u32) -> MpdResult<()> {
-        self.execute_ok(&format!("deleteid \"{id}\""))
+        self.send(&format!("deleteid \"{id}\"")).and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
-        self.execute_ok(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
+        self.send(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
-        self.execute_option("playlistinfo")
+        self.send("playlistinfo").and_then(ProtoClient::read_opt_response)
     }
 
     #[tracing::instrument(skip(self))]
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
-        self.execute(&format!("find \"({})\"", filter.to_query_str()))
+        self.send(&format!("find \"({})\"", filter.to_query_str()))
+            .and_then(ProtoClient::read_response)
     }
 
     #[tracing::instrument(skip(self))]
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
         Ok(self
-            .execute::<Vec<Song>>(&format!("find \"({})\"", filter.to_query_str()))?
+            .send(&format!("find \"({})\"", filter.to_query_str()))
+            .and_then(ProtoClient::read_response::<Vec<Song>>)?
             .pop())
     }
 
     #[tracing::instrument(skip(self))]
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
-        self.execute_ok(&format!("findadd \"({})\"", filter.to_query_str()))
+        self.send(&format!("findadd \"({})\"", filter.to_query_str()))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
-        match filter {
-            Some(filter) => self.execute(&format!("list {tag} \"({})\"", filter.to_query_str())),
-            None => self.execute(&format!("list {tag}")),
-        }
+        self.send(&if let Some(filter) = filter {
+            format!("list {tag} \"({})\"", filter.to_query_str())
+        } else {
+            format!("list {tag}")
+        })
+        .and_then(ProtoClient::read_response)
     }
 
     // Database
     #[tracing::instrument(skip(self))]
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
-        if let Some(path) = path {
-            Ok(self
-                .execute_option(&format!("lsinfo \"{path}\""))?
-                .unwrap_or(LsInfo::default()))
+        Ok(if let Some(path) = path {
+            self.send(&format!("lsinfo \"{path}\""))
+                .and_then(ProtoClient::read_opt_response)?
+                .unwrap_or_default()
         } else {
-            Ok(self.execute_option("lsinfo")?.unwrap_or(LsInfo::default()))
-        }
+            self.send("lsinfo")
+                .and_then(ProtoClient::read_opt_response)?
+                .unwrap_or_default()
+        })
+        //     Ok(self
     }
 
     #[tracing::instrument(skip(self))]
     fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
-        if let Some(path) = path {
-            Ok(self
-                .execute_option(&format!("listfiles \"{path}\""))?
-                .unwrap_or(ListFiles::default()))
+        Ok(if let Some(path) = path {
+            self.send(&format!("listfiles \"{path}\""))
+                .and_then(ProtoClient::read_opt_response)?
+                .unwrap_or_default()
         } else {
-            Ok(self.execute_option("listfiles")?.unwrap_or(ListFiles::default()))
-        }
+            self.send("listfiles")
+                .and_then(ProtoClient::read_opt_response)?
+                .unwrap_or_default()
+        })
     }
 
     // Stored playlists
     #[tracing::instrument(skip(self))]
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
-        self.execute("listplaylists")
+        self.send("listplaylists").and_then(ProtoClient::read_response)
     }
     #[tracing::instrument(skip(self))]
     fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
-        self.execute(&format!("listplaylist \"{name}\""))
+        self.send(&format!("listplaylist \"{name}\""))
+            .and_then(ProtoClient::read_response)
     }
     #[tracing::instrument(skip(self))]
     fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
-        self.execute(&format!("listplaylistinfo \"{playlist}\""))
+        self.send(&format!("listplaylistinfo \"{playlist}\""))
+            .and_then(ProtoClient::read_response)
     }
     #[tracing::instrument(skip(self))]
     fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("load \"{name}\""))
+        self.send(&format!("load \"{name}\"")).and_then(ProtoClient::read_ok)
     }
     #[tracing::instrument(skip(self))]
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("rm \"{name}\""))
+        self.send(&format!("rm \"{name}\"")).and_then(ProtoClient::read_ok)
     }
     #[tracing::instrument(skip(self))]
     fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
-        self.execute_ok(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
+        self.send(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
+            .and_then(ProtoClient::read_ok)
     }
     #[tracing::instrument(skip(self))]
     fn move_in_playlist(
@@ -286,25 +308,29 @@ impl MpdClient for Client<'_> {
         range: &SingleOrRange,
         target_position: usize,
     ) -> MpdResult<()> {
-        self.execute_ok(&format!(
+        self.send(&format!(
             "playlistmove \"{playlist_name}\" {} {target_position}",
             range.as_mpd_range()
         ))
+        .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
     fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()> {
         match target_position {
-            Some(target_position) => {
-                self.execute_ok(&format!(r#"playlistadd "{playlist_name}" "{uri}" {target_position}"#))
-            }
-            None => self.execute_ok(&format!(r#"playlistadd "{playlist_name}" "{uri}""#)),
+            Some(target_position) => self
+                .send(&format!(r#"playlistadd "{playlist_name}" "{uri}" {target_position}"#))
+                .and_then(ProtoClient::read_ok),
+            None => self
+                .send(&format!(r#"playlistadd "{playlist_name}" "{uri}""#))
+                .and_then(ProtoClient::read_ok),
         }
     }
 
     #[tracing::instrument(skip(self))]
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
-        self.execute_ok(&format!("rename \"{name}\" \"{new_name}\""))
+        self.send(&format!("rename \"{name}\" \"{new_name}\""))
+            .and_then(ProtoClient::read_ok)
     }
 
     #[tracing::instrument(skip(self))]
@@ -315,20 +341,23 @@ impl MpdClient for Client<'_> {
                     "save mode can be used since MPD 0.24.0",
                 ));
             }
-            self.execute_ok(&format!("save \"{name}\" \"{}\"", mode.as_ref()))
+            self.send(&format!("save \"{name}\" \"{}\"", mode.as_ref()))
+                .and_then(ProtoClient::read_ok)
         } else {
-            self.execute_ok(&format!("save \"{name}\""))
+            self.send(&format!("save \"{name}\"")).and_then(ProtoClient::read_ok)
         }
     }
 
     #[tracing::instrument(skip(self))]
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.execute_binary(&format!("readpicture \"{path}\""))
+        self.send(&format!("readpicture \"{path}\""))
+            .and_then(ProtoClient::read_bin)
     }
 
     #[tracing::instrument(skip(self))]
     fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.execute_binary(&format!("albumart \"{path}\""))
+        self.send(&format!("albumart \"{path}\""))
+            .and_then(ProtoClient::read_bin)
     }
 
     #[tracing::instrument(skip(self))]

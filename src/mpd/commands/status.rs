@@ -57,14 +57,11 @@ impl FromMpd for Status {
             "audio" => self.audio = Some(value),
             "updating_db" => self.updating_db = Some(value.parse()?),
             "error" => self.error = Some(value),
+            "bitrate" => self.bitrate = None,
             "time" => {} // deprecated
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
-    }
-
-    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
     }
 }
 

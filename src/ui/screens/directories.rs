@@ -1,7 +1,6 @@
-use std::cmp::Ordering;
-
 use anyhow::Result;
 use crossterm::event::KeyEvent;
+use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
 use tracing::instrument;
@@ -9,7 +8,7 @@ use tracing::instrument;
 use crate::{
     mpd::{
         client::Client,
-        commands::{lsinfo::FileOrDir, Song},
+        commands::lsinfo::FileOrDir,
         mpd_client::{Filter, MpdClient, Tag},
     },
     state::State,
@@ -90,21 +89,6 @@ impl Screen for DirectoriesScreen {
 
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum DirectoriesActions {}
-
-impl std::cmp::Ord for FileOrDir {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (_, FileOrDir::Dir(_)) => Ordering::Greater,
-            (FileOrDir::Dir(_), _) => Ordering::Less,
-            (FileOrDir::File(Song { title: t1, .. }), FileOrDir::File(Song { title: t2, .. })) => t1.cmp(t2),
-        }
-    }
-}
-impl std::cmp::PartialOrd for FileOrDir {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 impl BrowserScreen<DirOrSong> for DirectoriesScreen {
     fn stack(&self) -> &DirStack<DirOrSong> {
@@ -188,26 +172,25 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     tracing::error!("Failed to move deeper inside dir. Next path is None");
                     return Ok(None);
                 };
-                let mut res: Vec<FileOrDir> = match client.lsinfo(Some(&next_path.join("/").to_string())) {
+                let res: Vec<_> = match client.lsinfo(Some(&next_path.join("/").to_string())) {
                     Ok(val) => val,
                     Err(err) => {
                         tracing::error!(message = "Failed to get lsinfo for dir", error = ?err);
                         return Ok(None);
                     }
                 }
-                .into();
-                res.sort();
-                Ok(Some(
-                    res.into_iter()
-                        .map(|v| match v {
-                            FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
-                            FileOrDir::File(song) => {
-                                DirOrSong::Song(song.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned())
-                            }
-                        })
-                        .map(|v| v.to_list_item(&state.config.ui.symbols, false))
-                        .collect(),
-                ))
+                .0
+                .into_iter()
+                .map(|v| match v {
+                    FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
+                    FileOrDir::File(song) => {
+                        DirOrSong::Song(song.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned())
+                    }
+                })
+                .sorted()
+                .map(|v| v.to_list_item(&state.config.ui.symbols, false))
+                .collect();
+                Ok(Some(res))
             }
             Some(DirOrSong::Song(file)) => Ok(client
                 .find_one(&[Filter::new(Tag::File, file)])?

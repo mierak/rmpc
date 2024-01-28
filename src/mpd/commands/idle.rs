@@ -20,10 +20,6 @@ pub enum IdleEvent {
 }
 
 impl FromMpd for Vec<IdleEvent> {
-    fn finish(self) -> Result<Self, crate::mpd::errors::MpdError> {
-        Ok(self)
-    }
-
     fn next_internal(&mut self, _key: &str, value: String) -> Result<LineHandled, MpdError> {
         match value.as_str() {
             "mixer" => self.push(IdleEvent::Mixer),
