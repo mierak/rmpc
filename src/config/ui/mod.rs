@@ -23,7 +23,7 @@ use super::defaults;
 
 #[derive(Debug)]
 pub struct UiConfig {
-    pub disable_images: bool,
+    pub disable_album_art: bool,
     pub draw_borders: bool,
     pub background_color: Option<Color>,
     pub header_background_color: Option<Color>,
@@ -36,8 +36,6 @@ pub struct UiConfig {
     pub inactive_tab_style: Style,
     pub column_widths: [u16; 3],
     pub symbols: SymbolsConfig,
-    pub volume_color: Color,
-    pub status_color: Color,
     pub progress_bar: ProgressBarConfig,
     pub scrollbar: ScrollbarConfig,
     pub show_song_table_header: bool,
@@ -48,7 +46,7 @@ pub struct UiConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UiConfigFile {
     #[serde(default = "defaults::default_false")]
-    pub(super) disable_images: bool,
+    pub(super) disable_album_art: bool,
     #[serde(default = "defaults::default_true")]
     pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
@@ -65,8 +63,6 @@ pub struct UiConfigFile {
     pub(super) current_song_style: Option<StyleFile>,
     pub(super) highlight_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
-    pub(super) volume_color: Option<String>,
-    pub(super) status_color: Option<String>,
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
     pub(super) header: HeaderConfigFile,
@@ -75,7 +71,7 @@ pub struct UiConfigFile {
 impl Default for UiConfigFile {
     fn default() -> Self {
         Self {
-            disable_images: false,
+            disable_album_art: false,
             draw_borders: true,
             show_song_table_header: true,
             background_color: None,
@@ -112,8 +108,6 @@ impl Default for UiConfigFile {
                 modifiers: None,
             }),
             browser_column_widths: vec![20, 38, 42],
-            volume_color: Some("blue".to_string()),
-            status_color: Some("yellow".to_string()),
             progress_bar: ProgressBarConfigFile::default(),
             scrollbar: ScrollbarConfigFile::default(),
             symbols: SymbolsFile {
@@ -167,28 +161,26 @@ impl TryFrom<UiConfigFile> for UiConfig {
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             current_song_style: value.current_song_style.to_config_or(Some(Color::Red), None)?,
-            volume_color: StringColor(value.volume_color).to_color()?.unwrap_or(Color::Blue),
-            status_color: StringColor(value.status_color).to_color()?.unwrap_or(Color::Yellow),
-            highlight_style: value
-                .highlight_style
-                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
             highlight_border_style: value.highlight_border_style.to_config_or(Some(Color::Blue), None)?,
-            active_tab_style: value
-                .active_tab_style
-                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
             inactive_tab_style: value.inactive_tab_style.to_config_or(None, header_bg_color)?,
-            disable_images: value.disable_images,
+            disable_album_art: value.disable_album_art,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
             progress_bar: value.progress_bar.into_config()?,
+            song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
+            header: value.header.try_into()?,
             column_widths: [
                 value.browser_column_widths[0],
                 value.browser_column_widths[1],
                 value.browser_column_widths[2],
             ],
-            song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
-            header: value.header.try_into()?,
+            active_tab_style: value
+                .active_tab_style
+                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+            highlight_style: value
+                .highlight_style
+                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
         })
     }
 }
