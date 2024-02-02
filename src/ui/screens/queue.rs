@@ -4,7 +4,7 @@ use itertools::Itertools;
 use strum::Display;
 
 use crate::{
-    config::Config,
+    config::{ui::Position, Config},
     mpd::{
         client::Client,
         mpd_client::{MpdClient, QueueMoveTarget},
@@ -70,21 +70,29 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> anyhow::Result<()> {
         let queue_len = app.queue.len().unwrap_or(0);
-        let show_image = !app.config.ui.disable_album_art;
+        let album_art_width = app.config.ui.album_art_width_percent;
+        let show_image = album_art_width > 0;
 
-        let [img_section, queue_section] = *Layout::default()
+        let mut img_queue_constraints = [
+            Constraint::Percentage(album_art_width),
+            Constraint::Percentage(100 - album_art_width),
+        ];
+
+        if matches!(app.config.ui.album_art_position, Position::Right) {
+            img_queue_constraints.reverse();
+        }
+
+        let [mut img_section, mut queue_section] = *Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(if show_image { 35 } else { 0 }),
-                    Constraint::Percentage(if show_image { 65 } else { 100 }),
-                ]
-                .as_ref(),
-            )
+            .constraints(img_queue_constraints)
             .split(area)
         else {
             return Ok(());
         };
+
+        if matches!(app.config.ui.album_art_position, Position::Right) {
+            std::mem::swap(&mut img_section, &mut queue_section);
+        }
 
         let header_height = u16::from(app.config.ui.show_song_table_header);
         let [table_header_section, mut queue_section] = *Layout::default()

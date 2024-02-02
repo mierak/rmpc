@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub fn default_column_widths() -> Vec<u16> {
     vec![20, 38, 42]
 }

@@ -94,9 +94,10 @@ fn main() -> Result<()> {
                 "Failed to connect to mpd"
             );
 
-            let display_image_warn = if !config.ui.disable_album_art && !utils::kitty::check_kitty_support()? {
-                warn!(message = "Images are enabled but kitty image protocol is not supported by your terminal, disabling images");
-                config.ui.disable_album_art = true;
+            let album_art_disabled = config.ui.album_art_width_percent == 0;
+            let display_image_warn = if !album_art_disabled && !utils::kitty::check_kitty_support()? {
+                warn!(message = "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
+                config.ui.album_art_width_percent = 0;
                 true
             } else {
                 false
@@ -114,7 +115,7 @@ fn main() -> Result<()> {
             let mut ui = Ui::new(client, state.config);
             if display_image_warn {
                 ui.display_message(
-                    "Images are enabled but kitty image protocol is not supported by your terminal, disabling images"
+                    "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art"
                         .to_owned(),
                     Level::Warn,
                 );
@@ -281,7 +282,7 @@ fn handle_idle_event(
                 .as_ref()
                 .and_then(|p| p.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
             {
-                if !state.config.ui.disable_album_art {
+                if !state.config.ui.album_art_width_percent != 0 {
                     state.album_art = try_ret!(
                         client.find_album_art(&current_song.file),
                         "Failed to get find album art"

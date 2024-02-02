@@ -412,7 +412,7 @@ impl StringExt for String {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}...",
-                self.chars().take(max_len.saturating_sub(3)).collect::<String>()
+                self.chars().take(max_len.saturating_sub(4)).collect::<String>()
             ))
         } else {
             Cow::Borrowed(self)

@@ -23,7 +23,8 @@ use super::defaults;
 
 #[derive(Debug)]
 pub struct UiConfig {
-    pub disable_album_art: bool,
+    pub album_art_position: Position,
+    pub album_art_width_percent: u16,
     pub draw_borders: bool,
     pub background_color: Option<Color>,
     pub header_background_color: Option<Color>,
@@ -44,9 +45,15 @@ pub struct UiConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum Position {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UiConfigFile {
-    #[serde(default = "defaults::default_false")]
-    pub(super) disable_album_art: bool,
+    pub(super) album_art_position: Position,
+    pub(super) album_art_width_percent: u16,
     #[serde(default = "defaults::default_true")]
     pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
@@ -71,11 +78,13 @@ pub struct UiConfigFile {
 impl Default for UiConfigFile {
     fn default() -> Self {
         Self {
-            disable_album_art: false,
+            album_art_position: Position::Left,
+            album_art_width_percent: 40,
             draw_borders: true,
-            show_song_table_header: true,
             background_color: None,
             header_background_color: None,
+            show_song_table_header: true,
+            header: HeaderConfigFile::default(),
             background_color_modal: None,
             borders_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
@@ -116,7 +125,6 @@ impl Default for UiConfigFile {
                 marker: "".to_owned(),
             },
             song_table_format: QueueTableColumnsFile::default(),
-            header: HeaderConfigFile::default(),
         }
     }
 }
@@ -156,6 +164,8 @@ impl TryFrom<UiConfigFile> for UiConfig {
 
         Ok(Self {
             background_color: bg_color,
+            album_art_position: value.album_art_position,
+            album_art_width_percent: value.album_art_width_percent,
             draw_borders: value.draw_borders,
             background_color_modal: StringColor(value.background_color_modal).to_color()?.or(bg_color),
             header_background_color: header_bg_color,
@@ -163,7 +173,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
             current_song_style: value.current_song_style.to_config_or(Some(Color::Red), None)?,
             highlight_border_style: value.highlight_border_style.to_config_or(Some(Color::Blue), None)?,
             inactive_tab_style: value.inactive_tab_style.to_config_or(None, header_bg_color)?,
-            disable_album_art: value.disable_album_art,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
