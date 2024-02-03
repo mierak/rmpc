@@ -21,7 +21,7 @@ use crate::{
     },
 };
 use ratatui::{
-    prelude::{Constraint, Direction, Layout, Rect},
+    prelude::{Constraint, Layout, Rect},
     style::Stylize,
     widgets::{Block, Borders, Padding, Row, Table, TableState},
     Frame,
@@ -82,11 +82,7 @@ impl Screen for QueueScreen {
             img_queue_constraints.reverse();
         }
 
-        let [mut img_section, mut queue_section] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(img_queue_constraints)
-            .split(area)
-        else {
+        let [mut img_section, mut queue_section] = *Layout::horizontal(img_queue_constraints).split(area) else {
             return Ok(());
         };
 
@@ -95,10 +91,8 @@ impl Screen for QueueScreen {
         }
 
         let header_height = u16::from(app.config.ui.show_song_table_header);
-        let [table_header_section, mut queue_section] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(header_height), Constraint::Percentage(100)].as_ref())
-            .split(queue_section)
+        let [table_header_section, mut queue_section] =
+            *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(queue_section)
         else {
             return Ok(());
         };
@@ -109,7 +103,7 @@ impl Screen for QueueScreen {
             self.img_state.image(&mut app.album_art);
         }
 
-        let widths = Layout::new(Direction::Horizontal, self.column_widths.clone()).split(table_header_section);
+        let widths = Layout::horizontal(self.column_widths.clone()).split(table_header_section);
         let formats = &app.config.ui.song_table_format;
 
         let table_items = app
@@ -126,7 +120,7 @@ impl Screen for QueueScreen {
                                 .as_line_ellipsized(song, widths[i].width.into())
                                 .alignment(formats[i].alignment.into());
                             if is_current {
-                                column.patch_style(app.config.ui.current_song_style);
+                                column = column.patch_style(app.config.ui.current_song_style);
                             }
                             column
                         }));
@@ -140,8 +134,9 @@ impl Screen for QueueScreen {
             .unwrap_or_default();
 
         if app.config.ui.show_song_table_header {
-            let header_table = Table::new([], self.column_widths.clone())
+            let header_table = Table::default()
                 .header(Row::new(self.header.iter().copied()))
+                .widths(self.column_widths.clone())
                 .block(app.config.as_header_table_block());
             frame.render_widget(header_table, table_header_section);
         }

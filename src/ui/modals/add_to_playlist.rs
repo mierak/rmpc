@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ratatui::{
-    prelude::{Constraint, Direction, Layout},
+    prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols,
     widgets::{Block, Borders, Clear, List, ListState},
@@ -69,10 +69,8 @@ impl Modal for AddToPlaylistModal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
-        let [list_area, buttons_area] = *Layout::default()
-            .constraints([Constraint::Length(3), Constraint::Max(3)].as_ref())
-            .direction(Direction::Vertical)
-            .split(popup_area)
+        let [list_area, buttons_area] =
+            *Layout::vertical([Constraint::Length(12), Constraint::Max(3)]).split(popup_area)
         else {
             return Ok(());
         };

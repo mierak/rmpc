@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    prelude::{Constraint, Direction, Layout, Margin},
+    prelude::{Constraint, Layout, Margin},
     style::Style,
     symbols::{self, border},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
@@ -53,10 +53,8 @@ impl Modal for ConfirmQueueClearModal {
         if let Some(bg_color) = app.config.ui.background_color_modal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
-        let [text_area, buttons_area] = *Layout::default()
-            .constraints([Constraint::Length(2), Constraint::Max(3)].as_ref())
-            .direction(Direction::Vertical)
-            .split(popup_area)
+        let [text_area, buttons_area] =
+            *Layout::vertical([Constraint::Length(2), Constraint::Max(3)]).split(popup_area)
         else {
             return Ok(());
         };

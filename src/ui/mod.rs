@@ -8,7 +8,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout},
+    prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
@@ -155,18 +155,12 @@ impl Ui<'_> {
             self.shared_state.status_message = None;
         }
 
-        let [header_area, content_area, bar_area] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(if app.config.ui.draw_borders { 5 } else { 3 }),
-                    Constraint::Percentage(100),
-                    Constraint::Min(1),
-                ]
-                .as_ref(),
-            )
-            .split(frame.size())
-        else {
+        let [header_area, content_area, bar_area] = *Layout::vertical([
+            Constraint::Length(if app.config.ui.draw_borders { 5 } else { 3 }),
+            Constraint::Percentage(100),
+            Constraint::Min(1),
+        ])
+        .split(frame.size()) else {
             return Ok(());
         };
 

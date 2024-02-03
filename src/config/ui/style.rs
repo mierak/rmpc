@@ -111,23 +111,9 @@ impl TryFrom<&[u8]> for crate::config::ConfigColor {
             b"light_cyan" => Ok(Self::LightCyan),
             b"white" => Ok(Self::White),
             s if input.len() == 7 && input.first().is_some_and(|v| v == &b'#') => {
-                let r = u8::from_str_radix(
-                    std::str::from_utf8(&s[1..3]).context("Failed to get str for red color value")?,
-                    16,
-                )
-                .context("Failed to parse red color value")?;
-                let g = u8::from_str_radix(
-                    std::str::from_utf8(&s[3..5]).context("Failed to get str for green color value")?,
-                    16,
-                )
-                .context("Failed to parse green color value")?;
-                let b = u8::from_str_radix(
-                    std::str::from_utf8(&s[5..7]).context("Failed to get str for blue color value")?,
-                    16,
-                )
-                .context("Failed to parse blue color value")?;
-
-                Ok(Self::Rgb(r, g, b))
+                let res = std::str::from_utf8(s.strip_prefix(b"#").context("")?)?;
+                let res = u32::from_str_radix(res, 16).context("")?;
+                Ok(Self::Hex(res))
             }
             s if s.starts_with(b"rgb(") => {
                 let mut colors =
@@ -196,6 +182,7 @@ pub enum ConfigColor {
     LightMagenta,
     LightCyan,
     White,
+    Hex(u32),
     Rgb(u8, u8, u8),
     Indexed(u8),
 }
@@ -222,6 +209,7 @@ impl From<crate::config::ConfigColor> for RColor {
             CColor::LightCyan => RColor::LightCyan,
             CColor::White => RColor::White,
             CColor::Rgb(r, g, b) => RColor::Rgb(r, g, b),
+            CColor::Hex(v) => RColor::from_u32(v),
             CColor::Indexed(v) => RColor::Indexed(v),
         }
     }
@@ -261,7 +249,7 @@ mod tests {
     fn hex_value() {
         let input: &[u8] = b"#ff00ff";
         let result = ConfigColor::try_from(input).unwrap();
-        assert_eq!(result, ConfigColor::Rgb(255, 0, 255));
+        assert_eq!(result, ConfigColor::Hex(16_711_935));
     }
 
     #[test]

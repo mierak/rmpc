@@ -1,5 +1,5 @@
 use ratatui::{
-    prelude::{Constraint, Direction, Layout, Margin},
+    prelude::{Constraint, Layout, Margin},
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
@@ -15,17 +15,11 @@ pub struct Input<'a> {
 
 impl Widget for Input<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let [text_area, input_area] = *Layout::default()
-            .constraints(
-                [
-                    Constraint::Max(self.label.chars().count() as u16 + 2),
-                    Constraint::Max(24),
-                ]
-                .as_ref(),
-            )
-            .direction(Direction::Horizontal)
-            .split(area)
-        else {
+        let [text_area, input_area] = *Layout::horizontal([
+            Constraint::Max(self.label.chars().count() as u16 + 2),
+            Constraint::Max(24),
+        ])
+        .split(area) else {
             return;
         };
 

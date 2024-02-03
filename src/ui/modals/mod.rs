@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    prelude::{Constraint, Direction, Layout, Rect},
+    prelude::{Constraint, Layout, Rect},
     Frame,
 };
 
@@ -51,55 +51,35 @@ pub trait RectExt {
 
 impl RectExt for Rect {
     fn centered(&self, width_percent: u16, height_percent: u16) -> Rect {
-        let popup_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Percentage((100 - height_percent) / 2),
-                    Constraint::Percentage(height_percent),
-                    Constraint::Percentage((100 - height_percent) / 2),
-                ]
-                .as_ref(),
-            )
-            .split(*self);
+        let popup_layout = Layout::vertical([
+            Constraint::Percentage((100 - height_percent) / 2),
+            Constraint::Percentage(height_percent),
+            Constraint::Percentage((100 - height_percent) / 2),
+        ])
+        .split(*self);
 
-        Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage((100 - width_percent) / 2),
-                    Constraint::Percentage(width_percent),
-                    Constraint::Percentage((100 - width_percent) / 2),
-                ]
-                .as_ref(),
-            )
-            .split(popup_layout[1])[1]
+        Layout::horizontal([
+            Constraint::Percentage((100 - width_percent) / 2),
+            Constraint::Percentage(width_percent),
+            Constraint::Percentage((100 - width_percent) / 2),
+        ])
+        .split(popup_layout[1])[1]
     }
 
     fn centered_exact(&self, width: u16, height: u16) -> Rect {
-        let popup_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length((self.height.saturating_sub(height)) / 2),
-                    Constraint::Length(height),
-                    Constraint::Length((self.height.saturating_sub(height)) / 2),
-                ]
-                .as_ref(),
-            )
-            .split(*self);
+        let popup_layout = Layout::vertical([
+            Constraint::Length((self.height.saturating_sub(height)) / 2),
+            Constraint::Length(height),
+            Constraint::Length((self.height.saturating_sub(height)) / 2),
+        ])
+        .split(*self);
 
-        Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Length((self.width.saturating_sub(width)) / 2),
-                    Constraint::Length(width),
-                    Constraint::Length((self.width.saturating_sub(width)) / 2),
-                ]
-                .as_ref(),
-            )
-            .split(popup_layout[1])[1]
+        Layout::horizontal([
+            Constraint::Length((self.width.saturating_sub(width)) / 2),
+            Constraint::Length(width),
+            Constraint::Length((self.width.saturating_sub(width)) / 2),
+        ])
+        .split(popup_layout[1])[1]
     }
 }
 

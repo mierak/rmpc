@@ -73,18 +73,12 @@ where
             .collect_vec();
         let preview = state.preview().cloned();
 
-        let [previous_area, current_area, preview_area] = *Layout::default()
-            .direction(ratatui::prelude::Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(self.widths[0]),
-                    Constraint::Percentage(self.widths[1]),
-                    Constraint::Percentage(self.widths[2]),
-                ]
-                .as_ref(),
-            )
-            .split(area)
-        else {
+        let [previous_area, current_area, preview_area] = *Layout::horizontal([
+            Constraint::Percentage(self.widths[0]),
+            Constraint::Percentage(self.widths[1]),
+            Constraint::Percentage(self.widths[2]),
+        ])
+        .split(area) else {
             return;
         };
 

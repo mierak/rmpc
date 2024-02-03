@@ -1,8 +1,8 @@
 use ratatui::{
-    prelude::{Alignment, Constraint, Direction, Layout},
+    prelude::{Constraint, Layout},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Paragraph, Widget},
+    widgets::{Block, Widget},
 };
 use strum::{IntoEnumIterator, VariantNames};
 
@@ -53,27 +53,27 @@ where
         let c = &config.ui.header;
 
         let top_left_w = PropertyTemplates(&c.top_left);
-        let top_left_w = top_left_w.format(self.song, self.status).alignment(Alignment::Left);
+        let top_left_w = top_left_w.format(self.song, self.status).left_aligned();
         top_left_w.render(top_left, buf);
 
         let top_center_w = PropertyTemplates(&c.top_center);
-        let top_center_w = top_center_w.format(self.song, self.status).alignment(Alignment::Center);
+        let top_center_w = top_center_w.format(self.song, self.status).centered();
         top_center_w.render(top_center, buf);
 
         let top_right_w = PropertyTemplates(&c.top_right);
-        let top_right_w = top_right_w.format(self.song, self.status).alignment(Alignment::Right);
+        let top_right_w = top_right_w.format(self.song, self.status).right_aligned();
         top_right_w.render(top_right, buf);
 
         let bot_left_w = PropertyTemplates(&c.bottom_left);
-        let bot_left_w = bot_left_w.format(self.song, self.status).alignment(Alignment::Left);
+        let bot_left_w = bot_left_w.format(self.song, self.status).left_aligned();
         bot_left_w.render(bottom_left, buf);
 
         let bot_center_w = PropertyTemplates(&c.bottom_center);
-        let bot_center_w = bot_center_w.format(self.song, self.status).alignment(Alignment::Center);
+        let bot_center_w = bot_center_w.format(self.song, self.status).centered();
         bot_center_w.render(bottom_center, buf);
 
         let bot_right_w = PropertyTemplates(&c.bottom_right);
-        let bot_right_w = bot_right_w.format(self.song, self.status).alignment(Alignment::Right);
+        let bot_right_w = bot_right_w.format(self.song, self.status).right_aligned();
         bot_right_w.render(bottom_right, buf);
 
         let app_tabs = AppTabs::new(self.active_tab, config);
@@ -83,8 +83,8 @@ where
 
 struct PropertyTemplates<'a>(&'a [Property]);
 impl<'a> PropertyTemplates<'a> {
-    fn format(&'a self, song: Option<&'a Song>, status: &'a Status) -> Paragraph<'a> {
-        Paragraph::new(Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
+    fn format(&'a self, song: Option<&'a Song>, status: &'a Status) -> Line<'a> {
+        Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
             match *val {
                 Property::Song(sp) => acc.push(sp.as_span_opt(song)),
                 Property::Status(p) => acc.push(p.as_span(status)),
@@ -92,7 +92,7 @@ impl<'a> PropertyTemplates<'a> {
                 Property::Text { value, style } => acc.push(Span::styled(value, style)),
             }
             acc
-        })))
+        }))
     }
 }
 
@@ -127,68 +127,40 @@ struct Layouts {
 
 impl Layouts {
     fn new(area: ratatui::prelude::Rect) -> Option<Self> {
-        let [header, tabs] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Length(3)].as_ref())
-            .split(area)
-        else {
+        let [header, tabs] = *Layout::vertical([Constraint::Length(2), Constraint::Length(3)]).split(area) else {
             return None;
         };
 
-        let [left_area, center_area, right_area] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(60),
-                    Constraint::Percentage(20),
-                ]
-                .as_ref(),
-            )
-            .split(header)
-        else {
+        let [left_area, center_area, right_area] = *Layout::horizontal([
+            Constraint::Percentage(20),
+            Constraint::Percentage(60),
+            Constraint::Percentage(20),
+        ])
+        .split(header) else {
             return None;
         };
 
-        let [top_center, bottom_center] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(center_area.height / 2),
-                    Constraint::Length(center_area.height / 2),
-                ]
-                .as_ref(),
-            )
-            .split(center_area)
-        else {
+        let [top_center, bottom_center] = *Layout::vertical([
+            Constraint::Length(center_area.height / 2),
+            Constraint::Length(center_area.height / 2),
+        ])
+        .split(center_area) else {
             return None;
         };
 
-        let [top_right, bottom_right] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(center_area.height / 2),
-                    Constraint::Length(center_area.height / 2),
-                ]
-                .as_ref(),
-            )
-            .split(right_area)
-        else {
+        let [top_right, bottom_right] = *Layout::vertical([
+            Constraint::Length(center_area.height / 2),
+            Constraint::Length(center_area.height / 2),
+        ])
+        .split(right_area) else {
             return None;
         };
 
-        let [top_left, bottom_left] = *Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(center_area.height / 2),
-                    Constraint::Length(center_area.height / 2),
-                ]
-                .as_ref(),
-            )
-            .split(left_area)
-        else {
+        let [top_left, bottom_left] = *Layout::vertical([
+            Constraint::Length(center_area.height / 2),
+            Constraint::Length(center_area.height / 2),
+        ])
+        .split(left_area) else {
             return None;
         };
 

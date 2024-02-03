@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    prelude::{Constraint, Direction, Layout},
+    prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols::{self, border},
     widgets::{Block, Borders, Clear},
@@ -85,10 +85,8 @@ impl Modal for RenamePlaylistModal {
         if let Some(bg_color) = app.config.ui.background_color_modal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
-        let [body_area, buttons_area] = *Layout::default()
-            .constraints([Constraint::Length(2), Constraint::Max(3)].as_ref())
-            .direction(Direction::Vertical)
-            .split(popup_area)
+        let [body_area, buttons_area] =
+            *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
         else {
             return Ok(());
         };
