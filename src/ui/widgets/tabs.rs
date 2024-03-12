@@ -1,4 +1,4 @@
-// This is a "fork" of ratatui's Tabs widget made to remove the spacing between tabs
+// This is a "fork" of ratatui's Tabs widget
 
 // The MIT License (MIT)
 //
@@ -25,11 +25,14 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
+    prelude::Alignment,
     style::{Style, Styled},
     symbols,
     text::{Line, Span},
     widgets::{Block, Widget},
 };
+
+use super::get_line_offset;
 
 /// A widget to display available tabs in a multiple panels context.
 ///
@@ -61,6 +64,8 @@ pub struct Tabs<'a> {
     highlight_style: Style,
     /// Tab divider
     divider: Span<'a>,
+    /// Alignment of the tabs
+    alignment: Alignment,
 }
 
 #[allow(unused)]
@@ -76,6 +81,7 @@ impl<'a> Tabs<'a> {
             style: Style::default(),
             highlight_style: Style::default(),
             divider: Span::raw(symbols::line::VERTICAL),
+            alignment: Alignment::Left,
         }
     }
 
@@ -104,6 +110,11 @@ impl<'a> Tabs<'a> {
         T: Into<Span<'a>>,
     {
         self.divider = divider.into();
+        self
+    }
+
+    pub fn alignment(mut self, alignment: Alignment) -> Tabs<'a> {
+        self.alignment = alignment;
         self
     }
 }
@@ -136,7 +147,12 @@ impl<'a> Widget for Tabs<'a> {
             return;
         }
 
-        let mut x = tabs_area.left();
+        let mut x = get_line_offset(
+            self.titles.iter().map(|t| t.width() as u16).sum(),
+            tabs_area.width,
+            self.alignment,
+        );
+
         let titles_length = self.titles.len();
         for (i, title) in self.titles.into_iter().enumerate() {
             let last_title = titles_length - 1 == i;

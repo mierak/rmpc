@@ -177,7 +177,6 @@ impl MpdClient for Client<'_> {
 
     #[tracing::instrument(skip(self))]
     fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()> {
-        tracing::debug!(version = ?self.version, consume = ?consume);
         if self.version < Version::new(0, 24, 0) && matches!(consume, OnOffOneshot::Oneshot) {
             Err(MpdError::UnsupportedMpdVersion(
                 "consume oneshot can be used since MPD 0.24.0",

@@ -8,8 +8,9 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::{Backend, Constraint, CrosstermBackend, Layout},
+    prelude::{Backend, Constraint, CrosstermBackend, Layout, Margin},
     style::{Color, Style},
+    symbols::border,
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
@@ -196,7 +197,25 @@ impl Ui<'_> {
             bar_area,
         );
 
-        screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
+        if app.config.ui.draw_borders {
+            screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
+        } else {
+            screen_call!(
+                self,
+                app,
+                render(
+                    frame,
+                    ratatui::prelude::Rect {
+                        x: content_area.x,
+                        y: content_area.y + 1,
+                        width: content_area.width,
+                        height: content_area.height - 1,
+                    },
+                    app,
+                    &mut self.shared_state
+                )
+            )?;
+        }
 
         if let Some(ref mut modal) = self.active_modal {
             Self::render_modal(modal, frame, app, &mut self.shared_state)?;
@@ -511,6 +530,7 @@ impl Config {
 
         ratatui::widgets::Block::default()
             .borders(Borders::TOP | Borders::BOTTOM)
+            .border_set(border::ONE_EIGHTH_WIDE)
             .border_style(self.as_border_style())
     }
 

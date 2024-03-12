@@ -18,10 +18,7 @@ where
     T: PartialEq + IntoEnumIterator + VariantNames,
 {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let tab_names = T::VARIANTS
-            .iter()
-            .map(|e| format!("{: ^13}", format!("{e}")))
-            .collect::<Vec<String>>();
+        let tab_names = T::VARIANTS.iter().map(|e| format!("{e: ^13}")).collect::<Vec<String>>();
 
         let Some(selected_tab) = T::iter()
             .enumerate()
@@ -36,6 +33,7 @@ where
             .divider("")
             .block(self.config.as_tabs_block())
             .style(self.config.ui.inactive_tab_style)
+            .alignment(ratatui::prelude::Alignment::Center)
             .highlight_style(self.config.ui.active_tab_style);
 
         tabs.render(area, buf);
