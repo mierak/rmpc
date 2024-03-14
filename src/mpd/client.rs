@@ -14,7 +14,7 @@ use log::debug;
 type MpdResult<T> = Result<T, MpdError>;
 
 pub struct Client<'name> {
-    name: Option<&'name str>,
+    name: &'name str,
     rx: BufReader<TcpStream>,
     stream: TcpStream,
     reconnect: bool,
@@ -34,7 +34,7 @@ impl std::fmt::Debug for Client<'_> {
 
 #[allow(dead_code)]
 impl<'name> Client<'name> {
-    pub fn init(addr: &'static str, name: Option<&'name str>, reconnect: bool) -> MpdResult<Client<'name>> {
+    pub fn init(addr: &'static str, name: &'name str, reconnect: bool) -> MpdResult<Client<'name>> {
         let stream = TcpStream::connect(addr)?;
         stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
         stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
@@ -51,7 +51,7 @@ impl<'name> Client<'name> {
             )));
         };
 
-        debug!(version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
+        debug!(name, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
 
         Ok(Self {
             name,
@@ -85,7 +85,7 @@ impl<'name> Client<'name> {
         self.stream = stream;
         self.version = version;
 
-        debug!(handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
+        debug!(name = self.name, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
 
         Ok(self)
     }

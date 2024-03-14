@@ -85,7 +85,7 @@ fn main() -> Result<()> {
             try_ret!(tx.send(AppEvent::RequestRender), "Failed to render first frame");
 
             let mut client = try_ret!(
-                Client::init(config.address, Some("command"), true),
+                Client::init(config.address, "command", true),
                 "Failed to connect to mpd"
             );
 
@@ -125,7 +125,7 @@ fn main() -> Result<()> {
                     state,
                     rx,
                     try_ret!(
-                        Client::init(config.address, Some("state"), true),
+                        Client::init(config.address, "state", true),
                         "Failed to connect to mpd with state client"
                     ),
                     render_loop,
@@ -135,7 +135,7 @@ fn main() -> Result<()> {
             })?;
 
             let mut idle_client = try_ret!(
-                Client::init(config.address, Some("idle"), true),
+                Client::init(config.address, "idle", true),
                 "Failed to connect to mpd with idle client"
             );
             idle_client.set_read_timeout(None)?;

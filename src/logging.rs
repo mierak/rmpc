@@ -165,7 +165,7 @@ impl Visitor {
 impl std::fmt::Display for Visitor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for ele in self.values.iter() {
-            write!(f, r#""{}={}" "#, ele.0, ele.1)?;
+            write!(f, r#"{}="{}" "#, ele.0, ele.1)?;
         }
         Ok(())
     }
