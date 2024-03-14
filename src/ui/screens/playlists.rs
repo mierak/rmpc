@@ -3,7 +3,6 @@ use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
-use tracing::instrument;
 
 use crate::{
     mpd::{
@@ -15,8 +14,9 @@ use crate::{
         modals::{rename_playlist::RenamePlaylistModal, Modals},
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, Level, SharedUiState, StatusMessage,
+        KeyHandleResultInternal, SharedUiState,
     },
+    utils::macros::{status_error, status_info},
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen, SongExt};
@@ -50,12 +50,11 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    #[instrument(err)]
     fn before_show(
         &mut self,
         client: &mut Client<'_>,
         app: &mut crate::state::State,
-        shared: &mut SharedUiState,
+        _shared: &mut SharedUiState,
     ) -> Result<()> {
         let mut playlists: Vec<_> = client
             .list_playlists()
@@ -70,7 +69,6 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    #[instrument(err)]
     fn refresh(
         &mut self,
         client: &mut Client<'_>,
@@ -95,7 +93,6 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    #[instrument(err)]
     fn handle_action(
         &mut self,
         event: KeyEvent,
@@ -138,12 +135,12 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         item: &DirOrSong,
         index: usize,
         client: &mut Client<'_>,
-        shared: &mut SharedUiState,
+        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {
                 client.delete_playlist(d)?;
-                shared.status_message = Some(StatusMessage::new(format!("Playlist '{d}' deleted"), Level::Info));
+                status_info!("Playlist '{d}' deleted");
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             DirOrSong::Song(s) => {
@@ -151,10 +148,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                     return Ok(KeyHandleResultInternal::SkipRender);
                 };
                 client.delete_from_playlist(playlist, &SingleOrRange::single(index))?;
-                shared.status_message = Some(StatusMessage::new(
-                    format!("File '{s}' deleted from playlist '{playlist}'"),
-                    Level::Info,
-                ));
+                status_info!("File '{s}' deleted from playlist '{playlist}'");
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
         }
@@ -164,24 +158,18 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         &self,
         item: &DirOrSong,
         client: &mut Client<'_>,
-        shared: &mut SharedUiState,
+        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {
                 client.load_playlist(d)?;
-                shared.status_message = Some(StatusMessage::new(
-                    format!("Playlist '{d}' added to queue"),
-                    Level::Info,
-                ));
+                status_info!("Playlist '{d}' added to queue");
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             DirOrSong::Song(s) => {
                 client.add(s)?;
                 if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, s)]) {
-                    shared.status_message = Some(StatusMessage::new(
-                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
-                        Level::Info,
-                    ));
+                    status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
                 }
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -204,7 +192,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
     fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack().current().selected() else {
-            tracing::error!("Failed to move deeper inside dir. Current value is None");
+            log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
@@ -225,7 +213,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         let Some((selected, idx)) = self.stack().current().selected_with_idx() else {
-            tracing::error!("Failed to move playlist. No playlist selected");
+            status_error!("Failed to move playlist. No playlist selected");
             return Ok(KeyHandleResultInternal::SkipRender);
         };
         let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {

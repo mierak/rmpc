@@ -3,15 +3,15 @@ use crate::{
         client::Client,
         commands::Song as MpdSong,
         errors::MpdError,
-        mpd_client::Filter,
-        mpd_client::{MpdClient, Tag},
+        mpd_client::{Filter, MpdClient, Tag},
     },
     state::State,
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, Level, SharedUiState, StatusMessage,
+        KeyHandleResultInternal, SharedUiState,
     },
+    utils::macros::status_info,
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen};
@@ -20,7 +20,6 @@ use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
-use tracing::instrument;
 
 #[derive(Debug, Default)]
 pub struct AlbumsScreen {
@@ -49,12 +48,11 @@ impl Screen for AlbumsScreen {
         Ok(())
     }
 
-    #[instrument(err)]
     fn before_show(
         &mut self,
         client: &mut Client<'_>,
         app: &mut crate::state::State,
-        shared: &mut SharedUiState,
+        _shared: &mut SharedUiState,
     ) -> Result<()> {
         let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
         self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
@@ -87,7 +85,6 @@ impl Screen for AlbumsScreen {
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum AlbumsActions {}
 
-#[tracing::instrument]
 fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
         .list_tag(Tag::Title, Some(&[Filter::new(Tag::Album, album)]))?
@@ -95,14 +92,8 @@ fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterator<Ite
         .map(DirOrSong::Song))
 }
 
-#[tracing::instrument]
 fn find_songs(client: &mut Client<'_>, album: &str, file: &str) -> Result<Vec<MpdSong>, MpdError> {
     client.find(&[Filter::new(Tag::Title, file), Filter::new(Tag::Album, album)])
-}
-
-#[tracing::instrument]
-fn add_song(client: &mut Client<'_>, album: &str, file: &str) -> Result<(), MpdError> {
-    client.find_add(&[Filter::new(Tag::Title, file), Filter::new(Tag::Album, album)])
 }
 
 impl BrowserScreen<DirOrSong> for AlbumsScreen {
@@ -124,11 +115,11 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
 
     fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(current) = self.stack.current().selected() else {
-            tracing::error!("Failed to move deeper inside dir. Current value is None");
+            log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
         let Some(value) = current.as_path() else {
-            tracing::error!("Failed to move deeper inside dir. Current value is None");
+            log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
@@ -140,7 +131,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => {
-                tracing::error!("Unexpected nesting in Artists dir structure");
+                log::error!("Unexpected nesting in Artists dir structure");
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
         }
@@ -150,7 +141,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         &self,
         item: &DirOrSong,
         client: &mut Client<'_>,
-        shared: &mut SharedUiState,
+        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match self.stack.path() {
             [album] => {
@@ -159,19 +150,13 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
                     Filter::new(Tag::Album, album.as_str()),
                 ])?;
 
-                shared.status_message = Some(StatusMessage::new(
-                    format!("'{}' from album '{album}' added to queue", item.value()),
-                    Level::Info,
-                ));
+                status_info!("'{}' from album '{album}' added to queue", item.value());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
                 client.find_add(&[Filter::new(Tag::Album, item.value())])?;
 
-                shared.status_message = Some(StatusMessage::new(
-                    format!("Album '{}' added to queue", item.value()),
-                    Level::Info,
-                ));
+                status_info!("Album '{}' added to queue", item.value());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),

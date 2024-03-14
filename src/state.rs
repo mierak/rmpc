@@ -11,7 +11,6 @@ use crate::{
 };
 use anyhow::Result;
 use derive_more::{AsMut, AsRef, Deref, DerefMut};
-use tracing::instrument;
 
 #[derive(Clone, PartialEq, AsRef, AsMut, Deref)]
 pub struct MyVec<T>(Vec<T>);
@@ -59,7 +58,6 @@ impl std::fmt::Debug for State {
 }
 
 impl State {
-    #[instrument(ret, skip_all)]
     pub fn try_new(client: &mut Client<'_>, config: &'static Config) -> Result<Self> {
         let current_song = client.get_current_song()?;
         let queue = client.playlist_info()?;

@@ -1,5 +1,3 @@
-use tracing::instrument;
-
 use self::errors::MpdError;
 
 pub mod client;
@@ -15,18 +13,18 @@ where
 {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError>;
 
-    #[instrument(skip(self))]
     fn next(&mut self, line: String) -> Result<(), MpdError> {
         let (key, value) = split_line(line)?;
         match self.next_internal(key.to_lowercase().as_str(), value)? {
             LineHandled::Yes => {}
-            LineHandled::No { value } => tracing::warn!(message = "Encountered unknow key/value pair", key, value),
+            LineHandled::No { value } => {
+                log::warn!(key = key.as_str(), value = value.as_str(); "Encountered unknow key/value pair")
+            }
         }
         Ok(())
     }
 }
 
-#[instrument]
 pub(self) fn split_line(mut line: String) -> Result<(String, String), MpdError> {
     let delim_idx = match line.find(':') {
         Some(val) => val,

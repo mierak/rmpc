@@ -17,8 +17,8 @@ use crate::{
             button::{Button, ButtonGroup, ButtonGroupState},
             input::Input,
         },
-        Level, StatusMessage,
     },
+    utils::macros::status_info,
 };
 
 use super::{KeyHandleResultInternal, RectExt, SharedUiState};
@@ -126,10 +126,7 @@ impl Modal for SaveQueueModal {
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 {
                     client.save_queue_as_playlist(&self.name, None)?;
-                    _shared.status_message = Some(StatusMessage::new(
-                        format!("Playlist '{}' saved", self.name),
-                        Level::Info,
-                    ));
+                    status_info!("Playlist '{}' saved", self.name);
                 }
                 self.on_hide();
                 return Ok(KeyHandleResultInternal::Modal(None));
@@ -163,10 +160,7 @@ impl Modal for SaveQueueModal {
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 {
                         client.save_queue_as_playlist(&self.name, None)?;
-                        _shared.status_message = Some(StatusMessage::new(
-                            format!("Playlist '{}' saved", self.name),
-                            Level::Info,
-                        ));
+                        status_info!("Playlist '{}' saved", self.name);
                     }
                     self.on_hide();
                     Ok(KeyHandleResultInternal::Modal(None))

@@ -3,7 +3,6 @@ use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
-use tracing::instrument;
 
 use crate::{
     mpd::{
@@ -15,8 +14,9 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, Level, SharedUiState, StatusMessage,
+        KeyHandleResultInternal, SharedUiState,
     },
+    utils::macros::status_info,
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen, SongExt};
@@ -66,7 +66,6 @@ impl Screen for DirectoriesScreen {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     fn handle_action(
         &mut self,
         event: KeyEvent,
@@ -111,7 +110,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         &self,
         item: &DirOrSong,
         client: &mut Client<'_>,
-        shared: &mut SharedUiState,
+        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(dirname) => {
@@ -120,18 +119,12 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 let next_path = next_path.join("/").to_string();
 
                 client.add(&next_path)?;
-                shared.status_message = Some(StatusMessage::new(
-                    format!("Directory '{next_path}' added to queue"),
-                    Level::Info,
-                ));
+                status_info!("Directory '{next_path}' added to queue");
             }
             DirOrSong::Song(file) => {
                 client.add(file)?;
                 if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, file)]) {
-                    shared.status_message = Some(StatusMessage::new(
-                        format!("'{}' by '{}' added to queue", song.title_str(), song.artist_str()),
-                        Level::Info,
-                    ));
+                    status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
                 }
             }
         };
@@ -140,11 +133,11 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
 
     fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack.current().selected() else {
-            tracing::error!("Failed to move deeper inside dir. Current value is None");
+            log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
         let Some(next_path) = self.stack.next_path() else {
-            tracing::error!("Failed to move deeper inside dir. Next path is None");
+            log::error!("Failed to move deeper inside dir. Next path is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
@@ -169,13 +162,13 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir(_)) => {
                 let Some(next_path) = self.stack.next_path() else {
-                    tracing::error!("Failed to move deeper inside dir. Next path is None");
+                    log::error!("Failed to move deeper inside dir. Next path is None");
                     return Ok(None);
                 };
                 let res: Vec<_> = match client.lsinfo(Some(&next_path.join("/").to_string())) {
                     Ok(val) => val,
                     Err(err) => {
-                        tracing::error!(message = "Failed to get lsinfo for dir", error = ?err);
+                        log::error!(error:? = err; "Failed to get lsinfo for dir",);
                         return Ok(None);
                     }
                 }

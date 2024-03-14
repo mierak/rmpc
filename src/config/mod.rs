@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use log::Level;
 use serde::{Deserialize, Serialize};
-use tracing::Level;
 
 mod defaults;
 mod keys;
@@ -18,7 +18,7 @@ use self::{
 pub struct Args {
     #[arg(short, long, value_name = "FILE", default_value = get_default_config_path().into_os_string())]
     pub config: PathBuf,
-    #[arg(short, long, default_value_t = Level::DEBUG)]
+    #[arg(short, long, default_value_t = Level::Debug)]
     pub log: Level,
     #[command(subcommand)]
     pub command: Option<Command>,

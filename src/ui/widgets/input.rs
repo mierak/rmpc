@@ -35,7 +35,12 @@ impl Widget for Input<'_> {
         };
         let label = Paragraph::new(self.label).wrap(Wrap { trim: true });
         let input = Paragraph::new(self.trimed_text(input_area))
-            .block(Block::default().borders(Borders::ALL).border_style(block_border_style))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(ratatui::symbols::border::ROUNDED)
+                    .border_style(block_border_style),
+            )
             .fg(Color::White)
             .wrap(Wrap { trim: true });
 

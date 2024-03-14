@@ -1,21 +1,19 @@
 use std::{io::Stdout, ops::AddAssign, time::Duration};
 
-use ansi_to_tui::IntoText;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use crossterm::{
     event::KeyEvent,
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::{Backend, Constraint, CrosstermBackend, Layout, Margin},
+    prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
     symbols::border,
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
 use strum::Display;
-use tracing::instrument;
 
 use crate::{
     config::Config,
@@ -60,20 +58,10 @@ pub struct StatusMessage {
     pub created: std::time::Instant,
 }
 
-impl StatusMessage {
-    pub fn new(message: String, level: Level) -> Self {
-        Self {
-            message,
-            level,
-            created: std::time::Instant::now(),
-        }
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct SharedUiState {
-    pub status_message: Option<StatusMessage>,
-    pub frame_counter: u32,
+    status_message: Option<StatusMessage>,
+    frame_counter: u32,
 }
 
 #[derive(Debug)]
@@ -141,7 +129,6 @@ macro_rules! screen_call {
 }
 
 impl Ui<'_> {
-    #[instrument(skip_all)]
     pub fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
         if let Some(bg_color) = app.config.ui.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
@@ -169,17 +156,10 @@ impl Ui<'_> {
 
         frame.render_widget(header, header_area);
 
-        if let Some(StatusMessage {
-            ref message, ref level, ..
-        }) = self.shared_state.status_message
-        {
-            let status_bar = Paragraph::new(
-                message
-                    .into_text()
-                    .context("Failed to convert status bar message to text")?,
-            )
-            .alignment(ratatui::prelude::Alignment::Center)
-            .style(Style::default().fg(level.to_color()).bg(Color::Black));
+        if let Some(StatusMessage { message, level, .. }) = &self.shared_state.status_message {
+            let status_bar = Paragraph::new(message.to_owned())
+                .alignment(ratatui::prelude::Alignment::Center)
+                .style(Style::default().fg(level.into()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
         } else if app.config.status_update_interval_ms.is_some() {
             let elapsed_bar = app.config.as_styled_progress_bar();
@@ -252,7 +232,6 @@ impl Ui<'_> {
         }
     }
 
-    #[instrument(skip(self, app), fields(screen))]
     pub fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<KeyHandleResult> {
         macro_rules! screen_call_inner {
             ($fn:ident($($param:expr),+)) => {
@@ -317,7 +296,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = app.active_tab.next();
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -325,7 +303,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = app.active_tab.prev();
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -333,7 +310,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = screens::Screens::Queue;
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -341,7 +317,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = screens::Screens::Directories;
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -349,7 +324,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = screens::Screens::Artists;
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -357,7 +331,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = screens::Screens::Albums;
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -365,7 +338,6 @@ impl Ui<'_> {
                             screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
 
                             app.active_tab = screens::Screens::Playlists;
-                            tracing::Span::current().record("screen", app.active_tab.to_string());
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
@@ -389,7 +361,6 @@ impl Ui<'_> {
         }
     }
 
-    #[instrument(skip_all)]
     pub fn before_show(&mut self, app: &mut State) -> Result<()> {
         screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state))
     }
@@ -471,12 +442,9 @@ impl From<KeyHandleResultInternal> for KeyHandleResult {
     }
 }
 
-trait LevelExt {
-    fn to_color(&self) -> Color;
-}
-impl LevelExt for Level {
-    fn to_color(&self) -> Color {
-        match *self {
+impl From<&Level> for Color {
+    fn from(value: &Level) -> Self {
+        match value {
             Level::Info => Color::Blue,
             Level::Warn => Color::Yellow,
             Level::Error => Color::Red,

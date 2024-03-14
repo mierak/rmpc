@@ -1,163 +1,179 @@
-use std::{
-    io::{self, Write},
-    vec,
-};
-
-use time::{macros::format_description, UtcOffset};
-use tracing::{subscriber::Interest, Level, Metadata};
-use tracing_appender::{non_blocking::WorkerGuard, rolling::Rotation};
-use tracing_subscriber::{
-    fmt::MakeWriter,
-    layer::{Context, Filter},
-    prelude::__tracing_subscriber_SubscriberExt,
-    util::SubscriberInitExt,
-    Layer,
-};
+use flexi_logger::{style, FileSpec, FlexiLoggerError, LoggerHandle};
 
 use crate::AppEvent;
 
-struct TestWriter;
-
-impl std::io::Write for TestWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let buf_len = buf.len();
-        println!("{buf:?}");
-        Ok(buf_len)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
+pub fn init(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    #[cfg(debug_assertions)]
+    return init_debug(tx);
+    #[cfg(not(debug_assertions))]
+    return init_release(tx);
 }
 
-pub fn configure(level: Level, tx: &std::sync::mpsc::Sender<AppEvent>) -> Vec<WorkerGuard> {
-    let error_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::StatusBar)));
-    let file_appender = tracing_appender::rolling::RollingFileAppender::new(Rotation::DAILY, "./", "mpdox.log");
-    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-    let (non_blocking_errors, errors_guard) = tracing_appender::non_blocking(&*error_writer);
-    #[cfg(debug_assertions)]
-    let mut guards = vec![guard, errors_guard];
-    #[cfg(not(debug_assertions))]
-    let guards = vec![guard, errors_guard];
-    let registry = tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::Layer::default()
-                .with_ansi(false)
-                .with_writer(non_blocking)
-                .with_file(true)
-                .with_target(false)
-                .with_line_number(true)
-                .with_timer(tracing_subscriber::fmt::time::OffsetTime::new(
-                    UtcOffset::UTC,
-                    format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"),
-                ))
-                .compact()
-                .with_filter(LogsFilter::new(level)),
+#[allow(dead_code)]
+fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    flexi_logger::Logger::try_with_str("debug")?
+        .log_to_file(
+            FileSpec::default()
+                .directory(std::env::temp_dir())
+                .basename("rmpc")
+                .suppress_timestamp(),
         )
-        .with(
-            tracing_subscriber::fmt::Layer::default()
-                .with_writer(non_blocking_errors)
-                .with_target(false)
-                .with_level(false)
-                .without_time()
-                .with_filter(LogsFilter::new(Level::ERROR)),
-        );
-    #[cfg(debug_assertions)]
-    {
-        let logs_writer = Box::leak(Box::new(LogChannelWriter::new(tx.clone(), WriterVariant::Log)));
-        let (non_blocking_logs, logs_guard) = tracing_appender::non_blocking(&*logs_writer);
-        guards.push(logs_guard);
-        registry
-            .with(
-                tracing_subscriber::fmt::Layer::default()
-                    .with_writer(non_blocking_logs)
-                    .with_ansi(true)
-                    .with_file(true)
-                    .with_target(false)
-                    .with_line_number(true)
-                    .with_timer(tracing_subscriber::fmt::time::OffsetTime::new(
-                        UtcOffset::UTC,
-                        format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"),
-                    ))
-                    .compact()
-                    .with_filter(LogsFilter::new(level)),
-            )
-            .init();
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        registry.init();
-    }
-
-    guards
+        .add_writer("status_bar", Box::new(StatusBarWriter::new(tx)))
+        .format_for_writer(colored_structured_detailed_format)
+        .format_for_files(structured_detailed_format)
+        .set_palette("160;221;15;39;128".to_string())
+        .start()
 }
 
-pub struct LogsFilter {
-    level: Level,
-}
-impl LogsFilter {
-    pub fn new(level: Level) -> Self {
-        LogsFilter { level }
-    }
-}
-impl<T> Filter<T> for LogsFilter {
-    fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
-        if meta.target().contains(clap::crate_name!()) {
-            Interest::sometimes()
-        } else {
-            Interest::never()
-        }
-    }
-
-    fn enabled(&self, meta: &Metadata<'_>, _cx: &Context<'_, T>) -> bool {
-        meta.target().contains(clap::crate_name!()) && *meta.level() <= self.level
-    }
+#[allow(dead_code)]
+fn init_debug(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    flexi_logger::Logger::try_with_str("debug")?
+        .log_to_file_and_writer(
+            FileSpec::default()
+                .directory(std::env::temp_dir())
+                .basename("rmpc")
+                .suppress_timestamp(),
+            Box::new(AppEventChannelWriter::new(tx.clone())),
+        )
+        .add_writer("status_bar", Box::new(StatusBarWriter::new(tx)))
+        .format_for_writer(colored_structured_detailed_format)
+        .format_for_files(structured_detailed_format)
+        .set_palette("160;221;15;39;128".to_string())
+        .start()
 }
 
-pub enum WriterVariant {
-    Log,
-    StatusBar,
-}
-
-pub struct LogChannelWriter {
+pub struct StatusBarWriter {
     tx: std::sync::mpsc::Sender<AppEvent>,
-    variant: WriterVariant,
 }
 
-impl LogChannelWriter {
-    pub fn new(tx: std::sync::mpsc::Sender<AppEvent>, variant: WriterVariant) -> Self {
-        Self { tx, variant }
+impl StatusBarWriter {
+    pub fn new(tx: std::sync::mpsc::Sender<AppEvent>) -> Self {
+        Self { tx }
     }
 }
 
-impl Write for &LogChannelWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if (match self.variant {
-            WriterVariant::Log => self.tx.send(AppEvent::Log(buf.to_owned())),
-            WriterVariant::StatusBar => self
-                .tx
-                .send(AppEvent::StatusBar(String::from_utf8_lossy(buf).to_string())),
-        })
-        .is_err()
+pub struct AppEventChannelWriter {
+    tx: std::sync::mpsc::Sender<AppEvent>,
+    format_fn: Option<flexi_logger::FormatFunction>,
+}
+
+impl flexi_logger::writers::LogWriter for StatusBarWriter {
+    fn write(&self, _now: &mut flexi_logger::DeferredNow, record: &log::Record) -> std::io::Result<()> {
+        match self
+            .tx
+            .send(AppEvent::Status(format!("{}", record.args()), record.level().into()))
         {
-            return Err(io::Error::new(io::ErrorKind::Other, anyhow::anyhow!("test")));
+            Ok(v) => Ok(v),
+            Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
         }
-        Ok(buf.len())
     }
 
-    fn flush(&mut self) -> io::Result<()> {
+    fn flush(&self) -> std::io::Result<()> {
         Ok(())
     }
 }
 
-impl<'a> MakeWriter<'a> for LogChannelWriter {
-    type Writer = &'a Self;
+impl AppEventChannelWriter {
+    pub fn new(tx: std::sync::mpsc::Sender<AppEvent>) -> Self {
+        Self { tx, format_fn: None }
+    }
+}
 
-    fn make_writer(&'a self) -> Self::Writer {
-        self
+impl flexi_logger::writers::LogWriter for AppEventChannelWriter {
+    fn write(&self, now: &mut flexi_logger::DeferredNow, record: &log::Record) -> std::io::Result<()> {
+        let mut buf = Vec::new();
+        (self.format_fn).and_then(|fun| Some(fun(&mut buf, now, record)));
+
+        match self.tx.send(AppEvent::Log(buf)) {
+            Ok(v) => Ok(v),
+            Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
+        }
     }
 
-    fn make_writer_for(&'a self, _metadata: &Metadata<'_>) -> Self::Writer {
-        self
+    fn flush(&self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn format(&mut self, format: flexi_logger::FormatFunction) {
+        self.format_fn = Some(format);
+    }
+}
+
+impl From<log::Level> for crate::ui::Level {
+    fn from(level: log::Level) -> Self {
+        match level {
+            log::Level::Error => crate::ui::Level::Error,
+            log::Level::Warn => crate::ui::Level::Warn,
+            log::Level::Info => crate::ui::Level::Info,
+            log::Level::Debug => crate::ui::Level::Debug,
+            log::Level::Trace => crate::ui::Level::Trace,
+        }
+    }
+}
+
+pub fn colored_structured_detailed_format(
+    w: &mut dyn std::io::Write,
+    now: &mut flexi_logger::DeferredNow,
+    record: &log::Record,
+) -> Result<(), std::io::Error> {
+    let mut visitor = Visitor::new();
+    record.key_values().visit(&mut visitor).unwrap();
+
+    let level = record.level();
+    write!(
+        w,
+        r#"{} {:<5} {}:{} message="{}" {}"#,
+        now.now_utc_owned().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+        record.level().to_string(),
+        record.file().unwrap_or("<unnamed>"),
+        record.line().unwrap_or(0),
+        style(level).paint(&record.args().to_string()),
+        visitor
+    )
+}
+
+pub fn structured_detailed_format(
+    w: &mut dyn std::io::Write,
+    now: &mut flexi_logger::DeferredNow,
+    record: &log::Record,
+) -> Result<(), std::io::Error> {
+    let mut visitor = Visitor::new();
+    record.key_values().visit(&mut visitor).unwrap();
+    write!(
+        w,
+        r#"{} {:<5} {}:{} message="{}" {}"#,
+        now.now_utc_owned().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+        record.level().to_string(),
+        record.file().unwrap_or("<unnamed>"),
+        record.line().unwrap_or(0),
+        &record.args().to_string(),
+        visitor
+    )
+}
+
+#[derive(Debug)]
+struct Visitor {
+    values: Vec<(String, String)>,
+}
+
+impl Visitor {
+    fn new() -> Self {
+        Self { values: Vec::new() }
+    }
+}
+
+impl std::fmt::Display for Visitor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for ele in self.values.iter() {
+            write!(f, r#""{}={}" "#, ele.0, ele.1)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'kvs> log::kv::VisitSource<'kvs> for Visitor {
+    fn visit_pair(&mut self, key: log::kv::Key<'kvs>, value: log::kv::Value<'kvs>) -> Result<(), log::kv::Error> {
+        self.values.push((key.to_string(), value.to_string()));
+        Ok(())
     }
 }

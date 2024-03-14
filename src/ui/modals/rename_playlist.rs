@@ -17,8 +17,8 @@ use crate::{
             button::{Button, ButtonGroup, ButtonGroupState},
             input::Input,
         },
-        Level, StatusMessage,
     },
+    utils::macros::status_info,
 };
 
 use super::{KeyHandleResultInternal, RectExt, SharedUiState};
@@ -135,10 +135,7 @@ impl Modal for RenamePlaylistModal {
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 && self.playlist_name != self.new_name {
                     client.rename_playlist(&self.playlist_name, &self.new_name)?;
-                    _shared.status_message = Some(StatusMessage::new(
-                        format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
-                        Level::Info,
-                    ));
+                    status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
                 }
                 self.on_hide();
                 return Ok(KeyHandleResultInternal::Modal(None));
@@ -172,10 +169,7 @@ impl Modal for RenamePlaylistModal {
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 && self.playlist_name != self.new_name {
                         client.rename_playlist(&self.playlist_name, &self.new_name)?;
-                        _shared.status_message = Some(StatusMessage::new(
-                            format!("Playlist '{}' renamed te '{}'", self.playlist_name, self.new_name),
-                            Level::Info,
-                        ));
+                        status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
                     }
                     self.on_hide();
                     Ok(KeyHandleResultInternal::Modal(None))

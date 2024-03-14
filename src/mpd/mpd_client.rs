@@ -4,6 +4,8 @@ use anyhow::Result;
 use derive_more::Deref;
 use strum::{AsRefStr, Display};
 
+use crate::utils::macros::status_error;
+
 use super::{
     client::Client,
     commands::{
@@ -83,99 +85,81 @@ pub trait MpdClient {
 
 impl MpdClient for Client<'_> {
     // Queries
-    #[tracing::instrument(skip(self))]
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         self.send("idle").and_then(ProtoClient::read_response)
     }
 
-    #[tracing::instrument(skip(self))]
     fn get_volume(&mut self) -> MpdResult<Volume> {
         self.send("getvol").and_then(ProtoClient::read_response)
     }
 
-    #[tracing::instrument(skip(self))]
     fn set_volume(&mut self, volume: &Volume) -> MpdResult<()> {
         self.send(&format!("setvol {}", volume.value()))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
         self.send("currentsong").and_then(ProtoClient::read_opt_response)
     }
 
-    #[tracing::instrument(skip(self))]
     fn get_status(&mut self) -> MpdResult<Status> {
         self.send("status").and_then(ProtoClient::read_response)
     }
 
     // Playback control
-    #[tracing::instrument(skip(self))]
     fn pause_toggle(&mut self) -> MpdResult<()> {
         self.send("pause").and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn next(&mut self) -> MpdResult<()> {
         self.send("next").and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn prev(&mut self) -> MpdResult<()> {
         self.send("previous").and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn play_pos(&mut self, pos: u32) -> MpdResult<()> {
         self.send(&format!("play {pos}")).and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn play(&mut self) -> MpdResult<()> {
         self.send("play").and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn play_id(&mut self, id: u32) -> MpdResult<()> {
         self.send(&format!("playid {id}")).and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn stop(&mut self) -> MpdResult<()> {
         self.send("stop").and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()> {
         self.send(&format!("seekcur +{time_sec}"))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()> {
         self.send(&format!("seekcur -{time_sec}"))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn repeat(&mut self, enabled: bool) -> MpdResult<()> {
         self.send(&format!("repeat {}", u8::from(enabled)))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn random(&mut self, enabled: bool) -> MpdResult<()> {
         self.send(&format!("random {}", u8::from(enabled)))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn single(&mut self, single: OnOffOneshot) -> MpdResult<()> {
         self.send(&format!("single {}", single.to_mpd_value()))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()> {
         if self.version < Version::new(0, 24, 0) && matches!(consume, OnOffOneshot::Oneshot) {
             Err(MpdError::UnsupportedMpdVersion(
@@ -188,39 +172,32 @@ impl MpdClient for Client<'_> {
     }
 
     // Current queue
-    #[tracing::instrument(skip(self))]
     fn add(&mut self, path: &str) -> MpdResult<()> {
         self.send(&format!("add \"{path}\"")).and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn clear(&mut self) -> MpdResult<()> {
         self.send("clear").and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn delete_id(&mut self, id: u32) -> MpdResult<()> {
         self.send(&format!("deleteid \"{id}\"")).and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
         self.send(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         self.send("playlistinfo").and_then(ProtoClient::read_opt_response)
     }
 
-    #[tracing::instrument(skip(self))]
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         self.send(&format!("find \"({})\"", filter.to_query_str()))
             .and_then(ProtoClient::read_response)
     }
 
-    #[tracing::instrument(skip(self))]
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
         Ok(self
             .send(&format!("find \"({})\"", filter.to_query_str()))
@@ -228,13 +205,11 @@ impl MpdClient for Client<'_> {
             .pop())
     }
 
-    #[tracing::instrument(skip(self))]
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
         self.send(&format!("findadd \"({})\"", filter.to_query_str()))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         self.send(&if let Some(filter) = filter {
             format!("list {tag} \"({})\"", filter.to_query_str())
@@ -245,7 +220,6 @@ impl MpdClient for Client<'_> {
     }
 
     // Database
-    #[tracing::instrument(skip(self))]
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
         Ok(if let Some(path) = path {
             self.send(&format!("lsinfo \"{path}\""))
@@ -259,7 +233,6 @@ impl MpdClient for Client<'_> {
         //     Ok(self
     }
 
-    #[tracing::instrument(skip(self))]
     fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
         Ok(if let Some(path) = path {
             self.send(&format!("listfiles \"{path}\""))
@@ -273,34 +246,27 @@ impl MpdClient for Client<'_> {
     }
 
     // Stored playlists
-    #[tracing::instrument(skip(self))]
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.send("listplaylists").and_then(ProtoClient::read_response)
     }
-    #[tracing::instrument(skip(self))]
     fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
         self.send(&format!("listplaylist \"{name}\""))
             .and_then(ProtoClient::read_response)
     }
-    #[tracing::instrument(skip(self))]
     fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
         self.send(&format!("listplaylistinfo \"{playlist}\""))
             .and_then(ProtoClient::read_response)
     }
-    #[tracing::instrument(skip(self))]
     fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send(&format!("load \"{name}\"")).and_then(ProtoClient::read_ok)
     }
-    #[tracing::instrument(skip(self))]
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send(&format!("rm \"{name}\"")).and_then(ProtoClient::read_ok)
     }
-    #[tracing::instrument(skip(self))]
     fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
         self.send(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
             .and_then(ProtoClient::read_ok)
     }
-    #[tracing::instrument(skip(self))]
     fn move_in_playlist(
         &mut self,
         playlist_name: &str,
@@ -314,7 +280,6 @@ impl MpdClient for Client<'_> {
         .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()> {
         match target_position {
             Some(target_position) => self
@@ -326,13 +291,11 @@ impl MpdClient for Client<'_> {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
         self.send(&format!("rename \"{name}\" \"{new_name}\""))
             .and_then(ProtoClient::read_ok)
     }
 
-    #[tracing::instrument(skip(self))]
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
         if let Some(mode) = mode {
             if self.version < Version::new(0, 24, 0) {
@@ -347,19 +310,16 @@ impl MpdClient for Client<'_> {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
         self.send(&format!("readpicture \"{path}\""))
             .and_then(ProtoClient::read_bin)
     }
 
-    #[tracing::instrument(skip(self))]
     fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
         self.send(&format!("albumart \"{path}\""))
             .and_then(ProtoClient::read_bin)
     }
 
-    #[tracing::instrument(skip(self))]
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
         match self.albumart(path) {
             Ok(Some(v)) => Ok(Some(v)),
@@ -370,23 +330,23 @@ impl MpdClient for Client<'_> {
             })) => match self.read_picture(path) {
                 Ok(Some(p)) => Ok(Some(p)),
                 Ok(None) => {
-                    tracing::debug!(message = "No album art found, falling back to placeholder image");
+                    log::debug!("No album art found, falling back to placeholder image");
                     Ok(None)
                 }
                 Err(MpdError::Mpd(MpdFailureResponse {
                     code: ErrorCode::NoExist,
                     ..
                 })) => {
-                    tracing::debug!(message = "No album art found, falling back to placeholder image");
+                    log::debug!("No album art found, falling back to placeholder image");
                     Ok(None)
                 }
                 Err(e) => {
-                    tracing::error!(message = "Failed to read picture", error = ?e);
+                    status_error!(error:? = e; "Failed to read picture");
                     Ok(None)
                 }
             },
             Err(e) => {
-                tracing::error!(message = "Failed to read picture", error = ?e);
+                status_error!(error:? = e; "Failed to read picture",);
                 Ok(None)
             }
         }

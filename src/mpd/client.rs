@@ -9,7 +9,7 @@ use super::{
     version::Version,
 };
 use anyhow::Result;
-use tracing::debug;
+use log::debug;
 
 type MpdResult<T> = Result<T, MpdError>;
 
@@ -34,7 +34,6 @@ impl std::fmt::Debug for Client<'_> {
 
 #[allow(dead_code)]
 impl<'name> Client<'name> {
-    #[tracing::instrument]
     pub fn init(addr: &'static str, name: Option<&'name str>, reconnect: bool) -> MpdResult<Client<'name>> {
         let stream = TcpStream::connect(addr)?;
         stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
@@ -52,11 +51,7 @@ impl<'name> Client<'name> {
             )));
         };
 
-        debug!(
-            message = "MPD client initiazed",
-            handshake = buf.trim(),
-            version = version.to_string()
-        );
+        debug!(version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
 
         Ok(Self {
             name,
@@ -68,7 +63,6 @@ impl<'name> Client<'name> {
         })
     }
 
-    #[tracing::instrument]
     fn reconnect(&mut self) -> MpdResult<&Client> {
         let stream = TcpStream::connect(self.addr)?;
         stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
@@ -91,21 +85,15 @@ impl<'name> Client<'name> {
         self.stream = stream;
         self.version = version;
 
-        debug!(
-            message = "MPD client initiazed",
-            handshake = buf.trim(),
-            version = version.to_string()
-        );
+        debug!(handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
 
         Ok(self)
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn set_read_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
         self.stream.set_read_timeout(timeout)
     }
 
-    #[tracing::instrument(skip(self))]
     pub fn set_write_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
         self.stream.set_write_timeout(timeout)
     }

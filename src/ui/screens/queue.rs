@@ -19,7 +19,9 @@ use crate::{
         widgets::kitty_image::{ImageState, KittyImage},
         KeyHandleResultInternal, SharedUiState,
     },
+    utils::macros::status_error,
 };
+use log::error;
 use ratatui::{
     prelude::{Constraint, Layout, Rect},
     style::Stylize,
@@ -27,7 +29,6 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Row, Table, TableState},
     Frame,
 };
-use tracing::error;
 
 use crate::state::State;
 
@@ -134,14 +135,15 @@ impl Screen for QueueScreen {
             })
             .unwrap_or_default();
 
-        let right_table_padding = Padding::right(2);
+        let mut table_padding = Padding::right(2);
+        table_padding.left = 1;
         if app.config.ui.show_song_table_header {
             let header_table = Table::default()
                 .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
                     Line::from(*title).alignment(formats[idx].alignment.into())
                 })))
                 .widths(self.column_widths.clone())
-                .block(app.config.as_header_table_block().padding(right_table_padding));
+                .block(app.config.as_header_table_block().padding(table_padding));
             frame.render_widget(header_table, table_header_section);
         }
 
@@ -149,7 +151,7 @@ impl Screen for QueueScreen {
         let table = Table::new(table_items, self.column_widths.clone())
             .block({
                 let mut b = Block::default()
-                    .padding(right_table_padding)
+                    .padding(table_padding)
                     .border_style(app.config.as_border_style().bold());
                 if app.config.ui.show_song_table_header {
                     b = b.borders(Borders::TOP);
@@ -247,7 +249,7 @@ impl Screen for QueueScreen {
                             Err(e) => error!("{:?}", e),
                         }
                     } else {
-                        error!("No song selected");
+                        status_error!("No song selected");
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
                 }

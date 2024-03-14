@@ -17,10 +17,10 @@ use anyhow::Result;
 use clap::Parser;
 use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
+use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use ron::extensions::Extensions;
-use tracing::{error, info, instrument, trace, warn};
 use ui::Level;
 
 use crate::{config::Config, mpd::mpd_client::MpdClient, ui::Ui, utils::macros::try_ret};
@@ -35,13 +35,7 @@ mod utils;
 #[derive(Debug)]
 pub enum AppEvent {
     UserInput(KeyEvent),
-    StatusBar(String),
-    // TODO there is an issue here
-    // if an error is emmited from an ui thread, tracing will notify the thread that it should
-    // rerender to show the error which potentionally triggers the error again entering an
-    // infinite loop
-    // Maybe it could be solved if we can rerender only the status bar since it already is
-    // in the shared ui part
+    Status(String, Level),
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
     RequestStatusUpdate,
@@ -78,11 +72,12 @@ fn main() -> Result<()> {
         }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
-            let _guards = logging::configure(args.log, &tx.clone());
+            logging::init(tx.clone()).expect("Logger to initialize");
+
             let config = Box::leak(Box::new(match read_cfg(&args) {
                 Ok(val) => val,
                 Err(err) => {
-                    warn!(message = "Using default config", ?err);
+                    warn!(err:?; "Using default config");
                     ConfigFile::default().try_into()?
                 }
             }));
@@ -96,7 +91,7 @@ fn main() -> Result<()> {
 
             let album_art_disabled = config.ui.album_art_width_percent == 0;
             let display_image_warn = if !album_art_disabled && !utils::kitty::check_kitty_support()? {
-                warn!(message = "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
+                warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
                 config.ui.album_art_width_percent = 0;
                 true
             } else {
@@ -156,7 +151,7 @@ fn main() -> Result<()> {
                 original_hook(panic);
             }));
 
-            info!(message = "Application initialized successfully", ?config);
+            info!(config:?; "Application initialized successfully");
 
             let _ = main_task.join().expect("Main task to not fail");
         }
@@ -165,7 +160,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[instrument(skip_all)]
 fn main_task<B: Backend + std::io::Write>(
     mut ui: Ui<'static>,
     mut state: state::State,
@@ -211,12 +205,12 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                     Err(err) => {
-                        error!(message = "Key handler failed", ?err);
+                        error!(err:?; "Key handler failed",);
                         render_wanted = true;
                     }
                 },
-                AppEvent::StatusBar(message) => {
-                    ui.display_message(message, Level::Error);
+                AppEvent::Status(message, level) => {
+                    ui.display_message(message, level);
                     render_wanted = true;
                 }
                 AppEvent::Log(msg) => {
@@ -227,7 +221,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::IdleEvent(event) => {
                     if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
-                        error!(message = "Failed handle idle event", error = ?err, event = ?event);
+                        error!(error:? = err, event:?; "Failed handle idle event");
                     }
                     render_wanted = true;
                 }
@@ -235,7 +229,7 @@ fn main_task<B: Backend + std::io::Write>(
                     match client.get_status() {
                         Ok(status) => state.status = status,
                         Err(err) => {
-                            error!(message = "Unable to send render command from status update loop", ?err);
+                            error!(err:?; "Unable to send render command from status update loop");
                         }
                     };
                     render_wanted = true;
@@ -253,7 +247,7 @@ fn main_task<B: Backend + std::io::Write>(
             terminal
                 .draw(|frame| {
                     if let Err(err) = ui.render(frame, &mut state) {
-                        error!(message = "Failed to render a frame", error = ?err);
+                        error!(error:? = err; "Failed to render a frame");
                     };
                 })
                 .expect("Expected render to succeed");
@@ -265,7 +259,6 @@ fn main_task<B: Backend + std::io::Write>(
     ui::restore_terminal(&mut terminal).expect("Terminal restore to succeed");
 }
 
-#[instrument]
 fn handle_idle_event(
     event: IdleEvent,
     state: &mut state::State,
@@ -300,23 +293,22 @@ fn handle_idle_event(
         IdleEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
         IdleEvent::Playlist => state.queue = try_ret!(client.playlist_info(), "Failed to get playlist"),
         // TODO: handle these events eventually ?
-        IdleEvent::Database => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Update => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Output => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Partition => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Sticker => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Subscription => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Message => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Neighbor => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::Mount => warn!(message = "Received unhandled event", ?event),
-        IdleEvent::StoredPlaylist => {
-            warn!(message = "Received unhandled event", ?event);
+        IdleEvent::Database
+        | IdleEvent::Update
+        | IdleEvent::Output
+        | IdleEvent::Partition
+        | IdleEvent::Sticker
+        | IdleEvent::Subscription
+        | IdleEvent::Message
+        | IdleEvent::Neighbor
+        | IdleEvent::Mount
+        | IdleEvent::StoredPlaylist => {
+            warn!(event:?; "Received unhandled event")
         }
     };
     Ok(())
 }
 
-#[instrument(skip_all, fields(events))]
 fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEvent>) {
     let mut error_count = 0;
     loop {
@@ -324,10 +316,10 @@ fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEve
             Ok(val) => val,
             Err(err) => {
                 if error_count > 5 {
-                    error!(message = "Unexpected error when receiving idle events", ?err);
+                    error!(err:?; "Unexpected error when receiving idle events");
                     break;
                 }
-                warn!(message = "Unexpected error when receiving idle events", ?err);
+                warn!(err:?; "Unexpected error when receiving idle events");
                 error_count += 1;
                 std::thread::sleep(Duration::from_secs(error_count));
                 continue;
@@ -335,15 +327,14 @@ fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEve
         };
 
         for event in events {
-            trace!(message = "Received idle event", idle_event = ?event);
+            trace!(idle_event:? = event; "Received idle event");
             if let Err(err) = sender.send(AppEvent::IdleEvent(event)) {
-                error!(message = "Failed to send app event", error = ?err);
+                error!(error:? = err; "Failed to send app event");
             }
         }
     }
 }
 
-#[instrument(skip_all)]
 fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
     loop {
         match crossterm::event::poll(Duration::from_millis(250)) {
@@ -351,18 +342,18 @@ fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
                 let event = match crossterm::event::read() {
                     Ok(e) => e,
                     Err(err) => {
-                        warn!(message = "Failed to read input event", error = ?err);
+                        warn!(error:? = err; "Failed to read input event");
                         continue;
                     }
                 };
                 if let Event::Key(key) = event {
                     if let Err(err) = user_input_tx.send(AppEvent::UserInput(key)) {
-                        error!(messge = "Failed to send user input", error = ?err);
+                        error!(error:? = err; "Failed to send user input");
                     }
                 }
             }
             Ok(_) => {}
-            Err(e) => warn!(message = "Error when polling for event", error = ?e),
+            Err(e) => warn!(error:? = e; "Error when polling for event"),
         }
     }
 }
@@ -383,7 +374,7 @@ impl RenderLoop {
 
         // send stop event at the start to not start the loop immedietally
         if let Err(err) = tx.send(LoopEvent::Stop) {
-            error!(message = "Failed to properly initialize status update loop", error = ?err);
+            error!(error:? = err; "Failed to properly initialize status update loop");
         }
 
         let Some(update_interval) = config.status_update_interval_ms.map(Duration::from_millis) else {
@@ -405,7 +396,7 @@ impl RenderLoop {
 
                 std::thread::sleep(update_interval);
                 if let Err(err) = render_sender.send(AppEvent::RequestStatusUpdate) {
-                    error!(message = "Failed to send status update request", error = ?err);
+                    error!(error:? = err; "Failed to send status update request");
                 }
             }
         });
@@ -420,7 +411,6 @@ impl RenderLoop {
         }
     }
 
-    #[instrument(skip(self))]
     fn stop(&mut self) -> Result<()> {
         if let Some(tx) = &self.event_tx {
             Ok(tx.send(LoopEvent::Stop)?)

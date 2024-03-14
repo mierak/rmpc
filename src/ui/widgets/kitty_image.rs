@@ -338,12 +338,12 @@ impl ImageState {
             (Some(ref mut v), None) => {
                 self.image = Some(crate::state::MyVec::new(std::mem::take(v.as_mut())));
                 self.needs_transfer = true;
-                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.len()));
+                log::debug!(size = image.as_ref().map(|a| a.len()); "New image received",);
             }
             (Some(v), Some(i)) if v.ne(&i) && !v.is_empty() => {
                 self.image = Some(crate::state::MyVec::new(std::mem::take(v.as_mut())));
                 self.needs_transfer = true;
-                tracing::debug!(message = "New image received", size = image.as_ref().map(|a| a.len()));
+                log::debug!(size = image.as_ref().map(|a| a.len()); "New image received");
             }
             (Some(v), Some(_)) => {
                 v.as_mut().clear();
@@ -498,13 +498,13 @@ impl<'a> StatefulWidget for KittyImage<'a> {
                 Ok(data) => {
                     KittyImage::transfer_data(&data.content, width, height, data.img_width, data.img_height, state);
                 }
-                Err(e) => tracing::error!(message = "Failed to transfer image data", error = ?e),
+                Err(e) => log::error!(error:? = e; "Failed to transfer image data"),
             }
         }
 
         match KittyImage::create_unicode_placeholder_grid(width, height, state) {
             Ok(res) => Paragraph::new(res).alignment(Alignment::Center).render(area, buf),
-            Err(e) => tracing::error!(message = "Failed to construct unicode placeholder grid", error = ?e),
+            Err(e) => log::error!(error:? = e; "Failed to construct unicode placeholder grid"),
         };
     }
 }

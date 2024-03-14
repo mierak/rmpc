@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use tracing::trace;
+use log::trace;
 
 use super::{
     errors::{MpdError, MpdFailureResponse},
@@ -49,7 +49,6 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(res)
     }
 
-    #[tracing::instrument]
     fn execute(&mut self, command: &str) -> Result<&mut Self, MpdError> {
         if let Err(e) = self.client.write([command, "\n"].concat().as_bytes()) {
             if e.kind() == std::io::ErrorKind::BrokenPipe {
@@ -64,9 +63,8 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    #[tracing::instrument]
     pub(super) fn read_ok(mut self) -> Result<(), MpdError> {
-        trace!(message = "Reading command");
+        trace!(command = self.command; "Reading command");
         let read = self.client.read();
         match Self::read_line(read) {
             Ok(MpdLine::Ok) => Ok(()),
@@ -80,12 +78,11 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    #[tracing::instrument]
     pub(super) fn read_response<V>(mut self) -> Result<V, MpdError>
     where
         V: FromMpd + Default,
     {
-        trace!(message = "Reading command");
+        trace!(command = self.command; "Reading command");
         let mut result = V::default();
         let read = self.client.read();
         loop {
@@ -102,12 +99,11 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    #[tracing::instrument]
     pub(super) fn read_opt_response<V>(mut self) -> Result<Option<V>, MpdError>
     where
         V: FromMpd + Default,
     {
-        trace!(message = "Reading command");
+        trace!(command = self.command; "Reading command");
         let mut result = V::default();
         let mut found_any = false;
         let read = self.client.read();
@@ -128,7 +124,6 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    #[tracing::instrument]
     pub(super) fn read_bin(mut self) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
         let _ = match self._read_bin(&mut buf) {
@@ -145,7 +140,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
             self.execute(&format!("{} {}", self.command, buf.len()))?;
             if let Some(response) = self._read_bin(&mut buf)? {
                 if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
-                    trace!(message = "Finshed reading binary response", len = buf.len());
+                    trace!( len = buf.len();"Finshed reading binary response");
                     break;
                 }
             } else {
@@ -155,7 +150,6 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(Some(buf))
     }
 
-    #[tracing::instrument(skip(binary_buf), fields(buf_len = binary_buf.len()))]
     fn _read_bin(&mut self, binary_buf: &mut Vec<u8>) -> Result<Option<BinaryMpdResponse>, MpdError> {
         let mut result = BinaryMpdResponse::default();
         let read = self.client.read();
@@ -163,7 +157,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
             loop {
                 match Self::read_line(read)? {
                     MpdLine::Ok => {
-                        tracing::warn!("Expected binary data but got 'OK'");
+                        log::warn!("Expected binary data but got 'OK'");
                         return Ok(None);
                     }
                     MpdLine::Value(val) => {
