@@ -177,7 +177,9 @@ impl Screen for QueueScreen {
         );
         if show_image {
             frame.render_stateful_widget(
-                KittyImage::default().block(Block::default().border_style(app.config.as_border_style())),
+                KittyImage::default()
+                    .default_art(&app.config.ui.default_album_art)
+                    .block(Block::default().border_style(app.config.as_border_style())),
                 img_section,
                 &mut self.img_state,
             );

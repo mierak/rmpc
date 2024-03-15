@@ -11,7 +11,6 @@ use ratatui::{
 };
 
 use crate::{state::MyVec, utils::tmux};
-const DEFAULT_ART: &[u8; 6214] = include_bytes!("../../../assets/note.jpg");
 const DELIM: &str = "\u{10EEEE}";
 const GRID: &[&str] = &[
     "\u{0305}",
@@ -364,6 +363,7 @@ impl ImageState {
 #[derive(Debug, Default)]
 pub struct KittyImage<'a> {
     block: Option<Block<'a>>,
+    default_art: &'a [u8],
 }
 
 struct Data {
@@ -467,6 +467,11 @@ impl<'a> KittyImage<'a> {
         self.block = Some(block);
         self
     }
+
+    pub fn default_art(mut self, default_art: &'a [u8]) -> Self {
+        self.default_art = default_art;
+        self
+    }
 }
 
 impl<'a> StatefulWidget for KittyImage<'a> {
@@ -482,8 +487,8 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             None => area,
         };
         let image = match &state.image {
-            None => DEFAULT_ART,
-            Some(data) if data.is_empty() => DEFAULT_ART,
+            None => self.default_art,
+            Some(data) if data.is_empty() => self.default_art,
             Some(data) => data.as_slice(),
         };
 

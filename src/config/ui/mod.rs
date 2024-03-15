@@ -21,6 +21,8 @@ pub use style::{ConfigColor, StyleFile};
 
 use super::defaults;
 
+const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
+
 #[derive(Debug)]
 pub struct UiConfig {
     pub album_art_position: Position,
@@ -42,6 +44,7 @@ pub struct UiConfig {
     pub show_song_table_header: bool,
     pub song_table_format: Vec<SongTableColumn>,
     pub header: HeaderConfig,
+    pub default_album_art: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -73,6 +76,7 @@ pub struct UiConfigFile {
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
     pub(super) header: HeaderConfigFile,
+    pub(super) default_album_art_path: Option<String>,
 }
 
 impl Default for UiConfigFile {
@@ -80,6 +84,7 @@ impl Default for UiConfigFile {
         Self {
             album_art_position: Position::Left,
             album_art_width_percent: 40,
+            default_album_art_path: None,
             draw_borders: true,
             background_color: None,
             header_background_color: None,
@@ -190,6 +195,9 @@ impl TryFrom<UiConfigFile> for UiConfig {
             highlight_style: value
                 .highlight_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+            default_album_art: value
+                .default_album_art_path
+                .map_or_else(|| Ok(DEFAULT_ART.to_vec()), |path| std::fs::read(path))?,
         })
     }
 }

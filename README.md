@@ -51,19 +51,19 @@ Alignment is an optional field that specifies the alignment of the text in the c
 This is the default song table format. It shows four columns: Artist, Title, Album and Duration.
 ```rust,ignore
 song_table_format: [
-    (prop: Artist(style: None, default: "Unknown"),                                          label: None, width_percent: 20, alignment: None),
-    (prop: Title(style: None, default: "Unknown"),                                           label: None, width_percent: 35, alignment: None),
+    (prop: Artist(style: None, default: "Unknown"), label: None, width_percent: 20, alignment: None),
+    (prop: Title(style: None, default: "Unknown"), label: None, width_percent: 35, alignment: None),
     (prop: Album(style: (fg: "white", bg: None, modifiers: None), default: "Unknown Album"), label: None, width_percent: 30, alignment: None),
-    (prop: Duration(style: None, default: "-"),                                              label: None, width_percent: 15, alignment: Right)
+    (prop: Duration(style: None, default: "-"), label: None, width_percent: 15, alignment: Right)
 ],
 ```
 
 ## Song Property
 Can be any of the following:
 * Filename(style: Option<[StyleDef](#styledef)>)
-* Title(style: Option<[StyleDef](#styledef)>,    default: String)
-* Artist(style: Option<[StyleDef](#styledef)>,   default: String)
-* Album(style: Option<[StyleDef](#styledef)>,    default: String)
+* Title(style: Option<[StyleDef](#styledef)>, default: String)
+* Artist(style: Option<[StyleDef](#styledef)>, default: String)
+* Album(style: Option<[StyleDef](#styledef)>, default: String)
 * Duration(style: Option<[StyleDef](#styledef)>, default: String)
 * Other(name: String, style: Option<[StyleDef](#styledef)>, default: String)
 
@@ -140,6 +140,8 @@ This is the default config. You can also generate it by running `rmpc --config`
     volume_step: 5,
     // How often to update the progress bar in milliseconds
     status_update_interval_ms: 1000,
+    // Path to image that is to be used as the fallback album art to override the default if none was found for the current song eg. "/home/user/pictures/fallback.jpg"
+    default_album_art_path: None,
     keybinds: (
         // Global keybinds are as the name implies, global. On every screen except when modal is active.
         // Possible modifiers are: SHIFT, CONTROL, ALT, SUPER, HYPER, META.
