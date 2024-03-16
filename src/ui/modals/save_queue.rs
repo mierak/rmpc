@@ -95,7 +95,7 @@ impl Modal for SaveQueueModal {
             .active_style(if self.input_focused {
                 Style::default().reversed()
             } else {
-                app.config.ui.highlight_style
+                app.config.ui.current_item_style
             })
             .buttons(buttons)
             .block(

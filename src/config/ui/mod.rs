@@ -32,8 +32,8 @@ pub struct UiConfig {
     pub header_background_color: Option<Color>,
     pub background_color_modal: Option<Color>,
     pub borders_style: Style,
-    pub current_song_style: Style,
-    pub highlight_style: Style,
+    pub highlighted_item_style: Style,
+    pub current_item_style: Style,
     pub highlight_border_style: Style,
     pub active_tab_style: Style,
     pub inactive_tab_style: Style,
@@ -70,8 +70,8 @@ pub struct UiConfigFile {
     pub(super) active_tab_style: Option<StyleFile>,
     pub(super) inactive_tab_style: Option<StyleFile>,
     pub(super) borders_style: Option<StyleFile>,
-    pub(super) current_song_style: Option<StyleFile>,
-    pub(super) highlight_style: Option<StyleFile>,
+    pub(super) highlighted_item_style: Option<StyleFile>,
+    pub(super) current_item_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
@@ -96,12 +96,12 @@ impl Default for UiConfigFile {
                 bg: None,
                 modifiers: None,
             }),
-            current_song_style: Some(StyleFile {
+            highlighted_item_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
                 modifiers: Some(Modifiers::Bold),
             }),
-            highlight_style: Some(StyleFile {
+            current_item_style: Some(StyleFile {
                 fg: Some("black".to_string()),
                 bg: Some("blue".to_string()),
                 modifiers: Some(Modifiers::Bold),
@@ -175,7 +175,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             background_color_modal: StringColor(value.background_color_modal).to_color()?.or(bg_color),
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
-            current_song_style: value.current_song_style.to_config_or(Some(Color::Red), None)?,
+            highlighted_item_style: value.highlighted_item_style.to_config_or(Some(Color::Blue), None)?,
             highlight_border_style: value.highlight_border_style.to_config_or(Some(Color::Blue), None)?,
             inactive_tab_style: value.inactive_tab_style.to_config_or(None, header_bg_color)?,
             symbols: value.symbols.into(),
@@ -192,8 +192,8 @@ impl TryFrom<UiConfigFile> for UiConfig {
             active_tab_style: value
                 .active_tab_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-            highlight_style: value
-                .highlight_style
+            current_item_style: value
+                .current_item_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
             default_album_art: value
                 .default_album_art_path

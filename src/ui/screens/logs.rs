@@ -41,7 +41,7 @@ impl Screen for LogsScreen {
                 match l {
                     Ok(mut val) => {
                         if self.scrolling_state.get_selected().is_some_and(|v| v == idx) {
-                            val = val.patch_style(app.config.ui.highlight_style);
+                            val = val.patch_style(app.config.ui.current_item_style);
                         }
                         Ok(ListItem::new(val))
                     }

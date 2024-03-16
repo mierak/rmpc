@@ -74,8 +74,7 @@ impl Screen for DirectoriesScreen {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            self.handle_filter_input(event);
-            Ok(KeyHandleResultInternal::RenderRequested)
+            self.handle_filter_input(event, client, app)
         } else if let Some(_action) = app.config.keybinds.directories.get(&event.into()) {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
@@ -181,7 +180,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     }
                 })
                 .sorted()
-                .map(|v| v.to_list_item(&state.config.ui.symbols, false))
+                .map(|v| v.to_list_item(&state.config, false, None))
                 .collect();
                 Ok(Some(res))
             }

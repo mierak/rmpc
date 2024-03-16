@@ -69,8 +69,7 @@ impl Screen for ArtistsScreen {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            self.handle_filter_input(event);
-            Ok(KeyHandleResultInternal::RenderRequested)
+            self.handle_filter_input(event, client, app)
         } else if let Some(_action) = app.config.keybinds.artists.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
@@ -209,12 +208,12 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                     ),
                     [artist] => Some(
                         list_titles(client, artist, current)?
-                            .map(|s| s.to_list_item(&state.config.ui.symbols, false))
+                            .map(|s| s.to_list_item(&state.config, false, None))
                             .collect_vec(),
                     ),
                     [] => Some(
                         list_albums(client, current)?
-                            .map(|s| s.to_list_item(&state.config.ui.symbols, false))
+                            .map(|s| s.to_list_item(&state.config, false, None))
                             .collect_vec(),
                     ),
                     _ => None,

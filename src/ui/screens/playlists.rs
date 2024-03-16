@@ -101,8 +101,7 @@ impl Screen for PlaylistsScreen {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            self.handle_filter_input(event);
-            Ok(KeyHandleResultInternal::RenderRequested)
+            self.handle_filter_input(event, client, app)
         } else if let Some(_action) = app.config.keybinds.playlists.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
@@ -244,7 +243,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                         .list_playlist(d)?
                         .into_iter()
                         .map(DirOrSong::Song)
-                        .map(|s| s.to_list_item(&state.config.ui.symbols, false))
+                        .map(|s| s.to_list_item(&state.config, false, None))
                         .collect_vec(),
                     DirOrSong::Song(file) => client
                         .find_one(&[Filter::new(Tag::File, file)])?

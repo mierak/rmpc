@@ -62,7 +62,7 @@ impl Modal for ConfirmQueueClearModal {
         let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
         self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default()
-            .active_style(app.config.ui.highlight_style)
+            .active_style(app.config.ui.current_item_style)
             .buttons(buttons)
             .block(
                 Block::default()

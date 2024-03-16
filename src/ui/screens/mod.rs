@@ -454,27 +454,42 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn rename(&self, item: &T, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
-    fn handle_filter_input(&mut self, event: KeyEvent) {
-        match event.code {
-            KeyCode::Char(c) => {
-                if let Some(ref mut f) = self.stack_mut().current_mut().filter {
-                    f.push(c);
-                }
-            }
-            KeyCode::Backspace => {
-                if let Some(ref mut f) = self.stack_mut().current_mut().filter {
-                    f.pop();
-                };
-            }
-            KeyCode::Enter => {
-                self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().jump_next_matching();
-            }
-            KeyCode::Esc => {
+    fn handle_filter_input(
+        &mut self,
+        event: KeyEvent,
+        client: &mut Client<'_>,
+        state: &State,
+    ) -> Result<KeyHandleResultInternal> {
+        match state.config.keybinds.navigation.get(&event.into()) {
+            Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().filter = None;
+                let preview = self.prepare_preview(client, state)?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            _ => {}
+            Some(CommonAction::Confirm) => {
+                self.set_filter_input_mode_active(false);
+                self.stack_mut().current_mut().jump_next_matching();
+                let preview = self.prepare_preview(client, state)?;
+                self.stack_mut().set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            _ => match event.code {
+                KeyCode::Char(c) => {
+                    if let Some(ref mut f) = self.stack_mut().current_mut().filter {
+                        f.push(c);
+                    }
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                KeyCode::Backspace => {
+                    if let Some(ref mut f) = self.stack_mut().current_mut().filter {
+                        f.pop();
+                    };
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                _ => Ok(KeyHandleResultInternal::SkipRender),
+            },
         }
     }
 

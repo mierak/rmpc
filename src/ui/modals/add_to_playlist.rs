@@ -88,7 +88,7 @@ impl Modal for AddToPlaylistModal {
         )
         .highlight_style(match self.focused {
             FocusedComponent::Buttons => Style::default().reversed(),
-            FocusedComponent::Playlists => app.config.ui.highlight_style,
+            FocusedComponent::Playlists => app.config.ui.current_item_style,
         })
         .block(
             Block::default()
@@ -104,7 +104,7 @@ impl Modal for AddToPlaylistModal {
             .buttons(buttons)
             .active_style(match self.focused {
                 FocusedComponent::Playlists => Style::default().reversed(),
-                FocusedComponent::Buttons => app.config.ui.highlight_style,
+                FocusedComponent::Buttons => app.config.ui.current_item_style,
             })
             .block(
                 Block::default()

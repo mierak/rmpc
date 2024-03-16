@@ -122,12 +122,12 @@ impl Screen for QueueScreen {
                                 .as_line_ellipsized(song, widths[i].width.into())
                                 .alignment(formats[i].alignment.into());
                             if is_current {
-                                column = column.patch_style(app.config.ui.current_song_style);
+                                column = column.patch_style(app.config.ui.highlighted_item_style);
                             }
                             column
                         }));
                         if is_current {
-                            row = row.style(app.config.ui.current_song_style);
+                            row = row.style(app.config.ui.highlighted_item_style);
                         };
                         row
                     })
@@ -161,7 +161,7 @@ impl Screen for QueueScreen {
                 }
                 b
             })
-            .highlight_style(app.config.ui.highlight_style);
+            .highlight_style(app.config.ui.current_item_style);
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 

@@ -70,7 +70,7 @@ impl Screen for AlbumsScreen {
         shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            self.handle_filter_input(event);
+            self.handle_filter_input(event, client, app)?;
             Ok(KeyHandleResultInternal::RenderRequested)
         } else if let Some(_action) = app.config.keybinds.albums.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
@@ -176,7 +176,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
                         .map(std::iter::Iterator::collect),
                     [] => Some(
                         list_titles(client, current)?
-                            .map(|v| v.to_list_item(&state.config.ui.symbols, false))
+                            .map(|v| v.to_list_item(&state.config, false, None))
                             .collect_vec(),
                     ),
                     _ => None,

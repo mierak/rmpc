@@ -12,14 +12,14 @@ pub use stack::DirStack;
 pub use state::DirState;
 
 use crate::{
-    config::ui::SymbolsConfig,
+    config::Config,
     ui::screens::{browser::DirOrSong, StringExt},
 };
 
 pub trait DirStackItem {
     fn as_path(&self) -> Option<&str>;
     fn matches(&self, filter: &str, ignorecase: bool) -> bool;
-    fn to_list_item(&self, symbols: &SymbolsConfig, is_marked: bool) -> ListItem<'static>;
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> ListItem<'static>;
 }
 
 impl DirStackItem for String {
@@ -35,8 +35,12 @@ impl DirStackItem for String {
         }
     }
 
-    fn to_list_item(&self, _symbols: &SymbolsConfig, _is_marked: bool) -> ListItem<'static> {
-        ListItem::new(self.clone())
+    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> ListItem<'static> {
+        if filter.is_some_and(|filter| self.matches(filter, true)) {
+            ListItem::new(self.clone()).style(config.ui.highlighted_item_style)
+        } else {
+            ListItem::new(self.clone())
+        }
     }
 }
 
@@ -62,7 +66,8 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn to_list_item(&self, symbols: &SymbolsConfig, is_marked: bool) -> ListItem<'static> {
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> ListItem<'static> {
+        let symbols = &config.ui.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, Style::default().fg(Color::Blue))
         } else {
@@ -73,7 +78,11 @@ impl DirStackItem for DirOrSong {
             DirOrSong::Dir(v) => format!("{} {}", symbols.dir, if v.is_empty() { "Untitled" } else { v.as_str() }),
             DirOrSong::Song(s) => format!("{} {}", symbols.song, s.file_name()),
         };
-        ListItem::new(Line::from(vec![marker_span, Span::from(value)]))
+        if filter.is_some_and(|filter| self.matches(filter, true)) {
+            ListItem::new(Line::from(vec![marker_span, Span::from(value)])).style(config.ui.highlighted_item_style)
+        } else {
+            ListItem::new(Line::from(vec![marker_span, Span::from(value)]))
+        }
     }
 }
 

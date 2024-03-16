@@ -62,14 +62,26 @@ where
             .items
             .iter()
             .enumerate()
-            .map(|(idx, v)| v.to_list_item(&self.config.ui.symbols, state.previous().marked().contains(&idx)))
+            .map(|(idx, v)| {
+                v.to_list_item(
+                    &self.config,
+                    state.previous().marked().contains(&idx),
+                    state.previous().filter.as_ref().map(|f| f.as_str()),
+                )
+            })
             .collect_vec();
         let current = state
             .current()
             .items
             .iter()
             .enumerate()
-            .map(|(idx, v)| v.to_list_item(&self.config.ui.symbols, state.current().marked().contains(&idx)))
+            .map(|(idx, v)| {
+                v.to_list_item(
+                    &self.config,
+                    state.current().marked().contains(&idx),
+                    state.current().filter.as_ref().map(|f| f.as_str()),
+                )
+            })
             .collect_vec();
         let preview = state.preview().cloned();
 
@@ -83,8 +95,7 @@ where
         };
 
         {
-            let preview = List::new(preview.unwrap_or_default())
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+            let preview = List::new(preview.unwrap_or_default()).highlight_style(self.config.ui.current_item_style);
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
@@ -105,7 +116,7 @@ where
             } else {
                 previous = previous.block(Block::default().padding(Padding::new(1, 2, 0, 0)));
             };
-            previous = previous.highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+            previous = previous.highlight_style(self.config.ui.current_item_style);
 
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
@@ -135,7 +146,7 @@ where
                     }
                     b.padding(Padding::new(1, 2, 0, 0))
                 })
-                .highlight_style(Style::default().bg(Color::Blue).fg(Color::Black).bold());
+                .highlight_style(self.config.ui.current_item_style);
 
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(

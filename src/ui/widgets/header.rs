@@ -132,9 +132,9 @@ impl Layouts {
         };
 
         let [left_area, center_area, right_area] = *Layout::horizontal([
-            Constraint::Percentage(20),
-            Constraint::Percentage(60),
-            Constraint::Percentage(20),
+            Constraint::Percentage(30),
+            Constraint::Percentage(40),
+            Constraint::Percentage(30),
         ])
         .split(header) else {
             return None;

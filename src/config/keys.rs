@@ -90,7 +90,7 @@ impl Default for KeyConfigFile {
                 (C::Bottom,           vec![Key { key: K::Char('G'), modifiers: M::SHIFT   }]),
                 (C::Top,              vec![Key { key: K::Char('g'), modifiers: M::NONE    }]),
                 (C::EnterSearch,      vec![Key { key: K::Char('/'), modifiers: M::NONE    }]),
-                (C::NextResult,       vec![Key { key: K::Char('n'), modifiers: M::CONTROL }]),
+                (C::NextResult,       vec![Key { key: K::Char('n'), modifiers: M::NONE    }]),
                 (C::PreviousResult,   vec![Key { key: K::Char('N'), modifiers: M::SHIFT   }]),
                 (C::Select,           vec![Key { key: K::Char(' '), modifiers: M::NONE    }]),
                 (C::Add,              vec![Key { key: K::Char('a'), modifiers: M::NONE    }]),
