@@ -222,31 +222,32 @@ impl Screen for QueueScreen {
         _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            match event.code {
-                KeyCode::Char(c) => {
-                    if let Some(ref mut f) = self.filter {
-                        f.push(c);
-                    };
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                KeyCode::Backspace => {
-                    if let Some(ref mut f) = self.filter {
-                        f.pop();
-                    };
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                // TODO
-                KeyCode::Enter => {
+            match app.config.keybinds.navigation.get(&event.into()) {
+                Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
                     self.jump_forward(app);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                KeyCode::Esc => {
+                Some(CommonAction::Close) => {
                     self.filter_input_mode = false;
                     self.filter = None;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
+                _ => match event.code {
+                    KeyCode::Char(c) => {
+                        if let Some(ref mut f) = self.filter {
+                            f.push(c);
+                        };
+                        Ok(KeyHandleResultInternal::RenderRequested)
+                    }
+                    KeyCode::Backspace => {
+                        if let Some(ref mut f) = self.filter {
+                            f.pop();
+                        };
+                        Ok(KeyHandleResultInternal::RenderRequested)
+                    }
+                    _ => Ok(KeyHandleResultInternal::SkipRender),
+                },
             }
         } else if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
             match action {
