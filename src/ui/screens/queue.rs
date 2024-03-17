@@ -19,7 +19,7 @@ use crate::{
         widgets::kitty_image::{ImageState, KittyImage},
         KeyHandleResultInternal, SharedUiState,
     },
-    utils::macros::status_error,
+    utils::macros::{status_error, status_info, status_warn},
 };
 use log::error;
 use ratatui::{
@@ -394,28 +394,50 @@ impl Screen for QueueScreen {
 impl QueueScreen {
     pub fn jump_forward(&mut self, app: &mut crate::state::State) {
         let formats = &app.config.ui.song_table_format;
-        if let Some(filter) = self.filter.as_ref() {
-            if let Some(selected) = self.scrolling_state.get_selected() {
-                for i in selected + 1..app.queue.len().unwrap_or(0) {
-                    if app.queue.as_ref().is_some_and(|q| q[i].matches(formats, filter, true)) {
-                        self.scrolling_state.select(Some(i));
-                        break;
-                    }
-                }
+        let Some(queue) = &app.queue else {
+            status_warn!("Queue is empty");
+            return;
+        };
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+        let Some(selected) = self.scrolling_state.get_selected() else {
+            error!(state:? = self.scrolling_state; "No song selected");
+            return;
+        };
+
+        let length = queue.len();
+        for i in selected + 1..length + selected {
+            let i = i % length;
+            if queue[i].matches(formats, filter, true) {
+                self.scrolling_state.select(Some(i));
+                break;
             }
         }
     }
 
     pub fn jump_back(&mut self, app: &mut crate::state::State) {
         let formats = &app.config.ui.song_table_format;
-        if let Some(filter) = self.filter.as_ref() {
-            if let Some(selected) = self.scrolling_state.get_selected() {
-                for i in (0..selected).rev() {
-                    if app.queue.as_ref().is_some_and(|q| q[i].matches(formats, filter, true)) {
-                        self.scrolling_state.select(Some(i));
-                        break;
-                    }
-                }
+        let Some(queue) = &app.queue else {
+            status_warn!("Queue is empty");
+            return;
+        };
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+        let Some(selected) = self.scrolling_state.get_selected() else {
+            error!(state:? = self.scrolling_state; "No song selected");
+            return;
+        };
+
+        let length = queue.len();
+        for i in (0..length).rev() {
+            let i = (i + selected) % length;
+            if queue[i].matches(formats, filter, true) {
+                self.scrolling_state.select(Some(i));
+                break;
             }
         }
     }

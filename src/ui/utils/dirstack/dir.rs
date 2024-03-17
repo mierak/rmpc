@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 
+use log::error;
 use ratatui::widgets::ListState;
+
+use crate::utils::macros::status_warn;
 
 use super::{state::DirState, DirStackItem};
 
@@ -126,29 +129,41 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
     }
 
     pub fn jump_next_matching(&mut self) {
-        if let Some(filter) = self.filter.as_ref() {
-            if let Some(selected) = self.state.get_selected() {
-                for i in selected + 1..self.items.len() {
-                    let s = &self.items[i];
-                    if s.matches(filter, self.filter_ignore_case) {
-                        self.state.select(Some(i));
-                        break;
-                    }
-                }
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+        let Some(selected) = self.state.get_selected() else {
+            error!(state:? = self.state; "No song selected");
+            return;
+        };
+
+        let length = self.items.len();
+        for i in selected + 1..length + selected {
+            let i = i % length;
+            if self.items[i].matches(filter, self.filter_ignore_case) {
+                self.state.select(Some(i));
+                break;
             }
         }
     }
 
     pub fn jump_previous_matching(&mut self) {
-        if let Some(filter) = self.filter.as_ref() {
-            if let Some(selected) = self.state.get_selected() {
-                for i in (0..selected).rev() {
-                    let s = &self.items[i];
-                    if s.matches(filter, self.filter_ignore_case) {
-                        self.state.select(Some(i));
-                        break;
-                    }
-                }
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+        let Some(selected) = self.state.get_selected() else {
+            error!(state:? = self.state; "No song selected");
+            return;
+        };
+
+        let length = self.items.len();
+        for i in (0..length).rev() {
+            let i = (i + selected) % length;
+            if self.items[i].matches(filter, self.filter_ignore_case) {
+                self.state.select(Some(i));
+                break;
             }
         }
     }

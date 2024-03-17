@@ -17,7 +17,7 @@ use crate::{
     },
     mpd::{
         client::Client,
-        commands::{status::OnOffOneshot, volume::Bound, IdleEvent, Song, Status},
+        commands::{status::OnOffOneshot, volume::Bound, Song, Status},
     },
     state::State,
 };

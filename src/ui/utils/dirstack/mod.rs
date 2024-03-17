@@ -84,12 +84,14 @@ impl DirStackItem for DirOrSong {
     fn matches(&self, filter: &str, ignorecase: bool) -> bool {
         if ignorecase {
             match self {
-                DirOrSong::Dir(v) => v.to_lowercase().contains(&filter.to_lowercase()),
+                DirOrSong::Dir(v) => if v.is_empty() { "Untitled" } else { v.as_str() }
+                    .to_lowercase()
+                    .contains(&filter.to_lowercase()),
                 DirOrSong::Song(s) => s.to_lowercase().contains(&filter.to_lowercase()),
             }
         } else {
             match self {
-                DirOrSong::Dir(v) => v.contains(filter),
+                DirOrSong::Dir(v) => if v.is_empty() { "Untitled" } else { v.as_str() }.contains(filter),
                 DirOrSong::Song(s) => s.contains(filter),
             }
         }
