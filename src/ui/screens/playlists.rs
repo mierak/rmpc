@@ -19,7 +19,7 @@ use crate::{
     utils::macros::{status_error, status_info},
 };
 
-use super::{browser::DirOrSong, BrowserScreen, Screen, SongExt};
+use super::{browser::DirOrSong, BrowserScreen, Screen};
 
 #[derive(Debug, Default)]
 pub struct PlaylistsScreen {

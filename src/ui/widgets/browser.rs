@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, Padding, StatefulWidget};
+use ratatui::widgets::{Block, Borders, List, ListItem, Padding, StatefulWidget};
 
 use crate::config::Config;
 use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
@@ -45,9 +45,9 @@ const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::PLAIN
 };
 
-impl<T> StatefulWidget for Browser<'_, T>
+impl<'a, T> StatefulWidget for Browser<'_, T>
 where
-    T: std::fmt::Debug + DirStackItem,
+    T: std::fmt::Debug + DirStackItem<Item = ListItem<'a>>,
 {
     type State = DirStack<T>;
 

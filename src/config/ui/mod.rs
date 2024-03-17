@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use self::{
     header::{HeaderConfig, HeaderConfigFile},
     progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
-    queue_table::{QueueTableColumns, QueueTableColumnsFile, SongTableColumn},
+    queue_table::{QueueTableColumns, QueueTableColumnsFile},
     scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
     style::{Modifiers, StringColor, ToConfigOr},
 };
@@ -17,6 +17,7 @@ mod queue_table;
 mod scrollbar;
 mod style;
 
+pub use self::queue_table::SongTableColumn;
 pub use style::{ConfigColor, StyleFile};
 
 use super::defaults;

@@ -11,10 +11,13 @@ use ratatui::{
 use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
-    config::ui::properties::{SongProperty, StatusProperty, WidgetProperty},
+    config::ui::{
+        properties::{SongProperty, StatusProperty, WidgetProperty},
+        SongTableColumn,
+    },
     mpd::{
         client::Client,
-        commands::{status::OnOffOneshot, volume::Bound, Song, Status},
+        commands::{status::OnOffOneshot, volume::Bound, IdleEvent, Song, Status},
     },
     state::State,
 };
@@ -252,18 +255,45 @@ pub(crate) mod browser {
     }
 }
 
-pub trait SongExt {
-    fn title_str(&self) -> &str;
-    fn artist_str(&self) -> &str;
-}
-
-impl SongExt for Song {
+impl Song {
     fn title_str(&self) -> &str {
         self.title.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
     fn artist_str(&self) -> &str {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
+    }
+
+    fn matches(&self, formats: &[SongTableColumn], filter: &str, ignore_case: bool) -> bool {
+        for format in formats {
+            let match_found = match format.prop {
+                SongProperty::Filename { .. } => self.file.matches(filter, ignore_case),
+                SongProperty::Title { default, .. } => self.title.as_ref().map_or_else(
+                    || DirStackItem::matches(&default, filter, ignore_case),
+                    |v| v.matches(filter, ignore_case),
+                ),
+                SongProperty::Artist { default, .. } => self.artist.as_ref().map_or_else(
+                    || DirStackItem::matches(&default, filter, ignore_case),
+                    |v| v.matches(filter, ignore_case),
+                ),
+                SongProperty::Album { default, .. } => self.album.as_ref().map_or_else(
+                    || DirStackItem::matches(&default, filter, ignore_case),
+                    |v| v.matches(filter, ignore_case),
+                ),
+                SongProperty::Duration { default, .. } => self.duration.as_ref().map_or_else(
+                    || DirStackItem::matches(&default, filter, ignore_case),
+                    |duration| duration.to_string().matches(filter, ignore_case),
+                ),
+                SongProperty::Other { name, default, .. } => self.others.get(name).map_or_else(
+                    || DirStackItem::matches(&default, filter, ignore_case),
+                    |v| v.matches(filter, ignore_case),
+                ),
+            };
+            if match_found {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

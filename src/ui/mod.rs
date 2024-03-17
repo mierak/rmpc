@@ -17,8 +17,8 @@ use strum::Display;
 
 use crate::{
     config::Config,
-    mpd::client::Client,
     mpd::{
+        client::Client,
         commands::{volume::Bound, State as MpdState},
         mpd_client::MpdClient,
     },

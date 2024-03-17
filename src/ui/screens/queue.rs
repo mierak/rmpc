@@ -116,20 +116,25 @@ impl Screen for QueueScreen {
                     .iter()
                     .map(|song| {
                         let is_current = app.status.songid.as_ref().is_some_and(|v| *v == song.id);
-                        let mut row = Row::new((0..formats.len()).map(|i| {
-                            let mut column = formats[i]
+                        let columns = (0..formats.len()).map(|i| {
+                            formats[i]
                                 .prop
                                 .as_line_ellipsized(song, widths[i].width.into())
-                                .alignment(formats[i].alignment.into());
-                            if is_current {
-                                column = column.patch_style(app.config.ui.highlighted_item_style);
-                            }
-                            column
-                        }));
-                        if is_current {
-                            row = row.style(app.config.ui.highlighted_item_style);
-                        };
-                        row
+                                .alignment(formats[i].alignment.into())
+                        });
+
+                        let is_highlighted = is_current
+                            || self
+                                .filter
+                                .as_ref()
+                                .is_some_and(|filter| song.matches(formats, filter, true));
+
+                        if is_highlighted {
+                            Row::new(columns.map(|column| column.patch_style(app.config.ui.highlighted_item_style)))
+                                .style(app.config.ui.highlighted_item_style)
+                        } else {
+                            Row::new(columns)
+                        }
                     })
                     .collect_vec()
             })
@@ -230,6 +235,7 @@ impl Screen for QueueScreen {
                     };
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
+                // TODO
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
                     self.jump_forward(app);
@@ -386,14 +392,11 @@ impl Screen for QueueScreen {
 
 impl QueueScreen {
     pub fn jump_forward(&mut self, app: &mut crate::state::State) {
+        let formats = &app.config.ui.song_table_format;
         if let Some(filter) = self.filter.as_ref() {
             if let Some(selected) = self.scrolling_state.get_selected() {
                 for i in selected + 1..app.queue.len().unwrap_or(0) {
-                    if app.queue.as_ref().is_some_and(|q| {
-                        q[i].title
-                            .as_ref()
-                            .is_some_and(|v| v.to_lowercase().contains(&filter.to_lowercase()))
-                    }) {
+                    if app.queue.as_ref().is_some_and(|q| q[i].matches(formats, filter, true)) {
                         self.scrolling_state.select(Some(i));
                         break;
                     }
@@ -403,14 +406,11 @@ impl QueueScreen {
     }
 
     pub fn jump_back(&mut self, app: &mut crate::state::State) {
+        let formats = &app.config.ui.song_table_format;
         if let Some(filter) = self.filter.as_ref() {
             if let Some(selected) = self.scrolling_state.get_selected() {
                 for i in (0..selected).rev() {
-                    if app.queue.as_ref().is_some_and(|q| {
-                        q[i].title
-                            .as_ref()
-                            .is_some_and(|v| v.to_lowercase().contains(&filter.to_lowercase()))
-                    }) {
+                    if app.queue.as_ref().is_some_and(|q| q[i].matches(formats, filter, true)) {
                         self.scrolling_state.select(Some(i));
                         break;
                     }

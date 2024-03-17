@@ -17,12 +17,15 @@ use crate::{
 };
 
 pub trait DirStackItem {
+    type Item;
     fn as_path(&self) -> Option<&str>;
-    fn matches(&self, filter: &str, ignorecase: bool) -> bool;
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> ListItem<'static>;
+    fn matches(&self, filter: &str, ignore_case: bool) -> bool;
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item;
 }
 
-impl DirStackItem for String {
+impl<'a> DirStackItem for &'a str {
+    type Item = ListItem<'a>;
+
     fn as_path(&self) -> Option<&str> {
         Some(self)
     }
@@ -35,7 +38,31 @@ impl DirStackItem for String {
         }
     }
 
-    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> ListItem<'static> {
+    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> Self::Item {
+        if filter.is_some_and(|filter| self.matches(filter, true)) {
+            ListItem::new(self.to_owned()).style(config.ui.highlighted_item_style)
+        } else {
+            ListItem::new(self.to_owned())
+        }
+    }
+}
+
+impl DirStackItem for String {
+    type Item = ListItem<'static>;
+
+    fn as_path(&self) -> Option<&str> {
+        Some(self)
+    }
+
+    fn matches(&self, filter: &str, ignorecase: bool) -> bool {
+        if ignorecase {
+            self.to_lowercase().contains(&filter.to_lowercase())
+        } else {
+            self.contains(filter)
+        }
+    }
+
+    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> Self::Item {
         if filter.is_some_and(|filter| self.matches(filter, true)) {
             ListItem::new(self.clone()).style(config.ui.highlighted_item_style)
         } else {
@@ -45,6 +72,8 @@ impl DirStackItem for String {
 }
 
 impl DirStackItem for DirOrSong {
+    type Item = ListItem<'static>;
+
     fn as_path(&self) -> Option<&str> {
         match self {
             DirOrSong::Dir(d) => Some(d),
@@ -66,7 +95,7 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> ListItem<'static> {
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
         let symbols = &config.ui.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, Style::default().fg(Color::Blue))

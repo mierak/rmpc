@@ -205,7 +205,7 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                     Err(err) => {
-                        error!(err:?; "Key handler failed",);
+                        error!(err:?; "Key handler failed");
                         render_wanted = true;
                     }
                 },
