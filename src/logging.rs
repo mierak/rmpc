@@ -21,7 +21,7 @@ fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, F
         .add_writer("status_bar", Box::new(StatusBarWriter::new(tx)))
         .format_for_writer(colored_structured_detailed_format)
         .format_for_files(structured_detailed_format)
-        .set_palette("160;221;15;39;128".to_string())
+        .set_palette("1;3;15;4;13".to_string())
         .start()
 }
 
@@ -38,7 +38,7 @@ fn init_debug(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, Fle
         .add_writer("status_bar", Box::new(StatusBarWriter::new(tx)))
         .format_for_writer(colored_structured_detailed_format)
         .format_for_files(structured_detailed_format)
-        .set_palette("160;221;15;39;128".to_string())
+        .set_palette("1;3;15;4;13".to_string())
         .start()
 }
 

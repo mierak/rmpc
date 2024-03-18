@@ -3,6 +3,8 @@ use std::{
     net::TcpStream,
 };
 
+use crate::utils::macros::status_warn;
+
 use super::{
     errors::MpdError,
     proto_client::{ProtoClient, SocketClient},
@@ -12,6 +14,12 @@ use anyhow::Result;
 use log::debug;
 
 type MpdResult<T> = Result<T, MpdError>;
+
+const MAX_SUPPORTED_VERSION: Version = Version {
+    major: 0,
+    minor: 23,
+    patch: 5,
+};
 
 pub struct Client<'name> {
     name: &'name str,
@@ -52,6 +60,12 @@ impl<'name> Client<'name> {
         };
 
         debug!(name, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
+
+        if version > MAX_SUPPORTED_VERSION {
+            status_warn!(
+                "MPD version '{version}' is higher than supported. Maximum supported protocol version is '{MAX_SUPPORTED_VERSION}'. Some features may work incorrectly."
+            );
+        }
 
         Ok(Self {
             name,
