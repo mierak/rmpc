@@ -61,7 +61,9 @@ pub struct ConfigFile {
     volume_step: u8,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
+    #[serde(default)]
     keybinds: KeyConfigFile,
+    #[serde(default)]
     ui: Option<UiConfigFile>,
 }
 

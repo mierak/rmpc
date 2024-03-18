@@ -160,6 +160,74 @@ Possible modifiers for styles are:
 * Reversed
 * CrossedOut
 
+## Keybinds
+Keybinds are configured in the config file. There are different keybinds for different screens and actions.
+Keybinds are optional and do not have be specified in the config file. If ommited the default keybinds below are used.
+
+### Global
+These keybinds work everywhere (except when a modal is active) and are used to controle things like playback, navigation between different screens and exiting rmpc.
+By default the keybinds are vim-like, but you can change them to whatever you want. See [Example Config](#example-config) for more information.
+| Key                 | Action         | Info                                                                                  |
+|---------------------|----------------|---------------------------------------------------------------------------------------|
+| `q`                 | Quit           | Exit rmpc                                                                             |
+| `z`                 | ToggleRepeat   | Toggle repeat                                                                         |
+| `c`                 | ToggleSingle   | Whether to stop playing after single track or repeat track/playlist when repeat is on |
+| `x`                 | ToggleRandom   | Toggles random                                                                        |
+| `v`                 | ToggleConsume  | Remove song from the queue after playing                                              |
+| `p`                 | TogglePause    | Pause/Unpause playback                                                                |
+| `s`                 | Stop           | Stop playback                                                                         |
+| `,`                 | VolumeDown     | Lower volume                                                                          |
+| `b`                 | SeekBack       | Seek currently playing track backwards                                                |
+| `f`                 | SeekForward    | Seek currently playing track forwards                                                 |
+| `.`                 | VolumeUp       | Raise volume                                                                          |
+| `>`                 | NextTrack      | Play next track in the queue                                                          |
+| `<`                 | PreviousTrack  | Play previous track in the queue                                                      |
+| `3`                 | ArtistsTab     | Switch directly to Artists tab                                                        |
+| `5`                 | PlaylistsTab   | Switch directly to Playlists tab                                                      |
+| `2`                 | DirectoriesTab | Switch directly to Directories tab                                                    |
+| `1`                 | QueueTab       | Switch directly to QueueTab tab                                                       |
+| `4`                 | AlbumsTab      | Switch directly to Albums tab                                                         |
+| `Right` or `Tab`    | NextTab        | Switch to next tab                                                                    |
+| `Left` or `<S-Tab>` | PreviousTab    | Switch to previous tab                                                                |
+
+### Navigation
+These keybinds are used to navigate the different screens and to interact with the items on the screen.
+Also includes some more advanced ones like moving the cursor up or down half a page, moving the cursor to the top or bottom of the list and controlling search mode.
+
+| Key              | Action         | Info                                                                                                               |
+|------------------|----------------|--------------------------------------------------------------------------------------------------------------------|
+| `<C-c>` or `Esc` | Close          | Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.                               |
+| `k`              | Up             | Up                                                                                                                 |
+| `l`              | Right          | Right                                                                                                              |
+| `space`          | Select         | Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist |
+| `Enter`          | Confirm        | Confirm whatever action is currently going on                                                                      |
+| `K`              | MoveUp         | Move current item up, for example song in a queue                                                                  |
+| `J`              | MoveDown       | Move current item down, for example song in a queue                                                                |
+| `g`              | Top            | Jump all he way to the top                                                                                         |
+| `<C-n>`          | NextResult     | When a filter is active, jump to the next result                                                                   |
+| `N`              | PreviousResult | When a filter is active, jump to the previous result                                                               |
+| `G`              | Bottom         | Jump all the way to the bottom                                                                                     |
+| `j`              | Down           | Down                                                                                                               |
+| `D`              | Delete         | Delete. For example a playlist, song from a playlist or wipe the current queue.                                    |
+| `<C-u>`          | UpHalf         | Jump by half a screen up                                                                                           |
+| `<C-d>`          | DownHalf       | Jump by half a screen down                                                                                         |
+| `i`              | FocusInput     | Focuses textbox if any is on the screen and is not focused                                                         |
+| `/`              | EnterSearch    | Enter search mode                                                                                                  |
+| `h`              | Left           | Left                                                                                                               |
+| `r`              | Rename         | Rename. Currently only for playlists                                                                               |
+| `a`              | Add:           | Add item to a playlist                                                                                             |
+
+### Queue
+Keybinds specific to the queue screen.
+
+| Key     | Action        | Info                                          |
+|---------|---------------|-----------------------------------------------|
+| `<C-s>` | Save          | Save current queue as a new playlist          |
+| `D`     | DeleteAll     | Clear current queue                           |
+| `Enter` | Play          | Play song under cursor                        |
+| `a`     | AddToPlaylist | Add song under cursor to an existing playlist |
+| `d`     | Delete        | Remove song under curor from the queue        |
+
 ## Example Config
 This is the default config. You can also generate it by running `rmpc config`
 

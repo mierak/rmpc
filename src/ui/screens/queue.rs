@@ -19,7 +19,7 @@ use crate::{
         widgets::kitty_image::{ImageState, KittyImage},
         KeyHandleResultInternal, SharedUiState,
     },
-    utils::macros::{status_error, status_info, status_warn},
+    utils::macros::{status_error, status_warn},
 };
 use log::error;
 use ratatui::{

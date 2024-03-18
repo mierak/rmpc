@@ -31,6 +31,7 @@ use super::{
 pub mod albums;
 pub mod artists;
 pub mod directories;
+#[cfg(debug_assertions)]
 pub mod logs;
 pub mod playlists;
 pub mod queue;

@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 
+#[cfg(debug_assertions)]
+use crate::ui::screens::logs::LogsActions;
 use crate::ui::{
     screens::{
-        albums::AlbumsActions, artists::ArtistsActions, directories::DirectoriesActions, logs::LogsActions,
-        playlists::PlaylistsActions, queue::QueueActions, CommonAction,
+        albums::AlbumsActions, artists::ArtistsActions, directories::DirectoriesActions, playlists::PlaylistsActions,
+        queue::QueueActions, CommonAction,
     },
     GlobalAction,
 };
@@ -25,19 +27,24 @@ pub struct KeyConfig {
     pub artists: HashMap<Key, ArtistsActions>,
     pub directories: HashMap<Key, DirectoriesActions>,
     pub playlists: HashMap<Key, PlaylistsActions>,
+    #[cfg(debug_assertions)]
     pub logs: HashMap<Key, LogsActions>,
     pub queue: HashMap<Key, QueueActions>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeyConfigFile {
+    #[serde(default)]
     pub global: HashMap<GlobalAction, Vec<Key>>,
+    #[serde(default)]
     pub navigation: HashMap<CommonAction, Vec<Key>>,
-    pub albums: HashMap<AlbumsActions, Vec<Key>>,
-    pub artists: HashMap<ArtistsActions, Vec<Key>>,
-    pub directories: HashMap<DirectoriesActions, Vec<Key>>,
-    pub playlists: HashMap<PlaylistsActions, Vec<Key>>,
+    // pub albums: HashMap<AlbumsActions, Vec<Key>>,
+    // pub artists: HashMap<ArtistsActions, Vec<Key>>,
+    // pub directories: HashMap<DirectoriesActions, Vec<Key>>,
+    // pub playlists: HashMap<PlaylistsActions, Vec<Key>>,
+    #[cfg(debug_assertions)]
     pub logs: HashMap<LogsActions, Vec<Key>>,
+    #[serde(default)]
     pub queue: HashMap<QueueActions, Vec<Key>>,
 }
 
@@ -53,6 +60,7 @@ impl Default for KeyConfigFile {
         use PlaylistsActions as P;
         use KeyCode as K;
         use KeyModifiers as M;
+        #[cfg(debug_assertions)]
         use LogsActions as L;
         use QueueActions as Q;
         Self {
@@ -100,14 +108,15 @@ impl Default for KeyConfigFile {
                 (C::Confirm,          vec![Key { key: K::Enter,     modifiers: M::NONE    }]),
                 (C::FocusInput,       vec![Key { key: K::Char('i'), modifiers: M::NONE    }]),
             ]),
-            albums: HashMap::from([
-            ]),
-            artists: HashMap::from([
-            ]),
-            directories: HashMap::from([
-            ]),
-            playlists: HashMap::from([
-            ]),
+            // albums: HashMap::from([
+            // ]),
+            // artists: HashMap::from([
+            // ]),
+            // directories: HashMap::from([
+            // ]),
+            // playlists: HashMap::from([
+            // ]),
+            #[cfg(debug_assertions)]
             logs: HashMap::from([
                 (L::Clear,            vec![Key { key: K::Char('D'), modifiers: M::SHIFT   }]),
             ]),
@@ -130,13 +139,19 @@ fn invert_map<T: Copy, V: std::hash::Hash + std::cmp::Eq>(v: HashMap<T, Vec<V>>)
 
 impl From<KeyConfigFile> for KeyConfig {
     fn from(value: KeyConfigFile) -> Self {
+        dbg!(&value.queue);
         KeyConfig {
             global: invert_map(value.global),
             navigation: invert_map(value.navigation),
-            albums: invert_map(value.albums),
-            artists: invert_map(value.artists),
-            directories: invert_map(value.directories),
-            playlists: invert_map(value.playlists),
+            // albums: invert_map(value.albums),
+            // artists: invert_map(value.artists),
+            // directories: invert_map(value.directories),
+            // playlists: invert_map(value.playlists),
+            albums: HashMap::new(),
+            artists: HashMap::new(),
+            directories: HashMap::new(),
+            playlists: HashMap::new(),
+            #[cfg(debug_assertions)]
             logs: invert_map(value.logs),
             queue: invert_map(value.queue),
         }
@@ -173,10 +188,10 @@ mod tests {
             logs: HashMap::from([(LogsActions::Clear, vec![Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }])]),
             queue: HashMap::from([(QueueActions::Play, vec![Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }]),
                                   (QueueActions::Save, vec![Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }])]),
-            albums: HashMap::from([]),
-            artists: HashMap::from([]),
-            directories: HashMap::from([]),
-            playlists: HashMap::from([]),
+            // albums: HashMap::from([]),
+            // artists: HashMap::from([]),
+            // directories: HashMap::from([]),
+            // playlists: HashMap::from([]),
             navigation: HashMap::from([(CommonAction::Up, vec![Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, 
                                                                Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }])]),
         };

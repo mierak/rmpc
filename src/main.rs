@@ -23,7 +23,12 @@ use ratatui::{prelude::Backend, Terminal};
 use ron::extensions::Extensions;
 use ui::Level;
 
-use crate::{config::Config, mpd::mpd_client::MpdClient, ui::Ui, utils::macros::try_ret};
+use crate::{
+    config::Config,
+    mpd::mpd_client::MpdClient,
+    ui::Ui,
+    utils::macros::{status_warn, try_ret},
+};
 
 mod config;
 mod logging;
@@ -77,7 +82,7 @@ fn main() -> Result<()> {
             let config = Box::leak(Box::new(match read_cfg(&args) {
                 Ok(val) => val,
                 Err(err) => {
-                    warn!(err:?; "Using default config");
+                    status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
                     ConfigFile::default().try_into()?
                 }
             }));
