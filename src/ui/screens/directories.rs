@@ -180,7 +180,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     }
                 })
                 .sorted()
-                .map(|v| v.to_list_item(&state.config, false, None))
+                .map(|v| v.to_list_item(state.config, false, None))
                 .collect();
                 Ok(Some(res))
             }

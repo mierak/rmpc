@@ -170,19 +170,16 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
-        let Some(value) = current.as_path() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(KeyHandleResultInternal::RenderRequested);
-        };
 
         match self.stack.path() {
             [_artist, _album] => self.add(current, client, shared),
             [artist] => {
-                self.stack.push(list_titles(client, artist, value)?.collect());
+                self.stack
+                    .push(list_titles(client, artist, current.as_path())?.collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
-                self.stack.push(list_albums(client, value)?.collect());
+                self.stack.push(list_albums(client, current.as_path())?.collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => {
@@ -196,7 +193,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
         self.stack
             .current()
             .selected()
-            .and_then(DirStackItem::as_path)
+            .map(DirStackItem::as_path)
             .map_or(Ok(None), |current| -> Result<_> {
                 Ok(match self.stack.path() {
                     [artist, album] => Some(
@@ -208,12 +205,12 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                     ),
                     [artist] => Some(
                         list_titles(client, artist, current)?
-                            .map(|s| s.to_list_item(&state.config, false, None))
+                            .map(|s| s.to_list_item(state.config, false, None))
                             .collect_vec(),
                     ),
                     [] => Some(
                         list_albums(client, current)?
-                            .map(|s| s.to_list_item(&state.config, false, None))
+                            .map(|s| s.to_list_item(state.config, false, None))
                             .collect_vec(),
                     ),
                     _ => None,

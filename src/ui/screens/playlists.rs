@@ -243,7 +243,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                         .list_playlist(d)?
                         .into_iter()
                         .map(DirOrSong::Song)
-                        .map(|s| s.to_list_item(&state.config, false, None))
+                        .map(|s| s.to_list_item(state.config, false, None))
                         .collect_vec(),
                     DirOrSong::Song(file) => client
                         .find_one(&[Filter::new(Tag::File, file)])?

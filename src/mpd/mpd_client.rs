@@ -56,6 +56,7 @@ pub trait MpdClient {
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
+    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()>;
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>>;
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
@@ -193,8 +194,19 @@ impl MpdClient for Client<'_> {
         self.send("playlistinfo").and_then(ProtoClient::read_opt_response)
     }
 
+    /// Search the database for songs matching FILTER
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         self.send(&format!("find \"({})\"", filter.to_query_str()))
+            .and_then(ProtoClient::read_response)
+    }
+
+    /// Search the database for songs matching FILTER (see Filters).
+    /// Parameters have the same meaning as for find, except that search is not case sensitive.
+    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
+        let query = filter.to_query_str();
+        let query = query.as_str();
+        log::debug!(query; "Searching for songs");
+        self.send(&format!("search \"({query})\""))
             .and_then(ProtoClient::read_response)
     }
 
@@ -507,7 +519,7 @@ trait StrExt {
 }
 impl StrExt for &str {
     fn escape(self) -> String {
-        self.replace('\\', "\\\\")
+        self.replace('\\', r"\\\\")
             .replace('(', "\\(")
             .replace(')', "\\)")
             .replace('\'', "\\\\'")
@@ -515,21 +527,25 @@ impl StrExt for &str {
     }
 }
 
-// TODO: fill out the rest of the tags eventually
-#[derive(Debug, Display)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
+#[strum(serialize_all = "PascalCase")]
 pub enum Tag {
+    Any,
     Artist,
+    AlbumArtist,
     Album,
     Title,
     File,
+    Genre,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FilterKind {
     Exact,
     StartsWith,
+    Contains,
+    Regex,
 }
 
 #[derive(Debug)]
@@ -553,7 +569,7 @@ impl<'a> Filter<'a> {
         Self { tag, value, kind }
     }
 
-    pub fn with_type(&mut self, t: FilterKind) -> &mut Self {
+    pub fn with_type(mut self, t: FilterKind) -> Self {
         self.kind = t;
         self
     }
@@ -562,6 +578,8 @@ impl<'a> Filter<'a> {
         match self.kind {
             FilterKind::Exact => format!("{} == '{}'", self.tag, self.value.escape()),
             FilterKind::StartsWith => format!("{} =~ '^{}'", self.tag, self.value.escape()),
+            FilterKind::Contains => format!("{} =~ '.*{}.*'", self.tag, self.value.escape()),
+            FilterKind::Regex => format!("{} =~ '{}'", self.tag, self.value.escape()),
         }
     }
 }
@@ -604,14 +622,39 @@ mod filter_tests {
     fn single_value() {
         let input: &[Filter<'_>] = &[Filter::new(Tag::Artist, "mrs singer")];
 
-        assert_eq!(input.to_query_str(), "(artist == 'mrs singer')");
+        assert_eq!(input.to_query_str(), "(Artist == 'mrs singer')");
     }
 
     #[test]
     fn starts_with() {
         let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
 
-        assert_eq!(input.to_query_str(), "(artist =~ '^mrs singer')");
+        assert_eq!(input.to_query_str(), "(Artist =~ '^mrs singer')");
+    }
+
+    #[test]
+    fn exact() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
+
+        assert_eq!(input.to_query_str(), "(Album == 'the greatest')");
+    }
+
+    #[test]
+    fn contains() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
+
+        assert_eq!(input.to_query_str(), "(Album =~ '.*the greatest.*')");
+    }
+
+    #[test]
+    fn regex() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(
+            Tag::Album,
+            r"the greatest.*\s+[A-Za-z]+$",
+            FilterKind::Regex,
+        )];
+
+        assert_eq!(input.to_query_str(), r"(Album =~ 'the greatest.*\\\\s+[A-Za-z]+$')");
     }
 
     #[test]
@@ -623,7 +666,7 @@ mod filter_tests {
 
         assert_eq!(
             input.to_query_str(),
-            "(album == 'the greatest') AND (artist == 'mrs singer')"
+            "(Album == 'the greatest') AND (Artist == 'mrs singer')"
         );
     }
 }

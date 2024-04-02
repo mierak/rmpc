@@ -8,7 +8,7 @@ use crate::ui::screens::logs::LogsActions;
 use crate::ui::{
     screens::{
         albums::AlbumsActions, artists::ArtistsActions, directories::DirectoriesActions, playlists::PlaylistsActions,
-        queue::QueueActions, CommonAction,
+        queue::QueueActions, search::SearchActions, CommonAction,
     },
     GlobalAction,
 };
@@ -27,6 +27,7 @@ pub struct KeyConfig {
     pub artists: HashMap<Key, ArtistsActions>,
     pub directories: HashMap<Key, DirectoriesActions>,
     pub playlists: HashMap<Key, PlaylistsActions>,
+    pub search: HashMap<Key, SearchActions>,
     #[cfg(debug_assertions)]
     pub logs: HashMap<Key, LogsActions>,
     pub queue: HashMap<Key, QueueActions>,
@@ -42,6 +43,7 @@ pub struct KeyConfigFile {
     // pub artists: HashMap<ArtistsActions, Vec<Key>>,
     // pub directories: HashMap<DirectoriesActions, Vec<Key>>,
     // pub playlists: HashMap<PlaylistsActions, Vec<Key>>,
+    // pub search: HashMap<SearchActions, Vec<Key>>,
     #[cfg(debug_assertions)]
     pub logs: HashMap<LogsActions, Vec<Key>>,
     #[serde(default)]
@@ -85,6 +87,7 @@ impl Default for KeyConfigFile {
                 (G::ArtistsTab,       vec![Key { key: K::Char('3'), modifiers: M::NONE }]),
                 (G::AlbumsTab,        vec![Key { key: K::Char('4'), modifiers: M::NONE }]),
                 (G::PlaylistsTab,     vec![Key { key: K::Char('5'), modifiers: M::NONE }]),
+                (G::SearchTab,        vec![Key { key: K::Char('6'), modifiers: M::NONE }]),
             ]),
             navigation: HashMap::from([
                 (C::Up,               vec![Key { key: K::Char('k'), modifiers: M::NONE    }]),
@@ -139,7 +142,6 @@ fn invert_map<T: Copy, V: std::hash::Hash + std::cmp::Eq>(v: HashMap<T, Vec<V>>)
 
 impl From<KeyConfigFile> for KeyConfig {
     fn from(value: KeyConfigFile) -> Self {
-        dbg!(&value.queue);
         KeyConfig {
             global: invert_map(value.global),
             navigation: invert_map(value.navigation),
@@ -151,6 +153,7 @@ impl From<KeyConfigFile> for KeyConfig {
             artists: HashMap::new(),
             directories: HashMap::new(),
             playlists: HashMap::new(),
+            search: HashMap::new(),
             #[cfg(debug_assertions)]
             logs: invert_map(value.logs),
             queue: invert_map(value.queue),
@@ -204,6 +207,7 @@ mod tests {
             artists: HashMap::from([]),
             directories: HashMap::from([]),
             playlists: HashMap::from([]),
+            search: HashMap::from([]),
             navigation: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL }, CommonAction::Up),
                                        (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up)]),
         };

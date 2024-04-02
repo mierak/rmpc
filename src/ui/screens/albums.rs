@@ -118,15 +118,11 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
-        let Some(value) = current.as_path() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(KeyHandleResultInternal::RenderRequested);
-        };
 
         match self.stack.path() {
             [_album] => self.add(current, client, shared),
             [] => {
-                let res = list_titles(client, value)?;
+                let res = list_titles(client, current.as_path())?;
                 self.stack.push(res.collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -167,7 +163,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         self.stack()
             .current()
             .selected()
-            .and_then(DirStackItem::as_path)
+            .map(DirStackItem::as_path)
             .map_or(Ok(None), |current| -> Result<_> {
                 Ok(match self.stack.path() {
                     [album] => find_songs(client, album, current)?
@@ -176,7 +172,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
                         .map(std::iter::Iterator::collect),
                     [] => Some(
                         list_titles(client, current)?
-                            .map(|v| v.to_list_item(&state.config, false, None))
+                            .map(|v| v.to_list_item(state.config, false, None))
                             .collect_vec(),
                     ),
                     _ => None,

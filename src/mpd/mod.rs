@@ -18,14 +18,14 @@ where
         match self.next_internal(key.to_lowercase().as_str(), value)? {
             LineHandled::Yes => {}
             LineHandled::No { value } => {
-                log::warn!(key = key.as_str(), value = value.as_str(); "Encountered unknow key/value pair")
+                log::warn!(key = key.as_str(), value = value.as_str(); "Encountered unknow key/value pair");
             }
         }
         Ok(())
     }
 }
 
-pub(self) fn split_line(mut line: String) -> Result<(String, String), MpdError> {
+pub fn split_line(mut line: String) -> Result<(String, String), MpdError> {
     let delim_idx = match line.find(':') {
         Some(val) => val,
         None => return Err(MpdError::ValueExpected(line)),

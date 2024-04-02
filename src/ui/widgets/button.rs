@@ -6,11 +6,23 @@ use ratatui::{
 
 use super::get_line_offset;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Button<'a> {
     label: &'a str,
     block: Option<Block<'a>>,
     style: Style,
+    label_alignment: Alignment,
+}
+
+impl<'a> Default for Button<'a> {
+    fn default() -> Self {
+        Self {
+            label_alignment: Alignment::Center,
+            label: "",
+            block: None,
+            style: Style::default(),
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -29,6 +41,11 @@ impl<'a> Button<'a> {
         self.style = style;
         self
     }
+
+    pub fn label_alignment(mut self, alignment: Alignment) -> Self {
+        self.label_alignment = alignment;
+        self
+    }
 }
 
 impl<'a> Widget for Button<'a> {
@@ -44,7 +61,7 @@ impl<'a> Widget for Button<'a> {
         };
 
         buf.set_string(
-            area.left() + get_line_offset(self.label.len() as u16, area.width, Alignment::Center),
+            area.left() + get_line_offset(self.label.len() as u16, area.width, self.label_alignment),
             area.top(),
             self.label,
             self.style,
@@ -83,7 +100,7 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
     type State = ButtonGroupState;
 
     fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
-        buf.set_style(area, self.inactive_style);
+        // buf.set_style(area, self.inactive_style);
         let area = match self.block.take() {
             Some(b) => {
                 let inner_area = b.inner(area);
@@ -108,6 +125,8 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
             let mut button = button;
             if idx == state.selected {
                 button = button.style(self.active_style);
+            } else {
+                button = button.style(self.inactive_style);
             }
             button.render(chunks[idx], buf);
         });

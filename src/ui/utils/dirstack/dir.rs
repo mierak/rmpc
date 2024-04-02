@@ -28,6 +28,23 @@ impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
 
 #[allow(dead_code)]
 impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
+    pub fn new(root: Vec<T>) -> Self {
+        let mut result = Self {
+            items: Vec::new(),
+            state: DirState::default(),
+            filter: None,
+            filter_ignore_case: true,
+        };
+
+        if !root.is_empty() {
+            result.state.select(Some(0));
+            result.state.set_content_len(Some(root.len()));
+            result.items = root;
+        };
+
+        result
+    }
+
     pub fn replace(&mut self, new_current: Vec<T>) {
         if new_current.is_empty() {
             self.state.select(None);
@@ -38,6 +55,14 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         }
         self.state.set_content_len(Some(new_current.len()));
         self.items = new_current;
+    }
+
+    pub fn to_list_items(&self, config: &crate::config::Config) -> Vec<T::Item> {
+        self.items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| item.to_list_item(config, self.state.marked.contains(&i), self.filter.as_deref()))
+            .collect()
     }
 
     pub fn selected(&self) -> Option<&T> {

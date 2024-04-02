@@ -13,12 +13,13 @@ pub use state::DirState;
 
 use crate::{
     config::Config,
+    mpd::commands::Song,
     ui::screens::{browser::DirOrSong, StringExt},
 };
 
 pub trait DirStackItem {
     type Item;
-    fn as_path(&self) -> Option<&str>;
+    fn as_path(&self) -> &str;
     fn matches(&self, filter: &str, ignore_case: bool) -> bool;
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item;
 }
@@ -26,8 +27,8 @@ pub trait DirStackItem {
 impl<'a> DirStackItem for &'a str {
     type Item = ListItem<'a>;
 
-    fn as_path(&self) -> Option<&str> {
-        Some(self)
+    fn as_path(&self) -> &str {
+        self
     }
 
     fn matches(&self, filter: &str, ignorecase: bool) -> bool {
@@ -50,8 +51,8 @@ impl<'a> DirStackItem for &'a str {
 impl DirStackItem for String {
     type Item = ListItem<'static>;
 
-    fn as_path(&self) -> Option<&str> {
-        Some(self)
+    fn as_path(&self) -> &str {
+        self
     }
 
     fn matches(&self, filter: &str, ignorecase: bool) -> bool {
@@ -62,11 +63,19 @@ impl DirStackItem for String {
         }
     }
 
-    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> Self::Item {
-        if filter.is_some_and(|filter| self.matches(filter, true)) {
-            ListItem::new(self.clone()).style(config.ui.highlighted_item_style)
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
+        let symbols = &config.ui.symbols;
+        let marker_span = if is_marked {
+            Span::styled(symbols.marker, Style::default().fg(Color::Blue))
         } else {
-            ListItem::new(self.clone())
+            Span::from(" ".repeat(symbols.marker.chars().count()))
+        };
+
+        if filter.is_some_and(|filter| self.matches(filter, true)) {
+            ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
+                .style(config.ui.highlighted_item_style)
+        } else {
+            ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
         }
     }
 }
@@ -74,10 +83,10 @@ impl DirStackItem for String {
 impl DirStackItem for DirOrSong {
     type Item = ListItem<'static>;
 
-    fn as_path(&self) -> Option<&str> {
+    fn as_path(&self) -> &str {
         match self {
-            DirOrSong::Dir(d) => Some(d),
-            DirOrSong::Song(s) => Some(s),
+            DirOrSong::Dir(d) => d,
+            DirOrSong::Song(s) => s,
         }
     }
 
@@ -114,6 +123,50 @@ impl DirStackItem for DirOrSong {
         } else {
             ListItem::new(Line::from(vec![marker_span, Span::from(value)]))
         }
+    }
+}
+
+impl DirStackItem for Song {
+    type Item = ListItem<'static>;
+
+    fn as_path(&self) -> &str {
+        &self.file
+    }
+
+    fn matches(&self, filter: &str, ignore_case: bool) -> bool {
+        if ignore_case {
+            format!("{} - {}", self.title_str(), self.artist_str())
+                .to_lowercase()
+                .contains(&filter.to_lowercase())
+        } else {
+            format!("{} - {}", self.title_str(), self.artist_str()).contains(filter)
+        }
+    }
+
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
+        let symbols = &config.ui.symbols;
+        let marker_span = if is_marked {
+            Span::styled(symbols.marker, Style::default().fg(Color::Blue))
+        } else {
+            Span::from(" ".repeat(symbols.marker.chars().count()))
+        };
+
+        let title = self.title_str().to_owned();
+        let artist = self.artist_str().to_owned();
+        let separator_span = Span::from(" - ");
+        let icon_span = Span::from(format!(" {}", symbols.song));
+        let mut result = ListItem::new(Line::from(vec![
+            icon_span,
+            marker_span,
+            Span::from(artist),
+            separator_span,
+            Span::from(title),
+        ]));
+        if filter.is_some_and(|filter| DirStackItem::matches(self, filter, true)) {
+            result = result.style(config.ui.highlighted_item_style);
+        }
+
+        result
     }
 }
 

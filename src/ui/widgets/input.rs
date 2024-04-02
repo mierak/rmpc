@@ -1,30 +1,35 @@
+use std::borrow::Cow;
+
 use ratatui::{
     prelude::{Constraint, Layout, Margin},
-    style::{Color, Style, Stylize},
+    style::Style,
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
 
 #[derive(Debug, Default)]
 pub struct Input<'a> {
     text: &'a str,
+    placeholder: Option<&'a str>,
     label: &'a str,
+    label_style: Style,
+    input_style: Style,
     focused: bool,
     focused_style: Style,
     unfocused_style: Style,
+    borderless: bool,
 }
 
 impl Widget for Input<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let [text_area, input_area] = *Layout::horizontal([
-            Constraint::Max(self.label.chars().count() as u16 + 2),
-            Constraint::Max(24),
-        ])
-        .split(area) else {
+        let label_len = self.label.chars().count() as u16;
+        let [text_area, input_area] =
+            *Layout::horizontal([Constraint::Max(label_len + 2), Constraint::Fill(1)]).split(area)
+        else {
             return;
         };
 
         let input_area = input_area.inner(&Margin {
-            horizontal: 1,
+            horizontal: 0,
             vertical: 0,
         });
 
@@ -33,21 +38,27 @@ impl Widget for Input<'_> {
         } else {
             self.unfocused_style
         };
-        let label = Paragraph::new(self.label).wrap(Wrap { trim: true });
-        let input = Paragraph::new(self.trimed_text(input_area))
-            .block(
+
+        let label = Paragraph::new(self.label)
+            .wrap(Wrap { trim: false })
+            .style(self.label_style);
+        let mut input = Paragraph::new(self.trimed_text(input_area)).style(self.input_style);
+
+        if !self.borderless {
+            input = input.block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(ratatui::symbols::border::ROUNDED)
                     .border_style(block_border_style),
-            )
-            .fg(Color::White)
-            .wrap(Wrap { trim: true });
+            );
+        }
+
+        input = input.wrap(Wrap { trim: true });
 
         label.render(
             text_area.inner(&Margin {
-                horizontal: 1,
-                vertical: 1,
+                horizontal: 0,
+                vertical: if self.borderless { 0 } else { 1 },
             }),
             buf,
         );
@@ -57,7 +68,11 @@ impl Widget for Input<'_> {
 
 #[allow(unused)]
 impl<'a> Input<'a> {
-    fn trimed_text(&self, input_area: ratatui::layout::Rect) -> String {
+    fn trimed_text(&self, input_area: ratatui::layout::Rect) -> Cow<'a, str> {
+        if self.text.is_empty() && !self.focused {
+            return Cow::Borrowed(self.placeholder.unwrap_or(""));
+        }
+
         let mut input_len = input_area
             .inner(&Margin {
                 horizontal: 1,
@@ -69,15 +84,16 @@ impl<'a> Input<'a> {
             input_len = input_len.saturating_sub(1);
         }
 
-        format!(
+        Cow::Owned(format!(
             "{}{}",
             self.text
                 .chars()
                 .skip(self.text.len().saturating_sub(input_len))
                 .collect::<String>(),
             if self.focused { "█" } else { "" },
-        )
+        ))
     }
+
     pub fn set_text(mut self, text: &'a str) -> Self {
         self.text = text;
         self
@@ -100,6 +116,26 @@ impl<'a> Input<'a> {
 
     pub fn set_unfocused_style(mut self, unfocused_style: Style) -> Self {
         self.unfocused_style = unfocused_style;
+        self
+    }
+
+    pub fn set_borderless(mut self, borderless: bool) -> Self {
+        self.borderless = borderless;
+        self
+    }
+
+    pub fn set_label_style(mut self, label_style: Style) -> Self {
+        self.label_style = label_style;
+        self
+    }
+
+    pub fn set_input_style(mut self, input_style: Style) -> Self {
+        self.input_style = input_style;
+        self
+    }
+
+    pub fn set_placeholder(mut self, placeholder: &'a str) -> Self {
+        self.placeholder = Some(placeholder);
         self
     }
 }

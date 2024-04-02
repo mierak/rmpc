@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, Padding, StatefulWidget};
 
@@ -57,32 +56,8 @@ where
             vertical: 0,
             horizontal: 0,
         };
-        let previous = state
-            .previous()
-            .items
-            .iter()
-            .enumerate()
-            .map(|(idx, v)| {
-                v.to_list_item(
-                    &self.config,
-                    state.previous().marked().contains(&idx),
-                    state.previous().filter.as_ref().map(|f| f.as_str()),
-                )
-            })
-            .collect_vec();
-        let current = state
-            .current()
-            .items
-            .iter()
-            .enumerate()
-            .map(|(idx, v)| {
-                v.to_list_item(
-                    &self.config,
-                    state.current().marked().contains(&idx),
-                    state.current().filter.as_ref().map(|f| f.as_str()),
-                )
-            })
-            .collect_vec();
+        let previous = state.previous().to_list_items(self.config);
+        let current = state.current().to_list_items(self.config);
         let preview = state.preview().cloned();
 
         let [previous_area, current_area, preview_area] = *Layout::horizontal([
@@ -110,7 +85,7 @@ where
                     Block::default()
                         .borders(Borders::RIGHT)
                         .border_style(self.border_style)
-                        .padding(Padding::new(0, 2, 0, 0))
+                        .padding(Padding::new(0, 1, 0, 0))
                         .border_set(LEFT_COLUMN_SYMBOLS),
                 );
             } else {
@@ -142,9 +117,9 @@ where
                             .border_set(MIDDLE_COLUMN_SYMBOLS);
                     }
                     if let Some(ref title) = title {
-                        b = b.title(title.clone().blue());
+                        b = b.title(title.clone().set_style(self.config.ui.borders_style));
                     }
-                    b.padding(Padding::new(1, 2, 0, 0))
+                    b.padding(Padding::new(0, 1, 0, 0))
                 })
                 .highlight_style(self.config.ui.current_item_style);
 

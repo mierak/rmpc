@@ -20,7 +20,7 @@ use crate::{
     mpd::{
         client::Client,
         commands::{volume::Bound, State as MpdState},
-        mpd_client::MpdClient,
+        mpd_client::{FilterKind, MpdClient},
     },
 };
 use crate::{mpd::version::Version, state::State};
@@ -31,7 +31,7 @@ use self::{
     modals::{Modal, Modals},
     screens::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
-        queue::QueueScreen, Screen,
+        queue::QueueScreen, search::SearchScreen, Screen,
     },
     widgets::header::Header,
 };
@@ -92,6 +92,7 @@ struct Screens {
     albums: AlbumsScreen,
     artists: ArtistsScreen,
     playlists: PlaylistsScreen,
+    search: SearchScreen,
 }
 
 impl Screens {
@@ -104,6 +105,7 @@ impl Screens {
             albums: AlbumsScreen::default(),
             artists: ArtistsScreen::default(),
             playlists: PlaylistsScreen::default(),
+            search: SearchScreen::default(),
         }
     }
 }
@@ -124,6 +126,7 @@ macro_rules! screen_call {
             screens::Screens::Artists => invoke!($self.screens.artists, $fn, $($param),+),
             screens::Screens::Albums => invoke!($self.screens.albums, $fn, $($param),+),
             screens::Screens::Playlists => invoke!($self.screens.playlists, $fn, $($param),+),
+            screens::Screens::Search => invoke!($self.screens.search, $fn, $($param),+),
         }
     }
 }
@@ -341,11 +344,19 @@ impl Ui<'_> {
                             screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
+                        GlobalAction::SearchTab if !matches!(app.active_tab, screens::Screens::Search) => {
+                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+
+                            app.active_tab = screens::Screens::Search;
+                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
                         GlobalAction::QueueTab => {}
                         GlobalAction::DirectoriesTab => {}
                         GlobalAction::ArtistsTab => {}
                         GlobalAction::AlbumsTab => {}
                         GlobalAction::PlaylistsTab => {}
+                        GlobalAction::SearchTab => {}
                         GlobalAction::NextTrack => {}
                         GlobalAction::PreviousTrack => {}
                         GlobalAction::Stop => {}
@@ -396,6 +407,7 @@ pub enum GlobalAction {
     ArtistsTab,
     AlbumsTab,
     PlaylistsTab,
+    SearchTab,
 }
 
 pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>) -> Result<()> {
@@ -477,6 +489,40 @@ impl BoolExt for bool {
         } else {
             "Off"
         }
+    }
+}
+
+impl From<&FilterKind> for &'static str {
+    fn from(value: &FilterKind) -> Self {
+        match value {
+            FilterKind::Exact => "Exact match",
+            FilterKind::Contains => "Contains value",
+            FilterKind::StartsWith => "Starts with value",
+            FilterKind::Regex => "Regex",
+        }
+    }
+}
+
+impl std::fmt::Display for FilterKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FilterKind::Exact => write!(f, "Exact match"),
+            FilterKind::Contains => write!(f, "Contains value"),
+            FilterKind::StartsWith => write!(f, "Starts with value"),
+            FilterKind::Regex => write!(f, "Regex"),
+        }
+    }
+}
+
+impl FilterKind {
+    fn cycle(&mut self) -> &mut Self {
+        *self = match self {
+            FilterKind::Exact => FilterKind::Contains,
+            FilterKind::Contains => FilterKind::StartsWith,
+            FilterKind::StartsWith => FilterKind::Regex,
+            FilterKind::Regex => FilterKind::Exact,
+        };
+        self
     }
 }
 

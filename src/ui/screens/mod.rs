@@ -35,6 +35,7 @@ pub mod directories;
 pub mod logs;
 pub mod playlists;
 pub mod queue;
+pub mod search;
 
 #[derive(Debug, Display, EnumVariantNames, Default, Clone, Copy, EnumIter, PartialEq)]
 pub enum Screens {
@@ -46,6 +47,7 @@ pub enum Screens {
     Artists,
     Albums,
     Playlists,
+    Search,
 }
 
 pub(super) trait Screen {
@@ -133,13 +135,15 @@ impl Screens {
             Screens::Directories => Screens::Artists,
             Screens::Artists => Screens::Albums,
             Screens::Albums => Screens::Playlists,
-            Screens::Playlists => Screens::Queue,
+            Screens::Playlists => Screens::Search,
+            Screens::Search => Screens::Queue,
         }
     }
 
     pub fn prev(self) -> Self {
         match self {
-            Screens::Queue => Screens::Playlists,
+            Screens::Queue => Screens::Search,
+            Screens::Search => Screens::Playlists,
             Screens::Playlists => Screens::Albums,
             Screens::Albums => Screens::Artists,
             Screens::Artists => Screens::Directories,
@@ -257,15 +261,15 @@ pub(crate) mod browser {
 }
 
 impl Song {
-    fn title_str(&self) -> &str {
+    pub fn title_str(&self) -> &str {
         self.title.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
-    fn artist_str(&self) -> &str {
+    pub fn artist_str(&self) -> &str {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
-    fn matches(&self, formats: &[SongTableColumn], filter: &str, ignore_case: bool) -> bool {
+    pub fn matches(&self, formats: &[SongTableColumn], filter: &str, ignore_case: bool) -> bool {
         for format in formats {
             let match_found = match format.prop {
                 SongProperty::Filename { .. } => self.file.matches(filter, ignore_case),

@@ -25,17 +25,9 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
             current: Dir::default(),
             preview: None,
         };
-        let mut root_state = DirState::default();
-
         result.push(Vec::new());
+        result.current = Dir::new(root);
 
-        if !root.is_empty() {
-            root_state.select(Some(0));
-            root_state.set_content_len(Some(root.len()));
-            result.current.items = root;
-        };
-
-        result.current.state = root_state;
         result
     }
 
@@ -68,7 +60,7 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
     }
 
     pub fn next_path(&self) -> Option<Vec<String>> {
-        if let Some(Some(current)) = self.current().selected().map(DirStackItem::as_path) {
+        if let Some(current) = self.current().selected().map(DirStackItem::as_path) {
             let mut res = self.path().to_vec();
             res.push(current.to_owned());
             Some(res)
@@ -95,7 +87,7 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
         };
         new_state.set_content_len(Some(head.len()));
 
-        if let Some(Some(current)) = self.current().selected().map(DirStackItem::as_path) {
+        if let Some(current) = self.current().selected().map(DirStackItem::as_path) {
             self.path.push(current.to_owned());
         }
 
