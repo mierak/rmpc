@@ -198,7 +198,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
             default_album_art: value
                 .default_album_art_path
-                .map_or_else(|| Ok(DEFAULT_ART.to_vec()), |path| std::fs::read(path))?,
+                .map_or(Ok(DEFAULT_ART.to_vec()), std::fs::read)?,
         })
     }
 }

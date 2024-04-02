@@ -9,6 +9,7 @@
     clippy::zero_sized_map_values,
     clippy::too_many_lines,
     clippy::match_single_binding,
+    clippy::struct_field_names,
     unused_macros
 )]
 use std::{ops::Sub, sync::mpsc::TryRecvError, time::Duration};
@@ -173,6 +174,7 @@ fn main_task<B: Backend + std::io::Write>(
     mut render_loop: RenderLoop,
     mut terminal: Terminal<B>,
 ) {
+    let event_receiver = event_receiver;
     let mut render_wanted = false;
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
@@ -308,7 +310,7 @@ fn handle_idle_event(
         | IdleEvent::Neighbor
         | IdleEvent::Mount
         | IdleEvent::StoredPlaylist => {
-            warn!(event:?; "Received unhandled event")
+            warn!(event:?; "Received unhandled event");
         }
     };
     Ok(())
@@ -316,6 +318,7 @@ fn handle_idle_event(
 
 fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEvent>) {
     let mut error_count = 0;
+    let sender = sender;
     loop {
         let events = match idle_client.idle() {
             Ok(val) => val,
@@ -341,6 +344,7 @@ fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEve
 }
 
 fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
+    let user_input_tx = user_input_tx;
     loop {
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(true) => {

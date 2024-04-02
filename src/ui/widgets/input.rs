@@ -58,7 +58,7 @@ impl Widget for Input<'_> {
         label.render(
             text_area.inner(&Margin {
                 horizontal: 0,
-                vertical: if self.borderless { 0 } else { 1 },
+                vertical: u16::from(!self.borderless),
             }),
             buf,
         );

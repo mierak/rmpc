@@ -82,7 +82,7 @@ impl AppEventChannelWriter {
 impl flexi_logger::writers::LogWriter for AppEventChannelWriter {
     fn write(&self, now: &mut flexi_logger::DeferredNow, record: &log::Record) -> std::io::Result<()> {
         let mut buf = Vec::new();
-        (self.format_fn).and_then(|fun| Some(fun(&mut buf, now, record)));
+        (self.format_fn).map(|fun| fun(&mut buf, now, record));
 
         match self.tx.send(AppEvent::Log(buf)) {
             Ok(v) => Ok(v),
@@ -117,7 +117,12 @@ pub fn colored_structured_detailed_format(
     record: &log::Record,
 ) -> Result<(), std::io::Error> {
     let mut visitor = Visitor::new();
-    record.key_values().visit(&mut visitor).unwrap();
+    match record.key_values().visit(&mut visitor) {
+        Ok(()) => {}
+        Err(err) => {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, err));
+        }
+    }
 
     let level = record.level();
     write!(
@@ -136,9 +141,14 @@ pub fn structured_detailed_format(
     w: &mut dyn std::io::Write,
     now: &mut flexi_logger::DeferredNow,
     record: &log::Record,
-) -> Result<(), std::io::Error> {
+) -> anyhow::Result<(), std::io::Error> {
     let mut visitor = Visitor::new();
-    record.key_values().visit(&mut visitor).unwrap();
+    match record.key_values().visit(&mut visitor) {
+        Ok(()) => {}
+        Err(err) => {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, err));
+        }
+    }
     write!(
         w,
         r#"{} {:<5} {}:{} message="{}" {}"#,
@@ -164,7 +174,7 @@ impl Visitor {
 
 impl std::fmt::Display for Visitor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for ele in self.values.iter() {
+        for ele in &self.values {
             write!(f, r#"{}="{}" "#, ele.0, ele.1)?;
         }
         Ok(())
