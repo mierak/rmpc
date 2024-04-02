@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-use super::{KeyHandleResultInternal, RectExt, SharedUiState};
+use super::{KeyHandleResultInternal, RectExt};
 
 use super::Modal;
 
@@ -57,12 +57,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
 };
 
 impl Modal for AddToPlaylistModal {
-    fn render(
-        &mut self,
-        frame: &mut ratatui::Frame,
-        app: &mut crate::state::State,
-        _shared_state: &mut SharedUiState,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::state::State) -> anyhow::Result<()> {
         let popup_area = frame.size().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.ui.background_color_modal {
@@ -131,7 +126,6 @@ impl Modal for AddToPlaylistModal {
         key: crossterm::event::KeyEvent,
         client: &mut crate::mpd::client::Client<'_>,
         app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
     ) -> anyhow::Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
             match action {

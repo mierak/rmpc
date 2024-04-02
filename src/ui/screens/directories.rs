@@ -14,7 +14,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, SharedUiState,
+        KeyHandleResultInternal,
     },
     utils::macros::status_info,
 };
@@ -29,13 +29,7 @@ pub struct DirectoriesScreen {
 
 impl Screen for DirectoriesScreen {
     type Actions = DirectoriesActions;
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        app: &mut crate::state::State,
-        _state: &mut SharedUiState,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
         frame.render_stateful_widget(
             Browser::new(app.config)
                 .set_widths(&app.config.ui.column_widths)
@@ -47,12 +41,7 @@ impl Screen for DirectoriesScreen {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        client: &mut Client<'_>,
-        app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn before_show(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
         self.stack = DirStack::new(
             client
                 .lsinfo(None)?
@@ -71,14 +60,13 @@ impl Screen for DirectoriesScreen {
         event: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
-        shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             self.handle_filter_input(event, client, app)
         } else if let Some(_action) = app.config.keybinds.directories.get(&event.into()) {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, app, shared)
+            self.handle_common_action(*action, client, app)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -105,12 +93,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         self.filter_input_mode
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        client: &mut Client<'_>,
-        _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(dirname) => {
                 let mut next_path = self.stack.path().to_vec();
@@ -130,7 +113,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         Ok(KeyHandleResultInternal::RenderRequested)
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
@@ -153,7 +136,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 self.stack.push(res);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
-            t @ DirOrSong::Song(_) => self.add(t, client, shared),
+            t @ DirOrSong::Song(_) => self.add(t, client),
         }
     }
 

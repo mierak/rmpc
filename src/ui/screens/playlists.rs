@@ -14,7 +14,7 @@ use crate::{
         modals::{rename_playlist::RenamePlaylistModal, Modals},
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, SharedUiState,
+        KeyHandleResultInternal,
     },
     utils::macros::{status_error, status_info},
 };
@@ -32,13 +32,7 @@ pub enum PlaylistsActions {}
 
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        app: &mut State,
-        _shared_state: &mut SharedUiState,
-    ) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut State) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(app.config)
                 .set_widths(&app.config.ui.column_widths)
@@ -50,12 +44,7 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        client: &mut Client<'_>,
-        app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn before_show(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
         let mut playlists: Vec<_> = client
             .list_playlists()
             .context("Cannot list playlists")?
@@ -69,20 +58,15 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    fn refresh(
-        &mut self,
-        client: &mut Client<'_>,
-        app: &mut crate::state::State,
-        shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn refresh(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
         let selected_idx = self.stack.current().selected_with_idx().map(|(_, idx)| idx);
         let filter = std::mem::take(&mut self.stack.current_mut().filter);
         match self.stack.pop() {
             Some(_) => {
-                self.next(client, shared)?;
+                self.next(client)?;
             }
             None => {
-                self.before_show(client, app, shared)?;
+                self.before_show(client, app)?;
             }
         };
         self.stack.current_mut().state.select(selected_idx);
@@ -98,14 +82,13 @@ impl Screen for PlaylistsScreen {
         event: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
-        shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             self.handle_filter_input(event, client, app)
         } else if let Some(_action) = app.config.keybinds.playlists.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, app, shared)
+            self.handle_common_action(*action, client, app)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -129,13 +112,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         self.filter_input_mode
     }
 
-    fn delete(
-        &self,
-        item: &DirOrSong,
-        index: usize,
-        client: &mut Client<'_>,
-        _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn delete(&self, item: &DirOrSong, index: usize, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {
                 client.delete_playlist(d)?;
@@ -153,12 +130,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        client: &mut Client<'_>,
-        _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {
                 client.load_playlist(d)?;
@@ -175,12 +147,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn rename(
-        &self,
-        item: &DirOrSong,
-        _client: &mut Client<'_>,
-        _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn rename(&self, item: &DirOrSong, _client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
                 RenamePlaylistModal::new(d.clone()),
@@ -189,7 +156,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
@@ -201,7 +168,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                 self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
-            DirOrSong::Song(_song) => self.add(selected, client, shared),
+            DirOrSong::Song(_song) => self.add(selected, client),
         }
     }
 
@@ -209,7 +176,6 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         &mut self,
         direction: super::MoveDirection,
         client: &mut Client<'_>,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         let Some((selected, idx)) = self.stack().current().selected_with_idx() else {
             status_error!("Failed to move playlist. No playlist selected");

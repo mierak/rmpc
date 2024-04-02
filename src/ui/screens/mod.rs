@@ -25,7 +25,7 @@ use crate::{
 use super::{
     utils::dirstack::{DirStack, DirStackItem},
     widgets::volume::Volume,
-    DurationExt, KeyHandleResultInternal, SharedUiState,
+    DurationExt, KeyHandleResultInternal,
 };
 
 pub mod albums;
@@ -52,41 +52,20 @@ pub enum Screens {
 
 pub(super) trait Screen {
     type Actions;
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        app: &mut crate::state::State,
-        shared_state: &mut SharedUiState,
-    ) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(
-        &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared_state: &mut SharedUiState,
-    ) -> Result<()> {
+    fn on_hide(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(
-        &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn before_show(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn refresh(
-        &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn refresh(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
         Ok(())
     }
 
@@ -95,7 +74,6 @@ pub(super) trait Screen {
         event: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal>;
 }
 
@@ -466,27 +444,16 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn stack_mut(&mut self) -> &mut DirStack<T>;
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal>;
-    fn move_selected(
-        &mut self,
-        direction: MoveDirection,
-        client: &mut Client<'_>,
-        shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal>;
+    fn move_selected(&mut self, direction: MoveDirection, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
     fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>>;
-    fn add(&self, item: &T, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal>;
-    fn delete(
-        &self,
-        item: &T,
-        index: usize,
-        client: &mut Client<'_>,
-        shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &T, client: &mut Client<'_>) -> Result<KeyHandleResultInternal>;
+    fn delete(&self, item: &T, index: usize, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
-    fn rename(&self, item: &T, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
+    fn rename(&self, item: &T, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
     fn handle_filter_input(
@@ -533,7 +500,6 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         action: CommonAction,
         client: &mut Client<'_>,
         app: &mut State,
-        shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match action {
             CommonAction::Up => {
@@ -549,13 +515,13 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::MoveUp => {
-                let res = self.move_selected(MoveDirection::Up, client, shared)?;
-                self.refresh(client, app, shared)?;
+                let res = self.move_selected(MoveDirection::Up, client)?;
+                self.refresh(client, app)?;
                 Ok(res)
             }
             CommonAction::MoveDown => {
-                let res = self.move_selected(MoveDirection::Down, client, shared)?;
-                self.refresh(client, app, shared)?;
+                let res = self.move_selected(MoveDirection::Down, client)?;
+                self.refresh(client, app)?;
                 Ok(res)
             }
             CommonAction::DownHalf => {
@@ -583,7 +549,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Right => {
-                let res = self.next(client, shared)?;
+                let res = self.next(client)?;
                 let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(res)
@@ -621,13 +587,13 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, client, shared)?;
+                    self.add(item, client)?;
                 }
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Add => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, client, shared)
+                    self.add(item, client)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
@@ -635,15 +601,15 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.delete(item, *idx, client, shared)?;
+                    self.delete(item, *idx, client)?;
                 }
-                self.refresh(client, app, shared)?;
+                self.refresh(client, app)?;
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Delete => {
                 if let Some((item, index)) = self.stack().current().selected_with_idx() {
-                    self.delete(item, index, client, shared)?;
-                    self.refresh(client, app, shared)?;
+                    self.delete(item, index, client)?;
+                    self.refresh(client, app)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)
@@ -651,7 +617,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             }
             CommonAction::Rename => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.rename(item, client, shared)
+                    self.rename(item, client)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }

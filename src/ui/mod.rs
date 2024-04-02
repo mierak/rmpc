@@ -58,18 +58,13 @@ pub struct StatusMessage {
     pub created: std::time::Instant,
 }
 
-#[derive(Debug, Default)]
-pub struct SharedUiState {
-    status_message: Option<StatusMessage>,
-    frame_counter: u32,
-}
-
 #[derive(Debug)]
 pub struct Ui<'a> {
     client: Client<'a>,
     screens: Screens,
-    shared_state: SharedUiState,
     active_modal: Option<Modals>,
+    status_message: Option<StatusMessage>,
+    rendered_frames_count: u32,
 }
 
 impl<'a> Ui<'a> {
@@ -77,8 +72,9 @@ impl<'a> Ui<'a> {
         Self {
             client,
             screens: Screens::new(config),
-            shared_state: SharedUiState::default(),
             active_modal: None,
+            status_message: None,
+            rendered_frames_count: 0,
         }
     }
 }
@@ -136,14 +132,13 @@ impl Ui<'_> {
         if let Some(bg_color) = app.config.ui.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
         }
-        self.shared_state.frame_counter.add_assign(1);
+        self.rendered_frames_count.add_assign(1);
         if self
-            .shared_state
             .status_message
             .as_ref()
             .is_some_and(|m| m.created.elapsed() > std::time::Duration::from_secs(5))
         {
-            self.shared_state.status_message = None;
+            self.status_message = None;
         }
 
         let [header_area, content_area, bar_area] = *Layout::vertical([
@@ -159,7 +154,7 @@ impl Ui<'_> {
 
         frame.render_widget(header, header_area);
 
-        if let Some(StatusMessage { message, level, .. }) = &self.shared_state.status_message {
+        if let Some(StatusMessage { message, level, .. }) = &self.status_message {
             let status_bar = Paragraph::new(message.to_owned())
                 .alignment(ratatui::prelude::Alignment::Center)
                 .style(Style::default().fg(level.into()).bg(Color::Black));
@@ -176,12 +171,12 @@ impl Ui<'_> {
 
         #[cfg(debug_assertions)]
         frame.render_widget(
-            Paragraph::new(format!("{} frames", self.shared_state.frame_counter)),
+            Paragraph::new(format!("{} frames", self.rendered_frames_count)),
             bar_area,
         );
 
         if app.config.ui.draw_borders {
-            screen_call!(self, app, render(frame, content_area, app, &mut self.shared_state))?;
+            screen_call!(self, app, render(frame, content_area, app))?;
         } else {
             screen_call!(
                 self,
@@ -194,30 +189,24 @@ impl Ui<'_> {
                         width: content_area.width,
                         height: content_area.height - 1,
                     },
-                    app,
-                    &mut self.shared_state
+                    app
                 )
             )?;
         }
 
         if let Some(ref mut modal) = self.active_modal {
-            Self::render_modal(modal, frame, app, &mut self.shared_state)?;
+            Self::render_modal(modal, frame, app)?;
         }
 
         Ok(())
     }
 
-    fn render_modal(
-        active_modal: &mut modals::Modals,
-        frame: &mut Frame<'_>,
-        app: &mut State,
-        shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn render_modal(active_modal: &mut modals::Modals, frame: &mut Frame<'_>, app: &mut State) -> Result<()> {
         match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, app, shared),
-            modals::Modals::SaveQueue(ref mut m) => m.render(frame, app, shared),
-            modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, app, shared),
-            modals::Modals::AddToPlaylist(ref mut m) => m.render(frame, app, shared),
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, app),
+            modals::Modals::SaveQueue(ref mut m) => m.render(frame, app),
+            modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, app),
+            modals::Modals::AddToPlaylist(ref mut m) => m.render(frame, app),
         }
     }
     fn handle_modal_key(
@@ -225,13 +214,12 @@ impl Ui<'_> {
         client: &mut Client<'_>,
         key: KeyEvent,
         app: &mut State,
-        shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app, shared),
-            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app, shared),
-            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app, shared),
-            modals::Modals::AddToPlaylist(ref mut m) => m.handle_key(key, client, app, shared),
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app),
+            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app),
+            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app),
+            modals::Modals::AddToPlaylist(ref mut m) => m.handle_key(key, client, app),
         }
     }
 
@@ -242,17 +230,17 @@ impl Ui<'_> {
             }
         }
         if let Some(ref mut modal) = self.active_modal {
-            return match Self::handle_modal_key(modal, &mut self.client, key, app, &mut self.shared_state)? {
+            return match Self::handle_modal_key(modal, &mut self.client, key, app)? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.active_modal = None;
-                    screen_call_inner!(refresh(&mut self.client, app, &mut self.shared_state));
+                    screen_call_inner!(refresh(&mut self.client, app));
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 r => Ok(r.into()),
             };
         }
 
-        match screen_call_inner!(handle_action(key, &mut self.client, app, &mut self.shared_state)) {
+        match screen_call_inner!(handle_action(key, &mut self.client, app)) {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(modal) => {
@@ -296,59 +284,59 @@ impl Ui<'_> {
                             self.client.seek_curr_backwards(5)?;
                         }
                         GlobalAction::NextTab => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = app.active_tab.next();
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PreviousTab => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = app.active_tab.prev();
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::QueueTab if !matches!(app.active_tab, screens::Screens::Queue) => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = screens::Screens::Queue;
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::DirectoriesTab if !matches!(app.active_tab, screens::Screens::Directories) => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = screens::Screens::Directories;
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::ArtistsTab if !matches!(app.active_tab, screens::Screens::Artists) => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = screens::Screens::Artists;
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::AlbumsTab if !matches!(app.active_tab, screens::Screens::Albums) => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = screens::Screens::Albums;
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PlaylistsTab if !matches!(app.active_tab, screens::Screens::Playlists) => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = screens::Screens::Playlists;
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::SearchTab if !matches!(app.active_tab, screens::Screens::Search) => {
-                            screen_call_inner!(on_hide(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(on_hide(&mut self.client, app));
 
                             app.active_tab = screens::Screens::Search;
-                            screen_call_inner!(before_show(&mut self.client, app, &mut self.shared_state));
+                            screen_call_inner!(before_show(&mut self.client, app));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::QueueTab => {}
@@ -373,11 +361,11 @@ impl Ui<'_> {
     }
 
     pub fn before_show(&mut self, app: &mut State) -> Result<()> {
-        screen_call!(self, app, before_show(&mut self.client, app, &mut self.shared_state))
+        screen_call!(self, app, before_show(&mut self.client, app))
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {
-        self.shared_state.status_message = Some(StatusMessage {
+        self.status_message = Some(StatusMessage {
             message,
             level,
             created: std::time::Instant::now(),

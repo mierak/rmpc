@@ -9,7 +9,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, SharedUiState,
+        KeyHandleResultInternal,
     },
     utils::macros::status_info,
 };
@@ -30,13 +30,7 @@ pub struct AlbumsScreen {
 impl Screen for AlbumsScreen {
     type Actions = AlbumsActions;
 
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        app: &mut State,
-        _shared_state: &mut SharedUiState,
-    ) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut State) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(app.config)
                 .set_widths(&app.config.ui.column_widths)
@@ -48,12 +42,7 @@ impl Screen for AlbumsScreen {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        client: &mut Client<'_>,
-        app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn before_show(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
         let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
         self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
         let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
@@ -67,7 +56,6 @@ impl Screen for AlbumsScreen {
         event: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
-        shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             self.handle_filter_input(event, client, app)?;
@@ -75,7 +63,7 @@ impl Screen for AlbumsScreen {
         } else if let Some(_action) = app.config.keybinds.albums.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, app, shared)
+            self.handle_common_action(*action, client, app)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -113,14 +101,14 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         self.filter_input_mode
     }
 
-    fn next(&mut self, client: &mut Client<'_>, shared: &mut SharedUiState) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
         };
 
         match self.stack.path() {
-            [_album] => self.add(current, client, shared),
+            [_album] => self.add(current, client),
             [] => {
                 let res = list_titles(client, current.as_path())?;
                 self.stack.push(res.collect());
@@ -133,12 +121,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         }
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        client: &mut Client<'_>,
-        _shared: &mut SharedUiState,
-    ) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
         match self.stack.path() {
             [album] => {
                 client.find_add(&[

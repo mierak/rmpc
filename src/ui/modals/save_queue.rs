@@ -21,7 +21,7 @@ use crate::{
     utils::macros::status_info,
 };
 
-use super::{KeyHandleResultInternal, RectExt, SharedUiState};
+use super::{KeyHandleResultInternal, RectExt};
 
 use super::Modal;
 
@@ -57,12 +57,7 @@ impl SaveQueueModal {
 }
 
 impl Modal for SaveQueueModal {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        app: &mut crate::state::State,
-        _shared_state: &mut SharedUiState,
-    ) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
         let popup_area = frame.size().centered_exact(50, 7);
         let [body_area, buttons_area] =
             *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
@@ -116,7 +111,6 @@ impl Modal for SaveQueueModal {
         key: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         let action = app.config.keybinds.navigation.get(&key.into());
         if self.input_focused {

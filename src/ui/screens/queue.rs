@@ -17,7 +17,7 @@ use crate::{
         },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
-        KeyHandleResultInternal, SharedUiState,
+        KeyHandleResultInternal,
     },
     utils::macros::{status_error, status_warn},
 };
@@ -64,13 +64,7 @@ impl QueueScreen {
 
 impl Screen for QueueScreen {
     type Actions = QueueActions;
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
         let queue_len = app.queue.len().unwrap_or(0);
         let album_art_width = app.config.ui.album_art_width_percent;
         let show_image = album_art_width > 0;
@@ -193,12 +187,7 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        _client: &mut Client<'_>,
-        app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn before_show(&mut self, _client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
         self.scrolling_state.set_content_len(app.queue.len());
         if let Some(songid) = app.status.songid {
             let idx = app
@@ -219,7 +208,6 @@ impl Screen for QueueScreen {
         event: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
             match app.config.keybinds.navigation.get(&event.into()) {

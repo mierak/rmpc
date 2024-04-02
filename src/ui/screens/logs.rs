@@ -12,7 +12,7 @@ use strum::Display;
 use crate::{
     mpd::client::Client,
     state::State,
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal, SharedUiState},
+    ui::{utils::dirstack::DirState, KeyHandleResultInternal},
 };
 
 use super::{CommonAction, Screen};
@@ -24,13 +24,7 @@ pub struct LogsScreen {
 
 impl Screen for LogsScreen {
     type Actions = LogsActions;
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
         let lines: Vec<_> = app
             .logs
             .iter()
@@ -78,12 +72,7 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        _client: &mut Client<'_>,
-        _app: &mut crate::state::State,
-        _shared: &mut SharedUiState,
-    ) -> Result<()> {
+    fn before_show(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
         self.scrolling_state.last();
         Ok(())
     }
@@ -93,7 +82,6 @@ impl Screen for LogsScreen {
         event: KeyEvent,
         _client: &mut Client<'_>,
         app: &mut State,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.logs.get(&event.into()) {
             match action {

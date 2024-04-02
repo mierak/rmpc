@@ -21,7 +21,7 @@ use crate::{
     utils::macros::status_info,
 };
 
-use super::{KeyHandleResultInternal, RectExt, SharedUiState};
+use super::{KeyHandleResultInternal, RectExt};
 
 use super::Modal;
 
@@ -67,12 +67,7 @@ impl RenamePlaylistModal {
 }
 
 impl Modal for RenamePlaylistModal {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        app: &mut crate::state::State,
-        _shared_state: &mut SharedUiState,
-    ) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -125,7 +120,6 @@ impl Modal for RenamePlaylistModal {
         key: KeyEvent,
         client: &mut Client<'_>,
         app: &mut State,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal> {
         let action = app.config.keybinds.navigation.get(&key.into());
         if self.input_focused {

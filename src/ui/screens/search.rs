@@ -266,7 +266,6 @@ impl Screen for SearchScreen {
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
         app: &mut crate::state::State,
-        _shared_state: &mut crate::ui::SharedUiState,
     ) -> anyhow::Result<()> {
         let widths = &app.config.ui.column_widths;
         let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
@@ -326,7 +325,6 @@ impl Screen for SearchScreen {
         event: crossterm::event::KeyEvent,
         client: &mut crate::mpd::client::Client<'_>,
         app: &mut crate::state::State,
-        _shared: &mut crate::ui::SharedUiState,
     ) -> anyhow::Result<crate::ui::KeyHandleResultInternal> {
         let action = app.config.keybinds.navigation.get(&event.into());
         match &mut self.phase {

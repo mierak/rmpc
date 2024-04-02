@@ -12,7 +12,7 @@ use self::{
     rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
 };
 
-use super::{KeyHandleResultInternal, SharedUiState};
+use super::KeyHandleResultInternal;
 
 pub mod add_to_playlist;
 pub mod confirm_queue_clear;
@@ -28,19 +28,13 @@ pub enum Modals {
 }
 
 pub(super) trait Modal {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        _app: &mut crate::state::State,
-        _shared_state: &mut SharedUiState,
-    ) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, _app: &mut crate::state::State) -> Result<()>;
 
     fn handle_key(
         &mut self,
         key: KeyEvent,
         _client: &mut Client<'_>,
         _app: &mut State,
-        _shared: &mut SharedUiState,
     ) -> Result<KeyHandleResultInternal>;
 }
 
