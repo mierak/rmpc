@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{style::ToConfigOr, StyleFile};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ProgressBarConfig {
     /// Symbols for the rogress bar at the bottom of the screen
     /// First symbol is used for the elapsed part of the progress bar

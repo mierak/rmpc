@@ -21,11 +21,6 @@ pub mod macros {
             }
         };
     }
-    macro_rules! println_var {
-        ( $e:expr ) => {
-            println!("{}", $e);
-        };
-    }
 
     macro_rules! status_info {
         ($($t:tt)*) => {{
@@ -62,8 +57,6 @@ pub mod macros {
         }};
     }
 
-    #[allow(unused_imports)]
-    pub(crate) use println_var;
     #[allow(unused_imports)]
     pub(crate) use status_debug;
     #[allow(unused_imports)]

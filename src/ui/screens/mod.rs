@@ -16,8 +16,8 @@ use crate::{
         SongTableColumn,
     },
     mpd::{
-        client::Client,
-        commands::{status::OnOffOneshot, volume::Bound, Song, Status},
+        commands::{status::OnOffOneshot, volume::Bound, IdleEvent, Song, Status},
+        mpd_client::MpdClient,
     },
     state::State,
 };
@@ -55,24 +55,29 @@ pub(super) trait Screen {
     fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
+    fn on_hide(&mut self, _client: &mut impl MpdClient, _app: &mut crate::state::State) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, _client: &mut impl MpdClient, _app: &mut crate::state::State) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn refresh(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
+    fn on_idle_event(
+        &mut self,
+        _event: IdleEvent,
+        _client: &mut impl MpdClient,
+        _app: &mut crate::state::State,
+    ) -> Result<()> {
         Ok(())
     }
 
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        _client: &mut Client<'_>,
+        _client: &mut impl MpdClient,
         _app: &mut State,
     ) -> Result<KeyHandleResultInternal>;
 }
@@ -444,22 +449,27 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn stack_mut(&mut self) -> &mut DirStack<T>;
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal>;
-    fn move_selected(&mut self, direction: MoveDirection, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
+    fn move_selected(
+        &mut self,
+        direction: MoveDirection,
+        client: &mut impl MpdClient,
+    ) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
-    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>>;
-    fn add(&self, item: &T, client: &mut Client<'_>) -> Result<KeyHandleResultInternal>;
-    fn delete(&self, item: &T, index: usize, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn prepare_preview(&mut self, client: &mut impl MpdClient, state: &State)
+        -> Result<Option<Vec<ListItem<'static>>>>;
+    fn add(&self, item: &T, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
+    fn delete(&self, item: &T, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
-    fn rename(&self, item: &T, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn rename(&self, item: &T, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
     fn handle_filter_input(
         &mut self,
         event: KeyEvent,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
         state: &State,
     ) -> Result<KeyHandleResultInternal> {
         match state.config.keybinds.navigation.get(&event.into()) {
@@ -498,7 +508,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn handle_common_action(
         &mut self,
         action: CommonAction,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         match action {
@@ -516,12 +526,10 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             }
             CommonAction::MoveUp => {
                 let res = self.move_selected(MoveDirection::Up, client)?;
-                self.refresh(client, app)?;
                 Ok(res)
             }
             CommonAction::MoveDown => {
                 let res = self.move_selected(MoveDirection::Down, client)?;
-                self.refresh(client, app)?;
                 Ok(res)
             }
             CommonAction::DownHalf => {
@@ -603,13 +611,11 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                     let item = &self.stack().current().items[*idx];
                     self.delete(item, *idx, client)?;
                 }
-                self.refresh(client, app)?;
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Delete => {
-                if let Some((item, index)) = self.stack().current().selected_with_idx() {
+                if let Some((index, item)) = self.stack().current().selected_with_idx() {
                     self.delete(item, index, client)?;
-                    self.refresh(client, app)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)

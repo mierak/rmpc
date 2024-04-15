@@ -113,7 +113,7 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     pub fn select(&mut self, idx: Option<usize>) {
-        let idx = idx.map(|idx| idx.max(0).min(self.content_len.unwrap_or(0)));
+        let idx = idx.map(|idx| idx.max(0).min(self.content_len.map_or(0, |len| len - 1)));
         self.inner.select_scrolling(idx);
         self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0));
     }
@@ -499,6 +499,24 @@ mod tests {
             assert_eq!(subject.get_selected(), Some(0));
         }
     }
+
+    mod select {
+
+        use ratatui::widgets::ListState;
+
+        use crate::ui::utils::dirstack::DirState;
+
+        #[test]
+        fn select_last_element_when_out_of_bounds() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+
+            subject.select(Some(150));
+
+            assert_eq!(subject.get_selected(), Some(99));
+        }
+    }
+
     mod remove {
         use std::collections::BTreeSet;
 

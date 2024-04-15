@@ -233,7 +233,6 @@ impl Ui<'_> {
             return match Self::handle_modal_key(modal, &mut self.client, key, app)? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.active_modal = None;
-                    screen_call_inner!(refresh(&mut self.client, app));
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 r => Ok(r.into()),
@@ -271,11 +270,11 @@ impl Ui<'_> {
                         GlobalAction::TogglePause => {}
                         GlobalAction::VolumeUp => {
                             self.client
-                                .set_volume(app.status.volume.inc_by(app.config.volume_step))?;
+                                .set_volume(*app.status.volume.inc_by(app.config.volume_step))?;
                         }
                         GlobalAction::VolumeDown => {
                             self.client
-                                .set_volume(app.status.volume.dec_by(app.config.volume_step))?;
+                                .set_volume(*app.status.volume.dec_by(app.config.volume_step))?;
                         }
                         GlobalAction::SeekForward if app.status.state == MpdState::Play => {
                             self.client.seek_curr_forwards(5)?;
@@ -370,6 +369,10 @@ impl Ui<'_> {
             level,
             created: std::time::Instant::now(),
         });
+    }
+
+    pub fn on_idle_event(&mut self, event: crate::mpd::commands::IdleEvent, state: &mut State) -> Result<()> {
+        screen_call!(self, state, on_idle_event(event, &mut self.client, state))
     }
 }
 

@@ -6,7 +6,7 @@ use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 use super::Volume;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Status {
     pub partition: String, // the name of the current partition (see Partition commands)
     pub volume: Volume,    // 0-100 (deprecated: -1 if the volume cannot be determined)

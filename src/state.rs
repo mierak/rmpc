@@ -26,7 +26,7 @@ impl<T> std::fmt::Debug for MyVec<T> {
     }
 }
 
-#[derive(Deref, DerefMut)]
+#[derive(Deref, DerefMut, Default)]
 pub struct MyVecDeque<T>(VecDeque<T>);
 impl<T> std::fmt::Debug for MyVecDeque<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,6 +43,21 @@ pub struct State {
     pub logs: MyVecDeque<Vec<u8>>,
     pub status_loop_active: bool,
     pub album_art: Option<MyVec<u8>>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            config: Box::leak(Box::default()),
+            active_tab: Screens::default(),
+            status: Status::default(),
+            current_song: None,
+            queue: None,
+            logs: MyVecDeque(VecDeque::new()),
+            status_loop_active: false,
+            album_art: None,
+        }
+    }
 }
 
 impl std::fmt::Debug for State {

@@ -3,7 +3,7 @@ use derive_more::AsRef;
 use crate::mpd::errors::MpdError;
 use crate::mpd::{FromMpd, LineHandled};
 
-#[derive(Debug, Default, PartialEq, AsRef)]
+#[derive(Debug, Default, PartialEq, AsRef, Clone, Copy)]
 pub struct Volume(u8);
 
 impl Bound<u8> for Volume {

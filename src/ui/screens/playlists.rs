@@ -6,7 +6,7 @@ use strum::Display;
 
 use crate::{
     mpd::{
-        client::Client,
+        commands::IdleEvent,
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
     state::State,
@@ -20,6 +20,9 @@ use crate::{
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen};
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, Default)]
 pub struct PlaylistsScreen {
@@ -44,43 +47,85 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
-        let mut playlists: Vec<_> = client
-            .list_playlists()
-            .context("Cannot list playlists")?
-            .into_iter()
-            .map(|playlist| DirOrSong::Dir(playlist.name))
-            .collect();
-        playlists.sort();
-        self.stack = DirStack::new(playlists);
-        let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
-        self.stack.set_preview(preview);
+    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+        if self.stack().path().is_empty() {
+            let mut playlists: Vec<_> = client
+                .list_playlists()
+                .context("Cannot list playlists")?
+                .into_iter()
+                .map(|playlist| DirOrSong::Dir(playlist.name))
+                .collect();
+            playlists.sort();
+            self.stack = DirStack::new(playlists);
+            let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+            self.stack.set_preview(preview);
+        }
         Ok(())
     }
 
-    fn refresh(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
-        let selected_idx = self.stack.current().selected_with_idx().map(|(_, idx)| idx);
-        let filter = std::mem::take(&mut self.stack.current_mut().filter);
-        match self.stack.pop() {
-            Some(_) => {
-                self.next(client)?;
-            }
-            None => {
-                self.before_show(client, app)?;
-            }
-        };
-        self.stack.current_mut().state.select(selected_idx);
-        self.stack.current_mut().filter = filter;
-        self.prepare_preview(client, app)
-            .context("Cannot prepare preview after refresh")?;
+    fn on_idle_event(&mut self, event: IdleEvent, client: &mut impl MpdClient, app: &mut State) -> Result<()> {
+        match event {
+            IdleEvent::StoredPlaylist | IdleEvent::Database => {
+                let mut new_stack = DirStack::new(
+                    client
+                        .list_playlists()
+                        .context("Cannot list playlists")?
+                        .into_iter()
+                        .map(|playlist| DirOrSong::Dir(playlist.name))
+                        .sorted()
+                        .collect_vec(),
+                );
 
+                match self.stack.current_mut().selected_mut() {
+                    Some(DirOrSong::Dir(playlist)) => {
+                        let mut items = new_stack.current().items.iter();
+                        // Select the same playlist by name or index as before
+                        let idx_to_select = items
+                            .find_position(|p| matches!(p, DirOrSong::Dir(d) if d == playlist))
+                            .or_else(|| self.stack().current().selected_with_idx())
+                            .map(|(idx, _)| idx);
+                        new_stack.current_mut().state.select(idx_to_select);
+
+                        self.stack = new_stack;
+                    }
+                    Some(DirOrSong::Song(ref mut song)) => {
+                        let song = std::mem::take(song);
+                        let playlist = &self.stack.path()[0];
+                        let mut items = new_stack.current().items.iter();
+                        // Select the same playlist by name or index as before
+                        let playlist_idx_to_select = items
+                            .find_position(|p| matches!(p, DirOrSong::Dir(d) if d == playlist))
+                            .or_else(|| self.stack().previous().selected_with_idx())
+                            .map(|(idx, _)| idx);
+                        new_stack.current_mut().state.select(playlist_idx_to_select);
+
+                        let previous_song_index = self.stack.current().selected_with_idx().map(|(idx, _)| idx);
+                        self.stack = new_stack;
+                        self.next(client)?;
+
+                        // Select the same song by filename or index as before
+                        let mut items = self.stack.current().items.iter();
+                        let idx_to_select = items
+                            .find_position(|p| matches!(p, DirOrSong::Song(s) if s == &song))
+                            .map(|(idx, _)| idx)
+                            .or(previous_song_index);
+                        self.stack.current_mut().state.select(idx_to_select);
+                    }
+                    None => {}
+                }
+
+                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                self.stack.set_preview(preview);
+            }
+            _ => {}
+        }
         Ok(())
     }
 
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
@@ -112,7 +157,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         self.filter_input_mode
     }
 
-    fn delete(&self, item: &DirOrSong, index: usize, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn delete(&self, item: &DirOrSong, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {
                 client.delete_playlist(d)?;
@@ -130,7 +175,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn add(&self, item: &DirOrSong, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {
                 client.load_playlist(d)?;
@@ -147,7 +192,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn rename(&self, item: &DirOrSong, _client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn rename(&self, item: &DirOrSong, _client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
                 RenamePlaylistModal::new(d.clone()),
@@ -156,7 +201,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
-    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
@@ -175,9 +220,9 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
     fn move_selected(
         &mut self,
         direction: super::MoveDirection,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
     ) -> Result<KeyHandleResultInternal> {
-        let Some((selected, idx)) = self.stack().current().selected_with_idx() else {
+        let Some((idx, selected)) = self.stack().current().selected_with_idx() else {
             status_error!("Failed to move playlist. No playlist selected");
             return Ok(KeyHandleResultInternal::SkipRender);
         };
@@ -193,13 +238,16 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                     super::MoveDirection::Down => (idx + 1).min(self.stack().current().items.len() - 1),
                 };
                 client.move_in_playlist(playlist, &SingleOrRange::single(idx), new_idx)?;
-                self.stack.current_mut().state.select(Some(new_idx));
             }
         }
         Ok(KeyHandleResultInternal::SkipRender)
     }
 
-    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(
+        &mut self,
+        client: &mut impl MpdClient,
+        state: &State,
+    ) -> Result<Option<Vec<ListItem<'static>>>> {
         self.stack()
             .current()
             .selected()

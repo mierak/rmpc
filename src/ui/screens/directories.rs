@@ -6,7 +6,6 @@ use strum::Display;
 
 use crate::{
     mpd::{
-        client::Client,
         commands::lsinfo::FileOrDir,
         mpd_client::{Filter, MpdClient, Tag},
     },
@@ -41,16 +40,18 @@ impl Screen for DirectoriesScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
-        self.stack = DirStack::new(
-            client
-                .lsinfo(None)?
-                .into_iter()
-                .map(Into::<DirOrSong>::into)
-                .collect::<Vec<_>>(),
-        );
-        let preview = self.prepare_preview(client, app)?;
-        self.stack.set_preview(preview);
+    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+        if self.stack().path().is_empty() {
+            self.stack = DirStack::new(
+                client
+                    .lsinfo(None)?
+                    .into_iter()
+                    .map(Into::<DirOrSong>::into)
+                    .collect::<Vec<_>>(),
+            );
+            let preview = self.prepare_preview(client, app)?;
+            self.stack.set_preview(preview);
+        }
 
         Ok(())
     }
@@ -58,7 +59,7 @@ impl Screen for DirectoriesScreen {
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
@@ -93,7 +94,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         self.filter_input_mode
     }
 
-    fn add(&self, item: &DirOrSong, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(dirname) => {
                 let mut next_path = self.stack.path().to_vec();
@@ -113,7 +114,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         Ok(KeyHandleResultInternal::RenderRequested)
     }
 
-    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
@@ -140,7 +141,11 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         }
     }
 
-    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(
+        &mut self,
+        client: &mut impl MpdClient,
+        state: &State,
+    ) -> Result<Option<Vec<ListItem<'static>>>> {
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir(_)) => {
                 let Some(next_path) = self.stack.next_path() else {

@@ -10,7 +10,7 @@ use ratatui::{
 use strum::Display;
 
 use crate::{
-    mpd::client::Client,
+    mpd::mpd_client::MpdClient,
     state::State,
     ui::{utils::dirstack::DirState, KeyHandleResultInternal},
 };
@@ -72,7 +72,7 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut Client<'_>, _app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, _client: &mut impl MpdClient, _app: &mut crate::state::State) -> Result<()> {
         self.scrolling_state.last();
         Ok(())
     }
@@ -80,7 +80,7 @@ impl Screen for LogsScreen {
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        _client: &mut Client<'_>,
+        _client: &mut impl MpdClient,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.logs.get(&event.into()) {

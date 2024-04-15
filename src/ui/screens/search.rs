@@ -13,6 +13,7 @@ use ratatui::{
 use strum::Display;
 
 use crate::mpd::commands::Song;
+use crate::state::State;
 use crate::ui::utils::dirstack::Dir;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -33,7 +34,7 @@ pub struct SearchScreen {
 }
 
 impl SearchScreen {
-    fn add_current(&mut self, client: &mut crate::mpd::client::Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn add_current(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         if let Some(item) = self.songs_dir.selected() {
             client.add(&item.file)?;
             Ok(KeyHandleResultInternal::RenderRequested)
@@ -79,11 +80,7 @@ impl SearchScreen {
         );
     }
 
-    fn prepare_preview(
-        &mut self,
-        client: &mut crate::mpd::client::Client<'_>,
-        app: &crate::state::State,
-    ) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(&mut self, client: &mut impl MpdClient, app: &State) -> Result<Option<Vec<ListItem<'static>>>> {
         match &self.phase {
             Phase::SearchTextboxInput => Ok(None),
             Phase::Search => Ok(Some(self.songs_dir.to_list_items(app.config))),
@@ -207,7 +204,7 @@ impl SearchScreen {
         }
     }
 
-    fn search(&mut self, client: &mut crate::mpd::client::Client<'_>) -> Result<Vec<Song>> {
+    fn search(&mut self, client: &mut impl MpdClient) -> Result<Vec<Song>> {
         let (filter_kind, case_sensitive) =
             self.inputs
                 .filter_inputs
@@ -323,7 +320,7 @@ impl Screen for SearchScreen {
     fn handle_action(
         &mut self,
         event: crossterm::event::KeyEvent,
-        client: &mut crate::mpd::client::Client<'_>,
+        client: &mut impl MpdClient,
         app: &mut crate::state::State,
     ) -> anyhow::Result<crate::ui::KeyHandleResultInternal> {
         let action = app.config.keybinds.navigation.get(&event.into());

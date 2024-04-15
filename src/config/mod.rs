@@ -45,7 +45,7 @@ fn get_default_config_path() -> PathBuf {
     return path;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Config {
     pub address: &'static str,
     pub volume_step: u8,

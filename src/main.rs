@@ -31,6 +31,11 @@ use crate::{
     utils::macros::{status_warn, try_ret},
 };
 
+#[cfg(test)]
+mod tests {
+    pub mod fixtures;
+}
+
 mod config;
 mod logging;
 mod mpd;
@@ -230,6 +235,9 @@ fn main_task<B: Backend + std::io::Write>(
                     if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
                         error!(error:? = err, event:?; "Failed handle idle event");
                     }
+                    if let Err(err) = ui.on_idle_event(event, &mut state) {
+                        error!(error:? = err, event:?; "Ui failed to handle idle event");
+                    }
                     render_wanted = true;
                 }
                 AppEvent::RequestStatusUpdate => {
@@ -299,17 +307,17 @@ fn handle_idle_event(
         }
         IdleEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
         IdleEvent::Playlist => state.queue = try_ret!(client.playlist_info(), "Failed to get playlist"),
+        IdleEvent::StoredPlaylist => {}
+        IdleEvent::Database => {}
         // TODO: handle these events eventually ?
-        IdleEvent::Database
-        | IdleEvent::Update
+        IdleEvent::Update
         | IdleEvent::Output
         | IdleEvent::Partition
         | IdleEvent::Sticker
         | IdleEvent::Subscription
         | IdleEvent::Message
         | IdleEvent::Neighbor
-        | IdleEvent::Mount
-        | IdleEvent::StoredPlaylist => {
+        | IdleEvent::Mount => {
             warn!(event:?; "Received unhandled event");
         }
     };

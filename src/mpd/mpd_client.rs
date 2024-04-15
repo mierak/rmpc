@@ -33,7 +33,7 @@ pub enum SaveMode {
 pub trait MpdClient {
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
-    fn set_volume(&mut self, volume: &Volume) -> MpdResult<()>;
+    fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
     fn get_current_song(&mut self) -> MpdResult<Option<Song>>;
     fn get_status(&mut self) -> MpdResult<Status>;
     // Playback control
@@ -94,7 +94,7 @@ impl MpdClient for Client<'_> {
         self.send("getvol").and_then(ProtoClient::read_response)
     }
 
-    fn set_volume(&mut self, volume: &Volume) -> MpdResult<()> {
+    fn set_volume(&mut self, volume: Volume) -> MpdResult<()> {
         self.send(&format!("setvol {}", volume.value()))
             .and_then(ProtoClient::read_ok)
     }
@@ -550,9 +550,9 @@ pub enum FilterKind {
 
 #[derive(Debug)]
 pub struct Filter<'a> {
-    tag: Tag,
-    value: &'a str,
-    kind: FilterKind,
+    pub tag: Tag,
+    pub value: &'a str,
+    pub kind: FilterKind,
 }
 
 #[allow(dead_code)]

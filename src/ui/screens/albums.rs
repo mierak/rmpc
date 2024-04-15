@@ -1,6 +1,5 @@
 use crate::{
     mpd::{
-        client::Client,
         commands::Song as MpdSong,
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
@@ -42,11 +41,13 @@ impl Screen for AlbumsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
-        let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-        self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
-        let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
-        self.stack.set_preview(preview);
+    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+        if self.stack().path().is_empty() {
+            let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+            self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
+            let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+            self.stack.set_preview(preview);
+        }
 
         Ok(())
     }
@@ -54,7 +55,7 @@ impl Screen for AlbumsScreen {
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
@@ -73,14 +74,14 @@ impl Screen for AlbumsScreen {
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum AlbumsActions {}
 
-fn list_titles(client: &mut Client<'_>, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
+fn list_titles(client: &mut impl MpdClient, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
         .list_tag(Tag::Title, Some(&[Filter::new(Tag::Album, album)]))?
         .into_iter()
         .map(DirOrSong::Song))
 }
 
-fn find_songs(client: &mut Client<'_>, album: &str, file: &str) -> Result<Vec<MpdSong>, MpdError> {
+fn find_songs(client: &mut impl MpdClient, album: &str, file: &str) -> Result<Vec<MpdSong>, MpdError> {
     client.find(&[Filter::new(Tag::Title, file), Filter::new(Tag::Album, album)])
 }
 
@@ -101,7 +102,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         self.filter_input_mode
     }
 
-    fn next(&mut self, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(KeyHandleResultInternal::RenderRequested);
@@ -121,7 +122,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         }
     }
 
-    fn add(&self, item: &DirOrSong, client: &mut Client<'_>) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match self.stack.path() {
             [album] => {
                 client.find_add(&[
@@ -142,7 +143,11 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         }
     }
 
-    fn prepare_preview(&mut self, client: &mut Client<'_>, state: &State) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(
+        &mut self,
+        client: &mut impl MpdClient,
+        state: &State,
+    ) -> Result<Option<Vec<ListItem<'static>>>> {
         self.stack()
             .current()
             .selected()

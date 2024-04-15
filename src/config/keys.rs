@@ -19,7 +19,7 @@ pub struct Key {
     pub modifiers: KeyModifiers,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct KeyConfig {
     pub global: HashMap<Key, GlobalAction>,
     pub navigation: HashMap<Key, CommonAction>,

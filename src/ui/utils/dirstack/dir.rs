@@ -73,9 +73,17 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         }
     }
 
-    pub fn selected_with_idx(&self) -> Option<(&T, usize)> {
+    pub fn selected_mut(&mut self) -> Option<&mut T> {
         if let Some(sel) = self.state.get_selected() {
-            self.items.get(sel).map(|v| (v, sel))
+            self.items.get_mut(sel)
+        } else {
+            None
+        }
+    }
+
+    pub fn selected_with_idx(&self) -> Option<(usize, &T)> {
+        if let Some(sel) = self.state.get_selected() {
+            self.items.get(sel).map(|v| (sel, v))
         } else {
             None
         }
@@ -135,6 +143,10 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
 
     pub fn prev(&mut self) {
         self.state.prev();
+    }
+
+    pub fn select_idx(&mut self, idx: usize) {
+        self.state.select(Some(idx));
     }
 
     pub fn next_half_viewport(&mut self) {
@@ -258,7 +270,7 @@ mod tests {
 
             let result = subject.selected_with_idx();
 
-            assert_eq!(result.unwrap(), (&"c".to_owned(), 2));
+            assert_eq!(result.unwrap(), (2, &"c".to_owned()));
         }
     }
 

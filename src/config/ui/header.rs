@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::properties::{Property, PropertyFile, SongPropertyFile, StatusPropertyFile, WidgetPropertyFile};
 use super::style::{Modifiers, StyleFile};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct HeaderConfig {
     pub top_center: Vec<Property>,
     pub bottom_center: Vec<Property>,

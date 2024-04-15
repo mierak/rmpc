@@ -24,7 +24,7 @@ use super::defaults;
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct UiConfig {
     pub album_art_position: Position,
     pub album_art_width_percent: u16,
@@ -48,8 +48,9 @@ pub struct UiConfig {
     pub default_album_art: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub enum Position {
+    #[default]
     Left,
     Right,
 }

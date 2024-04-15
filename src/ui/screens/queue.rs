@@ -5,10 +5,7 @@ use strum::Display;
 
 use crate::{
     config::{ui::Position, Config},
-    mpd::{
-        client::Client,
-        mpd_client::{MpdClient, QueueMoveTarget},
-    },
+    mpd::mpd_client::{MpdClient, QueueMoveTarget},
     state::PlayListInfoExt,
     ui::{
         modals::{
@@ -187,7 +184,7 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut Client<'_>, app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, _client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
         self.scrolling_state.set_content_len(app.queue.len());
         if let Some(songid) = app.status.songid {
             let idx = app
@@ -206,7 +203,7 @@ impl Screen for QueueScreen {
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        client: &mut Client<'_>,
+        client: &mut impl MpdClient,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {

@@ -21,8 +21,11 @@ itertools = "0.11.0"
 ron = "0.8.1"
 derive_more = { version = "0.99.17", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }
 rustix = { version = "0.38.30", features = ["termios", "stdio"] }
-test-case = "3.3.1"
 bitflags = { version = "2.4.2", features = ["serde"] }
 log = { version = "0.4.21", features = ["kv"] }
 flexi_logger = "0.27.4"
 chrono = "0.4.35"
+
+[dev-dependencies]
+rstest = "0.19.0"
+test-case = "3.3.1"

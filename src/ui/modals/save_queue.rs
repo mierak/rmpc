@@ -18,7 +18,7 @@ use crate::{
             input::Input,
         },
     },
-    utils::macros::status_info,
+    utils::macros::{status_error, status_info},
 };
 
 use super::{KeyHandleResultInternal, RectExt};
@@ -119,8 +119,14 @@ impl Modal for SaveQueueModal {
                 return Ok(KeyHandleResultInternal::RenderRequested);
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 {
-                    client.save_queue_as_playlist(&self.name, None)?;
-                    status_info!("Playlist '{}' saved", self.name);
+                    match client.save_queue_as_playlist(&self.name, None) {
+                        Ok(()) => {
+                            status_info!("Playlist '{}' saved", self.name);
+                        }
+                        Err(_err) => {
+                            status_error!("Failed to save playlist '{}'", self.name);
+                        }
+                    };
                 }
                 self.on_hide();
                 return Ok(KeyHandleResultInternal::Modal(None));

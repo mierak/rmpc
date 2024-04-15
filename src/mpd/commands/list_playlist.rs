@@ -3,7 +3,7 @@ use derive_more::{AsMut, AsRef, Into, IntoIterator};
 use crate::mpd::{FromMpd, LineHandled};
 
 #[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
-pub struct FileList(Vec<String>);
+pub struct FileList(pub Vec<String>);
 
 impl FromMpd for FileList {
     fn next_internal(
