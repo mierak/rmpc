@@ -5,8 +5,10 @@ use strum::Display;
 
 use crate::{
     config::{ui::Position, Config},
-    mpd::mpd_client::{MpdClient, QueueMoveTarget},
-    state::PlayListInfoExt,
+    mpd::{
+        commands::{IdleEvent, Song},
+        mpd_client::{MpdClient, QueueMoveTarget},
+    },
     ui::{
         modals::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
@@ -16,7 +18,7 @@ use crate::{
         widgets::kitty_image::{ImageState, KittyImage},
         KeyHandleResultInternal,
     },
-    utils::macros::{status_error, status_warn},
+    utils::macros::{status_error, status_warn, try_ret},
 };
 use log::error;
 use ratatui::{
@@ -39,6 +41,8 @@ pub struct QueueScreen {
     filter_input_mode: bool,
     header: Vec<&'static str>,
     column_widths: Vec<Constraint>,
+    queue: Vec<Song>,
+    album_art: Option<Vec<u8>>,
 }
 
 impl QueueScreen {
@@ -49,6 +53,8 @@ impl QueueScreen {
             filter: None,
             filter_input_mode: false,
             header: config.ui.song_table_format.iter().map(|v| v.label).collect_vec(),
+            queue: Vec::new(),
+            album_art: None,
             column_widths: config
                 .ui
                 .song_table_format
@@ -62,7 +68,7 @@ impl QueueScreen {
 impl Screen for QueueScreen {
     type Actions = QueueActions;
     fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
-        let queue_len = app.queue.len().unwrap_or(0);
+        let queue_len = self.queue.len();
         let album_art_width = app.config.ui.album_art_width_percent;
         let show_image = album_art_width > 0;
 
@@ -93,43 +99,38 @@ impl Screen for QueueScreen {
         self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
         self.scrolling_state.set_content_len(Some(queue_len));
         if show_image {
-            self.img_state.image(&mut app.album_art);
+            self.img_state.image(&mut self.album_art);
         }
 
         let widths = Layout::horizontal(self.column_widths.clone()).split(table_header_section);
         let formats = &app.config.ui.song_table_format;
 
-        let table_items = app
+        let table_items = self
             .queue
-            .as_ref()
-            .map(|queue| {
-                queue
-                    .iter()
-                    .map(|song| {
-                        let is_current = app.status.songid.as_ref().is_some_and(|v| *v == song.id);
-                        let columns = (0..formats.len()).map(|i| {
-                            formats[i]
-                                .prop
-                                .as_line_ellipsized(song, widths[i].width.into())
-                                .alignment(formats[i].alignment.into())
-                        });
+            .iter()
+            .map(|song| {
+                let is_current = app.status.songid.as_ref().is_some_and(|v| *v == song.id);
+                let columns = (0..formats.len()).map(|i| {
+                    formats[i]
+                        .prop
+                        .as_line_ellipsized(song, widths[i].width.into())
+                        .alignment(formats[i].alignment.into())
+                });
 
-                        let is_highlighted = is_current
-                            || self
-                                .filter
-                                .as_ref()
-                                .is_some_and(|filter| song.matches(formats, filter, true));
+                let is_highlighted = is_current
+                    || self
+                        .filter
+                        .as_ref()
+                        .is_some_and(|filter| song.matches(formats, filter, true));
 
-                        if is_highlighted {
-                            Row::new(columns.map(|column| column.patch_style(app.config.ui.highlighted_item_style)))
-                                .style(app.config.ui.highlighted_item_style)
-                        } else {
-                            Row::new(columns)
-                        }
-                    })
-                    .collect_vec()
+                if is_highlighted {
+                    Row::new(columns.map(|column| column.patch_style(app.config.ui.highlighted_item_style)))
+                        .style(app.config.ui.highlighted_item_style)
+                } else {
+                    Row::new(columns)
+                }
             })
-            .unwrap_or_default();
+            .collect_vec();
 
         let mut table_padding = Padding::right(2);
         table_padding.left = 1;
@@ -184,19 +185,59 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
-        self.scrolling_state.set_content_len(app.queue.len());
+    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+        let queue = client.playlist_info()?;
+        self.album_art = if let Some(song) = queue
+            .as_ref()
+            .and_then(|p| p.iter().find(|s| app.status.songid.is_some_and(|i| i == s.id)))
+        {
+            client.find_album_art(&song.file)?
+        } else {
+            None
+        };
+        self.queue = queue.unwrap_or_default();
+        self.scrolling_state.set_content_len(Some(self.queue.len()));
         if let Some(songid) = app.status.songid {
-            let idx = app
+            let idx = self
                 .queue
-                .as_ref()
-                .and_then(|queue| queue.iter().enumerate().find(|(_, song)| song.id == songid))
+                .iter()
+                .enumerate()
+                .find(|(_, song)| song.id == songid)
                 .map(|v| v.0);
             self.scrolling_state.select(idx);
-        } else if app.queue.len().is_some() {
+        } else {
             self.scrolling_state.select(Some(0));
         }
 
+        Ok(())
+    }
+
+    fn on_idle_event(
+        &mut self,
+        event: crate::mpd::commands::IdleEvent,
+        client: &mut impl MpdClient,
+        app: &mut crate::state::State,
+    ) -> Result<()> {
+        match event {
+            IdleEvent::Playlist => {
+                let queue = client.playlist_info()?;
+                if let Some(queue) = queue {
+                    self.scrolling_state.set_content_len(Some(queue.len()));
+                    self.queue = queue;
+                }
+            }
+            IdleEvent::Player => {
+                if let Some(current_song) = self.queue.iter().find(|s| app.status.songid.is_some_and(|i| i == s.id)) {
+                    if !app.config.ui.album_art_width_percent != 0 {
+                        self.album_art = try_ret!(
+                            client.find_album_art(&current_song.file),
+                            "Failed to get find album art"
+                        );
+                    }
+                };
+            }
+            _ => {}
+        };
         Ok(())
     }
 
@@ -237,7 +278,8 @@ impl Screen for QueueScreen {
         } else if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
             match action {
                 QueueActions::Delete => {
-                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
+                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    {
                         match client.delete_id(selected_song.id) {
                             Ok(()) => {}
                             Err(e) => error!("{:?}", e),
@@ -251,7 +293,8 @@ impl Screen for QueueScreen {
                     ConfirmQueueClearModal::default(),
                 )))),
                 QueueActions::Play => {
-                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
+                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    {
                         client.play_id(selected_song.id)?;
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
@@ -260,7 +303,8 @@ impl Screen for QueueScreen {
                     SaveQueueModal::default(),
                 )))),
                 QueueActions::AddToPlaylist => {
-                    if let Some(selected_song) = app.queue.get_selected(self.scrolling_state.get_selected()) {
+                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    {
                         let playlists = client
                             .list_playlists()?
                             .into_iter()
@@ -278,26 +322,27 @@ impl Screen for QueueScreen {
         } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::Up => {
-                    if !app.queue.is_empty_or_none() {
+                    if !self.queue.is_empty() {
                         self.scrolling_state.prev();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    if !app.queue.is_empty_or_none() {
+                    if !self.queue.is_empty() {
                         self.scrolling_state.next();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::MoveUp => {
-                    if app.queue.is_empty_or_none() {
+                    if self.queue.is_empty() {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
-                    let Some(selected) = app.queue.get_selected(Some(idx)) else {
+
+                    let Some(selected) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx)) else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
 
@@ -307,42 +352,42 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => {
-                    if app.queue.is_empty_or_none() {
+                    if self.queue.is_empty() {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
-                    let Some(selected) = app.queue.get_selected(Some(idx)) else {
+                    let Some(selected) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx)) else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
 
-                    let new_idx = (idx + 1).min(app.queue.len().unwrap_or(1) - 1);
+                    let new_idx = (idx + 1).min(self.queue.len() - 1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
                     self.scrolling_state.select(Some(new_idx));
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::DownHalf => {
-                    if !app.queue.is_empty_or_none() {
+                    if !self.queue.is_empty() {
                         self.scrolling_state.next_half_viewport();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
-                    if !app.queue.is_empty_or_none() {
+                    if !self.queue.is_empty() {
                         self.scrolling_state.prev_half_viewport();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
-                    if !app.queue.is_empty_or_none() {
+                    if !self.queue.is_empty() {
                         self.scrolling_state.last();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
-                    if !app.queue.is_empty_or_none() {
+                    if !self.queue.is_empty() {
                         self.scrolling_state.first();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -379,10 +424,6 @@ impl Screen for QueueScreen {
 impl QueueScreen {
     pub fn jump_forward(&mut self, app: &mut crate::state::State) {
         let formats = &app.config.ui.song_table_format;
-        let Some(queue) = &app.queue else {
-            status_warn!("Queue is empty");
-            return;
-        };
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -392,10 +433,10 @@ impl QueueScreen {
             return;
         };
 
-        let length = queue.len();
+        let length = self.queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if queue[i].matches(formats, filter, true) {
+            if self.queue[i].matches(formats, filter, true) {
                 self.scrolling_state.select(Some(i));
                 break;
             }
@@ -404,10 +445,6 @@ impl QueueScreen {
 
     pub fn jump_back(&mut self, app: &mut crate::state::State) {
         let formats = &app.config.ui.song_table_format;
-        let Some(queue) = &app.queue else {
-            status_warn!("Queue is empty");
-            return;
-        };
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -417,10 +454,10 @@ impl QueueScreen {
             return;
         };
 
-        let length = queue.len();
+        let length = self.queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if queue[i].matches(formats, filter, true) {
+            if self.queue[i].matches(formats, filter, true) {
                 self.scrolling_state.select(Some(i));
                 break;
             }

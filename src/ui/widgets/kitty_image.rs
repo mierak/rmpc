@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Block, Paragraph, StatefulWidget, Widget},
 };
 
-use crate::{state::MyVec, utils::tmux};
+use crate::utils::tmux;
 const DELIM: &str = "\u{10EEEE}";
 const GRID: &[&str] = &[
     "\u{0305}",
@@ -315,7 +315,7 @@ const GRID: &[&str] = &[
 #[derive(Debug)]
 pub struct ImageState {
     idx: u32,
-    image: Option<MyVec<u8>>,
+    image: Option<Vec<u8>>,
     needs_transfer: bool,
 }
 
@@ -332,20 +332,20 @@ impl Default for ImageState {
 impl ImageState {
     /// Takes image data in buffer
     /// Leaves the provided buffer empty if any data were in there
-    pub fn image(&mut self, image: &mut Option<MyVec<u8>>) -> &Self {
+    pub fn image(&mut self, image: &mut Option<Vec<u8>>) -> &Self {
         match (image.as_mut(), &mut self.image) {
             (Some(ref mut v), None) => {
-                self.image = Some(crate::state::MyVec::new(std::mem::take(v.as_mut())));
+                self.image = Some(std::mem::take(v));
                 self.needs_transfer = true;
-                log::debug!(size = image.as_ref().map(|a| a.len()); "New image received",);
+                log::debug!(size = image.as_ref().map(Vec::len); "New image received",);
             }
             (Some(v), Some(i)) if v.ne(&i) && !v.is_empty() => {
-                self.image = Some(crate::state::MyVec::new(std::mem::take(v.as_mut())));
+                self.image = Some(std::mem::take(v));
                 self.needs_transfer = true;
-                log::debug!(size = image.as_ref().map(|a| a.len()); "New image received");
+                log::debug!(size = image.as_ref().map(Vec::len); "New image received");
             }
             (Some(v), Some(_)) => {
-                v.as_mut().clear();
+                v.clear();
             }
             // The image is identical, should be in place already
             (None, None) => {} // Default img should be in place already

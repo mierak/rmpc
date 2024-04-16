@@ -285,19 +285,6 @@ fn handle_idle_event(
         IdleEvent::Player => {
             state.current_song = try_ret!(client.get_current_song(), "Failed get current song");
             state.status = try_ret!(client.get_status(), "Failed get status");
-            if let Some(current_song) = state
-                .queue
-                .as_ref()
-                .and_then(|p| p.iter().find(|s| state.status.songid.is_some_and(|i| i == s.id)))
-            {
-                if !state.config.ui.album_art_width_percent != 0 {
-                    state.album_art = try_ret!(
-                        client.find_album_art(&current_song.file),
-                        "Failed to get find album art"
-                    )
-                    .map(state::MyVec::new);
-                }
-            }
 
             if state.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
@@ -306,7 +293,7 @@ fn handle_idle_event(
             }
         }
         IdleEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
-        IdleEvent::Playlist => state.queue = try_ret!(client.playlist_info(), "Failed to get playlist"),
+        IdleEvent::Playlist => {}
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
         // TODO: handle these events eventually ?
