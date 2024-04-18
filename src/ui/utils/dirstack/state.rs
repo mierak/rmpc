@@ -113,7 +113,7 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     pub fn select(&mut self, idx: Option<usize>) {
-        let idx = idx.map(|idx| idx.max(0).min(self.content_len.map_or(0, |len| len - 1)));
+        let idx = idx.map(|idx| idx.max(0).min(self.content_len.map_or(0, |len| len.saturating_sub(1))));
         self.inner.select_scrolling(idx);
         self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0));
     }

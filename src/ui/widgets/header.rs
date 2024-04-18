@@ -100,18 +100,13 @@ impl<'a, T> Header<'a, T>
 where
     T: PartialEq + IntoEnumIterator + VariantNames,
 {
-    pub fn new(config: &'a Config, active_tab: T, status: &'a Status) -> Self {
+    pub fn new(config: &'a Config, active_tab: T, status: &'a Status, song: Option<&'a Song>) -> Self {
         Self {
             config,
             status,
             active_tab,
-            song: None,
+            song,
         }
-    }
-
-    pub fn set_song(mut self, song: Option<&'a Song>) -> Self {
-        self.song = song;
-        self
     }
 }
 

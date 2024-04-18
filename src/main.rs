@@ -22,7 +22,7 @@ use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use ron::extensions::Extensions;
-use ui::Level;
+use ui::{Level, UiEvent};
 
 use crate::{
     config::Config,
@@ -226,17 +226,19 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::Log(msg) => {
-                    state.logs.push_back(msg);
-                    if state.logs.len() > 1000 {
-                        state.logs.pop_front();
+                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut state) {
+                        error!(error:? = err; "Ui failed to handle log event");
                     }
+                    render_wanted = true;
                 }
                 AppEvent::IdleEvent(event) => {
                     if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
                         error!(error:? = err, event:?; "Failed handle idle event");
                     }
-                    if let Err(err) = ui.on_idle_event(event, &mut state) {
-                        error!(error:? = err, event:?; "Ui failed to handle idle event");
+                    if let Ok(ev) = event.try_into() {
+                        if let Err(err) = ui.on_event(ev, &mut state) {
+                            error!(error:? = err, event:?; "Ui failed to handle idle event");
+                        }
                     }
                     render_wanted = true;
                 }
@@ -277,22 +279,19 @@ fn main_task<B: Backend + std::io::Write>(
 fn handle_idle_event(
     event: IdleEvent,
     state: &mut state::State,
-    client: &mut Client<'_>,
+    __client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
 ) -> Result<()> {
     match event {
-        IdleEvent::Mixer => state.status.volume = try_ret!(client.get_volume(), "Failed to get volume"),
+        IdleEvent::Mixer => {}
         IdleEvent::Player => {
-            state.current_song = try_ret!(client.get_current_song(), "Failed get current song");
-            state.status = try_ret!(client.get_status(), "Failed get status");
-
             if state.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             } else {
                 render_loop.stop()?;
             }
         }
-        IdleEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
+        IdleEvent::Options => {}
         IdleEvent::Playlist => {}
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}

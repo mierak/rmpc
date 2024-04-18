@@ -2,15 +2,15 @@
 
 use rstest::{fixture, rstest};
 
-use crate::mpd::commands::IdleEvent;
+use crate::config::Config;
+use crate::mpd::commands::Status;
+use crate::tests::fixtures::config;
 use crate::tests::fixtures::mpd_client::{client, TestMpdClient};
-use crate::tests::fixtures::state;
+use crate::tests::fixtures::status;
+use crate::ui::UiEvent;
 
+use crate::ui::screens::{browser::DirOrSong, playlists::PlaylistsScreen, Screen};
 use crate::ui::screens::{BrowserScreen, CommonAction};
-use crate::{
-    state::State,
-    ui::screens::{browser::DirOrSong, playlists::PlaylistsScreen, Screen},
-};
 
 mod on_idle_event {
     use super::*;
@@ -18,13 +18,14 @@ mod on_idle_event {
         use super::*;
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_by_name(
-            mut state: State,
+            mut status: Status,
             mut screen: PlaylistsScreen,
+            config: Config,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let current = screen.stack.current_mut();
             let playlist_name = client.playlists[2].name.clone();
@@ -32,42 +33,44 @@ mod on_idle_event {
             assert_eq!(current.selected(), Some(&DirOrSong::Dir(playlist_name.clone())));
 
             client.playlists.remove(0);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.current().selected(), Some(&DirOrSong::Dir(playlist_name)));
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_index_when_playlist_not_found_after_refresh(
-            mut state: State,
+            config: Config,
             mut screen: PlaylistsScreen,
+            mut status: Status,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             screen.stack.current_mut().select_idx(2);
 
             client.playlists.remove(2);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 2);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_last_playlist_when_last_was_selected_and_removed(
-            mut state: State,
+            config: Config,
             mut screen: PlaylistsScreen,
+            mut status: Status,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let playlist_count = client.playlists.len();
             screen.stack.current_mut().select_idx(playlist_count - 1);
 
             client.playlists.pop();
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(
                 screen.stack.current().selected_with_idx().unwrap().0,
@@ -76,18 +79,19 @@ mod on_idle_event {
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_first_playlist_when_first_was_selected_and_removed(
-            mut state: State,
+            config: Config,
             mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            mut status: Status,
+            #[case] mut event: UiEvent,
         ) {
             screen.stack.current_mut().select_idx(0);
 
             client.playlists.remove(0);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
         }
@@ -97,33 +101,35 @@ mod on_idle_event {
         use super::*;
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_song(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let playlist_name = client.playlists[2].name.clone();
             screen.stack.current_mut().select_idx(5);
             client.playlists[2].songs_indices.remove(0);
 
             client.playlists.remove(1);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 4);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_last_song(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let playlist_name = client.playlists[2].name.clone();
             let last_song_idx = screen.stack.current().items.len() - 1;
@@ -131,64 +137,68 @@ mod on_idle_event {
             client.playlists[2].songs_indices.remove(last_song_idx);
 
             client.playlists.remove(1);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, last_song_idx - 1);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_first_song(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let playlist_name = client.playlists[2].name.clone();
             screen.stack.current_mut().select_idx(0);
             client.playlists[2].songs_indices.remove(0);
 
             client.playlists.remove(1);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_song_idx(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             screen.stack.current_mut().select_idx(5);
 
             client.playlists.remove(2);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 5);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_idx_and_last_song(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let playlist_len = screen.stack.current().items.len();
             screen.stack.current_mut().select_idx(playlist_len - 1);
 
             client.playlists.remove(2);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(
@@ -198,55 +208,58 @@ mod on_idle_event {
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_idx_and_first_song(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             screen.stack.current_mut().select_idx(0);
 
             client.playlists.remove(2);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_first_playlist_and_same_song_idx(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_0)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             screen.stack.current_mut().select_idx(5);
 
             client.playlists.remove(0);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 0);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 5);
         }
 
         #[rstest]
-        #[case(IdleEvent::StoredPlaylist)]
-        #[case(IdleEvent::Database)]
+        #[case(UiEvent::StoredPlaylist)]
+        #[case(UiEvent::Database)]
         fn selects_the_last_playlist_and_same_song_idx(
-            mut state: State,
+            config: Config,
+            mut status: Status,
             #[from(screen_in_playlist_4)] mut screen: PlaylistsScreen,
             mut client: TestMpdClient,
-            #[case] event: IdleEvent,
+            #[case] mut event: UiEvent,
         ) {
             let playlist_count = client.playlists.len();
             screen.stack.current_mut().select_idx(5);
 
             client.playlists.remove(playlist_count - 1);
-            screen.on_idle_event(event, &mut client, &mut state).unwrap();
+            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
 
             assert_eq!(
                 screen.stack.previous().selected_with_idx().unwrap().0,
@@ -258,41 +271,41 @@ mod on_idle_event {
 }
 
 #[fixture]
-fn screen_in_playlist_0(mut client: TestMpdClient, mut state: State) -> PlaylistsScreen {
+fn screen_in_playlist_0(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut state).unwrap();
+    screen.before_show(&mut client, &mut status, &config).unwrap();
     screen.stack.current_mut().select_idx(0);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &mut state)
+        .handle_common_action(CommonAction::Right, &mut client, &config)
         .unwrap();
     screen
 }
 
 #[fixture]
-fn screen_in_playlist_2(mut client: TestMpdClient, mut state: State) -> PlaylistsScreen {
+fn screen_in_playlist_2(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut state).unwrap();
+    screen.before_show(&mut client, &mut status, &config).unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &mut state)
+        .handle_common_action(CommonAction::Right, &mut client, &config)
         .unwrap();
     screen
 }
 
 #[fixture]
-fn screen_in_playlist_4(mut client: TestMpdClient, mut state: State) -> PlaylistsScreen {
+fn screen_in_playlist_4(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut state).unwrap();
+    screen.before_show(&mut client, &mut status, &config).unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &mut state)
+        .handle_common_action(CommonAction::Right, &mut client, &config)
         .unwrap();
     screen
 }
 
 #[fixture]
-fn screen(mut client: TestMpdClient, mut state: State) -> PlaylistsScreen {
+fn screen(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut state).unwrap();
+    screen.before_show(&mut client, &mut status, &config).unwrap();
     screen
 }

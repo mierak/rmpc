@@ -6,6 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use itertools::Itertools;
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
@@ -19,9 +20,10 @@ use crate::{
     config::Config,
     mpd::{
         client::Client,
-        commands::{volume::Bound, State as MpdState},
+        commands::{idle::IdleEvent, volume::Bound, State as MpdState, Status},
         mpd_client::{FilterKind, MpdClient},
     },
+    utils::macros::try_ret,
 };
 use crate::{mpd::version::Version, state::State};
 
@@ -63,8 +65,10 @@ pub struct Ui<'a> {
     client: Client<'a>,
     screens: Screens,
     active_modal: Option<Modals>,
+    active_screen: screens::Screens,
     status_message: Option<StatusMessage>,
     rendered_frames_count: u32,
+    current_song: Option<crate::mpd::commands::Song>,
 }
 
 impl<'a> Ui<'a> {
@@ -72,9 +76,11 @@ impl<'a> Ui<'a> {
         Self {
             client,
             screens: Screens::new(config),
+            active_screen: screens::Screens::Queue,
             active_modal: None,
             status_message: None,
             rendered_frames_count: 0,
+            current_song: None,
         }
     }
 }
@@ -104,6 +110,37 @@ impl Screens {
             search: SearchScreen::default(),
         }
     }
+
+    fn on_event(
+        &mut self,
+        mut event: UiEvent,
+        client: &mut impl MpdClient,
+        status: &mut Status,
+        config: &Config,
+    ) -> Result<()> {
+        [
+            screens::Screens::Queue,
+            screens::Screens::Logs,
+            screens::Screens::Directories,
+            screens::Screens::Albums,
+            screens::Screens::Artists,
+            screens::Screens::Playlists,
+            screens::Screens::Search,
+        ]
+        .iter()
+        .map(|screen| -> Result<()> {
+            match screen {
+                screens::Screens::Logs => self.logs.on_event(&mut event, client, status, config),
+                screens::Screens::Queue => self.queue.on_event(&mut event, client, status, config),
+                screens::Screens::Directories => self.directories.on_event(&mut event, client, status, config),
+                screens::Screens::Albums => self.albums.on_event(&mut event, client, status, config),
+                screens::Screens::Artists => self.artists.on_event(&mut event, client, status, config),
+                screens::Screens::Playlists => self.playlists.on_event(&mut event, client, status, config),
+                screens::Screens::Search => self.search.on_event(&mut event, client, status, config),
+            }
+        })
+        .fold_ok((), |(), val| val)
+    }
 }
 
 macro_rules! invoke {
@@ -113,8 +150,8 @@ macro_rules! invoke {
 }
 
 macro_rules! screen_call {
-    ($self:ident, $app:ident, $fn:ident($($param:expr),+)) => {
-        match $app.active_tab {
+    ($self:ident, $state:ident, $fn:ident($($param:expr),+)) => {
+        match $self.active_screen {
             screens::Screens::Queue => invoke!($self.screens.queue, $fn, $($param),+),
             #[cfg(debug_assertions)]
             screens::Screens::Logs => invoke!($self.screens.logs, $fn, $($param),+),
@@ -128,8 +165,8 @@ macro_rules! screen_call {
 }
 
 impl Ui<'_> {
-    pub fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
-        if let Some(bg_color) = app.config.ui.background_color {
+    pub fn render(&mut self, frame: &mut Frame, state: &mut State) -> Result<()> {
+        if let Some(bg_color) = state.config.ui.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
         }
         self.rendered_frames_count.add_assign(1);
@@ -142,7 +179,7 @@ impl Ui<'_> {
         }
 
         let [header_area, content_area, bar_area] = *Layout::vertical([
-            Constraint::Length(if app.config.ui.draw_borders { 5 } else { 3 }),
+            Constraint::Length(if state.config.ui.draw_borders { 5 } else { 3 }),
             Constraint::Percentage(100),
             Constraint::Min(1),
         ])
@@ -150,7 +187,12 @@ impl Ui<'_> {
             return Ok(());
         };
 
-        let header = Header::new(app.config, app.active_tab, &app.status).set_song(app.current_song.as_ref());
+        let header = Header::new(
+            state.config,
+            self.active_screen,
+            &state.status,
+            self.current_song.as_ref(),
+        );
 
         frame.render_widget(header, header_area);
 
@@ -159,12 +201,12 @@ impl Ui<'_> {
                 .alignment(ratatui::prelude::Alignment::Center)
                 .style(Style::default().fg(level.into()).bg(Color::Black));
             frame.render_widget(status_bar, bar_area);
-        } else if app.config.status_update_interval_ms.is_some() {
-            let elapsed_bar = app.config.as_styled_progress_bar();
-            let elapsed_bar = if app.status.duration == Duration::ZERO {
+        } else if state.config.status_update_interval_ms.is_some() {
+            let elapsed_bar = state.config.as_styled_progress_bar();
+            let elapsed_bar = if state.status.duration == Duration::ZERO {
                 elapsed_bar.value(0.0)
             } else {
-                elapsed_bar.value(app.status.elapsed.as_secs_f32() / app.status.duration.as_secs_f32())
+                elapsed_bar.value(state.status.elapsed.as_secs_f32() / state.status.duration.as_secs_f32())
             };
             frame.render_widget(elapsed_bar, bar_area);
         }
@@ -175,12 +217,12 @@ impl Ui<'_> {
             bar_area,
         );
 
-        if app.config.ui.draw_borders {
-            screen_call!(self, app, render(frame, content_area, app))?;
+        if state.config.ui.draw_borders {
+            screen_call!(self, state, render(frame, content_area, &state.status, state.config))?;
         } else {
             screen_call!(
                 self,
-                app,
+                state,
                 render(
                     frame,
                     ratatui::prelude::Rect {
@@ -189,48 +231,49 @@ impl Ui<'_> {
                         width: content_area.width,
                         height: content_area.height - 1,
                     },
-                    app
+                    &state.status,
+                    state.config
                 )
             )?;
         }
 
         if let Some(ref mut modal) = self.active_modal {
-            Self::render_modal(modal, frame, app)?;
+            Self::render_modal(modal, frame, state)?;
         }
 
         Ok(())
     }
 
-    fn render_modal(active_modal: &mut modals::Modals, frame: &mut Frame<'_>, app: &mut State) -> Result<()> {
+    fn render_modal(active_modal: &mut modals::Modals, frame: &mut Frame<'_>, state: &mut State) -> Result<()> {
         match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, app),
-            modals::Modals::SaveQueue(ref mut m) => m.render(frame, app),
-            modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, app),
-            modals::Modals::AddToPlaylist(ref mut m) => m.render(frame, app),
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, state),
+            modals::Modals::SaveQueue(ref mut m) => m.render(frame, state),
+            modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, state),
+            modals::Modals::AddToPlaylist(ref mut m) => m.render(frame, state),
         }
     }
     fn handle_modal_key(
         active_modal: &mut modals::Modals,
         client: &mut Client<'_>,
         key: KeyEvent,
-        app: &mut State,
+        state: &mut State,
     ) -> Result<KeyHandleResultInternal> {
         match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, app),
-            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, app),
-            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, app),
-            modals::Modals::AddToPlaylist(ref mut m) => m.handle_key(key, client, app),
+            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, state),
+            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, state),
+            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, state),
+            modals::Modals::AddToPlaylist(ref mut m) => m.handle_key(key, client, state),
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, app: &mut State) -> Result<KeyHandleResult> {
+    pub fn handle_key(&mut self, key: KeyEvent, state: &mut State) -> Result<KeyHandleResult> {
         macro_rules! screen_call_inner {
             ($fn:ident($($param:expr),+)) => {
-                screen_call!(self, app, $fn($($param),+))?
+                screen_call!(self, state, $fn($($param),+))?
             }
         }
         if let Some(ref mut modal) = self.active_modal {
-            return match Self::handle_modal_key(modal, &mut self.client, key, app)? {
+            return match Self::handle_modal_key(modal, &mut self.client, key, state)? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.active_modal = None;
                     Ok(KeyHandleResult::RenderRequested)
@@ -239,7 +282,7 @@ impl Ui<'_> {
             };
         }
 
-        match screen_call_inner!(handle_action(key, &mut self.client, app)) {
+        match screen_call_inner!(handle_action(key, &mut self.client, &mut state.status, state.config)) {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(modal) => {
@@ -247,22 +290,22 @@ impl Ui<'_> {
                 return Ok(KeyHandleResult::RenderRequested);
             }
             KeyHandleResultInternal::KeyNotHandled => {
-                if let Some(action) = app.config.keybinds.global.get(&key.into()) {
+                if let Some(action) = state.config.keybinds.global.get(&key.into()) {
                     match action {
-                        GlobalAction::NextTrack if app.status.state == MpdState::Play => self.client.next()?,
-                        GlobalAction::PreviousTrack if app.status.state == MpdState::Play => self.client.prev()?,
-                        GlobalAction::Stop if app.status.state == MpdState::Play => self.client.stop()?,
-                        GlobalAction::ToggleRepeat => self.client.repeat(!app.status.repeat)?,
-                        GlobalAction::ToggleSingle => self.client.single(app.status.single.cycle())?,
-                        GlobalAction::ToggleRandom => self.client.random(!app.status.random)?,
+                        GlobalAction::NextTrack if state.status.state == MpdState::Play => self.client.next()?,
+                        GlobalAction::PreviousTrack if state.status.state == MpdState::Play => self.client.prev()?,
+                        GlobalAction::Stop if state.status.state == MpdState::Play => self.client.stop()?,
+                        GlobalAction::ToggleRepeat => self.client.repeat(!state.status.repeat)?,
+                        GlobalAction::ToggleSingle => self.client.single(state.status.single.cycle())?,
+                        GlobalAction::ToggleRandom => self.client.random(!state.status.random)?,
                         GlobalAction::ToggleConsume if self.client.version < Version::new(0, 24, 0) => {
-                            self.client.consume(app.status.consume.cycle_pre_mpd_24())?;
+                            self.client.consume(state.status.consume.cycle_pre_mpd_24())?;
                         }
                         GlobalAction::ToggleConsume => {
-                            self.client.consume(app.status.consume.cycle())?;
+                            self.client.consume(state.status.consume.cycle())?;
                         }
                         GlobalAction::TogglePause
-                            if app.status.state == MpdState::Play || app.status.state == MpdState::Pause =>
+                            if state.status.state == MpdState::Play || state.status.state == MpdState::Pause =>
                         {
                             self.client.pause_toggle()?;
                             return Ok(KeyHandleResult::SkipRender);
@@ -270,72 +313,74 @@ impl Ui<'_> {
                         GlobalAction::TogglePause => {}
                         GlobalAction::VolumeUp => {
                             self.client
-                                .set_volume(*app.status.volume.inc_by(app.config.volume_step))?;
+                                .set_volume(*state.status.volume.inc_by(state.config.volume_step))?;
                         }
                         GlobalAction::VolumeDown => {
                             self.client
-                                .set_volume(*app.status.volume.dec_by(app.config.volume_step))?;
+                                .set_volume(*state.status.volume.dec_by(state.config.volume_step))?;
                         }
-                        GlobalAction::SeekForward if app.status.state == MpdState::Play => {
+                        GlobalAction::SeekForward if state.status.state == MpdState::Play => {
                             self.client.seek_curr_forwards(5)?;
                         }
-                        GlobalAction::SeekBack if app.status.state == MpdState::Play => {
+                        GlobalAction::SeekBack if state.status.state == MpdState::Play => {
                             self.client.seek_curr_backwards(5)?;
                         }
                         GlobalAction::NextTab => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = app.active_tab.next();
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = self.active_screen.next();
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PreviousTab => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = app.active_tab.prev();
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = self.active_screen.prev();
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::QueueTab if !matches!(app.active_tab, screens::Screens::Queue) => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                        GlobalAction::QueueTab if !matches!(self.active_screen, screens::Screens::Queue) => {
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = screens::Screens::Queue;
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = screens::Screens::Queue;
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::DirectoriesTab if !matches!(app.active_tab, screens::Screens::Directories) => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                        GlobalAction::DirectoriesTab
+                            if !matches!(self.active_screen, screens::Screens::Directories) =>
+                        {
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = screens::Screens::Directories;
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = screens::Screens::Directories;
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::ArtistsTab if !matches!(app.active_tab, screens::Screens::Artists) => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                        GlobalAction::ArtistsTab if !matches!(self.active_screen, screens::Screens::Artists) => {
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = screens::Screens::Artists;
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = screens::Screens::Artists;
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::AlbumsTab if !matches!(app.active_tab, screens::Screens::Albums) => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                        GlobalAction::AlbumsTab if !matches!(self.active_screen, screens::Screens::Albums) => {
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = screens::Screens::Albums;
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = screens::Screens::Albums;
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::PlaylistsTab if !matches!(app.active_tab, screens::Screens::Playlists) => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                        GlobalAction::PlaylistsTab if !matches!(self.active_screen, screens::Screens::Playlists) => {
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = screens::Screens::Playlists;
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = screens::Screens::Playlists;
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::SearchTab if !matches!(app.active_tab, screens::Screens::Search) => {
-                            screen_call_inner!(on_hide(&mut self.client, app));
+                        GlobalAction::SearchTab if !matches!(self.active_screen, screens::Screens::Search) => {
+                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
 
-                            app.active_tab = screens::Screens::Search;
-                            screen_call_inner!(before_show(&mut self.client, app));
+                            self.active_screen = screens::Screens::Search;
+                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::QueueTab => {}
@@ -359,8 +404,13 @@ impl Ui<'_> {
         }
     }
 
-    pub fn before_show(&mut self, app: &mut State) -> Result<()> {
-        screen_call!(self, app, before_show(&mut self.client, app))
+    pub fn before_show(&mut self, state: &mut State) -> Result<()> {
+        self.current_song = try_ret!(self.client.get_current_song(), "Failed get current song");
+        screen_call!(
+            self,
+            state,
+            before_show(&mut self.client, &mut state.status, state.config)
+        )
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {
@@ -371,8 +421,51 @@ impl Ui<'_> {
         });
     }
 
-    pub fn on_idle_event(&mut self, event: crate::mpd::commands::IdleEvent, state: &mut State) -> Result<()> {
-        screen_call!(self, state, on_idle_event(event, &mut self.client, state))
+    pub fn on_event(&mut self, event: UiEvent, state: &mut State) -> Result<()> {
+        match event {
+            UiEvent::Mixer => state.status.volume = try_ret!(self.client.get_volume(), "Failed to get volume"),
+            UiEvent::Options => state.status = try_ret!(self.client.get_status(), "Failed to get status"),
+            UiEvent::Player => {
+                state.status = try_ret!(self.client.get_status(), "Failed get status");
+            }
+            UiEvent::Playlist => {}
+            UiEvent::Database => {}
+            UiEvent::StoredPlaylist => {}
+            UiEvent::LogAdded(_) => {}
+            UiEvent::Update => {}
+        }
+
+        self.screens
+            .on_event(event, &mut self.client, &mut state.status, state.config)
+    }
+}
+
+#[derive(Debug)]
+pub enum UiEvent {
+    Player,
+    Mixer,
+    Playlist,
+    Options,
+    Database,
+    StoredPlaylist,
+    Update,
+    LogAdded(Vec<u8>),
+}
+
+impl TryFrom<IdleEvent> for UiEvent {
+    type Error = ();
+
+    fn try_from(event: IdleEvent) -> Result<Self, ()> {
+        Ok(match event {
+            IdleEvent::Player => UiEvent::Player,
+            IdleEvent::Update => UiEvent::Update,
+            IdleEvent::Mixer => UiEvent::Mixer,
+            IdleEvent::Playlist => UiEvent::Playlist,
+            IdleEvent::Options => UiEvent::Options,
+            IdleEvent::Database => UiEvent::Database,
+            IdleEvent::StoredPlaylist => UiEvent::StoredPlaylist,
+            _ => return Err(()),
+        })
     }
 }
 

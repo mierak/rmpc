@@ -6,7 +6,7 @@ use strum::Display;
 use crate::{
     config::{ui::Position, Config},
     mpd::{
-        commands::{IdleEvent, Song},
+        commands::{Song, Status},
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     ui::{
@@ -16,7 +16,7 @@ use crate::{
         },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
-        KeyHandleResultInternal,
+        KeyHandleResultInternal, UiEvent,
     },
     utils::macros::{status_error, status_warn, try_ret},
 };
@@ -28,8 +28,6 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Row, Table, TableState},
     Frame,
 };
-
-use crate::state::State;
 
 use super::{CommonAction, Screen};
 
@@ -67,9 +65,9 @@ impl QueueScreen {
 
 impl Screen for QueueScreen {
     type Actions = QueueActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> anyhow::Result<()> {
         let queue_len = self.queue.len();
-        let album_art_width = app.config.ui.album_art_width_percent;
+        let album_art_width = config.ui.album_art_width_percent;
         let show_image = album_art_width > 0;
 
         let mut img_queue_constraints = [
@@ -77,7 +75,7 @@ impl Screen for QueueScreen {
             Constraint::Percentage(100 - album_art_width),
         ];
 
-        if matches!(app.config.ui.album_art_position, Position::Right) {
+        if matches!(config.ui.album_art_position, Position::Right) {
             img_queue_constraints.reverse();
         }
 
@@ -85,11 +83,11 @@ impl Screen for QueueScreen {
             return Ok(());
         };
 
-        if matches!(app.config.ui.album_art_position, Position::Right) {
+        if matches!(config.ui.album_art_position, Position::Right) {
             std::mem::swap(&mut img_section, &mut queue_section);
         }
 
-        let header_height = u16::from(app.config.ui.show_song_table_header);
+        let header_height = u16::from(config.ui.show_song_table_header);
         let [table_header_section, mut queue_section] =
             *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(queue_section)
         else {
@@ -103,13 +101,13 @@ impl Screen for QueueScreen {
         }
 
         let widths = Layout::horizontal(self.column_widths.clone()).split(table_header_section);
-        let formats = &app.config.ui.song_table_format;
+        let formats = &config.ui.song_table_format;
 
         let table_items = self
             .queue
             .iter()
             .map(|song| {
-                let is_current = app.status.songid.as_ref().is_some_and(|v| *v == song.id);
+                let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
                 let columns = (0..formats.len()).map(|i| {
                     formats[i]
                         .prop
@@ -124,8 +122,8 @@ impl Screen for QueueScreen {
                         .is_some_and(|filter| song.matches(formats, filter, true));
 
                 if is_highlighted {
-                    Row::new(columns.map(|column| column.patch_style(app.config.ui.highlighted_item_style)))
-                        .style(app.config.ui.highlighted_item_style)
+                    Row::new(columns.map(|column| column.patch_style(config.ui.highlighted_item_style)))
+                        .style(config.ui.highlighted_item_style)
                 } else {
                     Row::new(columns)
                 }
@@ -134,13 +132,13 @@ impl Screen for QueueScreen {
 
         let mut table_padding = Padding::right(2);
         table_padding.left = 1;
-        if app.config.ui.show_song_table_header {
+        if config.ui.show_song_table_header {
             let header_table = Table::default()
                 .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
                     Line::from(*title).alignment(formats[idx].alignment.into())
                 })))
                 .widths(self.column_widths.clone())
-                .block(app.config.as_header_table_block().padding(table_padding));
+                .block(config.as_header_table_block().padding(table_padding));
             frame.render_widget(header_table, table_header_section);
         }
 
@@ -149,8 +147,8 @@ impl Screen for QueueScreen {
             .block({
                 let mut b = Block::default()
                     .padding(table_padding)
-                    .border_style(app.config.as_border_style().bold());
-                if app.config.ui.show_song_table_header {
+                    .border_style(config.as_border_style().bold());
+                if config.ui.show_song_table_header {
                     b = b.borders(Borders::TOP);
                 }
                 if let Some(ref title) = title {
@@ -158,14 +156,14 @@ impl Screen for QueueScreen {
                 }
                 b
             })
-            .highlight_style(app.config.ui.current_item_style);
+            .highlight_style(config.ui.current_item_style);
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 
         queue_section.y = queue_section.y.saturating_add(1);
         queue_section.height = queue_section.height.saturating_sub(1);
         frame.render_stateful_widget(
-            app.config.as_styled_scrollbar(),
+            config.as_styled_scrollbar(),
             queue_section.inner(&ratatui::prelude::Margin {
                 vertical: 0,
                 horizontal: 0,
@@ -175,8 +173,8 @@ impl Screen for QueueScreen {
         if show_image {
             frame.render_stateful_widget(
                 KittyImage::default()
-                    .default_art(&app.config.ui.default_album_art)
-                    .block(Block::default().border_style(app.config.as_border_style())),
+                    .default_art(&config.ui.default_album_art)
+                    .block(Block::default().border_style(config.as_border_style())),
                 img_section,
                 &mut self.img_state,
             );
@@ -185,11 +183,11 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, _config: &Config) -> Result<()> {
         let queue = client.playlist_info()?;
         self.album_art = if let Some(song) = queue
             .as_ref()
-            .and_then(|p| p.iter().find(|s| app.status.songid.is_some_and(|i| i == s.id)))
+            .and_then(|p| p.iter().find(|s| status.songid.is_some_and(|i| i == s.id)))
         {
             client.find_album_art(&song.file)?
         } else {
@@ -197,7 +195,7 @@ impl Screen for QueueScreen {
         };
         self.queue = queue.unwrap_or_default();
         self.scrolling_state.set_content_len(Some(self.queue.len()));
-        if let Some(songid) = app.status.songid {
+        if let Some(songid) = status.songid {
             let idx = self
                 .queue
                 .iter()
@@ -212,23 +210,24 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn on_idle_event(
+    fn on_event(
         &mut self,
-        event: crate::mpd::commands::IdleEvent,
+        event: &mut UiEvent,
         client: &mut impl MpdClient,
-        app: &mut crate::state::State,
+        status: &mut Status,
+        config: &Config,
     ) -> Result<()> {
         match event {
-            IdleEvent::Playlist => {
+            UiEvent::Playlist => {
                 let queue = client.playlist_info()?;
                 if let Some(queue) = queue {
                     self.scrolling_state.set_content_len(Some(queue.len()));
                     self.queue = queue;
                 }
             }
-            IdleEvent::Player => {
-                if let Some(current_song) = self.queue.iter().find(|s| app.status.songid.is_some_and(|i| i == s.id)) {
-                    if !app.config.ui.album_art_width_percent != 0 {
+            UiEvent::Player => {
+                if let Some(current_song) = self.queue.iter().find(|s| status.songid.is_some_and(|i| i == s.id)) {
+                    if !config.ui.album_art_width_percent != 0 {
                         self.album_art = try_ret!(
                             client.find_album_art(&current_song.file),
                             "Failed to get find album art"
@@ -245,13 +244,14 @@ impl Screen for QueueScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        app: &mut State,
+        _status: &mut Status,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            match app.config.keybinds.navigation.get(&event.into()) {
+            match config.keybinds.navigation.get(&event.into()) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    self.jump_forward(app);
+                    self.jump_forward(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Some(CommonAction::Close) => {
@@ -275,7 +275,7 @@ impl Screen for QueueScreen {
                     _ => Ok(KeyHandleResultInternal::SkipRender),
                 },
             }
-        } else if let Some(action) = app.config.keybinds.queue.get(&event.into()) {
+        } else if let Some(action) = config.keybinds.queue.get(&event.into()) {
             match action {
                 QueueActions::Delete => {
                     if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
@@ -319,7 +319,7 @@ impl Screen for QueueScreen {
                     }
                 }
             }
-        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::Up => {
                     if !self.queue.is_empty() {
@@ -400,11 +400,11 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(app);
+                    self.jump_forward(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(app);
+                    self.jump_back(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
@@ -422,8 +422,8 @@ impl Screen for QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn jump_forward(&mut self, app: &mut crate::state::State) {
-        let formats = &app.config.ui.song_table_format;
+    pub fn jump_forward(&mut self, config: &Config) {
+        let formats = &config.ui.song_table_format;
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -443,8 +443,8 @@ impl QueueScreen {
         }
     }
 
-    pub fn jump_back(&mut self, app: &mut crate::state::State) {
-        let formats = &app.config.ui.song_table_format;
+    pub fn jump_back(&mut self, config: &Config) {
+        let formats = &config.ui.song_table_format;
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;

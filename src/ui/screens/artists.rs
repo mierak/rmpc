@@ -1,10 +1,10 @@
 use crate::{
+    config::Config,
     mpd::{
-        commands::Song,
+        commands::{Song, Status},
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    state::State,
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
@@ -28,11 +28,11 @@ pub struct ArtistsScreen {
 
 impl Screen for ArtistsScreen {
     type Actions = ArtistsActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut State) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> Result<()> {
         frame.render_stateful_widget(
-            Browser::new(app.config)
-                .set_widths(&app.config.ui.column_widths)
-                .set_border_style(app.config.as_border_style()),
+            Browser::new(config)
+                .set_widths(&config.ui.column_widths)
+                .set_border_style(config.as_border_style()),
             area,
             &mut self.stack,
         );
@@ -40,11 +40,11 @@ impl Screen for ArtistsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
         if self.stack().path().is_empty() {
             let result = client.list_tag(Tag::Artist, None).context("Cannot list artists")?;
             self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
-            let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+            let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
         }
 
@@ -55,14 +55,15 @@ impl Screen for ArtistsScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        app: &mut State,
+        _status: &mut Status,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            self.handle_filter_input(event, client, app)
-        } else if let Some(_action) = app.config.keybinds.artists.get(&event.into()) {
+            self.handle_filter_input(event, client, config)
+        } else if let Some(_action) = config.keybinds.artists.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
-        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, app)
+        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+            self.handle_common_action(*action, client, config)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -176,7 +177,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
     fn prepare_preview(
         &mut self,
         client: &mut impl MpdClient,
-        state: &State,
+        config: &Config,
     ) -> Result<Option<Vec<ListItem<'static>>>> {
         self.stack
             .current()
@@ -188,17 +189,17 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                         find_songs(client, artist, album, current)?
                             .first()
                             .context("Expected to find exactly one song")?
-                            .to_preview(&state.config.ui.symbols)
+                            .to_preview(&config.ui.symbols)
                             .collect_vec(),
                     ),
                     [artist] => Some(
                         list_titles(client, artist, current)?
-                            .map(|s| s.to_list_item(state.config, false, None))
+                            .map(|s| s.to_list_item(config, false, None))
                             .collect_vec(),
                     ),
                     [] => Some(
                         list_albums(client, current)?
-                            .map(|s| s.to_list_item(state.config, false, None))
+                            .map(|s| s.to_list_item(config, false, None))
                             .collect_vec(),
                     ),
                     _ => None,

@@ -10,22 +10,24 @@ use ratatui::{
 use strum::Display;
 
 use crate::{
-    mpd::mpd_client::MpdClient,
-    state::State,
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal},
+    config::Config,
+    mpd::{commands::Status, mpd_client::MpdClient},
+    state::MyVecDeque,
+    ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
 };
 
 use super::{CommonAction, Screen};
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
+    logs: MyVecDeque<Vec<u8>>,
     scrolling_state: DirState<ListState>,
 }
 
 impl Screen for LogsScreen {
     type Actions = LogsActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
-        let lines: Vec<_> = app
+    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> anyhow::Result<()> {
+        let lines: Vec<_> = self
             .logs
             .iter()
             .map(|l| -> Result<_> { Ok(l.into_text()?.lines) })
@@ -35,7 +37,7 @@ impl Screen for LogsScreen {
                 match l {
                     Ok(mut val) => {
                         if self.scrolling_state.get_selected().is_some_and(|v| v == idx) {
-                            val = val.patch_style(app.config.ui.current_item_style);
+                            val = val.patch_style(config.ui.current_item_style);
                         }
                         Ok(ListItem::new(val))
                     }
@@ -44,7 +46,7 @@ impl Screen for LogsScreen {
             })
             .try_collect()?;
 
-        let scrollbar = app.config.as_styled_scrollbar();
+        let scrollbar = config.as_styled_scrollbar();
 
         let [content, scroll] = *Layout::default()
             .direction(Direction::Horizontal)
@@ -72,8 +74,24 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut impl MpdClient, _app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, _client: &mut impl MpdClient, _status: &mut Status, _config: &Config) -> Result<()> {
         self.scrolling_state.last();
+        Ok(())
+    }
+
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _client: &mut impl MpdClient,
+        _status: &mut Status,
+        _config: &Config,
+    ) -> Result<()> {
+        if let UiEvent::LogAdded(msg) = event {
+            self.logs.push_back(std::mem::take(msg));
+            if self.logs.len() > 1000 {
+                self.logs.pop_front();
+            }
+        };
         Ok(())
     }
 
@@ -81,16 +99,17 @@ impl Screen for LogsScreen {
         &mut self,
         event: KeyEvent,
         _client: &mut impl MpdClient,
-        app: &mut State,
+        _status: &mut Status,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
-        if let Some(action) = app.config.keybinds.logs.get(&event.into()) {
+        if let Some(action) = config.keybinds.logs.get(&event.into()) {
             match action {
                 LogsActions::Clear => {
-                    app.logs.clear();
+                    self.logs.clear();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
             }
-        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport();

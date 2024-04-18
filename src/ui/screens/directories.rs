@@ -5,11 +5,11 @@ use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use strum::Display;
 
 use crate::{
+    config::Config,
     mpd::{
-        commands::lsinfo::FileOrDir,
+        commands::{lsinfo::FileOrDir, Status},
         mpd_client::{Filter, MpdClient, Tag},
     },
-    state::State,
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
@@ -28,11 +28,11 @@ pub struct DirectoriesScreen {
 
 impl Screen for DirectoriesScreen {
     type Actions = DirectoriesActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> anyhow::Result<()> {
         frame.render_stateful_widget(
-            Browser::new(app.config)
-                .set_widths(&app.config.ui.column_widths)
-                .set_border_style(app.config.as_border_style()),
+            Browser::new(config)
+                .set_widths(&config.ui.column_widths)
+                .set_border_style(config.as_border_style()),
             area,
             &mut self.stack,
         );
@@ -40,7 +40,7 @@ impl Screen for DirectoriesScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
         if self.stack().path().is_empty() {
             self.stack = DirStack::new(
                 client
@@ -49,7 +49,7 @@ impl Screen for DirectoriesScreen {
                     .map(Into::<DirOrSong>::into)
                     .collect::<Vec<_>>(),
             );
-            let preview = self.prepare_preview(client, app)?;
+            let preview = self.prepare_preview(client, config)?;
             self.stack.set_preview(preview);
         }
 
@@ -60,14 +60,15 @@ impl Screen for DirectoriesScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        app: &mut State,
+        _status: &mut Status,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
         if self.filter_input_mode {
-            self.handle_filter_input(event, client, app)
-        } else if let Some(_action) = app.config.keybinds.directories.get(&event.into()) {
+            self.handle_filter_input(event, client, config)
+        } else if let Some(_action) = config.keybinds.directories.get(&event.into()) {
             Ok(KeyHandleResultInternal::KeyNotHandled)
-        } else if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, app)
+        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+            self.handle_common_action(*action, client, config)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -144,7 +145,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
     fn prepare_preview(
         &mut self,
         client: &mut impl MpdClient,
-        state: &State,
+        config: &Config,
     ) -> Result<Option<Vec<ListItem<'static>>>> {
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir(_)) => {
@@ -168,13 +169,13 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     }
                 })
                 .sorted()
-                .map(|v| v.to_list_item(state.config, false, None))
+                .map(|v| v.to_list_item(config, false, None))
                 .collect();
                 Ok(Some(res))
             }
             Some(DirOrSong::Song(file)) => Ok(client
                 .find_one(&[Filter::new(Tag::File, file)])?
-                .map(|v| v.to_preview(&state.config.ui.symbols).collect())),
+                .map(|v| v.to_preview(&config.ui.symbols).collect())),
             None => Ok(None),
         }
     }

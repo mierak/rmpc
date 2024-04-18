@@ -12,8 +12,9 @@ use ratatui::{
 };
 use strum::Display;
 
+use crate::config::Config;
 use crate::mpd::commands::Song;
-use crate::state::State;
+use crate::mpd::commands::Status;
 use crate::ui::utils::dirstack::Dir;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -47,18 +48,18 @@ impl SearchScreen {
         &mut self,
         frame: &mut ratatui::prelude::Frame<'_>,
         area: ratatui::prelude::Rect,
-        app: &mut crate::state::State,
+        config: &Config,
     ) {
         let title = self.songs_dir.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
-        let current = List::new(self.songs_dir.to_list_items(app.config))
+        let current = List::new(self.songs_dir.to_list_items(config))
             .block({
                 let mut b = Block::default();
                 if let Some(ref title) = title {
-                    b = b.title(title.clone().set_style(app.config.ui.borders_style));
+                    b = b.title(title.clone().set_style(config.ui.borders_style));
                 }
                 b.padding(Padding::new(0, 2, 0, 0))
             })
-            .highlight_style(app.config.ui.current_item_style);
+            .highlight_style(config.ui.current_item_style);
         let directory = &mut self.songs_dir;
 
         directory.state.set_content_len(Some(directory.items.len()));
@@ -74,16 +75,20 @@ impl SearchScreen {
         };
         frame.render_stateful_widget(current, area, directory.state.as_render_state_ref());
         frame.render_stateful_widget(
-            app.config.as_styled_scrollbar(),
+            config.as_styled_scrollbar(),
             area,
             directory.state.as_scrollbar_state_ref(),
         );
     }
 
-    fn prepare_preview(&mut self, client: &mut impl MpdClient, app: &State) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(
+        &mut self,
+        client: &mut impl MpdClient,
+        config: &Config,
+    ) -> Result<Option<Vec<ListItem<'static>>>> {
         match &self.phase {
             Phase::SearchTextboxInput => Ok(None),
-            Phase::Search => Ok(Some(self.songs_dir.to_list_items(app.config))),
+            Phase::Search => Ok(Some(self.songs_dir.to_list_items(config))),
             Phase::List { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
                     return Ok(None);
@@ -93,7 +98,7 @@ impl SearchScreen {
                     .find(&[Filter::new(Tag::File, &current.file)])?
                     .first()
                     .context("Expected to find exactly one song")?
-                    .to_preview(&app.config.ui.symbols)
+                    .to_preview(&config.ui.symbols)
                     .collect_vec();
                 Ok(Some(preview))
             }
@@ -104,7 +109,7 @@ impl SearchScreen {
         &mut self,
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
-        app: &mut crate::state::State,
+        config: &Config,
     ) {
         let input_areas = Layout::vertical(
             (0..self.inputs.textbox_inputs.len()
@@ -132,13 +137,13 @@ impl SearchScreen {
                         .set_text(value);
 
                     widget = if matches!(self.phase, Phase::SearchTextboxInput) && is_focused {
-                        widget.set_label_style(app.config.ui.highlighted_item_style)
+                        widget.set_label_style(config.ui.highlighted_item_style)
                     } else if is_focused {
                         widget
-                            .set_label_style(app.config.ui.current_item_style)
-                            .set_input_style(app.config.ui.current_item_style)
+                            .set_label_style(config.ui.current_item_style)
+                            .set_input_style(config.ui.current_item_style)
                     } else if !value.is_empty() {
-                        widget.set_input_style(app.config.ui.highlighted_item_style)
+                        widget.set_input_style(config.ui.highlighted_item_style)
                     } else {
                         widget
                     };
@@ -152,7 +157,7 @@ impl SearchScreen {
         frame.render_widget(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(app.config.ui.borders_style),
+                .border_style(config.ui.borders_style),
             input_areas[idx],
         );
         idx += 1;
@@ -174,8 +179,8 @@ impl SearchScreen {
 
             if is_focused {
                 inp = inp
-                    .set_label_style(app.config.ui.current_item_style)
-                    .set_input_style(app.config.ui.current_item_style);
+                    .set_label_style(config.ui.current_item_style)
+                    .set_input_style(config.ui.current_item_style);
             };
             frame.render_widget(inp, input_areas[idx]);
             idx += 1;
@@ -184,7 +189,7 @@ impl SearchScreen {
         frame.render_widget(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(app.config.ui.borders_style),
+                .border_style(config.ui.borders_style),
             input_areas[idx],
         );
         idx += 1;
@@ -198,7 +203,7 @@ impl SearchScreen {
                 FocusedInputGroup::Buttons(ButtonInput { variant, .. }) if &input.variant == variant);
 
             if is_focused {
-                button = button.style(app.config.ui.current_item_style);
+                button = button.style(config.ui.current_item_style);
             };
             frame.render_widget(button, input_areas[idx]);
         }
@@ -262,9 +267,10 @@ impl Screen for SearchScreen {
         &mut self,
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
-        app: &mut crate::state::State,
+        _status: &Status,
+        config: &Config,
     ) -> anyhow::Result<()> {
-        let widths = &app.config.ui.column_widths;
+        let widths = &config.ui.column_widths;
         let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
             Constraint::Percentage(widths[0]),
             Constraint::Percentage(widths[1]),
@@ -277,13 +283,13 @@ impl Screen for SearchScreen {
         frame.render_widget(
             Block::default()
                 .borders(Borders::RIGHT)
-                .border_style(app.config.ui.borders_style),
+                .border_style(config.ui.borders_style),
             previous_area,
         );
         frame.render_widget(
             Block::default()
                 .borders(Borders::RIGHT)
-                .border_style(app.config.ui.borders_style),
+                .border_style(config.ui.borders_style),
             current_area_init,
         );
         let previous_area = Rect {
@@ -301,16 +307,16 @@ impl Screen for SearchScreen {
 
         match self.phase {
             Phase::Search | Phase::SearchTextboxInput => {
-                self.render_input_column(frame, current_area, app);
+                self.render_input_column(frame, current_area, config);
             }
             Phase::List { filter_input_on: _ } => {
-                self.render_song_column(frame, current_area, app);
-                self.render_input_column(frame, previous_area, app);
+                self.render_song_column(frame, current_area, config);
+                self.render_input_column(frame, previous_area, config);
             }
         }
 
         if let Some(preview) = &self.preview {
-            let preview = List::new(preview.clone()).highlight_style(app.config.ui.current_item_style);
+            let preview = List::new(preview.clone()).highlight_style(config.ui.current_item_style);
             frame.render_widget(preview, preview_area);
         }
 
@@ -321,20 +327,21 @@ impl Screen for SearchScreen {
         &mut self,
         event: crossterm::event::KeyEvent,
         client: &mut impl MpdClient,
-        app: &mut crate::state::State,
+        _status: &mut Status,
+        config: &Config,
     ) -> anyhow::Result<crate::ui::KeyHandleResultInternal> {
-        let action = app.config.keybinds.navigation.get(&event.into());
+        let action = config.keybinds.navigation.get(&event.into());
         match &mut self.phase {
             Phase::SearchTextboxInput => {
                 if let Some(CommonAction::Close) = action {
                     self.phase = Phase::Search;
                     self.songs_dir = Dir::new(self.search(client)?);
-                    self.preview = self.prepare_preview(client, app)?;
+                    self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else if let Some(CommonAction::Confirm) = action {
                     self.phase = Phase::Search;
                     self.songs_dir = Dir::new(self.search(client)?);
-                    self.preview = self.prepare_preview(client, app)?;
+                    self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
                     match event.code {
@@ -361,7 +368,7 @@ impl Screen for SearchScreen {
                 }
             }
             Phase::Search => {
-                if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+                if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
                             self.inputs.next();
@@ -377,7 +384,7 @@ impl Screen for SearchScreen {
                         CommonAction::UpHalf => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
                             self.phase = Phase::List { filter_input_on: false };
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Right => Ok(KeyHandleResultInternal::RenderRequested),
@@ -402,7 +409,7 @@ impl Screen for SearchScreen {
                                 FocusedInputGroup::Buttons(_) => {
                                     self.reset();
                                     self.songs_dir = Dir::default();
-                                    self.preview = self.prepare_preview(client, app)?;
+                                    self.preview = self.prepare_preview(client, config)?;
                                 }
                                 FocusedInputGroup::Filters(FilterInput {
                                     variant: FilterInputVariant::SelectFilterKind { ref mut value },
@@ -410,7 +417,7 @@ impl Screen for SearchScreen {
                                 }) => {
                                     value.cycle();
                                     self.songs_dir = Dir::new(self.search(client)?);
-                                    self.preview = self.prepare_preview(client, app)?;
+                                    self.preview = self.prepare_preview(client, config)?;
                                 }
                                 FocusedInputGroup::Filters(FilterInput {
                                     variant: FilterInputVariant::SelectFilterCaseSensitive { ref mut value },
@@ -418,7 +425,7 @@ impl Screen for SearchScreen {
                                 }) => {
                                     *value = !*value;
                                     self.songs_dir = Dir::new(self.search(client)?);
-                                    self.preview = self.prepare_preview(client, app)?;
+                                    self.preview = self.prepare_preview(client, config)?;
                                 }
                             }
                             Ok(KeyHandleResultInternal::RenderRequested)
@@ -443,12 +450,12 @@ impl Screen for SearchScreen {
                 if let Some(CommonAction::Close) = action {
                     *filter_input_on = false;
                     self.songs_dir.filter = None;
-                    self.preview = self.prepare_preview(client, app)?;
+                    self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else if let Some(CommonAction::Confirm) = action {
                     *filter_input_on = false;
                     self.songs_dir.jump_next_matching();
-                    self.preview = self.prepare_preview(client, app)?;
+                    self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
                     match event.code {
@@ -471,44 +478,44 @@ impl Screen for SearchScreen {
             Phase::List {
                 filter_input_on: filter_input_modce @ false,
             } => {
-                if let Some(action) = app.config.keybinds.navigation.get(&event.into()) {
+                if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
                             self.songs_dir.next();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Up => {
                             self.songs_dir.prev();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::MoveDown => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::MoveUp => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::DownHalf => {
                             self.songs_dir.next_half_viewport();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::UpHalf => {
                             self.songs_dir.prev_half_viewport();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Right => self.add_current(client),
                         CommonAction::Left => {
                             self.phase = Phase::Search;
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Top => {
                             self.songs_dir.first();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Bottom => {
                             self.songs_dir.last();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::EnterSearch => {
@@ -518,12 +525,12 @@ impl Screen for SearchScreen {
                         }
                         CommonAction::NextResult => {
                             self.songs_dir.jump_next_matching();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::PreviousResult => {
                             self.songs_dir.jump_previous_matching();
-                            self.preview = self.prepare_preview(client, app)?;
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Select => {

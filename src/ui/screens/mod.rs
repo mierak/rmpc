@@ -11,21 +11,23 @@ use ratatui::{
 use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
-    config::ui::{
-        properties::{SongProperty, StatusProperty, WidgetProperty},
-        SongTableColumn,
+    config::{
+        ui::{
+            properties::{SongProperty, StatusProperty, WidgetProperty},
+            SongTableColumn,
+        },
+        Config,
     },
     mpd::{
-        commands::{status::OnOffOneshot, volume::Bound, IdleEvent, Song, Status},
+        commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
     },
-    state::State,
 };
 
 use super::{
     utils::dirstack::{DirStack, DirStackItem},
     widgets::volume::Volume,
-    DurationExt, KeyHandleResultInternal,
+    DurationExt, KeyHandleResultInternal, UiEvent,
 };
 
 pub mod albums;
@@ -50,26 +52,28 @@ pub enum Screens {
     Search,
 }
 
+#[allow(unused_variables)]
 pub(super) trait Screen {
     type Actions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, app: &mut crate::state::State) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, _client: &mut impl MpdClient, _app: &mut crate::state::State) -> Result<()> {
+    fn on_hide(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, _client: &mut impl MpdClient, _app: &mut crate::state::State) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn on_idle_event(
+    fn on_event(
         &mut self,
-        _event: IdleEvent,
-        _client: &mut impl MpdClient,
-        _app: &mut crate::state::State,
+        event: &mut UiEvent,
+        client: &mut impl MpdClient,
+        status: &mut Status,
+        config: &Config,
     ) -> Result<()> {
         Ok(())
     }
@@ -77,8 +81,9 @@ pub(super) trait Screen {
     fn handle_action(
         &mut self,
         event: KeyEvent,
-        _client: &mut impl MpdClient,
-        _app: &mut State,
+        client: &mut impl MpdClient,
+        status: &mut Status,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal>;
 }
 
@@ -457,8 +462,11 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     ) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
-    fn prepare_preview(&mut self, client: &mut impl MpdClient, state: &State)
-        -> Result<Option<Vec<ListItem<'static>>>>;
+    fn prepare_preview(
+        &mut self,
+        client: &mut impl MpdClient,
+        config: &Config,
+    ) -> Result<Option<Vec<ListItem<'static>>>>;
     fn add(&self, item: &T, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
     fn delete(&self, item: &T, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
@@ -470,20 +478,20 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        state: &State,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
-        match state.config.keybinds.navigation.get(&event.into()) {
+        match config.keybinds.navigation.get(&event.into()) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().filter = None;
-                let preview = self.prepare_preview(client, state)?;
+                let preview = self.prepare_preview(client, config)?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().jump_next_matching();
-                let preview = self.prepare_preview(client, state)?;
+                let preview = self.prepare_preview(client, config)?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -509,18 +517,18 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         &mut self,
         action: CommonAction,
         client: &mut impl MpdClient,
-        app: &mut State,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
         match action {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Down => {
                 self.stack_mut().current_mut().next();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -534,37 +542,37 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             }
             CommonAction::DownHalf => {
                 self.stack_mut().current_mut().next_half_viewport();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::UpHalf => {
                 self.stack_mut().current_mut().prev_half_viewport();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Bottom => {
                 self.stack_mut().current_mut().last();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Top => {
                 self.stack_mut().current_mut().first();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Right => {
                 let res = self.next(client)?;
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(res)
             }
             CommonAction::Left => {
                 self.stack_mut().pop();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -575,20 +583,20 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             }
             CommonAction::NextResult => {
                 self.stack_mut().current_mut().jump_next_matching();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::PreviousResult => {
                 self.stack_mut().current_mut().jump_previous_matching();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Select => {
                 self.stack_mut().current_mut().toggle_mark_selected();
                 self.stack_mut().current_mut().next();
-                let preview = self.prepare_preview(client, app).context("Cannot prepare preview")?;
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }

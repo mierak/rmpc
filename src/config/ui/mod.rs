@@ -24,7 +24,7 @@ use super::defaults;
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct UiConfig {
     pub album_art_position: Position,
     pub album_art_width_percent: u16,
@@ -46,6 +46,12 @@ pub struct UiConfig {
     pub song_table_format: Vec<SongTableColumn>,
     pub header: HeaderConfig,
     pub default_album_art: Vec<u8>,
+}
+
+impl std::fmt::Debug for UiConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UiConfig {{ album_art_position: {:?}, album_art_width_percent: {}, draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, active_tab_style: {:?}, inactive_tab_style: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.album_art_position, self.album_art_width_percent, self.draw_borders, self.background_color, self.header_background_color, self.background_color_modal, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.active_tab_style, self.inactive_tab_style, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
