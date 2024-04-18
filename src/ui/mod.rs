@@ -120,6 +120,7 @@ impl Screens {
     ) -> Result<()> {
         [
             screens::Screens::Queue,
+            #[cfg(debug_assertions)]
             screens::Screens::Logs,
             screens::Screens::Directories,
             screens::Screens::Albums,
@@ -130,6 +131,7 @@ impl Screens {
         .iter()
         .map(|screen| -> Result<()> {
             match screen {
+                #[cfg(debug_assertions)]
                 screens::Screens::Logs => self.logs.on_event(&mut event, client, status, config),
                 screens::Screens::Queue => self.queue.on_event(&mut event, client, status, config),
                 screens::Screens::Directories => self.directories.on_event(&mut event, client, status, config),
