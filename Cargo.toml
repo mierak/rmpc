@@ -12,7 +12,7 @@ base64 = "0.21.6"
 clap = { version = "4.4.14", features = ["derive", "cargo", "string" ] }
 crossterm = { version = "0.27.0", features = ["serde"] }
 image = "0.24.7"
-ratatui = { version = "0.26.1", features = ["all-widgets"] }
+ratatui = { version = "=0.26.1", features = ["all-widgets"] }
 serde = { version = "1.0.195", features = ["derive"] }
 strum = { version = "0.25.0", features = ["derive"] }
 time = { version = "0.3.31", features = ["macros", "local-offset"] }
@@ -26,6 +26,8 @@ log = { version = "0.4.21", features = ["kv"] }
 flexi_logger = "0.27.4"
 chrono = "0.4.35"
 serde_with = "3.7.0"
+serde_json = "1.0.116"
+either = "1.11.0"
 
 [dev-dependencies]
 rstest = "0.19.0"

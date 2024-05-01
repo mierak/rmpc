@@ -141,20 +141,24 @@ impl Default for KeyConfigFile {
     }
 }
 
-fn invert_map<T: Copy, V: std::hash::Hash + std::cmp::Eq>(v: HashMap<T, SingleOrMultiple<V>>) -> HashMap<V, T> {
-    v.into_iter()
-        .flat_map(|(k, v)| match v {
-            SingleOrMultiple::Single(v) => vec![(v, k)],
-            SingleOrMultiple::Multiple(v) => v.into_iter().map(move |v| (v, k)).collect_vec(),
-        })
-        .collect()
+fn invert_and_flatten<T: Copy, V: std::hash::Hash + std::cmp::Eq>(
+    v: HashMap<T, SingleOrMultiple<V>>,
+) -> impl Iterator<Item = (V, T)> {
+    v.into_iter().flat_map(|(k, v)| match v {
+        SingleOrMultiple::Single(v) => vec![(v, k)],
+        SingleOrMultiple::Multiple(v) => v.into_iter().map(move |v| (v, k)).collect_vec(),
+    })
+}
+
+fn invert_keys<T: Copy>(v: HashMap<T, SingleOrMultiple<Key>>) -> HashMap<Key, T> {
+    invert_and_flatten(v).filter(|v| v.0.key != KeyCode::Null).collect()
 }
 
 impl From<KeyConfigFile> for KeyConfig {
     fn from(value: KeyConfigFile) -> Self {
         KeyConfig {
-            global: invert_map(value.global),
-            navigation: invert_map(value.navigation),
+            global: invert_keys(value.global),
+            navigation: invert_keys(value.navigation),
             // albums: invert_map(value.albums),
             // artists: invert_map(value.artists),
             // directories: invert_map(value.directories),
@@ -165,8 +169,8 @@ impl From<KeyConfigFile> for KeyConfig {
             playlists: HashMap::new(),
             search: HashMap::new(),
             #[cfg(debug_assertions)]
-            logs: invert_map(value.logs),
-            queue: invert_map(value.queue),
+            logs: invert_keys(value.logs),
+            queue: invert_keys(value.queue),
         }
     }
 }

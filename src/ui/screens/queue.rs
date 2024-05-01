@@ -4,7 +4,13 @@ use itertools::Itertools;
 use strum::Display;
 
 use crate::{
-    config::{ui::Position, Config},
+    config::{
+        ui::{
+            properties::{Property, SongProperty},
+            Position,
+        },
+        Config,
+    },
     mpd::{
         commands::{Song, Status},
         mpd_client::{MpdClient, QueueMoveTarget},
@@ -37,10 +43,11 @@ pub struct QueueScreen {
     scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
-    header: Vec<&'static str>,
-    column_widths: Vec<Constraint>,
     queue: Vec<Song>,
     album_art: Option<Vec<u8>>,
+    header: Vec<&'static str>,
+    column_widths: Vec<Constraint>,
+    column_formats: Vec<&'static Property<'static, SongProperty>>,
 }
 
 impl QueueScreen {
@@ -59,6 +66,7 @@ impl QueueScreen {
                 .iter()
                 .map(|v| Constraint::Percentage(v.width_percent))
                 .collect_vec(),
+            column_formats: config.ui.song_table_format.iter().map(|v| v.prop).collect_vec(),
         }
     }
 }
@@ -109,9 +117,7 @@ impl Screen for QueueScreen {
             .map(|song| {
                 let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
                 let columns = (0..formats.len()).map(|i| {
-                    formats[i]
-                        .prop
-                        .as_line_ellipsized(song, widths[i].width.into())
+                    song.as_line_ellipsized(formats[i].prop, widths[i].width.into())
                         .alignment(formats[i].alignment.into())
                 });
 
@@ -119,7 +125,7 @@ impl Screen for QueueScreen {
                     || self
                         .filter
                         .as_ref()
-                        .is_some_and(|filter| song.matches(formats, filter, true));
+                        .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter, true));
 
                 if is_highlighted {
                     Row::new(columns.map(|column| column.patch_style(config.ui.highlighted_item_style)))
@@ -251,7 +257,7 @@ impl Screen for QueueScreen {
             match config.keybinds.navigation.get(&event.into()) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    self.jump_forward(config);
+                    self.jump_forward();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Some(CommonAction::Close) => {
@@ -400,11 +406,11 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(config);
+                    self.jump_forward();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(config);
+                    self.jump_back();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
@@ -422,8 +428,7 @@ impl Screen for QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn jump_forward(&mut self, config: &Config) {
-        let formats = &config.ui.song_table_format;
+    pub fn jump_forward(&mut self) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -436,15 +441,14 @@ impl QueueScreen {
         let length = self.queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.queue[i].matches(formats, filter, true) {
+            if self.queue[i].matches(self.column_formats.as_slice(), filter, true) {
                 self.scrolling_state.select(Some(i));
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self, config: &Config) {
-        let formats = &config.ui.song_table_format;
+    pub fn jump_back(&mut self) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -457,7 +461,7 @@ impl QueueScreen {
         let length = self.queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.queue[i].matches(formats, filter, true) {
+            if self.queue[i].matches(self.column_formats.as_slice(), filter, true) {
                 self.scrolling_state.select(Some(i));
                 break;
             }

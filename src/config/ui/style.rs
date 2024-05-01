@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use bitflags::bitflags;
 use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 pub(super) trait ToConfigOr {
     fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style>;
@@ -15,11 +16,80 @@ impl StringColor {
     }
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StyleFile {
     pub(super) fg: Option<String>,
     pub(super) bg: Option<String>,
     pub(super) modifiers: Option<Modifiers>,
+}
+
+impl std::fmt::Display for Modifiers {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.contains(Modifiers::Bold) {
+            write!(f, "b")?;
+        }
+        if self.contains(Modifiers::Dim) {
+            write!(f, "d")?;
+        }
+        if self.contains(Modifiers::Italic) {
+            write!(f, "i")?;
+        }
+        if self.contains(Modifiers::Underlined) {
+            write!(f, "u")?;
+        }
+        if self.contains(Modifiers::Reversed) {
+            write!(f, "r")?;
+        }
+        if self.contains(Modifiers::CrossedOut) {
+            write!(f, "c")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for StyleFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Style({},{},{})",
+            match self.fg {
+                Some(ref fg) => fg.to_owned(),
+                None => "none".to_string(),
+            },
+            match self.bg {
+                Some(ref bg) => bg.to_owned(),
+                None => "none".to_string(),
+            },
+            self.modifiers
+                .as_ref()
+                .map_or_else(|| "none".to_string(), ToString::to_string)
+        )
+    }
+}
+#[cfg(test)]
+mod tests2 {
+
+    #[test]
+    fn test() {
+        use super::StyleFile;
+        let style = StyleFile {
+            fg: Some("red".to_string()),
+            bg: Some("blue".to_string()),
+            modifiers: None,
+        };
+        assert_eq!(style.to_string(), "red;blue;none");
+    }
+    #[test]
+    fn test2() {
+        use super::StyleFile;
+        let style = StyleFile {
+            fg: Some("#FF0000".to_string()),
+            bg: Some("blue".to_string()),
+            modifiers: Some(super::Modifiers::Bold | super::Modifiers::Dim | super::Modifiers::Italic),
+        };
+        assert_eq!(style.to_string(), "#FF0000;blue;bdi");
+    }
 }
 
 #[allow(clippy::similar_names)]

@@ -1,14 +1,17 @@
+use either::Either;
 use ratatui::{
     prelude::{Constraint, Layout},
     style::Style,
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Widget},
 };
 use strum::{IntoEnumIterator, VariantNames};
 
 use crate::{
-    config::ui::properties::Property,
-    config::Config,
+    config::{
+        ui::properties::{Property, PropertyKind},
+        Config,
+    },
     mpd::commands::{Song, Status},
 };
 
@@ -52,27 +55,27 @@ where
 
         let c = &config.ui.header;
 
-        let top_left_w = PropertyTemplates(&c.top_left);
+        let top_left_w = PropertyTemplates(c.top_left);
         let top_left_w = top_left_w.format(self.song, self.status).left_aligned();
         top_left_w.render(top_left, buf);
 
-        let top_center_w = PropertyTemplates(&c.top_center);
+        let top_center_w = PropertyTemplates(c.top_center);
         let top_center_w = top_center_w.format(self.song, self.status).centered();
         top_center_w.render(top_center, buf);
 
-        let top_right_w = PropertyTemplates(&c.top_right);
+        let top_right_w = PropertyTemplates(c.top_right);
         let top_right_w = top_right_w.format(self.song, self.status).right_aligned();
         top_right_w.render(top_right, buf);
 
-        let bot_left_w = PropertyTemplates(&c.bottom_left);
+        let bot_left_w = PropertyTemplates(c.bottom_left);
         let bot_left_w = bot_left_w.format(self.song, self.status).left_aligned();
         bot_left_w.render(bottom_left, buf);
 
-        let bot_center_w = PropertyTemplates(&c.bottom_center);
+        let bot_center_w = PropertyTemplates(c.bottom_center);
         let bot_center_w = bot_center_w.format(self.song, self.status).centered();
         bot_center_w.render(bottom_center, buf);
 
-        let bot_right_w = PropertyTemplates(&c.bottom_right);
+        let bot_right_w = PropertyTemplates(c.bottom_right);
         let bot_right_w = bot_right_w.format(self.song, self.status).right_aligned();
         bot_right_w.render(bottom_right, buf);
 
@@ -81,15 +84,13 @@ where
     }
 }
 
-struct PropertyTemplates<'a>(&'a [Property]);
+struct PropertyTemplates<'a>(&'a [&'a Property<'static, PropertyKind>]);
 impl<'a> PropertyTemplates<'a> {
     fn format(&'a self, song: Option<&'a Song>, status: &'a Status) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
-            match *val {
-                Property::Song(sp) => acc.push(sp.as_span_opt(song)),
-                Property::Status(p) => acc.push(p.as_span(status)),
-                Property::Widget(w) => acc.append(&mut w.as_spans(status)),
-                Property::Text { value, style } => acc.push(Span::styled(value, style)),
+            match val.as_span(song, status) {
+                Either::Left(span) => acc.push(span),
+                Either::Right(ref mut spans) => acc.append(spans),
             }
             acc
         }))

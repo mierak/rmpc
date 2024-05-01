@@ -429,7 +429,6 @@ impl Ui<'_> {
             UiEvent::Options => state.status = try_ret!(self.client.get_status(), "Failed to get status"),
             UiEvent::Player => {
                 self.current_song = try_ret!(self.client.get_current_song(), "Failed get current song");
-                state.status = try_ret!(self.client.get_status(), "Failed get status");
             }
             UiEvent::Playlist => {}
             UiEvent::Database => {}

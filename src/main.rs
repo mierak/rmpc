@@ -71,7 +71,7 @@ fn main() -> Result<()> {
                     ron::ser::PrettyConfig::default()
                         .depth_limit(3)
                         .struct_names(false)
-                        .compact_arrays(true)
+                        .compact_arrays(false)
                         .extensions(
                             Extensions::IMPLICIT_SOME
                                 | Extensions::UNWRAP_NEWTYPES
@@ -279,12 +279,13 @@ fn main_task<B: Backend + std::io::Write>(
 fn handle_idle_event(
     event: IdleEvent,
     state: &mut state::State,
-    __client: &mut Client<'_>,
+    client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
 ) -> Result<()> {
     match event {
         IdleEvent::Mixer => {}
         IdleEvent::Player => {
+            state.status = try_ret!(client.get_status(), "Failed get status");
             if state.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             } else {

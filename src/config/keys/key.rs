@@ -160,6 +160,7 @@ impl FromStr for Key {
             "F10" => KeyCode::F(10),
             "F11" => KeyCode::F(11),
             "F12" => KeyCode::F(12),
+            "" => KeyCode::Null,
             c => {
                 if key_part.len() != 1 {
                     return Err(format!("Invalid key: '{c}' from input '{s}'"));
@@ -230,6 +231,7 @@ mod tests {
     #[case("<C-S-->",      Key { key: KeyCode::Char('-'), modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT })]
     #[case("5",            Key { key: KeyCode::Char('5'), modifiers: KeyModifiers::NONE })]
     #[case("%",            Key { key: KeyCode::Char('%'), modifiers: KeyModifiers::NONE })]
+    #[case("",             Key { key: KeyCode::Null,      modifiers: KeyModifiers::NONE })]
     fn serialization_round_trip(#[case] expected_str: &str, #[case] input: Key) {
         let serialized = input.to_string();
         assert_eq!(expected_str, serialized);

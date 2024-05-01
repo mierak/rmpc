@@ -2,8 +2,10 @@ use std::borrow::Cow;
 
 use anyhow::{Context, Result};
 use crossterm::event::{KeyCode, KeyEvent};
+use either::Either;
 use ratatui::{
     prelude::Rect,
+    style::Style,
     text::{Line, Span},
     widgets::ListItem,
     Frame,
@@ -12,10 +14,7 @@ use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
     config::{
-        ui::{
-            properties::{SongProperty, StatusProperty, WidgetProperty},
-            SongTableColumn,
-        },
+        ui::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
         Config,
     },
     mpd::{
@@ -257,30 +256,33 @@ impl Song {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
-    pub fn matches(&self, formats: &[SongTableColumn], filter: &str, ignore_case: bool) -> bool {
+    pub fn matches(&self, formats: &[&Property<'static, SongProperty>], filter: &str, ignore_case: bool) -> bool {
         for format in formats {
-            let match_found = match format.prop {
-                SongProperty::Filename { .. } => self.file.matches(filter, ignore_case),
-                SongProperty::Title { default, .. } => self.title.as_ref().map_or_else(
-                    || DirStackItem::matches(&default, filter, ignore_case),
-                    |v| v.matches(filter, ignore_case),
-                ),
-                SongProperty::Artist { default, .. } => self.artist.as_ref().map_or_else(
-                    || DirStackItem::matches(&default, filter, ignore_case),
-                    |v| v.matches(filter, ignore_case),
-                ),
-                SongProperty::Album { default, .. } => self.album.as_ref().map_or_else(
-                    || DirStackItem::matches(&default, filter, ignore_case),
-                    |v| v.matches(filter, ignore_case),
-                ),
-                SongProperty::Duration { default, .. } => self.duration.as_ref().map_or_else(
-                    || DirStackItem::matches(&default, filter, ignore_case),
-                    |duration| duration.to_string().matches(filter, ignore_case),
-                ),
-                SongProperty::Other { name, default, .. } => self.others.get(name).map_or_else(
-                    || DirStackItem::matches(&default, filter, ignore_case),
-                    |v| v.matches(filter, ignore_case),
-                ),
+            let match_found = match &format.kind {
+                PropertyKindOrText::Text { value } => value.matches(filter, ignore_case),
+                PropertyKindOrText::Property(p) => match p {
+                    SongProperty::Filename => self.file.matches(filter, ignore_case),
+                    SongProperty::Title => self.title.as_ref().map_or_else(
+                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
+                        |v| v.matches(filter, ignore_case),
+                    ),
+                    SongProperty::Artist => self.artist.as_ref().map_or_else(
+                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
+                        |v| v.matches(filter, ignore_case),
+                    ),
+                    SongProperty::Album => self.album.as_ref().map_or_else(
+                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
+                        |v| v.matches(filter, ignore_case),
+                    ),
+                    SongProperty::Duration => self.duration.as_ref().map_or_else(
+                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
+                        |duration| duration.to_string().matches(filter, ignore_case),
+                    ),
+                    SongProperty::Other { name } => self.others.get(*name).map_or_else(
+                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
+                        |v| v.matches(filter, ignore_case),
+                    ),
+                },
             };
             if match_found {
                 return true;
@@ -288,133 +290,147 @@ impl Song {
         }
         return false;
     }
-}
 
-impl WidgetProperty {
-    pub fn as_spans<'a>(&self, status: &'a Status) -> Vec<Span<'a>> {
-        match *self {
-            WidgetProperty::Volume { style } => vec![Span::styled(Volume::get_str(*status.volume.value()), style)],
-            WidgetProperty::States {
-                active_style,
-                inactive_style,
-                separator_style,
-            } => {
-                let separator = Span::styled(" / ", separator_style);
-                vec![
-                    if status.repeat {
-                        Span::styled("Repeat", active_style)
-                    } else {
-                        Span::styled("Repeat", inactive_style)
-                    },
-                    separator.clone(),
-                    if status.random {
-                        Span::styled("Random", active_style)
-                    } else {
-                        Span::styled("Random", inactive_style)
-                    },
-                    separator.clone(),
-                    match status.consume {
-                        OnOffOneshot::On => Span::styled("Consume", active_style),
-                        OnOffOneshot::Off => Span::styled("Consume", inactive_style),
-                        OnOffOneshot::Oneshot => Span::styled("Oneshot(C)", active_style),
-                    },
-                    separator,
-                    match status.single {
-                        OnOffOneshot::On => Span::styled("Single", active_style),
-                        OnOffOneshot::Off => Span::styled("Single", inactive_style),
-                        OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", active_style),
-                    },
-                ]
-            }
+    fn default_as_line_ellipsized<'song>(
+        &'song self,
+        format: &'static Property<'static, SongProperty>,
+        max_len: usize,
+    ) -> Line<'song> {
+        format
+            .default
+            .as_ref()
+            .map_or(Line::default(), |f| self.as_line_ellipsized(f, max_len))
+    }
+
+    pub fn as_line_ellipsized<'song>(
+        &'song self,
+        format: &'static Property<'static, SongProperty>,
+        max_len: usize,
+    ) -> Line<'song> {
+        let style = format.style.unwrap_or_default();
+        match &format.kind {
+            PropertyKindOrText::Text { value } => Line::styled(value.ellipsize(max_len).to_string(), style),
+            PropertyKindOrText::Property(s) => match s {
+                SongProperty::Filename => Line::styled(self.file.ellipsize(max_len).to_string(), style),
+                SongProperty::Title => self.title.as_ref().map_or_else(
+                    || self.default_as_line_ellipsized(format, max_len),
+                    |v| Line::styled(v.ellipsize(max_len), style),
+                ),
+                SongProperty::Artist => self.artist.as_ref().map_or_else(
+                    || self.default_as_line_ellipsized(format, max_len),
+                    |v| Line::styled(v.ellipsize(max_len), style),
+                ),
+                SongProperty::Album => self.album.as_ref().map_or_else(
+                    || self.default_as_line_ellipsized(format, max_len),
+                    |v| Line::styled(v.ellipsize(max_len), style),
+                ),
+                SongProperty::Duration => self.duration.as_ref().map_or_else(
+                    || self.default_as_line_ellipsized(format, max_len),
+                    |v| Line::styled(v.to_string(), style),
+                ),
+                SongProperty::Other { name } => self.others.get(*name).map_or_else(
+                    || self.default_as_line_ellipsized(format, max_len),
+                    |v| Line::styled(v.ellipsize(max_len), style),
+                ),
+            },
         }
     }
 }
 
-impl StatusProperty {
-    pub fn as_span<'state>(&self, status: &'state Status) -> Span<'state> {
-        match *self {
-            StatusProperty::State { style } => Span::styled(status.state.to_string(), style),
-            StatusProperty::Duration { style } => Span::styled(status.duration.to_string(), style),
-            StatusProperty::Elapsed { style } => Span::styled(status.elapsed.to_string(), style),
-            StatusProperty::Volume { style } => Span::styled(status.volume.value().to_string(), style),
-            StatusProperty::Repeat { style } => Span::styled(if status.repeat { "On" } else { "Off" }, style),
-            StatusProperty::Random { style } => Span::styled(if status.random { "On" } else { "Off" }, style),
-            StatusProperty::Consume { style } => Span::styled(status.consume.to_string(), style),
-            StatusProperty::Single { style } => Span::styled(status.single.to_string(), style),
-            StatusProperty::Bitrate { style, default } => status
-                .bitrate
-                .as_ref()
-                .map_or_else(|| Span::styled(default, style), |v| Span::styled(v.to_string(), style)),
-            StatusProperty::Crossfade { style, default } => status
-                .xfade
-                .as_ref()
-                .map_or_else(|| Span::styled(default, style), |v| Span::styled(v.to_string(), style)),
-        }
-    }
-}
-
-impl SongProperty {
-    pub fn as_span_opt<'song>(&self, song: Option<&'song Song>) -> Span<'song> {
-        match (self, song) {
-            (SongProperty::Filename { style }, None) => Span::styled("", *style),
-            (SongProperty::Title { style, default }, None) => Span::styled(*default, *style),
-            (SongProperty::Artist { style, default }, None) => Span::styled(*default, *style),
-            (SongProperty::Album { style, default }, None) => Span::styled(*default, *style),
-            (SongProperty::Duration { style, default }, None) => Span::styled(*default, *style),
-            (SongProperty::Other { style, default, .. }, None) => Span::styled(*default, *style),
-            (SongProperty::Filename { style }, Some(song)) => Span::styled(song.file.as_str(), *style),
-            (SongProperty::Title { default, style }, Some(song)) => {
-                Span::styled(song.title.as_ref().map_or_else(|| *default, |v| v.as_str()), *style)
-            }
-            (SongProperty::Artist { default, style }, Some(song)) => {
-                Span::styled(song.artist.as_ref().map_or_else(|| *default, |v| v.as_str()), *style)
-            }
-            (SongProperty::Album { default, style }, Some(song)) => {
-                Span::styled(song.album.as_ref().map_or_else(|| *default, |v| v.as_str()), *style)
-            }
-            (SongProperty::Duration { default, style }, Some(song)) => Span::styled(
-                song.duration
-                    .map_or_else(|| Cow::Borrowed(*default), |v| Cow::Owned(v.to_string())),
-                *style,
-            ),
-            (SongProperty::Other { name, default, style }, Some(song)) => {
-                Span::styled(song.others.get(*name).map_or_else(|| *default, |v| v), *style)
-            }
-        }
+impl Property<'static, PropertyKind> {
+    fn default_as_span<'song: 's, 's>(
+        &self,
+        song: Option<&'song Song>,
+        status: &'song Status,
+    ) -> Either<Span<'s>, Vec<Span<'s>>> {
+        self.default
+            .as_ref()
+            .map_or(Either::Right(Vec::default()), |p| p.as_span(song, status))
     }
 
-    pub fn as_line_ellipsized<'song>(&self, song: &'song Song, max_len: usize) -> Line<'song> {
-        match self {
-            SongProperty::Filename { style } => Line::styled(song.file.ellipsize(max_len), *style),
-            SongProperty::Title { default, style } => Line::styled(
-                song.title
-                    .as_ref()
-                    .map_or_else(|| Cow::Borrowed(*default), |v| v.ellipsize(max_len)),
-                *style,
-            ),
-            SongProperty::Artist { default, style } => Line::styled(
-                song.artist
-                    .as_ref()
-                    .map_or_else(|| Cow::Borrowed(*default), |v| v.ellipsize(max_len)),
-                *style,
-            ),
-            SongProperty::Album { default, style } => Line::styled(
-                song.album
-                    .as_ref()
-                    .map_or_else(|| Cow::Borrowed(*default), |v| v.ellipsize(max_len)),
-                *style,
-            ),
-            SongProperty::Duration { default, style } => Line::styled(
-                song.duration
-                    .map_or_else(|| Cow::Borrowed(*default), |v| Cow::Owned(v.to_string())),
-                *style,
-            ),
-            SongProperty::Other { name, default, style } => Line::styled(
-                song.others
-                    .get(*name)
-                    .map_or_else(|| Cow::Borrowed(*default), |v| Cow::Owned(v.to_string())),
-                *style,
-            ),
+    pub fn as_span<'song: 's, 's>(
+        &'s self,
+        song: Option<&'song Song>,
+        status: &'song Status,
+    ) -> Either<Span<'s>, Vec<Span<'s>>> {
+        let style = self.style.unwrap_or_default();
+        match &self.kind {
+            PropertyKindOrText::Text { value } => Either::Left(Span::styled(value.as_str(), style)),
+            PropertyKindOrText::Property(PropertyKind::Song(s)) => match (s, song) {
+                (SongProperty::Filename, None) => Either::Left(Span::styled("", Style::default())), // cannot happen
+                (SongProperty::Title, None) => self.default_as_span(song, status),
+                (SongProperty::Artist, None) => self.default_as_span(song, status),
+                (SongProperty::Album, None) => self.default_as_span(song, status),
+                (SongProperty::Duration, None) => self.default_as_span(song, status),
+                (SongProperty::Other { .. }, None) => self.default_as_span(song, status),
+                (SongProperty::Filename, Some(s)) => Either::Left(Span::styled(s.file.as_str(), style)),
+                (SongProperty::Title, Some(s)) => s.title.as_ref().map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.as_str(), style)),
+                ),
+                (SongProperty::Artist, Some(s)) => s.artist.as_ref().map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.as_str(), style)),
+                ),
+                (SongProperty::Album, Some(s)) => s.album.as_ref().map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.as_str(), style)),
+                ),
+                (SongProperty::Duration, Some(s)) => s.duration.as_ref().map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.to_string(), style)),
+                ),
+                (SongProperty::Other { name }, Some(s)) => s.others.get(*name).map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.as_str(), style)),
+                ),
+            },
+            PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
+                StatusProperty::State => Either::Left(Span::styled(status.state.as_ref(), style)),
+                StatusProperty::Duration => Either::Left(Span::styled(status.duration.to_string(), style)),
+                StatusProperty::Elapsed => Either::Left(Span::styled(status.elapsed.to_string(), style)),
+                StatusProperty::Volume => Either::Left(Span::styled(status.volume.value().to_string(), style)),
+                StatusProperty::Repeat => Either::Left(Span::styled(if status.repeat { "On" } else { "Off" }, style)),
+                StatusProperty::Random => Either::Left(Span::styled(if status.random { "On" } else { "Off" }, style)),
+                StatusProperty::Consume => Either::Left(Span::styled(status.consume.to_string(), style)),
+                StatusProperty::Single => Either::Left(Span::styled(status.single.to_string(), style)),
+                StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.to_string(), Style::default())),
+                ),
+                StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
+                    || self.default_as_span(song, status),
+                    |v| Either::Left(Span::styled(v.to_string(), Style::default())),
+                ),
+            },
+            PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
+                WidgetProperty::Volume { style } => {
+                    Either::Left(Span::styled(Volume::get_str(*status.volume.value()), *style))
+                }
+                WidgetProperty::States {
+                    active_style,
+                    separator_style,
+                } => {
+                    let separator = Span::styled(" / ", *separator_style);
+                    Either::Right(vec![
+                        Span::styled("Repeat", if status.repeat { *active_style } else { style }),
+                        separator.clone(),
+                        Span::styled("Random", if status.random { *active_style } else { style }),
+                        separator.clone(),
+                        match status.consume {
+                            OnOffOneshot::On => Span::styled("Consume", *active_style),
+                            OnOffOneshot::Off => Span::styled("Consume", style),
+                            OnOffOneshot::Oneshot => Span::styled("Oneshot(C)", *active_style),
+                        },
+                        separator,
+                        match status.single {
+                            OnOffOneshot::On => Span::styled("Single", *active_style),
+                            OnOffOneshot::Off => Span::styled("Single", style),
+                            OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", *active_style),
+                        },
+                    ])
+                }
+            },
         }
     }
 }

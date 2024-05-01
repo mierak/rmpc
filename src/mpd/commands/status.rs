@@ -65,19 +65,25 @@ impl FromMpd for Status {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Clone, Copy, strum::AsRefStr)]
 pub enum State {
+    #[strum(serialize = "Playing")]
     Play,
     #[default]
+    #[strum(serialize = "Stopped")]
     Stop,
+    #[strum(serialize = "Paused")]
     Pause,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, strum::AsRefStr)]
 pub enum OnOffOneshot {
+    #[strum(serialize = "On")]
     On,
     #[default]
+    #[strum(serialize = "Off")]
     Off,
+    #[strum(serialize = "OS")]
     Oneshot,
 }
 

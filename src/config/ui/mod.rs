@@ -43,7 +43,7 @@ pub struct UiConfig {
     pub progress_bar: ProgressBarConfig,
     pub scrollbar: ScrollbarConfig,
     pub show_song_table_header: bool,
-    pub song_table_format: Vec<SongTableColumn>,
+    pub song_table_format: &'static [SongTableColumn],
     pub header: HeaderConfig,
     pub default_album_art: Vec<u8>,
 }
@@ -190,7 +190,9 @@ impl TryFrom<UiConfigFile> for UiConfig {
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
             progress_bar: value.progress_bar.into_config()?,
-            song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
+            song_table_format: Box::leak(Box::new(
+                TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
+            )),
             header: value.header.try_into()?,
             column_widths: [
                 value.browser_column_widths[0],
