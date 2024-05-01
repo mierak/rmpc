@@ -181,7 +181,11 @@ impl Ui<'_> {
         }
 
         let [header_area, content_area, bar_area] = *Layout::vertical([
-            Constraint::Length(if state.config.ui.draw_borders { 5 } else { 3 }),
+            Constraint::Length(if state.config.ui.draw_borders {
+                u16::try_from(state.config.ui.header.rows.len())? + 3
+            } else {
+                u16::try_from(state.config.ui.header.rows.len())? + 1
+            }),
             Constraint::Percentage(100),
             Constraint::Min(1),
         ])
