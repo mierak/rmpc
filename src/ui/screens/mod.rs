@@ -73,8 +73,8 @@ pub(super) trait Screen {
         client: &mut impl MpdClient,
         status: &mut Status,
         config: &Config,
-    ) -> Result<()> {
-        Ok(())
+    ) -> Result<KeyHandleResultInternal> {
+        Ok(KeyHandleResultInternal::SkipRender)
     }
 
     fn handle_action(

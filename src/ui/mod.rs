@@ -6,7 +6,6 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use itertools::Itertools;
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
@@ -20,7 +19,7 @@ use crate::{
     config::Config,
     mpd::{
         client::Client,
-        commands::{idle::IdleEvent, volume::Bound, State as MpdState, Status},
+        commands::{idle::IdleEvent, volume::Bound, State as MpdState},
         mpd_client::{FilterKind, MpdClient},
     },
     utils::macros::try_ret,
@@ -64,7 +63,7 @@ pub struct StatusMessage {
 pub struct Ui<'a> {
     client: Client<'a>,
     screens: Screens,
-    active_modal: Option<Modals>,
+    modals: Vec<Box<dyn Modal>>,
     active_screen: screens::Screens,
     status_message: Option<StatusMessage>,
     rendered_frames_count: u32,
@@ -77,10 +76,10 @@ impl<'a> Ui<'a> {
             client,
             screens: Screens::new(config),
             active_screen: screens::Screens::Queue,
-            active_modal: None,
             status_message: None,
             rendered_frames_count: 0,
             current_song: None,
+            modals: Vec::default(),
         }
     }
 }
@@ -109,39 +108,6 @@ impl Screens {
             playlists: PlaylistsScreen::default(),
             search: SearchScreen::default(),
         }
-    }
-
-    fn on_event(
-        &mut self,
-        mut event: UiEvent,
-        client: &mut impl MpdClient,
-        status: &mut Status,
-        config: &Config,
-    ) -> Result<()> {
-        [
-            screens::Screens::Queue,
-            #[cfg(debug_assertions)]
-            screens::Screens::Logs,
-            screens::Screens::Directories,
-            screens::Screens::Albums,
-            screens::Screens::Artists,
-            screens::Screens::Playlists,
-            screens::Screens::Search,
-        ]
-        .iter()
-        .map(|screen| -> Result<()> {
-            match screen {
-                #[cfg(debug_assertions)]
-                screens::Screens::Logs => self.logs.on_event(&mut event, client, status, config),
-                screens::Screens::Queue => self.queue.on_event(&mut event, client, status, config),
-                screens::Screens::Directories => self.directories.on_event(&mut event, client, status, config),
-                screens::Screens::Albums => self.albums.on_event(&mut event, client, status, config),
-                screens::Screens::Artists => self.artists.on_event(&mut event, client, status, config),
-                screens::Screens::Playlists => self.playlists.on_event(&mut event, client, status, config),
-                screens::Screens::Search => self.search.on_event(&mut event, client, status, config),
-            }
-        })
-        .fold_ok((), |(), val| val)
     }
 }
 
@@ -243,33 +209,11 @@ impl Ui<'_> {
             )?;
         }
 
-        if let Some(ref mut modal) = self.active_modal {
-            Self::render_modal(modal, frame, state)?;
+        for modal in &mut self.modals {
+            modal.render(frame, state)?;
         }
 
         Ok(())
-    }
-
-    fn render_modal(active_modal: &mut modals::Modals, frame: &mut Frame<'_>, state: &mut State) -> Result<()> {
-        match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.render(frame, state),
-            modals::Modals::SaveQueue(ref mut m) => m.render(frame, state),
-            modals::Modals::RenamePlaylist(ref mut m) => m.render(frame, state),
-            modals::Modals::AddToPlaylist(ref mut m) => m.render(frame, state),
-        }
-    }
-    fn handle_modal_key(
-        active_modal: &mut modals::Modals,
-        client: &mut Client<'_>,
-        key: KeyEvent,
-        state: &mut State,
-    ) -> Result<KeyHandleResultInternal> {
-        match active_modal {
-            modals::Modals::ConfirmQueueClear(ref mut m) => m.handle_key(key, client, state),
-            modals::Modals::SaveQueue(ref mut m) => m.handle_key(key, client, state),
-            modals::Modals::RenamePlaylist(ref mut m) => m.handle_key(key, client, state),
-            modals::Modals::AddToPlaylist(ref mut m) => m.handle_key(key, client, state),
-        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut State) -> Result<KeyHandleResult> {
@@ -278,10 +222,10 @@ impl Ui<'_> {
                 screen_call!(self, state, $fn($($param),+))?
             }
         }
-        if let Some(ref mut modal) = self.active_modal {
-            return match Self::handle_modal_key(modal, &mut self.client, key, state)? {
+        if let Some(ref mut modal) = self.modals.last_mut() {
+            return match modal.handle_key(key, &mut self.client, state)? {
                 KeyHandleResultInternal::Modal(None) => {
-                    self.active_modal = None;
+                    self.modals.pop();
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 r => Ok(r.into()),
@@ -292,7 +236,18 @@ impl Ui<'_> {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(modal) => {
-                self.active_modal = modal;
+                match modal {
+                    Some(m) => match m {
+                        Modals::ConfirmQueueClear(m) => self.modals.push(Box::new(m)),
+                        Modals::SaveQueue(m) => self.modals.push(Box::new(m)),
+                        Modals::RenamePlaylist(m) => self.modals.push(Box::new(m)),
+                        Modals::AddToPlaylist(m) => self.modals.push(Box::new(m)),
+                        Modals::Confirm(m) => self.modals.push(Box::new(m)),
+                    },
+                    None => {
+                        self.modals.pop();
+                    }
+                }
                 return Ok(KeyHandleResult::RenderRequested);
             }
             KeyHandleResultInternal::KeyNotHandled => {
@@ -427,7 +382,7 @@ impl Ui<'_> {
         });
     }
 
-    pub fn on_event(&mut self, event: UiEvent, state: &mut State) -> Result<()> {
+    pub fn on_event(&mut self, mut event: UiEvent, state: &mut State) -> Result<KeyHandleResult> {
         match event {
             UiEvent::Mixer => state.status.volume = try_ret!(self.client.get_volume(), "Failed to get volume"),
             UiEvent::Options => state.status = try_ret!(self.client.get_status(), "Failed to get status"),
@@ -441,8 +396,89 @@ impl Ui<'_> {
             UiEvent::Update => {}
         }
 
-        self.screens
-            .on_event(event, &mut self.client, &mut state.status, state.config)
+        let mut ret = KeyHandleResultInternal::SkipRender;
+
+        for screen in [
+            screens::Screens::Queue,
+            #[cfg(debug_assertions)]
+            screens::Screens::Logs,
+            screens::Screens::Directories,
+            screens::Screens::Albums,
+            screens::Screens::Artists,
+            screens::Screens::Playlists,
+            screens::Screens::Search,
+        ] {
+            let result = match screen {
+                #[cfg(debug_assertions)]
+                screens::Screens::Logs => {
+                    self.screens
+                        .logs
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+                screens::Screens::Queue => {
+                    self.screens
+                        .queue
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+                screens::Screens::Directories => {
+                    self.screens
+                        .directories
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+                screens::Screens::Albums => {
+                    self.screens
+                        .albums
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+                screens::Screens::Artists => {
+                    self.screens
+                        .artists
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+                screens::Screens::Playlists => {
+                    self.screens
+                        .playlists
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+                screens::Screens::Search => {
+                    self.screens
+                        .search
+                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                }
+            };
+
+            match self.handle_screen_event_result(result)? {
+                KeyHandleResult::RenderRequested => ret = KeyHandleResultInternal::RenderRequested,
+                KeyHandleResult::SkipRender => {}
+                KeyHandleResult::Quit => {}
+            }
+        }
+
+        Ok(ret.into())
+    }
+
+    fn handle_screen_event_result(&mut self, result: Result<KeyHandleResultInternal>) -> Result<KeyHandleResult> {
+        match result {
+            Ok(KeyHandleResultInternal::SkipRender) => Ok(KeyHandleResult::SkipRender),
+            Ok(KeyHandleResultInternal::RenderRequested) => Ok(KeyHandleResult::RenderRequested),
+            Ok(KeyHandleResultInternal::Modal(modal)) => {
+                match modal {
+                    Some(m) => match m {
+                        Modals::ConfirmQueueClear(m) => self.modals.push(Box::new(m)),
+                        Modals::SaveQueue(m) => self.modals.push(Box::new(m)),
+                        Modals::RenamePlaylist(m) => self.modals.push(Box::new(m)),
+                        Modals::AddToPlaylist(m) => self.modals.push(Box::new(m)),
+                        Modals::Confirm(m) => self.modals.push(Box::new(m)),
+                    },
+                    None => {
+                        self.modals.pop();
+                    }
+                }
+                Ok(KeyHandleResult::RenderRequested)
+            }
+            Ok(KeyHandleResultInternal::KeyNotHandled) => Ok(KeyHandleResult::SkipRender),
+            Err(err) => Err(err),
+        }
     }
 }
 
@@ -515,6 +551,7 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     Ok(terminal)
 }
 
+#[derive(Debug)]
 enum KeyHandleResultInternal {
     /// Action warrants a render
     RenderRequested,

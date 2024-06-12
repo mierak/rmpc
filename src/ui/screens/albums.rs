@@ -10,7 +10,7 @@ use crate::{
         widgets::browser::Browser,
         KeyHandleResultInternal,
     },
-    utils::macros::status_info,
+    utils::macros::{status_info, status_warn},
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen};
@@ -50,6 +50,27 @@ impl Screen for AlbumsScreen {
         }
 
         Ok(())
+    }
+
+    fn on_event(
+        &mut self,
+        event: &mut crate::ui::UiEvent,
+        client: &mut impl MpdClient,
+        _status: &mut Status,
+        config: &Config,
+    ) -> Result<KeyHandleResultInternal> {
+        match event {
+            crate::ui::UiEvent::Database => {
+                let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
+                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
+                self.stack.set_preview(preview);
+
+                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+                Ok(KeyHandleResultInternal::SkipRender)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
     }
 
     fn handle_action(

@@ -101,13 +101,10 @@ fn main() -> Result<()> {
             );
 
             let album_art_disabled = config.ui.album_art_width_percent == 0;
-            let display_image_warn = if !album_art_disabled && !utils::kitty::check_kitty_support()? {
+            if !album_art_disabled && !utils::kitty::check_kitty_support()? {
                 warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
                 config.ui.album_art_width_percent = 0;
-                true
-            } else {
-                false
-            };
+            }
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
             let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");
@@ -118,19 +115,21 @@ fn main() -> Result<()> {
             }
 
             let tx_clone = tx.clone();
-            let mut ui = Ui::new(client, state.config);
-            if display_image_warn {
-                ui.display_message(
-                    "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art"
-                        .to_owned(),
-                    Level::Warn,
-                );
-            }
 
             std::thread::Builder::new()
                 .name("input poll".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
+
+                let mut ui = Ui::new(client, state.config);
+                if !config.ui.album_art_width_percent == 0 && !utils::kitty::check_kitty_support()?  {
+                    ui.display_message(
+                        "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art"
+                            .to_owned(),
+                        Level::Warn,
+                    );
+                }
+
                 main_task(
                     ui,
                     state,
@@ -296,9 +295,9 @@ fn handle_idle_event(
         IdleEvent::Playlist => {}
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
+        IdleEvent::Update => {}
         // TODO: handle these events eventually ?
-        IdleEvent::Update
-        | IdleEvent::Output
+        IdleEvent::Output
         | IdleEvent::Partition
         | IdleEvent::Sticker
         | IdleEvent::Subscription

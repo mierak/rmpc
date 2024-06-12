@@ -69,7 +69,7 @@ impl Screen for PlaylistsScreen {
         client: &mut impl MpdClient,
         _status: &mut Status,
         config: &Config,
-    ) -> Result<()> {
+    ) -> Result<KeyHandleResultInternal> {
         match event {
             UiEvent::StoredPlaylist | UiEvent::Database => {
                 let mut new_stack = DirStack::new(
@@ -122,10 +122,10 @@ impl Screen for PlaylistsScreen {
 
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack.set_preview(preview);
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            _ => {}
+            _ => Ok(KeyHandleResultInternal::SkipRender),
         }
-        Ok(())
     }
 
     fn handle_action(

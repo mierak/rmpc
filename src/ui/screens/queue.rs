@@ -222,7 +222,7 @@ impl Screen for QueueScreen {
         client: &mut impl MpdClient,
         status: &mut Status,
         config: &Config,
-    ) -> Result<()> {
+    ) -> Result<KeyHandleResultInternal> {
         match event {
             UiEvent::Playlist => {
                 let queue = client.playlist_info()?;
@@ -230,6 +230,7 @@ impl Screen for QueueScreen {
                     self.scrolling_state.set_content_len(Some(queue.len()));
                     self.queue = queue;
                 }
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::Player => {
                 if let Some(current_song) = self.queue.iter().find(|s| status.songid.is_some_and(|i| i == s.id)) {
@@ -240,10 +241,10 @@ impl Screen for QueueScreen {
                         );
                     }
                 };
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
-            _ => {}
-        };
-        Ok(())
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
     }
 
     fn handle_action(

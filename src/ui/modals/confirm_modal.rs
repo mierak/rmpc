@@ -1,10 +1,10 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::{
-    prelude::{Constraint, Layout},
-    style::{Style, Stylize},
+    prelude::{Constraint, Layout, Margin},
+    style::Style,
     symbols::{self, border},
-    widgets::{Block, Borders, Clear},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -13,12 +13,8 @@ use crate::{
     state::State,
     ui::{
         screens::CommonAction,
-        widgets::{
-            button::{Button, ButtonGroup, ButtonGroupState},
-            input::Input,
-        },
+        widgets::button::{Button, ButtonGroup, ButtonGroupState},
     },
-    utils::macros::status_info,
 };
 
 use super::{KeyHandleResultInternal, RectExt};
@@ -31,66 +27,50 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-#[derive(Debug)]
-pub struct RenamePlaylistModal {
+#[derive(Default, Debug)]
+pub struct ConfirmModal {
+    title: String,
+    message: String,
     button_group: ButtonGroupState,
-    input_focused: bool,
-    playlist_name: String,
-    new_name: String,
 }
 
-impl RenamePlaylistModal {
-    pub fn new(playlist_name: String) -> Self {
+#[allow(dead_code)]
+impl ConfirmModal {
+    pub fn new(title: String, message: String) -> Self {
         Self {
-            new_name: playlist_name.clone(),
-            playlist_name,
+            title,
+            message,
             button_group: ButtonGroupState::default(),
-            input_focused: true,
         }
     }
-    fn on_hide(&mut self) {
-        self.button_group = ButtonGroupState::default();
-        self.playlist_name = String::new();
-        self.input_focused = true;
-    }
 }
 
-impl Modal for RenamePlaylistModal {
+impl Modal for ConfirmModal {
     fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
             .border_style(app.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
-            .title("Rename playlist");
+            .title(self.title.as_str());
+        let text = Paragraph::new(self.message.as_str()).wrap(Wrap { trim: true });
 
-        let popup_area = frame.size().centered_exact(50, 7);
+        let popup_area = frame.size().centered_exact(45, 7);
         frame.render_widget(Clear, popup_area);
+
         if let Some(bg_color) = app.config.ui.background_color_modal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
-        let [body_area, buttons_area] =
+        let [text_area, buttons_area] =
             *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
         else {
             return Ok(());
         };
 
-        let input = Input::default()
-            .set_label("New name:")
-            .set_text(&self.new_name)
-            .set_focused(self.input_focused)
-            .set_focused_style(app.config.ui.highlight_border_style)
-            .set_unfocused_style(app.config.as_border_style());
-
-        let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
-        self.button_group.set_button_count(buttons.len());
+        self.button_group.set_button_count(1);
         let group = ButtonGroup::default()
-            .buttons(buttons)
-            .active_style(if self.input_focused {
-                Style::default().reversed()
-            } else {
-                app.config.ui.current_item_style
-            })
+            .active_style(app.config.ui.current_item_style)
+            .add_button(Button::default().label("Ok"))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -98,8 +78,14 @@ impl Modal for RenamePlaylistModal {
                     .border_style(app.config.as_border_style()),
             );
 
-        frame.render_widget(input, block.inner(body_area));
-        frame.render_widget(block, body_area);
+        frame.render_widget(
+            text,
+            block.inner(popup_area).inner(&Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
+        frame.render_widget(block, text_area);
         frame.render_stateful_widget(group, buttons_area, &mut self.button_group);
         Ok(())
     }
@@ -110,56 +96,26 @@ impl Modal for RenamePlaylistModal {
         client: &mut Client<'_>,
         app: &mut State,
     ) -> Result<KeyHandleResultInternal> {
-        let action = app.config.keybinds.navigation.get(&key.into());
-        if self.input_focused {
-            if let Some(CommonAction::Close) = action {
-                self.input_focused = false;
-                return Ok(KeyHandleResultInternal::RenderRequested);
-            } else if let Some(CommonAction::Confirm) = action {
-                if self.button_group.selected == 0 && self.playlist_name != self.new_name {
-                    client.rename_playlist(&self.playlist_name, &self.new_name)?;
-                    status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
-                }
-                self.on_hide();
-                return Ok(KeyHandleResultInternal::Modal(None));
-            }
-
-            match key.code {
-                KeyCode::Char(c) => {
-                    self.new_name.push(c);
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                KeyCode::Backspace => {
-                    self.new_name.pop();
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
-            }
-        } else if let Some(action) = action {
+        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.button_group.next();
+                    self.button_group.prev();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Close => {
-                    self.on_hide();
+                    self.button_group = ButtonGroupState::default();
                     Ok(KeyHandleResultInternal::Modal(None))
                 }
                 CommonAction::Confirm => {
-                    if self.button_group.selected == 0 && self.playlist_name != self.new_name {
-                        client.rename_playlist(&self.playlist_name, &self.new_name)?;
-                        status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
+                    if self.button_group.selected == 0 {
+                        client.clear()?;
                     }
-                    self.on_hide();
+                    self.button_group = ButtonGroupState::default();
                     Ok(KeyHandleResultInternal::Modal(None))
-                }
-                CommonAction::FocusInput => {
-                    self.input_focused = true;
-                    Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
@@ -176,6 +132,7 @@ impl Modal for RenamePlaylistModal {
                 CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::SkipRender)

@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::mpd::commands::Song;
 use crate::mpd::commands::Status;
 use crate::ui::utils::dirstack::Dir;
+use crate::utils::macros::status_warn;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
     ui::{
@@ -323,6 +324,26 @@ impl Screen for SearchScreen {
         Ok(())
     }
 
+    fn on_event(
+        &mut self,
+        event: &mut crate::ui::UiEvent,
+        client: &mut impl MpdClient,
+        _status: &mut Status,
+        config: &Config,
+    ) -> Result<KeyHandleResultInternal> {
+        match event {
+            crate::ui::UiEvent::Database => {
+                self.songs_dir = Dir::default();
+                self.preview = self.prepare_preview(client, config)?;
+                self.phase = Phase::Search;
+
+                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+                Ok(KeyHandleResultInternal::SkipRender)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
     fn handle_action(
         &mut self,
         event: crossterm::event::KeyEvent,
@@ -407,6 +428,7 @@ impl Screen for SearchScreen {
                             match self.inputs.focused_mut() {
                                 FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
                                 FocusedInputGroup::Buttons(_) => {
+                                    // Reset is the only button in this group at the moment
                                     self.reset();
                                     self.songs_dir = Dir::default();
                                     self.preview = self.prepare_preview(client, config)?;

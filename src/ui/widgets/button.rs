@@ -140,6 +140,11 @@ impl<'a> ButtonGroup<'a> {
         self
     }
 
+    pub fn add_button(mut self, button: Button<'a>) -> Self {
+        self.buttons.push(button);
+        self
+    }
+
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self

@@ -85,14 +85,16 @@ impl Screen for LogsScreen {
         _client: &mut impl MpdClient,
         _status: &mut Status,
         _config: &Config,
-    ) -> Result<()> {
+    ) -> Result<KeyHandleResultInternal> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
                 self.logs.pop_front();
             }
-        };
-        Ok(())
+            Ok(KeyHandleResultInternal::RenderRequested)
+        } else {
+            Ok(KeyHandleResultInternal::SkipRender)
+        }
     }
 
     fn handle_action(
