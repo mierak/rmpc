@@ -1,5 +1,6 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use log::Level;
@@ -7,11 +8,11 @@ use serde::{Deserialize, Serialize};
 
 mod defaults;
 mod keys;
-pub mod ui;
+pub mod theme;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
-    ui::{ConfigColor, UiConfig, UiConfigFile},
+    theme::{ConfigColor, UiConfig, UiConfigFile},
 };
 
 #[derive(Parser, Debug)]
@@ -28,6 +29,8 @@ pub struct Args {
 pub enum Command {
     /// Prints the default config. Can be used to bootstrap your config file.
     Config,
+    /// Prints the default theme. Can be used to bootstrap your theme file.
+    Theme,
 }
 
 fn get_default_config_path() -> PathBuf {
@@ -51,20 +54,20 @@ pub struct Config {
     pub volume_step: u8,
     pub keybinds: KeyConfig,
     pub status_update_interval_ms: Option<u64>,
-    pub ui: UiConfig,
+    pub theme: UiConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigFile {
     address: String,
+    #[serde(default)]
+    theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
     volume_step: u8,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
     #[serde(default)]
     keybinds: KeyConfigFile,
-    #[serde(default)]
-    ui: Option<UiConfigFile>,
 }
 
 impl Default for ConfigFile {
@@ -74,21 +77,41 @@ impl Default for ConfigFile {
             keybinds: KeyConfigFile::default(),
             volume_step: 5,
             status_update_interval_ms: Some(1000),
-            ui: Some(UiConfigFile::default()),
+            theme: None,
         }
     }
 }
 
-impl TryFrom<ConfigFile> for Config {
-    type Error = anyhow::Error;
+impl ConfigFile {
+    pub fn read(path: &PathBuf) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        let read = std::io::BufReader::new(file);
+        Ok(ron::de::from_reader(read)?)
+    }
 
-    fn try_from(value: ConfigFile) -> Result<Self, Self::Error> {
-        Ok(Self {
-            ui: value.ui.unwrap_or_default().try_into()?,
-            address: Box::leak(Box::new(value.address)),
-            volume_step: value.volume_step,
-            status_update_interval_ms: value.status_update_interval_ms.map(|v| v.max(100)),
-            keybinds: value.keybinds.into(),
+    fn read_theme(&self, config_dir: &Path) -> Result<UiConfig> {
+        self.theme.as_ref().map_or_else(
+            || UiConfigFile::default().try_into(),
+            |theme_name| -> Result<_> {
+                let path = PathBuf::from(config_dir)
+                    .join("themes")
+                    .join(format!("{theme_name}.ron"));
+                let file = std::fs::File::open(&path)
+                    .with_context(|| format!("Failed to open theme file {:?}", path.to_string_lossy()))?;
+                let read = std::io::BufReader::new(file);
+                let theme: UiConfigFile = ron::de::from_reader(read)?;
+                theme.try_into()
+            },
+        )
+    }
+
+    pub fn into_config(self, config_dir: &Path) -> Result<Config> {
+        Ok(Config {
+            theme: self.read_theme(config_dir.parent().expect("Config path to be defined correctly"))?,
+            address: Box::leak(Box::new(self.address)),
+            volume_step: self.volume_step,
+            status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
+            keybinds: self.keybinds.into(),
         })
     }
 }

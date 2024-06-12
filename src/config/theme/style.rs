@@ -288,7 +288,7 @@ impl From<crate::config::ConfigColor> for RColor {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::config::{ui::style::Modifiers, ConfigColor};
+    use crate::config::{theme::style::Modifiers, ConfigColor};
     use ratatui::style::Modifier as RM;
     use test_case::test_case;
 

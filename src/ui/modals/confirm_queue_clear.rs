@@ -45,7 +45,7 @@ impl Modal for ConfirmQueueClearModal {
         let popup_area = frame.size().centered_exact(45, 5);
         frame.render_widget(Clear, popup_area);
 
-        if let Some(bg_color) = app.config.ui.background_color_modal {
+        if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
         let [text_area, buttons_area] =
@@ -57,7 +57,7 @@ impl Modal for ConfirmQueueClearModal {
         let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
         self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default()
-            .active_style(app.config.ui.current_item_style)
+            .active_style(app.config.theme.current_item_style)
             .buttons(buttons)
             .block(
                 Block::default()

@@ -5,7 +5,7 @@ use strum::Display;
 
 use crate::{
     config::{
-        ui::{
+        theme::{
             properties::{Property, SongProperty},
             Position,
         },
@@ -57,16 +57,16 @@ impl QueueScreen {
             scrolling_state: DirState::default(),
             filter: None,
             filter_input_mode: false,
-            header: config.ui.song_table_format.iter().map(|v| v.label).collect_vec(),
+            header: config.theme.song_table_format.iter().map(|v| v.label).collect_vec(),
             queue: Vec::new(),
             album_art: None,
             column_widths: config
-                .ui
+                .theme
                 .song_table_format
                 .iter()
                 .map(|v| Constraint::Percentage(v.width_percent))
                 .collect_vec(),
-            column_formats: config.ui.song_table_format.iter().map(|v| v.prop).collect_vec(),
+            column_formats: config.theme.song_table_format.iter().map(|v| v.prop).collect_vec(),
         }
     }
 }
@@ -75,7 +75,7 @@ impl Screen for QueueScreen {
     type Actions = QueueActions;
     fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> anyhow::Result<()> {
         let queue_len = self.queue.len();
-        let album_art_width = config.ui.album_art_width_percent;
+        let album_art_width = config.theme.album_art_width_percent;
         let show_image = album_art_width > 0;
 
         let mut img_queue_constraints = [
@@ -83,7 +83,7 @@ impl Screen for QueueScreen {
             Constraint::Percentage(100 - album_art_width),
         ];
 
-        if matches!(config.ui.album_art_position, Position::Right) {
+        if matches!(config.theme.album_art_position, Position::Right) {
             img_queue_constraints.reverse();
         }
 
@@ -91,11 +91,11 @@ impl Screen for QueueScreen {
             return Ok(());
         };
 
-        if matches!(config.ui.album_art_position, Position::Right) {
+        if matches!(config.theme.album_art_position, Position::Right) {
             std::mem::swap(&mut img_section, &mut queue_section);
         }
 
-        let header_height = u16::from(config.ui.show_song_table_header);
+        let header_height = u16::from(config.theme.show_song_table_header);
         let [table_header_section, mut queue_section] =
             *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(queue_section)
         else {
@@ -109,7 +109,7 @@ impl Screen for QueueScreen {
         }
 
         let widths = Layout::horizontal(self.column_widths.clone()).split(table_header_section);
-        let formats = &config.ui.song_table_format;
+        let formats = &config.theme.song_table_format;
 
         let table_items = self
             .queue
@@ -128,8 +128,8 @@ impl Screen for QueueScreen {
                         .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter, true));
 
                 if is_highlighted {
-                    Row::new(columns.map(|column| column.patch_style(config.ui.highlighted_item_style)))
-                        .style(config.ui.highlighted_item_style)
+                    Row::new(columns.map(|column| column.patch_style(config.theme.highlighted_item_style)))
+                        .style(config.theme.highlighted_item_style)
                 } else {
                     Row::new(columns)
                 }
@@ -138,7 +138,7 @@ impl Screen for QueueScreen {
 
         let mut table_padding = Padding::right(2);
         table_padding.left = 1;
-        if config.ui.show_song_table_header {
+        if config.theme.show_song_table_header {
             let header_table = Table::default()
                 .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
                     Line::from(*title).alignment(formats[idx].alignment.into())
@@ -154,7 +154,7 @@ impl Screen for QueueScreen {
                 let mut b = Block::default()
                     .padding(table_padding)
                     .border_style(config.as_border_style().bold());
-                if config.ui.show_song_table_header {
+                if config.theme.show_song_table_header {
                     b = b.borders(Borders::TOP);
                 }
                 if let Some(ref title) = title {
@@ -162,7 +162,7 @@ impl Screen for QueueScreen {
                 }
                 b
             })
-            .highlight_style(config.ui.current_item_style);
+            .highlight_style(config.theme.current_item_style);
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 
@@ -179,7 +179,7 @@ impl Screen for QueueScreen {
         if show_image {
             frame.render_stateful_widget(
                 KittyImage::default()
-                    .default_art(&config.ui.default_album_art)
+                    .default_art(&config.theme.default_album_art)
                     .block(Block::default().border_style(config.as_border_style())),
                 img_section,
                 &mut self.img_state,
@@ -234,7 +234,7 @@ impl Screen for QueueScreen {
             }
             UiEvent::Player => {
                 if let Some(current_song) = self.queue.iter().find(|s| status.songid.is_some_and(|i| i == s.id)) {
-                    if !config.ui.album_art_width_percent != 0 {
+                    if !config.theme.album_art_width_percent != 0 {
                         self.album_art = try_ret!(
                             client.find_album_art(&current_song.file),
                             "Failed to get find album art"

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum::Display;
 
-use crate::config::ui::StyleFile;
+use crate::config::theme::StyleFile;
 
 use super::style::ToConfigOr;
 
@@ -155,7 +155,7 @@ impl std::fmt::Display for PropertyFile<PropertyKindFile> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::ui::style::Modifiers;
+    use crate::config::theme::style::Modifiers;
 
     use super::*;
 

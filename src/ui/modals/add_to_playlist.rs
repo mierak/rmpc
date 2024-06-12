@@ -60,7 +60,7 @@ impl Modal for AddToPlaylistModal {
     fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::state::State) -> anyhow::Result<()> {
         let popup_area = frame.size().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.ui.background_color_modal {
+        if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
@@ -83,7 +83,7 @@ impl Modal for AddToPlaylistModal {
         )
         .highlight_style(match self.focused {
             FocusedComponent::Buttons => Style::default().reversed(),
-            FocusedComponent::Playlists => app.config.ui.current_item_style,
+            FocusedComponent::Playlists => app.config.theme.current_item_style,
         })
         .block(
             Block::default()
@@ -99,7 +99,7 @@ impl Modal for AddToPlaylistModal {
             .buttons(buttons)
             .active_style(match self.focused {
                 FocusedComponent::Playlists => Style::default().reversed(),
-                FocusedComponent::Buttons => app.config.ui.current_item_style,
+                FocusedComponent::Buttons => app.config.theme.current_item_style,
             })
             .block(
                 Block::default()

@@ -31,7 +31,7 @@ impl Screen for DirectoriesScreen {
     fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> anyhow::Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
-                .set_widths(&config.ui.column_widths)
+                .set_widths(&config.theme.column_widths)
                 .set_border_style(config.as_border_style()),
             area,
             &mut self.stack,
@@ -201,7 +201,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
             }
             Some(DirOrSong::Song(file)) => Ok(client
                 .find_one(&[Filter::new(Tag::File, file)])?
-                .map(|v| v.to_preview(&config.ui.symbols).collect())),
+                .map(|v| v.to_preview(&config.theme.symbols).collect())),
             None => Ok(None),
         }
     }

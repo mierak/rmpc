@@ -32,7 +32,7 @@ impl Screen for AlbumsScreen {
     fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
-                .set_widths(&config.ui.column_widths)
+                .set_widths(&config.theme.column_widths)
                 .set_border_style(config.as_border_style()),
             area,
             &mut self.stack,
@@ -178,7 +178,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
                 Ok(match self.stack.path() {
                     [album] => find_songs(client, album, current)?
                         .first()
-                        .map(|v| v.to_preview(&config.ui.symbols))
+                        .map(|v| v.to_preview(&config.theme.symbols))
                         .map(std::iter::Iterator::collect),
                     [] => Some(
                         list_titles(client, current)?

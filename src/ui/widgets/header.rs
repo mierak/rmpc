@@ -9,7 +9,7 @@ use strum::{IntoEnumIterator, VariantNames};
 
 use crate::{
     config::{
-        ui::properties::{Property, PropertyKind},
+        theme::properties::{Property, PropertyKind},
         Config,
     },
     mpd::commands::{Song, Status},
@@ -34,17 +34,17 @@ where
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let config = self.config;
 
-        if let Some(header_bg_color) = config.ui.header_background_color {
+        if let Some(header_bg_color) = config.theme.header_background_color {
             Block::default()
                 .style(Style::default().bg(header_bg_color))
                 .render(area, buf);
         }
 
-        let row_count = config.ui.header.rows.len();
+        let row_count = config.theme.header.rows.len();
 
         let [header, tabs] = *Layout::vertical([
             Constraint::Length(row_count as u16),
-            Constraint::Length(if config.ui.draw_borders { 3 } else { 1 }),
+            Constraint::Length(if config.theme.draw_borders { 3 } else { 1 }),
         ])
         .split(area) else {
             return;
@@ -60,15 +60,15 @@ where
             .split(layouts[row]) else {
                 return;
             };
-            let template = PropertyTemplates(config.ui.header.rows[row].left);
+            let template = PropertyTemplates(config.theme.header.rows[row].left);
             let widget = template.format(self.song, self.status).left_aligned();
             widget.render(left, buf);
 
-            let template = PropertyTemplates(config.ui.header.rows[row].center);
+            let template = PropertyTemplates(config.theme.header.rows[row].center);
             let widget = template.format(self.song, self.status).centered();
             widget.render(center, buf);
 
-            let template = PropertyTemplates(config.ui.header.rows[row].right);
+            let template = PropertyTemplates(config.theme.header.rows[row].right);
             let widget = template.format(self.song, self.status).right_aligned();
             widget.render(right, buf);
         }

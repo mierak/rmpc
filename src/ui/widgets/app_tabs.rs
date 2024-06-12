@@ -32,9 +32,9 @@ where
             .select(selected_tab)
             .divider("")
             .block(self.config.as_tabs_block())
-            .style(self.config.ui.inactive_tab_style)
+            .style(self.config.theme.inactive_tab_style)
             .alignment(ratatui::prelude::Alignment::Center)
-            .highlight_style(self.config.ui.active_tab_style);
+            .highlight_style(self.config.theme.active_tab_style);
 
         tabs.render(area, buf);
     }

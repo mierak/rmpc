@@ -134,7 +134,7 @@ macro_rules! screen_call {
 
 impl Ui<'_> {
     pub fn render(&mut self, frame: &mut Frame, state: &mut State) -> Result<()> {
-        if let Some(bg_color) = state.config.ui.background_color {
+        if let Some(bg_color) = state.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
         }
         self.rendered_frames_count.add_assign(1);
@@ -147,10 +147,10 @@ impl Ui<'_> {
         }
 
         let [header_area, content_area, bar_area] = *Layout::vertical([
-            Constraint::Length(if state.config.ui.draw_borders {
-                u16::try_from(state.config.ui.header.rows.len())? + 3
+            Constraint::Length(if state.config.theme.draw_borders {
+                u16::try_from(state.config.theme.header.rows.len())? + 3
             } else {
-                u16::try_from(state.config.ui.header.rows.len())? + 1
+                u16::try_from(state.config.theme.header.rows.len())? + 1
             }),
             Constraint::Percentage(100),
             Constraint::Min(1),
@@ -189,7 +189,7 @@ impl Ui<'_> {
             bar_area,
         );
 
-        if state.config.ui.draw_borders {
+        if state.config.theme.draw_borders {
             screen_call!(self, state, render(frame, content_area, &state.status, state.config))?;
         } else {
             screen_call!(
@@ -655,7 +655,7 @@ impl FilterKind {
 
 impl Config {
     fn as_header_table_block(&self) -> ratatui::widgets::Block {
-        if !self.ui.draw_borders {
+        if !self.theme.draw_borders {
             return ratatui::widgets::Block::default();
         }
         Block::default().border_style(self.as_border_style())
@@ -665,7 +665,7 @@ impl Config {
         // if !self.ui.borders {
         //     return ratatui::widgets::Block::default().padding(Padding::new(0, 0, 1, 1));
         // }
-        if !self.ui.draw_borders {
+        if !self.theme.draw_borders {
             return ratatui::widgets::Block::default()/* .padding(Padding::new(0, 0, 1, 1)) */;
         }
 
@@ -676,30 +676,30 @@ impl Config {
     }
 
     fn as_border_style(&self) -> ratatui::style::Style {
-        self.ui.borders_style
+        self.theme.borders_style
     }
 
     fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {
-        let progress_bar_colors = &self.ui.progress_bar;
+        let progress_bar_colors = &self.theme.progress_bar;
         widgets::progress_bar::ProgressBar::default()
             .thumb_style(progress_bar_colors.thumb_style)
             .track_style(progress_bar_colors.track_style)
             .elapsed_style(progress_bar_colors.elapsed_style)
-            .elapsed_char(self.ui.progress_bar.symbols[0])
-            .thumb_char(self.ui.progress_bar.symbols[1])
-            .track_char(self.ui.progress_bar.symbols[2])
+            .elapsed_char(self.theme.progress_bar.symbols[0])
+            .thumb_char(self.theme.progress_bar.symbols[1])
+            .track_char(self.theme.progress_bar.symbols[2])
     }
 
     fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
         ratatui::widgets::Scrollbar::default()
             .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-            .track_symbol(Some(self.ui.scrollbar.symbols[0]))
-            .thumb_symbol(self.ui.scrollbar.symbols[1])
-            .begin_symbol(Some(self.ui.scrollbar.symbols[2]))
-            .end_symbol(Some(self.ui.scrollbar.symbols[3]))
-            .track_style(self.ui.scrollbar.track_style)
-            .begin_style(self.ui.scrollbar.ends_style)
-            .end_style(self.ui.scrollbar.ends_style)
-            .thumb_style(self.ui.scrollbar.thumb_style)
+            .track_symbol(Some(self.theme.scrollbar.symbols[0]))
+            .thumb_symbol(self.theme.scrollbar.symbols[1])
+            .begin_symbol(Some(self.theme.scrollbar.symbols[2]))
+            .end_symbol(Some(self.theme.scrollbar.symbols[3]))
+            .track_style(self.theme.scrollbar.track_style)
+            .begin_style(self.theme.scrollbar.ends_style)
+            .end_style(self.theme.scrollbar.ends_style)
+            .thumb_style(self.theme.scrollbar.thumb_style)
     }
 }

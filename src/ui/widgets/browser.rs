@@ -70,7 +70,7 @@ where
         };
 
         {
-            let preview = List::new(preview.unwrap_or_default()).highlight_style(self.config.ui.current_item_style);
+            let preview = List::new(preview.unwrap_or_default()).highlight_style(self.config.theme.current_item_style);
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
@@ -80,7 +80,7 @@ where
             prev_state.set_viewport_len(Some(previous_area.height.into()));
 
             let mut previous = List::new(previous);
-            if self.config.ui.draw_borders {
+            if self.config.theme.draw_borders {
                 previous = previous.block(
                     Block::default()
                         .borders(Borders::RIGHT)
@@ -91,7 +91,7 @@ where
             } else {
                 previous = previous.block(Block::default().padding(Padding::new(1, 2, 0, 0)));
             };
-            previous = previous.highlight_style(self.config.ui.current_item_style);
+            previous = previous.highlight_style(self.config.theme.current_item_style);
 
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
@@ -110,18 +110,18 @@ where
             let current = List::new(current)
                 .block({
                     let mut b = Block::default();
-                    if self.config.ui.draw_borders {
+                    if self.config.theme.draw_borders {
                         b = b
                             .borders(Borders::RIGHT)
                             .border_style(self.border_style)
                             .border_set(MIDDLE_COLUMN_SYMBOLS);
                     }
                     if let Some(ref title) = title {
-                        b = b.title(title.clone().set_style(self.config.ui.borders_style));
+                        b = b.title(title.clone().set_style(self.config.theme.borders_style));
                     }
                     b.padding(Padding::new(0, 1, 0, 0))
                 })
-                .highlight_style(self.config.ui.current_item_style);
+                .highlight_style(self.config.theme.current_item_style);
 
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(

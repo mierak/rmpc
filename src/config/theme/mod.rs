@@ -31,7 +31,7 @@ pub struct UiConfig {
     pub draw_borders: bool,
     pub background_color: Option<Color>,
     pub header_background_color: Option<Color>,
-    pub background_color_modal: Option<Color>,
+    pub modal_background_color: Option<Color>,
     pub borders_style: Style,
     pub highlighted_item_style: Style,
     pub current_item_style: Style,
@@ -50,7 +50,7 @@ pub struct UiConfig {
 
 impl std::fmt::Debug for UiConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UiConfig {{ album_art_position: {:?}, album_art_width_percent: {}, draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, active_tab_style: {:?}, inactive_tab_style: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.album_art_position, self.album_art_width_percent, self.draw_borders, self.background_color, self.header_background_color, self.background_color_modal, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.active_tab_style, self.inactive_tab_style, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
+        write!(f, "UiConfig {{ album_art_position: {:?}, album_art_width_percent: {}, draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, active_tab_style: {:?}, inactive_tab_style: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.album_art_position, self.album_art_width_percent, self.draw_borders, self.background_color, self.header_background_color, self.modal_background_color, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.active_tab_style, self.inactive_tab_style, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
     }
 }
 
@@ -74,7 +74,7 @@ pub struct UiConfigFile {
     pub(super) browser_column_widths: Vec<u16>,
     pub(super) background_color: Option<String>,
     pub(super) header_background_color: Option<String>,
-    pub(super) background_color_modal: Option<String>,
+    pub(super) modal_background_color: Option<String>,
     pub(super) active_tab_style: Option<StyleFile>,
     pub(super) inactive_tab_style: Option<StyleFile>,
     pub(super) borders_style: Option<StyleFile>,
@@ -98,7 +98,7 @@ impl Default for UiConfigFile {
             header_background_color: None,
             show_song_table_header: true,
             header: HeaderConfigFile::default(),
-            background_color_modal: None,
+            modal_background_color: None,
             borders_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
@@ -180,7 +180,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             album_art_position: value.album_art_position,
             album_art_width_percent: value.album_art_width_percent,
             draw_borders: value.draw_borders,
-            background_color_modal: StringColor(value.background_color_modal).to_color()?.or(bg_color),
+            modal_background_color: StringColor(value.modal_background_color).to_color()?.or(bg_color),
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             highlighted_item_style: value.highlighted_item_style.to_config_or(Some(Color::Blue), None)?,

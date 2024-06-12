@@ -58,7 +58,7 @@ impl Modal for ConfirmModal {
         let popup_area = frame.size().centered_exact(45, 7);
         frame.render_widget(Clear, popup_area);
 
-        if let Some(bg_color) = app.config.ui.background_color_modal {
+        if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
         let [text_area, buttons_area] =
@@ -69,7 +69,7 @@ impl Modal for ConfirmModal {
 
         self.button_group.set_button_count(1);
         let group = ButtonGroup::default()
-            .active_style(app.config.ui.current_item_style)
+            .active_style(app.config.theme.current_item_style)
             .add_button(Button::default().label("Ok"))
             .block(
                 Block::default()

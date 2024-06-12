@@ -14,7 +14,7 @@ use strum::{Display, EnumIter, EnumVariantNames};
 
 use crate::{
     config::{
-        ui::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
+        theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
         Config,
     },
     mpd::{
@@ -156,7 +156,7 @@ pub(crate) mod browser {
     };
 
     use crate::{
-        config::ui::SymbolsConfig,
+        config::theme::SymbolsConfig,
         mpd::commands::{lsinfo::FileOrDir, Song},
     };
 

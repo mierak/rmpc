@@ -41,7 +41,7 @@ impl<'a> DirStackItem for &'a str {
 
     fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> Self::Item {
         if filter.is_some_and(|filter| self.matches(filter, true)) {
-            ListItem::new(self.to_owned()).style(config.ui.highlighted_item_style)
+            ListItem::new(self.to_owned()).style(config.theme.highlighted_item_style)
         } else {
             ListItem::new(self.to_owned())
         }
@@ -64,7 +64,7 @@ impl DirStackItem for String {
     }
 
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
-        let symbols = &config.ui.symbols;
+        let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, Style::default().fg(Color::Blue))
         } else {
@@ -73,7 +73,7 @@ impl DirStackItem for String {
 
         if filter.is_some_and(|filter| self.matches(filter, true)) {
             ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
-                .style(config.ui.highlighted_item_style)
+                .style(config.theme.highlighted_item_style)
         } else {
             ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
         }
@@ -107,7 +107,7 @@ impl DirStackItem for DirOrSong {
     }
 
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
-        let symbols = &config.ui.symbols;
+        let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, Style::default().fg(Color::Blue))
         } else {
@@ -119,7 +119,7 @@ impl DirStackItem for DirOrSong {
             DirOrSong::Song(s) => format!("{} {}", symbols.song, s.file_name()),
         };
         if filter.is_some_and(|filter| self.matches(filter, true)) {
-            ListItem::new(Line::from(vec![marker_span, Span::from(value)])).style(config.ui.highlighted_item_style)
+            ListItem::new(Line::from(vec![marker_span, Span::from(value)])).style(config.theme.highlighted_item_style)
         } else {
             ListItem::new(Line::from(vec![marker_span, Span::from(value)]))
         }
@@ -144,7 +144,7 @@ impl DirStackItem for Song {
     }
 
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
-        let symbols = &config.ui.symbols;
+        let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, Style::default().fg(Color::Blue))
         } else {
@@ -163,7 +163,7 @@ impl DirStackItem for Song {
             Span::from(title),
         ]));
         if filter.is_some_and(|filter| DirStackItem::matches(self, filter, true)) {
-            result = result.style(config.ui.highlighted_item_style);
+            result = result.style(config.theme.highlighted_item_style);
         }
 
         result

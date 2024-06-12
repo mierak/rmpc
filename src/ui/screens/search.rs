@@ -56,11 +56,11 @@ impl SearchScreen {
             .block({
                 let mut b = Block::default();
                 if let Some(ref title) = title {
-                    b = b.title(title.clone().set_style(config.ui.borders_style));
+                    b = b.title(title.clone().set_style(config.theme.borders_style));
                 }
                 b.padding(Padding::new(0, 2, 0, 0))
             })
-            .highlight_style(config.ui.current_item_style);
+            .highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
         directory.state.set_content_len(Some(directory.items.len()));
@@ -99,7 +99,7 @@ impl SearchScreen {
                     .find(&[Filter::new(Tag::File, &current.file)])?
                     .first()
                     .context("Expected to find exactly one song")?
-                    .to_preview(&config.ui.symbols)
+                    .to_preview(&config.theme.symbols)
                     .collect_vec();
                 Ok(Some(preview))
             }
@@ -138,13 +138,13 @@ impl SearchScreen {
                         .set_text(value);
 
                     widget = if matches!(self.phase, Phase::SearchTextboxInput) && is_focused {
-                        widget.set_label_style(config.ui.highlighted_item_style)
+                        widget.set_label_style(config.theme.highlighted_item_style)
                     } else if is_focused {
                         widget
-                            .set_label_style(config.ui.current_item_style)
-                            .set_input_style(config.ui.current_item_style)
+                            .set_label_style(config.theme.current_item_style)
+                            .set_input_style(config.theme.current_item_style)
                     } else if !value.is_empty() {
-                        widget.set_input_style(config.ui.highlighted_item_style)
+                        widget.set_input_style(config.theme.highlighted_item_style)
                     } else {
                         widget
                     };
@@ -158,7 +158,7 @@ impl SearchScreen {
         frame.render_widget(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(config.ui.borders_style),
+                .border_style(config.theme.borders_style),
             input_areas[idx],
         );
         idx += 1;
@@ -180,8 +180,8 @@ impl SearchScreen {
 
             if is_focused {
                 inp = inp
-                    .set_label_style(config.ui.current_item_style)
-                    .set_input_style(config.ui.current_item_style);
+                    .set_label_style(config.theme.current_item_style)
+                    .set_input_style(config.theme.current_item_style);
             };
             frame.render_widget(inp, input_areas[idx]);
             idx += 1;
@@ -190,7 +190,7 @@ impl SearchScreen {
         frame.render_widget(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(config.ui.borders_style),
+                .border_style(config.theme.borders_style),
             input_areas[idx],
         );
         idx += 1;
@@ -204,7 +204,7 @@ impl SearchScreen {
                 FocusedInputGroup::Buttons(ButtonInput { variant, .. }) if &input.variant == variant);
 
             if is_focused {
-                button = button.style(config.ui.current_item_style);
+                button = button.style(config.theme.current_item_style);
             };
             frame.render_widget(button, input_areas[idx]);
         }
@@ -271,7 +271,7 @@ impl Screen for SearchScreen {
         _status: &Status,
         config: &Config,
     ) -> anyhow::Result<()> {
-        let widths = &config.ui.column_widths;
+        let widths = &config.theme.column_widths;
         let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
             Constraint::Percentage(widths[0]),
             Constraint::Percentage(widths[1]),
@@ -284,13 +284,13 @@ impl Screen for SearchScreen {
         frame.render_widget(
             Block::default()
                 .borders(Borders::RIGHT)
-                .border_style(config.ui.borders_style),
+                .border_style(config.theme.borders_style),
             previous_area,
         );
         frame.render_widget(
             Block::default()
                 .borders(Borders::RIGHT)
-                .border_style(config.ui.borders_style),
+                .border_style(config.theme.borders_style),
             current_area_init,
         );
         let previous_area = Rect {
@@ -317,7 +317,7 @@ impl Screen for SearchScreen {
         }
 
         if let Some(preview) = &self.preview {
-            let preview = List::new(preview.clone()).highlight_style(config.ui.current_item_style);
+            let preview = List::new(preview.clone()).highlight_style(config.theme.current_item_style);
             frame.render_widget(preview, preview_area);
         }
 

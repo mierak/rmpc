@@ -38,7 +38,7 @@ impl Screen for PlaylistsScreen {
     fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
-                .set_widths(&config.ui.column_widths)
+                .set_widths(&config.theme.column_widths)
                 .set_border_style(config.as_border_style()),
             area,
             &mut self.stack,
@@ -269,7 +269,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                     DirOrSong::Song(file) => client
                         .find_one(&[Filter::new(Tag::File, file)])?
                         .context(anyhow!("File '{file}' was listed but not found"))?
-                        .to_preview(&config.ui.symbols)
+                        .to_preview(&config.theme.symbols)
                         .collect_vec(),
                 }))
             })

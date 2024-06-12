@@ -12,11 +12,11 @@
     clippy::struct_field_names,
     unused_macros
 )]
-use std::{ops::Sub, sync::mpsc::TryRecvError, time::Duration};
+use std::{ops::Sub, path::Path, sync::mpsc::TryRecvError, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
-use config::{Args, Command, ConfigFile};
+use config::{theme::UiConfigFile, Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
@@ -53,13 +53,6 @@ pub enum AppEvent {
     RequestRender,
 }
 
-fn read_cfg(args: &Args) -> Result<Config> {
-    let file = std::fs::File::open(&args.config)?;
-    let read = std::io::BufReader::new(file);
-    let res: ConfigFile = ron::de::from_reader(read)?;
-    res.try_into()
-}
-
 fn main() -> Result<()> {
     let args = Args::parse();
     match &args.command {
@@ -81,15 +74,33 @@ fn main() -> Result<()> {
             );
             return Ok(());
         }
+        Some(Command::Theme) => {
+            println!(
+                "{}",
+                ron::ser::to_string_pretty(
+                    &UiConfigFile::default(),
+                    ron::ser::PrettyConfig::default()
+                        .depth_limit(3)
+                        .struct_names(false)
+                        .compact_arrays(false)
+                        .extensions(
+                            Extensions::IMPLICIT_SOME
+                                | Extensions::UNWRAP_NEWTYPES
+                                | Extensions::UNWRAP_VARIANT_NEWTYPES
+                        ),
+                )?
+            );
+            return Ok(());
+        }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
 
-            let config = Box::leak(Box::new(match read_cfg(&args) {
-                Ok(val) => val,
+            let config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
+                Ok(val) => val.into_config(&args.config)?,
                 Err(err) => {
                     status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                    ConfigFile::default().try_into()?
+                    ConfigFile::default().into_config(Path::new(""))?
                 }
             }));
 
@@ -100,10 +111,10 @@ fn main() -> Result<()> {
                 "Failed to connect to mpd"
             );
 
-            let album_art_disabled = config.ui.album_art_width_percent == 0;
+            let album_art_disabled = config.theme.album_art_width_percent == 0;
             if !album_art_disabled && !utils::kitty::check_kitty_support()? {
                 warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
-                config.ui.album_art_width_percent = 0;
+                config.theme.album_art_width_percent = 0;
             }
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
@@ -122,7 +133,7 @@ fn main() -> Result<()> {
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
 
                 let mut ui = Ui::new(client, state.config);
-                if !config.ui.album_art_width_percent == 0 && !utils::kitty::check_kitty_support()?  {
+                if !config.theme.album_art_width_percent == 0 && !utils::kitty::check_kitty_support()?  {
                     ui.display_message(
                         "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art"
                             .to_owned(),
