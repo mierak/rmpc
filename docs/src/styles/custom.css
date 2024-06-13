@@ -1,0 +1,52 @@
+.code {
+    font-family: var(--__sl-font-mono);
+    font-size: 13px;
+    background-color: rgb(35, 38, 47);
+    width: fit-content;
+    padding: 0rem 0.5rem;
+}
+
+.code .prop {
+    color: rgb(197, 228, 120);
+}
+
+.code .string {
+    color: rgb(236, 196, 141);
+}
+
+.code .bool {
+    color: rgb(130, 170, 255);
+}
+
+.code .other {
+    color: rgb(214, 222, 235);
+}
+
+.code .number {
+    color: rgb(247, 140, 108);
+}
+
+:root[data-theme="light"] {
+    .code {
+        background-color: rgb(246, 247, 249);
+    }
+    .code .prop {
+        color: rgb(60, 99, 179);
+    }
+
+    .code .string {
+        color: rgb(155, 80, 78);
+    }
+
+    .code .bool {
+        color: rgb(60, 99, 179);
+    }
+
+    .code .other {
+        color: rgb(64, 63, 83);
+    }
+
+    .code .number {
+        color: rgb(170, 9, 130);
+    }
+}

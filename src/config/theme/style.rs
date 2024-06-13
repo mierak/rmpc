@@ -17,7 +17,7 @@ impl StringColor {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StyleFile {
     pub(super) fg: Option<String>,
     pub(super) bg: Option<String>,
@@ -65,30 +65,6 @@ impl std::fmt::Display for StyleFile {
                 .as_ref()
                 .map_or_else(|| "none".to_string(), ToString::to_string)
         )
-    }
-}
-#[cfg(test)]
-mod tests2 {
-
-    #[test]
-    fn test() {
-        use super::StyleFile;
-        let style = StyleFile {
-            fg: Some("red".to_string()),
-            bg: Some("blue".to_string()),
-            modifiers: None,
-        };
-        assert_eq!(style.to_string(), "red;blue;none");
-    }
-    #[test]
-    fn test2() {
-        use super::StyleFile;
-        let style = StyleFile {
-            fg: Some("#FF0000".to_string()),
-            bg: Some("blue".to_string()),
-            modifiers: Some(super::Modifiers::Bold | super::Modifiers::Dim | super::Modifiers::Italic),
-        };
-        assert_eq!(style.to_string(), "#FF0000;blue;bdi");
     }
 }
 

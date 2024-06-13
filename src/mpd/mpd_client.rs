@@ -266,6 +266,11 @@ impl MpdClient for Client<'_> {
             .and_then(ProtoClient::read_response)
     }
     fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
+        if self.version < Version::new(0, 24, 0) {
+            return Err(MpdError::UnsupportedMpdVersion(
+                "consume oneshot can be used since MPD 0.24.0",
+            ));
+        }
         self.send(&format!("listplaylistinfo \"{playlist}\""))
             .and_then(ProtoClient::read_response)
     }

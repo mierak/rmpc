@@ -32,14 +32,14 @@ pub struct KeyConfig {
     pub queue: HashMap<Key, QueueActions>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SingleOrMultiple<T> {
     Single(T),
     Multiple(Vec<T>),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct KeyConfigFile {
     #[serde(default)]
     pub global: HashMap<GlobalAction, SingleOrMultiple<Key>>,

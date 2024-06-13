@@ -1,0 +1,86 @@
+---
+title: Default
+description: A default theme reference
+sidebar:
+    order: 0
+---
+
+import { Image } from "astro:assets";
+import img from "../../../assets/preview.png";
+
+The default theme. Requires a Nerd Font for some of the symbols.
+
+## Preview
+
+<Image src={img} width={800} alt="" />
+
+## Config
+
+```rust
+#![enable(implicit_some)]
+#![enable(unwrap_newtypes)]
+#![enable(unwrap_variant_newtypes)]
+(
+    album_art_position: Left,
+    album_art_width_percent: 40,
+    draw_borders: true,
+    symbols: (song: "🎵", dir: "📁", marker: "\u{e0b0}"),
+    progress_bar: (
+        symbols: ["█", "\u{e0b0}", "█"],
+        track_style: (fg: "#1e2030"),
+        elapsed_style: (fg: "blue"),
+        thumb_style: (fg: "blue", bg: "#1e2030"),
+    ),
+    scrollbar: (
+        symbols: ["│", "█", "▲", "▼"],
+        track_style: (),
+        ends_style: (),
+        thumb_style: (fg: "blue"),
+    ),
+    browser_column_widths: [20, 38, 42],
+    background_color: None,
+    header_background_color: None,
+    modal_background_color: None,
+    active_tab_style: (fg: "black", bg: "blue", modifiers: "Bold"),
+    inactive_tab_style: (),
+    borders_style: (fg: "blue"),
+    highlighted_item_style: (fg: "blue", modifiers: "Bold"),
+    current_item_style: (fg: "black", bg: "blue", modifiers: "Bold"),
+    highlight_border_style: (fg: "blue"),
+    show_song_table_header: true,
+    song_table_format: [
+        (
+            prop: (kind: Property(Artist), default: (kind: Text(value: "Unknown"))),
+            width_percent: 20,
+        ),
+        (
+            prop: (kind: Property(Title), default: (kind: Text(value: "Unknown"))),
+            width_percent: 35,
+        ),
+        (
+            prop: (kind: Property(Album), style: (fg: "white"), default: (kind: Text(value: "Album"), style: (fg: "white"))),
+            width_percent: 30,
+        ),
+        (
+            prop: (kind: Property(Duration), default: (kind: Text(value: "-"))),
+            width_percent: 15,
+            alignment: Right,
+        ),
+    ],
+    header: (
+        rows: [
+            (
+                left: [(kind: Text(value: "["), style: (fg: "yellow", modifiers: "Bold")), (kind: Property(Status(State)), style: (fg: "yellow", modifiers: "Bold")), (kind: Text(value: "]"), style: (fg: "yellow", modifiers: "Bold"))],
+                center: [(kind: Property(Song(Title)), style: (modifiers: "Bold"), default: (kind: Text(value: "No Song"), style: (modifiers: "Bold")))],
+                right: [(kind: Property(Widget(Volume)), style: (fg: "blue"))]
+            ),
+            (
+                left: [(kind: Property(Status(Elapsed))), (kind: Text(value: " / ")), (kind: Property(Status(Duration))), (kind: Text(value: " (")), (kind: Property(Status(Bitrate))), (kind: Text(value: " kbps)"))],
+                center: [(kind: Property(Song(Artist)), style: (fg: "yellow", modifiers: "Bold"), default: (kind: Text(value: "Unknown"), style: (fg: "yellow", modifiers: "Bold"))), (kind: Text(value: " - ")), (kind: Property(Song(Album)), default: (kind: Text(value: "Unknown Album")))],
+                right: [(kind: Property(Widget(States(active_style: (fg: "white", modifiers: "Bold"), separator_style: (fg: "white")))), style: (fg: "dark_gray"))]
+            ),
+        ],
+    ),
+    default_album_art_path: None,
+)
+```

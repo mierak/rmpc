@@ -12,16 +12,15 @@
     clippy::struct_field_names,
     unused_macros
 )]
-use std::{ops::Sub, path::Path, sync::mpsc::TryRecvError, time::Duration};
+use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
 
 use anyhow::Result;
 use clap::Parser;
-use config::{theme::UiConfigFile, Args, Command, ConfigFile};
+use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
-use ron::extensions::Extensions;
 use ui::{Level, UiEvent};
 
 use crate::{
@@ -57,39 +56,11 @@ fn main() -> Result<()> {
     let args = Args::parse();
     match &args.command {
         Some(Command::Config) => {
-            println!(
-                "{}",
-                ron::ser::to_string_pretty(
-                    &ConfigFile::default(),
-                    ron::ser::PrettyConfig::default()
-                        .depth_limit(3)
-                        .struct_names(false)
-                        .compact_arrays(false)
-                        .extensions(
-                            Extensions::IMPLICIT_SOME
-                                | Extensions::UNWRAP_NEWTYPES
-                                | Extensions::UNWRAP_VARIANT_NEWTYPES
-                        ),
-                )?
-            );
+            std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
             return Ok(());
         }
         Some(Command::Theme) => {
-            println!(
-                "{}",
-                ron::ser::to_string_pretty(
-                    &UiConfigFile::default(),
-                    ron::ser::PrettyConfig::default()
-                        .depth_limit(3)
-                        .struct_names(false)
-                        .compact_arrays(false)
-                        .extensions(
-                            Extensions::IMPLICIT_SOME
-                                | Extensions::UNWRAP_NEWTYPES
-                                | Extensions::UNWRAP_VARIANT_NEWTYPES
-                        ),
-                )?
-            );
+            std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
             return Ok(());
         }
         None => {
@@ -97,10 +68,10 @@ fn main() -> Result<()> {
             logging::init(tx.clone()).expect("Logger to initialize");
 
             let config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
-                Ok(val) => val.into_config(&args.config)?,
+                Ok(val) => val.into_config(Some(&args.config))?,
                 Err(err) => {
                     status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                    ConfigFile::default().into_config(Path::new(""))?
+                    ConfigFile::default().into_config(None)?
                 }
             }));
 

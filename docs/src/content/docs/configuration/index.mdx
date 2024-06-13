@@ -1,0 +1,68 @@
+---
+title: General configuration
+description: Configuring rmpc
+sidebar:
+    order: 1
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../components/ConfigValue.tsx";
+
+Rmpc uses [ron](https://github.com/ron-rs/ron) format for its configuration file. The file can be located at:
+
+-   `$XDG_CONFIG_HOME/rmpc/config.ron`
+-   `$HOME/.config/rmpc/config.ron`
+-   `Specific path specified by the --config flag`
+
+## Bootsrapping a config file
+
+Config file can be bootstrapped by running the following command:
+
+```bash frame=none showLineNumbers=false
+rmpc config > ~/.config/rmpc/config.ron
+```
+
+## Config file structure
+
+Below is a list of properties that can be changed.
+
+### address
+
+<ConfigValue name="address" type="string" customText="<ip>:<port>" />
+
+The address to connect to. By default rmpc tries to connect to MPD at `127.0.0.1:6600`. Socket connections are currently
+not supported.
+
+### theme
+
+<ConfigValue optional name="theme" type="string" />
+
+Theme file to use. If set to `None` or absent, the default theme is used. More info at:
+
+<LinkCard
+    title="Configuring themes"
+    description="Get the default theme file and customize it"
+    href="/rmpc/configuration/theme/"
+/>
+
+### keybinds
+
+<ConfigValue name="keybinds" type="other" customText="<keybinds>" link="/rmpc/configuration/keybinds/" />
+
+Keybinds to use. The default keybinds are used if this property is absent. More info at:
+
+<LinkCard title="Configuring keybinds" description="Customize the keybinds" href="/rmpc/configuration/keybinds/" />
+
+### volume_step
+
+<ConfigValue name="volume_step" type="number" />
+
+Determines the step when changing volume with the volume up and down keybinds. Default is 5%.
+
+### status_update_interval_ms
+
+<ConfigValue name="status_update_interval_ms" type="number" optional />
+
+Interval in milliseconds to update the status when a song is playing. Status means song progress, current bitrate, etc.
+Default is 1000ms. If set to `None` or absent, the progress bar at the bottom of the window is hidden as it serves no
+purpose at that point.

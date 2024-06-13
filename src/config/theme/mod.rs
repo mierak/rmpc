@@ -54,14 +54,14 @@ impl std::fmt::Debug for UiConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum Position {
     #[default]
     Left,
     Right,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UiConfigFile {
     pub(super) album_art_position: Position,
     pub(super) album_art_width_percent: u16,
@@ -133,16 +133,16 @@ impl Default for UiConfigFile {
             progress_bar: ProgressBarConfigFile::default(),
             scrollbar: ScrollbarConfigFile::default(),
             symbols: SymbolsFile {
-                song: "🎵".to_owned(),
-                dir: "📁".to_owned(),
-                marker: "".to_owned(),
+                song: "S".to_owned(),
+                dir: "D".to_owned(),
+                marker: "M".to_owned(),
             },
             song_table_format: QueueTableColumnsFile::default(),
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SymbolsFile {
     pub(super) song: String,
     pub(super) dir: String,

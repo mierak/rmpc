@@ -1,3 +1,4 @@
 /target
 *log*
 **.ron
+!assets/**.ron

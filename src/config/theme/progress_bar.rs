@@ -21,7 +21,7 @@ pub struct ProgressBarConfig {
     pub thumb_style: Style,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProgressBarConfigFile {
     pub(super) symbols: Vec<String>,
     pub(super) track_style: Option<StyleFile>,
@@ -32,7 +32,7 @@ pub struct ProgressBarConfigFile {
 impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
-            symbols: vec!["█".to_owned(), "".to_owned(), "█".to_owned()],
+            symbols: vec!["-".to_owned(), ">".to_owned(), " ".to_owned()],
             track_style: Some(StyleFile {
                 fg: Some("#1e2030".to_string()),
                 bg: None,

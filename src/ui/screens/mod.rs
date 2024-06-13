@@ -259,7 +259,7 @@ impl Song {
     pub fn matches(&self, formats: &[&Property<'static, SongProperty>], filter: &str, ignore_case: bool) -> bool {
         for format in formats {
             let match_found = match &format.kind {
-                PropertyKindOrText::Text { value } => value.matches(filter, ignore_case),
+                PropertyKindOrText::Text(value) => value.matches(filter, ignore_case),
                 PropertyKindOrText::Property(p) => match p {
                     SongProperty::Filename => self.file.matches(filter, ignore_case),
                     SongProperty::Title => self.title.as_ref().map_or_else(
@@ -278,7 +278,7 @@ impl Song {
                         || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
                         |duration| duration.to_string().matches(filter, ignore_case),
                     ),
-                    SongProperty::Other { name } => self.others.get(*name).map_or_else(
+                    SongProperty::Other(name) => self.others.get(*name).map_or_else(
                         || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
                         |v| v.matches(filter, ignore_case),
                     ),
@@ -309,7 +309,7 @@ impl Song {
     ) -> Line<'song> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
-            PropertyKindOrText::Text { value } => Line::styled(value.ellipsize(max_len).to_string(), style),
+            PropertyKindOrText::Text(value) => Line::styled(value.ellipsize(max_len).to_string(), style),
             PropertyKindOrText::Property(s) => match s {
                 SongProperty::Filename => Line::styled(self.file.ellipsize(max_len).to_string(), style),
                 SongProperty::Title => self.title.as_ref().map_or_else(
@@ -328,7 +328,7 @@ impl Song {
                     || self.default_as_line_ellipsized(format, max_len),
                     |v| Line::styled(v.to_string(), style),
                 ),
-                SongProperty::Other { name } => self.others.get(*name).map_or_else(
+                SongProperty::Other(name) => self.others.get(*name).map_or_else(
                     || self.default_as_line_ellipsized(format, max_len),
                     |v| Line::styled(v.ellipsize(max_len), style),
                 ),
@@ -355,7 +355,7 @@ impl Property<'static, PropertyKind> {
     ) -> Either<Span<'s>, Vec<Span<'s>>> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
-            PropertyKindOrText::Text { value } => Either::Left(Span::styled(value.as_str(), style)),
+            PropertyKindOrText::Text(value) => Either::Left(Span::styled(value.as_str(), style)),
             PropertyKindOrText::Property(PropertyKind::Song(s)) => match (s, song) {
                 (SongProperty::Filename, None) => Either::Left(Span::styled("", Style::default())), // cannot happen
                 (SongProperty::Title, None) => self.default_as_span(song, status),
@@ -380,7 +380,7 @@ impl Property<'static, PropertyKind> {
                     || self.default_as_span(song, status),
                     |v| Either::Left(Span::styled(v.to_string(), style)),
                 ),
-                (SongProperty::Other { name }, Some(s)) => s.others.get(*name).map_or_else(
+                (SongProperty::Other(name), Some(s)) => s.others.get(*name).map_or_else(
                     || self.default_as_span(song, status),
                     |v| Either::Left(Span::styled(v.as_str(), style)),
                 ),
@@ -404,9 +404,7 @@ impl Property<'static, PropertyKind> {
                 ),
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
-                WidgetProperty::Volume { style } => {
-                    Either::Left(Span::styled(Volume::get_str(*status.volume.value()), *style))
-                }
+                WidgetProperty::Volume => Either::Left(Span::styled(Volume::get_str(*status.volume.value()), style)),
                 WidgetProperty::States {
                     active_style,
                     separator_style,

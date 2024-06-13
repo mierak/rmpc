@@ -10,7 +10,7 @@ use super::style::ToConfigOr;
 use super::StyleFile;
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongTableColumnFile {
     /// Property to display in the column
     /// Can be one of: Duration, Filename, Artist, AlbumArtist, Title, Album, Date, Genre or Comment    
@@ -40,7 +40,7 @@ pub struct SongTableColumn {
 #[derive(Debug)]
 pub(super) struct QueueTableColumns(pub Vec<SongTableColumn>);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct QueueTableColumnsFile(pub Vec<SongTableColumnFile>);
 
 impl Default for QueueTableColumnsFile {
@@ -50,9 +50,7 @@ impl Default for QueueTableColumnsFile {
                 prop: PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Artist),
                     default: Some(Box::new(PropertyFile {
-                        kind: PropertyKindFileOrText::Text {
-                            value: "Unknown".to_string(),
-                        },
+                        kind: PropertyKindFileOrText::Text("Unknown".to_string()),
                         style: None,
                         default: None,
                     })),
@@ -66,9 +64,7 @@ impl Default for QueueTableColumnsFile {
                 prop: PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Title),
                     default: Some(Box::new(PropertyFile {
-                        kind: PropertyKindFileOrText::Text {
-                            value: "Unknown".to_string(),
-                        },
+                        kind: PropertyKindFileOrText::Text("Unknown".to_string()),
                         style: None,
                         default: None,
                     })),
@@ -82,9 +78,7 @@ impl Default for QueueTableColumnsFile {
                 prop: PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Album),
                     default: Some(Box::new(PropertyFile {
-                        kind: PropertyKindFileOrText::Text {
-                            value: "Album".to_string(),
-                        },
+                        kind: PropertyKindFileOrText::Text("Unknown Album".to_string()),
                         style: Some(StyleFile {
                             fg: Some("white".to_string()),
                             bg: None,
@@ -106,7 +100,7 @@ impl Default for QueueTableColumnsFile {
                 prop: PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Duration),
                     default: Some(Box::new(PropertyFile {
-                        kind: PropertyKindFileOrText::Text { value: "-".to_string() },
+                        kind: PropertyKindFileOrText::Text("-".to_string()),
                         style: None,
                         default: None,
                     })),
@@ -168,7 +162,7 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<'static, SongProperty>
     fn try_from(value: PropertyFile<SongPropertyFile>) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             kind: match value.kind {
-                PropertyKindFileOrText::Text { value } => PropertyKindOrText::Text { value },
+                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.try_into()?),
             },
             style: Some(value.style.to_config_or(None, None)?),

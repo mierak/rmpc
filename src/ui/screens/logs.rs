@@ -3,8 +3,8 @@ use anyhow::Result;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
-    prelude::{Constraint, Direction, Layout, Margin, Rect},
-    widgets::{List, ListItem, ListState},
+    prelude::Rect,
+    widgets::{Block, List, ListItem, ListState, Padding},
     Frame,
 };
 use strum::Display;
@@ -46,28 +46,15 @@ impl Screen for LogsScreen {
             })
             .try_collect()?;
 
-        let scrollbar = config.as_styled_scrollbar();
-
-        let [content, scroll] = *Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(100), Constraint::Min(0)].as_ref())
-            .split(area)
-        else {
-            return Ok(());
-        };
-
         let content_len = lines.len();
         self.scrolling_state.set_content_len(Some(content_len));
-        self.scrolling_state.set_viewport_len(Some(content.height.into()));
+        self.scrolling_state.set_viewport_len(Some(area.height.into()));
 
-        let logs_wg = List::new(lines);
-        frame.render_stateful_widget(logs_wg, content, self.scrolling_state.as_render_state_ref());
+        let logs_wg = List::new(lines).block(Block::default().padding(Padding::right(5)));
+        frame.render_stateful_widget(logs_wg, area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
-            scrollbar,
-            scroll.inner(&Margin {
-                vertical: 1,
-                horizontal: 0,
-            }),
+            config.as_styled_scrollbar(),
+            area,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 

@@ -1,0 +1,213 @@
+---
+title: theme
+description: Configuring rmpc theme
+sidebar:
+    order: 3
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../components/ConfigValue.tsx";
+
+A theme determines the look of rmpc. You can customize it by creating a custom theme file placed in the themes
+directory and then configuring the `theme` property in the config file filename of the theme.
+
+## Bootsrapping a theme file
+
+<Steps>
+1. Config file can be bootstrapped by running the following command:
+    ```bash frame=none showLineNumbers=false
+    rmpc theme > ~/.config/rmpc/themes/<theme_name>.ron
+    ```
+2. Use the theme in your config by editing the `theme` property `~/.config/rmpc/config.ron` file like so:
+    ```rust showLineNumbers=false
+    theme: Some("<theme_name>")
+    ```
+3. Restart rmpc
+</Steps>
+
+## Theme file structure
+
+Below is a list of properties that can be changed.
+
+### album_art_position
+
+<ConfigValue name="album_art_position" type={["Left", "Right"]} />
+Determines which side of the queue tab to display the album art on. Default is `Left`.
+
+### album_art_width_percent
+
+<ConfigValue name="album_art_width_percent" type="number" />
+
+Percentage of the queue tab width to use for the album art. Default is `40`.
+
+### default_album_art_path
+
+<ConfigValue name="default_album_art_path" type="string" optional />
+
+A default image is displayed if a song does not have an album art. This property can override that default image.
+
+### show_song_table_header
+
+<ConfigValue name="show_song_table_header" type="boolean" />
+
+If set to false, the header of the song table is not displayed. Default is `true`.
+
+### draw_borders
+
+<ConfigValue name="draw_borders" type="boolean" />
+Whether to draw borders in the UI.
+
+### symbols
+
+Symblos to use in the various browser screens (artist, search, ...)
+
+<ConfigValue name="symbols" type="other" customText="<Symbols>" />
+
+#### symbols.song
+
+<ConfigValue name="song" type="string" customText="S" />
+
+#### symbols.dir
+
+<ConfigValue name="dir" type="string" customText="D" />
+
+#### symbols.marker
+
+<ConfigValue name="marker" type="string" customText="M" />
+
+This symbol is used for selected items in the browser screens.
+
+### progress_bar
+
+Progress bar at the bottom of the window.
+
+<ConfigValue name="progress_bar" type="other" customText="ProgressBar" />
+
+#### progress_bar.symbols
+
+<ConfigValue name="track_style" type="string" customText="[elapsed, thumb, track]" />
+
+Array of three single character strings that determine the look of the progress bar. First value is the elapsed part of
+the progress bar, second is the thumb and the third is the empty track. Default is `["-", ">", " "]
+
+#### progress_bar.track_style
+
+<ConfigValue name="track_style" type="string" customText="Style" />
+
+Style of the empty track part of the progress bar.
+
+#### progress_bar.elapsed_style
+
+<ConfigValue name="elapsed_style" type="string" customText="Style" />
+
+Style of the elapsed part of the progress bar.
+
+#### progress_bar.thumb_style
+
+<ConfigValue name="thumb_style" type="string" customText="Style" />
+
+Style of the progress bar thumb.
+
+### scrollbar
+
+<ConfigValue name="scrollbar" type="other" customText="Scrollbar" />
+
+#### scrollbar.symbols
+
+<ConfigValue name="track_style" type="string" customText="[track, thumb, end_top, end_bot]" />
+
+Array of four single character strings that determine the look of the scrollbars. First value is the track, second is
+the thumb, third is the top end and the fourth is the bottom end. Default is `["│", "█", "▲", "▼"]`
+
+#### scrollbar.track_style
+
+<ConfigValue name="track_style" type="string" customText="Style" />
+
+#### scrollbar.ends_style
+
+<ConfigValue name="ends_style" type="string" customText="Style" />
+
+#### scrollbar.thumb_style
+
+<ConfigValue name="thumb_style" type="string" customText="Style" />
+
+### browser_column_widths
+
+<ConfigValue name="browser_column_widths" type="number" customText="[number, number, number]" />
+
+Three numerical values that determine the percent width of the columns in the browser tab. Default is `[20, 38, 42]`.
+Meaning the first column takes 20% of the width, the second 38% and the third 42%.
+
+### background_color
+
+<ConfigValue name="background_color" type="string" customText="color" />
+
+Background color of the main window.
+
+### header_background_color
+
+<ConfigValue name="background_color" type="string" customText="color" />
+
+Background color of the window header. The header is at the top of the window and contains tab bar and user configurable
+data.
+
+### modal_background_color
+
+<ConfigValue name="background_color" type="string" customText="color" />
+
+Background color of modal dialogs.
+
+### active_tab_style
+
+<ConfigValue name="active_tab_style" type="other" customText="Style" />
+
+Style for the active tab.
+
+### inactive_tab_style
+
+<ConfigValue name="inactive_tab_style" type="other" customText="Style" />
+
+Style for all tabs except the active one.
+
+### highlighted_item_style
+
+<ConfigValue name="highlighted_item_style" type="other" customText="Style" />
+
+### current_item_style
+
+<ConfigValue name="current_item_style" type="other" customText="Style" />
+
+### borders_style
+
+<ConfigValue name="borders_style" type="other" customText="Style" />
+
+### highlight_border_style
+
+<ConfigValue name="highlight_border_style" type="other" customText="Style" />
+
+### song_table_format
+
+<ConfigValue
+    name="song_table_format"
+    type="other"
+    customText="<song_table_format>"
+    link="/rmpc/configuration/song-table/"
+/>
+
+Configures the columns of the song table. This property is described in its own page:
+
+<LinkCard
+    title="song_table_format"
+    description="Configuration of the table of songs on the queue page"
+    href="/rmpc/configuration/song-table/"
+/>
+
+### header
+
+<ConfigValue name="header" type="other" customText="<header[]>" link="/rmpc/configuration/header/" />
+
+Configuration of the header. Header is displayed at the top of te window. It can display info about current song, the
+player state and custom widgets. This property is described in its own page:
+
+<LinkCard title="header" description="Configuration of the window header" href="/rmpc/configuration/header/" />

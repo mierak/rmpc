@@ -1,0 +1,38 @@
+---
+title: Installation
+description: Rusty Media Player Client installation guide
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+Currently only linux is officially supported. No binaries are currently provided, so you will need to build from source.
+To build you will need to have [rust toolchain](https://www.rust-lang.org/tools/install) installed. More installation
+methods will be provided in the future.
+
+## Steps
+
+<Steps>
+
+1. Install rmpc using cargo
+    ```bash frame=none showLineNumbers=false
+    cargo install --git https://github.com/mierak/rmpc --locked
+    ```
+2. Setup your config file
+
+    <LinkCard
+        title="Configuring rmpc"
+        description="Generate sample config file for rmpc and customize it to your liking."
+        href="/rmpc/configuration/"
+    />
+
+3. Run rmpc
+    ```bash frame=none showLineNumbers=false
+    rmpc
+    ```
+
+</Steps>
+
+:::note
+Minimum supported MPD version is 0.23.5. Other versions may work, but you are on your own.
+:::

@@ -20,14 +20,14 @@ pub struct HeaderConfig {
     pub rows: Vec<HeaderConfigRow>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HeaderConfigRowFile {
     pub(super) left: Vec<PropertyFile<PropertyKindFile>>,
     pub(super) center: Vec<PropertyFile<PropertyKindFile>>,
     pub(super) right: Vec<PropertyFile<PropertyKindFile>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HeaderConfigFile {
     pub(super) rows: Vec<HeaderConfigRowFile>,
 }
@@ -39,7 +39,7 @@ impl Default for HeaderConfigFile {
                 HeaderConfigRowFile {
                     left: vec![
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Text { value: "[".to_string() },
+                            kind: PropertyKindFileOrText::Text("[".to_string()),
                             style: Some(StyleFile {
                                 fg: Some("yellow".to_string()),
                                 bg: None,
@@ -57,7 +57,7 @@ impl Default for HeaderConfigFile {
                             default: None,
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Text { value: "]".to_string() },
+                            kind: PropertyKindFileOrText::Text("]".to_string()),
                             style: Some(StyleFile {
                                 fg: Some("yellow".to_string()),
                                 bg: None,
@@ -69,9 +69,7 @@ impl Default for HeaderConfigFile {
                     center: vec![PropertyFile {
                         kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(SongPropertyFile::Title)),
                         default: Some(Box::new(PropertyFile {
-                            kind: PropertyKindFileOrText::Text {
-                                value: "No Song".to_string(),
-                            },
+                            kind: PropertyKindFileOrText::Text("No Song".to_string()),
                             style: Some(StyleFile {
                                 fg: None,
                                 bg: None,
@@ -105,9 +103,7 @@ impl Default for HeaderConfigFile {
                             style: None,
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Text {
-                                value: " / ".to_string(),
-                            },
+                            kind: PropertyKindFileOrText::Text(" / ".to_string()),
                             default: None,
                             style: None,
                         },
@@ -119,9 +115,7 @@ impl Default for HeaderConfigFile {
                             style: None,
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Text {
-                                value: " (".to_string(),
-                            },
+                            kind: PropertyKindFileOrText::Text(" (".to_string()),
                             default: None,
                             style: None,
                         },
@@ -133,9 +127,7 @@ impl Default for HeaderConfigFile {
                             style: None,
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Text {
-                                value: " kbps)".to_string(),
-                            },
+                            kind: PropertyKindFileOrText::Text(" kbps)".to_string()),
                             default: None,
                             style: None,
                         },
@@ -144,9 +136,7 @@ impl Default for HeaderConfigFile {
                         PropertyFile {
                             kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(SongPropertyFile::Artist)),
                             default: Some(Box::new(PropertyFile {
-                                kind: PropertyKindFileOrText::Text {
-                                    value: "Unknown".to_string(),
-                                },
+                                kind: PropertyKindFileOrText::Text("Unknown".to_string()),
                                 style: Some(StyleFile {
                                     fg: Some("yellow".to_string()),
                                     bg: None,
@@ -161,18 +151,14 @@ impl Default for HeaderConfigFile {
                             }),
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Text {
-                                value: " - ".to_string(),
-                            },
+                            kind: PropertyKindFileOrText::Text(" - ".to_string()),
                             style: None,
                             default: None,
                         },
                         PropertyFile {
                             kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(SongPropertyFile::Album)),
                             default: Some(Box::new(PropertyFile {
-                                kind: PropertyKindFileOrText::Text {
-                                    value: "Unknown Album".to_string(),
-                                },
+                                kind: PropertyKindFileOrText::Text("Unknown Album".to_string()),
                                 style: None,
                                 default: None,
                             })),

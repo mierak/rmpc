@@ -1,0 +1,43 @@
+---
+title: Rusty Media Player Client
+description: A beautiful and configurable TUI client for MPD
+template: splash
+hero:
+    tagline: A beautiful and configurable TUI client for MPD
+    image:
+        file: ../../assets/preview.png
+    actions:
+        - text: Get Started
+          link: /rmpc/overview/
+          icon: right-arrow
+          variant: primary
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+import * as utils from "../../utils.ts";
+import Hero from "../../components/Hero.astro";
+
+## Next steps
+
+<CardGrid stagger>
+    <Card title="Install" icon="approve-check">
+        <a href="/rmpc/guides/installation/" style={{ textDecoration: "none" }}>
+            Installation instructions
+        </a>
+    </Card>
+    <Card title="Configure" icon="setting">
+        <a href="/rmpc/configuration/" style={{ textDecoration: "none" }}>
+            Configure rmpc just how you like it
+        </a>
+    </Card>
+    <Card title="Reference" icon="document">
+        <a href="/rmpc/reference/config/" style={{ textDecoration: "none" }}>
+            Looking for a specific configuration option?
+        </a>
+    </Card>
+    <Card title="Themes" icon="open-book">
+        <a href="/rmpc/configuration/theme/" style={{ textDecoration: "none" }}>
+            Browse predefined and user submitted themes
+        </a>
+    </Card>
+</CardGrid>

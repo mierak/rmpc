@@ -1,6 +1,8 @@
 > [!IMPORTANT]  
-> This README and the whole project is work in progress. The client is stable enough and ready for use, but expect bugs, missing features and config format changes without any notice.
+> This README, the docs and the whole project is work in progress. The client is stable enough and ready for use, but expect bugs, missing features and config format changes without any notice.
 
+
+Work in progress documentation [can be found here](https://mierak.github.io/rmpc/)
 
 # Rusty MPD Client
 A modern configurable terminal client for the Music Player Daemon, heavily inspired by [ncmpcpp](https://github.com/ncmpcpp/ncmpcpp) and [ranger](https://github.com/ranger/ranger)/[lf](https://github.com/gokcehan/lf) file managers.

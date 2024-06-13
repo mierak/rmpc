@@ -20,7 +20,7 @@ pub struct ScrollbarConfig {
     pub thumb_style: Style,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScrollbarConfigFile {
     pub(super) symbols: Vec<String>,
     pub(super) track_style: Option<StyleFile>,

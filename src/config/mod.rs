@@ -57,7 +57,7 @@ pub struct Config {
     pub theme: UiConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
     address: String,
     #[serde(default)]
@@ -89,9 +89,9 @@ impl ConfigFile {
         Ok(ron::de::from_reader(read)?)
     }
 
-    fn read_theme(&self, config_dir: &Path) -> Result<UiConfig> {
+    fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile> {
         self.theme.as_ref().map_or_else(
-            || UiConfigFile::default().try_into(),
+            || Ok(UiConfigFile::default()),
             |theme_name| -> Result<_> {
                 let path = PathBuf::from(config_dir)
                     .join("themes")
@@ -100,18 +100,56 @@ impl ConfigFile {
                     .with_context(|| format!("Failed to open theme file {:?}", path.to_string_lossy()))?;
                 let read = std::io::BufReader::new(file);
                 let theme: UiConfigFile = ron::de::from_reader(read)?;
-                theme.try_into()
+                Ok(theme)
             },
         )
     }
 
-    pub fn into_config(self, config_dir: &Path) -> Result<Config> {
+    pub fn into_config(self, config_dir: Option<&Path>) -> Result<Config> {
         Ok(Config {
-            theme: self.read_theme(config_dir.parent().expect("Config path to be defined correctly"))?,
+            theme: config_dir
+                .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
+                .transpose()?
+                .unwrap_or_default()
+                .try_into()?,
             address: Box::leak(Box::new(self.address)),
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
         })
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+
+    use crate::config::{keys::KeyConfigFile, theme::UiConfigFile, ConfigFile};
+
+    #[test]
+    fn example_config_equals_default() {
+        let config = ConfigFile::default();
+        let path = format!(
+            "{}/assets/example_config.ron",
+            std::env::var("CARGO_MANIFEST_DIR").unwrap()
+        );
+
+        let mut f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        f.keybinds.logs = KeyConfigFile::default().logs;
+
+        assert_eq!(config, f);
+    }
+
+    #[test]
+    fn example_theme_equals_default() {
+        let theme = UiConfigFile::default();
+        let path = format!(
+            "{}/assets/example_theme.ron",
+            std::env::var("CARGO_MANIFEST_DIR").unwrap()
+        );
+
+        let file = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+
+        assert_eq!(theme, file);
     }
 }
