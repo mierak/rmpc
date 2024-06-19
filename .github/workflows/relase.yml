@@ -1,0 +1,43 @@
+name: Release
+
+on: 
+  push:
+    tags:
+    - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        build:
+          - x86_64-unknown-linux-gnu
+        include:
+          - build: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    steps:
+    - name: Read release tag
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]; then
+            echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}"  >> "$GITHUB_ENV"
+        fi
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Build release
+      run: |
+        cargo build --release --target ${{ matrix.target }}
+    - name: Copy artifacts
+      working-directory: ./target/${{ matrix.target }}/release
+      run: |
+        mkdir -p "/tmp/artifacts"
+        tar cvzf "/tmp/artifacts/rmpc-${{ matrix.target }}.tar.gz" "rmpc"
+    - name: Release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: /tmp/artifacts/*
