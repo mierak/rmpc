@@ -77,6 +77,7 @@ impl Modal for RenamePlaylistModal {
 
         let input = Input::default()
             .set_label("New name:")
+            .set_label_style(app.config.as_text_style())
             .set_text(&self.new_name)
             .set_focused(self.input_focused)
             .set_focused_style(app.config.theme.highlight_border_style)
@@ -86,6 +87,7 @@ impl Modal for RenamePlaylistModal {
         self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default()
             .buttons(buttons)
+            .inactive_style(app.config.as_text_style())
             .active_style(if self.input_focused {
                 Style::default().reversed()
             } else {

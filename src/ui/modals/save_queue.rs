@@ -74,6 +74,7 @@ impl Modal for SaveQueueModal {
 
         let input = Input::default()
             .set_label("Playlist name:")
+            .set_label_style(app.config.as_text_style())
             .set_text(&self.name)
             .set_focused(self.input_focused)
             .set_focused_style(app.config.theme.highlight_border_style)
@@ -92,6 +93,7 @@ impl Modal for SaveQueueModal {
             } else {
                 app.config.theme.current_item_style
             })
+            .inactive_style(app.config.as_text_style())
             .buttons(buttons)
             .block(
                 Block::default()

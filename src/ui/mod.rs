@@ -199,9 +199,9 @@ impl Ui<'_> {
                     frame,
                     ratatui::prelude::Rect {
                         x: content_area.x,
-                        y: content_area.y + 1,
+                        y: content_area.y,
                         width: content_area.width,
-                        height: content_area.height - 1,
+                        height: content_area.height,
                     },
                     &state.status,
                     state.config
@@ -662,9 +662,6 @@ impl Config {
     }
 
     fn as_tabs_block(&self) -> ratatui::widgets::Block {
-        // if !self.ui.borders {
-        //     return ratatui::widgets::Block::default().padding(Padding::new(0, 0, 1, 1));
-        // }
         if !self.theme.draw_borders {
             return ratatui::widgets::Block::default()/* .padding(Padding::new(0, 0, 1, 1)) */;
         }
@@ -677,6 +674,13 @@ impl Config {
 
     fn as_border_style(&self) -> ratatui::style::Style {
         self.theme.borders_style
+    }
+
+    fn as_text_style(&self) -> ratatui::style::Style {
+        self.theme
+            .text_color
+            .map(|color| Style::default().fg(color))
+            .unwrap_or_default()
     }
 
     fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {

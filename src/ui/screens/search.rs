@@ -135,6 +135,8 @@ impl SearchScreen {
                         .set_label(label)
                         .set_placeholder("<None>")
                         .set_focused(is_focused && matches!(self.phase, Phase::SearchTextboxInput))
+                        .set_label_style(config.as_text_style())
+                        .set_input_style(config.as_text_style())
                         .set_text(value);
 
                     widget = if matches!(self.phase, Phase::SearchTextboxInput) && is_focused {
@@ -167,10 +169,14 @@ impl SearchScreen {
             let mut inp = match input.variant {
                 FilterInputVariant::SelectFilterKind { value } => Input::default()
                     .set_borderless(true)
+                    .set_label_style(config.as_text_style())
+                    .set_input_style(config.as_text_style())
                     .set_label(input.label)
                     .set_text(Into::into(&value)),
                 FilterInputVariant::SelectFilterCaseSensitive { value } => Input::default()
                     .set_borderless(true)
+                    .set_label_style(config.as_text_style())
+                    .set_input_style(config.as_text_style())
                     .set_label(input.label)
                     .set_text(if value { "Yes" } else { "No" }),
             };
@@ -205,7 +211,9 @@ impl SearchScreen {
 
             if is_focused {
                 button = button.style(config.theme.current_item_style);
-            };
+            } else {
+                button = button.style(config.as_text_style());
+            }
             frame.render_widget(button, input_areas[idx]);
         }
     }

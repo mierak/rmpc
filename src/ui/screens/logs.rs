@@ -50,7 +50,9 @@ impl Screen for LogsScreen {
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(area.height.into()));
 
-        let logs_wg = List::new(lines).block(Block::default().padding(Padding::right(5)));
+        let logs_wg = List::new(lines)
+            .style(config.as_text_style())
+            .block(Block::default().padding(Padding::right(5)));
         frame.render_stateful_widget(logs_wg, area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),

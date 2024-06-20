@@ -40,7 +40,9 @@ impl Modal for ConfirmQueueClearModal {
             .border_style(app.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Clear the queue?");
-        let text = Paragraph::new("Are you sure you want to clear the queue?").wrap(Wrap { trim: true });
+        let text = Paragraph::new("Are you sure you want to clear the queue?")
+            .style(app.config.as_text_style())
+            .wrap(Wrap { trim: true });
 
         let popup_area = frame.size().centered_exact(45, 5);
         frame.render_widget(Clear, popup_area);
@@ -58,6 +60,7 @@ impl Modal for ConfirmQueueClearModal {
         self.button_group.set_button_count(buttons.len());
         let group = ButtonGroup::default()
             .active_style(app.config.theme.current_item_style)
+            .inactive_style(app.config.as_text_style())
             .buttons(buttons)
             .block(
                 Block::default()

@@ -70,7 +70,9 @@ where
         };
 
         {
-            let preview = List::new(preview.unwrap_or_default()).highlight_style(self.config.theme.current_item_style);
+            let preview = List::new(preview.unwrap_or_default())
+                .highlight_style(self.config.theme.current_item_style)
+                .style(self.config.as_text_style());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
@@ -79,7 +81,7 @@ where
             prev_state.set_content_len(Some(previous.len()));
             prev_state.set_viewport_len(Some(previous_area.height.into()));
 
-            let mut previous = List::new(previous);
+            let mut previous = List::new(previous).style(self.config.as_text_style());
             if self.config.theme.draw_borders {
                 previous = previous.block(
                     Block::default()
@@ -121,7 +123,8 @@ where
                     }
                     b.padding(Padding::new(0, 1, 0, 0))
                 })
-                .highlight_style(self.config.theme.current_item_style);
+                .highlight_style(self.config.theme.current_item_style)
+                .style(self.config.as_text_style());
 
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(

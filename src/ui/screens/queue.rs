@@ -143,6 +143,7 @@ impl Screen for QueueScreen {
                 .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
                     Line::from(*title).alignment(formats[idx].alignment.into())
                 })))
+                .style(config.as_text_style())
                 .widths(self.column_widths.clone())
                 .block(config.as_header_table_block().padding(table_padding));
             frame.render_widget(header_table, table_header_section);
@@ -162,6 +163,7 @@ impl Screen for QueueScreen {
                 }
                 b
             })
+            .style(config.as_text_style())
             .highlight_style(config.theme.current_item_style);
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
@@ -170,10 +172,7 @@ impl Screen for QueueScreen {
         queue_section.height = queue_section.height.saturating_sub(1);
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
-            queue_section.inner(&ratatui::prelude::Margin {
-                vertical: 0,
-                horizontal: 0,
-            }),
+            queue_section,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
         if show_image {

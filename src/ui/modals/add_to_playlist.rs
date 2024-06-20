@@ -81,6 +81,7 @@ impl Modal for AddToPlaylistModal {
                 .map(|(idx, v)| format!("{:>3}: {v}", idx + 1))
                 .collect_vec(),
         )
+        .style(app.config.as_text_style())
         .highlight_style(match self.focused {
             FocusedComponent::Buttons => Style::default().reversed(),
             FocusedComponent::Playlists => app.config.theme.current_item_style,
@@ -97,6 +98,7 @@ impl Modal for AddToPlaylistModal {
         self.button_group.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
             .buttons(buttons)
+            .inactive_style(app.config.as_text_style())
             .active_style(match self.focused {
                 FocusedComponent::Playlists => Style::default().reversed(),
                 FocusedComponent::Buttons => app.config.theme.current_item_style,

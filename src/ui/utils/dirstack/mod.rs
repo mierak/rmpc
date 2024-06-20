@@ -1,5 +1,4 @@
 use ratatui::{
-    style::{Color, Style},
     text::{Line, Span},
     widgets::{ListItem, ListState, TableState},
 };
@@ -66,7 +65,7 @@ impl DirStackItem for String {
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, Style::default().fg(Color::Blue))
+            Span::styled(symbols.marker, config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
@@ -109,7 +108,7 @@ impl DirStackItem for DirOrSong {
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, Style::default().fg(Color::Blue))
+            Span::styled(symbols.marker, config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
@@ -146,7 +145,7 @@ impl DirStackItem for Song {
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, Style::default().fg(Color::Blue))
+            Span::styled(symbols.marker, config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };

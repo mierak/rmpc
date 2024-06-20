@@ -53,7 +53,9 @@ impl Modal for ConfirmModal {
             .border_style(app.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title(self.title.as_str());
-        let text = Paragraph::new(self.message.as_str()).wrap(Wrap { trim: true });
+        let text = Paragraph::new(self.message.as_str())
+            .style(app.config.as_text_style())
+            .wrap(Wrap { trim: true });
 
         let popup_area = frame.size().centered_exact(45, 7);
         frame.render_widget(Clear, popup_area);
@@ -70,6 +72,7 @@ impl Modal for ConfirmModal {
         self.button_group.set_button_count(1);
         let group = ButtonGroup::default()
             .active_style(app.config.theme.current_item_style)
+            .inactive_style(app.config.as_text_style())
             .add_button(Button::default().label("Ok"))
             .block(
                 Block::default()
