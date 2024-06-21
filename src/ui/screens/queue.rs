@@ -168,8 +168,10 @@ impl Screen for QueueScreen {
 
         frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
 
-        queue_section.y = queue_section.y.saturating_add(1);
-        queue_section.height = queue_section.height.saturating_sub(1);
+        if config.theme.show_song_table_header {
+            queue_section.y = queue_section.y.saturating_add(1);
+            queue_section.height = queue_section.height.saturating_sub(1);
+        }
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
             queue_section,
