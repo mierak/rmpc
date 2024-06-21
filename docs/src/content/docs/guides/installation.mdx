@@ -14,7 +14,18 @@ methods will be provided in the future.
 
 <Steps>
 
-1. Install rmpc using cargo
+1. Install rmpc with one of the following methods
+    - By downloading a precompiled binary from github [releases page](https://github.com/mierak/rmpc/releases/latest/).
+      Then untar the archive, set execute persmission if needed and run rmpc.
+    - Using cargo
+    ```bash frame=none showLineNumbers=false
+    cargo install rmpc --locked
+    ```
+    - Using [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)
+    ```bash frame=none showLineNumbers=false
+    cargo binstall rmpc
+    ```
+    - Install the latest git version
     ```bash frame=none showLineNumbers=false
     cargo install --git https://github.com/mierak/rmpc --locked
     ```

@@ -1,4 +1,4 @@
-# Rusty Media Player Client
+# Rusty Music Player Client
 
 Rmpc is a beautiful, modern and configurable terminal based Music Player Daemon client. It is
 heavily inspired by [ncmpcpp](https://github.com/ncmpcpp/ncmpcpp) and
