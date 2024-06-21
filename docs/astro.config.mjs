@@ -40,7 +40,7 @@ export default defineConfig({
                     },
                 },
                 {
-                    label: "Theme Gallery",
+                    label: "Theme gallery",
                     autogenerate: {
                         directory: "themes",
                     },
