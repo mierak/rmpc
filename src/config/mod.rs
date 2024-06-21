@@ -23,6 +23,9 @@ pub struct Args {
     pub log: Level,
     #[command(subcommand)]
     pub command: Option<Command>,
+    #[arg(short, long)]
+    /// Override the address to connect to. Defaults to value in the config file.
+    pub address: Option<String>,
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
@@ -83,10 +86,15 @@ impl Default for ConfigFile {
 }
 
 impl ConfigFile {
-    pub fn read(path: &PathBuf) -> Result<Self> {
+    pub fn read(path: &PathBuf, address: Option<String>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         let read = std::io::BufReader::new(file);
-        Ok(ron::de::from_reader(read)?)
+        let mut config: ConfigFile = ron::de::from_reader(read)?;
+        if let Some(address) = address {
+            config.address = address;
+        }
+
+        Ok(config)
     }
 
     fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile> {

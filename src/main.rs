@@ -53,7 +53,7 @@ pub enum AppEvent {
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
     match &args.command {
         Some(Command::Config) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
@@ -67,13 +67,15 @@ fn main() -> Result<()> {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
 
-            let config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
-                Ok(val) => val.into_config(Some(&args.config))?,
-                Err(err) => {
-                    status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                    ConfigFile::default().into_config(None)?
-                }
-            }));
+            let config = Box::leak(Box::new(
+                match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
+                    Ok(val) => val.into_config(Some(&args.config))?,
+                    Err(err) => {
+                        status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
+                        ConfigFile::default().into_config(None)?
+                    }
+                },
+            ));
 
             try_ret!(tx.send(AppEvent::RequestRender), "Failed to render first frame");
 
