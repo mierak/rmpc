@@ -607,20 +607,6 @@ impl DurationExt for Duration {
     }
 }
 
-trait BoolExt {
-    fn to_onoff(&self) -> &'static str;
-}
-
-impl BoolExt for bool {
-    fn to_onoff(&self) -> &'static str {
-        if *self {
-            "On"
-        } else {
-            "Off"
-        }
-    }
-}
-
 impl From<&FilterKind> for &'static str {
     fn from(value: &FilterKind) -> Self {
         match value {

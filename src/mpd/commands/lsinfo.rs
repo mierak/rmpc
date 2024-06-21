@@ -26,7 +26,11 @@ impl FromMpd for Dir {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "directory" => {
-                self.path = value.split('/').last().context("Failed to parse dir name.")?.to_owned();
+                value
+                    .split('/')
+                    .last()
+                    .context("Failed to parse dir name.")?
+                    .clone_into(&mut self.path);
                 self.full_path = value;
             }
             "last-modified" => self.last_modified = value,

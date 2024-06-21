@@ -42,6 +42,7 @@ pub(super) trait Modal: std::fmt::Debug {
     ) -> Result<KeyHandleResultInternal>;
 }
 
+#[allow(dead_code)]
 pub trait RectExt {
     fn centered(&self, width_percent: u16, height_percent: u16) -> Rect;
     fn centered_exact(&self, width: u16, height: u16) -> Rect;
