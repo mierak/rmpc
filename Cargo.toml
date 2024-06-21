@@ -1,7 +1,12 @@
 [package]
 name = "rmpc"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+license = "BSD-3-Clause"
+description = "A beautiful and configurable TUI client for MPD"
+homepage = "https://mierak.github.io/rmpc/"
+repository = "https://github.com/mierak/rmpc"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
