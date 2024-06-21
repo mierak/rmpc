@@ -11,8 +11,11 @@
     background_color: None,
     header_background_color: None,
     modal_background_color: None,
-    active_tab_style: (fg: "black", bg: "blue", modifiers: "Bold"),
-    inactive_tab_style: (),
+    tab_bar: (
+        enabled: true,
+        active_style: (fg: "black", bg: "blue", modifiers: "Bold"),
+        inactive_style: (),
+    ),
     highlighted_item_style: (fg: "blue", modifiers: "Bold"),
     current_item_style: (fg: "black", bg: "blue", modifiers: "Bold"),
     borders_style: (fg: "blue"),

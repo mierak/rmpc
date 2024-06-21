@@ -132,6 +132,8 @@ impl ConfigFile {
 #[allow(clippy::unwrap_used)]
 mod tests {
 
+    use walkdir::WalkDir;
+
     use crate::config::{keys::KeyConfigFile, theme::UiConfigFile, ConfigFile};
 
     #[test]
@@ -159,5 +161,22 @@ mod tests {
         let file = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
 
         assert_eq!(theme, file);
+    }
+
+    #[test]
+    fn gallery_themes_are_valid() {
+        let path = format!(
+            "{}/docs/src/assets/themes",
+            std::env::var("CARGO_MANIFEST_DIR").unwrap()
+        );
+
+        for entry in WalkDir::new(path).follow_links(true).into_iter().filter_map(Result::ok) {
+            let f_name = entry.file_name().to_string_lossy();
+
+            if f_name.ends_with(".ron") {
+                dbg!(entry.path());
+                ron::de::from_str::<UiConfigFile>(&std::fs::read_to_string(entry.path()).unwrap()).unwrap();
+            }
+        }
     }
 }

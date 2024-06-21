@@ -93,19 +93,19 @@ the progress bar, second is the thumb and the third is the empty track. Default 
 
 #### progress_bar.track_style
 
-<ConfigValue name="track_style" type="string" customText="Style" />
+<ConfigValue name="track_style" type="string" customText="<style>" />
 
 Style of the empty track part of the progress bar.
 
 #### progress_bar.elapsed_style
 
-<ConfigValue name="elapsed_style" type="string" customText="Style" />
+<ConfigValue name="elapsed_style" type="string" customText="<style>" />
 
 Style of the elapsed part of the progress bar.
 
 #### progress_bar.thumb_style
 
-<ConfigValue name="thumb_style" type="string" customText="Style" />
+<ConfigValue name="thumb_style" type="string" customText="<style>" />
 
 Style of the progress bar thumb.
 
@@ -122,15 +122,15 @@ the thumb, third is the top end and the fourth is the bottom end. Default is `["
 
 #### scrollbar.track_style
 
-<ConfigValue name="track_style" type="string" customText="Style" />
+<ConfigValue name="track_style" type="string" customText="<style>" />
 
 #### scrollbar.ends_style
 
-<ConfigValue name="ends_style" type="string" customText="Style" />
+<ConfigValue name="ends_style" type="string" customText="<style>" />
 
 #### scrollbar.thumb_style
 
-<ConfigValue name="thumb_style" type="string" customText="Style" />
+<ConfigValue name="thumb_style" type="string" customText="<style>" />
 
 ### browser_column_widths
 
@@ -164,33 +164,43 @@ Background color of modal dialogs.
 
 Foreground color of basic text. Defaults to your terminal's foreground color.
 
-### active_tab_style
+### tab_bar
 
-<ConfigValue name="active_tab_style" type="other" customText="Style" />
+Tab bar at the top of the windo below header. Shows what tab is currently active.
+
+#### tab_bar.enabled
+
+<ConfigValue name="enabled" type="boolean" />
+
+Whether to show tab bar at the top of the window. Default to `true`.
+
+#### tab_bar.active_style
+
+<ConfigValue name="active_style" type="other" customText="<style>" />
 
 Style for the active tab.
 
-### inactive_tab_style
+#### tab_bar.inactive_style
 
-<ConfigValue name="inactive_tab_style" type="other" customText="Style" />
+<ConfigValue name="inactive_style" type="other" customText="<style>" />
 
 Style for all tabs except the active one.
 
 ### highlighted_item_style
 
-<ConfigValue name="highlighted_item_style" type="other" customText="Style" />
+<ConfigValue name="highlighted_item_style" type="other" customText="<style>" />
 
 ### current_item_style
 
-<ConfigValue name="current_item_style" type="other" customText="Style" />
+<ConfigValue name="current_item_style" type="other" customText="<style>" />
 
 ### borders_style
 
-<ConfigValue name="borders_style" type="other" customText="Style" />
+<ConfigValue name="borders_style" type="other" customText="<style>" />
 
 ### highlight_border_style
 
-<ConfigValue name="highlight_border_style" type="other" customText="Style" />
+<ConfigValue name="highlight_border_style" type="other" customText="<style>" />
 
 ### song_table_format
 

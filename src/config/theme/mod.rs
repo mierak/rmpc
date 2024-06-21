@@ -37,11 +37,10 @@ pub struct UiConfig {
     pub highlighted_item_style: Style,
     pub current_item_style: Style,
     pub highlight_border_style: Style,
-    pub active_tab_style: Style,
-    pub inactive_tab_style: Style,
     pub column_widths: [u16; 3],
     pub symbols: SymbolsConfig,
     pub progress_bar: ProgressBarConfig,
+    pub tab_bar: TabBar,
     pub scrollbar: ScrollbarConfig,
     pub show_song_table_header: bool,
     pub song_table_format: &'static [SongTableColumn],
@@ -51,7 +50,7 @@ pub struct UiConfig {
 
 impl std::fmt::Debug for UiConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UiConfig {{ album_art_position: {:?}, album_art_width_percent: {}, draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, active_tab_style: {:?}, inactive_tab_style: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.album_art_position, self.album_art_width_percent, self.draw_borders, self.background_color, self.header_background_color, self.modal_background_color, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.active_tab_style, self.inactive_tab_style, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
+        write!(f, "UiConfig {{ album_art_position: {:?}, album_art_width_percent: {}, draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, tab_bar: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.album_art_position, self.album_art_width_percent, self.draw_borders, self.background_color, self.header_background_color, self.modal_background_color, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.tab_bar, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
     }
 }
 
@@ -69,6 +68,7 @@ pub struct UiConfigFile {
     #[serde(default = "defaults::default_true")]
     pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
+    pub(super) tab_bar: TabBarFile,
     pub(super) progress_bar: ProgressBarConfigFile,
     pub(super) scrollbar: ScrollbarConfigFile,
     #[serde(default = "defaults::default_column_widths")]
@@ -77,8 +77,6 @@ pub struct UiConfigFile {
     pub(super) text_color: Option<String>,
     pub(super) header_background_color: Option<String>,
     pub(super) modal_background_color: Option<String>,
-    pub(super) active_tab_style: Option<StyleFile>,
-    pub(super) inactive_tab_style: Option<StyleFile>,
     pub(super) borders_style: Option<StyleFile>,
     pub(super) highlighted_item_style: Option<StyleFile>,
     pub(super) current_item_style: Option<StyleFile>,
@@ -122,16 +120,19 @@ impl Default for UiConfigFile {
                 bg: None,
                 modifiers: None,
             }),
-            active_tab_style: Some(StyleFile {
-                fg: Some("black".to_string()),
-                bg: Some("blue".to_string()),
-                modifiers: Some(Modifiers::Bold),
-            }),
-            inactive_tab_style: Some(StyleFile {
-                fg: None,
-                bg: None,
-                modifiers: None,
-            }),
+            tab_bar: TabBarFile {
+                enabled: Some(true),
+                active_style: Some(StyleFile {
+                    fg: Some("black".to_string()),
+                    bg: Some("blue".to_string()),
+                    modifiers: Some(Modifiers::Bold),
+                }),
+                inactive_style: Some(StyleFile {
+                    fg: None,
+                    bg: None,
+                    modifiers: None,
+                }),
+            },
             browser_column_widths: vec![20, 38, 42],
             progress_bar: ProgressBarConfigFile::default(),
             scrollbar: ScrollbarConfigFile::default(),
@@ -143,6 +144,20 @@ impl Default for UiConfigFile {
             song_table_format: QueueTableColumnsFile::default(),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TabBarFile {
+    pub(super) enabled: Option<bool>,
+    pub(super) active_style: Option<StyleFile>,
+    pub(super) inactive_style: Option<StyleFile>,
+}
+
+#[derive(Debug, Default)]
+pub struct TabBar {
+    pub enabled: bool,
+    pub active_style: Style,
+    pub inactive_style: Style,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -189,7 +204,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             highlighted_item_style: value.highlighted_item_style.to_config_or(Some(Color::Blue), None)?,
             highlight_border_style: value.highlight_border_style.to_config_or(Some(Color::Blue), None)?,
-            inactive_tab_style: value.inactive_tab_style.to_config_or(None, header_bg_color)?,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
@@ -203,9 +217,14 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 value.browser_column_widths[1],
                 value.browser_column_widths[2],
             ],
-            active_tab_style: value
-                .active_tab_style
-                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+            tab_bar: TabBar {
+                enabled: value.tab_bar.enabled.unwrap_or(true),
+                active_style: value
+                    .tab_bar
+                    .active_style
+                    .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+                inactive_style: value.tab_bar.inactive_style.to_config_or(None, header_bg_color)?,
+            },
             current_item_style: value
                 .current_item_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,

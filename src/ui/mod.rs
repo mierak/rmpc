@@ -14,6 +14,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use strum::Display;
+use widgets::app_tabs::AppTabs;
 
 use crate::{
     config::Config,
@@ -146,12 +147,14 @@ impl Ui<'_> {
             self.status_message = None;
         }
 
-        let [header_area, content_area, bar_area] = *Layout::vertical([
-            Constraint::Length(if state.config.theme.draw_borders {
-                u16::try_from(state.config.theme.header.rows.len())? + 3
-            } else {
-                u16::try_from(state.config.theme.header.rows.len())? + 1
-            }),
+        let tab_area_height = match (state.config.theme.tab_bar.enabled, state.config.theme.draw_borders) {
+            (true, true) => 3,
+            (true, false) => 1,
+            (false, _) => 0,
+        };
+        let [header_area, tabs_area, content_area, bar_area] = *Layout::vertical([
+            Constraint::Length(u16::try_from(state.config.theme.header.rows.len())?),
+            Constraint::Length(tab_area_height), // Tab bar
             Constraint::Percentage(100),
             Constraint::Min(1),
         ])
@@ -159,14 +162,13 @@ impl Ui<'_> {
             return Ok(());
         };
 
-        let header = Header::new(
-            state.config,
-            self.active_screen,
-            &state.status,
-            self.current_song.as_ref(),
-        );
-
+        let header = Header::new(state.config, &state.status, self.current_song.as_ref());
         frame.render_widget(header, header_area);
+
+        if tab_area_height > 0 {
+            let app_tabs = AppTabs::new(self.active_screen, state.config);
+            frame.render_widget(app_tabs, tabs_area);
+        }
 
         if let Some(StatusMessage { message, level, .. }) = &self.status_message {
             let status_bar = Paragraph::new(message.to_owned())

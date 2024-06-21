@@ -5,7 +5,6 @@ use ratatui::{
     text::Line,
     widgets::{Block, Widget},
 };
-use strum::{IntoEnumIterator, VariantNames};
 
 use crate::{
     config::{
@@ -15,22 +14,13 @@ use crate::{
     mpd::commands::{Song, Status},
 };
 
-use super::app_tabs::AppTabs;
-
-pub struct Header<'a, T>
-where
-    T: PartialEq + IntoEnumIterator + VariantNames,
-{
+pub struct Header<'a> {
     config: &'a Config,
     status: &'a Status,
-    active_tab: T,
     song: Option<&'a Song>,
 }
 
-impl<T> Widget for Header<'_, T>
-where
-    T: PartialEq + IntoEnumIterator + VariantNames,
-{
+impl Widget for Header<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let config = self.config;
 
@@ -42,15 +32,7 @@ where
 
         let row_count = config.theme.header.rows.len();
 
-        let [header, tabs] = *Layout::vertical([
-            Constraint::Length(row_count as u16),
-            Constraint::Length(if config.theme.draw_borders { 3 } else { 1 }),
-        ])
-        .split(area) else {
-            return;
-        };
-
-        let layouts = Layout::vertical((0..row_count).map(|_| Constraint::Length(1))).split(header);
+        let layouts = Layout::vertical((0..row_count).map(|_| Constraint::Length(1))).split(area);
         for row in 0..row_count {
             let [left, center, right] = *Layout::horizontal([
                 Constraint::Percentage(30),
@@ -72,9 +54,6 @@ where
             let widget = template.format(self.song, self.status).right_aligned();
             widget.render(right, buf);
         }
-
-        let app_tabs = AppTabs::new(self.active_tab, config);
-        app_tabs.render(tabs, buf);
     }
 }
 
@@ -91,16 +70,8 @@ impl<'a> PropertyTemplates<'a> {
     }
 }
 
-impl<'a, T> Header<'a, T>
-where
-    T: PartialEq + IntoEnumIterator + VariantNames,
-{
-    pub fn new(config: &'a Config, active_tab: T, status: &'a Status, song: Option<&'a Song>) -> Self {
-        Self {
-            config,
-            status,
-            active_tab,
-            song,
-        }
+impl<'a> Header<'a> {
+    pub fn new(config: &'a Config, status: &'a Status, song: Option<&'a Song>) -> Self {
+        Self { config, status, song }
     }
 }

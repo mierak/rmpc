@@ -28,6 +28,7 @@ chrono = "0.4.35"
 serde_with = "3.7.0"
 serde_json = "1.0.116"
 either = "1.11.0"
+walkdir = "2.5.0"
 
 [dev-dependencies]
 rstest = "0.19.0"
