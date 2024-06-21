@@ -28,10 +28,10 @@ Below is a list of properties that can be changed.
 
 ### address
 
-<ConfigValue name="address" type="string" customText="<ip>:<port>" />
+<ConfigValue name="address" type={['"<ip>:<port>"', '"/path/to/socket"']} />
 
-The address to connect to. By default rmpc tries to connect to MPD at `127.0.0.1:6600`. Socket connections are currently
-not supported.
+The address to connect to. By default rmpc tries to connect to MPD at `127.0.0.1:6600`. Address can be either an IP
+address with a port or a UNIX domain socket path.
 
 ### theme
 
