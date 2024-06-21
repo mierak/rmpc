@@ -1,0 +1,17 @@
+name: Test and Validate
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Cargo test
+      run: |
+        cargo test
+    - name: Format check
+      run: |
+        cargo fmt --check
+
