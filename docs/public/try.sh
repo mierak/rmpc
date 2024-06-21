@@ -32,5 +32,4 @@ read -r mpd_ip
 printf "Enter MPD's port: " >&2
 read -r mpd_port
 
-# exec /tmp/rmpc/rmpc "$@"
-exec rmpc --address "$mpd_ip:$mpd_port"
+exec /tmp/rmpc/rmpc --address "$mpd_ip:$mpd_port"
