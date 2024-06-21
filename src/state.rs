@@ -17,7 +17,6 @@ impl<T> std::fmt::Debug for MyVecDeque<T> {
 
 pub struct State {
     pub config: &'static Config,
-    pub status_loop_active: bool,
     pub status: Status,
 }
 
@@ -26,7 +25,6 @@ impl Default for State {
         Self {
             status: Status::default(),
             config: Box::leak(Box::default()),
-            status_loop_active: false,
         }
     }
 }
@@ -35,10 +33,6 @@ impl State {
     pub fn try_new(client: &mut Client<'_>, config: &'static Config) -> Result<Self> {
         let status = client.get_status()?;
 
-        Ok(Self {
-            status,
-            config,
-            status_loop_active: false,
-        })
+        Ok(Self { config, status })
     }
 }

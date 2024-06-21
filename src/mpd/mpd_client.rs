@@ -30,6 +30,7 @@ pub enum SaveMode {
     Replace,
 }
 
+#[allow(dead_code)]
 pub trait MpdClient {
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
     fn get_volume(&mut self) -> MpdResult<Volume>;

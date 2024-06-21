@@ -34,10 +34,11 @@ impl Bound<u8> for Volume {
 
 impl Volume {
     pub fn new(value: u8) -> Self {
-        Self(value.max(0).min(100))
+        Self(value.clamp(0, 100))
     }
 }
 
+#[allow(dead_code)]
 pub trait Bound<T> {
     fn value(&self) -> &u8;
     fn inc(&mut self) -> &Self;
