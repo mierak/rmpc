@@ -85,10 +85,7 @@ fn main() -> Result<()> {
             );
 
             let album_art_disabled = config.theme.album_art_width_percent == 0;
-            if 
-
-
-                !album_art_disabled && !utils::kitty::check_kitty_support()? {
+            if !album_art_disabled && !utils::kitty::check_kitty_support()? {
                 warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
                 config.theme.album_art_width_percent = 0;
             }

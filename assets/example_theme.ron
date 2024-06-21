@@ -3,6 +3,7 @@
 #![enable(unwrap_variant_newtypes)]
 (
     album_art_position: Left,
+    album_art_width_percent: 40,
     default_album_art_path: None,
     show_song_table_header: true,
     draw_borders: true,
