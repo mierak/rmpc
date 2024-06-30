@@ -34,6 +34,8 @@ pub enum Command {
     Config,
     /// Prints the default theme. Can be used to bootstrap your theme file.
     Theme,
+    /// Prints the rmpc version
+    Version,
 }
 
 fn get_default_config_path() -> PathBuf {

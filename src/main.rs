@@ -57,11 +57,12 @@ fn main() -> Result<()> {
     match &args.command {
         Some(Command::Config) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
-            return Ok(());
         }
         Some(Command::Theme) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
-            return Ok(());
+        }
+        Some(Command::Version) => {
+            println!("rmpc version: {}", env!("CARGO_PKG_VERSION"));
         }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
