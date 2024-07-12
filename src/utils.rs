@@ -110,7 +110,7 @@ pub mod tmux {
 pub mod kitty {
     use super::tmux;
 
-    pub fn check_kitty_support() -> anyhow::Result<bool> {
+    pub fn is_kitty_image_protocol_supported() -> anyhow::Result<bool> {
         let query = if tmux::is_inside_tmux() {
             if !tmux::is_passthrough_enabled()? {
                 tmux::enable_passthrough()?;
