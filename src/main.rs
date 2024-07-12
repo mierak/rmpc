@@ -86,8 +86,8 @@ fn main() -> Result<()> {
             );
 
             let album_art_disabled = config.theme.album_art_width_percent == 0;
-            if !album_art_disabled && !utils::kitty::check_kitty_support()? {
-                warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
+            if !album_art_disabled && !utils::kitty::is_kitty_image_protocol_supported()? {
+                status_warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
                 config.theme.album_art_width_percent = 0;
             }
 
@@ -105,18 +105,8 @@ fn main() -> Result<()> {
                 .name("input poll".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
-
-                let mut ui = Ui::new(client, state.config);
-                if !config.theme.album_art_width_percent == 0 && !utils::kitty::check_kitty_support()?  {
-                    ui.display_message(
-                        "Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art"
-                            .to_owned(),
-                        Level::Warn,
-                    );
-                }
-
                 main_task(
-                    ui,
+                    Ui::new(client, state.config),
                     state,
                     rx,
                     try_ret!(
