@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 #[cfg(debug_assertions)]
@@ -33,18 +32,11 @@ pub struct KeyConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum SingleOrMultiple<T> {
-    Single(T),
-    Multiple(Vec<T>),
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct KeyConfigFile {
     #[serde(default)]
-    pub global: HashMap<GlobalAction, SingleOrMultiple<Key>>,
+    pub global: HashMap<Key, GlobalAction>,
     #[serde(default)]
-    pub navigation: HashMap<CommonAction, SingleOrMultiple<Key>>,
+    pub navigation: HashMap<Key, CommonAction>,
     // pub albums: HashMap<AlbumsActions, Vec<Key>>,
     // pub artists: HashMap<ArtistsActions, Vec<Key>>,
     // pub directories: HashMap<DirectoriesActions, Vec<Key>>,
@@ -52,9 +44,9 @@ pub struct KeyConfigFile {
     // pub search: HashMap<SearchActions, Vec<Key>>,
     #[cfg(debug_assertions)]
     #[serde(default)]
-    pub logs: HashMap<LogsActions, SingleOrMultiple<Key>>,
+    pub logs: HashMap<Key, LogsActions>,
     #[serde(default)]
-    pub queue: HashMap<QueueActions, SingleOrMultiple<Key>>,
+    pub queue: HashMap<Key, QueueActions>,
 }
 
 impl Default for KeyConfigFile {
@@ -74,49 +66,52 @@ impl Default for KeyConfigFile {
         use QueueActions as Q;
         Self {
             global: HashMap::from([
-                (G::Quit,             SingleOrMultiple::Single(Key { key: K::Char('q'), modifiers: M::NONE })),
-                (G::NextTrack,        SingleOrMultiple::Single(Key { key: K::Char('>'), modifiers: M::NONE })),
-                (G::PreviousTrack,    SingleOrMultiple::Single(Key { key: K::Char('<'), modifiers: M::NONE })),
-                (G::Stop,             SingleOrMultiple::Single(Key { key: K::Char('s'), modifiers: M::NONE })),
-                (G::ToggleRepeat,     SingleOrMultiple::Single(Key { key: K::Char('z'), modifiers: M::NONE })),
-                (G::ToggleRandom,     SingleOrMultiple::Single(Key { key: K::Char('x'), modifiers: M::NONE })),
-                (G::ToggleSingle,     SingleOrMultiple::Single(Key { key: K::Char('c'), modifiers: M::NONE })),
-                (G::TogglePause,      SingleOrMultiple::Single(Key { key: K::Char('p'), modifiers: M::NONE })),
-                (G::SeekForward,      SingleOrMultiple::Single(Key { key: K::Char('f'), modifiers: M::NONE })),
-                (G::SeekBack,         SingleOrMultiple::Single(Key { key: K::Char('b'), modifiers: M::NONE })),
-                (G::VolumeDown,       SingleOrMultiple::Single(Key { key: K::Char(','), modifiers: M::NONE })),
-                (G::VolumeUp,         SingleOrMultiple::Single(Key { key: K::Char('.'), modifiers: M::NONE })),
-                (G::PreviousTab,      SingleOrMultiple::Multiple(vec![Key { key: K::Left,      modifiers: M::NONE }, Key { key: K::BackTab,  modifiers: M::SHIFT }])),
-                (G::NextTab,          SingleOrMultiple::Multiple(vec![Key { key: K::Right,     modifiers: M::NONE }, Key { key: K::Tab,      modifiers: M::NONE }])),
-                (G::ToggleConsume,    SingleOrMultiple::Single(Key { key: K::Char('v'), modifiers: M::NONE })),
-                (G::QueueTab,         SingleOrMultiple::Single(Key { key: K::Char('1'), modifiers: M::NONE })),
-                (G::DirectoriesTab,   SingleOrMultiple::Single(Key { key: K::Char('2'), modifiers: M::NONE })),
-                (G::ArtistsTab,       SingleOrMultiple::Single(Key { key: K::Char('3'), modifiers: M::NONE })),
-                (G::AlbumsTab,        SingleOrMultiple::Single(Key { key: K::Char('4'), modifiers: M::NONE })),
-                (G::PlaylistsTab,     SingleOrMultiple::Single(Key { key: K::Char('5'), modifiers: M::NONE })),
-                (G::SearchTab,        SingleOrMultiple::Single(Key { key: K::Char('6'), modifiers: M::NONE })),
+                (Key { key: K::Char('q'), modifiers: M::NONE  }, G::Quit),
+                (Key { key: K::Char('>'), modifiers: M::NONE  }, G::NextTrack),
+                (Key { key: K::Char('<'), modifiers: M::NONE  }, G::PreviousTrack),
+                (Key { key: K::Char('s'), modifiers: M::NONE  }, G::Stop),
+                (Key { key: K::Char('z'), modifiers: M::NONE  }, G::ToggleRepeat),
+                (Key { key: K::Char('x'), modifiers: M::NONE  }, G::ToggleRandom),
+                (Key { key: K::Char('c'), modifiers: M::NONE  }, G::ToggleSingle),
+                (Key { key: K::Char('p'), modifiers: M::NONE  }, G::TogglePause),
+                (Key { key: K::Char('f'), modifiers: M::NONE  }, G::SeekForward),
+                (Key { key: K::Char('b'), modifiers: M::NONE  }, G::SeekBack),
+                (Key { key: K::Char(','), modifiers: M::NONE  }, G::VolumeDown),
+                (Key { key: K::Char('.'), modifiers: M::NONE  }, G::VolumeUp),
+                (Key { key: K::Left,      modifiers: M::NONE  }, G::PreviousTab),
+                (Key { key: K::BackTab,   modifiers: M::SHIFT }, G::PreviousTab),
+                (Key { key: K::Right,     modifiers: M::NONE  }, G::NextTab),
+                (Key { key: K::Tab,       modifiers: M::NONE  }, G::NextTab),
+                (Key { key: K::Char('v'), modifiers: M::NONE  }, G::ToggleConsume),
+                (Key { key: K::Char('1'), modifiers: M::NONE  }, G::QueueTab),
+                (Key { key: K::Char('2'), modifiers: M::NONE  }, G::DirectoriesTab),
+                (Key { key: K::Char('3'), modifiers: M::NONE  }, G::ArtistsTab),
+                (Key { key: K::Char('4'), modifiers: M::NONE  }, G::AlbumsTab),
+                (Key { key: K::Char('5'), modifiers: M::NONE  }, G::PlaylistsTab),
+                (Key { key: K::Char('6'), modifiers: M::NONE  }, G::SearchTab),
             ]),
             navigation: HashMap::from([
-                (C::Up,               SingleOrMultiple::Single(Key { key: K::Char('k'), modifiers: M::NONE    })),
-                (C::Down,             SingleOrMultiple::Single(Key { key: K::Char('j'), modifiers: M::NONE    })),
-                (C::MoveUp,           SingleOrMultiple::Single(Key { key: K::Char('K'), modifiers: M::SHIFT   })),
-                (C::MoveDown,         SingleOrMultiple::Single(Key { key: K::Char('J'), modifiers: M::SHIFT   })),
-                (C::Right,            SingleOrMultiple::Single(Key { key: K::Char('l'), modifiers: M::NONE    })),
-                (C::Left,             SingleOrMultiple::Single(Key { key: K::Char('h'), modifiers: M::NONE    })),
-                (C::DownHalf,         SingleOrMultiple::Single(Key { key: K::Char('d'), modifiers: M::CONTROL })),
-                (C::UpHalf,           SingleOrMultiple::Single(Key { key: K::Char('u'), modifiers: M::CONTROL })),
-                (C::Bottom,           SingleOrMultiple::Single(Key { key: K::Char('G'), modifiers: M::SHIFT   })),
-                (C::Top,              SingleOrMultiple::Single(Key { key: K::Char('g'), modifiers: M::NONE    })),
-                (C::EnterSearch,      SingleOrMultiple::Single(Key { key: K::Char('/'), modifiers: M::NONE    })),
-                (C::NextResult,       SingleOrMultiple::Single(Key { key: K::Char('n'), modifiers: M::NONE    })),
-                (C::PreviousResult,   SingleOrMultiple::Single(Key { key: K::Char('N'), modifiers: M::SHIFT   })),
-                (C::Select,           SingleOrMultiple::Single(Key { key: K::Char(' '), modifiers: M::NONE    })),
-                (C::Add,              SingleOrMultiple::Single(Key { key: K::Char('a'), modifiers: M::NONE    })),
-                (C::Delete,           SingleOrMultiple::Single(Key { key: K::Char('D'), modifiers: M::SHIFT   })),
-                (C::Rename,           SingleOrMultiple::Single(Key { key: K::Char('r'), modifiers: M::NONE    })),
-                (C::Close,            SingleOrMultiple::Multiple(vec![Key { key: K::Char('c'), modifiers: M::CONTROL }, Key { key: K::Esc, modifiers: M::NONE }])),
-                (C::Confirm,          SingleOrMultiple::Single(Key { key: K::Enter,     modifiers: M::NONE    })),
-                (C::FocusInput,       SingleOrMultiple::Single(Key { key: K::Char('i'), modifiers: M::NONE    })),
+                (Key { key: K::Char('k'), modifiers: M::NONE    }, C::Up),
+                (Key { key: K::Char('j'), modifiers: M::NONE    }, C::Down),
+                (Key { key: K::Char('K'), modifiers: M::SHIFT   }, C::MoveUp),
+                (Key { key: K::Char('J'), modifiers: M::SHIFT   }, C::MoveDown),
+                (Key { key: K::Char('l'), modifiers: M::NONE    }, C::Right),
+                (Key { key: K::Char('h'), modifiers: M::NONE    }, C::Left),
+                (Key { key: K::Char('d'), modifiers: M::CONTROL }, C::DownHalf),
+                (Key { key: K::Char('u'), modifiers: M::CONTROL }, C::UpHalf),
+                (Key { key: K::Char('G'), modifiers: M::SHIFT   }, C::Bottom),
+                (Key { key: K::Char('g'), modifiers: M::NONE    }, C::Top),
+                (Key { key: K::Char('/'), modifiers: M::NONE    }, C::EnterSearch),
+                (Key { key: K::Char('n'), modifiers: M::NONE    }, C::NextResult),
+                (Key { key: K::Char('N'), modifiers: M::SHIFT   }, C::PreviousResult),
+                (Key { key: K::Char(' '), modifiers: M::NONE    }, C::Select),
+                (Key { key: K::Char('a'), modifiers: M::NONE    }, C::Add),
+                (Key { key: K::Char('D'), modifiers: M::SHIFT   }, C::Delete),
+                (Key { key: K::Char('r'), modifiers: M::NONE    }, C::Rename),
+                (Key { key: K::Char('c'), modifiers: M::CONTROL }, C::Close),
+                (Key { key: K::Esc,       modifiers: M::NONE    }, C::Close),
+                (Key { key: K::Enter,     modifiers: M::NONE    }, C::Confirm),
+                (Key { key: K::Char('i'), modifiers: M::NONE    }, C::FocusInput),
             ]),
             // albums: HashMap::from([
             // ]),
@@ -128,37 +123,24 @@ impl Default for KeyConfigFile {
             // ]),
             #[cfg(debug_assertions)]
             logs: HashMap::from([
-                (L::Clear,            SingleOrMultiple::Single(Key { key: K::Char('D'), modifiers: M::SHIFT   })),
+                (Key { key: K::Char('D'), modifiers: M::SHIFT   }, L::Clear),
             ]),
             queue: HashMap::from([
-                (Q::Delete,           SingleOrMultiple::Single(Key { key: K::Char('d'), modifiers: M::NONE    })),
-                (Q::DeleteAll,        SingleOrMultiple::Single(Key { key: K::Char('D'), modifiers: M::SHIFT   })),
-                (Q::Play,             SingleOrMultiple::Single(Key { key: K::Enter,     modifiers: M::NONE    })),
-                (Q::Save,             SingleOrMultiple::Single(Key { key: K::Char('s'), modifiers: M::CONTROL })),
-                (Q::AddToPlaylist,    SingleOrMultiple::Single(Key { key: K::Char('a'), modifiers: M::NONE    })),
+                (Key { key: K::Char('d'), modifiers: M::NONE    }, Q::Delete),
+                (Key { key: K::Char('D'), modifiers: M::SHIFT   }, Q::DeleteAll),
+                (Key { key: K::Enter,     modifiers: M::NONE    }, Q::Play),
+                (Key { key: K::Char('s'), modifiers: M::CONTROL }, Q::Save),
+                (Key { key: K::Char('a'), modifiers: M::NONE    }, Q::AddToPlaylist),
             ]),
         }
     }
 }
 
-fn invert_and_flatten<T: Copy, V: std::hash::Hash + std::cmp::Eq>(
-    v: HashMap<T, SingleOrMultiple<V>>,
-) -> impl Iterator<Item = (V, T)> {
-    v.into_iter().flat_map(|(k, v)| match v {
-        SingleOrMultiple::Single(v) => vec![(v, k)],
-        SingleOrMultiple::Multiple(v) => v.into_iter().map(move |v| (v, k)).collect_vec(),
-    })
-}
-
-fn invert_keys<T: Copy>(v: HashMap<T, SingleOrMultiple<Key>>) -> HashMap<Key, T> {
-    invert_and_flatten(v).filter(|v| v.0.key != KeyCode::Null).collect()
-}
-
 impl From<KeyConfigFile> for KeyConfig {
     fn from(value: KeyConfigFile) -> Self {
         KeyConfig {
-            global: invert_keys(value.global),
-            navigation: invert_keys(value.navigation),
+            global: value.global,
+            navigation: value.navigation,
             // albums: invert_map(value.albums),
             // artists: invert_map(value.artists),
             // directories: invert_map(value.directories),
@@ -169,8 +151,8 @@ impl From<KeyConfigFile> for KeyConfig {
             playlists: HashMap::new(),
             search: HashMap::new(),
             #[cfg(debug_assertions)]
-            logs: invert_keys(value.logs),
-            queue: invert_keys(value.queue),
+            logs: value.logs,
+            queue: value.queue,
         }
     }
 }
@@ -190,12 +172,9 @@ mod tests {
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::{
-        config::keys::SingleOrMultiple,
-        ui::{
-            screens::{logs::LogsActions, queue::QueueActions, CommonAction},
-            GlobalAction,
-        },
+    use crate::ui::{
+        screens::{logs::LogsActions, queue::QueueActions, CommonAction},
+        GlobalAction,
     };
 
     use super::{Key, KeyConfig, KeyConfigFile};
@@ -204,16 +183,18 @@ mod tests {
     #[rustfmt::skip]
     fn converts() {
         let input = KeyConfigFile {
-            global: HashMap::from([(GlobalAction::Quit, SingleOrMultiple::Single(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }))]),
-            logs: HashMap::from([(LogsActions::Clear, SingleOrMultiple::Single(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }))]),
-            queue: HashMap::from([(QueueActions::Play, SingleOrMultiple::Single(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, })),
-                                  (QueueActions::Save, SingleOrMultiple::Single(Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }))]),
+            global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalAction::Quit)]),
+            logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActions::Clear)]),
+            queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActions::Play),
+                                  (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActions::Save)]),
             // albums: HashMap::from([]),
             // artists: HashMap::from([]),
             // directories: HashMap::from([]),
             // playlists: HashMap::from([]),
-            navigation: HashMap::from([(CommonAction::Up, SingleOrMultiple::Multiple(vec![Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, },
-                                                               Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }]))]),
+            navigation: HashMap::from([
+                (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonAction::Up),
+                (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up)
+            ])
         };
         let expected = KeyConfig {
             global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalAction::Quit)]),

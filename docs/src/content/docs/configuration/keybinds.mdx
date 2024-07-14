@@ -22,10 +22,10 @@ keybinds are vim-like, but you can change them to whatever you want.
 
 ## keybinds_map
 
-<ConfigValue name="global" type="other" customText='{ Play: "p", Stop: ["s", "X"], ...}' />
+<ConfigValue name="global" type="other" customText='{ "p": Play, "s": Stop, "X": Stop, ...}' />
 
-Is a simple list of key-value pairs where the Key is name of the action and value is the key to use specified as string.
-You can also bind multiple keys to a single action by supplying an array of strings.
+Is a simple list of key-value pairs where the left side is key to use specified as a string and the right side is a name of the action.
+You can also bind multiple keys to a single action by specfying it multiple times with a different key.
 
 ## Keybind syntax
 
