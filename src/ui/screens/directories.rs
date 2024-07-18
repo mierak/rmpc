@@ -13,7 +13,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal,
+        KeyHandleResultInternal, ToDescription,
     },
     utils::macros::{status_info, status_warn},
 };
@@ -103,6 +103,12 @@ impl Screen for DirectoriesScreen {
 
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum DirectoriesActions {}
+
+impl ToDescription for DirectoriesActions {
+    fn to_description(&self) -> &str {
+        ""
+    }
+}
 
 impl BrowserScreen<DirOrSong> for DirectoriesScreen {
     fn stack(&self) -> &DirStack<DirOrSong> {

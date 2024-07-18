@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::mpd::commands::Song;
 use crate::mpd::commands::Status;
 use crate::ui::utils::dirstack::Dir;
+use crate::ui::ToDescription;
 use crate::utils::macros::status_warn;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -598,6 +599,12 @@ impl Screen for SearchScreen {
 
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum SearchActions {}
+
+impl ToDescription for SearchActions {
+    fn to_description(&self) -> &str {
+        ""
+    }
+}
 
 impl Default for SearchScreen {
     fn default() -> Self {

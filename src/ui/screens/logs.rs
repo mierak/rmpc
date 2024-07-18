@@ -13,7 +13,7 @@ use crate::{
     config::Config,
     mpd::{commands::Status, mpd_client::MpdClient},
     state::MyVecDeque,
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
+    ui::{utils::dirstack::DirState, KeyHandleResultInternal, ToDescription, UiEvent},
 };
 
 use super::{CommonAction, Screen};
@@ -150,4 +150,12 @@ impl Screen for LogsScreen {
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum LogsActions {
     Clear,
+}
+
+impl ToDescription for LogsActions {
+    fn to_description(&self) -> &str {
+        match self {
+            LogsActions::Clear => "Clear logs",
+        }
+    }
 }

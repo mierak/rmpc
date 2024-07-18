@@ -8,7 +8,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal,
+        KeyHandleResultInternal, ToDescription,
     },
     utils::macros::{status_info, status_warn},
 };
@@ -95,6 +95,12 @@ impl Screen for AlbumsScreen {
 
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum AlbumsActions {}
+
+impl ToDescription for AlbumsActions {
+    fn to_description(&self) -> &str {
+        ""
+    }
+}
 
 fn list_titles(client: &mut impl MpdClient, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client

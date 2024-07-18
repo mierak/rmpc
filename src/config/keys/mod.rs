@@ -13,7 +13,7 @@ use crate::ui::{
     GlobalAction,
 };
 
-use self::key::Key;
+pub use self::key::Key;
 
 mod key;
 
@@ -67,6 +67,7 @@ impl Default for KeyConfigFile {
         Self {
             global: HashMap::from([
                 (Key { key: K::Char('q'), modifiers: M::NONE  }, G::Quit),
+                (Key { key: K::Char('~'), modifiers: M::NONE  }, G::ShowHelp),
                 (Key { key: K::Char('>'), modifiers: M::NONE  }, G::NextTrack),
                 (Key { key: K::Char('<'), modifiers: M::NONE  }, G::PreviousTrack),
                 (Key { key: K::Char('s'), modifiers: M::NONE  }, G::Stop),

@@ -31,6 +31,7 @@
             "p":       TogglePause,
             "z":       ToggleRepeat,
             "b":       SeekBack,
+            "~":       ShowHelp,
         },
         navigation: {
             "<C-u>":   UpHalf,

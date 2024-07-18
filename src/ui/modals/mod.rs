@@ -4,32 +4,17 @@ use ratatui::{
     prelude::{Constraint, Layout, Rect},
     Frame,
 };
-use strum::{EnumDiscriminants, EnumVariantNames};
 
 use crate::{mpd::client::Client, state::State};
-
-use self::{
-    add_to_playlist::AddToPlaylistModal, confirm_modal::ConfirmModal, confirm_queue_clear::ConfirmQueueClearModal,
-    rename_playlist::RenamePlaylistModal, save_queue::SaveQueueModal,
-};
 
 use super::KeyHandleResultInternal;
 
 pub mod add_to_playlist;
 pub mod confirm_modal;
 pub mod confirm_queue_clear;
+pub mod keybinds;
 pub mod rename_playlist;
 pub mod save_queue;
-
-#[allow(dead_code)]
-#[derive(Debug, EnumVariantNames, EnumDiscriminants)]
-pub enum Modals {
-    ConfirmQueueClear(ConfirmQueueClearModal),
-    SaveQueue(SaveQueueModal),
-    RenamePlaylist(RenamePlaylistModal),
-    AddToPlaylist(AddToPlaylistModal),
-    Confirm(ConfirmModal),
-}
 
 pub(super) trait Modal: std::fmt::Debug {
     fn render(&mut self, frame: &mut Frame, _app: &mut crate::state::State) -> Result<()>;
