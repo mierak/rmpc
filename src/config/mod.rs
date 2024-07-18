@@ -7,7 +7,7 @@ use log::Level;
 use serde::{Deserialize, Serialize};
 
 mod defaults;
-mod keys;
+pub mod keys;
 pub mod theme;
 
 use self::{

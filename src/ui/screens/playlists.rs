@@ -11,10 +11,10 @@ use crate::{
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
     ui::{
-        modals::{rename_playlist::RenamePlaylistModal, Modals},
+        modals::rename_playlist::RenamePlaylistModal,
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, UiEvent,
+        KeyHandleResultInternal, ToDescription, UiEvent,
     },
     utils::macros::{status_error, status_info},
 };
@@ -32,6 +32,12 @@ pub struct PlaylistsScreen {
 
 #[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum PlaylistsActions {}
+
+impl ToDescription for PlaylistsActions {
+    fn to_description(&self) -> &str {
+        ""
+    }
+}
 
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;
@@ -201,7 +207,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
     fn rename(&self, item: &DirOrSong, _client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
-            DirOrSong::Dir(d) => Ok(KeyHandleResultInternal::Modal(Some(Modals::RenamePlaylist(
+            DirOrSong::Dir(d) => Ok(KeyHandleResultInternal::Modal(Some(Box::new(
                 RenamePlaylistModal::new(d.clone()),
             )))),
             DirOrSong::Song(_) => Ok(KeyHandleResultInternal::SkipRender),

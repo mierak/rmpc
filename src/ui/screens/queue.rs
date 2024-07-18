@@ -18,11 +18,11 @@ use crate::{
     ui::{
         modals::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
-            save_queue::SaveQueueModal, Modals,
+            save_queue::SaveQueueModal,
         },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
-        KeyHandleResultInternal, UiEvent,
+        KeyHandleResultInternal, ToDescription, UiEvent,
     },
     utils::macros::{status_error, status_warn, try_ret},
 };
@@ -297,7 +297,7 @@ impl Screen for QueueScreen {
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
-                QueueActions::DeleteAll => Ok(KeyHandleResultInternal::Modal(Some(Modals::ConfirmQueueClear(
+                QueueActions::DeleteAll => Ok(KeyHandleResultInternal::Modal(Some(Box::new(
                     ConfirmQueueClearModal::default(),
                 )))),
                 QueueActions::Play => {
@@ -307,9 +307,9 @@ impl Screen for QueueScreen {
                     }
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
-                QueueActions::Save => Ok(KeyHandleResultInternal::Modal(Some(Modals::SaveQueue(
-                    SaveQueueModal::default(),
-                )))),
+                QueueActions::Save => Ok(KeyHandleResultInternal::Modal(Some(
+                    Box::new(SaveQueueModal::default()),
+                ))),
                 QueueActions::AddToPlaylist => {
                     if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
                     {
@@ -319,9 +319,10 @@ impl Screen for QueueScreen {
                             .map(|v| v.name)
                             .sorted()
                             .collect_vec();
-                        Ok(KeyHandleResultInternal::Modal(Some(Modals::AddToPlaylist(
-                            AddToPlaylistModal::new(selected_song.file.clone(), playlists),
-                        ))))
+                        Ok(KeyHandleResultInternal::Modal(Some(Box::new(AddToPlaylistModal::new(
+                            selected_song.file.clone(),
+                            playlists,
+                        )))))
                     } else {
                         Ok(KeyHandleResultInternal::SkipRender)
                     }
@@ -478,4 +479,16 @@ pub enum QueueActions {
     Play,
     Save,
     AddToPlaylist,
+}
+
+impl ToDescription for QueueActions {
+    fn to_description(&self) -> &str {
+        match self {
+            QueueActions::Delete => "Remove song under curor from the queue",
+            QueueActions::DeleteAll => "Clear current queue",
+            QueueActions::Play => "Play song under cursor",
+            QueueActions::Save => "Save current queue as a new playlist",
+            QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist",
+        }
+    }
 }

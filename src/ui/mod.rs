@@ -6,6 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use modals::keybinds::KeybindsModal;
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
@@ -30,7 +31,7 @@ use crate::{mpd::version::Version, state::State};
 #[cfg(debug_assertions)]
 use self::screens::logs::LogsScreen;
 use self::{
-    modals::{Modal, Modals},
+    modals::Modal,
     screens::{
         albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
         queue::QueueScreen, search::SearchScreen, Screen,
@@ -237,19 +238,12 @@ impl Ui<'_> {
         match screen_call_inner!(handle_action(key, &mut self.client, &mut state.status, state.config)) {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
-            KeyHandleResultInternal::Modal(modal) => {
-                match modal {
-                    Some(m) => match m {
-                        Modals::ConfirmQueueClear(m) => self.modals.push(Box::new(m)),
-                        Modals::SaveQueue(m) => self.modals.push(Box::new(m)),
-                        Modals::RenamePlaylist(m) => self.modals.push(Box::new(m)),
-                        Modals::AddToPlaylist(m) => self.modals.push(Box::new(m)),
-                        Modals::Confirm(m) => self.modals.push(Box::new(m)),
-                    },
-                    None => {
-                        self.modals.pop();
-                    }
-                }
+            KeyHandleResultInternal::Modal(Some(modal)) => {
+                self.modals.push(modal);
+                return Ok(KeyHandleResult::RenderRequested);
+            }
+            KeyHandleResultInternal::Modal(None) => {
+                self.modals.pop();
                 return Ok(KeyHandleResult::RenderRequested);
             }
             KeyHandleResultInternal::KeyNotHandled => {
@@ -358,6 +352,10 @@ impl Ui<'_> {
                         GlobalAction::SeekBack => {}
                         GlobalAction::SeekForward => {}
                         GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
+                        GlobalAction::ShowHelp => {
+                            self.modals.push(Box::new(KeybindsModal::new(state)));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
                     }
                     Ok(KeyHandleResult::SkipRender)
                 } else {
@@ -463,19 +461,12 @@ impl Ui<'_> {
         match result {
             Ok(KeyHandleResultInternal::SkipRender) => Ok(KeyHandleResult::SkipRender),
             Ok(KeyHandleResultInternal::RenderRequested) => Ok(KeyHandleResult::RenderRequested),
-            Ok(KeyHandleResultInternal::Modal(modal)) => {
-                match modal {
-                    Some(m) => match m {
-                        Modals::ConfirmQueueClear(m) => self.modals.push(Box::new(m)),
-                        Modals::SaveQueue(m) => self.modals.push(Box::new(m)),
-                        Modals::RenamePlaylist(m) => self.modals.push(Box::new(m)),
-                        Modals::AddToPlaylist(m) => self.modals.push(Box::new(m)),
-                        Modals::Confirm(m) => self.modals.push(Box::new(m)),
-                    },
-                    None => {
-                        self.modals.pop();
-                    }
-                }
+            Ok(KeyHandleResultInternal::Modal(Some(modal))) => {
+                self.modals.push(modal);
+                Ok(KeyHandleResult::RenderRequested)
+            }
+            Ok(KeyHandleResultInternal::Modal(None)) => {
+                self.modals.pop();
                 Ok(KeyHandleResult::RenderRequested)
             }
             Ok(KeyHandleResultInternal::KeyNotHandled) => Ok(KeyHandleResult::SkipRender),
@@ -516,6 +507,7 @@ impl TryFrom<IdleEvent> for UiEvent {
 #[derive(Debug, Display, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum GlobalAction {
     Quit,
+    ShowHelp,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -536,6 +528,41 @@ pub enum GlobalAction {
     AlbumsTab,
     PlaylistsTab,
     SearchTab,
+}
+
+impl ToDescription for GlobalAction {
+    fn to_description(&self) -> &str {
+        match self {
+            GlobalAction::Quit => "Exit rmpc",
+            GlobalAction::ToggleRepeat => "Toggle repeat",
+            GlobalAction::ToggleSingle => {
+                "Whether to stop playing after single track or repeat track/playlist when repeat is on"
+            }
+            GlobalAction::ToggleRandom => "Toggles random playback",
+            GlobalAction::ToggleConsume => "Remove song from the queue after playing",
+            GlobalAction::TogglePause => "Pause/Unpause playback",
+            GlobalAction::Stop => "Stop playback",
+            GlobalAction::VolumeUp => "Raise volume",
+            GlobalAction::VolumeDown => "Lower volume",
+            GlobalAction::NextTrack => "Play next track in the queue",
+            GlobalAction::PreviousTrack => "Play previous track in the queue",
+            GlobalAction::SeekForward => "Seek currently playing track forwards",
+            GlobalAction::SeekBack => "Seek currently playing track backwards",
+            GlobalAction::NextTab => "Switch to next tab",
+            GlobalAction::PreviousTab => "Switch to previous tab",
+            GlobalAction::QueueTab => "Switch directly to Queue tab",
+            GlobalAction::DirectoriesTab => "Switch directly to Directories tab",
+            GlobalAction::ArtistsTab => "Switch directly to Artists tab",
+            GlobalAction::AlbumsTab => "Switch directly to Albums tab",
+            GlobalAction::PlaylistsTab => "Switch directly to Playlists tab",
+            GlobalAction::SearchTab => "Switch directly to Search tab",
+            GlobalAction::ShowHelp => "Show keybinds",
+        }
+    }
+}
+
+pub trait ToDescription {
+    fn to_description(&self) -> &str;
 }
 
 pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>) -> Result<()> {
@@ -562,7 +589,7 @@ enum KeyHandleResultInternal {
     /// Event was not handled and should bubble up
     KeyNotHandled,
     /// Display a modal
-    Modal(Option<Modals>),
+    Modal(Option<Box<dyn Modal>>),
 }
 
 pub enum KeyHandleResult {
