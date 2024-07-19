@@ -37,17 +37,20 @@ impl ImageState {
             while let Ok((vec, width, height)) = rx.recv() {
                 let data = match KittyImage::create_data_to_transfer(&vec, width, height, Compression::new(6)) {
                     Ok(data) => data,
-                    Err(_) => {
+                    Err(err) => {
+                        status_error!(err:?; "Failed to compress image data");
                         continue;
                     }
                 };
 
                 if let Err(err) = data_sender.send(data) {
                     status_error!(err:?; "Failed to send compressed image data");
+                    continue;
                 }
 
                 if let Err(err) = sender.send(AppEvent::RequestRender) {
                     status_error!(err:?; "Failed to request rerender after image data compression finished");
+                    continue;
                 }
             }
         });
