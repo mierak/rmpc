@@ -1,5 +1,6 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, List, ListItem, Padding, StatefulWidget};
+use style::Styled;
 
 use crate::config::Config;
 use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
@@ -98,7 +99,7 @@ where
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 self.config.as_styled_scrollbar(),
-                previous_area.inner(&scrollbar_margin),
+                previous_area.inner(scrollbar_margin),
                 buf,
                 prev_state.as_scrollbar_state_ref(),
             );
@@ -129,7 +130,7 @@ where
             ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
                 self.config.as_styled_scrollbar(),
-                current_area.inner(&scrollbar_margin),
+                current_area.inner(scrollbar_margin),
                 buf,
                 state.as_scrollbar_state_ref(),
             );

@@ -28,7 +28,7 @@ impl Widget for Input<'_> {
             return;
         };
 
-        let input_area = input_area.inner(&Margin {
+        let input_area = input_area.inner(Margin {
             horizontal: 0,
             vertical: 0,
         });
@@ -56,7 +56,7 @@ impl Widget for Input<'_> {
         input = input.wrap(Wrap { trim: true });
 
         label.render(
-            text_area.inner(&Margin {
+            text_area.inner(Margin {
                 horizontal: 0,
                 vertical: u16::from(!self.borderless),
             }),
@@ -74,7 +74,7 @@ impl<'a> Input<'a> {
         }
 
         let mut input_len = input_area
-            .inner(&Margin {
+            .inner(Margin {
                 horizontal: 1,
                 vertical: 0,
             })

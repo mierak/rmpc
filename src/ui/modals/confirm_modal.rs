@@ -83,7 +83,7 @@ impl Modal for ConfirmModal {
 
         frame.render_widget(
             text,
-            block.inner(popup_area).inner(&Margin {
+            block.inner(popup_area).inner(Margin {
                 horizontal: 1,
                 vertical: 0,
             }),
