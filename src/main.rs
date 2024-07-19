@@ -104,9 +104,11 @@ fn main() -> Result<()> {
             std::thread::Builder::new()
                 .name("input poll".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
+
+            let tx_clone = tx.clone();
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
                 main_task(
-                    Ui::new(client, state.config),
+                    Ui::new(client, state.config, tx_clone),
                     state,
                     rx,
                     try_ret!(

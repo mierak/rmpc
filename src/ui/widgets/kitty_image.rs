@@ -1,5 +1,8 @@
 use anyhow::{Context, Result};
-use std::io::{Cursor, Write};
+use std::{
+    io::{Cursor, Write},
+    sync::mpsc::{channel, Receiver, Sender},
+};
 
 use base64::Engine;
 use flate2::Compression;
@@ -8,7 +11,261 @@ use ratatui::{
     widgets::{Block, StatefulWidget, Widget},
 };
 
-use crate::utils::tmux;
+use crate::{
+    utils::{macros::status_error, tmux},
+    AppEvent,
+};
+
+#[derive(Debug)]
+pub struct ImageState {
+    idx: u32,
+    image: Option<Vec<u8>>,
+    needs_transfer: bool,
+    transfer_request_channel: Sender<(Vec<u8>, usize, usize)>,
+    compression_finished_receiver: Receiver<Data>,
+}
+
+impl ImageState {
+    pub fn new(sender: Sender<AppEvent>) -> Self {
+        let compression_request_channel = channel::<(Vec<_>, usize, usize)>();
+        let rx = compression_request_channel.1;
+
+        let image_data_to_transfer_channel = channel::<Data>();
+        let data_sender = image_data_to_transfer_channel.0;
+
+        std::thread::spawn(move || {
+            while let Ok((vec, width, height)) = rx.recv() {
+                let data = match KittyImage::create_data_to_transfer(&vec, width, height, Compression::new(6)) {
+                    Ok(data) => data,
+                    Err(err) => {
+                        status_error!(err:?; "Failed to compress image data");
+                        continue;
+                    }
+                };
+
+                if let Err(err) = data_sender.send(data) {
+                    status_error!(err:?; "Failed to send compressed image data");
+                    continue;
+                }
+
+                if let Err(err) = sender.send(AppEvent::RequestRender) {
+                    status_error!(err:?; "Failed to request rerender after image data compression finished");
+                    continue;
+                }
+            }
+        });
+
+        Self {
+            idx: 0,
+            needs_transfer: true,
+            image: None,
+            transfer_request_channel: compression_request_channel.0,
+            compression_finished_receiver: image_data_to_transfer_channel.1,
+        }
+    }
+}
+
+impl ImageState {
+    /// Takes image data in buffer
+    /// Leaves the provided buffer empty if any data were in there
+    pub fn image(&mut self, image: &mut Option<Vec<u8>>) -> &Self {
+        match (image.as_mut(), &mut self.image) {
+            (Some(ref mut v), None) => {
+                self.image = Some(std::mem::take(v));
+                self.needs_transfer = true;
+                log::debug!(size = self.image.as_ref().map(Vec::len); "New image received",);
+            }
+            (Some(v), Some(i)) if v.ne(&i) && !v.is_empty() => {
+                self.image = Some(std::mem::take(v));
+                self.needs_transfer = true;
+                log::debug!(size = self.image.as_ref().map(Vec::len); "New image received");
+            }
+            (Some(v), Some(_)) => {
+                v.clear();
+            }
+            // The image is identical, should be in place already
+            (None, None) => {} // Default img should be in place already
+            (None, Some(_)) => {
+                // Show default img
+                self.image = None;
+                self.needs_transfer = true;
+            }
+        }
+
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct KittyImage<'a> {
+    block: Option<Block<'a>>,
+    default_art: &'a [u8],
+}
+
+struct Data {
+    content: String,
+    img_width: u32,
+    img_height: u32,
+}
+
+impl<'a> KittyImage<'a> {
+    fn create_data_to_transfer(
+        image_data: &[u8],
+        width: usize,
+        height: usize,
+        compression: Compression,
+    ) -> Result<Data> {
+        let (w, h) = KittyImage::get_image_size(width, height)?;
+        let image = image::io::Reader::new(Cursor::new(image_data))
+            .with_guessed_format()
+            .context("Unable to guess image format")?
+            .decode()
+            .context("Unable to decode image")?
+            .resize(w, h, image::imageops::FilterType::Lanczos3);
+
+        let binding = image.to_rgba8();
+        let rgba = binding.as_raw();
+
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
+        e.write_all(rgba)
+            .context("Error occured when writing image bytes to zlib encoder")?;
+
+        let content = base64::engine::general_purpose::STANDARD.encode(
+            e.finish()
+                .context("Error occured when flushing image bytes to zlib encoder")?,
+        );
+        Ok(Data {
+            content,
+            img_width: image.width(),
+            img_height: image.height(),
+        })
+    }
+
+    fn get_image_size(area_width: usize, area_height: usize) -> Result<(u32, u32)> {
+        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
+        let w = if size.width == 0 {
+            800
+        } else {
+            let cell_width = size.width / size.columns;
+            (cell_width as usize * area_width) as u32
+        };
+        let h = if size.height == 0 {
+            600
+        } else {
+            let cell_height = size.height / size.rows;
+            (cell_height as usize * area_height) as u32
+        };
+        Ok((w, h))
+    }
+
+    fn create_unicode_placeholder_grid(state: &ImageState, buf: &mut Buffer, area: Rect) {
+        (0..area.height).for_each(|y| {
+            let mut res = format!("\x1b[38;5;{}m", state.idx);
+
+            (0..area.width).for_each(|x| {
+                res.push_str(&format!(
+                    "{DELIM}{row}{col}",
+                    row = GRID[y as usize],
+                    col = GRID[x as usize],
+                ));
+
+                if x > 0 {
+                    buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
+                }
+            });
+
+            res.push_str("\x1b[39m\n");
+            buf.get_mut(area.left(), area.top() + y).set_symbol(&res);
+        });
+    }
+
+    fn transfer_data(content: &str, cols: usize, rows: usize, img_width: u32, img_height: u32, state: &mut ImageState) {
+        let mut iter = content.chars().peekable();
+
+        let first: String = iter.by_ref().take(4096).collect();
+        let delete_all_images = "\x1b_Ga=D\x1b\\";
+        let virtual_image_placement = &format!(
+            "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
+            state.idx, img_width, img_height, cols, rows, first
+        );
+
+        if tmux::is_inside_tmux() {
+            tmux::wrap_print(delete_all_images);
+            tmux::wrap_print(virtual_image_placement);
+
+            while iter.peek().is_some() {
+                let chunk: String = iter.by_ref().take(4096).collect();
+                let m = i32::from(iter.peek().is_some());
+                tmux::wrap_print(&format!("\x1b_Gm={m};{chunk}\x1b\\"));
+            }
+        } else {
+            print!("{delete_all_images}");
+            print!("{virtual_image_placement}");
+
+            while iter.peek().is_some() {
+                let chunk: String = iter.by_ref().take(4096).collect();
+                let m = i32::from(iter.peek().is_some());
+                print!("\x1b_Gm={m};{chunk}\x1b\\");
+            }
+        }
+    }
+
+    pub fn block(mut self, block: Block<'a>) -> Self {
+        self.block = Some(block);
+        self
+    }
+
+    pub fn default_art(mut self, default_art: &'a [u8]) -> Self {
+        self.default_art = default_art;
+        self
+    }
+}
+
+impl<'a> StatefulWidget for KittyImage<'a> {
+    type State = ImageState;
+
+    fn render(mut self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let area = match self.block.take() {
+            Some(b) => {
+                let inner_area = b.inner(area);
+                b.render(area, buf);
+                inner_area
+            }
+            None => area,
+        };
+        let image = match &state.image {
+            None => self.default_art,
+            Some(data) if data.is_empty() => self.default_art,
+            Some(data) => data.as_slice(),
+        };
+
+        let height = area.height as usize;
+        let width = area.width as usize;
+
+        if state.needs_transfer {
+            state.needs_transfer = false;
+
+            let delete_all_images = "\x1b_Ga=D\x1b\\";
+            if tmux::is_inside_tmux() {
+                tmux::wrap_print(delete_all_images);
+            } else {
+                print!("{delete_all_images}");
+            }
+
+            if let Err(err) = state.transfer_request_channel.send((image.to_vec(), width, height)) {
+                status_error!(err:?; "Failed to compress image data");
+            }
+        }
+
+        if let Ok(data) = state.compression_finished_receiver.try_recv() {
+            state.idx = state.idx.wrapping_add(1);
+            KittyImage::transfer_data(&data.content, width, height, data.img_width, data.img_height, state);
+        }
+
+        KittyImage::create_unicode_placeholder_grid(state, buf, area);
+    }
+}
+
 const DELIM: &str = "\u{10EEEE}";
 const GRID: &[&str] = &[
     "\u{0305}",
@@ -309,212 +566,3 @@ const GRID: &[&str] = &[
     "\u{1D243}",
     "\u{1D244}",
 ];
-
-#[derive(Debug)]
-pub struct ImageState {
-    idx: u32,
-    image: Option<Vec<u8>>,
-    needs_transfer: bool,
-}
-
-impl Default for ImageState {
-    fn default() -> Self {
-        Self {
-            idx: 0,
-            needs_transfer: true,
-            image: None,
-        }
-    }
-}
-
-impl ImageState {
-    /// Takes image data in buffer
-    /// Leaves the provided buffer empty if any data were in there
-    pub fn image(&mut self, image: &mut Option<Vec<u8>>) -> &Self {
-        match (image.as_mut(), &mut self.image) {
-            (Some(ref mut v), None) => {
-                self.image = Some(std::mem::take(v));
-                self.needs_transfer = true;
-                log::debug!(size = image.as_ref().map(Vec::len); "New image received",);
-            }
-            (Some(v), Some(i)) if v.ne(&i) && !v.is_empty() => {
-                self.image = Some(std::mem::take(v));
-                self.needs_transfer = true;
-                log::debug!(size = image.as_ref().map(Vec::len); "New image received");
-            }
-            (Some(v), Some(_)) => {
-                v.clear();
-            }
-            // The image is identical, should be in place already
-            (None, None) => {} // Default img should be in place already
-            (None, Some(_)) => {
-                // Show default img
-                self.image = None;
-                self.needs_transfer = true;
-            }
-        }
-
-        self
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct KittyImage<'a> {
-    block: Option<Block<'a>>,
-    default_art: &'a [u8],
-}
-
-struct Data {
-    content: String,
-    img_width: u32,
-    img_height: u32,
-}
-impl<'a> KittyImage<'a> {
-    fn create_data_to_transfer(
-        image_data: &[u8],
-        width: usize,
-        height: usize,
-        compression: Compression,
-    ) -> Result<Data> {
-        let (w, h) = KittyImage::get_image_size(width, height)?;
-        let image = image::io::Reader::new(Cursor::new(image_data))
-            .with_guessed_format()
-            .context("Unable to guess image format")?
-            .decode()
-            .context("Unable to decode image")?
-            .resize(w, h, image::imageops::FilterType::Lanczos3);
-
-        let binding = image.to_rgba8();
-        let rgba = binding.as_raw();
-
-        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
-        e.write_all(rgba)
-            .context("Error occured when writing image bytes to zlib encoder")?;
-
-        let content = base64::engine::general_purpose::STANDARD.encode(
-            e.finish()
-                .context("Error occured when flushing image bytes to zlib encoder")?,
-        );
-        Ok(Data {
-            content,
-            img_width: image.width(),
-            img_height: image.height(),
-        })
-    }
-
-    fn get_image_size(area_width: usize, area_height: usize) -> Result<(u32, u32)> {
-        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
-        let w = if size.width == 0 {
-            800
-        } else {
-            let cell_width = size.width / size.columns;
-            (cell_width as usize * area_width) as u32
-        };
-        let h = if size.height == 0 {
-            600
-        } else {
-            let cell_height = size.height / size.rows;
-            (cell_height as usize * area_height) as u32
-        };
-        Ok((w, h))
-    }
-
-    fn create_unicode_placeholder_grid(state: &ImageState, buf: &mut Buffer, area: Rect) {
-        (0..area.height).for_each(|y| {
-            let mut res = format!("\x1b[38;5;{}m", state.idx);
-
-            (0..area.width).for_each(|x| {
-                res.push_str(&format!(
-                    "{DELIM}{row}{col}",
-                    row = GRID[y as usize],
-                    col = GRID[x as usize],
-                ));
-
-                if x > 0 {
-                    buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
-                }
-            });
-
-            res.push_str("\x1b[39m\n");
-            buf.get_mut(area.left(), area.top() + y).set_symbol(&res);
-        });
-    }
-
-    fn transfer_data(content: &str, cols: usize, rows: usize, img_width: u32, img_height: u32, state: &mut ImageState) {
-        let mut iter = content.chars().peekable();
-
-        let first: String = iter.by_ref().take(4096).collect();
-        let delete_all_images = "\x1b_Ga=d\x1b\\";
-        let virtual_image_placement = &format!(
-            "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
-            state.idx, img_width, img_height, cols, rows, first
-        );
-
-        if tmux::is_inside_tmux() {
-            tmux::wrap_print(delete_all_images);
-            tmux::wrap_print(virtual_image_placement);
-
-            while iter.peek().is_some() {
-                let chunk: String = iter.by_ref().take(4096).collect();
-                let m = i32::from(iter.peek().is_some());
-                tmux::wrap_print(&format!("\x1b_Gm={m};{chunk}\x1b\\"));
-            }
-        } else {
-            print!("{delete_all_images}");
-            print!("{virtual_image_placement}");
-
-            while iter.peek().is_some() {
-                let chunk: String = iter.by_ref().take(4096).collect();
-                let m = i32::from(iter.peek().is_some());
-                print!("\x1b_Gm={m};{chunk}\x1b\\");
-            }
-        }
-    }
-
-    pub fn block(mut self, block: Block<'a>) -> Self {
-        self.block = Some(block);
-        self
-    }
-
-    pub fn default_art(mut self, default_art: &'a [u8]) -> Self {
-        self.default_art = default_art;
-        self
-    }
-}
-
-impl<'a> StatefulWidget for KittyImage<'a> {
-    type State = ImageState;
-
-    fn render(mut self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let area = match self.block.take() {
-            Some(b) => {
-                let inner_area = b.inner(area);
-                b.render(area, buf);
-                inner_area
-            }
-            None => area,
-        };
-        let image = match &state.image {
-            None => self.default_art,
-            Some(data) if data.is_empty() => self.default_art,
-            Some(data) => data.as_slice(),
-        };
-
-        let height = area.height as usize;
-        let width = area.width as usize;
-
-        if state.needs_transfer {
-            state.needs_transfer = false;
-            state.idx = state.idx.wrapping_add(1);
-
-            match KittyImage::create_data_to_transfer(image, width, height, Compression::new(6)) {
-                Ok(data) => {
-                    KittyImage::transfer_data(&data.content, width, height, data.img_width, data.img_height, state);
-                }
-                Err(e) => log::error!(error:? = e; "Failed to transfer image data"),
-            }
-        }
-
-        KittyImage::create_unicode_placeholder_grid(state, buf, area);
-    }
-}
