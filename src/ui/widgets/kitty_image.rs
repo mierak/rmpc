@@ -1,13 +1,11 @@
 use anyhow::{Context, Result};
 use std::io::{Cursor, Write};
 
-use ansi_to_tui::IntoText;
 use base64::Engine;
 use flate2::Compression;
 use ratatui::{
-    prelude::{Alignment, Buffer, Rect},
-    text::Text,
-    widgets::{Block, Paragraph, StatefulWidget, Widget},
+    prelude::{Buffer, Rect},
+    widgets::{Block, StatefulWidget, Widget},
 };
 
 use crate::utils::tmux;
@@ -421,15 +419,25 @@ impl<'a> KittyImage<'a> {
         Ok((w, h))
     }
 
-    fn create_unicode_placeholder_grid(cols: usize, rows: usize, state: &ImageState) -> Result<Text<'static>> {
-        let mut res = String::new();
-        for row in GRID.iter().take(rows) {
-            for col in GRID.iter().take(cols) {
-                res.push_str(&format!("\x1b[38;5;{}m{DELIM}{row}{col}", state.idx));
-            }
+    fn create_unicode_placeholder_grid(state: &ImageState, buf: &mut Buffer, area: Rect) {
+        (0..area.height).for_each(|y| {
+            let mut res = format!("\x1b[38;5;{}m", state.idx);
+
+            (0..area.width).for_each(|x| {
+                res.push_str(&format!(
+                    "{DELIM}{row}{col}",
+                    row = GRID[y as usize],
+                    col = GRID[x as usize],
+                ));
+
+                if x > 0 {
+                    buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
+                }
+            });
+
             res.push_str("\x1b[39m\n");
-        }
-        Ok(res.into_text()?)
+            buf.get_mut(area.left(), area.top() + y).set_symbol(&res);
+        });
     }
 
     fn transfer_data(content: &str, cols: usize, rows: usize, img_width: u32, img_height: u32, state: &mut ImageState) {
@@ -507,9 +515,6 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             }
         }
 
-        match KittyImage::create_unicode_placeholder_grid(width, height, state) {
-            Ok(res) => Paragraph::new(res).alignment(Alignment::Center).render(area, buf),
-            Err(e) => log::error!(error:? = e; "Failed to construct unicode placeholder grid"),
-        };
+        KittyImage::create_unicode_placeholder_grid(state, buf, area);
     }
 }
