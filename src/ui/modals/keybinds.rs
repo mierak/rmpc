@@ -88,7 +88,7 @@ impl Modal for KeybindsModal<'_> {
             .title("Keybinds");
 
         let [header_area, table_area] =
-            *Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).split(popup_area.inner(&Margin {
+            *Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).split(popup_area.inner(Margin {
                 horizontal: 1,
                 vertical: 1,
             }))
@@ -132,7 +132,7 @@ impl Modal for KeybindsModal<'_> {
         frame.render_widget(header_table, header_area);
         frame.render_stateful_widget(
             table,
-            table_area.inner(&Margin {
+            table_area.inner(Margin {
                 horizontal: 1,
                 vertical: 0,
             }),
@@ -140,7 +140,7 @@ impl Modal for KeybindsModal<'_> {
         );
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
-            popup_area.inner(&Margin {
+            popup_area.inner(Margin {
                 horizontal: 0,
                 vertical: 1,
             }),

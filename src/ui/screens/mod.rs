@@ -10,7 +10,7 @@ use ratatui::{
     widgets::ListItem,
     Frame,
 };
-use strum::{Display, EnumIter, EnumVariantNames};
+use strum::{Display, EnumIter, VariantNames};
 
 use crate::{
     config::{
@@ -38,7 +38,7 @@ pub mod playlists;
 pub mod queue;
 pub mod search;
 
-#[derive(Debug, Display, EnumVariantNames, Default, Clone, Copy, EnumIter, PartialEq)]
+#[derive(Debug, Display, VariantNames, Default, Clone, Copy, EnumIter, PartialEq)]
 pub enum Screens {
     #[default]
     Queue,
