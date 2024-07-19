@@ -25,6 +25,7 @@ use crate::{
         KeyHandleResultInternal, ToDescription, UiEvent,
     },
     utils::macros::{status_error, status_warn, try_ret},
+    AppEvent,
 };
 use log::error;
 use ratatui::{
@@ -37,7 +38,7 @@ use ratatui::{
 
 use super::{CommonAction, Screen};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct QueueScreen {
     img_state: ImageState,
     scrolling_state: DirState<TableState>,
@@ -51,9 +52,9 @@ pub struct QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
         Self {
-            img_state: ImageState::default(),
+            img_state: ImageState::new(app_event_sender),
             scrolling_state: DirState::default(),
             filter: None,
             filter_input_mode: false,

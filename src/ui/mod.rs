@@ -25,6 +25,7 @@ use crate::{
         mpd_client::{FilterKind, MpdClient},
     },
     utils::macros::try_ret,
+    AppEvent,
 };
 use crate::{mpd::version::Version, state::State};
 
@@ -73,10 +74,10 @@ pub struct Ui<'a> {
 }
 
 impl<'a> Ui<'a> {
-    pub fn new(client: Client<'a>, config: &Config) -> Ui<'a> {
+    pub fn new(client: Client<'a>, config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Ui<'a> {
         Self {
             client,
-            screens: Screens::new(config),
+            screens: Screens::new(config, app_event_sender),
             active_screen: screens::Screens::Queue,
             status_message: None,
             rendered_frames_count: 0,
@@ -86,7 +87,7 @@ impl<'a> Ui<'a> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Screens {
     queue: QueueScreen,
     #[cfg(debug_assertions)]
@@ -99,9 +100,9 @@ struct Screens {
 }
 
 impl Screens {
-    fn new(config: &Config) -> Self {
+    fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
         Self {
-            queue: QueueScreen::new(config),
+            queue: QueueScreen::new(config, app_event_sender),
             #[cfg(debug_assertions)]
             logs: LogsScreen::default(),
             directories: DirectoriesScreen::default(),
