@@ -1,10 +1,9 @@
-use ansi_to_tui::IntoText;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
-    widgets::{Block, List, ListItem, ListState, Padding},
+    widgets::{Block, List, ListState, Padding},
     Frame,
 };
 use strum::Display;
@@ -27,31 +26,18 @@ pub struct LogsScreen {
 impl Screen for LogsScreen {
     type Actions = LogsActions;
     fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> anyhow::Result<()> {
-        let lines: Vec<_> = self
-            .logs
-            .iter()
-            .map(|l| -> Result<_> { Ok(l.into_text()?.lines) })
-            .flatten_ok()
-            .enumerate()
-            .map(|(idx, l)| -> Result<_> {
-                match l {
-                    Ok(mut val) => {
-                        if self.scrolling_state.get_selected().is_some_and(|v| v == idx) {
-                            val = val.patch_style(config.theme.current_item_style);
-                        }
-                        Ok(ListItem::new(val))
-                    }
-                    Err(err) => Err(err),
-                }
-            })
-            .try_collect()?;
+        let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
 
         let content_len = lines.len();
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(area.height.into()));
+        if self.scrolling_state.get_selected().is_none() {
+            self.scrolling_state.last();
+        }
 
         let logs_wg = List::new(lines)
             .style(config.as_text_style())
+            .highlight_style(config.theme.current_item_style)
             .block(Block::default().padding(Padding::right(5)));
         frame.render_stateful_widget(logs_wg, area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
@@ -64,7 +50,6 @@ impl Screen for LogsScreen {
     }
 
     fn before_show(&mut self, _client: &mut impl MpdClient, _status: &mut Status, _config: &Config) -> Result<()> {
-        self.scrolling_state.last();
         Ok(())
     }
 
