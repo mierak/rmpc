@@ -164,11 +164,6 @@ fn main_task<B: Backend + std::io::Write>(
 
     loop {
         let now = std::time::Instant::now();
-        std::thread::sleep(
-            min_frame_duration
-                .checked_sub(now - last_render)
-                .unwrap_or(Duration::ZERO),
-        );
 
         let event = if render_wanted {
             match event_receiver.recv_timeout(
