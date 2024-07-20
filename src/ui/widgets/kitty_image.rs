@@ -1,7 +1,11 @@
 use anyhow::{Context, Result};
 use std::{
     io::{Cursor, Write},
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
+    time::Instant,
 };
 
 use base64::Engine;
@@ -19,15 +23,16 @@ use crate::{
 #[derive(Debug)]
 pub struct ImageState {
     idx: u32,
-    image: Option<Vec<u8>>,
+    image: Option<Arc<Vec<u8>>>,
+    default_art: Arc<Vec<u8>>,
     needs_transfer: bool,
-    transfer_request_channel: Sender<(Vec<u8>, usize, usize)>,
+    transfer_request_channel: Sender<(Arc<Vec<u8>>, usize, usize)>,
     compression_finished_receiver: Receiver<Data>,
 }
 
 impl ImageState {
-    pub fn new(sender: Sender<AppEvent>) -> Self {
-        let compression_request_channel = channel::<(Vec<_>, usize, usize)>();
+    pub fn new(sender: Sender<AppEvent>, default_art: Vec<u8>) -> Self {
+        let compression_request_channel = channel::<(Arc<Vec<_>>, usize, usize)>();
         let rx = compression_request_channel.1;
 
         let image_data_to_transfer_channel = channel::<Data>();
@@ -61,6 +66,7 @@ impl ImageState {
             image: None,
             transfer_request_channel: compression_request_channel.0,
             compression_finished_receiver: image_data_to_transfer_channel.1,
+            default_art: Arc::new(default_art),
         }
     }
 }
@@ -68,22 +74,24 @@ impl ImageState {
 impl ImageState {
     /// Takes image data in buffer
     /// Leaves the provided buffer empty if any data were in there
+    /// Has to be called on every image change event, not just when
+    /// it is currently displayed
     pub fn image(&mut self, image: &mut Option<Vec<u8>>) -> &Self {
         match (image.as_mut(), &mut self.image) {
-            (Some(ref mut v), None) => {
-                self.image = Some(std::mem::take(v));
+            (Some(ref mut new_img), None) => {
+                self.image = Some(Arc::new(std::mem::take(new_img)));
                 self.needs_transfer = true;
-                log::debug!(size = self.image.as_ref().map(Vec::len); "New image received",);
+                log::debug!(bytes = self.image.as_ref().map(|v| v.len()); "New image received",);
             }
-            (Some(v), Some(i)) if v.ne(&i) && !v.is_empty() => {
-                self.image = Some(std::mem::take(v));
+            (Some(new_img), Some(current_img)) if *new_img != **current_img && !new_img.is_empty() => {
+                self.image = Some(Arc::new(std::mem::take(new_img)));
                 self.needs_transfer = true;
-                log::debug!(size = self.image.as_ref().map(Vec::len); "New image received");
+                log::debug!(bytes = self.image.as_ref().map(|v| v.len()); "New image received");
             }
-            (Some(v), Some(_)) => {
-                v.clear();
+            (Some(new_img), Some(_)) => {
+                log::debug!("New image is identical to the current one, ignoring");
+                new_img.clear();
             }
-            // The image is identical, should be in place already
             (None, None) => {} // Default img should be in place already
             (None, Some(_)) => {
                 // Show default img
@@ -99,7 +107,6 @@ impl ImageState {
 #[derive(Debug, Default)]
 pub struct KittyImage<'a> {
     block: Option<Block<'a>>,
-    default_art: &'a [u8],
 }
 
 struct Data {
@@ -115,6 +122,8 @@ impl<'a> KittyImage<'a> {
         height: usize,
         compression: Compression,
     ) -> Result<Data> {
+        let start_time = Instant::now();
+        log::debug!(bytes = image_data.len(); "Compressing image data");
         let (w, h) = KittyImage::get_image_size(width, height)?;
         let image = image::io::Reader::new(Cursor::new(image_data))
             .with_guessed_format()
@@ -134,6 +143,8 @@ impl<'a> KittyImage<'a> {
             e.finish()
                 .context("Error occured when flushing image bytes to zlib encoder")?,
         );
+
+        log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
         Ok(Data {
             content,
             img_width: image.width(),
@@ -180,6 +191,8 @@ impl<'a> KittyImage<'a> {
     }
 
     fn transfer_data(content: &str, cols: usize, rows: usize, img_width: u32, img_height: u32, state: &mut ImageState) {
+        let start_time = Instant::now();
+        log::debug!(bytes = content.len(); "Transferring compressed image data");
         let mut iter = content.chars().peekable();
 
         let first: String = iter.by_ref().take(4096).collect();
@@ -190,6 +203,7 @@ impl<'a> KittyImage<'a> {
         );
 
         if tmux::is_inside_tmux() {
+            log::trace!("Using tmux wrap");
             tmux::wrap_print(delete_all_images);
             tmux::wrap_print(virtual_image_placement);
 
@@ -208,15 +222,11 @@ impl<'a> KittyImage<'a> {
                 print!("\x1b_Gm={m};{chunk}\x1b\\");
             }
         }
+        log::debug!(duration:? = start_time.elapsed(); "Transfer finished");
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
-        self
-    }
-
-    pub fn default_art(mut self, default_art: &'a [u8]) -> Self {
-        self.default_art = default_art;
         self
     }
 }
@@ -233,10 +243,11 @@ impl<'a> StatefulWidget for KittyImage<'a> {
             }
             None => area,
         };
+
         let image = match &state.image {
-            None => self.default_art,
-            Some(data) if data.is_empty() => self.default_art,
-            Some(data) => data.as_slice(),
+            None => Arc::clone(&state.default_art),
+            Some(data) if data.is_empty() => Arc::clone(&state.default_art),
+            Some(data) => Arc::clone(data),
         };
 
         let height = area.height as usize;
@@ -252,7 +263,7 @@ impl<'a> StatefulWidget for KittyImage<'a> {
                 print!("{delete_all_images}");
             }
 
-            if let Err(err) = state.transfer_request_channel.send((image.to_vec(), width, height)) {
+            if let Err(err) = state.transfer_request_channel.send((image, width, height)) {
                 status_error!(err:?; "Failed to compress image data");
             }
         }

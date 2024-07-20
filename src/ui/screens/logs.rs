@@ -50,6 +50,7 @@ impl Screen for LogsScreen {
     }
 
     fn before_show(&mut self, _client: &mut impl MpdClient, _status: &mut Status, _config: &Config) -> Result<()> {
+        self.scrolling_state.last();
         Ok(())
     }
 
