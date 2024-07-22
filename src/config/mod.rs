@@ -49,6 +49,9 @@ fn get_default_config_path() -> PathBuf {
         return path;
     }
     path.push(env!("CARGO_CRATE_NAME"));
+    #[cfg(debug_assertions)]
+    path.push("config.debug.ron");
+    #[cfg(not(debug_assertions))]
     path.push("config.ron");
     return path;
 }
