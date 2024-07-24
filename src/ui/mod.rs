@@ -549,6 +549,7 @@ impl Ui<'_> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum UiEvent {
     Player,
     Mixer,

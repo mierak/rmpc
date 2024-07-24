@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use actions::{
-    AlbumsActionsFile, ArtistsActionsFile, CommonActionFile, DirectoriesActionsFile, GlobalActionFile, LogsActionsFile,
+    AlbumsActionsFile, ArtistsActionsFile, CommonActionFile, DirectoriesActionsFile, GlobalActionFile,
     PlaylistsActionsFile, QueueActionsFile,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(debug_assertions)]
 pub use actions::LogsActions;
+#[cfg(debug_assertions)]
+use actions::LogsActionsFile;
 
 pub use actions::{
     AlbumsActions, ArtistsActions, CommonAction, DirectoriesActions, GlobalAction, PlaylistsActions, QueueActions,
