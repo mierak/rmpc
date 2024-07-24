@@ -4,10 +4,12 @@ use itertools::Itertools;
 
 use crate::{
     config::{
-        keys::QueueActions, theme::{
+        keys::QueueActions,
+        theme::{
             properties::{Property, SongProperty},
             Position,
-        }, Config
+        },
+        Config,
     },
     mpd::{
         commands::{Song, Status},
@@ -20,7 +22,7 @@ use crate::{
         },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
-        KeyHandleResultInternal,  UiEvent,
+        KeyHandleResultInternal, UiEvent,
     },
     utils::macros::{status_error, status_warn, try_ret},
     AppEvent,

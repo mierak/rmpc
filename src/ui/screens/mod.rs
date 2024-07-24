@@ -14,7 +14,9 @@ use strum::{Display, EnumIter, VariantNames};
 
 use crate::{
     config::{
-        keys::{CommonAction, ToDescription}, theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty}, Config
+        keys::{CommonAction, ToDescription},
+        theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
+        Config,
     },
     mpd::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
@@ -84,7 +86,6 @@ pub(super) trait Screen {
         config: &Config,
     ) -> Result<KeyHandleResultInternal>;
 }
-
 
 impl Screens {
     pub fn next(self) -> Self {

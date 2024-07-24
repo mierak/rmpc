@@ -90,7 +90,6 @@ impl Screen for ArtistsScreen {
     }
 }
 
-
 fn list_titles(
     client: &mut impl MpdClient,
     artist: &str,

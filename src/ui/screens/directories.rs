@@ -12,7 +12,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, 
+        KeyHandleResultInternal,
     },
     utils::macros::{status_info, status_warn},
 };
@@ -99,7 +99,6 @@ impl Screen for DirectoriesScreen {
         }
     }
 }
-
 
 impl BrowserScreen<DirOrSong> for DirectoriesScreen {
     fn stack(&self) -> &DirStack<DirOrSong> {

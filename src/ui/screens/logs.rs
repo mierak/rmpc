@@ -8,10 +8,13 @@ use ratatui::{
 };
 
 use crate::{
-    config::{keys::{CommonAction, LogsActions}, Config},
+    config::{
+        keys::{CommonAction, LogsActions},
+        Config,
+    },
     mpd::{commands::Status, mpd_client::MpdClient},
     state::MyVecDeque,
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal,  UiEvent},
+    ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
 };
 
 use super::Screen;

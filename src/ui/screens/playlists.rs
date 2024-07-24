@@ -13,7 +13,7 @@ use crate::{
         modals::rename_playlist::RenamePlaylistModal,
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal,  UiEvent,
+        KeyHandleResultInternal, UiEvent,
     },
     utils::macros::{status_error, status_info},
 };
@@ -28,7 +28,6 @@ pub struct PlaylistsScreen {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
 }
-
 
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;

@@ -1,5 +1,5 @@
 use crate::{
-    config::{ keys::AlbumsActions, Config},
+    config::{keys::AlbumsActions, Config},
     mpd::{
         commands::{Song as MpdSong, Status},
         errors::MpdError,
@@ -8,7 +8,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, 
+        KeyHandleResultInternal,
     },
     utils::macros::{status_info, status_warn},
 };
@@ -91,7 +91,6 @@ impl Screen for AlbumsScreen {
         }
     }
 }
-
 
 fn list_titles(client: &mut impl MpdClient, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
