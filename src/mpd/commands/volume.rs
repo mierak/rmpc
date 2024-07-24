@@ -10,6 +10,12 @@ impl Bound<u8> for Volume {
     fn value(&self) -> &u8 {
         &self.0
     }
+
+    fn set_value(&mut self, value: u8) -> &Self {
+        self.0 = value.clamp(0, 100);
+        self
+    }
+
     fn inc(&mut self) -> &Self {
         if self.0 < 100 {
             self.0 += 1;
@@ -41,6 +47,7 @@ impl Volume {
 #[allow(dead_code)]
 pub trait Bound<T> {
     fn value(&self) -> &u8;
+    fn set_value(&mut self, value: u8) -> &Self;
     fn inc(&mut self) -> &Self;
     fn inc_by(&mut self, step: T) -> &Self;
     fn dec(&mut self) -> &Self;

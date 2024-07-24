@@ -7,12 +7,10 @@ use ratatui::{
 };
 
 use crate::{
-    mpd::mpd_client::MpdClient,
-    ui::{
-        screens::CommonAction,
+    config::keys::CommonAction, mpd::mpd_client::MpdClient, ui::{
         utils::dirstack::DirState,
         widgets::button::{Button, ButtonGroup, ButtonGroupState},
-    },
+    }
 };
 
 use super::{KeyHandleResultInternal, RectExt};

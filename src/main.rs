@@ -64,6 +64,14 @@ fn main() -> Result<()> {
         Some(Command::Version) => {
             println!("rmpc version: {}", env!("CARGO_PKG_VERSION"));
         }
+        Some(cmd) => {
+            let address = match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
+                Ok(val) => val.into_config(Some(&args.config))?,
+                Err(_err) => ConfigFile::default().into_config(None)?,
+            }
+            .address;
+            cmd.execute(&mut Client::init(address, "", true)?)?;
+        }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");

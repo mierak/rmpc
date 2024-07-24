@@ -1,20 +1,16 @@
 use std::collections::HashMap;
 
+use actions::{AlbumsActionsFile, ArtistsActionsFile, CommonActionFile, DirectoriesActionsFile, GlobalActionFile, LogsActionsFile, PlaylistsActionsFile, QueueActionsFile};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 
 #[cfg(debug_assertions)]
-use crate::ui::screens::logs::LogsActions;
-use crate::ui::{
-    screens::{
-        albums::AlbumsActions, artists::ArtistsActions, directories::DirectoriesActions, playlists::PlaylistsActions,
-        queue::QueueActions, search::SearchActions, CommonAction,
-    },
-    GlobalAction,
-};
+pub use actions::LogsActions;
 
-pub use self::key::Key;
+pub use actions::{ArtistsActions, AlbumsActions, CommonAction, GlobalAction, PlaylistsActions, DirectoriesActions, QueueActions, SearchActions};
+pub use key::Key;
 
+mod actions;
 mod key;
 
 #[derive(Debug, PartialEq, Default)]
@@ -34,9 +30,9 @@ pub struct KeyConfig {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct KeyConfigFile {
     #[serde(default)]
-    pub global: HashMap<Key, GlobalAction>,
+    pub global: HashMap<Key, GlobalActionFile>,
     #[serde(default)]
-    pub navigation: HashMap<Key, CommonAction>,
+    pub navigation: HashMap<Key, CommonActionFile>,
     // pub albums: HashMap<AlbumsActions, Vec<Key>>,
     // pub artists: HashMap<ArtistsActions, Vec<Key>>,
     // pub directories: HashMap<DirectoriesActions, Vec<Key>>,
@@ -44,29 +40,32 @@ pub struct KeyConfigFile {
     // pub search: HashMap<SearchActions, Vec<Key>>,
     #[cfg(debug_assertions)]
     #[serde(default)]
-    pub logs: HashMap<Key, LogsActions>,
+    pub logs: HashMap<Key, LogsActionsFile>,
     #[serde(default)]
-    pub queue: HashMap<Key, QueueActions>,
+    pub queue: HashMap<Key, QueueActionsFile>,
 }
 
 impl Default for KeyConfigFile {
     #[rustfmt::skip]
     #[allow(unused_imports)]
     fn default() -> Self {
-        use GlobalAction as G;
-        use CommonAction as C;
-        use AlbumsActions as Al;
-        use ArtistsActions as Ar;
-        use DirectoriesActions as D;
-        use PlaylistsActions as P;
+        use GlobalActionFile as G;
+        use CommonActionFile as C;
+        use AlbumsActionsFile as Al;
+        use ArtistsActionsFile as Ar;
+        use DirectoriesActionsFile  as D;
+        use PlaylistsActionsFile as P;
         use KeyCode as K;
         use KeyModifiers as M;
         #[cfg(debug_assertions)]
-        use LogsActions as L;
-        use QueueActions as Q;
+        use LogsActionsFile as L;
+        use QueueActionsFile as Q;
         Self {
             global: HashMap::from([
                 (Key { key: K::Char('q'), modifiers: M::NONE  }, G::Quit),
+                (Key { key: K::Char(':'), modifiers: M::NONE  }, G::CommandMode),
+                (Key { key: K::Char('F'), modifiers: M::SHIFT  }, G::Command { command: "play".to_string(), description: None }),
+                (Key { key: K::Char('P'), modifiers: M::SHIFT  }, G::Command { command: "seek 50".to_string(), description: None }),
                 (Key { key: K::Char('~'), modifiers: M::NONE  }, G::ShowHelp),
                 (Key { key: K::Char('>'), modifiers: M::NONE  }, G::NextTrack),
                 (Key { key: K::Char('<'), modifiers: M::NONE  }, G::PreviousTrack),
@@ -74,6 +73,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('z'), modifiers: M::NONE  }, G::ToggleRepeat),
                 (Key { key: K::Char('x'), modifiers: M::NONE  }, G::ToggleRandom),
                 (Key { key: K::Char('c'), modifiers: M::NONE  }, G::ToggleSingle),
+                (Key { key: K::Char('v'), modifiers: M::NONE  }, G::ToggleConsume),
                 (Key { key: K::Char('p'), modifiers: M::NONE  }, G::TogglePause),
                 (Key { key: K::Char('f'), modifiers: M::NONE  }, G::SeekForward),
                 (Key { key: K::Char('b'), modifiers: M::NONE  }, G::SeekBack),
@@ -83,7 +83,6 @@ impl Default for KeyConfigFile {
                 (Key { key: K::BackTab,   modifiers: M::SHIFT }, G::PreviousTab),
                 (Key { key: K::Right,     modifiers: M::NONE  }, G::NextTab),
                 (Key { key: K::Tab,       modifiers: M::NONE  }, G::NextTab),
-                (Key { key: K::Char('v'), modifiers: M::NONE  }, G::ToggleConsume),
                 (Key { key: K::Char('1'), modifiers: M::NONE  }, G::QueueTab),
                 (Key { key: K::Char('2'), modifiers: M::NONE  }, G::DirectoriesTab),
                 (Key { key: K::Char('3'), modifiers: M::NONE  }, G::ArtistsTab),
@@ -140,8 +139,8 @@ impl Default for KeyConfigFile {
 impl From<KeyConfigFile> for KeyConfig {
     fn from(value: KeyConfigFile) -> Self {
         KeyConfig {
-            global: value.global,
-            navigation: value.navigation,
+            global: value.global.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            navigation: value.navigation.into_iter().map(|(k, v)| (k, v.into())).collect(),
             // albums: invert_map(value.albums),
             // artists: invert_map(value.artists),
             // directories: invert_map(value.directories),
@@ -152,8 +151,8 @@ impl From<KeyConfigFile> for KeyConfig {
             playlists: HashMap::new(),
             search: HashMap::new(),
             #[cfg(debug_assertions)]
-            logs: value.logs,
-            queue: value.queue,
+            logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            queue: value.queue.into_iter().map(|(k, v)| (k, v.into())).collect(),
         }
     }
 }
@@ -167,16 +166,18 @@ impl From<KeyEvent> for Key {
     }
 }
 
+pub trait ToDescription {
+    fn to_description(&self) -> &str;
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::ui::{
-        screens::{logs::LogsActions, queue::QueueActions, CommonAction},
-        GlobalAction,
-    };
+    use crate::config::keys::{actions::{CommonActionFile, GlobalActionFile, LogsActionsFile, QueueActionsFile}, CommonAction, GlobalAction, LogsActions, QueueActions};
 
     use super::{Key, KeyConfig, KeyConfigFile};
 
@@ -184,17 +185,17 @@ mod tests {
     #[rustfmt::skip]
     fn converts() {
         let input = KeyConfigFile {
-            global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalAction::Quit)]),
-            logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActions::Clear)]),
-            queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActions::Play),
-                                  (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActions::Save)]),
+            global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalActionFile::Quit)]),
+            logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActionsFile::Clear)]),
+            queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActionsFile::Play),
+                                  (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActionsFile::Save)]),
             // albums: HashMap::from([]),
             // artists: HashMap::from([]),
             // directories: HashMap::from([]),
             // playlists: HashMap::from([]),
             navigation: HashMap::from([
-                (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonAction::Up),
-                (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up)
+                (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonActionFile::Up),
+                (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonActionFile::Up)
             ])
         };
         let expected = KeyConfig {

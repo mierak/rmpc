@@ -9,16 +9,10 @@ use ratatui::{
 };
 
 use crate::{
-    mpd::{client::Client, mpd_client::MpdClient},
-    state::State,
-    ui::{
-        screens::CommonAction,
-        widgets::{
+    config::keys::CommonAction, mpd::{client::Client, mpd_client::MpdClient}, state::State, ui::widgets::{
             button::{Button, ButtonGroup, ButtonGroupState},
             input::Input,
-        },
-    },
-    utils::macros::{status_error, status_info},
+        }, utils::macros::{status_error, status_info}
 };
 
 use super::{KeyHandleResultInternal, RectExt};

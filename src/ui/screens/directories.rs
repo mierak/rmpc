@@ -2,10 +2,9 @@ use anyhow::Result;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
-use strum::Display;
 
 use crate::{
-    config::Config,
+    config::{keys::DirectoriesActions, Config},
     mpd::{
         commands::{lsinfo::FileOrDir, Status},
         mpd_client::{Filter, MpdClient, Tag},
@@ -13,7 +12,7 @@ use crate::{
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, ToDescription,
+        KeyHandleResultInternal, 
     },
     utils::macros::{status_info, status_warn},
 };
@@ -101,14 +100,6 @@ impl Screen for DirectoriesScreen {
     }
 }
 
-#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum DirectoriesActions {}
-
-impl ToDescription for DirectoriesActions {
-    fn to_description(&self) -> &str {
-        ""
-    }
-}
 
 impl BrowserScreen<DirOrSong> for DirectoriesScreen {
     fn stack(&self) -> &DirStack<DirOrSong> {

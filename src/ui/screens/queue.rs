@@ -1,15 +1,13 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
-use strum::Display;
 
 use crate::{
     config::{
-        theme::{
+        keys::QueueActions, theme::{
             properties::{Property, SongProperty},
             Position,
-        },
-        Config,
+        }, Config
     },
     mpd::{
         commands::{Song, Status},
@@ -22,7 +20,7 @@ use crate::{
         },
         utils::dirstack::DirState,
         widgets::kitty_image::{ImageState, KittyImage},
-        KeyHandleResultInternal, ToDescription, UiEvent,
+        KeyHandleResultInternal,  UiEvent,
     },
     utils::macros::{status_error, status_warn, try_ret},
     AppEvent,
@@ -243,6 +241,9 @@ impl Screen for QueueScreen {
                 if let Some(queue) = queue {
                     self.scrolling_state.set_content_len(Some(queue.len()));
                     self.queue = queue;
+                } else {
+                    self.scrolling_state.set_content_len(Some(0));
+                    self.queue.clear();
                 }
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -496,27 +497,6 @@ impl QueueScreen {
                 self.scrolling_state.select(Some(i));
                 break;
             }
-        }
-    }
-}
-
-#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum QueueActions {
-    Delete,
-    DeleteAll,
-    Play,
-    Save,
-    AddToPlaylist,
-}
-
-impl ToDescription for QueueActions {
-    fn to_description(&self) -> &str {
-        match self {
-            QueueActions::Delete => "Remove song under curor from the queue",
-            QueueActions::DeleteAll => "Clear current queue",
-            QueueActions::Play => "Play song under cursor",
-            QueueActions::Save => "Save current queue as a new playlist",
-            QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist",
         }
     }
 }

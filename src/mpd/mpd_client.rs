@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, str::FromStr};
 
 use anyhow::Result;
 use derive_more::Deref;
@@ -30,23 +30,54 @@ pub enum SaveMode {
     Replace,
 }
 
+pub enum ValueChange {
+    Increase(u32),
+    Decrease(u32),
+    Set(u32),
+}
+
+impl FromStr for ValueChange {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            v if v.starts_with('-') => Ok(ValueChange::Decrease(v.trim_start_matches('-').parse()?)),
+            v if v.starts_with('+') => Ok(ValueChange::Increase(v.trim_start_matches('+').parse()?)),
+            v => Ok(ValueChange::Set(v.parse()?)),
+        }
+    }
+}
+
+impl ValueChange {
+    fn to_mpd_str(&self) -> String {
+        match self {
+            ValueChange::Increase(val) => format!("+{val}"),
+            ValueChange::Decrease(val) => format!("-{val}"),
+            ValueChange::Set(val) => format!("{val}"),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub trait MpdClient {
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
+    /// Set playback volume relative to current
+    fn volume(&mut self, change: ValueChange) -> MpdResult<()>;
     fn get_current_song(&mut self) -> MpdResult<Option<Song>>;
     fn get_status(&mut self) -> MpdResult<Status>;
     // Playback control
     fn pause_toggle(&mut self) -> MpdResult<()>;
+    fn pause(&mut self) -> MpdResult<()>;
+    fn unpause(&mut self) -> MpdResult<()>;
     fn next(&mut self) -> MpdResult<()>;
     fn prev(&mut self) -> MpdResult<()>;
     fn play_pos(&mut self, pos: u32) -> MpdResult<()>;
     fn play(&mut self) -> MpdResult<()>;
     fn play_id(&mut self, id: u32) -> MpdResult<()>;
     fn stop(&mut self) -> MpdResult<()>;
-    fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()>;
-    fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()>;
+    fn seek_current(&mut self, value: ValueChange) -> MpdResult<()>;
     fn repeat(&mut self, enabled: bool) -> MpdResult<()>;
     fn random(&mut self, enabled: bool) -> MpdResult<()>;
     fn single(&mut self, single: OnOffOneshot) -> MpdResult<()>;
@@ -100,6 +131,15 @@ impl MpdClient for Client<'_> {
             .and_then(ProtoClient::read_ok)
     }
 
+    fn volume(&mut self, change: ValueChange) -> MpdResult<()> {
+        match change {
+            ValueChange::Increase(_) | ValueChange::Decrease(_) => self
+                .send(&format!("volume {}", change.to_mpd_str()))
+                .and_then(ProtoClient::read_ok),
+            ValueChange::Set(val) => self.send(&format!("setvol {val}")).and_then(ProtoClient::read_ok),
+        }
+    }
+
     fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
         self.send("currentsong").and_then(ProtoClient::read_opt_response)
     }
@@ -111,6 +151,14 @@ impl MpdClient for Client<'_> {
     // Playback control
     fn pause_toggle(&mut self) -> MpdResult<()> {
         self.send("pause").and_then(ProtoClient::read_ok)
+    }
+
+    fn pause(&mut self) -> MpdResult<()> {
+        self.send("pause 1").and_then(ProtoClient::read_ok)
+    }
+
+    fn unpause(&mut self) -> MpdResult<()> {
+        self.send("pause 0").and_then(ProtoClient::read_ok)
     }
 
     fn next(&mut self) -> MpdResult<()> {
@@ -137,13 +185,8 @@ impl MpdClient for Client<'_> {
         self.send("stop").and_then(ProtoClient::read_ok)
     }
 
-    fn seek_curr_forwards(&mut self, time_sec: u32) -> MpdResult<()> {
-        self.send(&format!("seekcur +{time_sec}"))
-            .and_then(ProtoClient::read_ok)
-    }
-
-    fn seek_curr_backwards(&mut self, time_sec: u32) -> MpdResult<()> {
-        self.send(&format!("seekcur -{time_sec}"))
+    fn seek_current(&mut self, value: ValueChange) -> MpdResult<()> {
+        self.send(&format!("seekcur {}", value.to_mpd_str()))
             .and_then(ProtoClient::read_ok)
     }
 

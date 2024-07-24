@@ -5,11 +5,11 @@ use rstest::fixture;
 
 use crate::mpd::{
     commands::{
-        list::MpdList, list_playlist::FileList, status::OnOffOneshot, IdleEvent, ListFiles, LsInfo, Playlist, Song,
-        Status, Volume,
+        list::MpdList, list_playlist::FileList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo,
+        Playlist, Song, Status, Volume,
     },
     errors::MpdError,
-    mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag},
+    mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
 };
 
 #[fixture]
@@ -82,6 +82,7 @@ pub struct TestMpdClient {
 }
 
 type MpdResult<T> = Result<T, MpdError>;
+#[allow(clippy::cast_possible_truncation)]
 impl MpdClient for TestMpdClient {
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         todo!()
@@ -93,6 +94,15 @@ impl MpdClient for TestMpdClient {
 
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()> {
         self.volume = volume;
+        Ok(())
+    }
+
+    fn volume(&mut self, change: ValueChange) -> MpdResult<()> {
+        match change {
+            ValueChange::Increase(val) => self.volume.inc_by(val as u8),
+            ValueChange::Decrease(val) => self.volume.dec_by(val as u8),
+            ValueChange::Set(val) => self.volume.set_value(val as u8),
+        };
         Ok(())
     }
 
@@ -111,6 +121,18 @@ impl MpdClient for TestMpdClient {
             S::Stop => S::Stop,
             S::Pause => S::Play,
         };
+        Ok(())
+    }
+
+    fn pause(&mut self) -> MpdResult<()> {
+        use crate::mpd::commands::State as S;
+        self.status.state = S::Pause;
+        Ok(())
+    }
+
+    fn unpause(&mut self) -> MpdResult<()> {
+        use crate::mpd::commands::State as S;
+        self.status.state = S::Play;
         Ok(())
     }
 
@@ -157,11 +179,7 @@ impl MpdClient for TestMpdClient {
         Ok(())
     }
 
-    fn seek_curr_forwards(&mut self, _time_sec: u32) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn seek_curr_backwards(&mut self, _time_sec: u32) -> MpdResult<()> {
+    fn seek_current(&mut self, _value: ValueChange) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
