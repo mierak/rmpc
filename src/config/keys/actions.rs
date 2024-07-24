@@ -213,8 +213,10 @@ pub enum LogsActions {
 
 #[cfg(debug_assertions)]
 impl From<LogsActionsFile> for LogsActions {
-    fn from(_value: LogsActionsFile) -> Self {
-        unreachable!()
+    fn from(value: LogsActionsFile) -> Self {
+        match value {
+            LogsActionsFile::Clear => LogsActions::Clear,
+        }
     }
 }
 

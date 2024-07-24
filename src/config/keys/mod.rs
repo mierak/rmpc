@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 
-use actions::{AlbumsActionsFile, ArtistsActionsFile, CommonActionFile, DirectoriesActionsFile, GlobalActionFile, LogsActionsFile, PlaylistsActionsFile, QueueActionsFile};
+use actions::{
+    AlbumsActionsFile, ArtistsActionsFile, CommonActionFile, DirectoriesActionsFile, GlobalActionFile, LogsActionsFile,
+    PlaylistsActionsFile, QueueActionsFile,
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 
 #[cfg(debug_assertions)]
 pub use actions::LogsActions;
 
-pub use actions::{ArtistsActions, AlbumsActions, CommonAction, GlobalAction, PlaylistsActions, DirectoriesActions, QueueActions, SearchActions};
+pub use actions::{
+    AlbumsActions, ArtistsActions, CommonAction, DirectoriesActions, GlobalAction, PlaylistsActions, QueueActions,
+    SearchActions,
+};
 pub use key::Key;
 
 mod actions;
@@ -64,8 +70,6 @@ impl Default for KeyConfigFile {
             global: HashMap::from([
                 (Key { key: K::Char('q'), modifiers: M::NONE  }, G::Quit),
                 (Key { key: K::Char(':'), modifiers: M::NONE  }, G::CommandMode),
-                (Key { key: K::Char('F'), modifiers: M::SHIFT  }, G::Command { command: "play".to_string(), description: None }),
-                (Key { key: K::Char('P'), modifiers: M::SHIFT  }, G::Command { command: "seek 50".to_string(), description: None }),
                 (Key { key: K::Char('~'), modifiers: M::NONE  }, G::ShowHelp),
                 (Key { key: K::Char('>'), modifiers: M::NONE  }, G::NextTrack),
                 (Key { key: K::Char('<'), modifiers: M::NONE  }, G::PreviousTrack),
@@ -170,14 +174,16 @@ pub trait ToDescription {
     fn to_description(&self) -> &str;
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    use crate::config::keys::{actions::{CommonActionFile, GlobalActionFile, LogsActionsFile, QueueActionsFile}, CommonAction, GlobalAction, LogsActions, QueueActions};
+    use crate::config::keys::{
+        actions::{CommonActionFile, GlobalActionFile, LogsActionsFile, QueueActionsFile},
+        CommonAction, GlobalAction, LogsActions, QueueActions,
+    };
 
     use super::{Key, KeyConfig, KeyConfigFile};
 
