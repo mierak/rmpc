@@ -412,4 +412,20 @@ impl MpdClient for TestMpdClient {
     fn find_album_art(&mut self, _path: &str) -> MpdResult<Option<Vec<u8>>> {
         todo!("Not yet implemented")
     }
+
+    fn outputs(&mut self) -> MpdResult<crate::mpd::commands::outputs::Outputs> {
+        todo!("Not yet implemented")
+    }
+
+    fn toggle_output(&mut self, _id: u32) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn enable_output(&mut self, _id: u32) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn disable_output(&mut self, _id: u32) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }

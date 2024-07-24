@@ -75,6 +75,23 @@ pub enum Command {
     Clear,
     /// Add a song to the current queue. Relative to music database root. '/' to add all files to the queue
     Add { file: String },
+    /// List MPD outputs
+    Outputs,
+    /// Toggle MPD output on or off
+    ToggleOutput {
+        // Id of the output to toggle
+        id: u32,
+    },
+    /// Enable MPD output
+    EnableOutput {
+        // Id of the output to enable
+        id: u32,
+    },
+    /// Disable MPD output
+    DisableOutput {
+        // Id of the output to disable
+        id: u32,
+    },
 }
 
 #[derive(Parser, ValueEnum, Copy, Clone, Debug, PartialEq)]
@@ -128,9 +145,13 @@ impl Command {
             Command::Seek { value } => client.seek_current(value.parse()?)?,
             Command::Clear => client.clear()?,
             Command::Add { file } => client.add(file)?,
+            Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
             Command::Config => bail!("Cannot use config command here."),
             Command::Theme => bail!("Cannot use theme command here."),
             Command::Version => bail!("Cannot use version command here."),
+            Command::ToggleOutput { id } => client.toggle_output(*id)?,
+            Command::EnableOutput { id } => client.enable_output(*id)?,
+            Command::DisableOutput { id } => client.disable_output(*id)?,
         };
         Ok(())
     }

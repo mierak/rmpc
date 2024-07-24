@@ -6,7 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use modals::keybinds::KeybindsModal;
+use modals::{keybinds::KeybindsModal, outputs::OutputsModal};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
@@ -427,6 +427,10 @@ impl Ui<'_> {
                         GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                         GlobalAction::ShowHelp => {
                             self.modals.push(Box::new(KeybindsModal::new(state)));
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::ShowOutputs => {
+                            self.modals.push(Box::new(OutputsModal::new(self.client.outputs()?.0)));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                     }

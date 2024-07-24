@@ -13,6 +13,7 @@ pub mod add_to_playlist;
 pub mod confirm_modal;
 pub mod confirm_queue_clear;
 pub mod keybinds;
+pub mod outputs;
 pub mod rename_playlist;
 pub mod save_queue;
 
