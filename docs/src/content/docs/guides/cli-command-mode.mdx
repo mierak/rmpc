@@ -33,7 +33,7 @@ Commands:
   stop            Stops playback
   next            Plays the next song in the playlist
   prev            Plays the previous song in the playlist
-  volume          Sets volume, relative if prefixed by + or -
+  volume          Sets volume, relative if prefixed by + or -. Prints current volume if no arguments is given
   repeat          On or off
   random          On or off
   single          On, off or oneshot
@@ -45,10 +45,12 @@ Commands:
   toggle-output   Toggle MPD output on or off
   enable-output   Enable MPD output
   disable-output  Disable MPD output
+  status          Prints various information like the playback status
+  song            Prints information about the current song
   help            Print this message or the help of the given subcommand(s)
 
 Options:
-  -c, --config <FILE>      [default: /home/mrk/.config/rmpc/config.debug.ron]
+  -c, --config <FILE>      [default: /home/<USER>/.config/rmpc/config.debug.ron]
   -l, --log <LOG>          [default: DEBUG]
   -a, --address <ADDRESS>  Override the address to connect to. Defaults to value in the config file
   -h, --help               Print help

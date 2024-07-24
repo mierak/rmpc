@@ -1,12 +1,13 @@
 use std::time::Duration;
 
 use anyhow::anyhow;
+use serde::Serialize;
 
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 use super::Volume;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Serialize, Default, Clone)]
 pub struct Status {
     pub partition: String, // the name of the current partition (see Partition commands)
     pub volume: Volume,    // 0-100 (deprecated: -1 if the volume cannot be determined)
@@ -65,7 +66,7 @@ impl FromMpd for Status {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Copy, strum::AsRefStr)]
+#[derive(Debug, Serialize, Default, PartialEq, Clone, Copy, strum::AsRefStr)]
 pub enum State {
     #[strum(serialize = "Playing")]
     Play,
@@ -76,7 +77,7 @@ pub enum State {
     Pause,
 }
 
-#[derive(Debug, Default, Clone, Copy, strum::AsRefStr)]
+#[derive(Debug, Serialize, Default, Clone, Copy, strum::AsRefStr)]
 pub enum OnOffOneshot {
     #[strum(serialize = "On")]
     On,
