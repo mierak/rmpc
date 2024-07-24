@@ -11,6 +11,7 @@ mod defaults;
 pub mod keys;
 pub mod theme;
 
+use crate::mpd::commands::volume::Bound;
 use crate::mpd::mpd_client::MpdClient;
 
 use self::{
@@ -53,10 +54,10 @@ pub enum Command {
     Next,
     /// Plays the previous song in the playlist
     Prev,
-    /// Sets volume, relative if prefixed by + or -
+    /// Sets volume, relative if prefixed by + or -. Prints current volume if no arguments is given.
     Volume {
         #[arg(allow_negative_numbers(true))]
-        value: String,
+        value: Option<String>,
     },
     /// On or off
     Repeat { value: OnOff },
@@ -92,6 +93,10 @@ pub enum Command {
         // Id of the output to disable
         id: u32,
     },
+    /// Prints various information like the playback status
+    Status,
+    /// Prints information about the current song
+    Song,
 }
 
 #[derive(Parser, ValueEnum, Copy, Clone, Debug, PartialEq)]
@@ -135,7 +140,8 @@ impl Command {
             Command::TogglePause => client.pause_toggle()?,
             Command::Unpause => client.unpause()?,
             Command::Stop => client.stop()?,
-            Command::Volume { value } => client.volume(value.parse()?)?,
+            Command::Volume { value: Some(value) } => client.volume(value.parse()?)?,
+            Command::Volume { value: None } => println!("{}", client.get_status()?.volume.value()),
             Command::Next => client.next()?,
             Command::Prev => client.prev()?,
             Command::Repeat { value } => client.repeat((*value).into())?,
@@ -152,6 +158,8 @@ impl Command {
             Command::ToggleOutput { id } => client.toggle_output(*id)?,
             Command::EnableOutput { id } => client.enable_output(*id)?,
             Command::DisableOutput { id } => client.disable_output(*id)?,
+            Command::Status => println!("{}", serde_json::ser::to_string(&client.get_status()?)?),
+            Command::Song => println!("{}", serde_json::ser::to_string(&client.get_current_song()?)?),
         };
         Ok(())
     }

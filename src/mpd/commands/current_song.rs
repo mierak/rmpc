@@ -1,8 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
+use serde::Serialize;
+
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
-#[derive(Default, PartialEq, Eq, Clone)]
+#[derive(Default, Serialize, PartialEq, Eq, Clone)]
 pub struct Song {
     pub id: u32,
     pub file: String,
