@@ -1,14 +1,17 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-use anyhow::Context;
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use anyhow::{bail, Context};
+use clap::{Parser, Subcommand, ValueEnum};
 use log::Level;
 use serde::{Deserialize, Serialize};
 
 mod defaults;
 pub mod keys;
 pub mod theme;
+
+use crate::mpd::mpd_client::MpdClient;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
@@ -36,6 +39,109 @@ pub enum Command {
     Theme,
     /// Prints the rmpc version
     Version,
+    /// Plays song at the position in the current playlist. Defaults to current paused song.
+    Play { position: Option<u32> },
+    /// Pause playback
+    Pause,
+    /// Unpause playback
+    Unpause,
+    /// Toggles between play and pause
+    TogglePause,
+    /// Stops playback
+    Stop,
+    /// Plays the next song in the playlist
+    Next,
+    /// Plays the previous song in the playlist
+    Prev,
+    /// Sets volume, relative if prefixed by + or -
+    Volume {
+        #[arg(allow_negative_numbers(true))]
+        value: String,
+    },
+    /// On or off
+    Repeat { value: OnOff },
+    /// On or off
+    Random { value: OnOff },
+    /// On, off or oneshot
+    Single { value: OnOffOneshot },
+    /// On, off or oneshot
+    Consume { value: OnOffOneshot },
+    /// Seeks current song(seconds), relative if prefixed by + or -
+    Seek {
+        #[arg(allow_negative_numbers(true))]
+        value: String,
+    },
+    /// Clear the current queue
+    Clear,
+    /// Add a song to the current queue. Relative to music database root. '/' to add all files to the queue
+    Add { file: String },
+}
+
+#[derive(Parser, ValueEnum, Copy, Clone, Debug, PartialEq)]
+pub enum OnOff {
+    On,
+    Off,
+}
+
+#[derive(Parser, ValueEnum, Copy, Clone, Debug, PartialEq)]
+pub enum OnOffOneshot {
+    On,
+    Off,
+    Oneshot,
+}
+
+impl From<OnOff> for bool {
+    fn from(value: OnOff) -> Self {
+        match value {
+            OnOff::On => true,
+            OnOff::Off => false,
+        }
+    }
+}
+
+impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
+    fn from(value: OnOffOneshot) -> Self {
+        match value {
+            OnOffOneshot::On => crate::mpd::commands::status::OnOffOneshot::On,
+            OnOffOneshot::Off => crate::mpd::commands::status::OnOffOneshot::Off,
+            OnOffOneshot::Oneshot => crate::mpd::commands::status::OnOffOneshot::Oneshot,
+        }
+    }
+}
+
+impl Command {
+    pub fn execute(&self, client: &mut impl MpdClient) -> Result<(), anyhow::Error> {
+        match self {
+            Command::Play { position: None } => client.play()?,
+            Command::Play { position: Some(pos) } => client.play_pos(*pos)?,
+            Command::Pause => client.pause()?,
+            Command::TogglePause => client.pause_toggle()?,
+            Command::Unpause => client.unpause()?,
+            Command::Stop => client.stop()?,
+            Command::Volume { value } => client.volume(value.parse()?)?,
+            Command::Next => client.next()?,
+            Command::Prev => client.prev()?,
+            Command::Repeat { value } => client.repeat((*value).into())?,
+            Command::Random { value } => client.random((*value).into())?,
+            Command::Single { value } => client.single((*value).into())?,
+            Command::Consume { value } => client.consume((*value).into())?,
+            Command::Seek { value } => client.seek_current(value.parse()?)?,
+            Command::Clear => client.clear()?,
+            Command::Add { file } => client.add(file)?,
+            Command::Config => bail!("Cannot use config command here."),
+            Command::Theme => bail!("Cannot use theme command here."),
+            Command::Version => bail!("Cannot use version command here."),
+        };
+        Ok(())
+    }
+}
+
+impl FromStr for Args {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Args::try_parse_from(std::iter::once("").chain(s.split_whitespace()))?)
+    }
 }
 
 fn get_default_config_path() -> PathBuf {

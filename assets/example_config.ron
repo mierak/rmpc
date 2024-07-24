@@ -8,6 +8,7 @@
     status_update_interval_ms: 1000,
     keybinds: (
         global: {
+            ":":       CommandMode,
             "3":       ArtistsTab,
             ",":       VolumeDown,
             "s":       Stop,

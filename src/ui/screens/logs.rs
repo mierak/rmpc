@@ -6,16 +6,18 @@ use ratatui::{
     widgets::{Block, List, ListState, Padding},
     Frame,
 };
-use strum::Display;
 
 use crate::{
-    config::Config,
+    config::{
+        keys::{CommonAction, LogsActions},
+        Config,
+    },
     mpd::{commands::Status, mpd_client::MpdClient},
     state::MyVecDeque,
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal, ToDescription, UiEvent},
+    ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
 };
 
-use super::{CommonAction, Screen};
+use super::Screen;
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
@@ -129,19 +131,6 @@ impl Screen for LogsScreen {
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
-        }
-    }
-}
-
-#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum LogsActions {
-    Clear,
-}
-
-impl ToDescription for LogsActions {
-    fn to_description(&self) -> &str {
-        match self {
-            LogsActions::Clear => "Clear logs",
         }
     }
 }

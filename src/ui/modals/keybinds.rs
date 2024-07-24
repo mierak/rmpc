@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
-use crate::{config::keys::Key, ui::ToDescription};
+use crate::config::keys::{CommonAction, Key, ToDescription};
 use anyhow::bail;
 use ratatui::{
     layout::{Constraint, Layout, Margin},
@@ -11,7 +11,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::ui::{screens::CommonAction, utils::dirstack::DirState, KeyHandleResultInternal};
+use crate::ui::{utils::dirstack::DirState, KeyHandleResultInternal};
 
 use super::{Modal, RectExt};
 

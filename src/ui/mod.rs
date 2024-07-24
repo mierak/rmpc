@@ -2,7 +2,7 @@ use std::{io::Stdout, ops::AddAssign, time::Duration};
 
 use anyhow::Result;
 use crossterm::{
-    event::KeyEvent,
+    event::{KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -11,20 +11,23 @@ use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
     symbols::border,
+    text::Text,
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
-use strum::Display;
 use widgets::app_tabs::AppTabs;
 
 use crate::{
-    config::Config,
+    config::{
+        keys::{CommonAction, GlobalAction},
+        Args, Config,
+    },
     mpd::{
         client::Client,
         commands::{idle::IdleEvent, volume::Bound, State as MpdState},
-        mpd_client::{FilterKind, MpdClient},
+        mpd_client::{FilterKind, MpdClient, ValueChange},
     },
-    utils::macros::try_ret,
+    utils::macros::{status_error, try_ret},
     AppEvent,
 };
 use crate::{mpd::version::Version, state::State};
@@ -71,6 +74,7 @@ pub struct Ui<'a> {
     status_message: Option<StatusMessage>,
     rendered_frames_count: u32,
     current_song: Option<crate::mpd::commands::Song>,
+    command: Option<String>,
 }
 
 impl<'a> Ui<'a> {
@@ -83,6 +87,7 @@ impl<'a> Ui<'a> {
             rendered_frames_count: 0,
             current_song: None,
             modals: Vec::default(),
+            command: None,
         }
     }
 }
@@ -172,7 +177,20 @@ impl Ui<'_> {
             frame.render_widget(app_tabs, tabs_area);
         }
 
-        if let Some(StatusMessage { message, level, .. }) = &self.status_message {
+        if let Some(command) = &self.command {
+            let [leader_area, command_area] =
+                *Layout::horizontal([Constraint::Length(1), Constraint::Percentage(100)]).split(bar_area)
+            else {
+                return Ok(());
+            };
+
+            let status_bar = Paragraph::new(command.as_str())
+                .alignment(ratatui::prelude::Alignment::Left)
+                .style(state.config.as_text_style());
+
+            frame.render_widget(Text::from(":"), leader_area); // TODO: use key from config
+            frame.render_widget(status_bar, command_area);
+        } else if let Some(StatusMessage { message, level, .. }) = &self.status_message {
             let status_bar = Paragraph::new(message.to_owned())
                 .alignment(ratatui::prelude::Alignment::Center)
                 .style(Style::default().fg(level.into()).bg(Color::Black));
@@ -187,11 +205,11 @@ impl Ui<'_> {
             frame.render_widget(elapsed_bar, bar_area);
         }
 
-        #[cfg(debug_assertions)]
-        frame.render_widget(
-            Paragraph::new(format!("{} frames", self.rendered_frames_count)),
-            bar_area,
-        );
+        // #[cfg(debug_assertions)]
+        // frame.render_widget(
+        //     Paragraph::new(format!("{} frames", self.rendered_frames_count)),
+        //     bar_area,
+        // );
 
         if state.config.theme.draw_borders {
             screen_call!(self, state, render(frame, content_area, &state.status, state.config))?;
@@ -221,6 +239,47 @@ impl Ui<'_> {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut State) -> Result<KeyHandleResult> {
+        let action = state.config.keybinds.navigation.get(&key.into());
+        if let Some(ref mut command) = self.command {
+            if let Some(CommonAction::Close) = action {
+                self.command = None;
+                return Ok(KeyHandleResult::RenderRequested);
+            } else if let Some(CommonAction::Confirm) = action {
+                let cmd = command.parse();
+                log::debug!("Executing command: {:?}", cmd);
+
+                self.command = None;
+                match cmd {
+                    Ok(Args { command: Some(cmd), .. }) => {
+                        match cmd.execute(&mut self.client) {
+                            Ok(_cmd) => {}
+                            Err(err) => {
+                                status_error!("Failed to execute command. {:?}", err);
+                            }
+                        };
+                    }
+                    Err(err) => {
+                        status_error!("Failed to parse command. {:?}", err);
+                    }
+                    _ => {}
+                }
+
+                return Ok(KeyHandleResult::RenderRequested);
+            }
+
+            match key.code {
+                KeyCode::Char(c) => {
+                    command.push(c);
+                    return Ok(KeyHandleResult::RenderRequested);
+                }
+                KeyCode::Backspace => {
+                    command.pop();
+                    return Ok(KeyHandleResult::RenderRequested);
+                }
+                _ => return Ok(KeyHandleResult::SkipRender),
+            }
+        }
+
         macro_rules! screen_call_inner {
             ($fn:ident($($param:expr),+)) => {
                 screen_call!(self, state, $fn($($param),+))?
@@ -250,6 +309,19 @@ impl Ui<'_> {
             KeyHandleResultInternal::KeyNotHandled => {
                 if let Some(action) = state.config.keybinds.global.get(&key.into()) {
                     match action {
+                        GlobalAction::Command { command, .. } => {
+                            let cmd = command.parse();
+                            log::debug!("executing {:?}", cmd);
+
+                            self.command = None;
+                            if let Ok(Args { command: Some(cmd), .. }) = cmd {
+                                cmd.execute(&mut self.client)?;
+                            }
+                        }
+                        GlobalAction::CommandMode => {
+                            self.command = Some(String::new());
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
                         GlobalAction::NextTrack if state.status.state == MpdState::Play => self.client.next()?,
                         GlobalAction::PreviousTrack if state.status.state == MpdState::Play => self.client.prev()?,
                         GlobalAction::Stop if state.status.state == MpdState::Play => self.client.stop()?,
@@ -278,10 +350,10 @@ impl Ui<'_> {
                                 .set_volume(*state.status.volume.dec_by(state.config.volume_step))?;
                         }
                         GlobalAction::SeekForward if state.status.state == MpdState::Play => {
-                            self.client.seek_curr_forwards(5)?;
+                            self.client.seek_current(ValueChange::Increase(5))?;
                         }
                         GlobalAction::SeekBack if state.status.state == MpdState::Play => {
-                            self.client.seek_curr_backwards(5)?;
+                            self.client.seek_current(ValueChange::Decrease(5))?;
                         }
                         GlobalAction::NextTab => {
                             screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
@@ -477,6 +549,7 @@ impl Ui<'_> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum UiEvent {
     Player,
     Mixer,
@@ -503,67 +576,6 @@ impl TryFrom<IdleEvent> for UiEvent {
             _ => return Err(()),
         })
     }
-}
-
-#[derive(Debug, Display, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum GlobalAction {
-    Quit,
-    ShowHelp,
-    NextTrack,
-    PreviousTrack,
-    Stop,
-    ToggleRepeat,
-    ToggleSingle,
-    ToggleRandom,
-    ToggleConsume,
-    TogglePause,
-    VolumeUp,
-    VolumeDown,
-    SeekForward,
-    SeekBack,
-    NextTab,
-    PreviousTab,
-    QueueTab,
-    DirectoriesTab,
-    ArtistsTab,
-    AlbumsTab,
-    PlaylistsTab,
-    SearchTab,
-}
-
-impl ToDescription for GlobalAction {
-    fn to_description(&self) -> &str {
-        match self {
-            GlobalAction::Quit => "Exit rmpc",
-            GlobalAction::ToggleRepeat => "Toggle repeat",
-            GlobalAction::ToggleSingle => {
-                "Whether to stop playing after single track or repeat track/playlist when repeat is on"
-            }
-            GlobalAction::ToggleRandom => "Toggles random playback",
-            GlobalAction::ToggleConsume => "Remove song from the queue after playing",
-            GlobalAction::TogglePause => "Pause/Unpause playback",
-            GlobalAction::Stop => "Stop playback",
-            GlobalAction::VolumeUp => "Raise volume",
-            GlobalAction::VolumeDown => "Lower volume",
-            GlobalAction::NextTrack => "Play next track in the queue",
-            GlobalAction::PreviousTrack => "Play previous track in the queue",
-            GlobalAction::SeekForward => "Seek currently playing track forwards",
-            GlobalAction::SeekBack => "Seek currently playing track backwards",
-            GlobalAction::NextTab => "Switch to next tab",
-            GlobalAction::PreviousTab => "Switch to previous tab",
-            GlobalAction::QueueTab => "Switch directly to Queue tab",
-            GlobalAction::DirectoriesTab => "Switch directly to Directories tab",
-            GlobalAction::ArtistsTab => "Switch directly to Artists tab",
-            GlobalAction::AlbumsTab => "Switch directly to Albums tab",
-            GlobalAction::PlaylistsTab => "Switch directly to Playlists tab",
-            GlobalAction::SearchTab => "Switch directly to Search tab",
-            GlobalAction::ShowHelp => "Show keybinds",
-        }
-    }
-}
-
-pub trait ToDescription {
-    fn to_description(&self) -> &str;
 }
 
 pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>) -> Result<()> {

@@ -2,10 +2,9 @@ use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
-use strum::Display;
 
 use crate::{
-    config::Config,
+    config::{keys::PlaylistsActions, Config},
     mpd::{
         commands::Status,
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
@@ -14,7 +13,7 @@ use crate::{
         modals::rename_playlist::RenamePlaylistModal,
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal, ToDescription, UiEvent,
+        KeyHandleResultInternal, UiEvent,
     },
     utils::macros::{status_error, status_info},
 };
@@ -28,15 +27,6 @@ mod tests;
 pub struct PlaylistsScreen {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
-}
-
-#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum PlaylistsActions {}
-
-impl ToDescription for PlaylistsActions {
-    fn to_description(&self) -> &str {
-        ""
-    }
 }
 
 impl Screen for PlaylistsScreen {

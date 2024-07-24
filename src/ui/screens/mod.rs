@@ -14,6 +14,7 @@ use strum::{Display, EnumIter, VariantNames};
 
 use crate::{
     config::{
+        keys::{CommonAction, ToDescription},
         theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
         Config,
     },
@@ -26,7 +27,7 @@ use crate::{
 use super::{
     utils::dirstack::{DirStack, DirStackItem},
     widgets::volume::Volume,
-    DurationExt, KeyHandleResultInternal, ToDescription, UiEvent,
+    DurationExt, KeyHandleResultInternal, UiEvent,
 };
 
 pub mod albums;
@@ -84,57 +85,6 @@ pub(super) trait Screen {
         status: &mut Status,
         config: &Config,
     ) -> Result<KeyHandleResultInternal>;
-}
-
-#[derive(Debug, Display, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-pub enum CommonAction {
-    Down,
-    Up,
-    MoveDown,
-    MoveUp,
-    DownHalf,
-    UpHalf,
-    Right,
-    Left,
-    Top,
-    Bottom,
-    EnterSearch,
-    NextResult,
-    PreviousResult,
-    Select,
-    Add,
-    Delete,
-    Rename,
-    Close,
-    Confirm,
-    FocusInput,
-}
-
-impl ToDescription for CommonAction {
-    fn to_description(&self) -> &str {
-        match self {
-            CommonAction::Up => "Go up",
-            CommonAction::Down => "Go down",
-            CommonAction::UpHalf => "Jump by half a screen up",
-            CommonAction::DownHalf => "Jump by half a screen down",
-            CommonAction::MoveUp => "Move current item up, for example song in a queue",
-            CommonAction::MoveDown => "Move current item down, for example song in a queue",
-            CommonAction::Right => "Go right",
-            CommonAction::Left => "Go left",
-            CommonAction::Top => "Jump all the way to the top",
-            CommonAction::Bottom => "Jump all the way to the bottom",
-            CommonAction::EnterSearch => "Enter search mode",
-            CommonAction::NextResult => "When a filter is active, jump to the next result",
-            CommonAction::PreviousResult => "When a filter is active, jump to the previous result",
-            CommonAction::Select => "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist",
-            CommonAction::Add => "Add item to a playlist",
-            CommonAction::Delete => "Delete. For example a playlist, song from a playlist or wipe the current queue",
-            CommonAction::Rename => "Rename. Currently only for playlists",
-            CommonAction::Close => "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.",
-            CommonAction::Confirm => "Confirm whatever action is currently going on",
-            CommonAction::FocusInput => "Focuses textbox if any is on the screen and is not focused",
-        }
-    }
 }
 
 impl Screens {
