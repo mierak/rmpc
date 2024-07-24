@@ -8,6 +8,7 @@ use super::ToDescription;
 pub enum GlobalAction {
     Quit,
     ShowHelp,
+    ShowOutputs,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -39,6 +40,7 @@ pub enum GlobalAction {
 pub enum GlobalActionFile {
     Quit,
     ShowHelp,
+    ShowOutputs,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -70,6 +72,7 @@ impl From<GlobalActionFile> for GlobalAction {
     fn from(value: GlobalActionFile) -> Self {
         match value {
             GlobalActionFile::Quit => GlobalAction::Quit,
+            GlobalActionFile::ShowOutputs => GlobalAction::ShowOutputs,
             GlobalActionFile::CommandMode => GlobalAction::CommandMode,
             GlobalActionFile::Command { command, description } => GlobalAction::Command {
                 command: Box::leak(Box::new(command)),
@@ -104,6 +107,7 @@ impl ToDescription for GlobalAction {
     fn to_description(&self) -> &str {
         match self {
             GlobalAction::Quit => "Exit rmpc",
+            GlobalAction::ShowOutputs => "Show MPD outputs config",
             GlobalAction::ToggleRepeat => "Toggle repeat",
             GlobalAction::ToggleSingle => {
                 "Whether to stop playing after single track or repeat track/playlist when repeat is on"

@@ -9,8 +9,8 @@ use crate::utils::macros::status_error;
 use super::{
     client::Client,
     commands::{
-        list::MpdList, list_playlist::FileList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo,
-        Playlist, Song, Status, Volume,
+        list::MpdList, list_playlist::FileList, outputs::Outputs, status::OnOffOneshot, volume::Bound, IdleEvent,
+        ListFiles, LsInfo, Playlist, Song, Status, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     proto_client::ProtoClient,
@@ -114,6 +114,11 @@ pub trait MpdClient {
     /// If no album art is fonud it invokes [`Self::read_picture`].
     /// If no art is still found, but no errors were encountered, None is returned.
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
+    // Outputs
+    fn outputs(&mut self) -> MpdResult<Outputs>;
+    fn toggle_output(&mut self, id: u32) -> MpdResult<()>;
+    fn enable_output(&mut self, id: u32) -> MpdResult<()>;
+    fn disable_output(&mut self, id: u32) -> MpdResult<()>;
 }
 
 impl MpdClient for Client<'_> {
@@ -411,6 +416,23 @@ impl MpdClient for Client<'_> {
                 Ok(None)
             }
         }
+    }
+
+    // Outputs
+    fn outputs(&mut self) -> MpdResult<Outputs> {
+        self.send("outputs").and_then(ProtoClient::read_response)
+    }
+
+    fn toggle_output(&mut self, id: u32) -> MpdResult<()> {
+        self.send(&format!("toggleoutput {id}")).and_then(ProtoClient::read_ok)
+    }
+
+    fn enable_output(&mut self, id: u32) -> MpdResult<()> {
+        self.send(&format!("enableoutput {id}")).and_then(ProtoClient::read_ok)
+    }
+
+    fn disable_output(&mut self, id: u32) -> MpdResult<()> {
+        self.send(&format!("disableoutput {id}")).and_then(ProtoClient::read_ok)
     }
 }
 

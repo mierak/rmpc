@@ -33,6 +33,7 @@
             "z":       ToggleRepeat,
             "b":       SeekBack,
             "~":       ShowHelp,
+            "O":       ShowOutputs,
         },
         navigation: {
             "<C-u>":   UpHalf,
