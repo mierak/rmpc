@@ -5,6 +5,7 @@ use anyhow::Result;
 use anyhow::{bail, Context};
 use clap::{Parser, Subcommand, ValueEnum};
 use log::Level;
+use rustix::path::Arg;
 use serde::{Deserialize, Serialize};
 
 mod defaults;
@@ -13,6 +14,8 @@ pub mod theme;
 
 use crate::mpd::commands::volume::Bound;
 use crate::mpd::mpd_client::MpdClient;
+use crate::utils::macros::status_info;
+use crate::ytdlp::YtDlp;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
@@ -33,6 +36,7 @@ pub struct Args {
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
 pub enum Command {
     /// Prints the default config. Can be used to bootstrap your config file.
     Config,
@@ -76,6 +80,8 @@ pub enum Command {
     Clear,
     /// Add a song to the current queue. Relative to music database root. '/' to add all files to the queue
     Add { file: String },
+    /// Add a song from youtube to the current queue.
+    AddYt { url: String },
     /// List MPD outputs
     Outputs,
     /// Toggle MPD output on or off
@@ -97,6 +103,12 @@ pub enum Command {
     Status,
     /// Prints information about the current song
     Song,
+    /// Mounts supported storage to MPD
+    Mount { name: String, path: String },
+    /// Unmounts storage with given name
+    Unmount { name: String },
+    /// List currently mounted storages
+    ListMounts,
 }
 
 #[derive(Parser, ValueEnum, Copy, Clone, Debug, PartialEq)]
@@ -132,10 +144,10 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
 }
 
 impl Command {
-    pub fn execute(&self, client: &mut impl MpdClient) -> Result<(), anyhow::Error> {
+    pub fn execute(mut self, client: &mut impl MpdClient, config: &'static Config) -> Result<(), anyhow::Error> {
         match self {
             Command::Play { position: None } => client.play()?,
-            Command::Play { position: Some(pos) } => client.play_pos(*pos)?,
+            Command::Play { position: Some(pos) } => client.play_pos(pos)?,
             Command::Pause => client.pause()?,
             Command::TogglePause => client.pause_toggle()?,
             Command::Unpause => client.unpause()?,
@@ -144,22 +156,43 @@ impl Command {
             Command::Volume { value: None } => println!("{}", client.get_status()?.volume.value()),
             Command::Next => client.next()?,
             Command::Prev => client.prev()?,
-            Command::Repeat { value } => client.repeat((*value).into())?,
-            Command::Random { value } => client.random((*value).into())?,
-            Command::Single { value } => client.single((*value).into())?,
-            Command::Consume { value } => client.consume((*value).into())?,
+            Command::Repeat { value } => client.repeat((value).into())?,
+            Command::Random { value } => client.random((value).into())?,
+            Command::Single { value } => client.single((value).into())?,
+            Command::Consume { value } => client.consume((value).into())?,
             Command::Seek { value } => client.seek_current(value.parse()?)?,
             Command::Clear => client.clear()?,
-            Command::Add { file } => client.add(file)?,
+            Command::Add { file } => client.add(&file)?,
+            Command::AddYt { ref mut url } => {
+                let Some(cache_dir) = config.cache_dir else {
+                    bail!("Cannot download video because 'cache_dir' is not configured.");
+                };
+                let ytdlp = YtDlp::new(cache_dir)?;
+                if !ytdlp.is_available {
+                    bail!("yt-dlp was not found on PATH. Please install yt-dlp and try again.");
+                }
+
+                let file_path = match ytdlp.download(url) {
+                    Ok(val) => val,
+                    Err(err) => bail!("Failed to download video: {}", err),
+                };
+
+                status_info!("URL '{url}' added to the queue");
+
+                client.add(&file_path)?;
+            }
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
             Command::Config => bail!("Cannot use config command here."),
             Command::Theme => bail!("Cannot use theme command here."),
             Command::Version => bail!("Cannot use version command here."),
-            Command::ToggleOutput { id } => client.toggle_output(*id)?,
-            Command::EnableOutput { id } => client.enable_output(*id)?,
-            Command::DisableOutput { id } => client.disable_output(*id)?,
+            Command::ToggleOutput { id } => client.toggle_output(id)?,
+            Command::EnableOutput { id } => client.enable_output(id)?,
+            Command::DisableOutput { id } => client.disable_output(id)?,
             Command::Status => println!("{}", serde_json::ser::to_string(&client.get_status()?)?),
             Command::Song => println!("{}", serde_json::ser::to_string(&client.get_current_song()?)?),
+            Command::Mount { ref name, ref path } => client.mount(name, path)?,
+            Command::Unmount { ref name } => client.unmount(name)?,
+            Command::ListMounts => println!("{}", serde_json::ser::to_string(&client.list_mounts()?)?),
         };
         Ok(())
     }
@@ -194,6 +227,7 @@ fn get_default_config_path() -> PathBuf {
 #[derive(Debug, Default)]
 pub struct Config {
     pub address: &'static str,
+    pub cache_dir: Option<&'static str>,
     pub volume_step: u8,
     pub keybinds: KeyConfig,
     pub status_update_interval_ms: Option<u64>,
@@ -203,6 +237,8 @@ pub struct Config {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
     address: String,
+    #[serde(default)]
+    cache_dir: Option<String>,
     #[serde(default)]
     theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
@@ -221,6 +257,7 @@ impl Default for ConfigFile {
             volume_step: 5,
             status_update_interval_ms: Some(1000),
             theme: None,
+            cache_dir: None,
         }
     }
 }
@@ -260,6 +297,13 @@ impl ConfigFile {
                 .transpose()?
                 .unwrap_or_default()
                 .try_into()?,
+            cache_dir: self.cache_dir.map(|v| -> &'static str {
+                if v.ends_with('/') {
+                    Box::leak(Box::new(v))
+                } else {
+                    Box::leak(Box::new(format!("{v}/")))
+                }
+            }),
             address: Box::leak(Box::new(self.address)),
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),

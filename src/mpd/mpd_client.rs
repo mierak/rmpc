@@ -10,7 +10,7 @@ use super::{
     client::Client,
     commands::{
         list::MpdList, list_playlist::FileList, outputs::Outputs, status::OnOffOneshot, volume::Bound, IdleEvent,
-        ListFiles, LsInfo, Playlist, Song, Status, Volume,
+        ListFiles, LsInfo, Mounts, Playlist, Song, Status, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     proto_client::ProtoClient,
@@ -61,6 +61,7 @@ impl ValueChange {
 #[allow(dead_code)]
 pub trait MpdClient {
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
+    fn noidle(&mut self) -> MpdResult<()>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
     /// Set playback volume relative to current
@@ -82,6 +83,10 @@ pub trait MpdClient {
     fn random(&mut self, enabled: bool) -> MpdResult<()>;
     fn single(&mut self, single: OnOffOneshot) -> MpdResult<()>;
     fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()>;
+    // Mounts
+    fn mount(&mut self, name: &str, path: &str) -> MpdResult<()>;
+    fn unmount(&mut self, name: &str) -> MpdResult<()>;
+    fn list_mounts(&mut self) -> MpdResult<Mounts>;
     // Current queue
     fn add(&mut self, path: &str) -> MpdResult<()>;
     fn clear(&mut self) -> MpdResult<()>;
@@ -125,6 +130,10 @@ impl MpdClient for Client<'_> {
     // Queries
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         self.send("idle").and_then(ProtoClient::read_response)
+    }
+
+    fn noidle(&mut self) -> MpdResult<()> {
+        self.send("noidle").and_then(ProtoClient::read_ok)
     }
 
     fn get_volume(&mut self) -> MpdResult<Volume> {
@@ -219,6 +228,20 @@ impl MpdClient for Client<'_> {
             self.send(&format!("consume {}", consume.to_mpd_value()))
                 .and_then(ProtoClient::read_ok)
         }
+    }
+
+    // Mounts
+    fn mount(&mut self, name: &str, path: &str) -> MpdResult<()> {
+        self.send(&format!("mount \"{name}\" \"{path}\""))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    fn unmount(&mut self, name: &str) -> MpdResult<()> {
+        self.send(&format!("unmount \"{name}\"")).and_then(ProtoClient::read_ok)
+    }
+
+    fn list_mounts(&mut self) -> MpdResult<Mounts> {
+        self.send("listmounts").and_then(ProtoClient::read_response)
     }
 
     // Current queue

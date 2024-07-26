@@ -88,6 +88,10 @@ impl MpdClient for TestMpdClient {
         todo!()
     }
 
+    fn noidle(&mut self) -> MpdResult<()> {
+        todo!()
+    }
+
     fn get_volume(&mut self) -> MpdResult<Volume> {
         Ok(self.volume)
     }
@@ -426,6 +430,18 @@ impl MpdClient for TestMpdClient {
     }
 
     fn disable_output(&mut self, _id: u32) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn mount(&mut self, _name: &str, _path: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn unmount(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_mounts(&mut self) -> MpdResult<crate::mpd::commands::Mounts> {
         todo!("Not yet implemented")
     }
 }
