@@ -1,0 +1,27 @@
+---
+title: Youtube playback
+description: Play music from youtube with rmpc
+sidebar:
+    order: 4
+---
+
+import { Steps } from "@astrojs/starlight/components";
+
+Rmpc can play videos from youtube, but needs a little setup before it can do that. Only single songs can be added at a time.
+
+<Steps>
+
+    1. Install [yt-dlp](https://github.com/yt-dlp/yt-dlp) and have it available in your PATH.
+    2. Configure rmpc's cache directory [in your config file](/rmpc/configuration/#cache_dir)
+    3. Either connect to your MPD instance via local socket or set cache_dir (or symlink it) to MPD music directory.
+    4. Execute `rmpc addyt <youtube-url>` or in tui `addyt <youtube-url>` to add a song to the queue.
+
+</Steps>
+
+:::caution
+MPD will not be able to add songs from outside its music directory if not connected through local socket.
+:::
+
+:::caution
+Rmpc will currently block until the song is downloaded and added to the queue if used in TUI mode. This can take a while, but will be resolved in the near future.
+:::

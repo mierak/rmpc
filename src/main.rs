@@ -41,6 +41,7 @@ mod mpd;
 mod state;
 mod ui;
 mod utils;
+mod ytdlp;
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -54,7 +55,7 @@ pub enum AppEvent {
 
 fn main() -> Result<()> {
     let mut args = Args::parse();
-    match &args.command {
+    match args.command {
         Some(Command::Config) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
         }
@@ -65,12 +66,14 @@ fn main() -> Result<()> {
             println!("rmpc version: {}", env!("CARGO_PKG_VERSION"));
         }
         Some(cmd) => {
-            let address = match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                Ok(val) => val.into_config(Some(&args.config))?,
-                Err(_err) => ConfigFile::default().into_config(None)?,
-            }
-            .address;
-            cmd.execute(&mut Client::init(address, "", true)?)?;
+            let config: &'static Config = Box::leak(Box::new(
+                match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
+                    Ok(val) => val.into_config(Some(&args.config))?,
+                    Err(_err) => ConfigFile::default().into_config(None)?,
+                },
+            ));
+            let mut client = Client::init(config.address, "", true)?;
+            cmd.execute(&mut client, config)?;
         }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();

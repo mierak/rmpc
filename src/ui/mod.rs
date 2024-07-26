@@ -251,7 +251,7 @@ impl Ui<'_> {
                 self.command = None;
                 match cmd {
                     Ok(Args { command: Some(cmd), .. }) => {
-                        match cmd.execute(&mut self.client) {
+                        match cmd.execute(&mut self.client, state.config) {
                             Ok(_cmd) => {}
                             Err(err) => {
                                 status_error!("Failed to execute command. {:?}", err);
@@ -315,7 +315,7 @@ impl Ui<'_> {
 
                             self.command = None;
                             if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                                cmd.execute(&mut self.client)?;
+                                cmd.execute(&mut self.client, state.config)?;
                             }
                         }
                         GlobalAction::CommandMode => {
