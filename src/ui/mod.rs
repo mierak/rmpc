@@ -28,7 +28,7 @@ use crate::{
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     utils::macros::{status_error, try_ret},
-    AppEvent,
+    AppEvent, WorkRequest,
 };
 use crate::{mpd::version::Version, state::State};
 
@@ -75,12 +75,19 @@ pub struct Ui<'a> {
     rendered_frames_count: u32,
     current_song: Option<crate::mpd::commands::Song>,
     command: Option<String>,
+    work_request_sender: std::sync::mpsc::Sender<WorkRequest>,
 }
 
 impl<'a> Ui<'a> {
-    pub fn new(client: Client<'a>, config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Ui<'a> {
+    pub fn new(
+        client: Client<'a>,
+        config: &Config,
+        app_event_sender: std::sync::mpsc::Sender<AppEvent>,
+        work_request_sender: std::sync::mpsc::Sender<WorkRequest>,
+    ) -> Ui<'a> {
         Self {
             client,
+            work_request_sender,
             screens: Screens::new(config, app_event_sender),
             active_screen: screens::Screens::Queue,
             status_message: None,
@@ -251,7 +258,7 @@ impl Ui<'_> {
                 self.command = None;
                 match cmd {
                     Ok(Args { command: Some(cmd), .. }) => {
-                        match cmd.execute(&mut self.client, state.config) {
+                        match cmd.execute(&mut self.client, state.config, &self.work_request_sender) {
                             Ok(_cmd) => {}
                             Err(err) => {
                                 status_error!("Failed to execute command. {:?}", err);
@@ -315,7 +322,7 @@ impl Ui<'_> {
 
                             self.command = None;
                             if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                                cmd.execute(&mut self.client, state.config)?;
+                                cmd.execute(&mut self.client, state.config, &self.work_request_sender)?;
                             }
                         }
                         GlobalAction::CommandMode => {

@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::mpsc::Sender;
 
 use anyhow::Result;
 use anyhow::{bail, Context};
@@ -14,8 +15,7 @@ pub mod theme;
 
 use crate::mpd::commands::volume::Bound;
 use crate::mpd::mpd_client::MpdClient;
-use crate::utils::macros::status_info;
-use crate::ytdlp::YtDlp;
+use crate::WorkRequest;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
@@ -144,7 +144,12 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
 }
 
 impl Command {
-    pub fn execute(mut self, client: &mut impl MpdClient, config: &'static Config) -> Result<(), anyhow::Error> {
+    pub fn execute(
+        self,
+        client: &mut impl MpdClient,
+        _config: &'static Config,
+        work_request_sender: &Sender<WorkRequest>,
+    ) -> Result<(), anyhow::Error> {
         match self {
             Command::Play { position: None } => client.play()?,
             Command::Play { position: Some(pos) } => client.play_pos(pos)?,
@@ -163,23 +168,8 @@ impl Command {
             Command::Seek { value } => client.seek_current(value.parse()?)?,
             Command::Clear => client.clear()?,
             Command::Add { file } => client.add(&file)?,
-            Command::AddYt { ref mut url } => {
-                let Some(cache_dir) = config.cache_dir else {
-                    bail!("Cannot download video because 'cache_dir' is not configured.");
-                };
-                let ytdlp = YtDlp::new(cache_dir)?;
-                if !ytdlp.is_available {
-                    bail!("yt-dlp was not found on PATH. Please install yt-dlp and try again.");
-                }
-
-                let file_path = match ytdlp.download(url) {
-                    Ok(val) => val,
-                    Err(err) => bail!("Failed to download video: {}", err),
-                };
-
-                status_info!("URL '{url}' added to the queue");
-
-                client.add(&file_path)?;
+            Command::AddYt { url } => {
+                work_request_sender.send(WorkRequest::DownloadYoutube { url })?;
             }
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
             Command::Config => bail!("Cannot use config command here."),

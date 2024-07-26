@@ -14,7 +14,7 @@
 )]
 use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
@@ -22,6 +22,8 @@ use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use ui::{Level, UiEvent};
+use utils::macros::{status_error, status_info, try_cont};
+use ytdlp::YtDlp;
 
 use crate::{
     config::Config,
@@ -44,6 +46,16 @@ mod utils;
 mod ytdlp;
 
 #[derive(Debug)]
+pub enum WorkRequest {
+    DownloadYoutube { url: String },
+}
+
+#[derive(Debug)]
+pub enum WorkDone {
+    YoutubeDowloaded { file_path: String },
+}
+
+#[derive(Debug)]
 pub enum AppEvent {
     UserInput(KeyEvent),
     Status(String, Level),
@@ -51,6 +63,7 @@ pub enum AppEvent {
     IdleEvent(IdleEvent),
     RequestStatusUpdate,
     RequestRender,
+    WorkDone(Result<WorkDone>),
 }
 
 fn main() -> Result<()> {
@@ -72,12 +85,38 @@ fn main() -> Result<()> {
                     Err(_err) => ConfigFile::default().into_config(None)?,
                 },
             ));
+            let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
+            let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             let mut client = Client::init(config.address, "", true)?;
-            cmd.execute(&mut client, config)?;
+            std::thread::Builder::new()
+                .name("worker task".to_owned())
+                .spawn(|| worker_task(worker_rx, tx, config))?;
+            cmd.execute(&mut client, config, &worker_tx)?;
+
+            // TODO generalize the error handling here
+            match rx.recv() {
+                Ok(AppEvent::WorkDone(Ok(WorkDone::YoutubeDowloaded { file_path }))) => match client.add(&file_path) {
+                    Ok(()) => {}
+                    Err(err) => {
+                        eprintln!("Failed to already dowlnoaded youtube video to queue: {err}");
+                    }
+                },
+                Ok(AppEvent::WorkDone(Err(err))) => {
+                    eprintln!("Failed to add youtube video to queue: {err}");
+                }
+                Err(err) => {
+                    eprintln!("Failed to add youtube video to queue: {err}");
+                }
+                Ok(ev) => {
+                    eprintln!("Failed to add youtube video to queue. Received unexpected event: {ev:?}");
+                }
+            }
         }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
+
+            let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
 
             let config = Box::leak(Box::new(
                 match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
@@ -111,6 +150,11 @@ fn main() -> Result<()> {
             }
 
             let tx_clone = tx.clone();
+            std::thread::Builder::new()
+                .name("worker task".to_owned())
+                .spawn(|| worker_task(worker_rx, tx_clone, config))?;
+
+            let tx_clone = tx.clone();
 
             std::thread::Builder::new()
                 .name("input poll".to_owned())
@@ -119,7 +163,7 @@ fn main() -> Result<()> {
             let tx_clone = tx.clone();
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
                 main_task(
-                    Ui::new(client, state.config, tx_clone),
+                    Ui::new(client, state.config, tx_clone, worker_tx),
                     state,
                     rx,
                     try_ret!(
@@ -156,6 +200,62 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn worker_task(
+    event_receiver: std::sync::mpsc::Receiver<WorkRequest>,
+    sender: std::sync::mpsc::Sender<AppEvent>,
+    config: &Config,
+) {
+    while let Ok(request) = event_receiver.recv() {
+        match request {
+            WorkRequest::DownloadYoutube { url } => {
+                let Some(cache_dir) = config.cache_dir else {
+                    try_cont!(
+                        sender.send(AppEvent::WorkDone(Err(anyhow!(
+                            "Cannot download video because 'cache_dir' is not configured."
+                        )))),
+                        "Failed to send youtube work done error event"
+                    );
+                    continue;
+                };
+
+                let ytdlp = match YtDlp::new(cache_dir) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        try_cont!(sender.send(AppEvent::WorkDone(Err(anyhow!(err)))), "");
+                        continue;
+                    }
+                };
+                if !ytdlp.is_available {
+                    try_cont!(
+                        sender.send(AppEvent::WorkDone(Err(anyhow!(
+                            "yt-dlp was not found on PATH. Please install yt-dlp and try again."
+                        )))),
+                        "Failed to send youtube work done error event"
+                    );
+                    continue;
+                }
+
+                let file_path = match ytdlp.download(&url) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        try_cont!(
+                            sender.send(AppEvent::WorkDone(Err(anyhow!("Failed to download video: {}", err)))),
+                            "Failed to send youtube work done error event"
+                        );
+                        continue;
+                    }
+                };
+
+                try_cont!(
+                    sender.send(AppEvent::WorkDone(Ok(WorkDone::YoutubeDowloaded { file_path }))),
+                    "Failed to send youtube work done error event"
+                );
+            }
+        }
+    }
 }
 
 fn main_task<B: Backend + std::io::Write>(
@@ -235,6 +335,21 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::RequestRender => {
                     render_wanted = true;
+                }
+                AppEvent::WorkDone(Ok(result)) => match result {
+                    WorkDone::YoutubeDowloaded { file_path } => {
+                        match client.add(&file_path) {
+                            Ok(()) => {
+                                status_info!("File '{file_path}' added to the queue");
+                            }
+                            Err(err) => {
+                                status_error!(err:?; "Failed to add '{file_path}' to the queue");
+                            }
+                        };
+                    }
+                },
+                AppEvent::WorkDone(Err(err)) => {
+                    status_error!("{}", err);
                 }
             }
         }
