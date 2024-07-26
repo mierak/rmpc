@@ -252,7 +252,7 @@ pub struct ConfigFile {
 impl Default for ConfigFile {
     fn default() -> Self {
         Self {
-            address: String::from("/tmp/mpd_socket"),
+            address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
             volume_step: 5,
             status_update_interval_ms: Some(1000),
