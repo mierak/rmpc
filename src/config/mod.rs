@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::mpsc::Sender;
 
 use anyhow::Result;
 use anyhow::{bail, Context};
@@ -144,12 +143,16 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
 }
 
 impl Command {
-    pub fn execute(
+    pub fn execute<F, C>(
         self,
-        client: &mut impl MpdClient,
+        client: &mut C,
         _config: &'static Config,
-        work_request_sender: &Sender<WorkRequest>,
-    ) -> Result<(), anyhow::Error> {
+        mut request_work: F,
+    ) -> Result<(), anyhow::Error>
+    where
+        C: MpdClient,
+        F: FnMut(WorkRequest, &mut C),
+    {
         match self {
             Command::Play { position: None } => client.play()?,
             Command::Play { position: Some(pos) } => client.play_pos(pos)?,
@@ -169,7 +172,7 @@ impl Command {
             Command::Clear => client.clear()?,
             Command::Add { file } => client.add(&file)?,
             Command::AddYt { url } => {
-                work_request_sender.send(WorkRequest::DownloadYoutube { url })?;
+                request_work(WorkRequest::DownloadYoutube { url }, client);
             }
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
             Command::Config => bail!("Cannot use config command here."),

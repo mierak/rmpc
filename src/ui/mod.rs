@@ -66,8 +66,7 @@ pub struct StatusMessage {
 }
 
 #[derive(Debug)]
-pub struct Ui<'a> {
-    client: Client<'a>,
+pub struct Ui {
     screens: Screens,
     modals: Vec<Box<dyn Modal>>,
     active_screen: screens::Screens,
@@ -78,15 +77,13 @@ pub struct Ui<'a> {
     work_request_sender: std::sync::mpsc::Sender<WorkRequest>,
 }
 
-impl<'a> Ui<'a> {
+impl Ui {
     pub fn new(
-        client: Client<'a>,
         config: &Config,
         app_event_sender: std::sync::mpsc::Sender<AppEvent>,
         work_request_sender: std::sync::mpsc::Sender<WorkRequest>,
-    ) -> Ui<'a> {
+    ) -> Ui {
         Self {
-            client,
             work_request_sender,
             screens: Screens::new(config, app_event_sender),
             active_screen: screens::Screens::Queue,
@@ -147,7 +144,7 @@ macro_rules! screen_call {
     }
 }
 
-impl Ui<'_> {
+impl Ui {
     pub fn render(&mut self, frame: &mut Frame, state: &mut State) -> Result<()> {
         if let Some(bg_color) = state.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
@@ -245,7 +242,7 @@ impl Ui<'_> {
         Ok(())
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut State) -> Result<KeyHandleResult> {
+    pub fn handle_key(&mut self, key: KeyEvent, state: &mut State, client: &mut Client<'_>) -> Result<KeyHandleResult> {
         let action = state.config.keybinds.navigation.get(&key.into());
         if let Some(ref mut command) = self.command {
             if let Some(CommonAction::Close) = action {
@@ -258,12 +255,11 @@ impl Ui<'_> {
                 self.command = None;
                 match cmd {
                     Ok(Args { command: Some(cmd), .. }) => {
-                        match cmd.execute(&mut self.client, state.config, &self.work_request_sender) {
-                            Ok(_cmd) => {}
-                            Err(err) => {
-                                status_error!("Failed to execute command. {:?}", err);
+                        cmd.execute(client, state.config, |request, _| {
+                            if let Err(err) = self.work_request_sender.send(request) {
+                                status_error!("Failed to send work request: {}", err);
                             }
-                        };
+                        })?;
                     }
                     Err(err) => {
                         status_error!("Failed to parse command. {:?}", err);
@@ -293,7 +289,7 @@ impl Ui<'_> {
             }
         }
         if let Some(ref mut modal) = self.modals.last_mut() {
-            return match modal.handle_key(key, &mut self.client, state)? {
+            return match modal.handle_key(key, client, state)? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.modals.pop();
                     Ok(KeyHandleResult::RenderRequested)
@@ -302,7 +298,7 @@ impl Ui<'_> {
             };
         }
 
-        match screen_call_inner!(handle_action(key, &mut self.client, &mut state.status, state.config)) {
+        match screen_call_inner!(handle_action(key, client, &mut state.status, state.config)) {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(Some(modal)) => {
@@ -322,102 +318,104 @@ impl Ui<'_> {
 
                             self.command = None;
                             if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                                cmd.execute(&mut self.client, state.config, &self.work_request_sender)?;
+                                cmd.execute(client, state.config, |request, _| {
+                                    if let Err(err) = self.work_request_sender.send(request) {
+                                        status_error!("Failed to send work request: {}", err);
+                                    }
+                                })?;
                             }
                         }
                         GlobalAction::CommandMode => {
                             self.command = Some(String::new());
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::NextTrack if state.status.state == MpdState::Play => self.client.next()?,
-                        GlobalAction::PreviousTrack if state.status.state == MpdState::Play => self.client.prev()?,
-                        GlobalAction::Stop if state.status.state == MpdState::Play => self.client.stop()?,
-                        GlobalAction::ToggleRepeat => self.client.repeat(!state.status.repeat)?,
-                        GlobalAction::ToggleSingle => self.client.single(state.status.single.cycle())?,
-                        GlobalAction::ToggleRandom => self.client.random(!state.status.random)?,
-                        GlobalAction::ToggleConsume if self.client.version < Version::new(0, 24, 0) => {
-                            self.client.consume(state.status.consume.cycle_pre_mpd_24())?;
+                        GlobalAction::NextTrack if state.status.state == MpdState::Play => client.next()?,
+                        GlobalAction::PreviousTrack if state.status.state == MpdState::Play => client.prev()?,
+                        GlobalAction::Stop if state.status.state == MpdState::Play => client.stop()?,
+                        GlobalAction::ToggleRepeat => client.repeat(!state.status.repeat)?,
+                        GlobalAction::ToggleSingle => client.single(state.status.single.cycle())?,
+                        GlobalAction::ToggleRandom => client.random(!state.status.random)?,
+                        GlobalAction::ToggleConsume if client.version() < Version::new(0, 24, 0) => {
+                            client.consume(state.status.consume.cycle_pre_mpd_24())?;
                         }
                         GlobalAction::ToggleConsume => {
-                            self.client.consume(state.status.consume.cycle())?;
+                            client.consume(state.status.consume.cycle())?;
                         }
                         GlobalAction::TogglePause
                             if state.status.state == MpdState::Play || state.status.state == MpdState::Pause =>
                         {
-                            self.client.pause_toggle()?;
+                            client.pause_toggle()?;
                             return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::TogglePause => {}
                         GlobalAction::VolumeUp => {
-                            self.client
-                                .set_volume(*state.status.volume.inc_by(state.config.volume_step))?;
+                            client.set_volume(*state.status.volume.inc_by(state.config.volume_step))?;
                         }
                         GlobalAction::VolumeDown => {
-                            self.client
-                                .set_volume(*state.status.volume.dec_by(state.config.volume_step))?;
+                            client.set_volume(*state.status.volume.dec_by(state.config.volume_step))?;
                         }
                         GlobalAction::SeekForward if state.status.state == MpdState::Play => {
-                            self.client.seek_current(ValueChange::Increase(5))?;
+                            client.seek_current(ValueChange::Increase(5))?;
                         }
                         GlobalAction::SeekBack if state.status.state == MpdState::Play => {
-                            self.client.seek_current(ValueChange::Decrease(5))?;
+                            client.seek_current(ValueChange::Decrease(5))?;
                         }
                         GlobalAction::NextTab => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = self.active_screen.next();
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PreviousTab => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = self.active_screen.prev();
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::QueueTab if !matches!(self.active_screen, screens::Screens::Queue) => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = screens::Screens::Queue;
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::DirectoriesTab
                             if !matches!(self.active_screen, screens::Screens::Directories) =>
                         {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = screens::Screens::Directories;
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::ArtistsTab if !matches!(self.active_screen, screens::Screens::Artists) => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = screens::Screens::Artists;
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::AlbumsTab if !matches!(self.active_screen, screens::Screens::Albums) => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = screens::Screens::Albums;
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PlaylistsTab if !matches!(self.active_screen, screens::Screens::Playlists) => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = screens::Screens::Playlists;
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::SearchTab if !matches!(self.active_screen, screens::Screens::Search) => {
-                            screen_call_inner!(on_hide(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(on_hide(client, &mut state.status, state.config));
 
                             self.active_screen = screens::Screens::Search;
-                            screen_call_inner!(before_show(&mut self.client, &mut state.status, state.config));
+                            screen_call_inner!(before_show(client, &mut state.status, state.config));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::QueueTab => {}
@@ -437,7 +435,7 @@ impl Ui<'_> {
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::ShowOutputs => {
-                            self.modals.push(Box::new(OutputsModal::new(self.client.outputs()?.0)));
+                            self.modals.push(Box::new(OutputsModal::new(client.outputs()?.0)));
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                     }
@@ -449,13 +447,9 @@ impl Ui<'_> {
         }
     }
 
-    pub fn before_show(&mut self, state: &mut State) -> Result<()> {
-        self.current_song = try_ret!(self.client.get_current_song(), "Failed get current song");
-        screen_call!(
-            self,
-            state,
-            before_show(&mut self.client, &mut state.status, state.config)
-        )
+    pub fn before_show(&mut self, state: &mut State, client: &mut impl MpdClient) -> Result<()> {
+        self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
+        screen_call!(self, state, before_show(client, &mut state.status, state.config))
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {
@@ -466,12 +460,17 @@ impl Ui<'_> {
         });
     }
 
-    pub fn on_event(&mut self, mut event: UiEvent, state: &mut State) -> Result<KeyHandleResult> {
+    pub fn on_event(
+        &mut self,
+        mut event: UiEvent,
+        state: &mut State,
+        client: &mut impl MpdClient,
+    ) -> Result<KeyHandleResult> {
         match event {
-            UiEvent::Mixer => state.status.volume = try_ret!(self.client.get_volume(), "Failed to get volume"),
-            UiEvent::Options => state.status = try_ret!(self.client.get_status(), "Failed to get status"),
+            UiEvent::Mixer => state.status.volume = try_ret!(client.get_volume(), "Failed to get volume"),
+            UiEvent::Options => state.status = try_ret!(client.get_status(), "Failed to get status"),
             UiEvent::Player => {
-                self.current_song = try_ret!(self.client.get_current_song(), "Failed get current song");
+                self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
             }
             UiEvent::Playlist => {}
             UiEvent::Database => {}
@@ -497,37 +496,37 @@ impl Ui<'_> {
                 screens::Screens::Logs => {
                     self.screens
                         .logs
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
                 screens::Screens::Queue => {
                     self.screens
                         .queue
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
                 screens::Screens::Directories => {
                     self.screens
                         .directories
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
                 screens::Screens::Albums => {
                     self.screens
                         .albums
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
                 screens::Screens::Artists => {
                     self.screens
                         .artists
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
                 screens::Screens::Playlists => {
                     self.screens
                         .playlists
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
                 screens::Screens::Search => {
                     self.screens
                         .search
-                        .on_event(&mut event, &mut self.client, &mut state.status, state.config)
+                        .on_event(&mut event, client, &mut state.status, state.config)
                 }
             };
 

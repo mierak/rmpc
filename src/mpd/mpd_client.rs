@@ -60,6 +60,7 @@ impl ValueChange {
 
 #[allow(dead_code)]
 pub trait MpdClient {
+    fn version(&mut self) -> Version;
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
     fn noidle(&mut self) -> MpdResult<()>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
@@ -127,6 +128,9 @@ pub trait MpdClient {
 }
 
 impl MpdClient for Client<'_> {
+    fn version(&mut self) -> Version {
+        self.version
+    }
     // Queries
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         self.send("idle").and_then(ProtoClient::read_response)

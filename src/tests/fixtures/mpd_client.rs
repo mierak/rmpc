@@ -444,4 +444,8 @@ impl MpdClient for TestMpdClient {
     fn list_mounts(&mut self) -> MpdResult<crate::mpd::commands::Mounts> {
         todo!("Not yet implemented")
     }
+
+    fn version(&mut self) -> crate::mpd::version::Version {
+        todo!("Not yet implemented")
+    }
 }
