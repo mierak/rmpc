@@ -14,7 +14,7 @@
 )]
 use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use config::{Args, Command, ConfigFile};
 use crossterm::event::{Event, KeyEvent};
@@ -194,11 +194,7 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
             };
 
             let ytdlp = YtDlp::new(cache_dir)?;
-            if !ytdlp.is_available {
-                bail!("yt-dlp was not found on PATH. Please install yt-dlp and try again.")
-            }
-
-            let file_path = ytdlp.download(&url).context("Failed to download viedo")?;
+            let file_path = ytdlp.download(&url)?;
 
             Ok(WorkDone::YoutubeDowloaded { file_path })
         }
