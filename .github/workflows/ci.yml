@@ -12,6 +12,7 @@ jobs:
     - name: Cargo test
       run: |
         cargo test
+        cargo test --release
   format:
     name: Check formatting
     runs-on: ubuntu-latest

@@ -183,9 +183,13 @@ mod tests {
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
+    #[cfg(debug_assertions)]
+    use crate::config::keys::LogsActions;
+    #[cfg(debug_assertions)]
+    use crate::config::keys::LogsActionsFile;
     use crate::config::keys::{
-        actions::{CommonActionFile, GlobalActionFile, LogsActionsFile, QueueActionsFile},
-        CommonAction, GlobalAction, LogsActions, QueueActions,
+        actions::{CommonActionFile, GlobalActionFile, QueueActionsFile},
+        CommonAction, GlobalAction, QueueActions,
     };
 
     use super::{Key, KeyConfig, KeyConfigFile};
@@ -195,6 +199,8 @@ mod tests {
     fn converts() {
         let input = KeyConfigFile {
             global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalActionFile::Quit)]),
+
+            #[cfg(debug_assertions)]
             logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActionsFile::Clear)]),
             queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActionsFile::Play),
                                   (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActionsFile::Save)]),
@@ -209,6 +215,7 @@ mod tests {
         };
         let expected = KeyConfig {
             global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalAction::Quit)]),
+            #[cfg(debug_assertions)]
             logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActions::Clear)]),
             queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActions::Play),
                                   (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActions::Save)]),
