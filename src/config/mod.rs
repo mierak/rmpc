@@ -311,9 +311,12 @@ mod tests {
 
     use walkdir::WalkDir;
 
-    use crate::config::{keys::KeyConfigFile, theme::UiConfigFile, ConfigFile};
+    #[cfg(debug_assertions)]
+    use crate::config::keys::KeyConfigFile;
+    use crate::config::{theme::UiConfigFile, ConfigFile};
 
     #[test]
+    #[cfg(debug_assertions)]
     fn example_config_equals_default() {
         let config = ConfigFile::default();
         let path = format!(
@@ -323,6 +326,20 @@ mod tests {
 
         let mut f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         f.keybinds.logs = KeyConfigFile::default().logs;
+
+        assert_eq!(config, f);
+    }
+
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn example_config_equals_default() {
+        let config = ConfigFile::default();
+        let path = format!(
+            "{}/assets/example_config.ron",
+            std::env::var("CARGO_MANIFEST_DIR").unwrap()
+        );
+
+        let f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
 
         assert_eq!(config, f);
     }
