@@ -275,6 +275,10 @@ impl Screen for QueueScreen {
                 self.last_song_id = status.songid;
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
+            UiEvent::Resized => {
+                self.img_state.force_transfer();
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
     }

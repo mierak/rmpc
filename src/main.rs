@@ -63,6 +63,7 @@ pub enum AppEvent {
     IdleEvent(IdleEvent),
     RequestStatusUpdate,
     RequestRender,
+    Resized,
     WorkDone(Result<WorkDone>),
 }
 
@@ -319,6 +320,11 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::WorkDone(Err(err)) => {
                     status_error!("{}", err);
                 }
+                AppEvent::Resized => {
+                    if let Err(err) = ui.on_event(UiEvent::Resized, &mut state, &mut client) {
+                        error!(error:? = err, event:?; "Ui failed to resize event");
+                    }
+                }
             }
         }
         if render_wanted {
@@ -407,20 +413,23 @@ fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
     let user_input_tx = user_input_tx;
     loop {
         match crossterm::event::poll(Duration::from_millis(250)) {
-            Ok(true) => {
-                let event = match crossterm::event::read() {
-                    Ok(e) => e,
-                    Err(err) => {
-                        warn!(error:? = err; "Failed to read input event");
-                        continue;
-                    }
-                };
-                if let Event::Key(key) = event {
+            Ok(true) => match crossterm::event::read() {
+                Ok(Event::Key(key)) => {
                     if let Err(err) = user_input_tx.send(AppEvent::UserInput(key)) {
                         error!(error:? = err; "Failed to send user input");
                     }
                 }
-            }
+                Ok(Event::Resize(_, _)) => {
+                    if let Err(err) = user_input_tx.send(AppEvent::Resized) {
+                        error!(error:? = err; "Failed to render request after resize");
+                    }
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    warn!(error:? = err; "Failed to read input event");
+                    continue;
+                }
+            },
             Ok(_) => {}
             Err(e) => warn!(error:? = e; "Error when polling for event"),
         }

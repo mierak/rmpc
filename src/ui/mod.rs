@@ -477,6 +477,7 @@ impl Ui {
             UiEvent::StoredPlaylist => {}
             UiEvent::LogAdded(_) => {}
             UiEvent::Update => {}
+            UiEvent::Resized => {}
         }
 
         let mut ret = KeyHandleResultInternal::SkipRender;
@@ -569,6 +570,7 @@ pub enum UiEvent {
     StoredPlaylist,
     Update,
     LogAdded(Vec<u8>),
+    Resized,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {

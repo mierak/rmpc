@@ -69,6 +69,10 @@ impl ImageState {
             default_art: Arc::new(default_art),
         }
     }
+
+    pub fn force_transfer(&mut self) {
+        self.needs_transfer = true;
+    }
 }
 
 impl ImageState {
