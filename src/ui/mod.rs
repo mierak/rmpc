@@ -292,6 +292,7 @@ impl Ui {
             return match modal.handle_key(key, client, state)? {
                 KeyHandleResultInternal::Modal(None) => {
                     self.modals.pop();
+                    self.on_event(UiEvent::ModalClosed, state, client)?;
                     Ok(KeyHandleResult::RenderRequested)
                 }
                 r => Ok(r.into()),
@@ -307,6 +308,7 @@ impl Ui {
             }
             KeyHandleResultInternal::Modal(None) => {
                 self.modals.pop();
+                self.on_event(UiEvent::ModalClosed, state, client)?;
                 return Ok(KeyHandleResult::RenderRequested);
             }
             KeyHandleResultInternal::KeyNotHandled => {
@@ -478,6 +480,7 @@ impl Ui {
             UiEvent::LogAdded(_) => {}
             UiEvent::Update => {}
             UiEvent::Resized => {}
+            UiEvent::ModalClosed => {}
         }
 
         let mut ret = KeyHandleResultInternal::SkipRender;
@@ -571,6 +574,7 @@ pub enum UiEvent {
     Update,
     LogAdded(Vec<u8>),
     Resized,
+    ModalClosed,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
