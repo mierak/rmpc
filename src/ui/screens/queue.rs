@@ -279,6 +279,10 @@ impl Screen for QueueScreen {
                 self.img_state.force_transfer();
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
+            UiEvent::ModalClosed => {
+                self.img_state.force_transfer();
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
     }
