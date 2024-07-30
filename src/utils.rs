@@ -107,6 +107,47 @@ pub mod tmux {
     }
 }
 
+pub mod image_proto {
+    use super::kitty::is_kitty_image_protocol_supported;
+    use anyhow::Result;
+
+    #[derive(Default, Debug, Clone, Copy)]
+    pub enum ImageProtocol {
+        Kitty,
+        UeberzugWayland,
+        UeberzugX11,
+        #[default]
+        None,
+    }
+
+    pub fn determine_image_support() -> Result<ImageProtocol> {
+        if is_kitty_image_protocol_supported()? {
+            return Ok(ImageProtocol::Kitty);
+        };
+
+        if which::which("ueberzugpp").is_ok() {
+            let session_type = std::env::var("XDG_SESSION_TYPE");
+            match session_type.unwrap_or_default().as_str() {
+                "wayland" => return Ok(ImageProtocol::UeberzugWayland),
+                "x11" => return Ok(ImageProtocol::UeberzugX11),
+                _ => {
+                    if std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty()) {
+                        log::warn!("XDG_SESSION_TYPE not set, will check display variables.");
+                        return Ok(ImageProtocol::UeberzugWayland);
+                    }
+
+                    if std::env::var("Display").is_ok_and(|v| !v.is_empty()) {
+                        log::warn!("XDG_SESSION_TYPE not set, will check display variables.");
+                        return Ok(ImageProtocol::UeberzugX11);
+                    }
+                }
+            }
+        }
+
+        return Ok(ImageProtocol::None);
+    }
+}
+
 pub mod kitty {
     use super::tmux;
 

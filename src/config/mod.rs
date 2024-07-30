@@ -14,6 +14,7 @@ pub mod theme;
 
 use crate::mpd::commands::volume::Bound;
 use crate::mpd::mpd_client::MpdClient;
+use crate::utils::image_proto::ImageProtocol;
 use crate::WorkRequest;
 
 use self::{
@@ -225,6 +226,7 @@ pub struct Config {
     pub keybinds: KeyConfig,
     pub status_update_interval_ms: Option<u64>,
     pub theme: UiConfig,
+    pub image_protocol: ImageProtocol,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -285,6 +287,7 @@ impl ConfigFile {
 
     pub fn into_config(self, config_dir: Option<&Path>) -> Result<Config> {
         Ok(Config {
+            image_protocol: ImageProtocol::None,
             theme: config_dir
                 .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
                 .transpose()?

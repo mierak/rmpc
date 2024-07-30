@@ -20,11 +20,10 @@ use crate::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
             save_queue::SaveQueueModal,
         },
-        utils::dirstack::DirState,
-        widgets::kitty_image::{ImageState, KittyImage},
+        utils::{album_art_facade::AlbumArtFacade, dirstack::DirState},
         KeyHandleResultInternal, UiEvent,
     },
-    utils::macros::{status_error, status_warn, try_ret},
+    utils::macros::{status_error, status_warn},
     AppEvent,
 };
 use log::error;
@@ -40,29 +39,29 @@ use super::{CommonAction, Screen};
 
 #[derive(Debug)]
 pub struct QueueScreen {
-    img_state: ImageState,
     scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
     queue: Vec<Song>,
-    album_art: Option<Vec<u8>>,
     header: Vec<&'static str>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<&'static Property<'static, SongProperty>>,
-    last_song_id: Option<u32>,
+    album_art_facade: AlbumArtFacade,
 }
 
 impl QueueScreen {
     pub fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
         Self {
-            img_state: ImageState::new(app_event_sender, config.theme.default_album_art.clone()),
+            album_art_facade: AlbumArtFacade::new(
+                config.image_protocol,
+                config.theme.default_album_art.clone(),
+                app_event_sender,
+            ),
             scrolling_state: DirState::default(),
             filter: None,
             filter_input_mode: false,
             header: config.theme.song_table_format.iter().map(|v| v.label).collect_vec(),
             queue: Vec::new(),
-            album_art: None,
-            last_song_id: None,
             column_widths: config
                 .theme
                 .song_table_format
@@ -79,7 +78,6 @@ impl Screen for QueueScreen {
     fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> anyhow::Result<()> {
         let queue_len = self.queue.len();
         let album_art_width = config.theme.album_art_width_percent;
-        let show_image = album_art_width > 0;
 
         let mut img_queue_constraints = [
             Constraint::Percentage(album_art_width),
@@ -177,40 +175,21 @@ impl Screen for QueueScreen {
             queue_section,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
-        if show_image {
-            frame.render_stateful_widget(
-                KittyImage::default().block(Block::default().border_style(config.as_border_style())),
-                img_section,
-                &mut self.img_state,
-            );
-        }
+
+        self.album_art_facade.render(frame, img_section, config)?;
 
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, _config: &Config) -> Result<()> {
         let queue = client.playlist_info()?;
-        if self.last_song_id.is_none() {
-            self.last_song_id = status.songid;
-        }
-        self.album_art = if let Some(song) = queue
+        if let Some(current_song) = queue
             .as_ref()
-            .and_then(|p| p.iter().find(|s| status.songid.is_some_and(|i| i == s.id)))
+            .and_then(|q| q.iter().find(|v| Some(v.id) == status.songid))
         {
-            if self.album_art.is_none() {
-                log::debug!(file = song.file.as_str(); "Trying to find album art for current song for for first display");
-                client.find_album_art(&song.file)?
-            } else {
-                Some(Vec::new())
-            }
-        } else {
-            None
-        };
+            let album_art = client.find_album_art(current_song.file.as_str())?;
 
-        let album_art_width = config.theme.album_art_width_percent;
-        let show_image = album_art_width > 0;
-        if show_image && !self.album_art.as_ref().is_some_and(Vec::is_empty) {
-            self.img_state.image(&mut self.album_art);
+            self.album_art_facade.transfer_image_data(album_art)?;
         }
 
         self.queue = queue.unwrap_or_default();
@@ -230,12 +209,16 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
+    fn on_hide(&mut self, _client: &mut impl MpdClient, _status: &mut Status, _config: &Config) -> Result<()> {
+        self.album_art_facade.hide_image()
+    }
+
     fn on_event(
         &mut self,
         event: &mut UiEvent,
         client: &mut impl MpdClient,
         status: &mut Status,
-        config: &Config,
+        _config: &Config,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             UiEvent::Playlist => {
@@ -250,38 +233,31 @@ impl Screen for QueueScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::Player => {
-                if let Some(current_song) = self.queue.iter().find(|s| status.songid.is_some_and(|i| i == s.id)) {
-                    if !config.theme.album_art_width_percent != 0
-                        && (self.last_song_id.is_some_and(|id| id != current_song.id) || self.last_song_id.is_none())
-                    {
-                        log::debug!(
-                            file = current_song.file.as_str(),
-                            selfid = self.last_song_id.as_ref(),
-                            currentid = current_song.id;
-                            "Trying to find album art for current song after a change"
-                        );
-                        self.album_art = try_ret!(
-                            client.find_album_art(&current_song.file),
-                            "Failed to get find album art"
-                        );
-                    }
-
-                    let album_art_width = config.theme.album_art_width_percent;
-                    let show_image = album_art_width > 0;
-                    if show_image && !self.album_art.as_ref().is_some_and(Vec::is_empty) {
-                        self.img_state.image(&mut self.album_art);
-                    }
-                };
-                self.last_song_id = status.songid;
+                let queue = client.playlist_info()?;
+                if let Some(current_song) = queue
+                    .as_ref()
+                    .and_then(|q| q.iter().find(|v| Some(v.id) == status.songid))
+                {
+                    let album_art = client.find_album_art(current_song.file.as_str())?;
+                    self.album_art_facade.transfer_image_data(album_art)?;
+                }
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
-            UiEvent::Resized => {
-                self.img_state.force_transfer();
+            UiEvent::Resized { columns, rows } => {
+                self.album_art_facade.handle_resize(*columns, *rows)?;
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            UiEvent::ModalOpened => {
+                self.album_art_facade.hide_image()?;
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::ModalClosed => {
-                self.img_state.force_transfer();
+                self.album_art_facade.rerender_image();
                 Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            UiEvent::Exit => {
+                self.album_art_facade.cleanup()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }

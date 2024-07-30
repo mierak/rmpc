@@ -22,7 +22,10 @@ use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use ui::{Level, UiEvent};
-use utils::macros::{status_error, status_info, try_cont};
+use utils::{
+    image_proto::ImageProtocol,
+    macros::{status_error, status_info, try_cont},
+};
 use ytdlp::YtDlp;
 
 use crate::{
@@ -63,7 +66,7 @@ pub enum AppEvent {
     IdleEvent(IdleEvent),
     RequestStatusUpdate,
     RequestRender,
-    Resized,
+    Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
 }
 
@@ -125,9 +128,23 @@ fn main() -> Result<()> {
             );
 
             let album_art_disabled = config.theme.album_art_width_percent == 0;
-            if !album_art_disabled && !utils::kitty::is_kitty_image_protocol_supported()? {
-                status_warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
-                config.theme.album_art_width_percent = 0;
+            if !album_art_disabled {
+                match utils::image_proto::determine_image_support()? {
+                    ImageProtocol::Kitty => {
+                        config.image_protocol = ImageProtocol::Kitty;
+                    }
+                    ImageProtocol::UeberzugWayland => {
+                        config.image_protocol = ImageProtocol::UeberzugWayland;
+                    }
+                    ImageProtocol::UeberzugX11 => {
+                        config.image_protocol = ImageProtocol::UeberzugX11;
+                    }
+                    ImageProtocol::None => {
+                        status_warn!("Album art is enabled but no image protocol is supported by your terminal, disabling album art");
+                        config.theme.album_art_width_percent = 0;
+                    }
+                }
+                status_info!("Using image protocol: {:?}", config.image_protocol);
             }
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
@@ -263,7 +280,12 @@ fn main_task<B: Backend + std::io::Write>(
             match event {
                 AppEvent::UserInput(key) => match ui.handle_key(key, &mut state, &mut client) {
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
-                    Ok(ui::KeyHandleResult::Quit) => break,
+                    Ok(ui::KeyHandleResult::Quit) => {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut state, &mut client) {
+                            error!(error:? = err, event:?; "Ui failed to handle quit event");
+                        }
+                        break;
+                    }
                     Ok(ui::KeyHandleResult::RenderRequested) => {
                         render_wanted = true;
                     }
@@ -320,8 +342,8 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::WorkDone(Err(err)) => {
                     status_error!("{}", err);
                 }
-                AppEvent::Resized => {
-                    if let Err(err) = ui.on_event(UiEvent::Resized, &mut state, &mut client) {
+                AppEvent::Resized { columns, rows } => {
+                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut state, &mut client) {
                         error!(error:? = err, event:?; "Ui failed to resize event");
                     }
                     render_wanted = true;
@@ -420,8 +442,8 @@ fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
                         error!(error:? = err; "Failed to send user input");
                     }
                 }
-                Ok(Event::Resize(_, _)) => {
-                    if let Err(err) = user_input_tx.send(AppEvent::Resized) {
+                Ok(Event::Resize(columns, rows)) => {
+                    if let Err(err) = user_input_tx.send(AppEvent::Resized { columns, rows }) {
                         error!(error:? = err; "Failed to render request after resize");
                     }
                 }
