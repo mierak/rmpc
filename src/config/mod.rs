@@ -333,25 +333,29 @@ impl ConfigFile {
             keybinds: self.keybinds.into(),
         };
 
-        config.image_method = match self.image_method {
-            ImageMethodFile::Kitty if crate::utils::image_proto::is_kitty_supported()? => ImageMethod::Kitty,
-            ImageMethodFile::Kitty => ImageMethod::Unsupported,
-            ImageMethodFile::UeberzugWayland if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
-                ImageMethod::UeberzugWayland
+        config.image_method = if config.theme.album_art_width_percent == 0 {
+            ImageMethod::None
+        } else {
+            match self.image_method {
+                ImageMethodFile::Kitty if crate::utils::image_proto::is_kitty_supported()? => ImageMethod::Kitty,
+                ImageMethodFile::Kitty => ImageMethod::Unsupported,
+                ImageMethodFile::UeberzugWayland if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
+                    ImageMethod::UeberzugWayland
+                }
+                ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
+                ImageMethodFile::UeberzugX11 if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
+                    ImageMethod::UeberzugX11
+                }
+                ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
+                ImageMethodFile::None => ImageMethod::None,
+                ImageMethodFile::Auto if config.theme.album_art_width_percent == 0 => ImageMethod::None,
+                ImageMethodFile::Auto => match crate::utils::image_proto::determine_image_support()? {
+                    ImageProtocol::Kitty => ImageMethod::Kitty,
+                    ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
+                    ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
+                    ImageProtocol::None => ImageMethod::None,
+                },
             }
-            ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-            ImageMethodFile::UeberzugX11 if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
-                ImageMethod::UeberzugX11
-            }
-            ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
-            ImageMethodFile::None => ImageMethod::None,
-            ImageMethodFile::Auto if config.theme.album_art_width_percent == 0 => ImageMethod::None,
-            ImageMethodFile::Auto => match crate::utils::image_proto::determine_image_support()? {
-                ImageProtocol::Kitty => ImageMethod::Kitty,
-                ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
-                ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
-                ImageProtocol::None => ImageMethod::None,
-            },
         };
 
         match config.image_method {
