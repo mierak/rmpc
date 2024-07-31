@@ -116,8 +116,8 @@ impl Ueberzug {
                         if let Some(pid) = daemon.pid {
                             if let Some(pid) = rustix::process::Pid::from_raw(pid.0) {
                                 try_skip!(
-                                    rustix::process::kill_process(pid, rustix::process::Signal::Kill),
-                                    "Failed to send SIGKILL to ueberzugpp pid file"
+                                    rustix::process::kill_process(pid, rustix::process::Signal::Term),
+                                    "Failed to send SIGTERM to ueberzugpp pid file"
                                 );
                             }
                         };
