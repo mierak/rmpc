@@ -45,7 +45,7 @@ pub struct UiConfig {
     pub show_song_table_header: bool,
     pub song_table_format: &'static [SongTableColumn],
     pub header: HeaderConfig,
-    pub default_album_art: Vec<u8>,
+    pub default_album_art: &'static [u8],
 }
 
 impl std::fmt::Debug for UiConfig {
@@ -228,9 +228,14 @@ impl TryFrom<UiConfigFile> for UiConfig {
             current_item_style: value
                 .current_item_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-            default_album_art: value
-                .default_album_art_path
-                .map_or(Ok(DEFAULT_ART.to_vec()), std::fs::read)?,
+            default_album_art: value.default_album_art_path.map_or(
+                Ok(DEFAULT_ART as &'static [u8]),
+                |path| -> Result<_> {
+                    let res = std::fs::read(path)?;
+                    let res: &'static [u8] = Box::leak(Box::new(res));
+                    Ok(res)
+                },
+            )?,
         })
     }
 }

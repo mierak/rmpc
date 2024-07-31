@@ -57,7 +57,10 @@ impl YtDlp {
         log::debug!(stdout = stdout.as_str(), stderr = stderr.as_str(), exit_code:?; "yt-dlp finished");
 
         if exit_code != Some(0) {
-            bail!("yt-dlp failed with exit code: {:?}", exit_code);
+            bail!(
+                "yt-dlp failed with exit code: {:?}. Check logs for more details.",
+                exit_code
+            );
         }
 
         // yt-dlp for some reason does not respect output file template when doing post processing

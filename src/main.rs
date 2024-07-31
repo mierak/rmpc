@@ -22,10 +22,7 @@ use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use ui::{Level, UiEvent};
-use utils::{
-    image_proto::ImageProtocol,
-    macros::{status_error, status_info, try_cont},
-};
+use utils::macros::{status_error, status_info, try_cont};
 use ytdlp::YtDlp;
 
 use crate::{
@@ -126,26 +123,6 @@ fn main() -> Result<()> {
                 Client::init(config.address, "command", true),
                 "Failed to connect to mpd"
             );
-
-            let album_art_disabled = config.theme.album_art_width_percent == 0;
-            if !album_art_disabled {
-                match utils::image_proto::determine_image_support()? {
-                    ImageProtocol::Kitty => {
-                        config.image_protocol = ImageProtocol::Kitty;
-                    }
-                    ImageProtocol::UeberzugWayland => {
-                        config.image_protocol = ImageProtocol::UeberzugWayland;
-                    }
-                    ImageProtocol::UeberzugX11 => {
-                        config.image_protocol = ImageProtocol::UeberzugX11;
-                    }
-                    ImageProtocol::None => {
-                        status_warn!("Album art is enabled but no image protocol is supported by your terminal, disabling album art");
-                        config.theme.album_art_width_percent = 0;
-                    }
-                }
-                status_info!("Using image protocol: {:?}", config.image_protocol);
-            }
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
             let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");

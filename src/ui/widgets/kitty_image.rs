@@ -31,7 +31,7 @@ pub struct KittyImageState {
 }
 
 impl KittyImageState {
-    pub fn new(sender: Sender<AppEvent>, default_art: Vec<u8>) -> Self {
+    pub fn new(sender: Sender<AppEvent>, default_art: &'static [u8]) -> Self {
         let compression_request_channel = channel::<(Arc<Vec<_>>, usize, usize)>();
         let rx = compression_request_channel.1;
 
@@ -66,7 +66,7 @@ impl KittyImageState {
             image: None,
             transfer_request_channel: compression_request_channel.0,
             compression_finished_receiver: image_data_to_transfer_channel.1,
-            default_art: Arc::new(default_art),
+            default_art: Arc::new(default_art.to_vec()),
         }
     }
 

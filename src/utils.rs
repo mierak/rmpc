@@ -22,6 +22,17 @@ pub mod macros {
         };
     }
 
+    macro_rules! try_skip {
+        ( $e:expr, $msg:literal ) => {
+            match $e {
+                Ok(_) => {},
+                Err(e) => {
+                    log::warn!(error:? = e; $msg);
+                },
+            }
+        };
+    }
+
     macro_rules! status_info {
         ($($t:tt)*) => {{
             log::info!($($t)*);
@@ -71,6 +82,8 @@ pub mod macros {
     pub(crate) use try_cont;
     #[allow(unused_imports)]
     pub(crate) use try_ret;
+    #[allow(unused_imports)]
+    pub(crate) use try_skip;
 }
 
 #[allow(dead_code)]
@@ -108,10 +121,10 @@ pub mod tmux {
 }
 
 pub mod image_proto {
-    use super::kitty::is_kitty_image_protocol_supported;
+    use super::tmux;
     use anyhow::Result;
 
-    #[derive(Default, Debug, Clone, Copy)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     pub enum ImageProtocol {
         Kitty,
         UeberzugWayland,
@@ -121,7 +134,7 @@ pub mod image_proto {
     }
 
     pub fn determine_image_support() -> Result<ImageProtocol> {
-        if is_kitty_image_protocol_supported()? {
+        if is_kitty_supported()? {
             return Ok(ImageProtocol::Kitty);
         };
 
@@ -131,13 +144,12 @@ pub mod image_proto {
                 "wayland" => return Ok(ImageProtocol::UeberzugWayland),
                 "x11" => return Ok(ImageProtocol::UeberzugX11),
                 _ => {
-                    if std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty()) {
-                        log::warn!("XDG_SESSION_TYPE not set, will check display variables.");
+                    log::warn!("XDG_SESSION_TYPE not set, will check display variables.");
+                    if is_ueberzug_wayland_supported() {
                         return Ok(ImageProtocol::UeberzugWayland);
                     }
 
-                    if std::env::var("Display").is_ok_and(|v| !v.is_empty()) {
-                        log::warn!("XDG_SESSION_TYPE not set, will check display variables.");
+                    if is_ueberzug_x11_supported() {
                         return Ok(ImageProtocol::UeberzugX11);
                     }
                 }
@@ -146,12 +158,15 @@ pub mod image_proto {
 
         return Ok(ImageProtocol::None);
     }
-}
 
-pub mod kitty {
-    use super::tmux;
+    pub fn is_ueberzug_wayland_supported() -> bool {
+        std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
+    }
+    pub fn is_ueberzug_x11_supported() -> bool {
+        std::env::var("Display").is_ok_and(|v| !v.is_empty())
+    }
 
-    pub fn is_kitty_image_protocol_supported() -> anyhow::Result<bool> {
+    pub fn is_kitty_supported() -> anyhow::Result<bool> {
         let query = if tmux::is_inside_tmux() {
             if !tmux::is_passthrough_enabled()? {
                 tmux::enable_passthrough()?;

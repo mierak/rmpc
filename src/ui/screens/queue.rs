@@ -9,7 +9,7 @@ use crate::{
             properties::{Property, SongProperty},
             Position,
         },
-        Config,
+        Config, ImageMethod,
     },
     mpd::{
         commands::{Song, Status},
@@ -23,7 +23,10 @@ use crate::{
         utils::{album_art_facade::AlbumArtFacade, dirstack::DirState},
         KeyHandleResultInternal, UiEvent,
     },
-    utils::macros::{status_error, status_warn},
+    utils::{
+        image_proto::ImageProtocol,
+        macros::{status_error, status_warn},
+    },
     AppEvent,
 };
 use log::error;
@@ -49,12 +52,25 @@ pub struct QueueScreen {
     album_art_facade: AlbumArtFacade,
 }
 
+impl From<ImageMethod> for ImageProtocol {
+    fn from(value: ImageMethod) -> Self {
+        match value {
+            ImageMethod::Kitty => ImageProtocol::Kitty,
+            ImageMethod::UeberzugWayland => ImageProtocol::UeberzugWayland,
+            ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
+            ImageMethod::None => ImageProtocol::None,
+            ImageMethod::Auto => ImageProtocol::None,
+            ImageMethod::Unsupported => ImageProtocol::None,
+        }
+    }
+}
+
 impl QueueScreen {
     pub fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
         Self {
             album_art_facade: AlbumArtFacade::new(
-                config.image_protocol,
-                config.theme.default_album_art.clone(),
+                config.image_method.into(),
+                config.theme.default_album_art,
                 app_event_sender,
             ),
             scrolling_state: DirState::default(),
@@ -183,14 +199,15 @@ impl Screen for QueueScreen {
 
     fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, _config: &Config) -> Result<()> {
         let queue = client.playlist_info()?;
-        if let Some(current_song) = queue
+        let album_art = if let Some(current_song) = queue
             .as_ref()
             .and_then(|q| q.iter().find(|v| Some(v.id) == status.songid))
         {
-            let album_art = client.find_album_art(current_song.file.as_str())?;
-
-            self.album_art_facade.transfer_image_data(album_art)?;
-        }
+            client.find_album_art(current_song.file.as_str())?
+        } else {
+            None
+        };
+        self.album_art_facade.transfer_image_data(album_art)?;
 
         self.queue = queue.unwrap_or_default();
         self.scrolling_state.set_content_len(Some(self.queue.len()));

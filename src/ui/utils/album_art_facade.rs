@@ -23,7 +23,7 @@ const UEBERZUG_ALBUM_ART_DIR: &str = "/tmp/rmpc";
 pub struct AlbumArtFacade {
     image_state: ImageState,
     image_data: Option<Vec<u8>>,
-    default_album_art: Vec<u8>,
+    default_album_art: &'static [u8],
     image_data_hash: u64,
     needs_rerender: bool,
 }
@@ -38,14 +38,12 @@ enum ImageState {
 impl AlbumArtFacade {
     pub fn new(
         protocol: ImageProtocol,
-        default_album_art: Vec<u8>,
+        default_album_art: &'static [u8],
         app_event_sender: std::sync::mpsc::Sender<AppEvent>,
     ) -> Self {
         Self {
             image_state: match protocol {
-                ImageProtocol::Kitty => {
-                    ImageState::Kitty(KittyImageState::new(app_event_sender, default_album_art.clone()))
-                }
+                ImageProtocol::Kitty => ImageState::Kitty(KittyImageState::new(app_event_sender, default_album_art)),
                 ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new().init(Layer::Wayland)),
                 ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new().init(Layer::X11)),
                 ImageProtocol::None => ImageState::None,
@@ -78,7 +76,11 @@ impl AlbumArtFacade {
                     .create(true)
                     .truncate(true)
                     .open(UEBERZUG_ALBUM_ART_PATH)?;
-                file.write_all(data.as_ref().unwrap_or(&self.default_album_art))?;
+                if let Some(data) = &data {
+                    file.write_all(data)?;
+                } else {
+                    file.write_all(self.default_album_art)?;
+                }
             }
             ImageState::None => {}
         }

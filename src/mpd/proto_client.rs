@@ -139,12 +139,14 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         loop {
             self.execute(&format!("{} {}", self.command, buf.len()))?;
             if let Some(response) = self._read_bin(&mut buf)? {
+                log::debug!(response:?; "Read binary response");
                 if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
                     trace!( len = buf.len();"Finshed reading binary response");
                     break;
                 }
             } else {
-                return Err(MpdError::ValueExpected("Expected binary data but got none".to_owned()));
+                return Ok(None);
+                // return Err(MpdError::ValueExpected("Expected binary data but got none".to_owned()));
             }
         }
         Ok(Some(buf))

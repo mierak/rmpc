@@ -15,6 +15,7 @@ pub mod theme;
 use crate::mpd::commands::volume::Bound;
 use crate::mpd::mpd_client::MpdClient;
 use crate::utils::image_proto::ImageProtocol;
+use crate::utils::macros::status_warn;
 use crate::WorkRequest;
 
 use self::{
@@ -218,6 +219,27 @@ fn get_default_config_path() -> PathBuf {
     return path;
 }
 
+#[derive(Default, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+pub enum ImageMethodFile {
+    Kitty,
+    UeberzugWayland,
+    UeberzugX11,
+    None,
+    #[default]
+    Auto,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageMethod {
+    Kitty,
+    UeberzugWayland,
+    UeberzugX11,
+    None,
+    #[default]
+    Auto,
+    Unsupported,
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub address: &'static str,
@@ -226,7 +248,7 @@ pub struct Config {
     pub keybinds: KeyConfig,
     pub status_update_interval_ms: Option<u64>,
     pub theme: UiConfig,
-    pub image_protocol: ImageProtocol,
+    pub image_method: ImageMethod,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -242,6 +264,8 @@ pub struct ConfigFile {
     status_update_interval_ms: Option<u64>,
     #[serde(default)]
     keybinds: KeyConfigFile,
+    #[serde(default)]
+    image_method: ImageMethodFile,
 }
 
 impl Default for ConfigFile {
@@ -253,6 +277,7 @@ impl Default for ConfigFile {
             status_update_interval_ms: Some(1000),
             theme: None,
             cache_dir: None,
+            image_method: ImageMethodFile::Auto,
         }
     }
 }
@@ -286,13 +311,15 @@ impl ConfigFile {
     }
 
     pub fn into_config(self, config_dir: Option<&Path>) -> Result<Config> {
-        Ok(Config {
-            image_protocol: ImageProtocol::None,
-            theme: config_dir
-                .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
-                .transpose()?
-                .unwrap_or_default()
-                .try_into()?,
+        let theme: UiConfig = config_dir
+            .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
+            .transpose()?
+            .unwrap_or_default()
+            .try_into()?;
+
+        let mut config = Config {
+            image_method: ImageMethod::default(),
+            theme,
             cache_dir: self.cache_dir.map(|v| -> &'static str {
                 if v.ends_with('/') {
                     Box::leak(Box::new(v))
@@ -304,7 +331,45 @@ impl ConfigFile {
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
-        })
+        };
+
+        config.image_method = match self.image_method {
+            ImageMethodFile::Kitty if crate::utils::image_proto::is_kitty_supported()? => ImageMethod::Kitty,
+            ImageMethodFile::Kitty => ImageMethod::Unsupported,
+            ImageMethodFile::UeberzugWayland if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
+                ImageMethod::UeberzugWayland
+            }
+            ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
+            ImageMethodFile::UeberzugX11 if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
+                ImageMethod::UeberzugX11
+            }
+            ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
+            ImageMethodFile::None => ImageMethod::None,
+            ImageMethodFile::Auto if config.theme.album_art_width_percent == 0 => ImageMethod::None,
+            ImageMethodFile::Auto => match crate::utils::image_proto::determine_image_support()? {
+                ImageProtocol::Kitty => ImageMethod::Kitty,
+                ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
+                ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
+                ImageProtocol::None => ImageMethod::None,
+            },
+        };
+
+        match config.image_method {
+            ImageMethod::Unsupported => {
+                status_warn!(
+                    "Album art is enabled but no image protocol is supported by your terminal, disabling album art"
+                );
+                config.theme.album_art_width_percent = 0;
+            }
+            ImageMethod::None => {
+                config.theme.album_art_width_percent = 0;
+            }
+            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 | ImageMethod::Auto => {
+                log::debug!(requested:? = self.image_method, resolved:? = config.image_method; "Image method resolved");
+            }
+        }
+
+        Ok(config)
     }
 }
 

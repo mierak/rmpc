@@ -38,6 +38,7 @@ address with a port or a UNIX domain socket path.
 <ConfigValue name="cache_dir" type="string" optional />
 
 Directory for rmpc's cache files. Used for files downloaded for youtube and might be used for more in the future.
+`None` completely disables album art display.
 
 ### theme
 
@@ -50,6 +51,13 @@ Theme file to use. If set to `None` or absent, the default theme is used. More i
     description="Get the default theme file and customize it"
     href="/rmpc/configuration/theme/"
 />
+
+### image_method
+
+<ConfigValue name="image_method" type={["Kitty", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
+
+Rendering method used to display images. Currently Kitty, UeberzugWayland and UeberzugX11 are supported.
+Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is not available.
 
 ### keybinds
 

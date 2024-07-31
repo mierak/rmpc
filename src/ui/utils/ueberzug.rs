@@ -14,11 +14,13 @@ use std::time::Duration;
 use std::{io::ErrorKind, process::Command};
 
 use crate::utils::macros::try_cont;
+use crate::utils::macros::try_skip;
 
 #[derive(Debug)]
 pub struct Ueberzug {
     sender: Sender<Action>,
     receiver: Option<Receiver<Action>>,
+    handle: Option<std::thread::JoinHandle<()>>,
 }
 
 struct UeberzugDaemon {
@@ -53,7 +55,11 @@ impl Layer {
 
 impl Ueberzug {
     pub fn cleanup(&mut self) -> Result<()> {
-        Ok(self.sender.send(Action::Destroy)?)
+        if let Some(handle) = self.handle.take() {
+            self.sender.send(Action::Destroy)?;
+            handle.join().expect("Ueberzug thread to end gracefully");
+        };
+        Ok(())
     }
 
     pub fn new() -> Self {
@@ -61,6 +67,7 @@ impl Ueberzug {
         Self {
             sender: tx,
             receiver: Some(rx),
+            handle: None,
         }
     }
 
@@ -82,7 +89,7 @@ impl Ueberzug {
             return self;
         };
 
-        std::thread::spawn(move || {
+        self.handle = Some(std::thread::spawn(move || {
             while let Ok(action) = rx.recv() {
                 daemon.pid = Some(try_cont!(
                     daemon.spawn_daemon_if_needed(),
@@ -99,20 +106,23 @@ impl Ueberzug {
                         try_cont!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
                     }
                     Action::Destroy => {
+                        try_skip!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
+
                         if let Some(ref mut proc) = daemon.ueberzug_process {
-                            try_cont!(proc.kill(), "Failed to kill ueberzugpp process");
-                            try_cont!(proc.wait(), "Ueberzugpp process failed to die");
+                            try_skip!(proc.kill(), "Failed to kill ueberzugpp process");
+                            try_skip!(proc.wait(), "Ueberzugpp process failed to die");
                         }
+
                         if let Some(pid) = daemon.pid {
                             if let Some(pid) = rustix::process::Pid::from_raw(pid.0) {
-                                try_cont!(
+                                try_skip!(
                                     rustix::process::kill_process(pid, rustix::process::Signal::Kill),
                                     "Failed to send SIGKILL to ueberzugpp pid file"
                                 );
                             }
                         };
 
-                        try_cont!(
+                        try_skip!(
                             std::fs::remove_file(&daemon.pid_file),
                             "Failed to remove ueberzugpp's pid file"
                         );
@@ -120,7 +130,7 @@ impl Ueberzug {
                     }
                 }
             }
-        });
+        }));
 
         self
     }
