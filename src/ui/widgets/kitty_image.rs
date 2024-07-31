@@ -21,7 +21,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct ImageState {
+pub struct KittyImageState {
     idx: u32,
     image: Option<Arc<Vec<u8>>>,
     default_art: Arc<Vec<u8>>,
@@ -30,8 +30,8 @@ pub struct ImageState {
     compression_finished_receiver: Receiver<Data>,
 }
 
-impl ImageState {
-    pub fn new(sender: Sender<AppEvent>, default_art: Vec<u8>) -> Self {
+impl KittyImageState {
+    pub fn new(sender: Sender<AppEvent>, default_art: &'static [u8]) -> Self {
         let compression_request_channel = channel::<(Arc<Vec<_>>, usize, usize)>();
         let rx = compression_request_channel.1;
 
@@ -66,7 +66,7 @@ impl ImageState {
             image: None,
             transfer_request_channel: compression_request_channel.0,
             compression_finished_receiver: image_data_to_transfer_channel.1,
-            default_art: Arc::new(default_art),
+            default_art: Arc::new(default_art.to_vec()),
         }
     }
 
@@ -75,7 +75,7 @@ impl ImageState {
     }
 }
 
-impl ImageState {
+impl KittyImageState {
     /// Takes image data in buffer
     /// Leaves the provided buffer empty if any data were in there
     /// Has to be called on every image change event, not just when
@@ -173,7 +173,7 @@ impl<'a> KittyImage<'a> {
         Ok((w, h))
     }
 
-    fn create_unicode_placeholder_grid(state: &ImageState, buf: &mut Buffer, area: Rect) {
+    fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, area: Rect) {
         (0..area.height).for_each(|y| {
             let mut res = format!("\x1b[38;5;{}m", state.idx);
 
@@ -194,7 +194,14 @@ impl<'a> KittyImage<'a> {
         });
     }
 
-    fn transfer_data(content: &str, cols: usize, rows: usize, img_width: u32, img_height: u32, state: &mut ImageState) {
+    fn transfer_data(
+        content: &str,
+        cols: usize,
+        rows: usize,
+        img_width: u32,
+        img_height: u32,
+        state: &mut KittyImageState,
+    ) {
         let start_time = Instant::now();
         log::debug!(bytes = content.len(); "Transferring compressed image data");
         let mut iter = content.chars().peekable();
@@ -236,7 +243,7 @@ impl<'a> KittyImage<'a> {
 }
 
 impl<'a> StatefulWidget for KittyImage<'a> {
-    type State = ImageState;
+    type State = KittyImageState;
 
     fn render(mut self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let area = match self.block.take() {

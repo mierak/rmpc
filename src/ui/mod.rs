@@ -209,11 +209,11 @@ impl Ui {
             frame.render_widget(elapsed_bar, bar_area);
         }
 
-        // #[cfg(debug_assertions)]
-        // frame.render_widget(
-        //     Paragraph::new(format!("{} frames", self.rendered_frames_count)),
-        //     bar_area,
-        // );
+        #[cfg(debug_assertions)]
+        frame.render_widget(
+            Paragraph::new(format!("{} frames", self.rendered_frames_count)),
+            bar_area,
+        );
 
         if state.config.theme.draw_borders {
             screen_call!(self, state, render(frame, content_area, &state.status, state.config))?;
@@ -304,6 +304,7 @@ impl Ui {
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(Some(modal)) => {
                 self.modals.push(modal);
+                self.on_event(UiEvent::ModalOpened, state, client)?;
                 return Ok(KeyHandleResult::RenderRequested);
             }
             KeyHandleResultInternal::Modal(None) => {
@@ -434,10 +435,12 @@ impl Ui {
                         GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                         GlobalAction::ShowHelp => {
                             self.modals.push(Box::new(KeybindsModal::new(state)));
+                            self.on_event(UiEvent::ModalOpened, state, client)?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::ShowOutputs => {
                             self.modals.push(Box::new(OutputsModal::new(client.outputs()?.0)));
+                            self.on_event(UiEvent::ModalOpened, state, client)?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                     }
@@ -479,8 +482,10 @@ impl Ui {
             UiEvent::StoredPlaylist => {}
             UiEvent::LogAdded(_) => {}
             UiEvent::Update => {}
-            UiEvent::Resized => {}
+            UiEvent::Resized { .. } => {}
+            UiEvent::ModalOpened => {}
             UiEvent::ModalClosed => {}
+            UiEvent::Exit => {}
         }
 
         let mut ret = KeyHandleResultInternal::SkipRender;
@@ -573,8 +578,10 @@ pub enum UiEvent {
     StoredPlaylist,
     Update,
     LogAdded(Vec<u8>),
-    Resized,
+    Resized { columns: u16, rows: u16 },
+    ModalOpened,
     ModalClosed,
+    Exit,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {

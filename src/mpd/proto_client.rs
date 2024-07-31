@@ -144,7 +144,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                     break;
                 }
             } else {
-                return Err(MpdError::ValueExpected("Expected binary data but got none".to_owned()));
+                return Ok(None);
             }
         }
         Ok(Some(buf))

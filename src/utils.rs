@@ -22,6 +22,17 @@ pub mod macros {
         };
     }
 
+    macro_rules! try_skip {
+        ( $e:expr, $msg:literal ) => {
+            match $e {
+                Ok(_) => {},
+                Err(e) => {
+                    log::warn!(error:? = e; $msg);
+                },
+            }
+        };
+    }
+
     macro_rules! status_info {
         ($($t:tt)*) => {{
             log::info!($($t)*);
@@ -71,6 +82,8 @@ pub mod macros {
     pub(crate) use try_cont;
     #[allow(unused_imports)]
     pub(crate) use try_ret;
+    #[allow(unused_imports)]
+    pub(crate) use try_skip;
 }
 
 #[allow(dead_code)]
@@ -107,10 +120,53 @@ pub mod tmux {
     }
 }
 
-pub mod kitty {
+pub mod image_proto {
     use super::tmux;
+    use anyhow::Result;
 
-    pub fn is_kitty_image_protocol_supported() -> anyhow::Result<bool> {
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ImageProtocol {
+        Kitty,
+        UeberzugWayland,
+        UeberzugX11,
+        #[default]
+        None,
+    }
+
+    pub fn determine_image_support() -> Result<ImageProtocol> {
+        if is_kitty_supported()? {
+            return Ok(ImageProtocol::Kitty);
+        };
+
+        if which::which("ueberzugpp").is_ok() {
+            let session_type = std::env::var("XDG_SESSION_TYPE");
+            match session_type.unwrap_or_default().as_str() {
+                "wayland" => return Ok(ImageProtocol::UeberzugWayland),
+                "x11" => return Ok(ImageProtocol::UeberzugX11),
+                _ => {
+                    log::warn!("XDG_SESSION_TYPE not set, will check display variables.");
+                    if is_ueberzug_wayland_supported() {
+                        return Ok(ImageProtocol::UeberzugWayland);
+                    }
+
+                    if is_ueberzug_x11_supported() {
+                        return Ok(ImageProtocol::UeberzugX11);
+                    }
+                }
+            }
+        }
+
+        return Ok(ImageProtocol::None);
+    }
+
+    pub fn is_ueberzug_wayland_supported() -> bool {
+        std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
+    }
+    pub fn is_ueberzug_x11_supported() -> bool {
+        std::env::var("Display").is_ok_and(|v| !v.is_empty())
+    }
+
+    pub fn is_kitty_supported() -> anyhow::Result<bool> {
         let query = if tmux::is_inside_tmux() {
             if !tmux::is_passthrough_enabled()? {
                 tmux::enable_passthrough()?;

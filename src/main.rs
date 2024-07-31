@@ -63,7 +63,7 @@ pub enum AppEvent {
     IdleEvent(IdleEvent),
     RequestStatusUpdate,
     RequestRender,
-    Resized,
+    Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
 }
 
@@ -123,12 +123,6 @@ fn main() -> Result<()> {
                 Client::init(config.address, "command", true),
                 "Failed to connect to mpd"
             );
-
-            let album_art_disabled = config.theme.album_art_width_percent == 0;
-            if !album_art_disabled && !utils::kitty::is_kitty_image_protocol_supported()? {
-                status_warn!("Album art is enabled but kitty image protocol is not supported by your terminal, disabling album art");
-                config.theme.album_art_width_percent = 0;
-            }
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
             let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");
@@ -263,7 +257,12 @@ fn main_task<B: Backend + std::io::Write>(
             match event {
                 AppEvent::UserInput(key) => match ui.handle_key(key, &mut state, &mut client) {
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
-                    Ok(ui::KeyHandleResult::Quit) => break,
+                    Ok(ui::KeyHandleResult::Quit) => {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut state, &mut client) {
+                            error!(error:? = err, event:?; "Ui failed to handle quit event");
+                        }
+                        break;
+                    }
                     Ok(ui::KeyHandleResult::RenderRequested) => {
                         render_wanted = true;
                     }
@@ -320,8 +319,8 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::WorkDone(Err(err)) => {
                     status_error!("{}", err);
                 }
-                AppEvent::Resized => {
-                    if let Err(err) = ui.on_event(UiEvent::Resized, &mut state, &mut client) {
+                AppEvent::Resized { columns, rows } => {
+                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut state, &mut client) {
                         error!(error:? = err, event:?; "Ui failed to resize event");
                     }
                     render_wanted = true;
@@ -420,8 +419,8 @@ fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
                         error!(error:? = err; "Failed to send user input");
                     }
                 }
-                Ok(Event::Resize(_, _)) => {
-                    if let Err(err) = user_input_tx.send(AppEvent::Resized) {
+                Ok(Event::Resize(columns, rows)) => {
+                    if let Err(err) = user_input_tx.send(AppEvent::Resized { columns, rows }) {
                         error!(error:? = err; "Failed to render request after resize");
                     }
                 }

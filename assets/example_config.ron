@@ -4,6 +4,7 @@
 (
     address: "127.0.0.1:6600",
     theme: None,
+    image_method: Auto,
     cache_dir: None,
     volume_step: 5,
     status_update_interval_ms: 1000,
