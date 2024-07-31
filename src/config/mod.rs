@@ -236,7 +236,6 @@ pub enum ImageMethod {
     UeberzugX11,
     None,
     #[default]
-    Auto,
     Unsupported,
 }
 
@@ -343,7 +342,7 @@ impl ConfigFile {
                     ImageMethod::UeberzugWayland
                 }
                 ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-                ImageMethodFile::UeberzugX11 if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
+                ImageMethodFile::UeberzugX11 if crate::utils::image_proto::is_ueberzug_x11_supported() => {
                     ImageMethod::UeberzugX11
                 }
                 ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
@@ -368,7 +367,7 @@ impl ConfigFile {
             ImageMethod::None => {
                 config.theme.album_art_width_percent = 0;
             }
-            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 | ImageMethod::Auto => {
+            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 => {
                 log::debug!(requested:? = self.image_method, resolved:? = config.image_method; "Image method resolved");
             }
         }

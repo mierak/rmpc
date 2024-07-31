@@ -59,7 +59,6 @@ impl From<ImageMethod> for ImageProtocol {
             ImageMethod::UeberzugWayland => ImageProtocol::UeberzugWayland,
             ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
             ImageMethod::None => ImageProtocol::None,
-            ImageMethod::Auto => ImageProtocol::None,
             ImageMethod::Unsupported => ImageProtocol::None,
         }
     }
