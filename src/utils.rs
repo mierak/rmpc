@@ -163,7 +163,7 @@ pub mod image_proto {
         std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
     }
     pub fn is_ueberzug_x11_supported() -> bool {
-        std::env::var("Display").is_ok_and(|v| !v.is_empty())
+        std::env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
     }
 
     pub fn is_kitty_supported() -> anyhow::Result<bool> {
