@@ -37,6 +37,7 @@ jobs:
       run: |
         mkdir -p "/tmp/artifacts"
         tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "./target/${{ matrix.target }}/release/rmpc" "./target/man" "./target/completions"
+        tar ztvf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz"
     # - name: Release
     #   uses: ncipollo/release-action@v1
     #   with:
