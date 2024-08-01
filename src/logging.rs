@@ -11,7 +11,7 @@ pub fn init(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, Flexi
 
 #[allow(dead_code)]
 fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
-    flexi_logger::Logger::try_with_str("debug")?
+    flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file(
             FileSpec::default()
                 .directory(std::env::temp_dir())
@@ -26,7 +26,7 @@ fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, F
 
 #[allow(dead_code)]
 fn init_debug(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
-    flexi_logger::Logger::try_with_str("debug")?
+    flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file_and_writer(
             FileSpec::default()
                 .directory(std::env::temp_dir())
