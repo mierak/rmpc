@@ -11,9 +11,9 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { workspace = true }
 anyhow = "1.0.86"
 base64 = "0.22.1"
-clap = { version = "4.5.9", features = ["derive", "cargo", "string" ] }
 crossterm = { version = "0.27.0", features = ["serde"] }
 image = "0.25.1"
 ratatui = { version = "0.27.0", features = ["all-widgets"] }
@@ -36,6 +36,14 @@ walkdir = "2.5.0"
 which = "6.0.1"
 url = "2.5.2"
 
+[build-dependencies]
+clap = { workspace = true }
+clap_complete = "4.5.12"
+clap_mangen = "0.2.23"
+
 [dev-dependencies]
 rstest = "0.21.0"
 test-case = "3.3.1"
+
+[workspace.dependencies]
+clap = { version = "4.5.9", features = ["derive", "cargo", "string" ] }

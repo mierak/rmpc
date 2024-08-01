@@ -19,8 +19,9 @@ use widgets::app_tabs::AppTabs;
 
 use crate::{
     config::{
+        cli::Args,
         keys::{CommonAction, GlobalAction},
-        Args, Config,
+        Config,
     },
     mpd::{
         client::Client,

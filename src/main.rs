@@ -16,7 +16,10 @@ use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use config::{Args, Command, ConfigFile};
+use config::{
+    cli::{Args, Command},
+    ConfigFile,
+};
 use crossterm::event::{Event, KeyEvent};
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
@@ -37,6 +40,7 @@ mod tests {
     pub mod fixtures;
 }
 
+mod cli;
 mod config;
 mod logging;
 mod mpd;
