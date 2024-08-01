@@ -33,10 +33,11 @@ jobs:
       run: |
         cargo build --release --target ${{ matrix.target }}
     - name: Copy artifacts
-      working-directory: 
+      working-directory: ./target
       run: |
         mkdir -p "/tmp/artifacts"
-        tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "./target/${{ matrix.target }}/release/rmpc" "./target/man" "./target/completions"
+        tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "./man" "./completions" -C "./${{ matrix.target }}/release" "rmpc"
+        echo "done"
         tar ztvf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz"
     # - name: Release
     #   uses: ncipollo/release-action@v1
