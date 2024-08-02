@@ -20,7 +20,7 @@ ratatui = { version = "0.27.0", features = ["all-widgets"] }
 serde = { version = "1.0.204", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 time = { version = "0.3.36", features = ["macros", "local-offset"] }
-flate2 = { version = "1.0.30", features = ["zlib-ng"], default-features = false }
+flate2 = { version = "1.0.30" }
 itertools = "0.13.0"
 ron = "0.8.1"
 derive_more = { version = "0.99.18", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }
