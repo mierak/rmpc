@@ -8,27 +8,29 @@ sidebar:
 import { Steps } from "@astrojs/starlight/components";
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
 
-Currently only linux is officially supported. No binaries are currently provided, so you will need to build from source.
-To build you will need to have [rust toolchain](https://www.rust-lang.org/tools/install) installed. More installation
-methods will be provided in the future.
+Currently only linux is officially supported. Precompiled binary is provided on Github and an AUR package is available for Arch.
+To build rmpc yourself you will need to have [rust toolchain](https://www.rust-lang.org/tools/install) installed. More installation
+methods will come in the future.
 
 ## Steps
 
 <Steps>
 
 1. Install rmpc with one of the following methods
-    - By downloading a precompiled binary from github [releases page](https://github.com/mierak/rmpc/releases/latest/).
-      Then untar the archive, set execute persmission if needed and run rmpc.
-    - Using cargo
+    ### Arch Linux
     ```bash frame=none showLineNumbers=false
+    yay -S rmpc-git
+    ```
+    ### Precompiled binaries
+    By downloading a precompiled binary from github [releases page](https://github.com/mierak/rmpc/releases/latest/).
+    Then untar the archive, set execute persmission if needed and run rmpc.
+    ### Using cargo
+    ```bash frame=none showLineNumbers=false
+    # compile the latest version from source
     cargo install rmpc --locked
-    ```
-    - Using [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)
-    ```bash frame=none showLineNumbers=false
+    # or download precompiled binary with cargo binstall
     cargo binstall rmpc
-    ```
-    - Install the latest git version
-    ```bash frame=none showLineNumbers=false
+    # or compile the latest work in progress version from git
     cargo install --git https://github.com/mierak/rmpc --locked
     ```
 2. Setup your config file
