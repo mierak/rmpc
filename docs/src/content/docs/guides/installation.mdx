@@ -21,6 +21,18 @@ methods will come in the future.
     ```bash frame=none showLineNumbers=false
     yay -S rmpc-git
     ```
+    ### NixOS
+    Add [`rmpc`](https://search.nixos.org/packages?channel=unstable&query=rmpc) (available in `nixos-unstable`) to your `systemPackages` and rebuild.
+
+    ```nix
+    { pkgs, ... }:
+
+    {
+      environment.systemPackages = with pkgs; [
+        rmpc
+      ];
+    }
+    ```
     ### Precompiled binaries
     By downloading a precompiled binary from github [releases page](https://github.com/mierak/rmpc/releases/latest/).
     Then untar the archive, set execute persmission if needed and run rmpc.
