@@ -81,3 +81,9 @@ Determines the step when changing volume with the volume up and down keybinds. D
 Interval in milliseconds to update the status when a song is playing. Status means song progress, current bitrate, etc.
 Default is 1000ms. If set to `None` or absent, the progress bar at the bottom of the window is hidden as it serves no
 purpose at that point.
+
+### select_current_song_on_change
+
+<ConfigValue name="select_current_song_on_change" type="bool" />
+
+If set to true, the current song is selected in the queue table when it changes. Defaults to false if not present.
