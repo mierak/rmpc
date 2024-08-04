@@ -234,7 +234,7 @@ impl Screen for QueueScreen {
         event: &mut UiEvent,
         client: &mut impl MpdClient,
         status: &mut Status,
-        _config: &Config,
+        config: &Config,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             UiEvent::Playlist => {
@@ -250,12 +250,15 @@ impl Screen for QueueScreen {
             }
             UiEvent::Player => {
                 let queue = client.playlist_info()?;
-                if let Some(current_song) = queue
+                if let Some((idx, current_song)) = queue
                     .as_ref()
-                    .and_then(|q| q.iter().find(|v| Some(v.id) == status.songid))
+                    .and_then(|q| q.iter().enumerate().find(|(_, v)| Some(v.id) == status.songid))
                 {
                     let album_art = client.find_album_art(current_song.file.as_str())?;
                     self.album_art_facade.transfer_image_data(album_art)?;
+                    if config.select_current_song_on_change {
+                        self.scrolling_state.select(Some(idx));
+                    }
                 }
                 Ok(KeyHandleResultInternal::RenderRequested)
             }

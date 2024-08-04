@@ -47,6 +47,7 @@ pub struct Config {
     pub volume_step: u8,
     pub keybinds: KeyConfig,
     pub status_update_interval_ms: Option<u64>,
+    pub select_current_song_on_change: bool,
     pub theme: UiConfig,
     pub image_method: ImageMethod,
 }
@@ -62,6 +63,8 @@ pub struct ConfigFile {
     volume_step: u8,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
+    #[serde(default = "defaults::default_false")]
+    select_current_song_on_change: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
     #[serde(default)]
@@ -78,6 +81,7 @@ impl Default for ConfigFile {
             theme: None,
             cache_dir: None,
             image_method: ImageMethodFile::Auto,
+            select_current_song_on_change: false,
         }
     }
 }
@@ -131,6 +135,7 @@ impl ConfigFile {
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
+            select_current_song_on_change: self.select_current_song_on_change,
         };
 
         config.image_method = if config.theme.album_art_width_percent == 0 {
