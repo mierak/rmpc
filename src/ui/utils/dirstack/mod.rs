@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ratatui::{
     text::{Line, Span},
     widgets::{ListItem, ListState, TableState},
@@ -10,36 +11,27 @@ pub use dir::Dir;
 pub use stack::DirStack;
 pub use state::DirState;
 
-use crate::{
-    config::Config,
-    mpd::commands::Song,
-    ui::screens::{browser::DirOrSong, StringExt},
-};
+use crate::{config::Config, mpd::commands::Song, ui::screens::browser::DirOrSong};
 
 pub trait DirStackItem {
     type Item;
     fn as_path(&self) -> &str;
-    fn matches(&self, filter: &str, ignore_case: bool) -> bool;
+    fn matches(&self, config: &Config, filter: &str) -> bool;
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item;
 }
 
 impl<'a> DirStackItem for &'a str {
     type Item = ListItem<'a>;
-
     fn as_path(&self) -> &str {
         self
     }
 
-    fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-        if ignorecase {
-            self.to_lowercase().contains(&filter.to_lowercase())
-        } else {
-            self.contains(filter)
-        }
+    fn matches(&self, _config: &Config, filter: &str) -> bool {
+        self.to_lowercase().contains(&filter.to_lowercase())
     }
 
-    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> Self::Item {
-        if filter.is_some_and(|filter| self.matches(filter, true)) {
+    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> ListItem<'a> {
+        if filter.is_some_and(|filter| self.matches(config, filter)) {
             ListItem::new(self.to_owned()).style(config.theme.highlighted_item_style)
         } else {
             ListItem::new(self.to_owned())
@@ -49,17 +41,12 @@ impl<'a> DirStackItem for &'a str {
 
 impl DirStackItem for String {
     type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         self
     }
 
-    fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-        if ignorecase {
-            self.to_lowercase().contains(&filter.to_lowercase())
-        } else {
-            self.contains(filter)
-        }
+    fn matches(&self, _config: &Config, filter: &str) -> bool {
+        self.to_lowercase().contains(&filter.to_lowercase())
     }
 
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
@@ -70,7 +57,7 @@ impl DirStackItem for String {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
 
-        if filter.is_some_and(|filter| self.matches(filter, true)) {
+        if filter.is_some_and(|filter| self.matches(config, filter)) {
             ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
                 .style(config.theme.highlighted_item_style)
         } else {
@@ -85,23 +72,16 @@ impl DirStackItem for DirOrSong {
     fn as_path(&self) -> &str {
         match self {
             DirOrSong::Dir(d) => d,
-            DirOrSong::Song(s) => s,
+            DirOrSong::Song(s) => &s.file,
         }
     }
 
-    fn matches(&self, filter: &str, ignorecase: bool) -> bool {
-        if ignorecase {
-            match self {
-                DirOrSong::Dir(v) => if v.is_empty() { "Untitled" } else { v.as_str() }
-                    .to_lowercase()
-                    .contains(&filter.to_lowercase()),
-                DirOrSong::Song(s) => s.to_lowercase().contains(&filter.to_lowercase()),
-            }
-        } else {
-            match self {
-                DirOrSong::Dir(v) => if v.is_empty() { "Untitled" } else { v.as_str() }.contains(filter),
-                DirOrSong::Song(s) => s.contains(filter),
-            }
+    fn matches(&self, config: &Config, filter: &str) -> bool {
+        match self {
+            DirOrSong::Dir(v) => if v.is_empty() { "Untitled" } else { v.as_str() }
+                .to_lowercase()
+                .contains(&filter.to_lowercase()),
+            DirOrSong::Song(s) => s.matches(config, config.theme.browser_song_format.0, filter),
         }
     }
 
@@ -114,13 +94,29 @@ impl DirStackItem for DirOrSong {
         };
 
         let value = match self {
-            DirOrSong::Dir(v) => format!("{} {}", symbols.dir, if v.is_empty() { "Untitled" } else { v.as_str() }),
-            DirOrSong::Song(s) => format!("{} {}", symbols.song, s.file_name()),
+            DirOrSong::Dir(v) => Line::from(Span::from(format!(
+                " {} {}",
+                symbols.dir,
+                if v.is_empty() { "Untitled" } else { v.as_str() }
+            ))),
+            DirOrSong::Song(s) => {
+                let spans = [marker_span, Span::from(symbols.song), Span::from(" ")]
+                    .into_iter()
+                    .chain(
+                        config
+                            .theme
+                            .browser_song_format
+                            .0
+                            .iter()
+                            .map(|prop| Span::from(prop.as_string(Some(s)))),
+                    );
+                Line::from(spans.collect_vec())
+            }
         };
-        if filter.is_some_and(|filter| self.matches(filter, true)) {
-            ListItem::new(Line::from(vec![marker_span, Span::from(value)])).style(config.theme.highlighted_item_style)
+        if filter.is_some_and(|filter| self.matches(config, filter)) {
+            ListItem::from(value).style(config.theme.highlighted_item_style)
         } else {
-            ListItem::new(Line::from(vec![marker_span, Span::from(value)]))
+            ListItem::from(value)
         }
     }
 }
@@ -132,14 +128,8 @@ impl DirStackItem for Song {
         &self.file
     }
 
-    fn matches(&self, filter: &str, ignore_case: bool) -> bool {
-        if ignore_case {
-            format!("{} - {}", self.title_str(), self.artist_str())
-                .to_lowercase()
-                .contains(&filter.to_lowercase())
-        } else {
-            format!("{} - {}", self.title_str(), self.artist_str()).contains(filter)
-        }
+    fn matches(&self, config: &Config, filter: &str) -> bool {
+        self.matches(config, config.theme.browser_song_format.0, filter)
     }
 
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
@@ -161,7 +151,7 @@ impl DirStackItem for Song {
             separator_span,
             Span::from(title),
         ]));
-        if filter.is_some_and(|filter| DirStackItem::matches(self, filter, true)) {
+        if filter.is_some_and(|filter| DirStackItem::matches(self, config, filter)) {
             result = result.style(config.theme.highlighted_item_style);
         }
 

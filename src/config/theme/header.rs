@@ -8,16 +8,16 @@ use super::properties::{
 };
 use super::style::{Modifiers, StyleFile};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct HeaderConfigRow {
     pub left: &'static [&'static Property<'static, PropertyKind>],
     pub center: &'static [&'static Property<'static, PropertyKind>],
     pub right: &'static [&'static Property<'static, PropertyKind>],
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct HeaderConfig {
-    pub rows: Vec<HeaderConfigRow>,
+    pub rows: &'static [HeaderConfigRow],
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -195,34 +195,36 @@ impl TryFrom<HeaderConfigFile> for HeaderConfig {
     type Error = anyhow::Error;
 
     fn try_from(value: HeaderConfigFile) -> Result<Self, Self::Error> {
-        Ok(Self {
-            rows: value
-                .rows
-                .into_iter()
-                .map(|row| -> Result<_> {
-                    let left = row
-                        .left
-                        .into_iter()
-                        .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
-                        .collect::<Result<Vec<_>>>()?;
-                    let center = row
-                        .center
-                        .into_iter()
-                        .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
-                        .collect::<Result<Vec<_>>>()?;
-                    let right = row
-                        .right
-                        .into_iter()
-                        .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
-                        .collect::<Result<Vec<_>>>()?;
+        let rows: Vec<_> = value
+            .rows
+            .into_iter()
+            .map(|row| -> Result<_> {
+                let left = row
+                    .left
+                    .into_iter()
+                    .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
+                    .collect::<Result<Vec<_>>>()?;
+                let center = row
+                    .center
+                    .into_iter()
+                    .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
+                    .collect::<Result<Vec<_>>>()?;
+                let right = row
+                    .right
+                    .into_iter()
+                    .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
+                    .collect::<Result<Vec<_>>>()?;
 
-                    Ok(HeaderConfigRow {
-                        left: Box::leak(Box::new(left)),
-                        center: Box::leak(Box::new(center)),
-                        right: Box::leak(Box::new(right)),
-                    })
+                Ok(HeaderConfigRow {
+                    left: Box::leak(Box::new(left)),
+                    center: Box::leak(Box::new(center)),
+                    right: Box::leak(Box::new(right)),
                 })
-                .try_collect()?,
+            })
+            .try_collect()?;
+
+        Ok(Self {
+            rows: Box::leak(Box::new(rows)),
         })
     }
 }

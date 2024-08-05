@@ -40,7 +40,7 @@ pub enum ImageMethod {
     Unsupported,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Config {
     pub address: &'static str,
     pub cache_dir: Option<&'static str>,

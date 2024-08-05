@@ -484,7 +484,7 @@ impl Screen for SearchScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else if let Some(CommonAction::Confirm) = action {
                     *filter_input_on = false;
-                    self.songs_dir.jump_next_matching();
+                    self.songs_dir.jump_next_matching(config);
                     self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
@@ -554,12 +554,12 @@ impl Screen for SearchScreen {
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::NextResult => {
-                            self.songs_dir.jump_next_matching();
+                            self.songs_dir.jump_next_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::PreviousResult => {
-                            self.songs_dir.jump_previous_matching();
+                            self.songs_dir.jump_previous_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }

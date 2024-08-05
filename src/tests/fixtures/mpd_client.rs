@@ -376,8 +376,24 @@ impl MpdClient for TestMpdClient {
         )
     }
 
-    fn list_playlist_info(&mut self, _playlist: &str) -> MpdResult<Vec<Song>> {
-        todo!("Not yet implemented")
+    fn list_playlist_info(&mut self, playlist: &str, _range: Option<SingleOrRange>) -> MpdResult<Vec<Song>> {
+        self.playlists.iter().find(|p| p.name == playlist).map_or_else(
+            || Err(MpdError::Generic("Playlist not found".to_string())),
+            |p| {
+                Ok(p.songs_indices
+                    .iter()
+                    .map(|idx| Song {
+                        file: self.songs[*idx].file.clone(),
+                        id: *idx as u32,
+                        title: None,
+                        artist: None,
+                        album: None,
+                        duration: None,
+                        others: HashMap::default(),
+                    })
+                    .collect())
+            },
+        )
     }
 
     fn load_playlist(&mut self, _name: &str) -> MpdResult<()> {

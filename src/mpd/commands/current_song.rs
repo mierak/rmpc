@@ -52,8 +52,12 @@ impl std::fmt::Debug for Song {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Song {{ file: {}, title: {:?}, artist: {:?}, id: {} }}",
-            self.file, self.title, self.artist, self.id
+            "Song {{ file: {}, title: {:?}, artist: {:?}, id: {}, track: {:?} }}",
+            self.file,
+            self.title,
+            self.artist,
+            self.id,
+            self.others.get("track")
         )
     }
 }

@@ -21,7 +21,7 @@ pub use key::Key;
 mod actions;
 mod key;
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Clone)]
 pub struct KeyConfig {
     pub global: HashMap<Key, GlobalAction>,
     pub navigation: HashMap<Key, CommonAction>,

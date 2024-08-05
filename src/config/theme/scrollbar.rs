@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{style::ToConfigOr, StyleFile};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct ScrollbarConfig {
     /// Symbols used for the scrollbar
     /// First symbol is used for the scrollbar track

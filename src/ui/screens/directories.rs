@@ -127,9 +127,9 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 client.add(&next_path)?;
                 status_info!("Directory '{next_path}' added to queue");
             }
-            DirOrSong::Song(file) => {
-                client.add(file)?;
-                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, file)]) {
+            DirOrSong::Song(song) => {
+                client.add(&song.file)?;
+                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &song.file)]) {
                     status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
                 }
             }
@@ -154,8 +154,9 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                     .into_iter()
                     .map(|v| match v {
                         FileOrDir::Dir(d) => DirOrSong::Dir(d.path),
-                        FileOrDir::File(s) => DirOrSong::Song(s.file),
+                        FileOrDir::File(s) => DirOrSong::Song(s),
                     })
+                    .sorted()
                     .collect();
                 self.stack.push(res);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -186,17 +187,15 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 .into_iter()
                 .map(|v| match v {
                     FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
-                    FileOrDir::File(song) => {
-                        DirOrSong::Song(song.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned())
-                    }
+                    FileOrDir::File(song) => DirOrSong::Song(song),
                 })
                 .sorted()
                 .map(|v| v.to_list_item(config, false, None))
                 .collect();
                 Ok(Some(res))
             }
-            Some(DirOrSong::Song(file)) => Ok(client
-                .find_one(&[Filter::new(Tag::File, file)])?
+            Some(DirOrSong::Song(song)) => Ok(client
+                .find_one(&[Filter::new(Tag::File, &song.file)])?
                 .map(|v| v.to_preview(&config.theme.symbols).collect())),
             None => Ok(None),
         }

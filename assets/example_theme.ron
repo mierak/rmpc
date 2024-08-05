@@ -107,5 +107,12 @@
             ),
         ],
     ),
+    browser_song_format: [
+        (kind: Property(Track), default: (kind: Text("--"))),
+        (kind: Text(" ")),
+        (kind: Property(Artist), default: (kind: Text("Unknown Artist"))),
+        (kind: Text(" - ")),
+        (kind: Property(Title)),
+    ]
 )
 

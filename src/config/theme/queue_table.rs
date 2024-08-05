@@ -162,7 +162,9 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<'static, SongProperty>
     fn try_from(value: PropertyFile<SongPropertyFile>) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             kind: match value.kind {
-                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Text(value) => {
+                    PropertyKindOrText::Text(Box::leak(Box::new(value)) as &'static str)
+                }
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.try_into()?),
             },
             style: Some(value.style.to_config_or(None, None)?),

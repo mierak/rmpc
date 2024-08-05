@@ -138,7 +138,7 @@ impl Screen for QueueScreen {
                     || self
                         .filter
                         .as_ref()
-                        .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter, true));
+                        .is_some_and(|filter| song.matches(config, self.column_formats.as_slice(), filter));
 
                 if is_highlighted {
                     Row::new(columns.map(|column| column.patch_style(config.theme.highlighted_item_style)))
@@ -293,7 +293,7 @@ impl Screen for QueueScreen {
             match config.keybinds.navigation.get(&event.into()) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    self.jump_forward();
+                    self.jump_forward(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Some(CommonAction::Close) => {
@@ -443,11 +443,11 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward();
+                    self.jump_forward(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back();
+                    self.jump_back(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
@@ -465,7 +465,7 @@ impl Screen for QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn jump_forward(&mut self) {
+    pub fn jump_forward(&mut self, config: &Config) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -478,14 +478,14 @@ impl QueueScreen {
         let length = self.queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.queue[i].matches(self.column_formats.as_slice(), filter, true) {
+            if self.queue[i].matches(config, self.column_formats.as_slice(), filter) {
                 self.scrolling_state.select(Some(i));
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self) {
+    pub fn jump_back(&mut self, config: &Config) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -498,7 +498,7 @@ impl QueueScreen {
         let length = self.queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.queue[i].matches(self.column_formats.as_slice(), filter, true) {
+            if self.queue[i].matches(config, self.column_formats.as_slice(), filter) {
                 self.scrolling_state.select(Some(i));
                 break;
             }

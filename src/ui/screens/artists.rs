@@ -14,7 +14,7 @@ use crate::{
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
@@ -96,27 +96,31 @@ fn list_titles(
     album: &str,
 ) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
-        .list_tag(
-            Tag::Title,
-            Some(&[Filter::new(Tag::Artist, artist), Filter::new(Tag::Album, album)]),
-        )?
+        .find(&[Filter::new(Tag::Artist, artist), Filter::new(Tag::Album, album)])?
         .into_iter()
-        .map(DirOrSong::Song))
+        .map(DirOrSong::Song)
+        .sorted())
 }
 
 fn list_albums(client: &mut impl MpdClient, artist: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
         .list_tag(Tag::Album, Some(&[Filter::new(Tag::Artist, artist)]))?
         .into_iter()
-        .map(DirOrSong::Dir))
+        .map(DirOrSong::Dir)
+        .sorted())
 }
 
 fn find_songs(client: &mut impl MpdClient, artist: &str, album: &str, file: &str) -> Result<Vec<Song>, MpdError> {
-    client.find(&[
-        Filter::new(Tag::Title, file),
-        Filter::new(Tag::Artist, artist),
-        Filter::new(Tag::Album, album),
-    ])
+    client
+        .find(&[
+            Filter::new(Tag::File, file),
+            Filter::new(Tag::Artist, artist),
+            Filter::new(Tag::Album, album),
+        ])
+        .map(|mut v| {
+            v.sort();
+            v
+        })
 }
 
 impl BrowserScreen<DirOrSong> for ArtistsScreen {
@@ -142,25 +146,25 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                 client.find_add(&[
                     Filter::new(Tag::Artist, artist.as_str()),
                     Filter::new(Tag::Album, album.as_str()),
-                    Filter::new(Tag::Title, item.value()),
+                    Filter::new(Tag::File, &item.dir_name_or_file_name()),
                 ])?;
 
-                status_info!("'{}' by '{artist}' from album '{album}' added to queue", item.value());
+                status_info!("'{}' added to queue", item.dir_name_or_file_name());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [artist] => {
                 client.find_add(&[
                     Filter::new(Tag::Artist, artist.as_str()),
-                    Filter::new(Tag::Album, item.value()),
+                    Filter::new(Tag::Album, &item.dir_name_or_file_name()),
                 ])?;
 
-                status_info!("Album '{}' by '{artist}' added to queue", item.value());
+                status_info!("Album '{}' by '{artist}' added to queue", item.dir_name_or_file_name());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
-                client.find_add(&[Filter::new(Tag::Artist, item.value())])?;
+                client.find_add(&[Filter::new(Tag::Artist, &item.dir_name_or_file_name())])?;
 
-                status_info!("All songs by '{}' added to queue", item.value());
+                status_info!("All songs by '{}' added to queue", item.dir_name_or_file_name());
                 Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -205,7 +209,12 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                     [artist, album] => Some(
                         find_songs(client, artist, album, current)?
                             .first()
-                            .context("Expected to find exactly one song")?
+                            .context(anyhow!(
+                                "Expected to find exactly one song: artist: '{}', album: '{}', current: '{}'",
+                                artist,
+                                album,
+                                current
+                            ))?
                             .to_preview(&config.theme.symbols)
                             .collect_vec(),
                     ),
