@@ -94,11 +94,14 @@ impl DirStackItem for DirOrSong {
         };
 
         let value = match self {
-            DirOrSong::Dir(v) => Line::from(Span::from(format!(
-                " {} {}",
-                symbols.dir,
-                if v.is_empty() { "Untitled" } else { v.as_str() }
-            ))),
+            DirOrSong::Dir(v) => Line::from(vec![
+                marker_span,
+                Span::from(format!(
+                    "{} {}",
+                    symbols.dir,
+                    if v.is_empty() { "Untitled" } else { v.as_str() }
+                )),
+            ]),
             DirOrSong::Song(s) => {
                 let spans = [marker_span, Span::from(symbols.song), Span::from(" ")]
                     .into_iter()
@@ -143,10 +146,10 @@ impl DirStackItem for Song {
         let title = self.title_str().to_owned();
         let artist = self.artist_str().to_owned();
         let separator_span = Span::from(" - ");
-        let icon_span = Span::from(format!(" {}", symbols.song));
+        let icon_span = Span::from(format!("{} ", symbols.song));
         let mut result = ListItem::new(Line::from(vec![
-            icon_span,
             marker_span,
+            icon_span,
             Span::from(artist),
             separator_span,
             Span::from(title),
