@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use log::error;
 use ratatui::widgets::ListState;
 
-use crate::utils::macros::status_warn;
+use crate::{config::Config, utils::macros::status_warn};
 
 use super::{state::DirState, DirStackItem};
 
@@ -12,7 +12,6 @@ pub struct Dir<T: std::fmt::Debug + DirStackItem> {
     pub items: Vec<T>,
     pub state: DirState<ListState>,
     pub filter: Option<String>,
-    pub filter_ignore_case: bool,
 }
 
 impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
@@ -21,7 +20,6 @@ impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
             items: Vec::default(),
             state: DirState::default(),
             filter: None,
-            filter_ignore_case: true,
         }
     }
 }
@@ -33,7 +31,6 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
             items: Vec::new(),
             state: DirState::default(),
             filter: None,
-            filter_ignore_case: true,
         };
 
         if !root.is_empty() {
@@ -165,7 +162,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         self.state.first();
     }
 
-    pub fn jump_next_matching(&mut self) {
+    pub fn jump_next_matching(&mut self, config: &Config) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -178,14 +175,14 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         let length = self.items.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.items[i].matches(filter, self.filter_ignore_case) {
+            if self.items[i].matches(config, filter) {
                 self.state.select(Some(i));
                 break;
             }
         }
     }
 
-    pub fn jump_previous_matching(&mut self) {
+    pub fn jump_previous_matching(&mut self, config: &Config) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -198,7 +195,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         let length = self.items.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.items[i].matches(filter, self.filter_ignore_case) {
+            if self.items[i].matches(config, filter) {
                 self.state.select(Some(i));
                 break;
             }
@@ -219,7 +216,6 @@ mod tests {
                 .collect(),
             state: DirState::default(),
             filter: None,
-            filter_ignore_case: true,
         };
         res.state.set_content_len(Some(res.items.len()));
         res.state.set_viewport_len(Some(res.items.len()));
@@ -421,7 +417,7 @@ mod tests {
     }
 
     mod jump_next_matching {
-        use crate::ui::utils::dirstack::Dir;
+        use crate::{config::Config, ui::utils::dirstack::Dir};
 
         #[test]
         fn jumps_by_half_viewport() {
@@ -435,16 +431,16 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_next_matching();
+            val.jump_next_matching(&Config::default());
             assert_eq!(val.state.get_selected(), Some(1));
 
-            val.jump_next_matching();
+            val.jump_next_matching(&Config::default());
             assert_eq!(val.state.get_selected(), Some(3));
         }
     }
 
     mod jump_previous_matching {
-        use crate::ui::utils::dirstack::Dir;
+        use crate::{config::Config, ui::utils::dirstack::Dir};
 
         #[test]
         fn jumps_by_half_viewport() {
@@ -461,10 +457,10 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_previous_matching();
+            val.jump_previous_matching(&Config::default());
             assert_eq!(val.state.get_selected(), Some(3));
 
-            val.jump_previous_matching();
+            val.jump_previous_matching(&Config::default());
             assert_eq!(val.state.get_selected(), Some(1));
         }
     }

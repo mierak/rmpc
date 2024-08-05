@@ -14,7 +14,7 @@ use crate::{
 };
 
 use super::{browser::DirOrSong, BrowserScreen, Screen};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
@@ -94,13 +94,19 @@ impl Screen for AlbumsScreen {
 
 fn list_titles(client: &mut impl MpdClient, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
-        .list_tag(Tag::Title, Some(&[Filter::new(Tag::Album, album)]))?
+        .find(&[Filter::new(Tag::Album, album)])?
         .into_iter()
-        .map(DirOrSong::Song))
+        .map(DirOrSong::Song)
+        .sorted())
 }
 
 fn find_songs(client: &mut impl MpdClient, album: &str, file: &str) -> Result<Vec<MpdSong>, MpdError> {
-    client.find(&[Filter::new(Tag::Title, file), Filter::new(Tag::Album, album)])
+    client
+        .find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)])
+        .map(|mut v| {
+            v.sort();
+            v
+        })
 }
 
 impl BrowserScreen<DirOrSong> for AlbumsScreen {
@@ -144,17 +150,17 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         match self.stack.path() {
             [album] => {
                 client.find_add(&[
-                    Filter::new(Tag::Title, item.value()),
+                    Filter::new(Tag::File, &item.dir_name_or_file_name()),
                     Filter::new(Tag::Album, album.as_str()),
                 ])?;
 
-                status_info!("'{}' from album '{album}' added to queue", item.value());
+                status_info!("'{}' added to queue", item.dir_name_or_file_name());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
-                client.find_add(&[Filter::new(Tag::Album, item.value())])?;
+                client.find_add(&[Filter::new(Tag::Album, &item.dir_name_or_file_name())])?;
 
-                status_info!("Album '{}' added to queue", item.value());
+                status_info!("Album '{}' added to queue", &item.dir_name_or_file_name());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -172,10 +178,17 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
             .map(DirStackItem::as_path)
             .map_or(Ok(None), |current| -> Result<_> {
                 Ok(match self.stack.path() {
-                    [album] => find_songs(client, album, current)?
-                        .first()
-                        .map(|v| v.to_preview(&config.theme.symbols))
-                        .map(std::iter::Iterator::collect),
+                    [album] => Some(
+                        find_songs(client, album, current)?
+                            .first()
+                            .context(anyhow!(
+                                "Expected to find exactly one song: album: '{}', current: '{}'",
+                                album,
+                                current
+                            ))?
+                            .to_preview(&config.theme.symbols)
+                            .collect_vec(),
+                    ),
                     [] => Some(
                         list_titles(client, current)?
                             .map(|v| v.to_list_item(config, false, None))

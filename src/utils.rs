@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 pub mod macros {
     macro_rules! try_ret {
         ( $e:expr, $msg:literal ) => {
@@ -84,6 +86,16 @@ pub mod macros {
     pub(crate) use try_ret;
     #[allow(unused_imports)]
     pub(crate) use try_skip;
+}
+
+pub trait ErrorExt {
+    fn to_status(&self) -> String;
+}
+
+impl ErrorExt for anyhow::Error {
+    fn to_status(&self) -> String {
+        self.chain().map(|e| e.to_string().replace('\n', "")).join(" ")
+    }
 }
 
 #[allow(dead_code)]

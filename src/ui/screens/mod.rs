@@ -124,7 +124,7 @@ impl Screens {
 pub mod dirstack {}
 
 pub(crate) mod browser {
-    use std::cmp::Ordering;
+    use std::{borrow::Cow, cmp::Ordering};
 
     use ratatui::{
         style::{Color, Style},
@@ -184,17 +184,18 @@ pub(crate) mod browser {
             r.into_iter().map(ListItem::new)
         }
     }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) enum DirOrSong {
         Dir(String),
-        Song(String),
+        Song(Song),
     }
 
     impl DirOrSong {
-        pub fn value(&self) -> &str {
+        pub fn dir_name_or_file_name(&self) -> Cow<str> {
             match self {
-                DirOrSong::Dir(v) => v,
-                DirOrSong::Song(v) => v,
+                DirOrSong::Dir(dir) => Cow::Borrowed(dir),
+                DirOrSong::Song(song) => Cow::Borrowed(&song.file),
             }
         }
     }
@@ -208,7 +209,27 @@ pub(crate) mod browser {
             }
         }
     }
+
     impl std::cmp::PartialOrd for DirOrSong {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl std::cmp::Ord for Song {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            let a_track = self.others.get("track").map(|v| v.parse::<u32>());
+            let b_track = other.others.get("track").map(|v| v.parse::<u32>());
+            match (a_track, b_track) {
+                (Some(Ok(a)), Some(Ok(b))) => a.cmp(&b),
+                (_, Some(Ok(_))) => Ordering::Greater,
+                (Some(Ok(_)), _) => Ordering::Less,
+                _ => self.title.cmp(&other.title),
+            }
+        }
+    }
+
+    impl std::cmp::PartialOrd for Song {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
             Some(self.cmp(other))
         }
@@ -218,8 +239,123 @@ pub(crate) mod browser {
         fn from(value: FileOrDir) -> Self {
             match value {
                 FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
-                FileOrDir::File(song) => DirOrSong::Song(song.file),
+                FileOrDir::File(song) => DirOrSong::Song(song),
             }
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crate::mpd::commands::Song;
+
+        use super::DirOrSong;
+
+        fn song(title: &str, track: Option<&str>) -> Song {
+            Song {
+                title: Some(title.to_owned()),
+                others: track.map(|v| ("track".to_owned(), v.to_owned())).into_iter().collect(),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn dir_before_song() {
+            let mut input = vec![
+                DirOrSong::Song(Song::default()),
+                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Song(Song::default()),
+                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Song(Song::default()),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir("a".to_owned()),
+                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Song(Song::default()),
+                    DirOrSong::Song(Song::default()),
+                    DirOrSong::Song(Song::default()),
+                ]
+            );
+        }
+
+        #[test]
+        fn all_by_track() {
+            let mut input = vec![
+                DirOrSong::Song(song("a", Some("8"))),
+                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Song(song("c", Some("5"))),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir("a".to_owned()),
+                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Song(song("b", Some("3"))),
+                    DirOrSong::Song(song("c", Some("5"))),
+                    DirOrSong::Song(song("a", Some("8"))),
+                ]
+            );
+        }
+
+        #[test]
+        fn by_track_then_title() {
+            let mut input = vec![
+                DirOrSong::Song(song("d", Some("10"))),
+                DirOrSong::Song(song("a", None)),
+                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Song(song("c", None)),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir("a".to_owned()),
+                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Song(song("b", Some("3"))),
+                    DirOrSong::Song(song("d", Some("10"))),
+                    DirOrSong::Song(song("a", None)),
+                    DirOrSong::Song(song("c", None)),
+                ]
+            );
+        }
+
+        #[test]
+        fn by_track_then_title_with_unparsable_track() {
+            let mut input = vec![
+                DirOrSong::Song(song("d", Some("10"))),
+                DirOrSong::Song(song("a", Some("lol"))),
+                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Song(song("c", None)),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir("a".to_owned()),
+                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Song(song("b", Some("3"))),
+                    DirOrSong::Song(song("d", Some("10"))),
+                    DirOrSong::Song(song("a", Some("lol"))),
+                    DirOrSong::Song(song("c", None)),
+                ]
+            );
         }
     }
 }
@@ -233,33 +369,29 @@ impl Song {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
-    pub fn matches(&self, formats: &[&Property<'static, SongProperty>], filter: &str, ignore_case: bool) -> bool {
+    fn format<'song>(&'song self, property: &SongProperty) -> Option<Cow<'song, str>> {
+        match property {
+            SongProperty::Filename => Some(Cow::Borrowed(self.file.as_str())),
+            SongProperty::Title => self.title.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
+            SongProperty::Artist => self.artist.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
+            SongProperty::Album => self.album.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
+            SongProperty::Track => self
+                .others
+                .get("track")
+                .map(|v| Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))),
+            SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
+            SongProperty::Other(name) => self.others.get(*name).map(|v| Cow::Borrowed(v.as_str())),
+        }
+    }
+
+    pub fn matches(&self, config: &Config, formats: &[&Property<'static, SongProperty>], filter: &str) -> bool {
         for format in formats {
             let match_found = match &format.kind {
-                PropertyKindOrText::Text(value) => value.matches(filter, ignore_case),
-                PropertyKindOrText::Property(p) => match p {
-                    SongProperty::Filename => self.file.matches(filter, ignore_case),
-                    SongProperty::Title => self.title.as_ref().map_or_else(
-                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
-                        |v| v.matches(filter, ignore_case),
-                    ),
-                    SongProperty::Artist => self.artist.as_ref().map_or_else(
-                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
-                        |v| v.matches(filter, ignore_case),
-                    ),
-                    SongProperty::Album => self.album.as_ref().map_or_else(
-                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
-                        |v| v.matches(filter, ignore_case),
-                    ),
-                    SongProperty::Duration => self.duration.as_ref().map_or_else(
-                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
-                        |duration| duration.to_string().matches(filter, ignore_case),
-                    ),
-                    SongProperty::Other(name) => self.others.get(*name).map_or_else(
-                        || format.default.is_some_and(|f| self.matches(&[f], filter, ignore_case)),
-                        |v| v.matches(filter, ignore_case),
-                    ),
-                },
+                PropertyKindOrText::Text(value) => value.matches(config, filter),
+                PropertyKindOrText::Property(property) => self.format(property).map_or_else(
+                    || format.default.is_some_and(|f| self.matches(config, &[f], filter)),
+                    |p| p.to_lowercase().contains(filter),
+                ),
             };
             if match_found {
                 return true;
@@ -286,30 +418,31 @@ impl Song {
     ) -> Line<'song> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
-            PropertyKindOrText::Text(value) => Line::styled(value.ellipsize(max_len).to_string(), style),
-            PropertyKindOrText::Property(s) => match s {
-                SongProperty::Filename => Line::styled(self.file.ellipsize(max_len).to_string(), style),
-                SongProperty::Title => self.title.as_ref().map_or_else(
-                    || self.default_as_line_ellipsized(format, max_len),
-                    |v| Line::styled(v.ellipsize(max_len), style),
-                ),
-                SongProperty::Artist => self.artist.as_ref().map_or_else(
-                    || self.default_as_line_ellipsized(format, max_len),
-                    |v| Line::styled(v.ellipsize(max_len), style),
-                ),
-                SongProperty::Album => self.album.as_ref().map_or_else(
-                    || self.default_as_line_ellipsized(format, max_len),
-                    |v| Line::styled(v.ellipsize(max_len), style),
-                ),
-                SongProperty::Duration => self.duration.as_ref().map_or_else(
-                    || self.default_as_line_ellipsized(format, max_len),
-                    |v| Line::styled(v.to_string(), style),
-                ),
-                SongProperty::Other(name) => self.others.get(*name).map_or_else(
-                    || self.default_as_line_ellipsized(format, max_len),
-                    |v| Line::styled(v.ellipsize(max_len), style),
-                ),
-            },
+            PropertyKindOrText::Text(value) => Line::styled((*value).ellipsize(max_len).to_string(), style),
+            PropertyKindOrText::Property(property) => self.format(property).map_or_else(
+                || self.default_as_line_ellipsized(format, max_len),
+                |v| Line::styled(v.ellipsize(max_len).into_owned(), style),
+            ),
+        }
+    }
+}
+
+impl Property<'static, SongProperty> {
+    fn default(&self, song: Option<&Song>) -> String {
+        self.default.as_ref().map_or(String::new(), |p| p.as_string(song))
+    }
+
+    pub fn as_string(&self, song: Option<&Song>) -> String {
+        match &self.kind {
+            PropertyKindOrText::Text(value) => (*value).to_string(),
+            PropertyKindOrText::Property(property) => {
+                if let Some(song) = song {
+                    song.format(property)
+                        .map_or_else(|| self.default(Some(song)), |v| v.into_owned())
+                } else {
+                    self.default(song)
+                }
+            }
         }
     }
 }
@@ -332,36 +465,17 @@ impl Property<'static, PropertyKind> {
     ) -> Either<Span<'s>, Vec<Span<'s>>> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
-            PropertyKindOrText::Text(value) => Either::Left(Span::styled(value.as_str(), style)),
-            PropertyKindOrText::Property(PropertyKind::Song(s)) => match (s, song) {
-                (SongProperty::Filename, None) => Either::Left(Span::styled("", Style::default())), // cannot happen
-                (SongProperty::Title, None) => self.default_as_span(song, status),
-                (SongProperty::Artist, None) => self.default_as_span(song, status),
-                (SongProperty::Album, None) => self.default_as_span(song, status),
-                (SongProperty::Duration, None) => self.default_as_span(song, status),
-                (SongProperty::Other { .. }, None) => self.default_as_span(song, status),
-                (SongProperty::Filename, Some(s)) => Either::Left(Span::styled(s.file.as_str(), style)),
-                (SongProperty::Title, Some(s)) => s.title.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.as_str(), style)),
-                ),
-                (SongProperty::Artist, Some(s)) => s.artist.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.as_str(), style)),
-                ),
-                (SongProperty::Album, Some(s)) => s.album.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.as_str(), style)),
-                ),
-                (SongProperty::Duration, Some(s)) => s.duration.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.to_string(), style)),
-                ),
-                (SongProperty::Other(name), Some(s)) => s.others.get(*name).map_or_else(
-                    || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.as_str(), style)),
-                ),
-            },
+            PropertyKindOrText::Text(value) => Either::Left(Span::styled(*value, style)),
+            PropertyKindOrText::Property(PropertyKind::Song(property)) => {
+                if let Some(song) = song {
+                    song.format(property).map_or_else(
+                        || self.default_as_span(Some(song), status),
+                        |s| Either::Left(Span::styled(s, style)),
+                    )
+                } else {
+                    self.default_as_span(song, status)
+                }
+            }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
                 StatusProperty::State => Either::Left(Span::styled(status.state.as_ref(), style)),
                 StatusProperty::Duration => Either::Left(Span::styled(status.duration.to_string(), style)),
@@ -411,17 +525,36 @@ impl Property<'static, PropertyKind> {
 }
 
 pub(crate) trait StringExt {
-    fn file_name(&self) -> &str;
     fn ellipsize(&self, max_len: usize) -> Cow<str>;
 }
 
-impl StringExt for String {
-    fn file_name(&self) -> &str {
-        self.rsplit('/')
-            .next()
-            .map_or(self, |v| v.rsplit_once('.').map_or(v, |v| v.0))
+impl StringExt for Cow<'_, str> {
+    fn ellipsize(&self, max_len: usize) -> Cow<str> {
+        if self.chars().count() > max_len {
+            Cow::Owned(format!(
+                "{}...",
+                self.chars().take(max_len.saturating_sub(4)).collect::<String>()
+            ))
+        } else {
+            Cow::Borrowed(self)
+        }
     }
+}
 
+impl StringExt for &str {
+    fn ellipsize(&self, max_len: usize) -> Cow<str> {
+        if self.chars().count() > max_len {
+            Cow::Owned(format!(
+                "{}...",
+                self.chars().take(max_len.saturating_sub(4)).collect::<String>()
+            ))
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+}
+
+impl StringExt for String {
     fn ellipsize(&self, max_len: usize) -> Cow<str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
@@ -481,7 +614,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().jump_next_matching();
+                self.stack_mut().current_mut().jump_next_matching(config);
                 let preview = self.prepare_preview(client, config)?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -573,13 +706,13 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::NextResult => {
-                self.stack_mut().current_mut().jump_next_matching();
+                self.stack_mut().current_mut().jump_next_matching(config);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::PreviousResult => {
-                self.stack_mut().current_mut().jump_previous_matching();
+                self.stack_mut().current_mut().jump_previous_matching(config);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)

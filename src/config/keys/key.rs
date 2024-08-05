@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyModifiers};
 use itertools::Itertools;
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 
-#[derive(Debug, SerializeDisplay, DeserializeFromStr, PartialEq, Eq, Hash)]
+#[derive(Debug, SerializeDisplay, DeserializeFromStr, PartialEq, Eq, Hash, Clone)]
 pub struct Key {
     pub key: KeyCode,
     pub modifiers: KeyModifiers,

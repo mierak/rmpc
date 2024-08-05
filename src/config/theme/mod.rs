@@ -1,4 +1,5 @@
 use anyhow::Result;
+use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +25,7 @@ use super::defaults;
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct UiConfig {
     pub album_art_position: Position,
     pub album_art_width_percent: u16,
@@ -38,6 +39,7 @@ pub struct UiConfig {
     pub current_item_style: Style,
     pub highlight_border_style: Style,
     pub column_widths: [u16; 3],
+    pub browser_song_format: SongFormat,
     pub symbols: SymbolsConfig,
     pub progress_bar: ProgressBarConfig,
     pub tab_bar: TabBar,
@@ -54,7 +56,7 @@ impl std::fmt::Debug for UiConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq, Clone, Copy)]
 pub enum Position {
     #[default]
     Left,
@@ -73,6 +75,8 @@ pub struct UiConfigFile {
     pub(super) scrollbar: ScrollbarConfigFile,
     #[serde(default = "defaults::default_column_widths")]
     pub(super) browser_column_widths: Vec<u16>,
+    #[serde(default)]
+    pub(super) browser_song_format: SongFormatFile,
     pub(super) background_color: Option<String>,
     pub(super) text_color: Option<String>,
     pub(super) header_background_color: Option<String>,
@@ -142,6 +146,7 @@ impl Default for UiConfigFile {
                 marker: "M".to_owned(),
             },
             song_table_format: QueueTableColumnsFile::default(),
+            browser_song_format: SongFormatFile::default(),
         }
     }
 }
@@ -153,7 +158,7 @@ pub struct TabBarFile {
     pub(super) inactive_style: Option<StyleFile>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TabBar {
     pub enabled: bool,
     pub active_style: Style,
@@ -167,7 +172,7 @@ pub struct SymbolsFile {
     pub(super) marker: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SymbolsConfig {
     pub song: &'static str,
     pub dir: &'static str,
@@ -236,6 +241,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     Ok(res)
                 },
             )?,
+            browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
         })
     }
 }

@@ -107,7 +107,7 @@ pub trait MpdClient {
     // Stored playlists
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
     fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
-    fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>>;
+    fn list_playlist_info(&mut self, playlist: &str, range: Option<SingleOrRange>) -> MpdResult<Vec<Song>>;
     fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
@@ -341,14 +341,19 @@ impl MpdClient for Client<'_> {
         self.send(&format!("listplaylist \"{name}\""))
             .and_then(ProtoClient::read_response)
     }
-    fn list_playlist_info(&mut self, playlist: &str) -> MpdResult<Vec<Song>> {
-        if self.version < Version::new(0, 24, 0) {
-            return Err(MpdError::UnsupportedMpdVersion(
-                "consume oneshot can be used since MPD 0.24.0",
-            ));
+    fn list_playlist_info(&mut self, playlist: &str, range: Option<SingleOrRange>) -> MpdResult<Vec<Song>> {
+        if let Some(range) = range {
+            if self.version < Version::new(0, 24, 0) {
+                return Err(MpdError::UnsupportedMpdVersion(
+                    "listplaylistinfo with range can only be used since MPD 0.24.0",
+                ));
+            }
+            self.send(&format!("listplaylistinfo \"{playlist}\" {}", range.as_mpd_range()))
+                .and_then(ProtoClient::read_response)
+        } else {
+            self.send(&format!("listplaylistinfo \"{playlist}\""))
+                .and_then(ProtoClient::read_response)
         }
-        self.send(&format!("listplaylistinfo \"{playlist}\""))
-            .and_then(ProtoClient::read_response)
     }
     fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send(&format!("load \"{name}\"")).and_then(ProtoClient::read_ok)
@@ -481,7 +486,7 @@ impl QueueMoveTarget {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct SingleOrRange {
     pub start: usize,
     pub end: Option<usize>,

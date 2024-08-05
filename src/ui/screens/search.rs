@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::mpd::commands::Song;
 use crate::mpd::commands::Status;
 use crate::ui::utils::dirstack::Dir;
+use crate::utils::macros::status_info;
 use crate::utils::macros::status_warn;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -37,8 +38,16 @@ pub struct SearchScreen {
 
 impl SearchScreen {
     fn add_current(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
-        if let Some(item) = self.songs_dir.selected() {
+        if !self.songs_dir.marked().is_empty() {
+            for idx in self.songs_dir.marked() {
+                let item = &self.songs_dir.items[*idx];
+                client.add(&item.file)?;
+            }
+            status_info!("Added {} songs queue", self.songs_dir.marked().len());
+            Ok(KeyHandleResultInternal::RenderRequested)
+        } else if let Some(item) = self.songs_dir.selected() {
             client.add(&item.file)?;
+            status_info!("Added '{}' to queue", item.file);
             Ok(KeyHandleResultInternal::RenderRequested)
         } else {
             Ok(KeyHandleResultInternal::SkipRender)
@@ -484,7 +493,7 @@ impl Screen for SearchScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else if let Some(CommonAction::Confirm) = action {
                     *filter_input_on = false;
-                    self.songs_dir.jump_next_matching();
+                    self.songs_dir.jump_next_matching(config);
                     self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
@@ -554,12 +563,12 @@ impl Screen for SearchScreen {
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::NextResult => {
-                            self.songs_dir.jump_next_matching();
+                            self.songs_dir.jump_next_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::PreviousResult => {
-                            self.songs_dir.jump_previous_matching();
+                            self.songs_dir.jump_previous_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
@@ -572,20 +581,7 @@ impl Screen for SearchScreen {
                         CommonAction::Close => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Confirm => self.add_current(client),
                         CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::Add => {
-                            if !self.songs_dir.marked().is_empty() {
-                                for idx in self.songs_dir.marked() {
-                                    let item = &self.songs_dir.items[*idx];
-                                    client.add(&item.file)?;
-                                }
-                                Ok(KeyHandleResultInternal::RenderRequested)
-                            } else if let Some(item) = self.songs_dir.selected() {
-                                client.add(&item.file)?;
-                                Ok(KeyHandleResultInternal::RenderRequested)
-                            } else {
-                                Ok(KeyHandleResultInternal::SkipRender)
-                            }
-                        }
+                        CommonAction::Add => self.add_current(client),
                         CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                     }
                 } else {

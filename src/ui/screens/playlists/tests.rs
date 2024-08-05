@@ -33,7 +33,9 @@ mod on_idle_event {
             assert_eq!(current.selected(), Some(&DirOrSong::Dir(playlist_name.clone())));
 
             client.playlists.remove(0);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.current().selected(), Some(&DirOrSong::Dir(playlist_name)));
         }
@@ -51,7 +53,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(2);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 2);
         }
@@ -70,7 +74,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(playlist_count - 1);
 
             client.playlists.pop();
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(
                 screen.stack.current().selected_with_idx().unwrap().0,
@@ -91,7 +97,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(0);
 
             client.playlists.remove(0);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
         }
@@ -115,7 +123,9 @@ mod on_idle_event {
             client.playlists[2].songs_indices.remove(0);
 
             client.playlists.remove(1);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 4);
@@ -137,7 +147,9 @@ mod on_idle_event {
             client.playlists[2].songs_indices.remove(last_song_idx);
 
             client.playlists.remove(1);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, last_song_idx - 1);
@@ -159,7 +171,9 @@ mod on_idle_event {
 
             client.playlists.remove(1);
 
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
@@ -178,7 +192,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(5);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 5);
@@ -198,7 +214,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(playlist_len - 1);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(
@@ -220,7 +238,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(0);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
@@ -239,7 +259,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(5);
 
             client.playlists.remove(0);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 0);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 5);
@@ -259,7 +281,9 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(5);
 
             client.playlists.remove(playlist_count - 1);
-            screen.on_event(&mut event, &mut client, &mut status, &config).unwrap();
+            screen
+                .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
+                .unwrap();
 
             assert_eq!(
                 screen.stack.previous().selected_with_idx().unwrap().0,
@@ -273,10 +297,12 @@ mod on_idle_event {
 #[fixture]
 fn screen_in_playlist_0(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut status, &config).unwrap();
+    screen
+        .before_show(&mut client, &mut status, Box::leak(Box::new(config.clone())))
+        .unwrap();
     screen.stack.current_mut().select_idx(0);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &config)
+        .handle_common_action(CommonAction::Right, &mut client, Box::leak(Box::new(config)))
         .unwrap();
     screen
 }
@@ -284,10 +310,12 @@ fn screen_in_playlist_0(mut client: TestMpdClient, mut status: Status, config: C
 #[fixture]
 fn screen_in_playlist_2(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut status, &config).unwrap();
+    screen
+        .before_show(&mut client, &mut status, Box::leak(Box::new(config.clone())))
+        .unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &config)
+        .handle_common_action(CommonAction::Right, &mut client, Box::leak(Box::new(config)))
         .unwrap();
     screen
 }
@@ -295,10 +323,12 @@ fn screen_in_playlist_2(mut client: TestMpdClient, mut status: Status, config: C
 #[fixture]
 fn screen_in_playlist_4(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut status, &config).unwrap();
+    screen
+        .before_show(&mut client, &mut status, Box::leak(Box::new(config.clone())))
+        .unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &config)
+        .handle_common_action(CommonAction::Right, &mut client, Box::leak(Box::new(config)))
         .unwrap();
     screen
 }
@@ -306,6 +336,8 @@ fn screen_in_playlist_4(mut client: TestMpdClient, mut status: Status, config: C
 #[fixture]
 fn screen(mut client: TestMpdClient, mut status: Status, config: Config) -> PlaylistsScreen {
     let mut screen = PlaylistsScreen::default();
-    screen.before_show(&mut client, &mut status, &config).unwrap();
+    screen
+        .before_show(&mut client, &mut status, Box::leak(Box::new(config)))
+        .unwrap();
     screen
 }

@@ -10,6 +10,7 @@
     clippy::too_many_lines,
     clippy::match_single_binding,
     clippy::struct_field_names,
+    clippy::redundant_closure_for_method_calls,
     unused_macros
 )]
 use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
@@ -25,7 +26,10 @@ use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use ui::{Level, UiEvent};
-use utils::macros::{status_error, status_info, try_cont};
+use utils::{
+    macros::{status_error, status_info, try_cont},
+    ErrorExt,
+};
 use ytdlp::YtDlp;
 
 use crate::{
@@ -271,7 +275,7 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                     Err(err) => {
-                        error!(err:?; "Key handler failed");
+                        status_error!(err:?; "Key handler failed: {}", err.to_status());
                         render_wanted = true;
                     }
                 },
@@ -287,11 +291,11 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::IdleEvent(event) => {
                     if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
-                        error!(error:? = err, event:?; "Failed handle idle event");
+                        status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                     }
                     if let Ok(ev) = event.try_into() {
                         if let Err(err) = ui.on_event(ev, &mut state, &mut client) {
-                            error!(error:? = err, event:?; "Ui failed to handle idle event");
+                            status_error!(error:? = err, event:?; "Ui failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
                     render_wanted = true;

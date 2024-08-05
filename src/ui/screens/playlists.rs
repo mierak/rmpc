@@ -45,13 +45,13 @@ impl Screen for PlaylistsScreen {
 
     fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
         if self.stack().path().is_empty() {
-            let mut playlists: Vec<_> = client
+            let playlists: Vec<_> = client
                 .list_playlists()
                 .context("Cannot list playlists")?
                 .into_iter()
                 .map(|playlist| DirOrSong::Dir(playlist.name))
+                .sorted()
                 .collect();
-            playlists.sort();
             self.stack = DirStack::new(playlists);
             let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
@@ -108,7 +108,7 @@ impl Screen for PlaylistsScreen {
                         // Select the same song by filename or index as before
                         let mut items = self.stack.current().items.iter();
                         let idx_to_select = items
-                            .find_position(|p| matches!(p, DirOrSong::Song(s) if s == &song))
+                            .find_position(|p| matches!(p, DirOrSong::Song(s) if s.file == song.file))
                             .map(|(idx, _)| idx)
                             .or(previous_song_index);
                         self.stack.current_mut().state.select(idx_to_select);
@@ -172,7 +172,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                     return Ok(KeyHandleResultInternal::SkipRender);
                 };
                 client.delete_from_playlist(playlist, &SingleOrRange::single(index))?;
-                status_info!("File '{s}' deleted from playlist '{playlist}'");
+                status_info!("File '{}' deleted from playlist '{playlist}'", s.file);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
         }
@@ -186,8 +186,8 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             DirOrSong::Song(s) => {
-                client.add(s)?;
-                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, s)]) {
+                client.add(&s.file)?;
+                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &s.file)]) {
                     status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
                 }
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -212,7 +212,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
         match selected {
             DirOrSong::Dir(playlist) => {
-                let info = client.list_playlist(playlist)?;
+                let info = client.list_playlist_info(playlist, None)?;
                 self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -257,14 +257,14 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
             .map_or(Ok(None), |current| -> Result<_> {
                 Ok(Some(match current {
                     DirOrSong::Dir(d) => client
-                        .list_playlist(d)?
+                        .list_playlist_info(d, None)?
                         .into_iter()
                         .map(DirOrSong::Song)
                         .map(|s| s.to_list_item(config, false, None))
                         .collect_vec(),
-                    DirOrSong::Song(file) => client
-                        .find_one(&[Filter::new(Tag::File, file)])?
-                        .context(anyhow!("File '{file}' was listed but not found"))?
+                    DirOrSong::Song(song) => client
+                        .find_one(&[Filter::new(Tag::File, &song.file)])?
+                        .context(anyhow!("File '{}' was listed but not found", song.file))?
                         .to_preview(&config.theme.symbols)
                         .collect_vec(),
                 }))
