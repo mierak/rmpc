@@ -12,6 +12,9 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use std::{io::ErrorKind, process::Command};
+use sysinfo::ProcessRefreshKind;
+use sysinfo::ProcessesToUpdate;
+use sysinfo::System;
 
 use crate::utils::macros::try_cont;
 use crate::utils::macros::try_skip;
@@ -175,45 +178,53 @@ impl UeberzugDaemon {
         socket.remove_image(pid)
     }
 
+    fn is_deamon_running(&self, pid: Pid) -> bool {
+        let mut system = System::new();
+        let infopid = sysinfo::Pid::from_u32(pid.0 as u32);
+        system.refresh_processes_specifics(ProcessesToUpdate::Some(&[infopid]), ProcessRefreshKind::everything());
+
+        system.process(infopid).is_some()
+    }
+
+    fn spawn_daemon(&self) -> Result<(Pid, Child)> {
+        let mut cmd = Command::new("ueberzugpp");
+        if let Err(err) = std::fs::remove_file(&self.pid_file) {
+            if err.kind() != ErrorKind::NotFound {
+                log::warn!(err:?; "Failed to delete pid file");
+            }
+        };
+        cmd.args([
+            "layer",
+            "-so",
+            self.layer.as_str(),
+            "--no-stdin",
+            "--pid-file",
+            &self.pid_file,
+        ]);
+
+        let child = cmd
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+
+        let pid = self.read_pid()?;
+
+        Ok((pid, child))
+    }
+
     pub fn spawn_daemon_if_needed(&mut self) -> Result<Pid> {
-        match self.pid {
-            Some(pid) => Ok(pid),
-            None => match std::fs::read_to_string(&self.pid_file) {
-                Ok(pid) => {
-                    let pid = Pid(pid
-                        .trim()
-                        .parse::<i32>()
-                        .context(anyhow!("Failed to parse ueberzug's PID {pid}"))?);
-                    self.pid = Some(pid);
-
-                    Ok(pid)
-                }
-                Err(err) if err.kind() == ErrorKind::NotFound => {
-                    let mut cmd = Command::new("ueberzugpp");
-                    cmd.args([
-                        "layer",
-                        "-so",
-                        self.layer.as_str(),
-                        "--no-stdin",
-                        "--pid-file",
-                        &self.pid_file,
-                    ]);
-
-                    let child = cmd
-                        .stdin(Stdio::null())
-                        .stdout(Stdio::null())
-                        .stderr(Stdio::null())
-                        .spawn()?;
-
-                    let pid = self.read_pid()?;
-
-                    self.pid = Some(pid);
-                    self.ueberzug_process = Some(child);
-
-                    Ok(pid)
-                }
-                Err(err) => Err(err.into()),
-            },
+        let Some(pid) = self.pid else {
+            let (pid, child) = self.spawn_daemon()?;
+            self.ueberzug_process = Some(child);
+            return Ok(pid);
+        };
+        if self.is_deamon_running(pid) {
+            Ok(pid)
+        } else {
+            let (pid, child) = self.spawn_daemon()?;
+            self.ueberzug_process = Some(child);
+            Ok(pid)
         }
     }
 
