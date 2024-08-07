@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::{
-    io::{Cursor, Write},
+    io::Write,
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc,
@@ -16,7 +16,11 @@ use ratatui::{
 };
 
 use crate::{
-    utils::{macros::status_error, tmux},
+    utils::{
+        image_proto::{get_image_size, resize_image},
+        macros::{status_error, status_info},
+        tmux,
+    },
     AppEvent,
 };
 
@@ -53,7 +57,7 @@ impl KittyImageState {
                     continue;
                 }
 
-                if let Err(err) = sender.send(AppEvent::RequestRender) {
+                if let Err(err) = sender.send(AppEvent::RequestRender(false)) {
                     status_error!(err:?; "Failed to request rerender after image data compression finished");
                     continue;
                 }
@@ -68,10 +72,6 @@ impl KittyImageState {
             compression_finished_receiver: image_data_to_transfer_channel.1,
             default_art: Arc::new(default_art.to_vec()),
         }
-    }
-
-    pub fn force_transfer(&mut self) {
-        self.needs_transfer = true;
     }
 }
 
@@ -106,6 +106,10 @@ impl KittyImageState {
 
         self
     }
+
+    pub fn force_transfer(&mut self) {
+        self.needs_transfer = true;
+    }
 }
 
 #[derive(Debug, Default)]
@@ -128,19 +132,11 @@ impl<'a> KittyImage<'a> {
     ) -> Result<Data> {
         let start_time = Instant::now();
         log::debug!(bytes = image_data.len(); "Compressing image data");
-        let (w, h) = KittyImage::get_image_size(width, height)?;
-        let image = image::io::Reader::new(Cursor::new(image_data))
-            .with_guessed_format()
-            .context("Unable to guess image format")?
-            .decode()
-            .context("Unable to decode image")?
-            .resize(w, h, image::imageops::FilterType::Lanczos3);
-
-        let binding = image.to_rgba8();
-        let rgba = binding.as_raw();
+        let (w, h) = get_image_size(width, height)?;
+        let image = resize_image(image_data, w, h)?;
 
         let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
-        e.write_all(rgba)
+        e.write_all(image.to_rgba8().as_raw())
             .context("Error occured when writing image bytes to zlib encoder")?;
 
         let content = base64::engine::general_purpose::STANDARD.encode(
@@ -154,23 +150,6 @@ impl<'a> KittyImage<'a> {
             img_width: image.width(),
             img_height: image.height(),
         })
-    }
-
-    fn get_image_size(area_width: usize, area_height: usize) -> Result<(u32, u32)> {
-        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
-        let w = if size.width == 0 {
-            800
-        } else {
-            let cell_width = size.width / size.columns;
-            (cell_width as usize * area_width) as u32
-        };
-        let h = if size.height == 0 {
-            600
-        } else {
-            let cell_height = size.height / size.rows;
-            (cell_height as usize * area_height) as u32
-        };
-        Ok((w, h))
     }
 
     fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, area: Rect) {
@@ -203,7 +182,7 @@ impl<'a> KittyImage<'a> {
         state: &mut KittyImageState,
     ) {
         let start_time = Instant::now();
-        log::debug!(bytes = content.len(); "Transferring compressed image data");
+        log::debug!(bytes = content.len(), img_width, img_height, rows, cols; "Transferring compressed image data");
         let mut iter = content.chars().peekable();
 
         let first: String = iter.by_ref().take(4096).collect();

@@ -25,6 +25,7 @@ pub enum ImageMethodFile {
     Kitty,
     UeberzugWayland,
     UeberzugX11,
+    Iterm2,
     None,
     #[default]
     Auto,
@@ -35,6 +36,7 @@ pub enum ImageMethod {
     Kitty,
     UeberzugWayland,
     UeberzugX11,
+    Iterm2,
     None,
     #[default]
     Unsupported,
@@ -142,6 +144,7 @@ impl ConfigFile {
             ImageMethod::None
         } else {
             match self.image_method {
+                ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
                 ImageMethodFile::Kitty if crate::utils::image_proto::is_kitty_supported()? => ImageMethod::Kitty,
                 ImageMethodFile::Kitty => ImageMethod::Unsupported,
                 ImageMethodFile::UeberzugWayland if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
@@ -158,6 +161,7 @@ impl ConfigFile {
                     ImageProtocol::Kitty => ImageMethod::Kitty,
                     ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
                     ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
+                    ImageProtocol::Iterm2 => ImageMethod::Iterm2,
                     ImageProtocol::None => ImageMethod::None,
                 },
             }
@@ -173,7 +177,7 @@ impl ConfigFile {
             ImageMethod::None => {
                 config.theme.album_art_width_percent = 0;
             }
-            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 => {
+            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 | ImageMethod::Iterm2 => {
                 log::debug!(requested:? = self.image_method, resolved:? = config.image_method; "Image method resolved");
             }
         }

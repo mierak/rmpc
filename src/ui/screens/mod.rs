@@ -56,6 +56,9 @@ pub enum Screens {
 pub(super) trait Screen {
     type Actions: ToDescription;
     fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> Result<()>;
+    fn post_render(&mut self, frame: &mut Frame, status: &Status, config: &Config) -> Result<()> {
+        Ok(())
+    }
 
     /// For any cleanup operations, ran when the screen hides
     fn on_hide(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {

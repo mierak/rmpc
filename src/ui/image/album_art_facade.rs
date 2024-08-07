@@ -4,16 +4,18 @@ use std::{
 };
 
 use anyhow::Result;
-use ratatui::{layout::Rect, widgets::Block, Frame};
+use ratatui::{layout::Rect, style::Color, widgets::Block, Frame};
 
 use crate::{
-    config::Config,
-    ui::{
-        utils::ueberzug::{Layer, Ueberzug},
-        widgets::kitty_image::{KittyImage, KittyImageState},
-    },
+    config::{Config, ImageMethod},
     utils::image_proto::ImageProtocol,
     AppEvent,
+};
+
+use super::{iterm2::Iterm2, kitty_image::KittyImageState, ImageProto};
+use super::{
+    kitty_image::KittyImage,
+    ueberzug::{Layer, Ueberzug},
 };
 
 const UEBERZUG_ALBUM_ART_PATH: &str = "/tmp/rmpc/albumart";
@@ -26,12 +28,14 @@ pub struct AlbumArtFacade {
     default_album_art: &'static [u8],
     image_data_hash: u64,
     needs_rerender: bool,
+    last_size: Rect,
 }
 
 #[derive(Debug)]
 enum ImageState {
     Kitty(KittyImageState),
     Ueberzug(Ueberzug),
+    Iterm2(Iterm2),
     None,
 }
 
@@ -46,12 +50,14 @@ impl AlbumArtFacade {
                 ImageProtocol::Kitty => ImageState::Kitty(KittyImageState::new(app_event_sender, default_album_art)),
                 ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new().init(Layer::Wayland)),
                 ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new().init(Layer::X11)),
+                ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(app_event_sender, default_album_art)),
                 ImageProtocol::None => ImageState::None,
             },
             image_data: None,
             image_data_hash: 0,
             needs_rerender: false,
             default_album_art,
+            last_size: Rect::default(),
         }
     }
 
@@ -83,6 +89,7 @@ impl AlbumArtFacade {
                 }
             }
             ImageState::None => {}
+            ImageState::Iterm2(iterm2) => iterm2.set_data(data.take()),
         }
 
         self.image_data = data;
@@ -99,10 +106,20 @@ impl AlbumArtFacade {
                 self.needs_rerender = true;
             }
             ImageState::None => {}
+            ImageState::Iterm2(iterm2) => iterm2.show(),
         }
     }
 
-    pub fn hide_image(&mut self) -> Result<()> {
+    pub fn show(&mut self) {
+        match &mut self.image_state {
+            ImageState::Kitty(_) => {}
+            ImageState::Ueberzug(_) => {}
+            ImageState::Iterm2(iterm2) => iterm2.show(),
+            ImageState::None => {}
+        }
+    }
+
+    pub fn hide_image(&mut self, bg_color: Option<Color>) -> Result<()> {
         match &mut self.image_state {
             ImageState::Kitty(_state) => {}
             ImageState::Ueberzug(state) => {
@@ -111,11 +128,13 @@ impl AlbumArtFacade {
                 state.remove_image()?;
             }
             ImageState::None => {}
+            ImageState::Iterm2(iterm2) => iterm2.hide(bg_color, self.last_size)?,
         }
         Ok(())
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect, config: &Config) -> anyhow::Result<()> {
+        self.last_size = area;
         match &mut self.image_state {
             ImageState::Kitty(state) => {
                 frame.render_stateful_widget(
@@ -130,6 +149,9 @@ impl AlbumArtFacade {
             }
             ImageState::Ueberzug(_) => {}
             ImageState::None => {}
+            ImageState::Iterm2(iterm2) => {
+                iterm2.render(area)?;
+            }
         };
         Ok(())
     }
@@ -145,6 +167,10 @@ impl AlbumArtFacade {
                 self.transfer_image_data(self.image_data.clone())
             }
             ImageState::None => Ok(()),
+            ImageState::Iterm2(iterm2) => {
+                iterm2.resize();
+                Ok(())
+            }
         }
     }
 
@@ -153,6 +179,31 @@ impl AlbumArtFacade {
             ImageState::Kitty(_) => Ok(()),
             ImageState::Ueberzug(state) => state.cleanup(),
             ImageState::None => Ok(()),
+            ImageState::Iterm2(_) => Ok(()),
+        }
+    }
+
+    pub(crate) fn post_render(&mut self, frame: &mut Frame, config: &Config) -> std::result::Result<(), anyhow::Error> {
+        match &mut self.image_state {
+            ImageState::Kitty(_) => Ok(()),
+            ImageState::Ueberzug(_) => Ok(()),
+            ImageState::Iterm2(iterm2) => {
+                iterm2.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size)
+            }
+            ImageState::None => Ok(()),
+        }
+    }
+}
+
+impl From<ImageMethod> for ImageProtocol {
+    fn from(value: ImageMethod) -> Self {
+        match value {
+            ImageMethod::Kitty => ImageProtocol::Kitty,
+            ImageMethod::UeberzugWayland => ImageProtocol::UeberzugWayland,
+            ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
+            ImageMethod::Iterm2 => ImageProtocol::Iterm2,
+            ImageMethod::None => ImageProtocol::None,
+            ImageMethod::Unsupported => ImageProtocol::None,
         }
     }
 }

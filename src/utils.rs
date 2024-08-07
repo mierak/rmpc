@@ -101,7 +101,7 @@ impl ErrorExt for anyhow::Error {
 #[allow(dead_code)]
 pub mod tmux {
     pub fn is_inside_tmux() -> bool {
-        std::env::var("TERM_PROGRAM").is_ok_and(|v| !v.is_empty())
+        std::env::var("TMUX").is_ok_and(|v| !v.is_empty()) && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
     }
 
     pub fn wrap(input: &str) -> String {
@@ -133,8 +133,14 @@ pub mod tmux {
 }
 
 pub mod image_proto {
+    use std::env;
+    use std::io::Cursor;
+
     use super::tmux;
+    use anyhow::Context;
     use anyhow::Result;
+    use image::codecs::jpeg::JpegEncoder;
+    use image::DynamicImage;
 
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     pub enum ImageProtocol {
@@ -143,6 +149,7 @@ pub mod image_proto {
         UeberzugX11,
         #[default]
         None,
+        Iterm2,
     }
 
     pub fn determine_image_support() -> Result<ImageProtocol> {
@@ -172,10 +179,18 @@ pub mod image_proto {
     }
 
     pub fn is_ueberzug_wayland_supported() -> bool {
-        std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
+        env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
     }
     pub fn is_ueberzug_x11_supported() -> bool {
-        std::env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
+        env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
+    }
+
+    // todo
+    pub fn is_iterm2_supported() -> bool {
+        if env::var("TERM_PROGRAM").is_ok_and(|v| v == "WezTerm") {
+            return true;
+        }
+        env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
     }
 
     pub fn is_kitty_supported() -> anyhow::Result<bool> {
@@ -219,5 +234,37 @@ pub mod image_proto {
         rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Now, &termios_orig)?;
 
         Ok(buf.contains("_Gi=31;OK"))
+    }
+
+    pub fn get_image_size(area_width: usize, area_height: usize) -> Result<(u32, u32)> {
+        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
+        let w = if size.width == 0 {
+            800
+        } else {
+            let cell_width = size.width / size.columns;
+            u32::try_from(cell_width as usize * area_width)?
+        };
+        let h = if size.height == 0 {
+            600
+        } else {
+            let cell_height = size.height / size.rows;
+            u32::try_from(cell_height as usize * area_height)?
+        };
+        Ok((w, h))
+    }
+
+    pub fn resize_image(image_data: &[u8], width_px: u32, hegiht_px: u32) -> Result<DynamicImage> {
+        Ok(image::io::Reader::new(Cursor::new(image_data))
+            .with_guessed_format()
+            .context("Unable to guess image format")?
+            .decode()
+            .context("Unable to decode image")?
+            .resize(width_px, hegiht_px, image::imageops::FilterType::Lanczos3))
+    }
+
+    pub fn jpg_encode(img: &DynamicImage) -> Result<Vec<u8>> {
+        let mut jpg = Vec::new();
+        JpegEncoder::new(&mut jpg).encode_image(img)?;
+        Ok(jpg)
     }
 }

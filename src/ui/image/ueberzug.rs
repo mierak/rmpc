@@ -178,6 +178,7 @@ impl UeberzugDaemon {
         socket.remove_image(pid)
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn is_deamon_running(&self, pid: Pid) -> bool {
         let mut system = System::new();
         let infopid = sysinfo::Pid::from_u32(pid.0 as u32);
