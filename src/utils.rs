@@ -101,7 +101,7 @@ impl ErrorExt for anyhow::Error {
 #[allow(dead_code)]
 pub mod tmux {
     pub fn is_inside_tmux() -> bool {
-        std::env::var("TERM_PROGRAM").is_ok_and(|v| !v.is_empty())
+        std::env::var("TERM_PROGRAM").is_ok_and(|v| v == "tmux")
     }
 
     pub fn wrap(input: &str) -> String {
