@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::u16;
 
 use anyhow::Context;
 use anyhow::Result;
