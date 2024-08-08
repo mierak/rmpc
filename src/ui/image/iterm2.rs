@@ -5,11 +5,18 @@ use crossterm::{
     queue,
     style::{Colors, SetColors},
 };
-use std::{io::Write, sync::Arc};
+use std::{
+    io::Write,
+    sync::{
+        mpsc::{channel, Sender},
+        Arc,
+    },
+};
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use crate::{
+    config::Size,
     utils::{
         image_proto::{get_image_size, jpg_encode, resize_image},
         macros::try_cont,
@@ -51,6 +58,7 @@ enum State {
 impl ImageProto for Iterm2 {
     fn render(
         &mut self,
+        _buf: &mut Buffer,
         Rect {
             x: _,
             y: _,
@@ -131,7 +139,7 @@ impl ImageProto for Iterm2 {
         self.state = State::Resize;
     }
 
-    fn set_data(&mut self, data: Option<Vec<u8>>) {
+    fn set_data(&mut self, data: Option<Vec<u8>>) -> Result<()> {
         if let Some(data) = data {
             self.image_data_to_encode = Arc::new(data);
         } else {
@@ -140,17 +148,18 @@ impl ImageProto for Iterm2 {
 
         self.state = State::Initial;
         self.encoded_data = None;
+        Ok(())
     }
 }
 
 impl Iterm2 {
-    pub fn new(app_event_sender: std::sync::mpsc::Sender<AppEvent>, default_art: &[u8]) -> Self {
-        let (sender, receiver) = std::sync::mpsc::channel::<(u16, u16, bool, Arc<Vec<u8>>)>();
-        let (encoded_tx, encoded_rx) = std::sync::mpsc::channel::<EncodedData>();
+    pub fn new(app_event_sender: Sender<AppEvent>, default_art: &[u8], max_size: Size) -> Self {
+        let (sender, receiver) = channel::<(u16, u16, bool, Arc<Vec<u8>>)>();
+        let (encoded_tx, encoded_rx) = channel::<EncodedData>();
 
         std::thread::spawn(move || loop {
             if let Ok((w, h, full_render, data)) = receiver.recv() {
-                let encoded = try_cont!(Iterm2::encode(w, h, &data), "Failed to encode data");
+                let encoded = try_cont!(Iterm2::encode(w, h, &data, max_size), "Failed to encode data");
                 try_cont!(encoded_tx.send(encoded), "Failed to send encoded data");
                 try_cont!(
                     app_event_sender.send(AppEvent::RequestRender(full_render)),
@@ -170,8 +179,9 @@ impl Iterm2 {
         }
     }
 
-    fn encode(width: u16, height: u16, data: &[u8]) -> Result<EncodedData> {
-        let (iwidth, iheight) = match get_image_size(width.into(), height.into()) {
+    fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
+        let (iwidth, iheight) = match get_image_size(width.into(), height.into(), max_size_px.width, max_size_px.height)
+        {
             Ok(v) => v,
             Err(err) => {
                 bail!("Failed to get image size, err: {}", err);

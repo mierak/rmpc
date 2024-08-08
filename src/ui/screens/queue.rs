@@ -54,9 +54,10 @@ impl QueueScreen {
     pub fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
         Self {
             album_art_facade: AlbumArtFacade::new(
-                config.image_method.into(),
+                config.album_art.method.into(),
                 config.theme.default_album_art,
                 app_event_sender,
+                config.album_art.max_size_px,
             ),
             scrolling_state: DirState::default(),
             filter: None,
@@ -195,7 +196,7 @@ impl Screen for QueueScreen {
         } else {
             None
         };
-        self.album_art_facade.transfer_image_data(album_art)?;
+        self.album_art_facade.set_image(album_art)?;
         self.album_art_facade.show();
 
         self.queue = queue.unwrap_or_default();
@@ -216,7 +217,7 @@ impl Screen for QueueScreen {
     }
 
     fn on_hide(&mut self, _client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
-        self.album_art_facade.hide_image(config.theme.background_color)
+        self.album_art_facade.hide(config.theme.background_color)
     }
 
     fn on_event(
@@ -245,7 +246,7 @@ impl Screen for QueueScreen {
                     .and_then(|q| q.iter().enumerate().find(|(_, v)| Some(v.id) == status.songid))
                 {
                     let album_art = client.find_album_art(current_song.file.as_str())?;
-                    self.album_art_facade.transfer_image_data(album_art)?;
+                    self.album_art_facade.set_image(album_art)?;
                     if config.select_current_song_on_change {
                         self.scrolling_state.select(Some(idx));
                     }
@@ -253,15 +254,15 @@ impl Screen for QueueScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::Resized { columns, rows } => {
-                self.album_art_facade.handle_resize(*columns, *rows)?;
+                self.album_art_facade.resize(*columns, *rows);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::ModalOpened => {
-                self.album_art_facade.hide_image(config.theme.background_color)?;
+                self.album_art_facade.hide(config.theme.background_color)?;
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::ModalClosed => {
-                self.album_art_facade.rerender_image();
+                self.album_art_facade.show();
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::Exit => {
