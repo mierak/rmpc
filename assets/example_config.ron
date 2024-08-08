@@ -4,11 +4,14 @@
 (
     address: "127.0.0.1:6600",
     theme: None,
-    image_method: Auto,
     cache_dir: None,
     volume_step: 5,
     status_update_interval_ms: 1000,
     select_current_song_on_change: false,
+    album_art: (
+        method: Auto,
+        max_size_px: (width: 600, height: 600),
+    ),
     keybinds: (
         global: {
             ":":       CommandMode,

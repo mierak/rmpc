@@ -70,7 +70,7 @@ pub enum AppEvent {
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
     RequestStatusUpdate,
-    RequestRender,
+    RequestRender(bool),
     Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
 }
@@ -125,7 +125,7 @@ fn main() -> Result<()> {
                 },
             ));
 
-            try_ret!(tx.send(AppEvent::RequestRender), "Failed to render first frame");
+            try_ret!(tx.send(AppEvent::RequestRender(false)), "Failed to render first frame");
 
             let mut client = try_ret!(
                 Client::init(config.address, "command", true),
@@ -238,6 +238,7 @@ fn main_task<B: Backend + std::io::Write>(
 ) {
     let event_receiver = event_receiver;
     let mut render_wanted = false;
+    let mut full_rerender_wanted = false;
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
@@ -309,8 +310,9 @@ fn main_task<B: Backend + std::io::Write>(
                     };
                     render_wanted = true;
                 }
-                AppEvent::RequestRender => {
+                AppEvent::RequestRender(wanted) => {
                     render_wanted = true;
+                    full_rerender_wanted = wanted;
                 }
                 AppEvent::WorkDone(Ok(result)) => match result {
                     WorkDone::YoutubeDowloaded { file_path } => {
@@ -340,6 +342,10 @@ fn main_task<B: Backend + std::io::Write>(
             if till_next_frame != Duration::ZERO {
                 continue;
             }
+            if full_rerender_wanted {
+                terminal.clear().expect("Terminal clear to succeed");
+                full_rerender_wanted = false;
+            }
             terminal
                 .draw(|frame| {
                     if let Err(err) = ui.render(frame, &mut state) {
@@ -347,6 +353,9 @@ fn main_task<B: Backend + std::io::Write>(
                     };
                 })
                 .expect("Expected render to succeed");
+            if let Err(err) = ui.post_render(&mut terminal.get_frame(), &mut state) {
+                error!(error:? = err; "Failed handle post render phase");
+            };
             last_render = now;
             render_wanted = false;
         }
