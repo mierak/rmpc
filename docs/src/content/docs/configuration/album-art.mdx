@@ -23,8 +23,8 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 | --------- | ------------------- | ------- | ------------------------------------------------------------------------------------ |
 | Kitty     | Kitty               | yes     | -                                                                                    |
 | WezTerm   | ITerm2              | yes     | -                                                                                    |
-| vscode    | ITerm2              | yes     | Needs to set album_art_max_size_px. Needs to be enabled in vscode.                   |
-| Tabby     | ITerm2              | yes     | Needs to set album_art_max_size_px                                                   |
+| vscode    | ITerm2              | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                             |
+| Tabby     | ITerm2              | yes     | Needs to set max_size_px                                                             |
 | Alacritty | Ueberzug            | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                            |
 | Others    | Ueberzug/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp) |
 
@@ -32,7 +32,7 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 
 ### method
 
-<ConfigValue name="method" type={["Kitty", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
+<ConfigValue name="method" type={["Kitty", "Iterm2", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
 
 Rendering method used to display images. Currently Kitty, UeberzugWayland and UeberzugX11 are supported.
 Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is not available.
@@ -71,3 +71,7 @@ Cons:
 -   Requires third party dependency
 -   Is a separate window on top of the terminal. This might require some additional configuration to make it look good in your environment.
 -   Album art has to be hidden completely when modal windows are shown
+
+### Iterm2 Inline image protocol
+
+Supported only in select few terminals and some of them need additional configuration. Works best in WezTerm.
