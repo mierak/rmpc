@@ -192,7 +192,7 @@ impl ConfigFile {
         } else {
             match self.image_method.unwrap_or(self.album_art.method) {
                 ImageMethodFile::Iterm2 if image_proto::is_iterm2_supported(is_tmux) => ImageMethod::Iterm2,
-                ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
+                ImageMethodFile::Iterm2 => ImageMethod::Unsupported,
                 ImageMethodFile::Kitty if image_proto::is_kitty_supported(is_tmux)? => ImageMethod::Kitty,
                 ImageMethodFile::Kitty => ImageMethod::Unsupported,
                 ImageMethodFile::UeberzugWayland if image_proto::is_ueberzug_wayland_supported() => {
@@ -208,7 +208,7 @@ impl ConfigFile {
                     ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
                     ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
                     ImageProtocol::Iterm2 => ImageMethod::Iterm2,
-                    ImageProtocol::None => ImageMethod::None,
+                    ImageProtocol::None => ImageMethod::Unsupported,
                 },
             }
         };
