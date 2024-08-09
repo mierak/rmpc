@@ -101,7 +101,7 @@ impl ErrorExt for anyhow::Error {
 #[allow(dead_code)]
 pub mod tmux {
     pub fn is_inside_tmux() -> bool {
-        std::env::var("TERM_PROGRAM").is_ok_and(|v| v == "tmux")
+        std::env::var("TMUX").is_ok_and(|v| !v.is_empty()) && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
     }
 
     pub fn wrap(input: &str) -> String {
@@ -133,8 +133,14 @@ pub mod tmux {
 }
 
 pub mod image_proto {
-    use super::tmux;
+    use std::env;
+    use std::io::Cursor;
+
+    use anyhow::Context;
     use anyhow::Result;
+    use image::codecs::jpeg::JpegEncoder;
+    use image::DynamicImage;
+    use rustix::path::Arg;
 
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     pub enum ImageProtocol {
@@ -143,10 +149,18 @@ pub mod image_proto {
         UeberzugX11,
         #[default]
         None,
+        Iterm2,
     }
 
-    pub fn determine_image_support() -> Result<ImageProtocol> {
-        if is_kitty_supported()? {
+    const ITERM2_TERMINAL_ENV_VARS: [&str; 3] = ["WEZTERM_EXECUTABLE", "TABBY_CONFIG_DIRECTORY", "VSCODE_INJECTION"];
+    const ITERM2_TERM_PROGRAMS: [&str; 3] = ["WezTerm", "vscode", "Tabby"];
+
+    pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
+        if is_iterm2_supported(is_tmux) {
+            return Ok(ImageProtocol::Iterm2);
+        }
+
+        if is_kitty_supported(is_tmux)? {
             return Ok(ImageProtocol::Kitty);
         };
 
@@ -171,18 +185,33 @@ pub mod image_proto {
         return Ok(ImageProtocol::None);
     }
 
-    pub fn is_ueberzug_wayland_supported() -> bool {
-        std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
-    }
-    pub fn is_ueberzug_x11_supported() -> bool {
-        std::env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
+    pub fn is_iterm2_supported(is_tmux: bool) -> bool {
+        if is_tmux {
+            if ITERM2_TERMINAL_ENV_VARS
+                .iter()
+                .any(|v| env::var_os(v).is_some_and(|v| !v.is_empty()))
+            {
+                return true;
+            }
+        } else if ITERM2_TERM_PROGRAMS
+            .iter()
+            .any(|v| env::var_os("TERM_PROGRAM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v)))
+        {
+            return true;
+        }
+        return false;
     }
 
-    pub fn is_kitty_supported() -> anyhow::Result<bool> {
-        let query = if tmux::is_inside_tmux() {
-            if !tmux::is_passthrough_enabled()? {
-                tmux::enable_passthrough()?;
-            }
+    pub fn is_ueberzug_wayland_supported() -> bool {
+        env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
+    }
+
+    pub fn is_ueberzug_x11_supported() -> bool {
+        env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
+    }
+
+    pub fn is_kitty_supported(is_tmux: bool) -> anyhow::Result<bool> {
+        let query = if is_tmux {
             "\x1bPtmux;\x1b\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\x1b\\\x1b\x1b[c\x1b\\"
         } else {
             "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c"
@@ -219,5 +248,111 @@ pub mod image_proto {
         rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Now, &termios_orig)?;
 
         Ok(buf.contains("_Gi=31;OK"))
+    }
+
+    #[allow(dead_code)]
+    pub fn read_size_csi() -> Result<Option<(u16, u16)>> {
+        let stdin = rustix::stdio::stdin();
+        let termios_orig = rustix::termios::tcgetattr(stdin)?;
+        let mut termios = termios_orig.clone();
+
+        termios.local_modes &= !rustix::termios::LocalModes::ICANON;
+        termios.local_modes &= !rustix::termios::LocalModes::ECHO;
+        // Set read timeout to 100ms as we cannot reliably check for end of terminal response
+        termios.special_codes[rustix::termios::SpecialCodeIndex::VTIME] = 1;
+        // Set read minimum to 0
+        termios.special_codes[rustix::termios::SpecialCodeIndex::VMIN] = 0;
+
+        rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Drain, &termios)?;
+
+        let stdout = rustix::stdio::stdout();
+        rustix::io::write(stdout, b"\x1b[14t")?;
+
+        let mut buf = String::new();
+        loop {
+            let mut charbuffer = [0; 1];
+            rustix::io::read(stdin, &mut charbuffer)?;
+
+            buf.push(charbuffer[0].into());
+
+            if charbuffer[0] == b'\0' || buf.ends_with('t') {
+                break;
+            }
+        }
+
+        // Reset to previous attrs
+        rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Now, &termios_orig)?;
+
+        let Some(buf) = buf.strip_prefix("\u{1b}[4;") else {
+            return Ok(None);
+        };
+
+        let Some(buf) = buf.strip_suffix('t') else {
+            return Ok(None);
+        };
+
+        if let Some((w, h)) = buf.split_once(';') {
+            let w: u16 = w.parse()?;
+            let h: u16 = h.parse()?;
+            return Ok(Some((w, h)));
+        }
+
+        Ok(None)
+    }
+
+    pub fn get_image_size(
+        area_width_col: usize,
+        area_height_col: usize,
+        max_width_px: u16,
+        max_height_px: u16,
+    ) -> Result<(u16, u16)> {
+        let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
+
+        // TODO: Figure out how to execute and read CSI sequences without it messing up crossterm
+
+        // if size.width == 0 || size.height == 0 {
+        //     if let Ok(Some((width, height))) = read_size_csi() {
+        //         size.width = width;
+        //         size.height = height;
+        //     }
+        // }
+
+        let w = if size.width == 0 {
+            max_width_px
+        } else {
+            let cell_width = size.width / size.columns;
+            u16::try_from(cell_width as usize * area_width_col)?
+        }
+        .min(max_width_px);
+        let h = if size.height == 0 {
+            max_height_px
+        } else {
+            let cell_height = size.height / size.rows;
+            u16::try_from(cell_height as usize * area_height_col)?
+        }
+        .max(max_height_px);
+        // TODO calc correct max size
+
+        log::debug!(size:?, area_width_col, area_height_col; "Resolved terminal size");
+        Ok((w, h))
+    }
+
+    pub fn resize_image(image_data: &[u8], width_px: u16, hegiht_px: u16) -> Result<DynamicImage> {
+        Ok(image::io::Reader::new(Cursor::new(image_data))
+            .with_guessed_format()
+            .context("Unable to guess image format")?
+            .decode()
+            .context("Unable to decode image")?
+            .resize(
+                u32::from(width_px),
+                u32::from(hegiht_px),
+                image::imageops::FilterType::Lanczos3,
+            ))
+    }
+
+    pub fn jpg_encode(img: &DynamicImage) -> Result<Vec<u8>> {
+        let mut jpg = Vec::new();
+        JpegEncoder::new(&mut jpg).encode_image(img)?;
+        Ok(jpg)
     }
 }

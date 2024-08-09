@@ -8,11 +8,47 @@ sidebar:
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
 import ConfigValue from "../../../components/ConfigValue.tsx";
 
-Currently there are two methods which rmpc can use to display images. Each of these methods functions
+Currently there are three methods which rmpc can use to display images. Each of these methods functions
 differently from the other and have their own advantages, disadvantages and quirks. The preffered and
-default method is `Kitty`.
+default method is `Kitty`. Special thanks to yazi for some inspirtion on detecting different kinds of terminals.
 
-The method can be overriden in the config file. Please refer to the [general configuration](/rmpc/configuration/#image_method) for more information.
+The method can be overriden in the config file. Please refer to the [Configuration](#method) for more information.
+
+## Supported terminals
+
+If your terminal is not listed here and you experience issues. Please disable the image method in the [config file](#method).
+Some of the terminals do not correctly report their size, thus some tweaking is needed. For those you need to set [max_size_px](#max_size_px).
+
+| Terminal  | Protocol            | Tmux    | Additional Info                                                                      |
+| --------- | ------------------- | ------- | ------------------------------------------------------------------------------------ |
+| Kitty     | Kitty               | yes     | -                                                                                    |
+| WezTerm   | ITerm2              | yes     | -                                                                                    |
+| vscode    | ITerm2              | yes     | Needs to set album_art_max_size_px. Needs to be enabled in vscode.                   |
+| Tabby     | ITerm2              | yes     | Needs to set album_art_max_size_px                                                   |
+| Alacritty | Ueberzug            | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                            |
+| Others    | Ueberzug/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp) |
+
+## Configuration
+
+### method
+
+<ConfigValue name="method" type={["Kitty", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
+
+Rendering method used to display images. Currently Kitty, UeberzugWayland and UeberzugX11 are supported.
+Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is not available.
+
+`None` completely disables album art display.
+
+### max_size_px
+
+<ConfigValue name="max_size_px" type="other" customText="(<width>, <height>)" />
+
+Sets limit for the album art size. If the album art is larger than this, it will be resized to fit the limit.
+You should not set this option unless needed because preferred image methods will figure out the correct size
+themselves. This is needed only for terminals that do not report their size correctly. Default is `(600, 600)`.
+`(0, 0)` means no practical limit. Ueberzug method is not influenced by this setting.
+
+## Protocols
 
 ### Kitty
 

@@ -12,8 +12,9 @@ mod defaults;
 pub mod keys;
 pub mod theme;
 
-use crate::utils::image_proto::ImageProtocol;
+use crate::utils::image_proto::{self, ImageProtocol};
 use crate::utils::macros::status_warn;
+use crate::utils::tmux;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
@@ -25,6 +26,7 @@ pub enum ImageMethodFile {
     Kitty,
     UeberzugWayland,
     UeberzugX11,
+    Iterm2,
     None,
     #[default]
     Auto,
@@ -35,9 +37,25 @@ pub enum ImageMethod {
     Kitty,
     UeberzugWayland,
     UeberzugX11,
+    Iterm2,
     None,
     #[default]
     Unsupported,
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+pub struct Size {
+    pub width: u16,
+    pub height: u16,
+}
+
+impl Default for Size {
+    fn default() -> Self {
+        Self {
+            width: 600,
+            height: 600,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -49,7 +67,7 @@ pub struct Config {
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub theme: UiConfig,
-    pub image_method: ImageMethod,
+    pub album_art: AlbumArtConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -68,7 +86,25 @@ pub struct ConfigFile {
     #[serde(default)]
     keybinds: KeyConfigFile,
     #[serde(default)]
-    image_method: ImageMethodFile,
+    image_method: Option<ImageMethodFile>,
+    #[serde(default)]
+    album_art_max_size_px: Size,
+    #[serde(default)]
+    album_art: AlbumArtConfigFile,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AlbumArtConfigFile {
+    #[serde(default)]
+    pub method: ImageMethodFile,
+    #[serde(default)]
+    pub max_size_px: Size,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct AlbumArtConfig {
+    pub method: ImageMethod,
+    pub max_size_px: Size,
 }
 
 impl Default for ConfigFile {
@@ -80,8 +116,10 @@ impl Default for ConfigFile {
             status_update_interval_ms: Some(1000),
             theme: None,
             cache_dir: None,
-            image_method: ImageMethodFile::Auto,
+            image_method: None,
             select_current_song_on_change: false,
+            album_art_max_size_px: Size::default(),
+            album_art: AlbumArtConfigFile::default(),
         }
     }
 }
@@ -121,8 +159,8 @@ impl ConfigFile {
             .unwrap_or_default()
             .try_into()?;
 
+        let size = self.album_art.max_size_px;
         let mut config = Config {
-            image_method: ImageMethod::default(),
             theme,
             cache_dir: self.cache_dir.map(|v| -> &'static str {
                 if v.ends_with('/') {
@@ -136,34 +174,46 @@ impl ConfigFile {
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
+            album_art: AlbumArtConfig {
+                method: ImageMethod::default(),
+                max_size_px: Size {
+                    width: if size.width == 0 { u16::MAX } else { size.width },
+                    height: if size.height == 0 { u16::MAX } else { size.height },
+                },
+            },
         };
 
-        config.image_method = if config.theme.album_art_width_percent == 0 {
+        let is_tmux = tmux::is_inside_tmux();
+        if is_tmux && !tmux::is_passthrough_enabled()? {
+            tmux::enable_passthrough()?;
+        };
+        config.album_art.method = if config.theme.album_art_width_percent == 0 {
             ImageMethod::None
         } else {
-            match self.image_method {
-                ImageMethodFile::Kitty if crate::utils::image_proto::is_kitty_supported()? => ImageMethod::Kitty,
+            match self.image_method.unwrap_or(self.album_art.method) {
+                ImageMethodFile::Iterm2 if image_proto::is_iterm2_supported(is_tmux) => ImageMethod::Iterm2,
+                ImageMethodFile::Iterm2 => ImageMethod::Unsupported,
+                ImageMethodFile::Kitty if image_proto::is_kitty_supported(is_tmux)? => ImageMethod::Kitty,
                 ImageMethodFile::Kitty => ImageMethod::Unsupported,
-                ImageMethodFile::UeberzugWayland if crate::utils::image_proto::is_ueberzug_wayland_supported() => {
+                ImageMethodFile::UeberzugWayland if image_proto::is_ueberzug_wayland_supported() => {
                     ImageMethod::UeberzugWayland
                 }
                 ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-                ImageMethodFile::UeberzugX11 if crate::utils::image_proto::is_ueberzug_x11_supported() => {
-                    ImageMethod::UeberzugX11
-                }
+                ImageMethodFile::UeberzugX11 if image_proto::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
                 ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
                 ImageMethodFile::None => ImageMethod::None,
                 ImageMethodFile::Auto if config.theme.album_art_width_percent == 0 => ImageMethod::None,
-                ImageMethodFile::Auto => match crate::utils::image_proto::determine_image_support()? {
+                ImageMethodFile::Auto => match image_proto::determine_image_support(is_tmux)? {
                     ImageProtocol::Kitty => ImageMethod::Kitty,
                     ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
                     ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
-                    ImageProtocol::None => ImageMethod::None,
+                    ImageProtocol::Iterm2 => ImageMethod::Iterm2,
+                    ImageProtocol::None => ImageMethod::Unsupported,
                 },
             }
         };
 
-        match config.image_method {
+        match config.album_art.method {
             ImageMethod::Unsupported => {
                 status_warn!(
                     "Album art is enabled but no image protocol is supported by your terminal, disabling album art"
@@ -173,8 +223,8 @@ impl ConfigFile {
             ImageMethod::None => {
                 config.theme.album_art_width_percent = 0;
             }
-            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 => {
-                log::debug!(requested:? = self.image_method, resolved:? = config.image_method; "Image method resolved");
+            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 | ImageMethod::Iterm2 => {
+                log::debug!(requested:? = self.album_art.method, resolved:? = config.album_art.method, is_tmux; "Image method resolved");
             }
         }
 

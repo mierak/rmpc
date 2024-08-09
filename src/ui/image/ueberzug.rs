@@ -1,6 +1,9 @@
 use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
 use rustix::path::Arg;
 use serde::Serialize;
 use std::fmt::Display;
@@ -8,7 +11,6 @@ use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::process::Child;
 use std::process::Stdio;
-use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use std::{io::ErrorKind, process::Command};
@@ -16,14 +18,18 @@ use sysinfo::ProcessRefreshKind;
 use sysinfo::ProcessesToUpdate;
 use sysinfo::System;
 
+use crate::config::Size;
 use crate::utils::macros::try_cont;
 use crate::utils::macros::try_skip;
+
+use super::ImageProto;
 
 #[derive(Debug)]
 pub struct Ueberzug {
     sender: Sender<Action>,
-    receiver: Option<Receiver<Action>>,
-    handle: Option<std::thread::JoinHandle<()>>,
+    default_album_art: &'static [u8],
+    handle: std::thread::JoinHandle<()>,
+    needs_render: bool,
 }
 
 struct UeberzugDaemon {
@@ -35,6 +41,8 @@ struct UeberzugDaemon {
 
 const IDENTIFIER: &str = "rmpc-albumart";
 const PID_FILE_TIMOUT: Duration = Duration::from_secs(5);
+const UEBERZUG_ALBUM_ART_PATH: &str = "/tmp/rmpc/albumart";
+const UEBERZUG_ALBUM_ART_DIR: &str = "/tmp/rmpc";
 
 enum Action {
     Add(&'static str, u16, u16, u16, u16),
@@ -56,25 +64,59 @@ impl Layer {
     }
 }
 
-impl Ueberzug {
-    pub fn cleanup(&mut self) -> Result<()> {
-        if let Some(handle) = self.handle.take() {
-            self.sender.send(Action::Destroy)?;
-            handle.join().expect("Ueberzug thread to end gracefully");
-        };
+impl ImageProto for Ueberzug {
+    fn render(&mut self, _: &mut Buffer, Rect { x, y, width, height }: Rect) -> Result<()> {
+        if self.needs_render {
+            self.needs_render = false;
+            self.sender
+                .send(Action::Add(UEBERZUG_ALBUM_ART_PATH, x, y, width, height))?;
+        }
         Ok(())
     }
 
-    pub fn new() -> Self {
-        let (tx, rx) = std::sync::mpsc::channel();
-        Self {
-            sender: tx,
-            receiver: Some(rx),
-            handle: None,
-        }
+    fn post_render(&mut self, _: &mut Buffer, _: Option<Color>, _: Rect) -> Result<()> {
+        Ok(())
     }
 
-    pub fn init(mut self, layer: Layer) -> Self {
+    fn hide(&mut self, _: Option<Color>, _: Rect) -> Result<()> {
+        Ok(self.sender.send(Action::Remove)?)
+    }
+
+    fn show(&mut self) {
+        self.needs_render = true;
+    }
+
+    fn resize(&mut self) {
+        self.needs_render = true;
+    }
+
+    fn set_data(&mut self, data: Option<Vec<u8>>) -> Result<()> {
+        std::fs::create_dir_all(UEBERZUG_ALBUM_ART_DIR)?;
+        self.needs_render = true;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(UEBERZUG_ALBUM_ART_PATH)?;
+        if let Some(data) = &data {
+            file.write_all(data)?;
+        } else {
+            file.write_all(self.default_album_art)?;
+        }
+        Ok(())
+    }
+
+    fn cleanup(self: Box<Self>) -> Result<()> {
+        self.sender.send(Action::Destroy)?;
+        self.handle.join().expect("Ueberzug thread to end gracefully");
+        Ok(())
+    }
+}
+
+impl Ueberzug {
+    pub fn new(default_album_art: &'static [u8], layer: Layer, _: Size) -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+
         let pid_file_path = std::env::temp_dir()
             .join("rmpc")
             .join(format!("ueberzug-{}.pid", std::process::id()))
@@ -88,11 +130,7 @@ impl Ueberzug {
             layer,
         };
 
-        let Some(rx) = self.receiver.take() else {
-            return self;
-        };
-
-        self.handle = Some(std::thread::spawn(move || {
+        let handle = std::thread::spawn(move || {
             while let Ok(action) = rx.recv() {
                 daemon.pid = Some(try_cont!(
                     daemon.spawn_daemon_if_needed(),
@@ -133,22 +171,19 @@ impl Ueberzug {
                     }
                 }
             }
-        }));
+        });
 
-        self
-    }
-
-    pub fn remove_image(&self) -> Result<()> {
-        Ok(self.sender.send(Action::Remove)?)
-    }
-
-    pub fn show_image(&self, path: &'static str, x: u16, y: u16, width: u16, height: u16) -> Result<()> {
-        Ok(self.sender.send(Action::Add(path, x, y, width, height))?)
+        Self {
+            sender: tx,
+            handle,
+            default_album_art,
+            needs_render: false,
+        }
     }
 }
 
 impl UeberzugDaemon {
-    pub fn show_image(&self, path: &'static str, x: u16, y: u16, width: u16, height: u16) -> Result<()> {
+    fn show_image(&self, path: &'static str, x: u16, y: u16, width: u16, height: u16) -> Result<()> {
         let Some(pid) = self.pid else {
             return Ok(());
         };
@@ -169,7 +204,7 @@ impl UeberzugDaemon {
         Ok(())
     }
 
-    pub fn remove_image(&self) -> Result<()> {
+    fn remove_image(&self) -> Result<()> {
         let Some(pid) = self.pid else {
             return Ok(());
         };
@@ -178,6 +213,7 @@ impl UeberzugDaemon {
         socket.remove_image(pid)
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn is_deamon_running(&self, pid: Pid) -> bool {
         let mut system = System::new();
         let infopid = sysinfo::Pid::from_u32(pid.0 as u32);
@@ -213,7 +249,7 @@ impl UeberzugDaemon {
         Ok((pid, child))
     }
 
-    pub fn spawn_daemon_if_needed(&mut self) -> Result<Pid> {
+    fn spawn_daemon_if_needed(&mut self) -> Result<Pid> {
         let Some(pid) = self.pid else {
             let (pid, child) = self.spawn_daemon()?;
             self.ueberzug_process = Some(child);

@@ -44,6 +44,7 @@ use self::{
     widgets::header::Header,
 };
 
+pub mod image;
 pub mod modals;
 pub mod screens;
 pub mod utils;
@@ -146,6 +147,10 @@ macro_rules! screen_call {
 }
 
 impl Ui {
+    pub fn post_render(&mut self, frame: &mut Frame, state: &mut State) -> Result<()> {
+        screen_call!(self, state, post_render(frame, &state.status, state.config))
+    }
+
     pub fn render(&mut self, frame: &mut Frame, state: &mut State) -> Result<()> {
         if let Some(bg_color) = state.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
