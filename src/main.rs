@@ -85,7 +85,11 @@ fn main() -> Result<()> {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
         }
         Some(Command::Version) => {
-            println!("rmpc version: {}", env!("CARGO_PKG_VERSION"));
+            println!(
+                "rmpc {} ({})",
+                env!("VERGEN_GIT_DESCRIBE"),
+                env!("VERGEN_GIT_COMMIT_DATE"),
+            );
         }
         Some(cmd) => {
             let config: &'static Config = Box::leak(Box::new(
@@ -112,6 +116,7 @@ fn main() -> Result<()> {
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
+            log::debug!(rev = env!("VERGEN_GIT_DESCRIBE"), date = env!("VERGEN_GIT_COMMIT_DATE"); "rmpc started");
 
             let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
 

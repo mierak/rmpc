@@ -7,6 +7,8 @@ use clap_complete::Shell::{Bash, Fish, Zsh};
 use clap_mangen::Man;
 use std::error::Error;
 use std::fs;
+use vergen_gitcl::Emitter;
+use vergen_gitcl::GitclBuilder;
 
 static NAME: &str = "rmpc";
 
@@ -32,11 +34,27 @@ fn generate_shell_completions(mut cmd: ClapCommand) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+fn emit_git_info() -> Result<(), Box<dyn Error>> {
+    Emitter::default()
+        .add_instructions(
+            &GitclBuilder::default()
+                .commit_date(true)
+                .describe(false, false, None)
+                .build()?,
+        )?
+        .emit()?;
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let mut cmd = Args::command();
     cmd.set_bin_name(NAME);
 
     generate_man_pages(cmd.clone())?;
     generate_shell_completions(cmd)?;
+
+    emit_git_info()?;
+
     Ok(())
 }

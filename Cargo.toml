@@ -41,6 +41,7 @@ sysinfo = "0.31.2"
 clap = { workspace = true }
 clap_complete = "4.5.12"
 clap_mangen = "0.2.23"
+vergen-gitcl = { version = "1.0.0", features = ["build"] }
 
 [dev-dependencies]
 rstest = "0.21.0"
