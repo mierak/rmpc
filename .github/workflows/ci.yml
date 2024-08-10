@@ -4,41 +4,65 @@ on: [pull_request, workflow_dispatch]
 
 jobs:
   test:
-    name: Cargo test
+    name: Test Debug Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Cargo test
       run: |
         cargo test
-        cargo test --release
-  format:
-    name: Check formatting
+  test-release:
+    name: Test Release Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+    - name: Cargo test
+      run: |
+        cargo test --release
+  format:
+    name: Check Formatting
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
     - name: Format check
       run: |
         cargo fmt --check
   clippy:
-    name: Clippy
+    name: Clippy Debug Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Run clippy
       run: |
         cargo clippy -- -D warnings
-        cargo clippy --release -- -D warnings
-  build:
-    name: Build check
+  clippy_release:
+    name: Clippy Release Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+    - name: Run clippy
+      run: |
+        cargo clippy --release -- -D warnings
+  build:
+    name: Build Check Debug Mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
     - name: Build check
       run: |
         cargo build
+  build-release:
+    name: Build Check Release Mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build check
+      run: |
         cargo build --release
