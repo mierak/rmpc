@@ -6,6 +6,7 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use serde::{Deserialize, Serialize};
+use strum::Display;
 
 pub mod cli;
 mod defaults;
@@ -21,7 +22,7 @@ use self::{
     theme::{ConfigColor, UiConfig, UiConfigFile},
 };
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Display, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum ImageMethodFile {
     Kitty,
     UeberzugWayland,
@@ -32,7 +33,7 @@ pub enum ImageMethodFile {
     Auto,
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Display, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageMethod {
     Kitty,
     UeberzugWayland,
@@ -58,9 +59,31 @@ impl Default for Size {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum MpdAddress<'a> {
+    IpAndPort(&'a str),
+    SocketPath(&'a str),
+}
+
+impl<'a> From<&'a str> for MpdAddress<'a> {
+    fn from(s: &'a str) -> Self {
+        if let Some((_ip, _port)) = s.split_once(':') {
+            Self::IpAndPort(s)
+        } else {
+            Self::SocketPath(s)
+        }
+    }
+}
+
+impl<'a> Default for MpdAddress<'a> {
+    fn default() -> Self {
+        Self::IpAndPort("127.0.0.1:6600")
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Config {
-    pub address: &'static str,
+    pub address: MpdAddress<'static>,
     pub cache_dir: Option<&'static str>,
     pub volume_step: u8,
     pub keybinds: KeyConfig,
@@ -70,30 +93,30 @@ pub struct Config {
     pub album_art: AlbumArtConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
-    address: String,
+    pub address: String,
     #[serde(default)]
-    cache_dir: Option<String>,
+    pub cache_dir: Option<String>,
     #[serde(default)]
-    theme: Option<String>,
+    pub theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
-    volume_step: u8,
+    pub volume_step: u8,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
-    status_update_interval_ms: Option<u64>,
+    pub status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
-    select_current_song_on_change: bool,
+    pub select_current_song_on_change: bool,
     #[serde(default)]
-    keybinds: KeyConfigFile,
+    pub keybinds: KeyConfigFile,
     #[serde(default)]
-    image_method: Option<ImageMethodFile>,
+    pub image_method: Option<ImageMethodFile>,
     #[serde(default)]
-    album_art_max_size_px: Size,
+    pub album_art_max_size_px: Size,
     #[serde(default)]
-    album_art: AlbumArtConfigFile,
+    pub album_art: AlbumArtConfigFile,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AlbumArtConfigFile {
     #[serde(default)]
     pub method: ImageMethodFile,
@@ -159,6 +182,7 @@ impl ConfigFile {
             .unwrap_or_default()
             .try_into()?;
 
+        let addr: &'static str = Box::leak(Box::new(self.address));
         let size = self.album_art.max_size_px;
         let mut config = Config {
             theme,
@@ -169,7 +193,7 @@ impl ConfigFile {
                     Box::leak(Box::new(format!("{v}/")))
                 }
             }),
-            address: Box::leak(Box::new(self.address)),
+            address: addr.into(),
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
