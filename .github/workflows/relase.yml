@@ -52,4 +52,5 @@ jobs:
       with:
         allowUpdates: true
         draft: true
+        tag: testing
         artifacts: /tmp/artifacts/*
