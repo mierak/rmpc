@@ -4,7 +4,7 @@ on: [pull_request, workflow_dispatch]
 
 jobs:
   test:
-    name: Cargo test
+    name: Test Debug Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -12,6 +12,14 @@ jobs:
     - name: Cargo test
       run: |
         cargo test
+  test-release:
+    name: Test Release Mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Cargo test
+      run: |
         cargo test --release
   format:
     name: Check formatting
@@ -23,7 +31,7 @@ jobs:
       run: |
         cargo fmt --check
   clippy:
-    name: Clippy
+    name: Clippy Debug Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -31,9 +39,17 @@ jobs:
     - name: Run clippy
       run: |
         cargo clippy -- -D warnings
+  clippy_release:
+    name: Clippy Release Mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Run clippy
+      run: |
         cargo clippy --release -- -D warnings
   build:
-    name: Build check
+    name: Build Check Debug Mode
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -41,4 +57,12 @@ jobs:
     - name: Build check
       run: |
         cargo build
+  build-release:
+    name: Build Check Release Mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Build check
+      run: |
         cargo build --release
