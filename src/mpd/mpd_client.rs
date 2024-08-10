@@ -4,7 +4,7 @@ use anyhow::Result;
 use derive_more::Deref;
 use strum::{AsRefStr, Display};
 
-use crate::utils::macros::status_error;
+use crate::utils::{macros::status_error, ErrorExt};
 
 use super::{
     client::Client,
@@ -439,12 +439,12 @@ impl MpdClient for Client<'_> {
                     Ok(None)
                 }
                 Err(e) => {
-                    status_error!(error:? = e; "Failed to read picture");
+                    status_error!(error:? = e; "Failed to read picture. {}", e.to_status());
                     Ok(None)
                 }
             },
             Err(e) => {
-                status_error!(error:? = e; "Failed to read picture",);
+                status_error!(error:? = e; "Failed to read picture. {}", e.to_status());
                 Ok(None)
             }
         }

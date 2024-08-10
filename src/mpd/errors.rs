@@ -124,7 +124,7 @@ impl Display for MpdFailureResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Cannot execute command: '{}'. Detail: '{}'. Reason: '{}'. Index in command list: '{}'",
+            "Cannot execute command: '{}'. Detail: '{}'. Reason: '{}'. Cmd idx: '{}'",
             self.command, self.message, self.code, self.command_list_index
         )
     }

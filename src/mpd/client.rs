@@ -4,7 +4,7 @@ use std::{
     os::unix::net::UnixStream,
 };
 
-use crate::utils::macros::status_warn;
+use crate::{config::MpdAddress, utils::macros::status_warn};
 
 use super::{
     errors::MpdError,
@@ -27,7 +27,7 @@ pub struct Client<'name> {
     rx: BufReader<TcpOrUnixStream>,
     stream: TcpOrUnixStream,
     reconnect: bool,
-    addr: &'static str,
+    addr: MpdAddress<'name>,
     pub version: Version,
 }
 
@@ -35,7 +35,7 @@ impl std::fmt::Debug for Client<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Client {{ name: {:?}, recconect: {}, addr: {} }}",
+            "Client {{ name: {:?}, recconect: {}, addr: {:?} }}",
             self.name, self.reconnect, self.addr
         )
     }
@@ -106,11 +106,10 @@ impl std::io::Write for TcpOrUnixStream {
 
 #[allow(dead_code)]
 impl<'name> Client<'name> {
-    pub fn init(addr: &'static str, name: &'name str, reconnect: bool) -> MpdResult<Client<'name>> {
-        let mut stream = if let Some((_ip, _port)) = addr.split_once(':') {
-            TcpOrUnixStream::Tcp(TcpStream::connect(addr)?)
-        } else {
-            TcpOrUnixStream::Unix(UnixStream::connect(addr)?)
+    pub fn init(addr: MpdAddress<'name>, name: &'name str, reconnect: bool) -> MpdResult<Client<'name>> {
+        let mut stream = match addr {
+            MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
+            MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
         stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
         stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
@@ -146,10 +145,9 @@ impl<'name> Client<'name> {
     }
 
     fn reconnect(&mut self) -> MpdResult<&Client> {
-        let mut stream = if let Some((_ip, _port)) = self.addr.split_once(':') {
-            TcpOrUnixStream::Tcp(TcpStream::connect(self.addr)?)
-        } else {
-            TcpOrUnixStream::Unix(UnixStream::connect(self.addr)?)
+        let mut stream = match self.addr {
+            MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
+            MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
         stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
         stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;

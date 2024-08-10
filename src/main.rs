@@ -22,13 +22,15 @@ use config::{
     ConfigFile,
 };
 use crossterm::event::{Event, KeyEvent};
+use deps::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP};
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
+use rustix::path::Arg;
 use ui::{Level, UiEvent};
 use utils::{
     macros::{status_error, status_info, try_cont},
-    ErrorExt,
+    tmux, ErrorExt,
 };
 use ytdlp::YtDlp;
 
@@ -46,6 +48,7 @@ mod tests {
 
 mod cli;
 mod config;
+mod deps;
 mod logging;
 mod mpd;
 mod state;
@@ -84,6 +87,38 @@ fn main() -> Result<()> {
         Some(Command::Theme) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
         }
+        Some(Command::DebugInfo) => {
+            let config_file = match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
+                Ok(val) => val,
+                Err(_err) => ConfigFile::default(),
+            };
+            let config = config_file.clone().into_config(Some(&args.config))?;
+
+            println!(
+                "rmpc {} ({})",
+                env!("VERGEN_GIT_DESCRIBE"),
+                env!("VERGEN_GIT_COMMIT_DATE"),
+            );
+            println!("\n{:<20} {}", "Config path", args.config.as_str()?);
+            println!("{:<20} {:?}", "Theme path", config_file.theme);
+
+            println!("\nMPD:");
+            println!("{:<20} {:?}", "Address", config.address);
+
+            println!("\nYoutube playback:");
+            println!("{:<20} {:?}", "Cache dir", config.cache_dir);
+            println!("{}", FFMPEG.display());
+            println!("{}", FFPROBE.display());
+            println!("{}", YTDLP.display());
+            println!("{}", PYTHON3.display());
+            println!("{}", PYTHON3MUTAGEN.display());
+
+            println!("\nImage protocol:");
+            println!("{:<20} {}", "Requested", config_file.album_art.method);
+            println!("{:<20} {}", "Resolved", config.album_art.method);
+            println!("{:<20} {}", "TMUX", tmux::is_inside_tmux());
+            println!("{}", UEBERZUGPP.display());
+        }
         Some(Command::Version) => {
             println!(
                 "rmpc {} ({})",
@@ -117,6 +152,7 @@ fn main() -> Result<()> {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
             log::debug!(rev = env!("VERGEN_GIT_DESCRIBE"), date = env!("VERGEN_GIT_COMMIT_DATE"); "rmpc started");
+            std::thread::spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()));
 
             let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
 
@@ -198,8 +234,15 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
     match request {
         WorkRequest::DownloadYoutube { url } => {
             let Some(cache_dir) = config.cache_dir else {
-                bail!("Cannot download video because 'cache_dir' is not configured.")
+                bail!("Youtube support requires 'cache_dir' to be configured")
             };
+
+            if let Err(unsupported_list) = crate::deps::is_youtube_supported(config.address) {
+                status_warn!(
+                    "Youtube support requires the following and may thus not work properly: {}",
+                    unsupported_list.join(", ")
+                );
+            }
 
             let ytdlp = YtDlp::new(cache_dir)?;
             let file_path = ytdlp.download(&url)?;
@@ -281,7 +324,7 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                     Err(err) => {
-                        status_error!(err:?; "Key handler failed: {}", err.to_status());
+                        status_error!(err:?; "Error: {}", err.to_status());
                         render_wanted = true;
                     }
                 },

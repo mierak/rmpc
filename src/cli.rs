@@ -41,6 +41,7 @@ impl Command {
             Command::Config => bail!("Cannot use config command here."),
             Command::Theme => bail!("Cannot use theme command here."),
             Command::Version => bail!("Cannot use version command here."),
+            Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::ToggleOutput { id } => client.toggle_output(id)?,
             Command::EnableOutput { id } => client.enable_output(id)?,
             Command::DisableOutput { id } => client.disable_output(id)?,

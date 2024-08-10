@@ -19,6 +19,8 @@ pub enum Command {
     Config,
     /// Prints the default theme. Can be used to bootstrap your theme file.
     Theme,
+    /// Prints information about optional runtime dependencies
+    DebugInfo,
     /// Prints the rmpc version
     Version,
     /// Plays song at the position in the current playlist. Defaults to current paused song.

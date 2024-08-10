@@ -1,5 +1,7 @@
 use itertools::Itertools;
 
+use crate::mpd::errors::MpdError;
+
 pub mod macros {
     macro_rules! try_ret {
         ( $e:expr, $msg:literal ) => {
@@ -98,6 +100,20 @@ impl ErrorExt for anyhow::Error {
     }
 }
 
+impl ErrorExt for MpdError {
+    fn to_status(&self) -> String {
+        match self {
+            MpdError::Parse(e) => format!("Failed to parse: {e}"),
+            MpdError::UnknownCode(e) => format!("Unkown code: {e}"),
+            MpdError::Generic(e) => format!("Generic error: {e}"),
+            MpdError::ClientClosed => "Client closed".to_string(),
+            MpdError::Mpd(e) => format!("MPD Error: {e}"),
+            MpdError::ValueExpected(e) => format!("Expected Value but got '{e}'"),
+            MpdError::UnsupportedMpdVersion(e) => format!("Unsuported MPD version: {e}"),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub mod tmux {
     pub fn is_inside_tmux() -> bool {
@@ -141,6 +157,8 @@ pub mod image_proto {
     use image::codecs::jpeg::JpegEncoder;
     use image::DynamicImage;
     use rustix::path::Arg;
+
+    use crate::deps::UEBERZUGPP;
 
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     pub enum ImageProtocol {
@@ -203,11 +221,11 @@ pub mod image_proto {
     }
 
     pub fn is_ueberzug_wayland_supported() -> bool {
-        env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())
+        env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty()) && UEBERZUGPP.installed
     }
 
     pub fn is_ueberzug_x11_supported() -> bool {
-        env::var("DISPLAY").is_ok_and(|v| !v.is_empty())
+        env::var("DISPLAY").is_ok_and(|v| !v.is_empty()) && UEBERZUGPP.installed
     }
 
     pub fn is_kitty_supported(is_tmux: bool) -> anyhow::Result<bool> {
