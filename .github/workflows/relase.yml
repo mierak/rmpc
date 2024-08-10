@@ -50,7 +50,7 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: my-artifact
+        name: rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz
         path: /tmp/artifacts/
 
     # - name: Release
