@@ -242,6 +242,8 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
                     "Youtube support requires the following and may thus not work properly: {}",
                     unsupported_list.join(", ")
                 );
+            } else {
+                status_info!("Downloading '{url}'");
             }
 
             let ytdlp = YtDlp::new(cache_dir)?;
