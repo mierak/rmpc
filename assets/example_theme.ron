@@ -112,7 +112,7 @@
         (kind: Text(" ")),
         (kind: Property(Artist), default: (kind: Text("Unknown Artist"))),
         (kind: Text(" - ")),
-        (kind: Property(Title)),
+        (kind: Property(Title), default: (kind: Property(Filename))),
     ]
 )
 

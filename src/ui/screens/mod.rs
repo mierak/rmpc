@@ -146,35 +146,58 @@ pub(crate) mod browser {
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
 
-            let title = Line::from(vec![
+            let file = Line::from(vec![
                 start_of_line_spacer.clone(),
-                Span::styled("Title", key_style),
+                Span::styled("File", key_style),
                 separator.clone(),
-                Span::from(self.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
+                Span::from(self.file.clone()),
             ]);
-            let artist = Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Artist", key_style),
-                separator.clone(),
-                Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-            ]);
-            let album = Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Album", key_style),
-                separator.clone(),
-                Span::from(self.album.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-            ]);
-            let duration = Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Duration", key_style),
-                separator.clone(),
-                Span::from(
-                    self.duration
-                        .as_ref()
-                        .map_or("-".to_owned(), |v| v.as_secs().to_string()),
-                ),
-            ]);
-            let mut r = vec![title, artist, album, duration];
+            let mut r = vec![file];
+
+            if let Some(file_name) = self.file_name() {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Filename", key_style),
+                    separator.clone(),
+                    Span::from(file_name.into_owned()),
+                ]));
+            }
+
+            if let Some(title) = &self.title {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Title", key_style),
+                    separator.clone(),
+                    Span::from(title.clone()),
+                ]));
+            }
+            if let Some(artist) = &self.artist {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Artist", key_style),
+                    separator.clone(),
+                    Span::from(artist.clone()),
+                ]));
+            }
+
+            if let Some(album) = &self.album {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Album", key_style),
+                    separator.clone(),
+                    Span::from(album.clone()),
+                ]));
+            }
+
+            if let Some(duration) = &self.duration {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Duration", key_style),
+                    separator.clone(),
+                    Span::from(duration.as_secs().to_string()),
+                ]));
+            }
+
             for (k, v) in &self.others {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
@@ -372,9 +395,16 @@ impl Song {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
+    pub fn file_name(&self) -> Option<Cow<str>> {
+        std::path::Path::new(&self.file)
+            .file_name()
+            .map(|file_name| file_name.to_string_lossy())
+    }
+
     fn format<'song>(&'song self, property: &SongProperty) -> Option<Cow<'song, str>> {
         match property {
-            SongProperty::Filename => Some(Cow::Borrowed(self.file.as_str())),
+            SongProperty::Filename => self.file_name(),
+            SongProperty::File => Some(Cow::Borrowed(self.file.as_str())),
             SongProperty::Title => self.title.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Artist => self.artist.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Album => self.album.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
