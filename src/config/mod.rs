@@ -28,6 +28,7 @@ pub enum ImageMethodFile {
     UeberzugWayland,
     UeberzugX11,
     Iterm2,
+    Sixel,
     None,
     #[default]
     Auto,
@@ -39,6 +40,7 @@ pub enum ImageMethod {
     UeberzugWayland,
     UeberzugX11,
     Iterm2,
+    Sixel,
     None,
     #[default]
     Unsupported,
@@ -225,6 +227,7 @@ impl ConfigFile {
                 ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
                 ImageMethodFile::UeberzugX11 if image_proto::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
                 ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
+                ImageMethodFile::Sixel => ImageMethod::Sixel,
                 ImageMethodFile::None => ImageMethod::None,
                 ImageMethodFile::Auto if config.theme.album_art_width_percent == 0 => ImageMethod::None,
                 ImageMethodFile::Auto => match image_proto::determine_image_support(is_tmux)? {
@@ -232,6 +235,7 @@ impl ConfigFile {
                     ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
                     ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
                     ImageProtocol::Iterm2 => ImageMethod::Iterm2,
+                    ImageProtocol::Sixel => ImageMethod::Sixel,
                     ImageProtocol::None => ImageMethod::Unsupported,
                 },
             }
@@ -247,7 +251,11 @@ impl ConfigFile {
             ImageMethod::None => {
                 config.theme.album_art_width_percent = 0;
             }
-            ImageMethod::Kitty | ImageMethod::UeberzugWayland | ImageMethod::UeberzugX11 | ImageMethod::Iterm2 => {
+            ImageMethod::Kitty
+            | ImageMethod::UeberzugWayland
+            | ImageMethod::UeberzugX11
+            | ImageMethod::Iterm2
+            | ImageMethod::Sixel => {
                 log::debug!(requested:? = self.album_art.method, resolved:? = config.album_art.method, is_tmux; "Image method resolved");
             }
         }

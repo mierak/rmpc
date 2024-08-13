@@ -9,8 +9,11 @@ use crate::{
     AppEvent,
 };
 
-use super::ueberzug::{Layer, Ueberzug};
 use super::{iterm2::Iterm2, kitty::KittyImageState, ImageProto};
+use super::{
+    sixel::Sixel,
+    ueberzug::{Layer, Ueberzug},
+};
 
 #[derive(Debug)]
 pub struct AlbumArtFacade {
@@ -25,6 +28,7 @@ enum ImageState {
     Kitty(KittyImageState),
     Ueberzug(Ueberzug),
     Iterm2(Iterm2),
+    Sixel(Sixel),
     None,
 }
 
@@ -44,6 +48,7 @@ impl AlbumArtFacade {
             }
             ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(default_album_art, Layer::X11, max_size)),
             ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(app_event_sender, default_album_art, max_size)),
+            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(app_event_sender, default_album_art, max_size)),
             ImageProtocol::None => ImageState::None,
         };
         Self {
@@ -67,6 +72,7 @@ impl AlbumArtFacade {
             ImageState::Kitty(state) => state.set_data(data.take())?,
             ImageState::Ueberzug(ueberzug) => ueberzug.set_data(data.take())?,
             ImageState::Iterm2(iterm2) => iterm2.set_data(data.take())?,
+            ImageState::Sixel(s) => s.set_data(data.take())?,
             ImageState::None => {}
         }
 
@@ -80,6 +86,7 @@ impl AlbumArtFacade {
             ImageState::Kitty(kitty) => kitty.show(),
             ImageState::Ueberzug(ueberzug) => ueberzug.show(),
             ImageState::Iterm2(iterm2) => iterm2.show(),
+            ImageState::Sixel(s) => s.show(),
             ImageState::None => {}
         }
     }
@@ -89,6 +96,7 @@ impl AlbumArtFacade {
             ImageState::Kitty(kitty) => kitty.hide(bg_color, self.last_size)?,
             ImageState::Ueberzug(ueberzug) => ueberzug.hide(bg_color, self.last_size)?,
             ImageState::Iterm2(iterm2) => iterm2.hide(bg_color, self.last_size)?,
+            ImageState::Sixel(s) => s.hide(bg_color, self.last_size)?,
             ImageState::None => {}
         }
         Ok(())
@@ -100,6 +108,7 @@ impl AlbumArtFacade {
             ImageState::Kitty(state) => state.render(frame.buffer_mut(), area)?,
             ImageState::Ueberzug(state) => state.render(frame.buffer_mut(), area)?,
             ImageState::Iterm2(iterm2) => iterm2.render(frame.buffer_mut(), area)?,
+            ImageState::Sixel(s) => s.render(frame.buffer_mut(), area)?,
             ImageState::None => {}
         };
         Ok(())
@@ -110,6 +119,7 @@ impl AlbumArtFacade {
             ImageState::Kitty(state) => state.resize(),
             ImageState::Ueberzug(ueberzug) => ueberzug.resize(),
             ImageState::Iterm2(iterm2) => iterm2.resize(),
+            ImageState::Sixel(s) => s.resize(),
             ImageState::None => {}
         }
     }
@@ -120,6 +130,7 @@ impl AlbumArtFacade {
             ImageState::Kitty(kitty) => Box::new(kitty).cleanup(),
             ImageState::Ueberzug(ueberzug) => Box::new(ueberzug).cleanup(),
             ImageState::Iterm2(iterm2) => Box::new(iterm2).cleanup(),
+            ImageState::Sixel(s) => Box::new(s).cleanup(),
             ImageState::None => Ok(()),
         }
     }
@@ -135,6 +146,7 @@ impl AlbumArtFacade {
             ImageState::Iterm2(iterm2) => {
                 iterm2.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size)
             }
+            ImageState::Sixel(s) => s.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size),
             ImageState::None => Ok(()),
         }
     }
@@ -147,6 +159,7 @@ impl From<ImageMethod> for ImageProtocol {
             ImageMethod::UeberzugWayland => ImageProtocol::UeberzugWayland,
             ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
             ImageMethod::Iterm2 => ImageProtocol::Iterm2,
+            ImageMethod::Sixel => ImageProtocol::Sixel,
             ImageMethod::None => ImageProtocol::None,
             ImageMethod::Unsupported => ImageProtocol::None,
         }

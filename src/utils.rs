@@ -151,12 +151,17 @@ pub mod tmux {
 pub mod image_proto {
     use std::env;
     use std::io::Cursor;
+    use std::os::unix::process::parent_id;
 
     use anyhow::Context;
     use anyhow::Result;
     use image::codecs::jpeg::JpegEncoder;
     use image::DynamicImage;
     use rustix::path::Arg;
+    use rustix::process;
+    use sysinfo::ProcessRefreshKind;
+    use sysinfo::ProcessesToUpdate;
+    use sysinfo::System;
 
     use crate::deps::UEBERZUGPP;
 
@@ -165,17 +170,26 @@ pub mod image_proto {
         Kitty,
         UeberzugWayland,
         UeberzugX11,
+        Iterm2,
+        Sixel,
         #[default]
         None,
-        Iterm2,
     }
 
     const ITERM2_TERMINAL_ENV_VARS: [&str; 3] = ["WEZTERM_EXECUTABLE", "TABBY_CONFIG_DIRECTORY", "VSCODE_INJECTION"];
     const ITERM2_TERM_PROGRAMS: [&str; 3] = ["WezTerm", "vscode", "Tabby"];
 
+    const SIXEL_TERMINAL_ENV_VARS: [&str; 1] = ["KONSOLE_VERSION"];
+    const SIXEL_TERM_PROGRAMS: [&str; 1] = ["Hyper"];
+    const SIXEL_TERM_VARS: [&str; 1] = ["foot"];
+
     pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
         if is_iterm2_supported(is_tmux) {
             return Ok(ImageProtocol::Iterm2);
+        }
+
+        if is_sixel_supported(is_tmux) {
+            return Ok(ImageProtocol::Sixel);
         }
 
         if is_kitty_supported(is_tmux)? {
@@ -218,6 +232,42 @@ pub mod image_proto {
             return true;
         }
         return false;
+    }
+
+    pub fn is_sixel_supported(is_tmux: bool) -> bool {
+        if SIXEL_TERMINAL_ENV_VARS
+            .iter()
+            .any(|v| env::var_os(v).is_some_and(|v| !v.is_empty()))
+        {
+            return true;
+        } else if SIXEL_TERM_VARS
+            .iter()
+            .any(|v| env::var_os("TERM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v)))
+        {
+            return true;
+        } else if SIXEL_TERM_PROGRAMS
+            .iter()
+            .any(|v| env::var_os("TERM_PROGRAM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v)))
+        {
+            return true;
+        }
+
+        // let mut system = System::new();
+        // let infopid = sysinfo::Pid::from_u32(std::process::id() as u32);
+        // system.refresh_processes_specifics(ProcessesToUpdate::All, ProcessRefreshKind::everything());
+        //
+        // let mut process = system.process(infopid);
+        //
+        // loop {
+        //     if let Some(proc) = process {
+        //         println!("{:?}", proc.name());
+        //         if proc.name() == "foot" {
+        //             return true;
+        //         }
+        //         process = proc.parent().and_then(|p| system.process(p));
+        //     }
+        // }
+        false
     }
 
     pub fn is_ueberzug_wayland_supported() -> bool {

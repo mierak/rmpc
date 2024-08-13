@@ -273,7 +273,11 @@ impl Default for SongFormatFile {
             PropertyFile {
                 kind: PropertyKindFileOrText::Property(SongPropertyFile::Title),
                 style: None,
-                default: None,
+                default: Some(Box::new(PropertyFile {
+                    kind: PropertyKindFileOrText::Property(SongPropertyFile::Filename),
+                    style: None,
+                    default: None,
+                })),
             },
         ])
     }

@@ -95,7 +95,8 @@ fn main() -> Result<()> {
             let config = config_file.clone().into_config(Some(&args.config))?;
 
             println!(
-                "rmpc {} ({})",
+                "rmpc {} {} ({})",
+                env!("CARGO_PKG_VERSION"),
                 env!("VERGEN_GIT_DESCRIBE"),
                 env!("VERGEN_GIT_COMMIT_DATE"),
             );
@@ -121,7 +122,8 @@ fn main() -> Result<()> {
         }
         Some(Command::Version) => {
             println!(
-                "rmpc {} ({})",
+                "rmpc {} {} ({})",
+                env!("CARGO_PKG_VERSION"),
                 env!("VERGEN_GIT_DESCRIBE"),
                 env!("VERGEN_GIT_COMMIT_DATE"),
             );

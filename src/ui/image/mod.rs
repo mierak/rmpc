@@ -1,9 +1,10 @@
 use anyhow::Result;
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
-pub mod album_art_facade;
+pub mod facade;
 pub mod iterm2;
 pub mod kitty;
+pub mod sixel;
 pub mod ueberzug;
 
 pub trait ImageProto {

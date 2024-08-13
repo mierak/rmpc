@@ -36,6 +36,7 @@ walkdir = "2.5.0"
 which = "6.0.1"
 url = "2.5.2"
 sysinfo = "0.31.2"
+color_quant = "1.1.0"
 
 [build-dependencies]
 clap = { workspace = true }
