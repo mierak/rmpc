@@ -12,6 +12,7 @@ use super::style::ToConfigOr;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
     Filename,
+    File,
     Title,
     Artist,
     Album,
@@ -23,6 +24,7 @@ pub enum SongPropertyFile {
 #[derive(Debug, Copy, Clone, Display)]
 pub enum SongProperty {
     Filename,
+    File,
     Title,
     Artist,
     Album,
@@ -131,6 +133,7 @@ impl TryFrom<SongPropertyFile> for SongProperty {
     fn try_from(value: SongPropertyFile) -> std::result::Result<Self, Self::Error> {
         Ok(match value {
             SongPropertyFile::Filename => SongProperty::Filename,
+            SongPropertyFile::File => SongProperty::File,
             SongPropertyFile::Title => SongProperty::Title,
             SongPropertyFile::Artist => SongProperty::Artist,
             SongPropertyFile::Album => SongProperty::Album,
@@ -273,7 +276,11 @@ impl Default for SongFormatFile {
             PropertyFile {
                 kind: PropertyKindFileOrText::Property(SongPropertyFile::Title),
                 style: None,
-                default: None,
+                default: Some(Box::new(PropertyFile {
+                    kind: PropertyKindFileOrText::Property(SongPropertyFile::Filename),
+                    style: None,
+                    default: None,
+                })),
             },
         ])
     }
