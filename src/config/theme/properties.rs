@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum::Display;
 
-use crate::config::theme::StyleFile;
+use crate::config::{theme::StyleFile, Leak};
 
 use super::style::ToConfigOr;
 
@@ -72,6 +72,7 @@ pub enum PropertyKindFile {
 pub enum PropertyKindFileOrText<T> {
     Text(String),
     Property(T),
+    Group(Vec<PropertyFile<T>>),
 }
 
 #[skip_serializing_none]
@@ -83,9 +84,10 @@ pub struct PropertyFile<T> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum PropertyKindOrText<T> {
-    Text(&'static str),
+pub enum PropertyKindOrText<'a, T> {
+    Text(&'a str),
     Property(T),
+    Group(&'a [&'a Property<'a, T>]),
 }
 
 #[derive(Debug, Clone)]
@@ -97,7 +99,7 @@ pub enum PropertyKind {
 
 #[derive(Debug, Clone)]
 pub struct Property<'a, T> {
-    pub kind: PropertyKindOrText<T>,
+    pub kind: PropertyKindOrText<'a, T>,
     pub style: Option<Style>,
     pub default: Option<&'a Property<'a, T>>,
 }
@@ -139,7 +141,7 @@ impl TryFrom<SongPropertyFile> for SongProperty {
             SongPropertyFile::Album => SongProperty::Album,
             SongPropertyFile::Duration => SongProperty::Duration,
             SongPropertyFile::Track => SongProperty::Track,
-            SongPropertyFile::Other(name) => SongProperty::Other(Box::leak(Box::new(name))),
+            SongPropertyFile::Other(name) => SongProperty::Other(name.leak()),
         })
     }
 }
@@ -160,13 +162,13 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
     fn try_from(value: StatusPropertyFile) -> Result<Self, Self::Error> {
         Ok(match value {
             StatusPropertyFile::State => StatusProperty::State,
-            StatusPropertyFile::Duration => StatusProperty::Duration {},
-            StatusPropertyFile::Elapsed => StatusProperty::Elapsed {},
-            StatusPropertyFile::Volume => StatusProperty::Volume {},
-            StatusPropertyFile::Repeat => StatusProperty::Repeat {},
-            StatusPropertyFile::Random => StatusProperty::Random {},
-            StatusPropertyFile::Consume => StatusProperty::Consume {},
-            StatusPropertyFile::Single => StatusProperty::Single {},
+            StatusPropertyFile::Duration => StatusProperty::Duration,
+            StatusPropertyFile::Elapsed => StatusProperty::Elapsed,
+            StatusPropertyFile::Volume => StatusProperty::Volume,
+            StatusPropertyFile::Repeat => StatusProperty::Repeat,
+            StatusPropertyFile::Random => StatusProperty::Random,
+            StatusPropertyFile::Consume => StatusProperty::Consume,
+            StatusPropertyFile::Single => StatusProperty::Single,
             StatusPropertyFile::Bitrate => StatusProperty::Bitrate,
             StatusPropertyFile::Crossfade => StatusProperty::Crossfade,
         })
@@ -177,12 +179,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for &'static Property<'static, Prop
     type Error = anyhow::Error;
 
     fn try_from(value: PropertyFile<PropertyKindFile>) -> std::prelude::v1::Result<Self, Self::Error> {
-        Property::<'static, PropertyKind>::try_from(value)
-            .map(|v| Box::leak(Box::new(v)))
-            .map(|v| {
-                let v: &'static Property<_> = v;
-                v
-            })
+        Property::<'static, PropertyKind>::try_from(value).map(|v| v.leak())
     }
 }
 
@@ -192,9 +189,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
     fn try_from(value: PropertyFile<PropertyKindFile>) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             kind: match value.kind {
-                PropertyKindFileOrText::Text(value) => {
-                    PropertyKindOrText::Text(Box::leak(Box::new(value)) as &'static str)
-                }
+                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(match prop {
                     PropertyKindFile::Song(s) => PropertyKind::Song(s.try_into()?),
                     PropertyKindFile::Status(s) => PropertyKind::Status(s.try_into()?),
@@ -209,6 +204,13 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
                         separator_style: separator_style.to_config_or(Some(Color::White), None)?,
                     }),
                 }),
+                PropertyKindFileOrText::Group(group) => {
+                    let res: Vec<_> = group
+                        .into_iter()
+                        .map(|p| -> Result<&'static Property<'static, PropertyKind>> { p.try_into() })
+                        .try_collect()?;
+                    PropertyKindOrText::Group(res.leak())
+                }
             },
             style: Some(value.style.to_config_or(None, None)?),
             default: value
@@ -229,16 +231,8 @@ impl TryFrom<SongFormatFile> for SongFormat {
     type Error = anyhow::Error;
 
     fn try_from(value: SongFormatFile) -> Result<Self, Self::Error> {
-        let properites: Vec<_> = value
-            .0
-            .into_iter()
-            .map(|v| -> Result<_> {
-                let res = Box::leak(Box::new(Property::try_from(v)?));
-                Ok(res as &'static Property<'static, SongProperty>)
-            })
-            .try_collect()?;
-
-        Ok(SongFormat(Box::leak(Box::new(properites))))
+        let properites: Vec<_> = value.0.into_iter().map(|v| v.try_into()).try_collect()?;
+        Ok(SongFormat(properites.leak()))
     }
 }
 
@@ -246,35 +240,39 @@ impl Default for SongFormatFile {
     fn default() -> Self {
         Self(vec![
             PropertyFile {
-                kind: PropertyKindFileOrText::Property(SongPropertyFile::Track),
-                style: None,
-                default: Some(Box::new(PropertyFile {
-                    kind: PropertyKindFileOrText::Text("--".to_string()),
-                    style: None,
-                    default: None,
-                })),
-            },
-            PropertyFile {
-                kind: PropertyKindFileOrText::Text(" ".to_string()),
-                style: None,
-                default: None,
-            },
-            PropertyFile {
-                kind: PropertyKindFileOrText::Property(SongPropertyFile::Artist),
-                style: None,
-                default: Some(Box::new(PropertyFile {
-                    kind: PropertyKindFileOrText::Text("Unknown Artist".to_string()),
-                    style: None,
-                    default: None,
-                })),
-            },
-            PropertyFile {
-                kind: PropertyKindFileOrText::Text(" - ".to_string()),
+                kind: PropertyKindFileOrText::Group(vec![
+                    PropertyFile {
+                        kind: PropertyKindFileOrText::Property(SongPropertyFile::Track),
+                        style: None,
+                        default: None,
+                    },
+                    PropertyFile {
+                        kind: PropertyKindFileOrText::Text(" ".to_string()),
+                        style: None,
+                        default: None,
+                    },
+                ]),
                 style: None,
                 default: None,
             },
             PropertyFile {
-                kind: PropertyKindFileOrText::Property(SongPropertyFile::Title),
+                kind: PropertyKindFileOrText::Group(vec![
+                    PropertyFile {
+                        kind: PropertyKindFileOrText::Property(SongPropertyFile::Artist),
+                        style: None,
+                        default: None,
+                    },
+                    PropertyFile {
+                        kind: PropertyKindFileOrText::Text(" - ".to_string()),
+                        style: None,
+                        default: None,
+                    },
+                    PropertyFile {
+                        kind: PropertyKindFileOrText::Property(SongPropertyFile::Title),
+                        style: None,
+                        default: None,
+                    },
+                ]),
                 style: None,
                 default: Some(Box::new(PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Filename),

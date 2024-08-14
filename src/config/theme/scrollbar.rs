@@ -59,12 +59,7 @@ impl ScrollbarConfigFile {
         let sb_down = std::mem::take(&mut self.symbols[3]);
 
         Ok(ScrollbarConfig {
-            symbols: [
-                Box::leak(Box::new(sb_track)),
-                Box::leak(Box::new(sb_thumb)),
-                Box::leak(Box::new(sb_up)),
-                Box::leak(Box::new(sb_down)),
-            ],
+            symbols: [sb_track.leak(), sb_thumb.leak(), sb_up.leak(), sb_down.leak()],
             ends_style: self.ends_style.to_config_or(Some(fallback_color), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(fallback_color), None)?,

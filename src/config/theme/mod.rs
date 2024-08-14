@@ -1,7 +1,7 @@
+use ::serde::{Deserialize, Serialize};
 use anyhow::Result;
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
-use serde::{Deserialize, Serialize};
 
 use self::{
     header::{HeaderConfig, HeaderConfigFile},
@@ -182,9 +182,9 @@ pub struct SymbolsConfig {
 impl From<SymbolsFile> for SymbolsConfig {
     fn from(value: SymbolsFile) -> Self {
         Self {
-            song: Box::leak(Box::new(value.song)),
-            dir: Box::leak(Box::new(value.dir)),
-            marker: Box::leak(Box::new(value.marker)),
+            song: value.song.leak(),
+            dir: value.dir.leak(),
+            marker: value.marker.leak(),
         }
     }
 }
@@ -213,9 +213,9 @@ impl TryFrom<UiConfigFile> for UiConfig {
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
             progress_bar: value.progress_bar.into_config()?,
-            song_table_format: Box::leak(Box::new(
-                TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
-            )),
+            song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?
+                .0
+                .leak(),
             header: value.header.try_into()?,
             column_widths: [
                 value.browser_column_widths[0],
@@ -233,14 +233,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
             current_item_style: value
                 .current_item_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-            default_album_art: value.default_album_art_path.map_or(
-                Ok(DEFAULT_ART as &'static [u8]),
-                |path| -> Result<_> {
-                    let res = std::fs::read(path)?;
-                    let res: &'static [u8] = Box::leak(Box::new(res));
-                    Ok(res)
-                },
-            )?,
+            default_album_art: value
+                .default_album_art_path
+                .map_or(Ok(DEFAULT_ART as &'static [u8]), |path| -> Result<_> {
+                    Ok(std::fs::read(path)?.leak())
+                })?,
             browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
         })
     }

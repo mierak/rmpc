@@ -62,8 +62,9 @@ impl<'a> PropertyTemplates<'a> {
     fn format(&'a self, song: Option<&'a Song>, status: &'a Status) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(song, status) {
-                Either::Left(span) => acc.push(span),
-                Either::Right(ref mut spans) => acc.append(spans),
+                Some(Either::Left(span)) => acc.push(span),
+                Some(Either::Right(ref mut spans)) => acc.append(spans),
+                None => {}
             }
             acc
         }))
