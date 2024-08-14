@@ -143,7 +143,7 @@ fn main() -> Result<()> {
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
-            log::debug!(rev = env!("VERGEN_GIT_DESCRIBE"), date = env!("VERGEN_GIT_COMMIT_DATE"); "rmpc started");
+            log::debug!(rev = env!("VERGEN_GIT_DESCRIBE"); "rmpc started");
             std::thread::spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()));
 
             let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
