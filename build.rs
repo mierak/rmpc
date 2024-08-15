@@ -36,12 +36,7 @@ fn generate_shell_completions(mut cmd: ClapCommand) -> Result<(), Box<dyn Error>
 
 fn emit_git_info() -> Result<(), Box<dyn Error>> {
     Emitter::default()
-        .add_instructions(
-            &GitclBuilder::default()
-                .commit_date(true)
-                .describe(false, false, None)
-                .build()?,
-        )?
+        .add_instructions(&GitclBuilder::default().describe(false, false, None).build()?)?
         .emit()?;
 
     Ok(())
