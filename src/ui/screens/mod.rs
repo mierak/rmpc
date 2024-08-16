@@ -860,7 +860,7 @@ mod format_tests {
 
         use crate::{
             config::theme::properties::{PropertyKind, StatusProperty},
-            mpd::commands::{status::OnOffOneshot, volume::Bound, State, Status, Volume},
+            mpd::commands::{status::OnOffOneshot, State, Status, Volume},
         };
 
         use super::*;
@@ -1197,6 +1197,51 @@ mod format_tests {
             let result = format.as_string(Some(&song));
 
             assert_eq!(result, Some("fallbacktext".to_owned()));
+        }
+
+        #[test]
+        fn group_nesting() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Group(&[
+                    &Property {
+                        kind: PropertyKindOrText::Group(&[
+                            &Property {
+                                kind: PropertyKindOrText::Property(SongProperty::Track),
+                                style: None,
+                                default: None,
+                            },
+                            &Property {
+                                kind: PropertyKindOrText::Text("inner"),
+                                style: None,
+                                default: None,
+                            },
+                        ]),
+                        style: None,
+                        default: Some(&Property {
+                            kind: PropertyKindOrText::Text("innerfallback"),
+                            style: None,
+                            default: None,
+                        }),
+                    },
+                    &Property {
+                        kind: PropertyKindOrText::Text("outer"),
+                        style: None,
+                        default: None,
+                    },
+                ]),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: None,
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("innerfallbackouter".to_owned()));
         }
     }
 }
