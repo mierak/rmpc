@@ -75,8 +75,8 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::ShowOutputs => GlobalAction::ShowOutputs,
             GlobalActionFile::CommandMode => GlobalAction::CommandMode,
             GlobalActionFile::Command { command, description } => GlobalAction::Command {
-                command: Box::leak(Box::new(command)),
-                description: description.map(|s| Box::leak(Box::new(s)) as &'static str),
+                command: command.leak(),
+                description: description.map(|s| s.leak() as &'static str),
             },
             GlobalActionFile::ShowHelp => GlobalAction::ShowHelp,
             GlobalActionFile::NextTrack => GlobalAction::NextTrack,

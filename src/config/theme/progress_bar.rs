@@ -59,11 +59,7 @@ impl ProgressBarConfigFile {
         let track = std::mem::take(&mut self.symbols[2]);
 
         Ok(ProgressBarConfig {
-            symbols: [
-                Box::leak(Box::new(elapsed)),
-                Box::leak(Box::new(thumb)),
-                Box::leak(Box::new(track)),
-            ],
+            symbols: [elapsed.leak(), thumb.leak(), track.leak()],
             elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::Black), None)?,

@@ -3,6 +3,8 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::config::Leak;
+
 use super::properties::{
     Alignment, Property, PropertyFile, PropertyKindFileOrText, PropertyKindOrText, SongProperty, SongPropertyFile,
 };
@@ -131,10 +133,12 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                     let label = v.label.unwrap_or_else(|| match &prop.kind {
                         PropertyKindOrText::Text { .. } => String::new(),
                         PropertyKindOrText::Property(prop) => prop.to_string(),
+                        PropertyKindOrText::Group(_) => String::new(),
                     });
+
                     Ok(SongTableColumn {
-                        prop: Box::leak(Box::new(prop)),
-                        label: Box::leak(Box::new(label)),
+                        prop: prop.leak(),
+                        label: label.leak(),
                         width_percent: v.width_percent,
                         alignment: v.alignment.unwrap_or(Alignment::Left),
                     })
@@ -148,12 +152,7 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for &'static Property<'static, Song
     type Error = anyhow::Error;
 
     fn try_from(value: PropertyFile<SongPropertyFile>) -> std::prelude::v1::Result<Self, Self::Error> {
-        Property::<'static, SongProperty>::try_from(value)
-            .map(|v| Box::leak(Box::new(v)))
-            .map(|v| {
-                let v: &'static Property<_> = v;
-                v
-            })
+        Property::<'static, SongProperty>::try_from(value).map(|v| v.leak())
     }
 }
 impl TryFrom<PropertyFile<SongPropertyFile>> for Property<'static, SongProperty> {
@@ -162,10 +161,15 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<'static, SongProperty>
     fn try_from(value: PropertyFile<SongPropertyFile>) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             kind: match value.kind {
-                PropertyKindFileOrText::Text(value) => {
-                    PropertyKindOrText::Text(Box::leak(Box::new(value)) as &'static str)
-                }
+                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.try_into()?),
+                PropertyKindFileOrText::Group(group) => {
+                    let res: Vec<_> = group
+                        .into_iter()
+                        .map(|p| -> Result<&'static Property<'static, SongProperty>> { p.try_into() })
+                        .try_collect()?;
+                    PropertyKindOrText::Group(res.leak())
+                }
             },
             style: Some(value.style.to_config_or(None, None)?),
             default: value

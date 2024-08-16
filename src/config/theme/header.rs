@@ -216,15 +216,13 @@ impl TryFrom<HeaderConfigFile> for HeaderConfig {
                     .collect::<Result<Vec<_>>>()?;
 
                 Ok(HeaderConfigRow {
-                    left: Box::leak(Box::new(left)),
-                    center: Box::leak(Box::new(center)),
-                    right: Box::leak(Box::new(right)),
+                    left: left.leak(),
+                    center: center.leak(),
+                    right: right.leak(),
                 })
             })
             .try_collect()?;
 
-        Ok(Self {
-            rows: Box::leak(Box::new(rows)),
-        })
+        Ok(Self { rows: rows.leak() })
     }
 }

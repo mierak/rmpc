@@ -146,35 +146,58 @@ pub(crate) mod browser {
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
 
-            let title = Line::from(vec![
+            let file = Line::from(vec![
                 start_of_line_spacer.clone(),
-                Span::styled("Title", key_style),
+                Span::styled("File", key_style),
                 separator.clone(),
-                Span::from(self.title.as_ref().map_or("Untitled", |v| v.as_str()).to_owned()),
+                Span::from(self.file.clone()),
             ]);
-            let artist = Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Artist", key_style),
-                separator.clone(),
-                Span::from(self.artist.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-            ]);
-            let album = Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Album", key_style),
-                separator.clone(),
-                Span::from(self.album.as_ref().map_or("Unknown", |v| v.as_str()).to_owned()),
-            ]);
-            let duration = Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Duration", key_style),
-                separator.clone(),
-                Span::from(
-                    self.duration
-                        .as_ref()
-                        .map_or("-".to_owned(), |v| v.as_secs().to_string()),
-                ),
-            ]);
-            let mut r = vec![title, artist, album, duration];
+            let mut r = vec![file];
+
+            if let Some(file_name) = self.file_name() {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Filename", key_style),
+                    separator.clone(),
+                    Span::from(file_name.into_owned()),
+                ]));
+            }
+
+            if let Some(title) = &self.title {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Title", key_style),
+                    separator.clone(),
+                    Span::from(title.clone()),
+                ]));
+            }
+            if let Some(artist) = &self.artist {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Artist", key_style),
+                    separator.clone(),
+                    Span::from(artist.clone()),
+                ]));
+            }
+
+            if let Some(album) = &self.album {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Album", key_style),
+                    separator.clone(),
+                    Span::from(album.clone()),
+                ]));
+            }
+
+            if let Some(duration) = &self.duration {
+                r.push(Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Duration", key_style),
+                    separator.clone(),
+                    Span::from(duration.as_secs().to_string()),
+                ]));
+            }
+
             for (k, v) in &self.others {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
@@ -372,9 +395,16 @@ impl Song {
         self.artist.as_ref().map_or("Untitled", |v| v.as_str())
     }
 
+    pub fn file_name(&self) -> Option<Cow<str>> {
+        std::path::Path::new(&self.file)
+            .file_name()
+            .map(|file_name| file_name.to_string_lossy())
+    }
+
     fn format<'song>(&'song self, property: &SongProperty) -> Option<Cow<'song, str>> {
         match property {
-            SongProperty::Filename => Some(Cow::Borrowed(self.file.as_str())),
+            SongProperty::Filename => self.file_name(),
+            SongProperty::File => Some(Cow::Borrowed(self.file.as_str())),
             SongProperty::Title => self.title.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Artist => self.artist.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Album => self.album.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
@@ -390,13 +420,14 @@ impl Song {
     pub fn matches(&self, config: &Config, formats: &[&Property<'static, SongProperty>], filter: &str) -> bool {
         for format in formats {
             let match_found = match &format.kind {
-                PropertyKindOrText::Text(value) => value.matches(config, filter),
+                PropertyKindOrText::Text(value) => Some(value.matches(config, filter)),
                 PropertyKindOrText::Property(property) => self.format(property).map_or_else(
-                    || format.default.is_some_and(|f| self.matches(config, &[f], filter)),
-                    |p| p.to_lowercase().contains(filter),
+                    || format.default.map(|f| self.matches(config, &[f], filter)),
+                    |p| Some(p.to_lowercase().contains(filter)),
                 ),
+                PropertyKindOrText::Group(_) => format.as_string(Some(self)).map(|v| v.matches(config, filter)),
             };
-            if match_found {
+            if match_found.is_some_and(|v| v) {
                 return true;
             }
         }
@@ -407,44 +438,67 @@ impl Song {
         &'song self,
         format: &'static Property<'static, SongProperty>,
         max_len: usize,
-    ) -> Line<'song> {
-        format
-            .default
-            .as_ref()
-            .map_or(Line::default(), |f| self.as_line_ellipsized(f, max_len))
+    ) -> Option<Line<'song>> {
+        format.default.and_then(|f| self.as_line_ellipsized(f, max_len))
     }
 
     pub fn as_line_ellipsized<'song>(
         &'song self,
         format: &'static Property<'static, SongProperty>,
         max_len: usize,
-    ) -> Line<'song> {
+    ) -> Option<Line<'song>> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
-            PropertyKindOrText::Text(value) => Line::styled((*value).ellipsize(max_len).to_string(), style),
+            PropertyKindOrText::Text(value) => Some(Line::styled((*value).ellipsize(max_len).to_string(), style)),
             PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                 || self.default_as_line_ellipsized(format, max_len),
-                |v| Line::styled(v.ellipsize(max_len).into_owned(), style),
+                |v| Some(Line::styled(v.ellipsize(max_len).into_owned(), style)),
             ),
+            PropertyKindOrText::Group(group) => {
+                let mut buf = Line::default();
+                for grformat in *group {
+                    if let Some(res) = self.as_line_ellipsized(grformat, max_len) {
+                        for span in res.spans {
+                            buf.push_span(span);
+                        }
+                    } else {
+                        return format
+                            .default
+                            .and_then(|format| self.as_line_ellipsized(format, max_len));
+                    }
+                }
+                return Some(buf);
+            }
         }
     }
 }
 
 impl Property<'static, SongProperty> {
-    fn default(&self, song: Option<&Song>) -> String {
-        self.default.as_ref().map_or(String::new(), |p| p.as_string(song))
+    fn default(&self, song: Option<&Song>) -> Option<String> {
+        self.default.and_then(|p| p.as_string(song))
     }
 
-    pub fn as_string(&self, song: Option<&Song>) -> String {
+    pub fn as_string(&self, song: Option<&Song>) -> Option<String> {
         match &self.kind {
-            PropertyKindOrText::Text(value) => (*value).to_string(),
+            PropertyKindOrText::Text(value) => Some((*value).to_string()),
             PropertyKindOrText::Property(property) => {
                 if let Some(song) = song {
                     song.format(property)
-                        .map_or_else(|| self.default(Some(song)), |v| v.into_owned())
+                        .map_or_else(|| self.default(Some(song)), |v| Some(v.into_owned()))
                 } else {
                     self.default(song)
                 }
+            }
+            PropertyKindOrText::Group(group) => {
+                let mut buf = String::new();
+                for format in *group {
+                    if let Some(res) = format.as_string(song) {
+                        buf.push_str(&res);
+                    } else {
+                        return self.default.and_then(|d| d.as_string(song));
+                    }
+                }
+                return Some(buf);
             }
         }
     }
@@ -455,56 +509,63 @@ impl Property<'static, PropertyKind> {
         &self,
         song: Option<&'song Song>,
         status: &'song Status,
-    ) -> Either<Span<'s>, Vec<Span<'s>>> {
-        self.default
-            .as_ref()
-            .map_or(Either::Right(Vec::default()), |p| p.as_span(song, status))
+    ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
+        self.default.and_then(|p| p.as_span(song, status))
     }
 
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
         status: &'song Status,
-    ) -> Either<Span<'s>, Vec<Span<'s>>> {
+    ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
-            PropertyKindOrText::Text(value) => Either::Left(Span::styled(*value, style)),
+            PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(*value, style))),
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
                     song.format(property).map_or_else(
                         || self.default_as_span(Some(song), status),
-                        |s| Either::Left(Span::styled(s, style)),
+                        |s| Some(Either::Left(Span::styled(s, style))),
                     )
                 } else {
                     self.default_as_span(song, status)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
-                StatusProperty::State => Either::Left(Span::styled(status.state.as_ref(), style)),
-                StatusProperty::Duration => Either::Left(Span::styled(status.duration.to_string(), style)),
-                StatusProperty::Elapsed => Either::Left(Span::styled(status.elapsed.to_string(), style)),
-                StatusProperty::Volume => Either::Left(Span::styled(status.volume.value().to_string(), style)),
-                StatusProperty::Repeat => Either::Left(Span::styled(if status.repeat { "On" } else { "Off" }, style)),
-                StatusProperty::Random => Either::Left(Span::styled(if status.random { "On" } else { "Off" }, style)),
-                StatusProperty::Consume => Either::Left(Span::styled(status.consume.to_string(), style)),
-                StatusProperty::Single => Either::Left(Span::styled(status.single.to_string(), style)),
+                StatusProperty::State => Some(Either::Left(Span::styled(status.state.as_ref(), style))),
+                StatusProperty::Duration => Some(Either::Left(Span::styled(status.duration.to_string(), style))),
+                StatusProperty::Elapsed => Some(Either::Left(Span::styled(status.elapsed.to_string(), style))),
+                StatusProperty::Volume => Some(Either::Left(Span::styled(status.volume.value().to_string(), style))),
+                StatusProperty::Repeat => Some(Either::Left(Span::styled(
+                    if status.repeat { "On" } else { "Off" },
+                    style,
+                ))),
+                StatusProperty::Random => Some(Either::Left(Span::styled(
+                    if status.random { "On" } else { "Off" },
+                    style,
+                ))),
+                StatusProperty::Consume => Some(Either::Left(Span::styled(status.consume.to_string(), style))),
+                StatusProperty::Single => Some(Either::Left(Span::styled(status.single.to_string(), style))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
                     || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.to_string(), Style::default())),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), Style::default()))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
                     || self.default_as_span(song, status),
-                    |v| Either::Left(Span::styled(v.to_string(), Style::default())),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), Style::default()))),
                 ),
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
-                WidgetProperty::Volume => Either::Left(Span::styled(Volume::get_str(*status.volume.value()), style)),
+                WidgetProperty::Volume => Some(Either::Left(Span::styled(
+                    Volume::get_str(*status.volume.value()),
+                    style,
+                ))),
                 WidgetProperty::States {
                     active_style,
                     separator_style,
                 } => {
                     let separator = Span::styled(" / ", *separator_style);
-                    Either::Right(vec![
+                    Some(Either::Right(vec![
                         Span::styled("Repeat", if status.repeat { *active_style } else { style }),
                         separator.clone(),
                         Span::styled("Random", if status.random { *active_style } else { style }),
@@ -520,9 +581,20 @@ impl Property<'static, PropertyKind> {
                             OnOffOneshot::Off => Span::styled("Single", style),
                             OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", *active_style),
                         },
-                    ])
+                    ]))
                 }
             },
+            PropertyKindOrText::Group(group) => {
+                let mut buf = Vec::new();
+                for format in *group {
+                    match format.as_span(song, status) {
+                        Some(Either::Left(span)) => buf.push(span),
+                        Some(Either::Right(spans)) => buf.extend(spans),
+                        None => return None,
+                    }
+                }
+                return Some(Either::Right(buf));
+            }
         }
     }
 }
@@ -766,6 +838,410 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
             CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender), // todo out?
             CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // todo next?
+        }
+    }
+}
+
+#[cfg(test)]
+mod format_tests {
+    use crate::{
+        config::{
+            theme::properties::{Property, PropertyKindOrText, SongProperty},
+            Leak,
+        },
+        mpd::commands::Song,
+    };
+
+    mod correct_values {
+        use std::{collections::HashMap, time::Duration};
+
+        use ratatui::text::Span;
+        use test_case::test_case;
+
+        use crate::{
+            config::theme::properties::{PropertyKind, StatusProperty},
+            mpd::commands::{status::OnOffOneshot, State, Status, Volume},
+        };
+
+        use super::*;
+
+        #[test_case(SongProperty::Title, "title")]
+        #[test_case(SongProperty::Artist, "artist")]
+        #[test_case(SongProperty::Album, "album")]
+        #[test_case(SongProperty::Track, "123")]
+        #[test_case(SongProperty::Duration, "2:03")]
+        #[test_case(SongProperty::Other("track"), "123")]
+        fn song_property_resolves_correctly(prop: SongProperty, expected: &str) {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Property(prop),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                id: 123,
+                file: "file".to_owned(),
+                album: Some("album".to_owned()),
+                duration: Some(Duration::from_secs(123)),
+                others: HashMap::from([("track".to_string(), "123".to_string())]),
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some(expected.to_string()));
+        }
+
+        #[test_case(StatusProperty::Volume, "100")]
+        #[test_case(StatusProperty::Repeat, "On")]
+        #[test_case(StatusProperty::Random, "On")]
+        #[test_case(StatusProperty::Single, "On")]
+        #[test_case(StatusProperty::Consume, "On")]
+        #[test_case(StatusProperty::Elapsed, "2:03")]
+        #[test_case(StatusProperty::Duration, "2:03")]
+        #[test_case(StatusProperty::Crossfade, "3")]
+        #[test_case(StatusProperty::Bitrate, "123")]
+        fn status_property_resolves_correctly(prop: StatusProperty, expected: &str) {
+            let format = Property::<'static, PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                id: 123,
+                file: "file".to_owned(),
+                album: Some("album".to_owned()),
+                duration: Some(Duration::from_secs(123)),
+                others: HashMap::from([("track".to_string(), "123".to_string())]),
+            };
+            let status = Status {
+                volume: Volume::new(123),
+                repeat: true,
+                random: true,
+                single: OnOffOneshot::On,
+                consume: OnOffOneshot::On,
+                bitrate: Some(123),
+                elapsed: Duration::from_secs(123),
+                duration: Duration::from_secs(123),
+                xfade: Some(3),
+                state: State::Play,
+                ..Default::default()
+            };
+
+            let result = format.as_span(Some(&song), &status);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+    }
+
+    mod property {
+        use super::*;
+
+        #[test]
+        fn works() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Property(SongProperty::Title),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("title".to_owned()));
+        }
+
+        #[test]
+        fn falls_back() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Property(SongProperty::Track),
+                style: None,
+                default: Some(
+                    Property {
+                        kind: PropertyKindOrText::Text("fallback"),
+                        style: None,
+                        default: None,
+                    }
+                    .leak(),
+                ),
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("fallback".to_owned()));
+        }
+
+        #[test]
+        fn falls_back_to_none() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Property(SongProperty::Track),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, None);
+        }
+    }
+
+    mod text {
+        use super::*;
+
+        #[test]
+        fn works() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Text("test"),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("test".to_owned()));
+        }
+
+        #[test]
+        fn fallback_is_ignored() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Text("test"),
+                style: None,
+                default: Some(
+                    Property {
+                        kind: PropertyKindOrText::Text("fallback"),
+                        style: None,
+                        default: None,
+                    }
+                    .leak(),
+                ),
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("test".to_owned()));
+        }
+    }
+
+    mod group {
+        use super::*;
+
+        #[test]
+        fn group_no_fallback() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Group(&[
+                    &Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Track),
+                        style: None,
+                        default: None,
+                    },
+                    &Property {
+                        kind: PropertyKindOrText::Text(" "),
+                        style: None,
+                        default: None,
+                    },
+                ]),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn group_fallback() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Group(&[
+                    &Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Track),
+                        style: None,
+                        default: None,
+                    },
+                    &Property {
+                        kind: PropertyKindOrText::Text(" "),
+                        style: None,
+                        default: None,
+                    },
+                ]),
+                style: None,
+                default: Some(
+                    Property {
+                        kind: PropertyKindOrText::Text("fallback"),
+                        style: None,
+                        default: None,
+                    }
+                    .leak(),
+                ),
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("fallback".to_owned()));
+        }
+
+        #[test]
+        fn group_resolved() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Group(&[
+                    &Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Title),
+                        style: None,
+                        default: None,
+                    },
+                    &Property {
+                        kind: PropertyKindOrText::Text("text"),
+                        style: None,
+                        default: None,
+                    },
+                ]),
+                style: None,
+                default: Some(
+                    Property {
+                        kind: PropertyKindOrText::Text("fallback"),
+                        style: None,
+                        default: None,
+                    }
+                    .leak(),
+                ),
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("titletext".to_owned()));
+        }
+
+        #[test]
+        fn group_fallback_in_group() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Group(&[
+                    &Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Track),
+                        style: None,
+                        default: Some(&Property {
+                            kind: PropertyKindOrText::Text("fallback"),
+                            style: None,
+                            default: None,
+                        }),
+                    },
+                    &Property {
+                        kind: PropertyKindOrText::Text("text"),
+                        style: None,
+                        default: None,
+                    },
+                ]),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: Some("artist".to_owned()),
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("fallbacktext".to_owned()));
+        }
+
+        #[test]
+        fn group_nesting() {
+            let format = Property::<'static, SongProperty> {
+                kind: PropertyKindOrText::Group(&[
+                    &Property {
+                        kind: PropertyKindOrText::Group(&[
+                            &Property {
+                                kind: PropertyKindOrText::Property(SongProperty::Track),
+                                style: None,
+                                default: None,
+                            },
+                            &Property {
+                                kind: PropertyKindOrText::Text("inner"),
+                                style: None,
+                                default: None,
+                            },
+                        ]),
+                        style: None,
+                        default: Some(&Property {
+                            kind: PropertyKindOrText::Text("innerfallback"),
+                            style: None,
+                            default: None,
+                        }),
+                    },
+                    &Property {
+                        kind: PropertyKindOrText::Text("outer"),
+                        style: None,
+                        default: None,
+                    },
+                ]),
+                style: None,
+                default: None,
+            };
+
+            let song = Song {
+                title: Some("title".to_owned()),
+                artist: None,
+                ..Default::default()
+            };
+
+            let result = format.as_string(Some(&song));
+
+            assert_eq!(result, Some("innerfallbackouter".to_owned()));
         }
     }
 }
