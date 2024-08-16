@@ -19,8 +19,8 @@ Describes a single column in the song table. This is a recursive data structure.
 
 ### prop
 
-<ConfigValue name="prop" type="other" customText="<song_property>" link="#song_property" />
-Property of the song to display in the column. Described in [its own section](#song_property)
+<ConfigValue name="prop" type="other" customText="<property>" link="#property" />
+Property of the song to display in the column. Described in [its own section](#property)
 
 ### width_percent
 
@@ -37,14 +37,14 @@ Percentage of the table reserved for this column. Sum of these value must be 100
 <ConfigValue name="label" type="string" optional />
 Optional label for the column. Displayed in the table header. Name of the property is used if not provided.
 
-## song_property
+## property
 
-<ConfigValue type="other" customText="(kind: <song_property_kind>, style: <style>, default: <song_property>)" />
+<ConfigValue type="other" customText="(kind: <property_kind>, style: <style>, default: <property>)" />
 
 ### kind
 
-<ConfigValue name="kind" type="other" customText="<song_property_kind>" link="#song_property_kind" />
-What property to display. Described in [its own section](#song_property_kind)
+<ConfigValue name="kind" type="other" customText="<property_kind>" link="#property_kind" />
+What property to display. Described in [its own section](#property_kind)
 
 ### style
 
@@ -53,13 +53,12 @@ Style for the property.
 
 ### default
 
-<ConfigValue name="default" type="other" customText="<song_property>" />
-This is a normal [song_property](#song_property). It is used as a fallback value when the current property is not
-defined
+<ConfigValue name="default" type="other" customText="<property>" />
+This is a normal [property](#property). It is used as a fallback value when the current property is not defined
 
-## song_property_kind
+## property_kind
 
-Kind can be one of two values, static `Text` or `Property` which shows one of the metadata tags which are present on the
+Kind can be one of three values, static `Text`, `Group` or `Property` which shows one of the metadata tags which are present on the
 song. There are a few predefined tags that can be used, but a special value is provided to display any arbitraty tag.
 
 ### Text
@@ -68,11 +67,35 @@ song. There are a few predefined tags that can be used, but a special value is p
 Will display static text in the table. Mostly useful for default values. For example if a song is missing an album tag,
 "Unknown Album" can be displayed by specifying `Text("Unknown Album")` as the default.
 
+### Group
+
+<ConfigValue name="kind" type="other" customText="Group(<property>)" link="#property" />A special kind of property that
+groups multiple properties together. If any of the properties in the group results in a `None` value, the whole group is
+considered `None` and the default value is used.
+
+Consider the following example:
+
+```rust
+(
+    kind: Group([
+        (kind: Property(Artist)),
+        (kind: Text(" - ")),
+        (kind: Property(Title)),
+    ]),
+    default: (kind: Property(Filename))
+),
+
+```
+
+If the artist or tilte of the song is missing is missing in its metadata, the whole group will be skipped, including the `Text`
+property and the song's filename will be displayed instead.
+
 ### Property
 
 <ConfigValue
     name="kind"
     type={[
+        "Property(File)",
         "Property(Filename)",
         "Property(Title)",
         "Property(Artist)",

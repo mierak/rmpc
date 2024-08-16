@@ -130,18 +130,11 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                 .into_iter()
                 .map(|v| -> Result<_> {
                     let prop: Property<SongProperty> = v.prop.try_into()?;
-                    let label = v.label.map_or_else(
-                        || match &prop.kind {
-                            PropertyKindOrText::Text { .. } => Ok(String::new()),
-                            PropertyKindOrText::Property(prop) => Ok(prop.to_string()),
-                            PropertyKindOrText::Group(_) => {
-                                // TODD this probably has no reason to not be allowed
-                                // verify and allow
-                                return Err(anyhow::anyhow!("Group property is not allowed in song table format"));
-                            }
-                        },
-                        Ok,
-                    )?;
+                    let label = v.label.unwrap_or_else(|| match &prop.kind {
+                        PropertyKindOrText::Text { .. } => String::new(),
+                        PropertyKindOrText::Property(prop) => prop.to_string(),
+                        PropertyKindOrText::Group(_) => String::new(),
+                    });
 
                     Ok(SongTableColumn {
                         prop: prop.leak(),
