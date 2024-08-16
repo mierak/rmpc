@@ -21,8 +21,9 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 use crate::{
     config::Size,
     utils::{
-        image_proto::{get_image_size, resize_image},
+        image_proto::{get_image_area_size_px, resize_image},
         macros::{try_cont, try_skip},
+        tmux,
     },
     AppEvent,
 };
@@ -56,7 +57,7 @@ impl Sixel {
 
         std::thread::spawn(move || loop {
             if let Ok((width, height, full_render, data)) = receiver.recv() {
-                let buf = try_cont!(encode(width, height, &data, max_size), "");
+                let buf = try_cont!(encode(width, height, &data, max_size), "Failed to encode");
 
                 try_skip!(encoded_tx.send(buf), "Failed to send encoded data");
                 try_cont!(
@@ -108,7 +109,7 @@ impl Sixel {
 fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8>> {
     let start = Instant::now();
 
-    let (iwidth, iheight) = match get_image_size(width.into(), height.into(), max_size.width, max_size.height) {
+    let (iwidth, iheight) = match get_image_area_size_px(width, height, max_size) {
         Ok(v) => v,
         Err(err) => {
             bail!("Failed to get image size, err: {}", err);
@@ -122,108 +123,19 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
         }
     };
 
+    let tmux = tmux::is_inside_tmux();
     let mut buf = Vec::new();
 
-    write!(buf, "\x1bP0;7q\"1;1;{};{}", image.width(), image.height())?;
+    if tmux {
+        write!(buf, "\x1bPtmux;\x1b\x1bP0;7q\"1;1;{};{}", image.width(), image.height())?;
+    } else {
+        write!(buf, "\x1bP0;7q\"1;1;{};{}", image.width(), image.height())?;
+    }
+
     let quantized = NeuQuant::new(10, 256, &image.to_rgba8());
     for (i, [r, g, b]) in quantized.color_map_rgb().u16_triples(|v| v * 100 / 255).enumerate() {
         write!(buf, "#{i};2;{r};{g};{b}")?;
     }
-
-    // for y in (0..image.height() as usize).step_by(6) {
-    //     if y + 6 >= image.height() as usize {
-    //         break;
-    //     }
-    //     let mut visited_colors = [false; 256];
-    //     let mut colors_to_visit: Vec<u8> = vec![
-    //         color_data[y][0],
-    //         color_data[y + 1][0],
-    //         color_data[y + 2][0],
-    //         color_data[y + 3][0],
-    //         color_data[y + 4][0],
-    //         color_data[y + 5][0],
-    //     ]
-    //     .into_iter()
-    //     .sorted()
-    //     .dedup()
-    //     .collect();
-    //
-    //     while let Some(color_idx) = colors_to_visit.pop() {
-    //         if visited_colors[color_idx as usize] {
-    //             continue;
-    //         }
-    //         let mut prevchar = b'?' as char;
-    //         let mut prevcolor = 0;
-    //         let mut repeat = 0;
-    //         for x in 0..image.width() as usize {
-    //             let mut character: u8 = 63;
-    //
-    //             let a = color_data[y][x];
-    //             let b = color_data[y + 1][x];
-    //             let c = color_data[y + 2][x];
-    //             let d = color_data[y + 3][x];
-    //             let e = color_data[y + 4][x];
-    //             let f = color_data[y + 5][x];
-    //
-    //             if a == color_idx {
-    //                 character += 1;
-    //             } else if !visited_colors[a as usize] {
-    //                 colors_to_visit.push(a);
-    //             }
-    //             if b == color_idx {
-    //                 character += 2;
-    //             } else if !visited_colors[b as usize] {
-    //                 colors_to_visit.push(b);
-    //             }
-    //             if c == color_idx {
-    //                 character += 4;
-    //             } else if !visited_colors[c as usize] {
-    //                 colors_to_visit.push(c);
-    //             }
-    //             if d == color_idx {
-    //                 character += 8;
-    //             } else if !visited_colors[d as usize] {
-    //                 colors_to_visit.push(d);
-    //             }
-    //             if e == color_idx {
-    //                 character += 16;
-    //             } else if !visited_colors[e as usize] {
-    //                 colors_to_visit.push(e);
-    //             }
-    //             if f == color_idx {
-    //                 character += 32;
-    //             } else if !visited_colors[f as usize] {
-    //                 colors_to_visit.push(f);
-    //             }
-    //
-    //             let character = character as char;
-    //             if (color_idx == prevcolor && prevchar == character) || repeat == 0 {
-    //                 repeat += 1;
-    //                 prevchar = character as char;
-    //                 prevcolor = color_idx;
-    //                 continue;
-    //             }
-    //             visited_colors[color_idx as usize] = true;
-    //
-    //             if repeat > 1 {
-    //                 write!(buf, "#{color_idx}!{repeat}{character}")?;
-    //             } else {
-    //                 write!(buf, "#{color_idx}{character}")?;
-    //             }
-    //
-    //             prevchar = character as char;
-    //             prevcolor = color_idx;
-    //             repeat = 1;
-    //         }
-    //         if repeat > 1 {
-    //             write!(buf, "#{color_idx}!{repeat}{prevchar}")?;
-    //         } else {
-    //             write!(buf, "#{color_idx}{prevchar}")?;
-    //         }
-    //         buf.push(b'$');
-    //     }
-    //     buf.push(b'-');
-    // }
 
     for y in 0..image.height() {
         let character: u8 = 63 + 2u8.pow(y % 6);
@@ -259,7 +171,11 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
         buf.push(if y % 6 == 5 { b'-' } else { b'$' });
     }
 
-    write!(buf, "\x1b\\")?;
+    if tmux {
+        write!(buf, "\x1b\\\x1b\\")?;
+    } else {
+        write!(buf, "\x1b\\")?;
+    }
 
     log::debug!(bytes = buf.len(), elapsed:? = start.elapsed(); "encoded data");
     Ok(buf)
@@ -380,3 +296,98 @@ impl ImageProto for Sixel {
         Ok(())
     }
 }
+
+// for y in (0..image.height() as usize).step_by(6) {
+//     if y + 6 >= image.height() as usize {
+//         break;
+//     }
+//     let mut visited_colors = [false; 256];
+//     let mut colors_to_visit: Vec<u8> = vec![
+//         color_data[y][0],
+//         color_data[y + 1][0],
+//         color_data[y + 2][0],
+//         color_data[y + 3][0],
+//         color_data[y + 4][0],
+//         color_data[y + 5][0],
+//     ]
+//     .into_iter()
+//     .sorted()
+//     .dedup()
+//     .collect();
+//
+//     while let Some(color_idx) = colors_to_visit.pop() {
+//         if visited_colors[color_idx as usize] {
+//             continue;
+//         }
+//         let mut prevchar = b'?' as char;
+//         let mut prevcolor = 0;
+//         let mut repeat = 0;
+//         for x in 0..image.width() as usize {
+//             let mut character: u8 = 63;
+//
+//             let a = color_data[y][x];
+//             let b = color_data[y + 1][x];
+//             let c = color_data[y + 2][x];
+//             let d = color_data[y + 3][x];
+//             let e = color_data[y + 4][x];
+//             let f = color_data[y + 5][x];
+//
+//             if a == color_idx {
+//                 character += 1;
+//             } else if !visited_colors[a as usize] {
+//                 colors_to_visit.push(a);
+//             }
+//             if b == color_idx {
+//                 character += 2;
+//             } else if !visited_colors[b as usize] {
+//                 colors_to_visit.push(b);
+//             }
+//             if c == color_idx {
+//                 character += 4;
+//             } else if !visited_colors[c as usize] {
+//                 colors_to_visit.push(c);
+//             }
+//             if d == color_idx {
+//                 character += 8;
+//             } else if !visited_colors[d as usize] {
+//                 colors_to_visit.push(d);
+//             }
+//             if e == color_idx {
+//                 character += 16;
+//             } else if !visited_colors[e as usize] {
+//                 colors_to_visit.push(e);
+//             }
+//             if f == color_idx {
+//                 character += 32;
+//             } else if !visited_colors[f as usize] {
+//                 colors_to_visit.push(f);
+//             }
+//
+//             let character = character as char;
+//             if (color_idx == prevcolor && prevchar == character) || repeat == 0 {
+//                 repeat += 1;
+//                 prevchar = character as char;
+//                 prevcolor = color_idx;
+//                 continue;
+//             }
+//             visited_colors[color_idx as usize] = true;
+//
+//             if repeat > 1 {
+//                 write!(buf, "#{color_idx}!{repeat}{character}")?;
+//             } else {
+//                 write!(buf, "#{color_idx}{character}")?;
+//             }
+//
+//             prevchar = character as char;
+//             prevcolor = color_idx;
+//             repeat = 1;
+//         }
+//         if repeat > 1 {
+//             write!(buf, "#{color_idx}!{repeat}{prevchar}")?;
+//         } else {
+//             write!(buf, "#{color_idx}{prevchar}")?;
+//         }
+//         buf.push(b'$');
+//     }
+//     buf.push(b'-');
+// }

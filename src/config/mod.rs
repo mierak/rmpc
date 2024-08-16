@@ -217,10 +217,8 @@ impl ConfigFile {
             ImageMethod::None
         } else {
             match self.image_method.unwrap_or(self.album_art.method) {
-                ImageMethodFile::Iterm2 if image_proto::is_iterm2_supported(is_tmux) => ImageMethod::Iterm2,
-                ImageMethodFile::Iterm2 => ImageMethod::Unsupported,
-                ImageMethodFile::Kitty if image_proto::is_kitty_supported(is_tmux)? => ImageMethod::Kitty,
-                ImageMethodFile::Kitty => ImageMethod::Unsupported,
+                ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
+                ImageMethodFile::Kitty => ImageMethod::Kitty,
                 ImageMethodFile::UeberzugWayland if image_proto::is_ueberzug_wayland_supported() => {
                     ImageMethod::UeberzugWayland
                 }

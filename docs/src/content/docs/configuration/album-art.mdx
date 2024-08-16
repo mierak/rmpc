@@ -19,14 +19,15 @@ The method can be overriden in the config file. Please refer to the [Configurati
 If your terminal is not listed here and you experience issues. Please disable the image method in the [config file](#method).
 Some of the terminals do not correctly report their size, thus some tweaking is needed. For those you need to set [max_size_px](#max_size_px).
 
-| Terminal  | Protocol            | Tmux    | Additional Info                                                                      |
-| --------- | ------------------- | ------- | ------------------------------------------------------------------------------------ |
-| Kitty     | Kitty               | yes     | -                                                                                    |
-| WezTerm   | ITerm2              | yes     | -                                                                                    |
-| vscode    | ITerm2              | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                             |
-| Tabby     | ITerm2              | yes     | Needs to set max_size_px                                                             |
-| Alacritty | Ueberzug            | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                            |
-| Others    | Ueberzug/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp) |
+| Terminal  | Protocol                  | Tmux    | Additional Info                                                                                                                                                       |
+| --------- | ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kitty     | Kitty                     | yes     | -                                                                                                                                                                     |
+| WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                     |
+| vscode    | ITerm2                    | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                                                                                                              |
+| Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                              |
+| Foot      | Sixel                     | yes     | -                                                                                                                                                                     |
+| Alacritty | Ueberzug                  | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                             |
+| Others    | Ueberzug/Sixel/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other protocols or disabling album_art altogether if you experience issues. |
 
 ## Configuration
 
@@ -75,3 +76,7 @@ Cons:
 ### Iterm2 Inline image protocol
 
 Supported only in select few terminals and some of them need additional configuration. Works best in WezTerm.
+
+### Sixel
+
+Has lower color depth than the alternatives.

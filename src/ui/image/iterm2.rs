@@ -18,7 +18,7 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 use crate::{
     config::Size,
     utils::{
-        image_proto::{get_image_size, jpg_encode, resize_image},
+        image_proto::{get_image_area_size_px, jpg_encode, resize_image},
         macros::try_cont,
         tmux,
     },
@@ -180,8 +180,7 @@ impl Iterm2 {
     }
 
     fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
-        let (iwidth, iheight) = match get_image_size(width.into(), height.into(), max_size_px.width, max_size_px.height)
-        {
+        let (iwidth, iheight) = match get_image_area_size_px(width, height, max_size_px) {
             Ok(v) => v,
             Err(err) => {
                 bail!("Failed to get image size, err: {}", err);

@@ -94,16 +94,7 @@ fn main() -> Result<()> {
             };
             let config = config_file.clone().into_config(Some(&args.config))?;
 
-<<<<<<< HEAD
-            println!(
-                "rmpc {} {} ({})",
-                env!("CARGO_PKG_VERSION"),
-                env!("VERGEN_GIT_DESCRIBE"),
-                env!("VERGEN_GIT_COMMIT_DATE"),
-            );
-=======
             println!("rmpc {}", env!("VERGEN_GIT_DESCRIBE"));
->>>>>>> master
             println!("\n{:<20} {}", "Config path", args.config.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
 
@@ -125,16 +116,7 @@ fn main() -> Result<()> {
             println!("{}", UEBERZUGPP.display());
         }
         Some(Command::Version) => {
-<<<<<<< HEAD
-            println!(
-                "rmpc {} {} ({})",
-                env!("CARGO_PKG_VERSION"),
-                env!("VERGEN_GIT_DESCRIBE"),
-                env!("VERGEN_GIT_COMMIT_DATE"),
-            );
-=======
             println!("rmpc {}", env!("VERGEN_GIT_DESCRIBE"),);
->>>>>>> master
         }
         Some(cmd) => {
             let config: &'static Config = Box::leak(Box::new(

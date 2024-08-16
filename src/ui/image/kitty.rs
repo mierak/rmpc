@@ -15,7 +15,7 @@ use ratatui::prelude::{Buffer, Rect};
 use crate::{
     config::Size,
     utils::{
-        image_proto::{get_image_size, resize_image},
+        image_proto::{get_image_area_size_px, resize_image},
         macros::status_error,
         tmux,
     },
@@ -30,15 +30,15 @@ pub struct KittyImageState {
     image: Arc<Vec<u8>>,
     default_art: Arc<Vec<u8>>,
     needs_transfer: bool,
-    transfer_request_channel: Sender<(Arc<Vec<u8>>, usize, usize)>,
+    transfer_request_channel: Sender<(Arc<Vec<u8>>, u16, u16)>,
     compression_finished_receiver: Receiver<Data>,
 }
 
 impl ImageProto for KittyImageState {
     fn render(&mut self, buf: &mut Buffer, rect: Rect) -> Result<()> {
         let state = self;
-        let height = rect.height as usize;
-        let width = rect.width as usize;
+        let height = rect.height;
+        let width = rect.width;
 
         if state.needs_transfer {
             state.needs_transfer = false;
@@ -98,7 +98,7 @@ impl ImageProto for KittyImageState {
 
 impl KittyImageState {
     pub fn new(sender: Sender<AppEvent>, default_art: &'static [u8], max_size: Size) -> Self {
-        let compression_request_channel = channel::<(Arc<Vec<_>>, usize, usize)>();
+        let compression_request_channel = channel::<(Arc<Vec<_>>, u16, u16)>();
         let rx = compression_request_channel.1;
 
         let image_data_to_transfer_channel = channel::<Data>();
@@ -140,14 +140,14 @@ impl KittyImageState {
 
 fn create_data_to_transfer(
     image_data: &[u8],
-    width: usize,
-    height: usize,
+    width: u16,
+    height: u16,
     compression: Compression,
     max_size: Size,
 ) -> Result<Data> {
     let start_time = Instant::now();
     log::debug!(bytes = image_data.len(); "Compressing image data");
-    let (w, h) = get_image_size(width, height, max_size.width, max_size.height)?;
+    let (w, h) = get_image_area_size_px(width, height, max_size)?;
     let image = resize_image(image_data, w, h)?;
 
     let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
@@ -188,14 +188,7 @@ fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, ar
     });
 }
 
-fn transfer_data(
-    content: &str,
-    cols: usize,
-    rows: usize,
-    img_width: u32,
-    img_height: u32,
-    state: &mut KittyImageState,
-) {
+fn transfer_data(content: &str, cols: u16, rows: u16, img_width: u32, img_height: u32, state: &mut KittyImageState) {
     let start_time = Instant::now();
     log::debug!(bytes = content.len(), img_width, img_height, rows, cols; "Transferring compressed image data");
     let mut iter = content.chars().peekable();

@@ -151,18 +151,15 @@ pub mod tmux {
 pub mod image_proto {
     use std::env;
     use std::io::Cursor;
-    use std::os::unix::process::parent_id;
 
     use anyhow::Context;
     use anyhow::Result;
+    use crossterm::terminal::WindowSize;
     use image::codecs::jpeg::JpegEncoder;
     use image::DynamicImage;
     use rustix::path::Arg;
-    use rustix::process;
-    use sysinfo::ProcessRefreshKind;
-    use sysinfo::ProcessesToUpdate;
-    use sysinfo::System;
 
+    use crate::config::Size;
     use crate::deps::UEBERZUGPP;
 
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,21 +176,15 @@ pub mod image_proto {
     const ITERM2_TERMINAL_ENV_VARS: [&str; 3] = ["WEZTERM_EXECUTABLE", "TABBY_CONFIG_DIRECTORY", "VSCODE_INJECTION"];
     const ITERM2_TERM_PROGRAMS: [&str; 3] = ["WezTerm", "vscode", "Tabby"];
 
-    const SIXEL_TERMINAL_ENV_VARS: [&str; 1] = ["KONSOLE_VERSION"];
-    const SIXEL_TERM_PROGRAMS: [&str; 1] = ["Hyper"];
-    const SIXEL_TERM_VARS: [&str; 1] = ["foot"];
-
     pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
         if is_iterm2_supported(is_tmux) {
             return Ok(ImageProtocol::Iterm2);
         }
 
-        if is_sixel_supported(is_tmux) {
-            return Ok(ImageProtocol::Sixel);
-        }
-
-        if is_kitty_supported(is_tmux)? {
-            return Ok(ImageProtocol::Kitty);
+        match query_device_attrs(is_tmux)? {
+            ImageProtocol::Kitty => return Ok(ImageProtocol::Kitty),
+            ImageProtocol::Sixel => return Ok(ImageProtocol::Sixel),
+            _ => {}
         };
 
         if which::which("ueberzugpp").is_ok() {
@@ -234,51 +225,7 @@ pub mod image_proto {
         return false;
     }
 
-    pub fn is_sixel_supported(is_tmux: bool) -> bool {
-        if SIXEL_TERMINAL_ENV_VARS
-            .iter()
-            .any(|v| env::var_os(v).is_some_and(|v| !v.is_empty()))
-        {
-            return true;
-        } else if SIXEL_TERM_VARS
-            .iter()
-            .any(|v| env::var_os("TERM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v)))
-        {
-            return true;
-        } else if SIXEL_TERM_PROGRAMS
-            .iter()
-            .any(|v| env::var_os("TERM_PROGRAM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v)))
-        {
-            return true;
-        }
-
-        // let mut system = System::new();
-        // let infopid = sysinfo::Pid::from_u32(std::process::id() as u32);
-        // system.refresh_processes_specifics(ProcessesToUpdate::All, ProcessRefreshKind::everything());
-        //
-        // let mut process = system.process(infopid);
-        //
-        // loop {
-        //     if let Some(proc) = process {
-        //         println!("{:?}", proc.name());
-        //         if proc.name() == "foot" {
-        //             return true;
-        //         }
-        //         process = proc.parent().and_then(|p| system.process(p));
-        //     }
-        // }
-        false
-    }
-
-    pub fn is_ueberzug_wayland_supported() -> bool {
-        env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty()) && UEBERZUGPP.installed
-    }
-
-    pub fn is_ueberzug_x11_supported() -> bool {
-        env::var("DISPLAY").is_ok_and(|v| !v.is_empty()) && UEBERZUGPP.installed
-    }
-
-    pub fn is_kitty_supported(is_tmux: bool) -> anyhow::Result<bool> {
+    pub fn query_device_attrs(is_tmux: bool) -> Result<ImageProtocol> {
         let query = if is_tmux {
             "\x1bPtmux;\x1b\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\x1b\\\x1b\x1b[c\x1b\\"
         } else {
@@ -315,7 +262,22 @@ pub mod image_proto {
         // Reset to previous attrs
         rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Now, &termios_orig)?;
 
-        Ok(buf.contains("_Gi=31;OK"))
+        log::debug!(buf:?; "devattr response");
+
+        if buf.contains("_Gi=31;OK") {
+            return Ok(ImageProtocol::Kitty);
+        } else if buf.contains(";4;") || buf.contains(";4c") {
+            return Ok(ImageProtocol::Sixel);
+        }
+        Ok(ImageProtocol::None)
+    }
+
+    pub fn is_ueberzug_wayland_supported() -> bool {
+        env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty()) && UEBERZUGPP.installed
+    }
+
+    pub fn is_ueberzug_x11_supported() -> bool {
+        env::var("DISPLAY").is_ok_and(|v| !v.is_empty()) && UEBERZUGPP.installed
     }
 
     #[allow(dead_code)]
@@ -368,12 +330,7 @@ pub mod image_proto {
         Ok(None)
     }
 
-    pub fn get_image_size(
-        area_width_col: usize,
-        area_height_col: usize,
-        max_width_px: u16,
-        max_height_px: u16,
-    ) -> Result<(u16, u16)> {
+    pub fn get_image_area_size_px(area_width_col: u16, area_height_col: u16, max_size_px: Size) -> Result<(u16, u16)> {
         let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
 
         // TODO: Figure out how to execute and read CSI sequences without it messing up crossterm
@@ -385,21 +342,9 @@ pub mod image_proto {
         //     }
         // }
 
-        let w = if size.width == 0 {
-            max_width_px
-        } else {
-            let cell_width = size.width / size.columns;
-            u16::try_from(cell_width as usize * area_width_col)?
-        }
-        .min(max_width_px);
-        let h = if size.height == 0 {
-            max_height_px
-        } else {
-            let cell_height = size.height / size.rows;
-            u16::try_from(cell_height as usize * area_height_col)?
-        }
-        .max(max_height_px);
         // TODO calc correct max size
+
+        let (w, h) = clamp_image_size(&size, area_width_col, area_height_col, max_size_px);
 
         log::debug!(size:?, area_width_col, area_height_col; "Resolved terminal size");
         Ok((w, h))
@@ -422,5 +367,46 @@ pub mod image_proto {
         let mut jpg = Vec::new();
         JpegEncoder::new(&mut jpg).encode_image(img)?;
         Ok(jpg)
+    }
+
+    fn clamp_image_size(size: &WindowSize, area_width_col: u16, area_height_col: u16, max_size_px: Size) -> (u16, u16) {
+        if size.width == 0 || size.height == 0 {
+            return (max_size_px.width, max_size_px.height);
+        }
+
+        let cell_width = size.width / size.columns;
+        let cell_height = size.height / size.rows;
+
+        let w = cell_width * area_width_col;
+        let h = cell_height * area_height_col;
+
+        (w.min(max_size_px.width), h.min(max_size_px.height))
+    }
+
+    #[cfg(test)]
+    mod test {
+        use crossterm::terminal::WindowSize;
+        use test_case::test_case;
+
+        use crate::config::Size;
+
+        use super::clamp_image_size;
+
+        #[test_case(&WindowSize { width: 0, height: 0, columns: 10, rows: 10 }, 10, 10, Size { width: 500, height: 500 }, Size { width: 500, height: 500 }; "size not reported")]
+        #[test_case(&WindowSize { width: 500, height: 500, columns: 10, rows: 10 }, 50, 10, Size { width: 500, height: 500 }, Size { width: 500, height: 500 }; "wider area")]
+        #[test_case(&WindowSize { width: 500, height: 500, columns: 10, rows: 10 }, 10, 50, Size { width: 500, height: 500 }, Size { width: 500, height: 500 }; "taller area")]
+        #[test_case(&WindowSize { width: 500, height: 500, columns: 10, rows: 10 }, 10, 10, Size { width: 5000, height: 500 }, Size { width: 500, height: 500 }; "square area")]
+        fn uses_max_size_if_size_not_reported(
+            window: &WindowSize,
+            area_width: u16,
+            area_height: u16,
+            max_size: Size,
+            expected: Size,
+        ) {
+            let (w, h) = clamp_image_size(window, area_width, area_height, max_size);
+
+            assert_eq!(w, expected.width, "width not correct");
+            assert_eq!(h, expected.height, "height not correct");
+        }
     }
 }
