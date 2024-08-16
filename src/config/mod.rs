@@ -182,15 +182,15 @@ impl ConfigFile {
             .unwrap_or_default()
             .try_into()?;
 
-        let addr: &'static str = Box::leak(Box::new(self.address));
+        let addr: &'static str = self.address.leak();
         let size = self.album_art.max_size_px;
         let mut config = Config {
             theme,
             cache_dir: self.cache_dir.map(|v| -> &'static str {
                 if v.ends_with('/') {
-                    Box::leak(Box::new(v))
+                    v.leak()
                 } else {
-                    Box::leak(Box::new(format!("{v}/")))
+                    format!("{v}/").leak()
                 }
             }),
             address: addr.into(),
@@ -280,6 +280,16 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
             OnOffOneshot::Off => crate::mpd::commands::status::OnOffOneshot::Off,
             OnOffOneshot::Oneshot => crate::mpd::commands::status::OnOffOneshot::Oneshot,
         }
+    }
+}
+
+pub trait Leak {
+    fn leak(self) -> &'static Self;
+}
+
+impl<T> Leak for T {
+    fn leak(self) -> &'static Self {
+        Box::leak(Box::new(self))
     }
 }
 

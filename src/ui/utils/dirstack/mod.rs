@@ -111,7 +111,7 @@ impl DirStackItem for DirOrSong {
                             .browser_song_format
                             .0
                             .iter()
-                            .map(|prop| Span::from(prop.as_string(Some(s)))),
+                            .map(|prop| Span::from(prop.as_string(Some(s)).unwrap_or_default())),
                     );
                 Line::from(spans.collect_vec())
             }
