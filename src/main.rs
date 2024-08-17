@@ -330,7 +330,6 @@ fn main_task<B: Backend + std::io::Write>(
                     if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut state, &mut client) {
                         error!(error:? = err; "Ui failed to handle log event");
                     }
-                    render_wanted = true;
                 }
                 AppEvent::IdleEvent(event) => {
                     if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {

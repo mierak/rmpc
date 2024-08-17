@@ -1548,6 +1548,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
+ "color_quant",
  "crossterm",
  "derive_more",
  "either",

@@ -16,7 +16,7 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     ui::{
-        image::album_art_facade::AlbumArtFacade,
+        image::facade::AlbumArtFacade,
         modals::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
             save_queue::SaveQueueModal,

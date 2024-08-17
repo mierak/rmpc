@@ -18,7 +18,7 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 use crate::{
     config::Size,
     utils::{
-        image_proto::{get_image_size, jpg_encode, resize_image},
+        image_proto::{get_image_area_size_px, jpg_encode, resize_image},
         macros::try_cont,
         tmux,
     },
@@ -89,7 +89,7 @@ impl ImageProto for Iterm2 {
 
     fn post_render(
         &mut self,
-        buf: &mut Buffer,
+        _buf: &mut Buffer,
         bg_color: Option<Color>,
         Rect { x, y, width, height }: Rect,
     ) -> Result<()> {
@@ -99,7 +99,6 @@ impl ImageProto for Iterm2 {
 
         if let Some(data) = &self.encoded_data {
             self.clear_area(bg_color, Rect { x, y, width, height })?;
-            self.skip_area(buf, x, y, width, height);
 
             let mut stdout = std::io::stdout();
             queue!(stdout, SavePosition)?;
@@ -180,8 +179,8 @@ impl Iterm2 {
     }
 
     fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
-        let (iwidth, iheight) = match get_image_size(width.into(), height.into(), max_size_px.width, max_size_px.height)
-        {
+        let start = std::time::Instant::now();
+        let (iwidth, iheight) = match get_image_area_size_px(width, height, max_size_px) {
             Ok(v) => v,
             Err(err) => {
                 bail!("Failed to get image size, err: {}", err);
@@ -199,20 +198,13 @@ impl Iterm2 {
 
         let content = base64::engine::general_purpose::STANDARD.encode(&jpg);
 
+        log::debug!(compressed_bytes = content.len(), image_bytes = jpg.len(), elapsed:? = start.elapsed(); "encoded data");
         Ok(EncodedData {
             content,
             size: jpg.len(),
             width: image.width(),
             height: image.height(),
         })
-    }
-
-    fn skip_area(&self, buf: &mut Buffer, x: u16, y: u16, width: u16, height: u16) {
-        for y in y..y + height {
-            for x in x..x + width {
-                buf.get_mut(x, y).set_skip(true).reset();
-            }
-        }
     }
 
     fn clear_area(&self, bg_color: Option<Color>, Rect { x, y, width, height }: Rect) -> Result<()> {
