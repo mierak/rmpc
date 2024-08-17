@@ -25,7 +25,7 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 | WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                     |
 | vscode    | ITerm2                    | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                                                                                                              |
 | Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                              |
-| Foot      | Sixel                     | yes     | -                                                                                                                                                                     |
+| Foot      | Sixel                     | yes     | Limited image size [in tmux](#sixel)                                                                                                                                  |
 | Alacritty | Ueberzug                  | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                             |
 | Others    | Ueberzug/Sixel/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other protocols or disabling album_art altogether if you experience issues. |
 
@@ -33,7 +33,7 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 
 ### method
 
-<ConfigValue name="method" type={["Kitty", "Iterm2", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
+<ConfigValue name="method" type={["Kitty", "Iterm2", "Sixel", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
 
 Rendering method used to display images. Currently Kitty, UeberzugWayland and UeberzugX11 are supported.
 Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is not available.
@@ -79,4 +79,9 @@ Supported only in select few terminals and some of them need additional configur
 
 ### Sixel
 
-Has lower color depth than the alternatives.
+Cons:
+
+-   Has lower color depth than the alternatives.
+-   Much lower image size can be transmitted through tmux due to sixel being a very size inefficient protocol.
+    Tmux supports only 1MB of data due to its internal buffering limitations. See [more info here](https://github.com/tmux/tmux/issues/1502#issuecomment-429710887).
+    You can limit your image size with [max_size_px](#max_size_px).

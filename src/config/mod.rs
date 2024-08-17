@@ -254,7 +254,7 @@ impl ConfigFile {
             | ImageMethod::UeberzugX11
             | ImageMethod::Iterm2
             | ImageMethod::Sixel => {
-                log::debug!(requested:? = self.album_art.method, resolved:? = config.album_art.method, is_tmux; "Image method resolved");
+                log::debug!(resolved:? = config.album_art.method, requested:? = self.album_art.method, is_tmux; "Image method resolved");
             }
         }
 

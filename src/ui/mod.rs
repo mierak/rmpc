@@ -486,7 +486,13 @@ impl Ui {
             UiEvent::Playlist => {}
             UiEvent::Database => {}
             UiEvent::StoredPlaylist => {}
-            UiEvent::LogAdded(_) => {}
+            UiEvent::LogAdded(_) =>
+            {
+                #[cfg(debug_assertions)]
+                if matches!(self.active_screen, screens::Screens::Logs) {
+                    return Ok(KeyHandleResult::RenderRequested);
+                }
+            }
             UiEvent::Update => {}
             UiEvent::Resized { .. } => {}
             UiEvent::ModalOpened => {}

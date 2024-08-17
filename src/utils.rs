@@ -346,7 +346,7 @@ pub mod image_proto {
 
         let (w, h) = clamp_image_size(&size, area_width_col, area_height_col, max_size_px);
 
-        log::debug!(size:?, area_width_col, area_height_col; "Resolved terminal size");
+        log::debug!(w, h, size:?; "Resolved terminal size");
         Ok((w, h))
     }
 

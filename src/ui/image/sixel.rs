@@ -15,14 +15,14 @@ use crossterm::{
     queue,
     style::{Colors, SetColors},
 };
-use image::{GenericImageView, Rgba};
+use image::Rgba;
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use crate::{
     config::Size,
     utils::{
         image_proto::{get_image_area_size_px, resize_image},
-        macros::{try_cont, try_skip},
+        macros::{status_error, try_cont, try_skip},
         tmux,
     },
     AppEvent,
@@ -48,6 +48,84 @@ pub struct Sixel {
     sender: Sender<(u16, u16, bool, Arc<Vec<u8>>)>,
     encoded_data_receiver: Receiver<Vec<u8>>,
     state: State,
+}
+
+impl ImageProto for Sixel {
+    fn render(&mut self, _buf: &mut Buffer, Rect { width, height, .. }: Rect) -> anyhow::Result<()> {
+        match self.state {
+            State::Initial => {
+                self.sender
+                    .send((width, height, false, Arc::clone(&self.image_data_to_encode)))?;
+                self.state = State::Encoding;
+            }
+            State::Resize => {
+                self.sender
+                    .send((width, height, true, Arc::clone(&self.image_data_to_encode)))?;
+                self.state = State::Encoding;
+            }
+            _ => {
+                if let Ok(data) = self.encoded_data_receiver.try_recv() {
+                    self.encoded_data = Some(data);
+                    self.state = State::Encoded;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn post_render(
+        &mut self,
+        _buf: &mut ratatui::prelude::Buffer,
+        bg_color: Option<ratatui::prelude::Color>,
+        rect @ Rect { x, y, .. }: Rect,
+    ) -> anyhow::Result<()> {
+        if !matches!(self.state, State::Encoded | State::Rerender) {
+            return Ok(());
+        }
+
+        if let Some(data) = &self.encoded_data {
+            log::debug!(bytes = data.len(); "transmitting data");
+            self.clear_area(bg_color, rect)?;
+            let mut stdout = std::io::stdout();
+            queue!(stdout, SavePosition)?;
+            queue!(stdout, MoveTo(x, y))?;
+            stdout.write_all(data)?;
+            stdout.flush()?;
+            queue!(stdout, RestorePosition)?;
+            self.state = State::Showing;
+        }
+
+        Ok(())
+    }
+
+    fn hide(&mut self, bg_color: Option<Color>, size: Rect) -> anyhow::Result<()> {
+        self.clear_area(bg_color, size)?;
+        Ok(())
+    }
+
+    fn show(&mut self) {
+        if self.encoded_data.is_some() {
+            self.state = State::Rerender;
+        } else {
+            self.state = State::Initial;
+        }
+    }
+
+    fn resize(&mut self) {
+        self.state = State::Resize;
+    }
+
+    fn set_data(&mut self, data: Option<Vec<u8>>) -> anyhow::Result<()> {
+        if let Some(data) = data {
+            self.image_data_to_encode = Arc::new(data);
+        } else {
+            self.image_data_to_encode = Arc::clone(&self.default_art);
+        }
+
+        self.state = State::Initial;
+        self.encoded_data = None;
+        Ok(())
+    }
 }
 
 impl Sixel {
@@ -96,14 +174,6 @@ impl Sixel {
         queue!(stdout, RestorePosition)?;
         Ok(())
     }
-
-    fn skip_area(&self, buf: &mut Buffer, x: u16, y: u16, width: u16, height: u16) {
-        for y in y..y + height {
-            for x in x..x + width {
-                buf.get_mut(x, y).set_skip(true).reset();
-            }
-        }
-    }
 }
 
 fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8>> {
@@ -123,7 +193,10 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
         }
     };
 
+    let width = image.width();
+    let height = image.height();
     let tmux = tmux::is_inside_tmux();
+
     let mut buf = Vec::new();
 
     if tmux {
@@ -132,19 +205,20 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
         write!(buf, "\x1bP0;7q\"1;1;{};{}", image.width(), image.height())?;
     }
 
-    let quantized = NeuQuant::new(10, 256, &image.to_rgba8());
-    for (i, [r, g, b]) in quantized.color_map_rgb().u16_triples(|v| v * 100 / 255).enumerate() {
+    let image = image.to_rgba8();
+    let quantized = NeuQuant::new(10, 256, image.as_raw());
+    for (i, [r, g, b]) in quantized.color_map_rgb().u16_triples().enumerate() {
         write!(buf, "#{i};2;{r};{g};{b}")?;
     }
 
-    for y in 0..image.height() {
+    for y in 0..height {
         let character: u8 = 63 + 2u8.pow(y % 6);
         let mut repeat = 0;
         let mut last_color = None;
 
-        for x in 0..image.width() {
+        for x in 0..width {
             let Rgba(current_pixel) = image.get_pixel(x, y);
-            let color = quantized.index_of(&current_pixel);
+            let color = quantized.index_of(current_pixel);
 
             if last_color.is_some_and(|c| c == color) || last_color.is_none() {
                 repeat.add_assign(1);
@@ -152,21 +226,20 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
                 continue;
             }
 
-            if repeat == 0 {
-                write!(buf, "#{color}{}", character as char)?;
-            } else {
-                write!(buf, "#{color}!{repeat}{}", character as char)?;
-            }
+            put_color(&mut buf, character, last_color.unwrap_or_default(), repeat)?;
 
             last_color = Some(color);
             repeat = 1;
         }
 
-        if repeat == 0 {
-            write!(buf, "#{}{}", last_color.unwrap_or(0), character as char)?;
-        } else {
-            write!(buf, "#{}!{repeat}{}", last_color.unwrap_or(0), character as char)?;
+        if tmux && buf.len() > 1_048_576 {
+            status_error!(
+            "Tmux supports a maximum of 1MB of data. Sixel image will not be displayed. Try decreasing max album art size.",
+        );
+            bail!("Exceeded tmux data limit")
         }
+
+        put_color(&mut buf, character, last_color.unwrap_or_default(), repeat)?;
 
         buf.push(if y % 6 == 5 { b'-' } else { b'$' });
     }
@@ -177,27 +250,30 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
         write!(buf, "\x1b\\")?;
     }
 
-    log::debug!(bytes = buf.len(), elapsed:? = start.elapsed(); "encoded data");
+    log::debug!(bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
     Ok(buf)
+}
+
+fn put_color<W: Write>(buf: &mut W, byte: u8, color: usize, repeat: u16) -> Result<(), std::io::Error> {
+    if repeat == 0 {
+        write!(buf, "#{}{}", color, byte as char)
+    } else {
+        write!(buf, "#{}!{repeat}{}", color, byte as char)
+    }
 }
 
 struct U16Triples {
     data: Vec<u8>,
     current: usize,
-    mapfn: fn(u16) -> u16,
 }
 
 trait IntoU16Triples {
-    fn u16_triples(self, mapfn: fn(u16) -> u16) -> U16Triples;
+    fn u16_triples(self) -> U16Triples;
 }
 
 impl IntoU16Triples for Vec<u8> {
-    fn u16_triples(self, mapfn: fn(u16) -> u16) -> U16Triples {
-        U16Triples {
-            data: self,
-            current: 0,
-            mapfn,
-        }
+    fn u16_triples(self) -> U16Triples {
+        U16Triples { data: self, current: 0 }
     }
 }
 
@@ -215,85 +291,7 @@ impl Iterator for U16Triples {
         let c = u16::from(self.data[self.current]);
         self.current += 1;
 
-        Some([(self.mapfn)(a), (self.mapfn)(b), (self.mapfn)(c)])
-    }
-}
-
-impl ImageProto for Sixel {
-    fn render(&mut self, _buf: &mut Buffer, Rect { width, height, .. }: Rect) -> anyhow::Result<()> {
-        match self.state {
-            State::Initial => {
-                self.sender
-                    .send((width, height, false, Arc::clone(&self.image_data_to_encode)))?;
-                self.state = State::Encoding;
-            }
-            State::Resize => {
-                self.sender
-                    .send((width, height, true, Arc::clone(&self.image_data_to_encode)))?;
-                self.state = State::Encoding;
-            }
-            _ => {
-                if let Ok(data) = self.encoded_data_receiver.try_recv() {
-                    self.encoded_data = Some(data);
-                    self.state = State::Encoded;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn post_render(
-        &mut self,
-        buf: &mut ratatui::prelude::Buffer,
-        bg_color: Option<ratatui::prelude::Color>,
-        rect @ Rect { x, y, width, height }: Rect,
-    ) -> anyhow::Result<()> {
-        if !matches!(self.state, State::Encoded | State::Rerender) {
-            return Ok(());
-        }
-
-        if let Some(data) = &self.encoded_data {
-            self.clear_area(bg_color, rect)?;
-            self.skip_area(buf, x, y, width, height);
-            let mut stdout = std::io::stdout();
-            queue!(stdout, SavePosition)?;
-            queue!(stdout, MoveTo(x, y))?;
-            stdout.write_all(data)?;
-            stdout.flush()?;
-            queue!(stdout, RestorePosition)?;
-            self.state = State::Showing;
-        }
-
-        Ok(())
-    }
-
-    fn hide(&mut self, bg_color: Option<Color>, size: Rect) -> anyhow::Result<()> {
-        self.clear_area(bg_color, size)?;
-        Ok(())
-    }
-
-    fn show(&mut self) {
-        if self.encoded_data.is_some() {
-            self.state = State::Rerender;
-        } else {
-            self.state = State::Initial;
-        }
-    }
-
-    fn resize(&mut self) {
-        self.state = State::Resize;
-    }
-
-    fn set_data(&mut self, data: Option<Vec<u8>>) -> anyhow::Result<()> {
-        if let Some(data) = data {
-            self.image_data_to_encode = Arc::new(data);
-        } else {
-            self.image_data_to_encode = Arc::clone(&self.default_art);
-        }
-
-        self.state = State::Initial;
-        self.encoded_data = None;
-        Ok(())
+        Some([a * 100 / 255, b * 100 / 255, c * 100 / 255])
     }
 }
 
