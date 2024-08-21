@@ -301,6 +301,7 @@ pub enum CommonActionFile {
     Close,
     Confirm,
     FocusInput,
+    AddAll,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
@@ -325,6 +326,7 @@ pub enum CommonAction {
     Close,
     Confirm,
     FocusInput,
+    AddAll,
 }
 
 impl ToDescription for CommonAction {
@@ -344,7 +346,8 @@ impl ToDescription for CommonAction {
             CommonAction::NextResult => "When a filter is active, jump to the next result",
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result",
             CommonAction::Select => "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist",
-            CommonAction::Add => "Add item to a playlist",
+            CommonAction::Add => "Add item to queue",
+            CommonAction::AddAll => "Add all items to queue",
             CommonAction::Delete => "Delete. For example a playlist, song from a playlist or wipe the current queue",
             CommonAction::Rename => "Rename. Currently only for playlists",
             CommonAction::Close => "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.",
@@ -377,6 +380,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::Close => CommonAction::Close,
             CommonActionFile::Confirm => CommonAction::Confirm,
             CommonActionFile::FocusInput => CommonAction::FocusInput,
+            CommonActionFile::AddAll => CommonAction::AddAll,
         }
     }
 }

@@ -113,6 +113,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('N'), modifiers: M::SHIFT   }, C::PreviousResult),
                 (Key { key: K::Char(' '), modifiers: M::NONE    }, C::Select),
                 (Key { key: K::Char('a'), modifiers: M::NONE    }, C::Add),
+                (Key { key: K::Char('A'), modifiers: M::SHIFT   }, C::AddAll),
                 (Key { key: K::Char('D'), modifiers: M::SHIFT   }, C::Delete),
                 (Key { key: K::Char('r'), modifiers: M::NONE    }, C::Rename),
                 (Key { key: K::Char('c'), modifiers: M::CONTROL }, C::Close),

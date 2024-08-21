@@ -131,6 +131,7 @@ impl Modal for ConfirmModal {
                 CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),

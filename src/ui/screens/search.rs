@@ -125,7 +125,7 @@ impl SearchScreen {
             (0..self.inputs.textbox_inputs.len()
                 + self.inputs.filter_inputs.len()
                 + self.inputs.button_inputs.len()
-                + 2) // +2 for because of separators
+                + 2) // +2 for borders/separators
                 .map(|_| Constraint::Length(1)),
         )
         .split(area);
@@ -227,23 +227,49 @@ impl SearchScreen {
         }
     }
 
-    fn search(&mut self, client: &mut impl MpdClient) -> Result<Vec<Song>> {
-        let (filter_kind, case_sensitive) =
-            self.inputs
-                .filter_inputs
-                .iter()
-                .fold((FilterKind::Contains, false), |mut acc, val| {
-                    match val.variant {
-                        FilterInputVariant::SelectFilterKind { value } => {
-                            acc.0 = value;
-                        }
-                        FilterInputVariant::SelectFilterCaseSensitive { value } => {
-                            acc.1 = value;
-                        }
-                    };
-                    acc
-                });
+    fn filter_type(&self) -> (FilterKind, bool) {
+        self.inputs
+            .filter_inputs
+            .iter()
+            .fold((FilterKind::Contains, false), |mut acc, val| {
+                match val.variant {
+                    FilterInputVariant::SelectFilterKind { value } => {
+                        acc.0 = value;
+                    }
+                    FilterInputVariant::SelectFilterCaseSensitive { value } => {
+                        acc.1 = value;
+                    }
+                };
+                acc
+            })
+    }
 
+    fn search_add(&mut self, client: &mut impl MpdClient) -> Result<()> {
+        let (filter_kind, case_sensitive) = self.filter_type();
+        let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
+            Textbox { value, filter_key, .. } if !value.is_empty() => {
+                Some(Filter::new(*filter_key, value).with_type(filter_kind))
+            }
+            _ => None,
+        });
+
+        let filter = filter.collect_vec();
+
+        if filter.is_empty() {
+            return Ok(());
+        }
+
+        if case_sensitive {
+            client.find_add(&filter)?;
+        } else {
+            client.search_add(&filter)?;
+        }
+
+        Ok(())
+    }
+
+    fn search(&mut self, client: &mut impl MpdClient) -> Result<Vec<Song>> {
+        let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
                 Some(Filter::new(*filter_key, value).with_type(filter_kind))
@@ -475,6 +501,12 @@ impl Screen for SearchScreen {
                             self.phase = Phase::SearchTextboxInput;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
+                        CommonAction::AddAll => {
+                            self.search_add(client)?;
+
+                            status_info!("All found songs added to queue");
+                            Ok(KeyHandleResultInternal::RenderRequested)
+                        }
                         CommonAction::FocusInput => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Add => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Delete => Ok(KeyHandleResultInternal::KeyNotHandled),
@@ -582,6 +614,11 @@ impl Screen for SearchScreen {
                         CommonAction::Confirm => self.add_current(client),
                         CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
                         CommonAction::Add => self.add_current(client),
+                        CommonAction::AddAll => {
+                            self.search_add(client)?;
+                            status_info!("All found songs added to queue");
+                            Ok(KeyHandleResultInternal::RenderRequested)
+                        }
                         CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                     }
                 } else {

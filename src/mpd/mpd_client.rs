@@ -98,6 +98,7 @@ pub trait MpdClient {
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()>;
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>>;
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
+    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
@@ -284,6 +285,16 @@ impl MpdClient for Client<'_> {
         log::debug!(query; "Searching for songs");
         self.send(&format!("search \"({query})\""))
             .and_then(ProtoClient::read_response)
+    }
+
+    /// Search the database for songs matching FILTER (see Filters) AND add them to queue.
+    /// Parameters have the same meaning as for find, except that search is not case sensitive.
+    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
+        let query = filter.to_query_str();
+        let query = query.as_str();
+        log::debug!(query; "Searching for songs and adding them");
+        self.send(&format!("searchadd \"({query})\""))
+            .and_then(ProtoClient::read_ok)
     }
 
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {

@@ -171,6 +171,34 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
         }
     }
 
+    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+        match self.stack.path() {
+            [artist, album] => {
+                client.find_add(&[
+                    Filter::new(Tag::Artist, artist.as_str()),
+                    Filter::new(Tag::Album, album.as_str()),
+                ])?;
+
+                status_info!("Album '{album}' by '{artist}' added to queue");
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            [artist] => {
+                client.find_add(&[Filter::new(Tag::Artist, artist.as_str())])?;
+
+                status_info!("All albums by '{artist}' added to queue");
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            [] => {
+                client.add("/")?; // add the whole library
+                status_info!("All songs added to queue");
+
+                Ok(KeyHandleResultInternal::SkipRender)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
     fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");

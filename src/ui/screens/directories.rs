@@ -122,7 +122,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
             DirOrSong::Dir(dirname) => {
                 let mut next_path = self.stack.path().to_vec();
                 next_path.push(dirname.clone());
-                let next_path = next_path.join("/").to_string();
+                let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
 
                 client.add(&next_path)?;
                 status_info!("Directory '{next_path}' added to queue");
@@ -134,6 +134,14 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 }
             }
         };
+        Ok(KeyHandleResultInternal::RenderRequested)
+    }
+
+    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+        let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
+        client.add(&path)?;
+        status_info!("Directory '{path}' added to queue");
+
         Ok(KeyHandleResultInternal::RenderRequested)
     }
 
