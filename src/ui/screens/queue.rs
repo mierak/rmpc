@@ -444,6 +444,7 @@ impl Screen for QueueScreen {
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),

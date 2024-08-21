@@ -188,6 +188,7 @@ impl Modal for KeybindsModal<'_> {
                 CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),

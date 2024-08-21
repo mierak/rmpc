@@ -178,6 +178,26 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         }
     }
 
+    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+        match self.stack().path() {
+            [playlist] => {
+                client.load_playlist(playlist)?;
+                status_info!("Playlist '{playlist}' added to queue");
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            [] => {
+                for playlist in &self.stack().current().items {
+                    self.add(playlist, client)?;
+                }
+                status_info!("All playlists added to queue");
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
     fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir(d) => {

@@ -464,4 +464,8 @@ impl MpdClient for TestMpdClient {
     fn version(&mut self) -> crate::mpd::version::Version {
         todo!("Not yet implemented")
     }
+
+    fn search_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }

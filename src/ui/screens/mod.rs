@@ -667,6 +667,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         config: &Config,
     ) -> Result<Option<Vec<ListItem<'static>>>>;
     fn add(&self, item: &T, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
+    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
     fn delete(&self, item: &T, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
@@ -813,6 +814,11 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
             }
+            CommonAction::AddAll if !self.stack().current().items.is_empty() => {
+                self.add_all(client)?;
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];

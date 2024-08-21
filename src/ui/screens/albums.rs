@@ -167,6 +167,24 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         }
     }
 
+    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+        match self.stack.path() {
+            [album] => {
+                client.find_add(&[Filter::new(Tag::Album, album.as_str())])?;
+                status_info!("Album '{}' added to queue", album);
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            [] => {
+                client.add("/")?; // add the whole library
+                status_info!("All albums added to queue");
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
     fn prepare_preview(
         &mut self,
         client: &mut impl MpdClient,
