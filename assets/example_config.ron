@@ -45,6 +45,7 @@
             "<C-u>":   UpHalf,
             "N":       PreviousResult,
             "a":       Add,
+            "A":       AddAll,
             "r":       Rename,
             "n":       NextResult,
             "g":       Top,
