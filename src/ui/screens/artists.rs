@@ -186,7 +186,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
             [artist] => {
                 client.find_add(&[Filter::new(Tag::Artist, artist.as_str())])?;
 
-                status_info!("Album '{}' by '{artist}' added to queue", artist);
+                status_info!("All albums by '{artist}' added to queue");
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
