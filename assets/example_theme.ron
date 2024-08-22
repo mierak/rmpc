@@ -9,6 +9,7 @@
     draw_borders: true,
     browser_column_widths: [20, 38, 42],
     background_color: None,
+    text_color: None,
     header_background_color: None,
     modal_background_color: None,
     tab_bar: (
