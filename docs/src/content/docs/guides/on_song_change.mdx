@@ -39,6 +39,7 @@ Edit it to your needs or create a new one.
 
     # Save album art of the currently playing song to a file
     if ! rmpc albumart --output "$ALBUM_ART_PATH"; then
+        # Use default album art if rmpc returns non-zero exit code
         ALBUM_ART_PATH="${DEFAULT_ALBUM_ART_PATH}"
     fi
 

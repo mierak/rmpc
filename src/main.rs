@@ -431,7 +431,7 @@ fn handle_idle_event(
                         let out = match cmd.args(args).output() {
                             Ok(out) => out,
                             Err(err) => {
-                                status_error!("err {:?}", err);
+                                status_error!("Unexpected error when executing on_song_change: {:?}", err);
                                 return;
                             }
                         };
