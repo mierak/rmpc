@@ -25,6 +25,8 @@ Usage: rmpc [OPTIONS] [COMMAND]
 Commands:
   config         Prints the default config. Can be used to bootstrap your config file
   theme          Prints the default theme. Can be used to bootstrap your theme file
+  albumart       Saves the current album art to a file. Exit codes: * 0: Success * 1: Error * 2: No album art found * 3: No song playing
+  debuginfo      Prints information about optional runtime dependencies
   version        Prints the rmpc version
   play           Plays song at the position in the current playlist. Defaults to current paused song
   pause          Pause playback
@@ -55,7 +57,6 @@ Commands:
 
 Options:
   -c, --config <FILE>      [default: /home/<USER>/.config/rmpc/config.debug.ron]
-  -l, --log <LOG>          [default: DEBUG]
   -a, --address <ADDRESS>  Override the address to connect to. Defaults to value in the config file
   -h, --help               Print help
 ```

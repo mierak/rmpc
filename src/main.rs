@@ -92,7 +92,7 @@ fn main() -> Result<()> {
                 Ok(val) => val,
                 Err(_err) => ConfigFile::default(),
             };
-            let config = config_file.clone().into_config(Some(&args.config))?;
+            let config = config_file.clone().into_config(Some(&args.config), true)?;
 
             println!("rmpc {}", env!("VERGEN_GIT_DESCRIBE"));
             println!("\n{:<20} {}", "Config path", args.config.as_str()?);
@@ -121,8 +121,8 @@ fn main() -> Result<()> {
         Some(cmd) => {
             let config: &'static Config = Box::leak(Box::new(
                 match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                    Ok(val) => val.into_config(Some(&args.config))?,
-                    Err(_err) => ConfigFile::default().into_config(None)?,
+                    Ok(val) => val.into_config(Some(&args.config), true)?,
+                    Err(_err) => ConfigFile::default().into_config(None, true)?,
                 },
             ));
             let mut client = Client::init(config.address, "", true)?;
@@ -150,10 +150,10 @@ fn main() -> Result<()> {
 
             let config = Box::leak(Box::new(
                 match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                    Ok(val) => val.into_config(Some(&args.config))?,
+                    Ok(val) => val.into_config(Some(&args.config), false)?,
                     Err(err) => {
                         status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                        ConfigFile::default().into_config(None)?
+                        ConfigFile::default().into_config(None, false)?
                     }
                 },
             ));
@@ -414,11 +414,38 @@ fn handle_idle_event(
     match event {
         IdleEvent::Mixer => {}
         IdleEvent::Player => {
+            let current_song_id = state.status.song;
+
             state.status = try_ret!(client.get_status(), "Failed get status");
+
             if state.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             } else {
                 render_loop.stop()?;
+            }
+
+            if state.status.song.is_some() && state.status.song != current_song_id {
+                if let Some([cmd, args @ ..]) = state.config.on_song_change {
+                    std::thread::spawn(move || {
+                        let mut cmd = std::process::Command::new(cmd);
+                        let out = match cmd.args(args).output() {
+                            Ok(out) => out,
+                            Err(err) => {
+                                status_error!("Unexpected error when executing on_song_change: {:?}", err);
+                                return;
+                            }
+                        };
+
+                        if !out.status.success() {
+                            status_error!(
+                                "on_song_change failed: exit code: '{}', stdout: '{}', stderr: '{}'",
+                                out.status.code().map_or_else(|| "-".to_string(), |v| v.to_string()),
+                                String::from_utf8_lossy(&out.stdout).trim(),
+                                String::from_utf8_lossy(&out.stderr).trim()
+                            );
+                        }
+                    });
+                };
             }
         }
         IdleEvent::Options => {}

@@ -19,6 +19,17 @@ pub enum Command {
     Config,
     /// Prints the default theme. Can be used to bootstrap your theme file.
     Theme,
+    /// Saves the current album art to a file.
+    /// Exit codes:
+    ///   * 0: Success
+    ///   * 1: Error
+    ///   * 2: No album art found
+    ///   * 3: No song playing
+    AlbumArt {
+        /// Output file where to save the album art, "-" for stdout
+        #[arg(short, long)]
+        output: String,
+    },
     /// Prints information about optional runtime dependencies
     DebugInfo,
     /// Prints the rmpc version

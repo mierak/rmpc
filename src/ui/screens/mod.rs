@@ -163,7 +163,7 @@ pub(crate) mod browser {
                 ]));
             }
 
-            if let Some(title) = &self.title {
+            if let Some(title) = self.title() {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
                     Span::styled("Title", key_style),
@@ -171,7 +171,7 @@ pub(crate) mod browser {
                     Span::from(title.clone()),
                 ]));
             }
-            if let Some(artist) = &self.artist {
+            if let Some(artist) = self.artist() {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
                     Span::styled("Artist", key_style),
@@ -180,7 +180,7 @@ pub(crate) mod browser {
                 ]));
             }
 
-            if let Some(album) = &self.album {
+            if let Some(album) = self.album() {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
                     Span::styled("Album", key_style),
@@ -198,7 +198,7 @@ pub(crate) mod browser {
                 ]));
             }
 
-            for (k, v) in &self.others {
+            for (k, v) in &self.metadata {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
                     Span::styled(k.clone(), key_style),
@@ -244,13 +244,13 @@ pub(crate) mod browser {
 
     impl std::cmp::Ord for Song {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            let a_track = self.others.get("track").map(|v| v.parse::<u32>());
-            let b_track = other.others.get("track").map(|v| v.parse::<u32>());
+            let a_track = self.metadata.get("track").map(|v| v.parse::<u32>());
+            let b_track = other.metadata.get("track").map(|v| v.parse::<u32>());
             match (a_track, b_track) {
                 (Some(Ok(a)), Some(Ok(b))) => a.cmp(&b),
                 (_, Some(Ok(_))) => Ordering::Greater,
                 (Some(Ok(_)), _) => Ordering::Less,
-                _ => self.title.cmp(&other.title),
+                _ => self.title().cmp(&other.title()),
             }
         }
     }
@@ -272,14 +272,18 @@ pub(crate) mod browser {
 
     #[cfg(test)]
     mod test {
+        use std::collections::HashMap;
+
         use crate::mpd::commands::Song;
 
         use super::DirOrSong;
 
         fn song(title: &str, track: Option<&str>) -> Song {
             Song {
-                title: Some(title.to_owned()),
-                others: track.map(|v| ("track".to_owned(), v.to_owned())).into_iter().collect(),
+                metadata: HashMap::from([
+                    ("title".to_owned(), title.to_owned()),
+                    track.map(|v| ("track".to_owned(), v.to_owned())).into_iter().collect(),
+                ]),
                 ..Default::default()
             }
         }
@@ -388,11 +392,11 @@ pub(crate) mod browser {
 
 impl Song {
     pub fn title_str(&self) -> &str {
-        self.title.as_ref().map_or("Untitled", |v| v.as_str())
+        self.title().map_or("Untitled", |v| v.as_str())
     }
 
     pub fn artist_str(&self) -> &str {
-        self.artist.as_ref().map_or("Untitled", |v| v.as_str())
+        self.artist().map_or("Untitled", |v| v.as_str())
     }
 
     pub fn file_name(&self) -> Option<Cow<str>> {
@@ -405,15 +409,15 @@ impl Song {
         match property {
             SongProperty::Filename => self.file_name(),
             SongProperty::File => Some(Cow::Borrowed(self.file.as_str())),
-            SongProperty::Title => self.title.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
-            SongProperty::Artist => self.artist.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
-            SongProperty::Album => self.album.as_ref().map(|v| Cow::Borrowed(v.as_ref())),
+            SongProperty::Title => self.title().map(|v| Cow::Borrowed(v.as_ref())),
+            SongProperty::Artist => self.artist().map(|v| Cow::Borrowed(v.as_ref())),
+            SongProperty::Album => self.album().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Track => self
-                .others
+                .metadata
                 .get("track")
                 .map(|v| Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))),
             SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
-            SongProperty::Other(name) => self.others.get(*name).map(|v| Cow::Borrowed(v.as_str())),
+            SongProperty::Other(name) => self.metadata.get(*name).map(|v| Cow::Borrowed(v.as_str())),
         }
     }
 
@@ -885,13 +889,15 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
                 id: 123,
                 file: "file".to_owned(),
-                album: Some("album".to_owned()),
                 duration: Some(Duration::from_secs(123)),
-                others: HashMap::from([("track".to_string(), "123".to_string())]),
+                metadata: HashMap::from([
+                    ("title".to_string(), "title".to_owned()),
+                    ("album".to_string(), "album".to_owned()),
+                    ("track".to_string(), "123".to_string()),
+                    ("artist".to_string(), "artist".to_string()),
+                ]),
             };
 
             let result = format.as_string(Some(&song));
@@ -916,13 +922,15 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
                 id: 123,
                 file: "file".to_owned(),
-                album: Some("album".to_owned()),
                 duration: Some(Duration::from_secs(123)),
-                others: HashMap::from([("track".to_string(), "123".to_string())]),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("album".to_string(), "album".to_owned()),
+                    ("title".to_string(), "title".to_owned()),
+                    ("track".to_string(), "123".to_string()),
+                ]),
             };
             let status = Status {
                 volume: Volume::new(123),
@@ -948,6 +956,8 @@ mod format_tests {
     }
 
     mod property {
+        use std::collections::HashMap;
+
         use super::*;
 
         #[test]
@@ -959,8 +969,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -985,8 +997,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1004,8 +1018,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1016,6 +1032,8 @@ mod format_tests {
     }
 
     mod text {
+        use std::collections::HashMap;
+
         use super::*;
 
         #[test]
@@ -1027,8 +1045,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1053,8 +1073,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1065,6 +1087,8 @@ mod format_tests {
     }
 
     mod group {
+        use std::collections::HashMap;
+
         use super::*;
 
         #[test]
@@ -1087,8 +1111,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1124,8 +1150,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1161,8 +1189,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1195,8 +1225,10 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: Some("artist".to_owned()),
+                metadata: HashMap::from([
+                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".to_owned()),
+                ]),
                 ..Default::default()
             };
 
@@ -1240,8 +1272,7 @@ mod format_tests {
             };
 
             let song = Song {
-                title: Some("title".to_owned()),
-                artist: None,
+                metadata: HashMap::from([("title".to_string(), "title".to_owned())]),
                 ..Default::default()
             };
 
