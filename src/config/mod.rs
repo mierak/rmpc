@@ -5,6 +5,7 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
@@ -93,6 +94,7 @@ pub struct Config {
     pub select_current_song_on_change: bool,
     pub theme: UiConfig,
     pub album_art: AlbumArtConfig,
+    pub on_song_change: Option<&'static [&'static str]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -116,6 +118,8 @@ pub struct ConfigFile {
     pub album_art_max_size_px: Size,
     #[serde(default)]
     pub album_art: AlbumArtConfigFile,
+    #[serde(default)]
+    pub on_song_change: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -145,6 +149,7 @@ impl Default for ConfigFile {
             select_current_song_on_change: false,
             album_art_max_size_px: Size::default(),
             album_art: AlbumArtConfigFile::default(),
+            on_song_change: None,
         }
     }
 }
@@ -177,7 +182,7 @@ impl ConfigFile {
         )
     }
 
-    pub fn into_config(self, config_dir: Option<&Path>) -> Result<Config> {
+    pub fn into_config(self, config_dir: Option<&Path>, is_cli: bool) -> Result<Config> {
         let theme: UiConfig = config_dir
             .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
             .transpose()?
@@ -207,12 +212,20 @@ impl ConfigFile {
                     height: if size.height == 0 { u16::MAX } else { size.height },
                 },
             },
+            on_song_change: self
+                .on_song_change
+                .map(|arr| arr.into_iter().map(|v| v.leak() as &'static str).collect_vec().leak() as &'static [_]),
         };
+
+        if is_cli {
+            return Ok(config);
+        }
 
         let is_tmux = tmux::is_inside_tmux();
         if is_tmux && !tmux::is_passthrough_enabled()? {
             tmux::enable_passthrough()?;
         };
+
         config.album_art.method = if config.theme.album_art_width_percent == 0 {
             ImageMethod::None
         } else {

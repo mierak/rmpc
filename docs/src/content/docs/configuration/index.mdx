@@ -84,3 +84,11 @@ purpose at that point.
 <ConfigValue name="select_current_song_on_change" type="bool" />
 
 If set to true, the current song is selected in the queue table when it changes. Defaults to false if not present.
+
+### on_song_change
+
+<ConfigValue name="on_song_change" type="other" customText={'["notify-send", "song changed!"]'} />
+
+Execute given command when the song changes. First element of the array is the command to execute and the rest are the
+arguments passed to the command. Nothing will be executed if left empty. Can be used to send
+[notifications](/rmpc/guides/on_song_change) when the song changes.

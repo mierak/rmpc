@@ -5,6 +5,7 @@
     address: "127.0.0.1:6600",
     theme: None,
     cache_dir: None,
+    on_song_change: None,
     volume_step: 5,
     status_update_interval_ms: 1000,
     select_current_song_on_change: false,

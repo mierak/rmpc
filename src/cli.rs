@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::{
     config::{cli::Command, Config},
     mpd::{commands::volume::Bound, mpd_client::MpdClient},
@@ -50,6 +52,29 @@ impl Command {
             Command::Mount { ref name, ref path } => client.mount(name, path)?,
             Command::Unmount { ref name } => client.unmount(name)?,
             Command::ListMounts => println!("{}", serde_json::ser::to_string(&client.list_mounts()?)?),
+            Command::AlbumArt { output } => {
+                let Some(song) = client.get_current_song()? else {
+                    std::process::exit(3);
+                };
+
+                let album_art = client.find_album_art(&song.file)?;
+
+                let Some(album_art) = album_art else {
+                    std::process::exit(2);
+                };
+
+                if &output == "-" {
+                    std::io::stdout().write_all(&album_art)?;
+                    std::io::stdout().flush()?;
+                } else {
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(output)?
+                        .write_all(&album_art)?;
+                }
+            }
         };
         Ok(())
     }

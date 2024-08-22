@@ -28,10 +28,11 @@ pub fn client() -> TestMpdClient {
             (0..10).map(|i| Song {
                 id: i,
                 file: format!("{}_{}_file_{i}", *artist, *album),
-                title: Some(format!("{}_{}_file_{i}", *artist, *album)),
-                artist: Some((*artist).to_string()),
-                album: Some((*album).to_string()),
-                others: HashMap::default(),
+                metadata: HashMap::from([
+                    ("artist".to_owned(), (*artist).to_string()),
+                    ("album".to_owned(), (*album).to_string()),
+                    ("title".to_owned(), format!("{}_{}_file_{i}", *artist, *album)),
+                ]),
                 duration: Some(Duration::from_secs(i.into())),
             })
         })
@@ -236,12 +237,12 @@ impl MpdClient for TestMpdClient {
             .filter(|s| {
                 let mut matches = true;
                 let values = [
-                    s.artist.as_ref(),
-                    s.others.get("albumartist"),
-                    s.album.as_ref(),
-                    s.title.as_ref(),
+                    s.artist(),
+                    s.metadata.get("albumartist"),
+                    s.album(),
+                    s.title(),
                     Some(&s.file),
-                    s.others.get("genre"),
+                    s.metadata.get("genre"),
                 ];
 
                 for filter in filter {
@@ -272,12 +273,12 @@ impl MpdClient for TestMpdClient {
             .filter(|s| {
                 let mut matches = true;
                 let values = [
-                    s.artist.as_ref(),
-                    s.others.get("albumartist"),
-                    s.album.as_ref(),
-                    s.title.as_ref(),
+                    s.artist(),
+                    s.metadata.get("albumartist"),
+                    s.album(),
+                    s.title(),
                     Some(&s.file),
-                    s.others.get("genre"),
+                    s.metadata.get("genre"),
                 ];
 
                 for filter in filter {
@@ -385,11 +386,8 @@ impl MpdClient for TestMpdClient {
                     .map(|idx| Song {
                         file: self.songs[*idx].file.clone(),
                         id: *idx as u32,
-                        title: None,
-                        artist: None,
-                        album: None,
                         duration: None,
-                        others: HashMap::default(),
+                        metadata: HashMap::default(),
                     })
                     .collect())
             },
