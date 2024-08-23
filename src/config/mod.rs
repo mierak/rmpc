@@ -8,6 +8,7 @@ use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use strum::Display;
+use utils::tilde_expand;
 
 pub mod cli;
 mod defaults;
@@ -212,9 +213,12 @@ impl ConfigFile {
                     height: if size.height == 0 { u16::MAX } else { size.height },
                 },
             },
-            on_song_change: self
-                .on_song_change
-                .map(|arr| arr.into_iter().map(|v| v.leak() as &'static str).collect_vec().leak() as &'static [_]),
+            on_song_change: self.on_song_change.map(|arr| {
+                arr.into_iter()
+                    .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
+                    .collect_vec()
+                    .leak() as &'static [_]
+            }),
         };
 
         if is_cli {
@@ -309,6 +313,57 @@ pub trait Leak {
 impl<T> Leak for T {
     fn leak(self) -> &'static Self {
         Box::leak(Box::new(self))
+    }
+}
+
+pub mod utils {
+    use std::borrow::Cow;
+    use std::path::MAIN_SEPARATOR;
+
+    pub fn tilde_expand(inp: &str) -> Cow<str> {
+        let Ok(home) = std::env::var("HOME") else {
+            return Cow::Borrowed(inp);
+        };
+
+        if let Some(inp) = inp.strip_prefix('~') {
+            if inp.is_empty() {
+                return Cow::Owned(home);
+            }
+
+            if inp.starts_with(MAIN_SEPARATOR) {
+                return Cow::Owned(format!("{home}{inp}"));
+            }
+        }
+
+        Cow::Borrowed(inp)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::tilde_expand;
+        use test_case::test_case;
+
+        #[test_case("~", "/home/some_user")]
+        #[test_case("~enene", "~enene")]
+        #[test_case("~nope/", "~nope/")]
+        #[test_case("~/yes", "/home/some_user/yes")]
+        #[test_case("no/~/no", "no/~/no")]
+        #[test_case("basic/path", "basic/path")]
+        fn home_dir_present(input: &str, expected: &str) {
+            std::env::set_var("HOME", "/home/some_user");
+            assert_eq!(tilde_expand(input), expected);
+        }
+
+        #[test_case("~", "~")]
+        #[test_case("~enene", "~enene")]
+        #[test_case("~nope/", "~nope/")]
+        #[test_case("~/yes", "~/yes")]
+        #[test_case("no/~/no", "no/~/no")]
+        #[test_case("basic/path", "basic/path")]
+        fn home_dir_not_present(input: &str, expected: &str) {
+            std::env::remove_var("HOME");
+            assert_eq!(tilde_expand(input), expected);
+        }
     }
 }
 

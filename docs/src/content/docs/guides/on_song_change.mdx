@@ -18,10 +18,10 @@ This method also assumes you have [jq](https://jqlang.github.io/jq/) installed, 
 `JSON` output.
 
 <Steps>
-1. Create a script and place it somewhere. For example `/tmp/rmpc/notify`. Below is an example of such script.
+1. Create a script and place it somewhere. For example `~/.config/rmpc/notify`. Below is an example of such script.
 Edit it to your needs or create a new one.
 
-    ```bash title=/tmp/rmpc/notify
+    ```bash title=~/.config/rmpc/notify
     #!/usr/bin/env sh
 
     # Directory where to store temporary data
@@ -50,7 +50,13 @@ Edit it to your needs or create a new one.
     notify-send -i "${ALBUM_ART_PATH}" "Now Playing" "$SONG_INFO"
     ```
 
-2.  In your rmpc's `config.ron` specify [on_song_change](/rmpc/configuration#on_song_change) property
+2.  Make the script executable
+
+    ```bash
+    chmod +x ~/.config/rmpc/notify
+    ```
+
+3.  In your rmpc's `config.ron` specify [on_song_change](/rmpc/configuration#on_song_change) property
     and point it at location of the script from step 1.
 
         ```rust title=config.ron
@@ -59,11 +65,11 @@ Edit it to your needs or create a new one.
         #![enable(unwrap_variant_newtypes)]
         (
             address: "/tmp/mpd_socket",
-            on_song_change: ["/tmp/rmpc/notify"],
+            on_song_change: ["~/.config/rmpc/notify"],
         ...
 
         ```
 
-3.  Restart rmpc
+4.  Restart rmpc
 
 </Steps>
