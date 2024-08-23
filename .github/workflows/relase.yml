@@ -36,6 +36,8 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+         fetch-tags: true
 
     - name: Build release
       run: |
@@ -46,6 +48,11 @@ jobs:
       run: |
         mkdir -p "/tmp/artifacts"
         tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
+
+    # - uses: actions/upload-artifact@v4
+    #   with:
+    #     name: rmpc-${{ matrix.target }}
+    #     path: /tmp/artifacts/
 
     - name: Release
       uses: ncipollo/release-action@v1
