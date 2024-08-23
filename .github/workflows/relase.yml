@@ -54,9 +54,9 @@ jobs:
         name: rmpc-${{ matrix.target }}
         path: /tmp/artifacts/
 
-    # - name: Release
-    #   uses: ncipollo/release-action@v1
-    #   with:
-    #     allowUpdates: true
-    #     draft: true
-    #     artifacts: /tmp/artifacts/*
+    - name: Release
+      uses: ncipollo/release-action@v1
+      with:
+        allowUpdates: true
+        draft: true
+        artifacts: /tmp/artifacts/*
