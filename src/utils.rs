@@ -410,3 +410,15 @@ pub mod image_proto {
         }
     }
 }
+
+pub trait DurationExt {
+    fn to_string(&self) -> String;
+}
+
+impl DurationExt for std::time::Duration {
+    fn to_string(&self) -> String {
+        let secs = self.as_secs();
+        let min = secs / 60;
+        format!("{}:{:0>2}", min, secs - min * 60)
+    }
+}

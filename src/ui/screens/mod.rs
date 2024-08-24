@@ -22,12 +22,13 @@ use crate::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
     },
+    utils::DurationExt,
 };
 
 use super::{
     utils::dirstack::{DirStack, DirStackItem},
     widgets::volume::Volume,
-    DurationExt, KeyHandleResultInternal, UiEvent,
+    KeyHandleResultInternal, UiEvent,
 };
 
 pub mod albums;

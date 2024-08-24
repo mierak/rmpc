@@ -23,14 +23,15 @@ use config::{
 };
 use crossterm::event::{Event, KeyEvent};
 use deps::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP};
+use itertools::Itertools;
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
 use ui::{Level, UiEvent};
 use utils::{
-    macros::{status_error, status_info, try_cont},
-    tmux, ErrorExt,
+    macros::{status_error, status_info, try_cont, try_skip},
+    tmux, DurationExt, ErrorExt,
 };
 use ytdlp::YtDlp;
 
@@ -419,16 +420,40 @@ fn handle_idle_event(
             state.status = try_ret!(client.get_status(), "Failed get status");
 
             if state.status.state == mpd::commands::status::State::Play {
-                render_loop.start()?;
+                try_skip!(render_loop.start(), "Failed to start render loop");
             } else {
-                render_loop.stop()?;
+                try_skip!(render_loop.stop(), "Failed to stop render loop");
             }
 
             if state.status.song.is_some() && state.status.song != current_song_id {
                 if let Some([cmd, args @ ..]) = state.config.on_song_change {
+                    let env = match client.get_current_song() {
+                        Ok(Some(song)) => song
+                            .metadata
+                            .into_iter()
+                            .map(|(mut k, v)| {
+                                k.make_ascii_uppercase();
+                                (k, v)
+                            })
+                            .chain(std::iter::once(("FILE".to_owned(), song.file)))
+                            .chain(std::iter::once((
+                                "DURATION".to_owned(),
+                                song.duration.map_or_else(String::new, |d| d.to_string()),
+                            )))
+                            .collect_vec(),
+                        Ok(None) => {
+                            status_error!("No song found when executing on_song_change");
+                            Vec::new()
+                        }
+                        Err(err) => {
+                            status_error!("Unexpected error when crating env for on_song_change: {:?}", err);
+                            Vec::new()
+                        }
+                    };
+
                     std::thread::spawn(move || {
                         let mut cmd = std::process::Command::new(cmd);
-                        let out = match cmd.args(args).output() {
+                        let out = match cmd.args(args).envs(env).output() {
                             Ok(out) => out,
                             Err(err) => {
                                 status_error!("Unexpected error when executing on_song_change: {:?}", err);
