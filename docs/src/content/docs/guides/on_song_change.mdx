@@ -14,8 +14,7 @@ like showing a desktop notification.
 ## Desktop notification on song change
 
 Assuming you have a notification daemon with support for images like [dunst](https://dunst-project.org/) running.
-This method also assumes you have [jq](https://jqlang.github.io/jq/) installed, which is needed to parse the
-`JSON` output.
+All song metadata are available to the script as environment variables. For example `$TITLE`, `$FILE`, `$DURATION`, etc.
 
 <Steps>
 1. Create a script and place it somewhere. For example `~/.config/rmpc/notify`. Below is an example of such script.
@@ -43,11 +42,8 @@ Edit it to your needs or create a new one.
         ALBUM_ART_PATH="${DEFAULT_ALBUM_ART_PATH}"
     fi
 
-    # Query info about current song from rmpc and format it with jq
-    SONG_INFO=$(rmpc song | jq '"\(.metadata.artist) - \(.metadata.title)"')
-
     # Send the notification
-    notify-send -i "${ALBUM_ART_PATH}" "Now Playing" "$SONG_INFO"
+    notify-send -i "${ALBUM_ART_PATH}" "Now Playing" "$ARTIST - $TITLE"
     ```
 
 2.  Make the script executable

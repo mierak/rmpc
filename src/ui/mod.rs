@@ -670,18 +670,6 @@ impl From<&Level> for Color {
     }
 }
 
-trait DurationExt {
-    fn to_string(&self) -> String;
-}
-
-impl DurationExt for Duration {
-    fn to_string(&self) -> String {
-        let secs = self.as_secs();
-        let min = secs / 60;
-        format!("{}:{:0>2}", min, secs - min * 60)
-    }
-}
-
 impl From<&FilterKind> for &'static str {
     fn from(value: &FilterKind) -> Self {
         match value {
