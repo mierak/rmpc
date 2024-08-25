@@ -1,8 +1,11 @@
+use anyhow::{anyhow, Result};
+use itertools::Itertools;
 use std::io::Write;
 
 use crate::{
     config::{cli::Command, Config},
     mpd::{commands::volume::Bound, mpd_client::MpdClient},
+    utils::macros::status_error,
     WorkRequest,
 };
 use anyhow::bail;
@@ -78,4 +81,46 @@ impl Command {
         };
         Ok(())
     }
+}
+
+pub fn run_external_blocking<'a, E>(command: &[&str], envs: E) -> Result<()>
+where
+    E: IntoIterator<Item = (&'a str, &'a str)>,
+{
+    let [cmd, args @ ..] = command else { todo!() };
+
+    let mut cmd = std::process::Command::new(cmd);
+    cmd.args(args);
+
+    for (key, val) in envs {
+        cmd.env(key, val);
+    }
+
+    let out = match cmd.output() {
+        Ok(out) => out,
+        Err(err) => {
+            return Err(anyhow!("Unexpected error when executing external command: {:?}", err));
+        }
+    };
+
+    if !out.status.success() {
+        return Err(anyhow!(
+            "External command failed: exit code: '{}', stdout: '{}', stderr: '{}'",
+            out.status.code().map_or_else(|| "-".to_string(), |v| v.to_string()),
+            String::from_utf8_lossy(&out.stdout).trim(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+
+    Ok(())
+}
+
+pub fn run_external<'a: 'static, K: Into<String>, V: Into<String>>(command: &'a [&'a str], envs: Vec<(K, V)>) {
+    let envs = envs.into_iter().map(|(k, v)| (k.into(), v.into())).collect_vec();
+
+    std::thread::spawn(move || {
+        if let Err(err) = run_external_blocking(command, envs.iter().map(|(k, v)| (k.as_str(), v.as_str()))) {
+            status_error!("{}", err);
+        }
+    });
 }

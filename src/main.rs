@@ -17,6 +17,7 @@ use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
 
 use anyhow::{bail, Result};
 use clap::Parser;
+use cli::run_external;
 use config::{
     cli::{Args, Command},
     ConfigFile,
@@ -426,7 +427,7 @@ fn handle_idle_event(
             }
 
             if state.status.song.is_some() && state.status.song != current_song_id {
-                if let Some([cmd, args @ ..]) = state.config.on_song_change {
+                if let Some(command) = state.config.on_song_change {
                     let env = match client.get_current_song() {
                         Ok(Some(song)) => song
                             .metadata
@@ -451,25 +452,7 @@ fn handle_idle_event(
                         }
                     };
 
-                    std::thread::spawn(move || {
-                        let mut cmd = std::process::Command::new(cmd);
-                        let out = match cmd.args(args).envs(env).output() {
-                            Ok(out) => out,
-                            Err(err) => {
-                                status_error!("Unexpected error when executing on_song_change: {:?}", err);
-                                return;
-                            }
-                        };
-
-                        if !out.status.success() {
-                            status_error!(
-                                "on_song_change failed: exit code: '{}', stdout: '{}', stderr: '{}'",
-                                out.status.code().map_or_else(|| "-".to_string(), |v| v.to_string()),
-                                String::from_utf8_lossy(&out.stdout).trim(),
-                                String::from_utf8_lossy(&out.stderr).trim()
-                            );
-                        }
-                    });
+                    run_external(command, env);
                 };
             }
         }

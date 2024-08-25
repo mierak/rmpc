@@ -30,14 +30,26 @@ mod on_idle_event {
             let current = screen.stack.current_mut();
             let playlist_name = client.playlists[2].name.clone();
             current.select_idx(2);
-            assert_eq!(current.selected(), Some(&DirOrSong::Dir(playlist_name.clone())));
+            assert_eq!(
+                current.selected(),
+                Some(&DirOrSong::Dir {
+                    name: playlist_name.clone(),
+                    full_path: playlist_name.clone()
+                })
+            );
 
             client.playlists.remove(0);
             screen
                 .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
                 .unwrap();
 
-            assert_eq!(screen.stack.current().selected(), Some(&DirOrSong::Dir(playlist_name)));
+            assert_eq!(
+                screen.stack.current().selected(),
+                Some(&DirOrSong::Dir {
+                    name: playlist_name.clone(),
+                    full_path: playlist_name.clone()
+                })
+            );
         }
 
         #[rstest]
@@ -127,7 +139,13 @@ mod on_idle_event {
                 .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
                 .unwrap();
 
-            assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
+            assert_eq!(
+                screen.stack.previous().selected(),
+                Some(&DirOrSong::Dir {
+                    name: playlist_name.clone(),
+                    full_path: playlist_name
+                })
+            );
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 4);
         }
 
@@ -151,7 +169,13 @@ mod on_idle_event {
                 .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
                 .unwrap();
 
-            assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
+            assert_eq!(
+                screen.stack.previous().selected(),
+                Some(&DirOrSong::Dir {
+                    name: playlist_name.clone(),
+                    full_path: playlist_name
+                })
+            );
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, last_song_idx - 1);
         }
 
@@ -175,7 +199,13 @@ mod on_idle_event {
                 .on_event(&mut event, &mut client, &mut status, Box::leak(Box::new(config)))
                 .unwrap();
 
-            assert_eq!(screen.stack.previous().selected(), Some(&DirOrSong::Dir(playlist_name)));
+            assert_eq!(
+                screen.stack.previous().selected(),
+                Some(&DirOrSong::Dir {
+                    name: playlist_name.clone(),
+                    full_path: playlist_name
+                })
+            );
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
         }
 

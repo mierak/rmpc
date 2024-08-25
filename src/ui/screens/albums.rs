@@ -43,7 +43,15 @@ impl Screen for AlbumsScreen {
     fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
         if self.stack().path().is_empty() {
             let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-            self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
+            self.stack = DirStack::new(
+                result
+                    .into_iter()
+                    .map(|v| DirOrSong::Dir {
+                        full_path: format!("{}{v}", self.stack().path().join("/")),
+                        name: v,
+                    })
+                    .collect::<Vec<_>>(),
+            );
             let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
         }
@@ -61,7 +69,15 @@ impl Screen for AlbumsScreen {
         match event {
             crate::ui::UiEvent::Database => {
                 let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                self.stack = DirStack::new(result.into_iter().map(DirOrSong::Dir).collect::<Vec<_>>());
+                self.stack = DirStack::new(
+                    result
+                        .into_iter()
+                        .map(|v| DirOrSong::Dir {
+                            full_path: format!("{}{v}", self.stack().path().join("/")),
+                            name: v,
+                        })
+                        .collect::<Vec<_>>(),
+                );
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack.set_preview(preview);
 
@@ -86,6 +102,8 @@ impl Screen for AlbumsScreen {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             self.handle_common_action(*action, client, config)
+        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
+            self.handle_global_action(*action, client, config)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -124,6 +142,27 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
 
     fn is_filter_input_mode_active(&self) -> bool {
         self.filter_input_mode
+    }
+
+    fn list_marked_songs(&mut self, client: &mut impl MpdClient) -> Result<Vec<MpdSong>> {
+        let marked = self
+            .stack()
+            .current()
+            .marked()
+            .iter()
+            .filter_map(|idx| self.stack().current().items.get(*idx));
+
+        let mut res: Vec<MpdSong> = Vec::new();
+        for item in marked {
+            match item {
+                DirOrSong::Dir { name, full_path: _ } => client
+                    .find(&[Filter::new(Tag::Album, name)])?
+                    .into_iter()
+                    .for_each(|mut song| res.push(std::mem::take(&mut song))),
+                DirOrSong::Song(song) => res.push(song.clone()),
+            }
+        }
+        Ok(res)
     }
 
     fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {

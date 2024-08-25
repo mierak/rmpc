@@ -438,6 +438,9 @@ impl Ui {
                         GlobalAction::Stop => {}
                         GlobalAction::SeekBack => {}
                         GlobalAction::SeekForward => {}
+                        GlobalAction::ExternalCommand { .. } => {
+                            todo!("fallback with only currently playing song")
+                        }
                         GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                         GlobalAction::ShowHelp => {
                             self.modals.push(Box::new(KeybindsModal::new(state)));

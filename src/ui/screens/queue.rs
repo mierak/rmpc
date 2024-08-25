@@ -3,8 +3,9 @@ use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
 
 use crate::{
+    cli::run_external,
     config::{
-        keys::QueueActions,
+        keys::{GlobalAction, QueueActions},
         theme::{
             properties::{Property, SongProperty},
             Position,
@@ -126,7 +127,7 @@ impl Screen for QueueScreen {
                     || self
                         .filter
                         .as_ref()
-                        .is_some_and(|filter| song.matches(config, self.column_formats.as_slice(), filter));
+                        .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter));
 
                 if is_highlighted {
                     Row::new(columns.map(|column| column.patch_style(config.theme.highlighted_item_style)))
@@ -285,7 +286,7 @@ impl Screen for QueueScreen {
             match config.keybinds.navigation.get(&event.into()) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    self.jump_forward(config);
+                    self.jump_forward();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Some(CommonAction::Close) => {
@@ -435,11 +436,11 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(config);
+                    self.jump_forward();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(config);
+                    self.jump_back();
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
@@ -451,6 +452,17 @@ impl Screen for QueueScreen {
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // queue has its own binding for play
             }
+        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
+            match action {
+                GlobalAction::ExternalCommand { command, .. } => {
+                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    {
+                        run_external(command, vec![("SONGS", &selected_song.file)]);
+                    }
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+                _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+            }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -458,7 +470,7 @@ impl Screen for QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn jump_forward(&mut self, config: &Config) {
+    pub fn jump_forward(&mut self) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -471,14 +483,14 @@ impl QueueScreen {
         let length = self.queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.queue[i].matches(config, self.column_formats.as_slice(), filter) {
+            if self.queue[i].matches(self.column_formats.as_slice(), filter) {
                 self.scrolling_state.select(Some(i));
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self, config: &Config) {
+    pub fn jump_back(&mut self) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -491,7 +503,7 @@ impl QueueScreen {
         let length = self.queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.queue[i].matches(config, self.column_formats.as_slice(), filter) {
+            if self.queue[i].matches(self.column_formats.as_slice(), filter) {
                 self.scrolling_state.select(Some(i));
                 break;
             }

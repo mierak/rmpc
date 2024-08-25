@@ -94,6 +94,8 @@ impl Screen for DirectoriesScreen {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             self.handle_common_action(*action, client, config)
+        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
+            self.handle_global_action(*action, client, config)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -119,7 +121,10 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
 
     fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
-            DirOrSong::Dir(dirname) => {
+            DirOrSong::Dir {
+                name: dirname,
+                full_path,
+            } => {
                 let mut next_path = self.stack.path().to_vec();
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
@@ -156,12 +161,15 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         };
 
         match selected {
-            DirOrSong::Dir(_) => {
+            DirOrSong::Dir { .. } => {
                 let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str()))?;
                 let res = new_current
                     .into_iter()
                     .map(|v| match v {
-                        FileOrDir::Dir(d) => DirOrSong::Dir(d.path),
+                        FileOrDir::Dir(d) => DirOrSong::Dir {
+                            name: d.path,
+                            full_path: d.full_path,
+                        },
                         FileOrDir::File(s) => DirOrSong::Song(s),
                     })
                     .sorted()
@@ -179,7 +187,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         config: &Config,
     ) -> Result<Option<Vec<ListItem<'static>>>> {
         match &self.stack.current().selected() {
-            Some(DirOrSong::Dir(_)) => {
+            Some(DirOrSong::Dir { .. }) => {
                 let Some(next_path) = self.stack.next_path() else {
                     log::error!("Failed to move deeper inside dir. Next path is None");
                     return Ok(None);
@@ -194,7 +202,10 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 .0
                 .into_iter()
                 .map(|v| match v {
-                    FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
+                    FileOrDir::Dir(dir) => DirOrSong::Dir {
+                        name: dir.path,
+                        full_path: dir.full_path,
+                    },
                     FileOrDir::File(song) => DirOrSong::Song(song),
                 })
                 .sorted()

@@ -49,7 +49,10 @@ impl Screen for PlaylistsScreen {
                 .list_playlists()
                 .context("Cannot list playlists")?
                 .into_iter()
-                .map(|playlist| DirOrSong::Dir(playlist.name))
+                .map(|playlist| DirOrSong::Dir {
+                    name: playlist.name.clone(),
+                    full_path: playlist.name,
+                })
                 .sorted()
                 .collect();
             self.stack = DirStack::new(playlists);
@@ -73,17 +76,20 @@ impl Screen for PlaylistsScreen {
                         .list_playlists()
                         .context("Cannot list playlists")?
                         .into_iter()
-                        .map(|playlist| DirOrSong::Dir(playlist.name))
+                        .map(|playlist| DirOrSong::Dir {
+                            name: playlist.name.clone(),
+                            full_path: playlist.name,
+                        })
                         .sorted()
                         .collect_vec(),
                 );
 
                 match self.stack.current_mut().selected_mut() {
-                    Some(DirOrSong::Dir(playlist)) => {
+                    Some(DirOrSong::Dir { name: playlist, .. }) => {
                         let mut items = new_stack.current().items.iter();
                         // Select the same playlist by name or index as before
                         let idx_to_select = items
-                            .find_position(|p| matches!(p, DirOrSong::Dir(d) if d == playlist))
+                            .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
                             .or_else(|| self.stack().current().selected_with_idx())
                             .map(|(idx, _)| idx);
                         new_stack.current_mut().state.select(idx_to_select);
@@ -96,7 +102,7 @@ impl Screen for PlaylistsScreen {
                         let mut items = new_stack.current().items.iter();
                         // Select the same playlist by name or index as before
                         let playlist_idx_to_select = items
-                            .find_position(|p| matches!(p, DirOrSong::Dir(d) if d == playlist))
+                            .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
                             .or_else(|| self.stack().previous().selected_with_idx())
                             .map(|(idx, _)| idx);
                         new_stack.current_mut().state.select(playlist_idx_to_select);
@@ -137,6 +143,8 @@ impl Screen for PlaylistsScreen {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             self.handle_common_action(*action, client, config)
+        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
+            self.handle_global_action(*action, client, config)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -162,13 +170,13 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
     fn delete(&self, item: &DirOrSong, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
-            DirOrSong::Dir(d) => {
+            DirOrSong::Dir { name: d, .. } => {
                 client.delete_playlist(d)?;
                 status_info!("Playlist '{d}' deleted");
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             DirOrSong::Song(s) => {
-                let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {
+                let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
                     return Ok(KeyHandleResultInternal::SkipRender);
                 };
                 client.delete_from_playlist(playlist, &SingleOrRange::single(index))?;
@@ -200,7 +208,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
     fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
-            DirOrSong::Dir(d) => {
+            DirOrSong::Dir { name: d, .. } => {
                 client.load_playlist(d)?;
                 status_info!("Playlist '{d}' added to queue");
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -217,7 +225,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
     fn rename(&self, item: &DirOrSong, _client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
-            DirOrSong::Dir(d) => Ok(KeyHandleResultInternal::Modal(Some(Box::new(
+            DirOrSong::Dir { name: d, .. } => Ok(KeyHandleResultInternal::Modal(Some(Box::new(
                 RenamePlaylistModal::new(d.clone()),
             )))),
             DirOrSong::Song(_) => Ok(KeyHandleResultInternal::SkipRender),
@@ -231,7 +239,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         };
 
         match selected {
-            DirOrSong::Dir(playlist) => {
+            DirOrSong::Dir { name: playlist, .. } => {
                 let info = client.list_playlist_info(playlist, None)?;
                 self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -249,12 +257,12 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
             status_error!("Failed to move playlist. No playlist selected");
             return Ok(KeyHandleResultInternal::SkipRender);
         };
-        let Some(DirOrSong::Dir(playlist)) = self.stack.previous().selected() else {
+        let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
             return Ok(KeyHandleResultInternal::SkipRender);
         };
 
         match selected {
-            DirOrSong::Dir(_) => {}
+            DirOrSong::Dir { .. } => {}
             DirOrSong::Song(_) => {
                 let new_idx = match direction {
                     super::MoveDirection::Up => idx.saturating_sub(1),
@@ -276,7 +284,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
             .selected()
             .map_or(Ok(None), |current| -> Result<_> {
                 Ok(Some(match current {
-                    DirOrSong::Dir(d) => client
+                    DirOrSong::Dir { name: d, .. } => client
                         .list_playlist_info(d, None)?
                         .into_iter()
                         .map(DirOrSong::Song)
