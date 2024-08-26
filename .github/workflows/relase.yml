@@ -36,8 +36,12 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v4
-      with:
-         fetch-tags: true
+      # with:
+      #    fetch-tags: true
+
+    - name: Fetch tags
+      run: |
+        git fetch --tags -f
 
     - name: Build release
       run: |
