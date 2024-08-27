@@ -14,17 +14,18 @@ use ratatui::{
 use strum::{Display, EnumIter, VariantNames};
 
 use crate::{
-    cli::run_external,
+    cli::{create_env, run_external},
     config::{
         keys::{CommonAction, GlobalAction, ToDescription},
         theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
         Config,
     },
+    context::AppContext,
     mpd::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
     },
-    utils::{macros::status_error, DurationExt},
+    utils::DurationExt,
 };
 
 use super::{
@@ -58,18 +59,18 @@ pub enum Screens {
 #[allow(unused_variables)]
 pub(super) trait Screen {
     type Actions: ToDescription;
-    fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
     fn post_render(&mut self, frame: &mut Frame, status: &Status, config: &Config) -> Result<()> {
         Ok(())
     }
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
+    fn on_hide(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
@@ -78,8 +79,7 @@ pub(super) trait Screen {
         &mut self,
         event: &mut UiEvent,
         client: &mut impl MpdClient,
-        status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
@@ -88,8 +88,7 @@ pub(super) trait Screen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal>;
 }
 
@@ -223,7 +222,7 @@ pub(crate) mod browser {
     impl DirOrSong {
         pub fn dir_name_or_file_name(&self) -> Cow<str> {
             match self {
-                DirOrSong::Dir { name, full_path } => Cow::Borrowed(name),
+                DirOrSong::Dir { name, full_path: _ } => Cow::Borrowed(name),
                 DirOrSong::Song(song) => Cow::Borrowed(&song.file),
             }
         }
@@ -665,7 +664,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
-    fn list_marked_songs(&mut self, client: &mut impl MpdClient) -> Result<Vec<Song>>;
+    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &T) -> Result<Vec<Song>>;
     fn move_selected(
         &mut self,
         direction: MoveDirection,
@@ -729,25 +728,29 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         &mut self,
         action: GlobalAction,
         client: &mut impl MpdClient,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match action {
             GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
-                let t = self
+                let songs: Vec<_> = self
                     .stack()
                     .current()
-                    .marked()
-                    .iter()
-                    .filter_map(|idx| self.stack().current().items.get(*idx))
-                    .map(|item| item.as_full_path())
-                    .join("\n");
+                    .marked_items()
+                    .map(|item| self.list_songs_in_item(client, item))
+                    .flatten_ok()
+                    .try_collect()?;
+                let songs = songs.iter().map(|song| song.file.as_str()).collect_vec();
 
-                run_external(command, vec![("SONGS", t)]);
+                run_external(command, create_env(context, songs, client)?);
+
                 Ok(KeyHandleResultInternal::SkipRender)
             }
             GlobalAction::ExternalCommand { command, .. } => {
                 if let Some(selected) = self.stack().current().selected() {
-                    run_external(command, vec![("SONGS", selected.as_full_path())]);
+                    let songs = self.list_songs_in_item(client, selected)?;
+                    let songs = songs.iter().map(|s| s.file.as_str());
+
+                    run_external(command, create_env(context, songs, client)?);
                 }
                 Ok(KeyHandleResultInternal::SkipRender)
             }
@@ -759,8 +762,9 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         &mut self,
         action: CommonAction,
         client: &mut impl MpdClient,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         match action {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev();

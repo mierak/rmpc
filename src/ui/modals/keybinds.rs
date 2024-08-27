@@ -50,7 +50,7 @@ fn add_binds<'a, V: Display + ToDescription>(
 }
 
 impl KeybindsModal<'_> {
-    pub fn new(app: &mut crate::state::State) -> Self {
+    pub fn new(app: &mut crate::context::AppContext) -> Self {
         let keybinds = &app.config.keybinds;
         let header_style = app.config.theme.current_item_style;
 
@@ -73,7 +73,7 @@ impl KeybindsModal<'_> {
 }
 
 impl Modal for KeybindsModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
         let popup_area = frame.size().centered(90, 90);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -154,7 +154,7 @@ impl Modal for KeybindsModal<'_> {
         &mut self,
         key: crossterm::event::KeyEvent,
         _client: &mut crate::mpd::client::Client<'_>,
-        app: &mut crate::state::State,
+        app: &mut crate::context::AppContext,
     ) -> anyhow::Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
             match action {

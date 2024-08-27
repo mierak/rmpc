@@ -5,10 +5,8 @@ use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 
 use crate::{
     config::{keys::PlaylistsActions, Config},
-    mpd::{
-        commands::Status,
-        mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
-    },
+    context::AppContext,
+    mpd::mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     ui::{
         modals::rename_playlist::RenamePlaylistModal,
         utils::dirstack::{DirStack, DirStackItem},
@@ -31,7 +29,7 @@ pub struct PlaylistsScreen {
 
 impl Screen for PlaylistsScreen {
     type Actions = PlaylistsActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
                 .set_widths(&config.theme.column_widths)
@@ -43,7 +41,7 @@ impl Screen for PlaylistsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if self.stack().path().is_empty() {
             let playlists: Vec<_> = client
                 .list_playlists()
@@ -56,7 +54,9 @@ impl Screen for PlaylistsScreen {
                 .sorted()
                 .collect();
             self.stack = DirStack::new(playlists);
-            let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
+            let preview = self
+                .prepare_preview(client, context.config)
+                .context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
         }
         Ok(())
@@ -66,8 +66,7 @@ impl Screen for PlaylistsScreen {
         &mut self,
         event: &mut UiEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             UiEvent::StoredPlaylist | UiEvent::Database => {
@@ -122,7 +121,9 @@ impl Screen for PlaylistsScreen {
                     None => {}
                 }
 
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
+                let preview = self
+                    .prepare_preview(client, context.config)
+                    .context("Cannot prepare preview")?;
                 self.stack.set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
@@ -134,17 +135,17 @@ impl Screen for PlaylistsScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         if self.filter_input_mode {
             self.handle_filter_input(event, client, config)
         } else if let Some(_action) = config.keybinds.playlists.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, config)
+            self.handle_common_action(*action, client, context)
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            self.handle_global_action(*action, client, config)
+            self.handle_global_action(*action, client, context)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -166,6 +167,17 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
 
     fn is_filter_input_mode_active(&self) -> bool {
         self.filter_input_mode
+    }
+
+    fn list_songs_in_item(
+        &self,
+        client: &mut impl MpdClient,
+        item: &DirOrSong,
+    ) -> Result<Vec<crate::mpd::commands::Song>> {
+        Ok(match item {
+            DirOrSong::Dir { name, .. } => client.list_playlist_info(name, None)?,
+            DirOrSong::Song(song) => vec![song.clone()],
+        })
     }
 
     fn delete(&self, item: &DirOrSong, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {

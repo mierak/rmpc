@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
 
 use crate::{
-    cli::run_external,
+    cli::{create_env, run_external},
     config::{
         keys::{GlobalAction, QueueActions},
         theme::{
@@ -12,6 +12,7 @@ use crate::{
         },
         Config,
     },
+    context::AppContext,
     mpd::{
         commands::{Song, Status},
         mpd_client::{MpdClient, QueueMoveTarget},
@@ -44,7 +45,6 @@ pub struct QueueScreen {
     scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
-    queue: Vec<Song>,
     header: Vec<&'static str>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<&'static Property<'static, SongProperty>>,
@@ -64,7 +64,6 @@ impl QueueScreen {
             filter: None,
             filter_input_mode: false,
             header: config.theme.song_table_format.iter().map(|v| v.label).collect_vec(),
-            queue: Vec::new(),
             column_widths: config
                 .theme
                 .song_table_format
@@ -78,8 +77,13 @@ impl QueueScreen {
 
 impl Screen for QueueScreen {
     type Actions = QueueActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> anyhow::Result<()> {
-        let queue_len = self.queue.len();
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        AppContext { config, status, queue }: &AppContext,
+    ) -> anyhow::Result<()> {
+        let queue_len = queue.len();
         let album_art_width = config.theme.album_art_width_percent;
 
         let mut img_queue_constraints = [
@@ -112,8 +116,7 @@ impl Screen for QueueScreen {
         let widths = Layout::horizontal(self.column_widths.clone()).split(table_header_section);
         let formats = &config.theme.song_table_format;
 
-        let table_items = self
-            .queue
+        let table_items = queue
             .iter()
             .map(|song| {
                 let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
@@ -188,23 +191,21 @@ impl Screen for QueueScreen {
         self.album_art_facade.post_render(frame, config)
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, _config: &Config) -> Result<()> {
-        let queue = client.playlist_info()?;
-        let album_art = if let Some(current_song) = queue
-            .as_ref()
-            .and_then(|q| q.iter().find(|v| Some(v.id) == status.songid))
-        {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        let status = &context.status;
+
+        let album_art = if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == status.songid) {
             client.find_album_art(current_song.file.as_str())?
         } else {
             None
         };
+
         self.album_art_facade.set_image(album_art)?;
         self.album_art_facade.show();
 
-        self.queue = queue.unwrap_or_default();
-        self.scrolling_state.set_content_len(Some(self.queue.len()));
+        self.scrolling_state.set_content_len(Some(context.queue.len()));
         if let Some(songid) = status.songid {
-            let idx = self
+            let idx = context
                 .queue
                 .iter()
                 .enumerate()
@@ -218,38 +219,27 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn on_hide(&mut self, _client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
-        self.album_art_facade.hide(config.theme.background_color)
+    fn on_hide(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        self.album_art_facade.hide(context.config.theme.background_color)
     }
 
     fn on_event(
         &mut self,
         event: &mut UiEvent,
         client: &mut impl MpdClient,
-        status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event {
-            UiEvent::Playlist => {
-                let queue = client.playlist_info()?;
-                if let Some(queue) = queue {
-                    self.scrolling_state.set_content_len(Some(queue.len()));
-                    self.queue = queue;
-                } else {
-                    self.scrolling_state.set_content_len(Some(0));
-                    self.queue.clear();
-                }
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
             UiEvent::Player => {
-                let queue = client.playlist_info()?;
-                if let Some((idx, current_song)) = queue
-                    .as_ref()
-                    .and_then(|q| q.iter().enumerate().find(|(_, v)| Some(v.id) == status.songid))
+                if let Some((idx, current_song)) = context
+                    .queue
+                    .iter()
+                    .enumerate()
+                    .find(|(_, v)| Some(v.id) == context.status.songid)
                 {
                     let album_art = client.find_album_art(current_song.file.as_str())?;
                     self.album_art_facade.set_image(album_art)?;
-                    if config.select_current_song_on_change {
+                    if context.config.select_current_song_on_change {
                         self.scrolling_state.select(Some(idx));
                     }
                 }
@@ -260,7 +250,7 @@ impl Screen for QueueScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::ModalOpened => {
-                self.album_art_facade.hide(config.theme.background_color)?;
+                self.album_art_facade.hide(context.config.theme.background_color)?;
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             UiEvent::ModalClosed => {
@@ -279,14 +269,14 @@ impl Screen for QueueScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         if self.filter_input_mode {
             match config.keybinds.navigation.get(&event.into()) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    self.jump_forward();
+                    self.jump_forward(&context.queue);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Some(CommonAction::Close) => {
@@ -313,7 +303,10 @@ impl Screen for QueueScreen {
         } else if let Some(action) = config.keybinds.queue.get(&event.into()) {
             match action {
                 QueueActions::Delete => {
-                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    if let Some(selected_song) = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx))
                     {
                         match client.delete_id(selected_song.id) {
                             Ok(()) => {}
@@ -328,7 +321,10 @@ impl Screen for QueueScreen {
                     ConfirmQueueClearModal::default(),
                 )))),
                 QueueActions::Play => {
-                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    if let Some(selected_song) = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx))
                     {
                         client.play_id(selected_song.id)?;
                     }
@@ -338,7 +334,10 @@ impl Screen for QueueScreen {
                     Box::new(SaveQueueModal::default()),
                 ))),
                 QueueActions::AddToPlaylist => {
-                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
+                    if let Some(selected_song) = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx))
                     {
                         let playlists = client
                             .list_playlists()?
@@ -358,19 +357,19 @@ impl Screen for QueueScreen {
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::Up => {
-                    if !self.queue.is_empty() {
+                    if !context.queue.is_empty() {
                         self.scrolling_state.prev();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    if !self.queue.is_empty() {
+                    if !context.queue.is_empty() {
                         self.scrolling_state.next();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::MoveUp => {
-                    if self.queue.is_empty() {
+                    if context.queue.is_empty() {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     }
 
@@ -378,7 +377,11 @@ impl Screen for QueueScreen {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
 
-                    let Some(selected) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx)) else {
+                    let Some(selected) = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx))
+                    else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
 
@@ -388,42 +391,46 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => {
-                    if self.queue.is_empty() {
+                    if context.queue.is_empty() {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
-                    let Some(selected) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx)) else {
+                    let Some(selected) = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx))
+                    else {
                         return Ok(KeyHandleResultInternal::SkipRender);
                     };
 
-                    let new_idx = (idx + 1).min(self.queue.len() - 1);
+                    let new_idx = (idx + 1).min(context.queue.len() - 1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
                     self.scrolling_state.select(Some(new_idx));
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::DownHalf => {
-                    if !self.queue.is_empty() {
+                    if !context.queue.is_empty() {
                         self.scrolling_state.next_half_viewport();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
-                    if !self.queue.is_empty() {
+                    if !context.queue.is_empty() {
                         self.scrolling_state.prev_half_viewport();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
-                    if !self.queue.is_empty() {
+                    if !context.queue.is_empty() {
                         self.scrolling_state.last();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Top => {
-                    if !self.queue.is_empty() {
+                    if !context.queue.is_empty() {
                         self.scrolling_state.first();
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
@@ -436,11 +443,11 @@ impl Screen for QueueScreen {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward();
+                    self.jump_forward(&context.queue);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back();
+                    self.jump_back(&context.queue);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
@@ -455,10 +462,12 @@ impl Screen for QueueScreen {
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
             match action {
                 GlobalAction::ExternalCommand { command, .. } => {
-                    if let Some(selected_song) = self.scrolling_state.get_selected().and_then(|idx| self.queue.get(idx))
-                    {
-                        run_external(command, vec![("SONGS", &selected_song.file)]);
-                    }
+                    let song = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
+
+                    run_external(command, create_env(context, song, client)?);
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 _ => Ok(KeyHandleResultInternal::KeyNotHandled),
@@ -470,7 +479,7 @@ impl Screen for QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn jump_forward(&mut self) {
+    pub fn jump_forward(&mut self, queue: &[Song]) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -480,17 +489,17 @@ impl QueueScreen {
             return;
         };
 
-        let length = self.queue.len();
+        let length = queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.queue[i].matches(self.column_formats.as_slice(), filter) {
+            if queue[i].matches(self.column_formats.as_slice(), filter) {
                 self.scrolling_state.select(Some(i));
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self) {
+    pub fn jump_back(&mut self, queue: &[Song]) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -500,10 +509,10 @@ impl QueueScreen {
             return;
         };
 
-        let length = self.queue.len();
+        let length = queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.queue[i].matches(self.column_formats.as_slice(), filter) {
+            if queue[i].matches(self.column_formats.as_slice(), filter) {
                 self.scrolling_state.select(Some(i));
                 break;
             }

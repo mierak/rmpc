@@ -1,9 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use itertools::Itertools;
 use std::io::Write;
 
 use crate::{
     config::{cli::Command, Config},
+    context::AppContext,
     mpd::{commands::volume::Bound, mpd_client::MpdClient},
     utils::macros::status_error,
     WorkRequest,
@@ -85,9 +86,11 @@ impl Command {
 
 pub fn run_external_blocking<'a, E>(command: &[&str], envs: E) -> Result<()>
 where
-    E: IntoIterator<Item = (&'a str, &'a str)>,
+    E: IntoIterator<Item = (&'a str, &'a str)> + std::fmt::Debug,
 {
-    let [cmd, args @ ..] = command else { todo!() };
+    let [cmd, args @ ..] = command else {
+        bail!("Invalid command: {:?}", command);
+    };
 
     let mut cmd = std::process::Command::new(cmd);
     cmd.args(args);
@@ -96,20 +99,23 @@ where
         cmd.env(key, val);
     }
 
+    log::debug!(command:?; "Running external command");
+    log::trace!(command:?, envs:? = cmd.get_envs(); "Running external command");
+
     let out = match cmd.output() {
         Ok(out) => out,
         Err(err) => {
-            return Err(anyhow!("Unexpected error when executing external command: {:?}", err));
+            bail!("Unexpected error when executing external command: {:?}", err);
         }
     };
 
     if !out.status.success() {
-        return Err(anyhow!(
+        bail!(
             "External command failed: exit code: '{}', stdout: '{}', stderr: '{}'",
             out.status.code().map_or_else(|| "-".to_string(), |v| v.to_string()),
             String::from_utf8_lossy(&out.stdout).trim(),
             String::from_utf8_lossy(&out.stderr).trim()
-        ));
+        );
     }
 
     Ok(())
@@ -123,4 +129,28 @@ pub fn run_external<'a: 'static, K: Into<String>, V: Into<String>>(command: &'a 
             status_error!("{}", err);
         }
     });
+}
+
+pub fn create_env<'a>(
+    context: &AppContext,
+    selected_songs_paths: impl IntoIterator<Item = &'a str>,
+    client: &mut impl MpdClient,
+) -> Result<Vec<(impl Into<String>, impl Into<String>)>> {
+    let mut result = Vec::new();
+
+    if let Some(current) = context.get_current_song(client)? {
+        result.push(("CURRENT_SONG", current.file.clone()));
+    }
+
+    let songs = selected_songs_paths.into_iter().fold(String::new(), |mut acc, val| {
+        acc.push('\n');
+        acc.push_str(val);
+        acc
+    });
+
+    if !songs.is_empty() {
+        result.push(("SELECTED_SONGS", songs));
+    }
+
+    Ok(result)
 }

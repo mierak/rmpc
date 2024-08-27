@@ -16,7 +16,6 @@ use crate::{config::Config, mpd::commands::Song, ui::screens::browser::DirOrSong
 pub trait DirStackItem {
     type Item;
     fn as_path(&self) -> &str;
-    fn as_full_path(&self) -> &str;
     fn matches(&self, config: &Config, filter: &str) -> bool;
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item;
 }
@@ -27,13 +26,6 @@ impl DirStackItem for DirOrSong {
     fn as_path(&self) -> &str {
         match self {
             DirOrSong::Dir { name, .. } => name,
-            DirOrSong::Song(s) => &s.file,
-        }
-    }
-
-    fn as_full_path(&self) -> &str {
-        match self {
-            DirOrSong::Dir { full_path, .. } => full_path,
             DirOrSong::Song(s) => &s.file,
         }
     }
@@ -90,10 +82,6 @@ impl DirStackItem for Song {
     type Item = ListItem<'static>;
 
     fn as_path(&self) -> &str {
-        &self.file
-    }
-
-    fn as_full_path(&self) -> &str {
         &self.file
     }
 
@@ -157,10 +145,6 @@ impl ScrollingState for ListState {
 impl DirStackItem for String {
     type Item = ListItem<'static>;
     fn as_path(&self) -> &str {
-        self
-    }
-
-    fn as_full_path(&self) -> &str {
         self
     }
 

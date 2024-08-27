@@ -10,8 +10,8 @@ use ratatui::{
 
 use crate::{
     config::keys::CommonAction,
+    context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    state::State,
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
@@ -55,7 +55,7 @@ impl SaveQueueModal {
 }
 
 impl Modal for SaveQueueModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
         let popup_area = frame.size().centered_exact(50, 7);
         let [body_area, buttons_area] =
             *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
@@ -110,7 +110,7 @@ impl Modal for SaveQueueModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        app: &mut State,
+        app: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
         let action = app.config.keybinds.navigation.get(&key.into());
         if self.input_focused {

@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
@@ -8,12 +10,9 @@ use ratatui::{
 };
 
 use crate::{
-    config::{
-        keys::{CommonAction, LogsActions},
-        Config,
-    },
-    mpd::{commands::Status, mpd_client::MpdClient},
-    state::MyVecDeque,
+    config::keys::{CommonAction, LogsActions},
+    context::AppContext,
+    mpd::mpd_client::MpdClient,
     ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
 };
 
@@ -21,13 +20,13 @@ use super::Screen;
 
 #[derive(Debug, Default)]
 pub struct LogsScreen {
-    logs: MyVecDeque<Vec<u8>>,
+    logs: VecDeque<Vec<u8>>,
     scrolling_state: DirState<ListState>,
 }
 
 impl Screen for LogsScreen {
     type Actions = LogsActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
         let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
 
         let content_len = lines.len();
@@ -51,7 +50,7 @@ impl Screen for LogsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut impl MpdClient, _status: &mut Status, _config: &Config) -> Result<()> {
+    fn before_show(&mut self, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
         self.scrolling_state.last();
         Ok(())
     }
@@ -60,8 +59,7 @@ impl Screen for LogsScreen {
         &mut self,
         event: &mut UiEvent,
         _client: &mut impl MpdClient,
-        _status: &mut Status,
-        _config: &Config,
+        _context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
@@ -78,9 +76,9 @@ impl Screen for LogsScreen {
         &mut self,
         event: KeyEvent,
         _client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         if let Some(action) = config.keybinds.logs.get(&event.into()) {
             match action {
                 LogsActions::Clear => {

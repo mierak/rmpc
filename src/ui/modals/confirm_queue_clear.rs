@@ -10,8 +10,8 @@ use ratatui::{
 
 use crate::{
     config::keys::CommonAction,
+    context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    state::State,
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
@@ -31,7 +31,7 @@ pub struct ConfirmQueueClearModal {
 }
 
 impl Modal for ConfirmQueueClearModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::state::State) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -83,7 +83,7 @@ impl Modal for ConfirmQueueClearModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        app: &mut State,
+        app: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
             match action {

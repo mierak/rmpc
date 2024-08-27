@@ -11,10 +11,13 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
 };
 
+use crate::cli::create_env;
+use crate::cli::run_external;
+use crate::config::keys::GlobalAction;
 use crate::config::keys::SearchActions;
 use crate::config::Config;
+use crate::context::AppContext;
 use crate::mpd::commands::Song;
-use crate::mpd::commands::Status;
 use crate::ui::utils::dirstack::Dir;
 use crate::utils::macros::status_info;
 use crate::utils::macros::status_warn;
@@ -99,7 +102,7 @@ impl SearchScreen {
         match &self.phase {
             Phase::SearchTextboxInput => Ok(None),
             Phase::Search => Ok(Some(self.songs_dir.to_list_items(config))),
-            Phase::List { .. } => {
+            Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
                     return Ok(None);
                 };
@@ -311,8 +314,7 @@ impl Screen for SearchScreen {
         &mut self,
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
-        _status: &Status,
-        config: &Config,
+        AppContext { config, .. }: &AppContext,
     ) -> anyhow::Result<()> {
         let widths = &config.theme.column_widths;
         let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
@@ -353,7 +355,7 @@ impl Screen for SearchScreen {
             Phase::Search | Phase::SearchTextboxInput => {
                 self.render_input_column(frame, current_area, config);
             }
-            Phase::List { filter_input_on: _ } => {
+            Phase::BrowseResults { filter_input_on: _ } => {
                 self.render_song_column(frame, current_area, config);
                 self.render_input_column(frame, previous_area, config);
             }
@@ -371,13 +373,12 @@ impl Screen for SearchScreen {
         &mut self,
         event: &mut crate::ui::UiEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             crate::ui::UiEvent::Database => {
                 self.songs_dir = Dir::default();
-                self.preview = self.prepare_preview(client, config)?;
+                self.preview = self.prepare_preview(client, context.config)?;
                 self.phase = Phase::Search;
 
                 status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
@@ -391,9 +392,9 @@ impl Screen for SearchScreen {
         &mut self,
         event: crossterm::event::KeyEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> anyhow::Result<crate::ui::KeyHandleResultInternal> {
+        let config = context.config;
         let action = config.keybinds.navigation.get(&event.into());
         match &mut self.phase {
             Phase::SearchTextboxInput => {
@@ -447,7 +448,7 @@ impl Screen for SearchScreen {
                         CommonAction::DownHalf => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::UpHalf => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
-                            self.phase = Phase::List { filter_input_on: false };
+                            self.phase = Phase::BrowseResults { filter_input_on: false };
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
@@ -515,7 +516,7 @@ impl Screen for SearchScreen {
                     Ok(KeyHandleResultInternal::KeyNotHandled)
                 }
             }
-            Phase::List {
+            Phase::BrowseResults {
                 filter_input_on: filter_input_on @ true,
             } => {
                 if let Some(CommonAction::Close) = action {
@@ -546,10 +547,25 @@ impl Screen for SearchScreen {
                     }
                 }
             }
-            Phase::List {
+            Phase::BrowseResults {
                 filter_input_on: filter_input_modce @ false,
             } => {
-                if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+                if let Some(action) = config.keybinds.global.get(&event.into()) {
+                    match action {
+                        GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
+                            let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
+                            run_external(command, create_env(context, songs, client)?);
+
+                            Ok(KeyHandleResultInternal::SkipRender)
+                        }
+                        GlobalAction::ExternalCommand { command, .. } => {
+                            let selected = self.songs_dir.selected().map(|s| s.file.as_str());
+                            run_external(command, create_env(context, selected, client)?);
+                            Ok(KeyHandleResultInternal::SkipRender)
+                        }
+                        _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                    }
+                } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
                             self.songs_dir.next();
@@ -811,7 +827,7 @@ impl<const N1: usize, const N2: usize, const N3: usize> InputGroups<N1, N2, N3> 
 enum Phase {
     SearchTextboxInput,
     Search,
-    List { filter_input_on: bool },
+    BrowseResults { filter_input_on: bool },
 }
 
 #[derive(Debug)]

@@ -1,7 +1,8 @@
 use crate::{
     config::{keys::AlbumsActions, Config},
+    context::AppContext,
     mpd::{
-        commands::{Song as MpdSong, Status},
+        commands::Song as MpdSong,
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
@@ -28,7 +29,7 @@ pub struct AlbumsScreen {
 impl Screen for AlbumsScreen {
     type Actions = AlbumsActions;
 
-    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
                 .set_widths(&config.theme.column_widths)
@@ -40,7 +41,7 @@ impl Screen for AlbumsScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if self.stack().path().is_empty() {
             let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
             self.stack = DirStack::new(
@@ -52,7 +53,9 @@ impl Screen for AlbumsScreen {
                     })
                     .collect::<Vec<_>>(),
             );
-            let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
+            let preview = self
+                .prepare_preview(client, context.config)
+                .context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
         }
 
@@ -63,8 +66,7 @@ impl Screen for AlbumsScreen {
         &mut self,
         event: &mut crate::ui::UiEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             crate::ui::UiEvent::Database => {
@@ -78,7 +80,9 @@ impl Screen for AlbumsScreen {
                         })
                         .collect::<Vec<_>>(),
                 );
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
+                let preview = self
+                    .prepare_preview(client, context.config)
+                    .context("Cannot prepare preview")?;
                 self.stack.set_preview(preview);
 
                 status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
@@ -92,18 +96,18 @@ impl Screen for AlbumsScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         if self.filter_input_mode {
             self.handle_filter_input(event, client, config)?;
             Ok(KeyHandleResultInternal::RenderRequested)
         } else if let Some(_action) = config.keybinds.albums.get(&event.into()) {
             Ok(KeyHandleResultInternal::SkipRender)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, config)
+            self.handle_common_action(*action, client, context)
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            self.handle_global_action(*action, client, config)
+            self.handle_global_action(*action, client, context)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -144,25 +148,15 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
         self.filter_input_mode
     }
 
-    fn list_marked_songs(&mut self, client: &mut impl MpdClient) -> Result<Vec<MpdSong>> {
-        let marked = self
-            .stack()
-            .current()
-            .marked()
-            .iter()
-            .filter_map(|idx| self.stack().current().items.get(*idx));
-
-        let mut res: Vec<MpdSong> = Vec::new();
-        for item in marked {
-            match item {
-                DirOrSong::Dir { name, full_path: _ } => client
-                    .find(&[Filter::new(Tag::Album, name)])?
-                    .into_iter()
-                    .for_each(|mut song| res.push(std::mem::take(&mut song))),
-                DirOrSong::Song(song) => res.push(song.clone()),
-            }
+    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<MpdSong>> {
+        match item {
+            DirOrSong::Dir { name, full_path: _ } => Ok(client
+                .find(&[Filter::new(Tag::Album, name)])?
+                .into_iter()
+                .map(|mut song| std::mem::take(&mut song))
+                .collect_vec()),
+            DirOrSong::Song(song) => Ok(vec![song.clone()]),
         }
-        Ok(res)
     }
 
     fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {

@@ -50,10 +50,10 @@ mod tests {
 
 mod cli;
 mod config;
+mod context;
 mod deps;
 mod logging;
 mod mpd;
-mod state;
 mod ui;
 mod utils;
 mod ytdlp;
@@ -94,7 +94,7 @@ fn main() -> Result<()> {
                 Ok(val) => val,
                 Err(_err) => ConfigFile::default(),
             };
-            let config = config_file.clone().into_config(Some(&args.config), true)?;
+            let config = config_file.clone().into_config(Some(&args.config), false)?;
 
             println!("rmpc {}", env!("VERGEN_GIT_DESCRIBE"));
             println!("\n{:<20} {}", "Config path", args.config.as_str()?);
@@ -168,7 +168,10 @@ fn main() -> Result<()> {
             );
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
-            let state = try_ret!(state::State::try_new(&mut client, config), "Failed to create app state");
+            let state = try_ret!(
+                context::AppContext::try_new(&mut client, config),
+                "Failed to create app state"
+            );
 
             let mut render_loop = RenderLoop::new(tx.clone(), config);
             if state.status.state == mpd::commands::status::State::Play {
@@ -189,7 +192,7 @@ fn main() -> Result<()> {
             let tx_clone = tx.clone();
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
                 main_task(
-                    Ui::new(state.config, tx_clone, worker_tx),
+                    Ui::new(config, tx_clone, worker_tx),
                     state,
                     rx,
                     client,
@@ -274,7 +277,7 @@ fn worker_task(
 
 fn main_task<B: Backend + std::io::Write>(
     mut ui: Ui,
-    mut state: state::State,
+    mut context: context::AppContext,
     event_receiver: std::sync::mpsc::Receiver<AppEvent>,
     mut client: Client<'_>,
     mut render_loop: RenderLoop,
@@ -286,7 +289,7 @@ fn main_task<B: Backend + std::io::Write>(
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
-    ui.before_show(&mut state, &mut client)
+    ui.before_show(&mut context, &mut client)
         .expect("Initial render init to succeed");
 
     loop {
@@ -308,10 +311,10 @@ fn main_task<B: Backend + std::io::Write>(
 
         if let Some(event) = event {
             match event {
-                AppEvent::UserInput(key) => match ui.handle_key(key, &mut state, &mut client) {
+                AppEvent::UserInput(key) => match ui.handle_key(key, &mut context, &mut client) {
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut state, &mut client) {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
                             error!(error:? = err, event:?; "Ui failed to handle quit event");
                         }
                         break;
@@ -329,16 +332,16 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::Log(msg) => {
-                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut state, &mut client) {
+                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut context, &mut client) {
                         error!(error:? = err; "Ui failed to handle log event");
                     }
                 }
                 AppEvent::IdleEvent(event) => {
-                    if let Err(err) = handle_idle_event(event, &mut state, &mut client, &mut render_loop) {
+                    if let Err(err) = handle_idle_event(event, &mut context, &mut client, &mut render_loop) {
                         status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                     }
                     if let Ok(ev) = event.try_into() {
-                        if let Err(err) = ui.on_event(ev, &mut state, &mut client) {
+                        if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
                             status_error!(error:? = err, event:?; "Ui failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
@@ -346,7 +349,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::RequestStatusUpdate => {
                     match client.get_status() {
-                        Ok(status) => state.status = status,
+                        Ok(status) => context.status = status,
                         Err(err) => {
                             error!(err:?; "Unable to send render command from status update loop");
                         }
@@ -373,7 +376,7 @@ fn main_task<B: Backend + std::io::Write>(
                     status_error!("{}", err);
                 }
                 AppEvent::Resized { columns, rows } => {
-                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut state, &mut client) {
+                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context, &mut client) {
                         error!(error:? = err, event:?; "Ui failed to resize event");
                     }
                     render_wanted = true;
@@ -391,12 +394,12 @@ fn main_task<B: Backend + std::io::Write>(
             }
             terminal
                 .draw(|frame| {
-                    if let Err(err) = ui.render(frame, &mut state) {
+                    if let Err(err) = ui.render(frame, &mut context) {
                         error!(error:? = err; "Failed to render a frame");
                     };
                 })
                 .expect("Expected render to succeed");
-            if let Err(err) = ui.post_render(&mut terminal.get_frame(), &mut state) {
+            if let Err(err) = ui.post_render(&mut terminal.get_frame(), &mut context) {
                 error!(error:? = err; "Failed handle post render phase");
             };
             last_render = now;
@@ -409,26 +412,26 @@ fn main_task<B: Backend + std::io::Write>(
 
 fn handle_idle_event(
     event: IdleEvent,
-    state: &mut state::State,
+    context: &mut context::AppContext,
     client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
 ) -> Result<()> {
     match event {
         IdleEvent::Mixer => {}
         IdleEvent::Player => {
-            let current_song_id = state.status.song;
+            let current_song_id = context.status.song;
 
-            state.status = try_ret!(client.get_status(), "Failed get status");
+            context.status = try_ret!(client.get_status(), "Failed get status");
 
-            if state.status.state == mpd::commands::status::State::Play {
+            if context.status.state == mpd::commands::status::State::Play {
                 try_skip!(render_loop.start(), "Failed to start render loop");
             } else {
                 try_skip!(render_loop.stop(), "Failed to stop render loop");
             }
 
-            if state.status.song.is_some() && state.status.song != current_song_id {
-                if let Some(command) = state.config.on_song_change {
-                    let env = match client.get_current_song() {
+            if context.status.song.is_some_and(|id| Some(id) != current_song_id) {
+                if let Some(command) = context.config.on_song_change {
+                    let env = match context.get_current_song(client) {
                         Ok(Some(song)) => song
                             .metadata
                             .into_iter()
@@ -457,7 +460,10 @@ fn handle_idle_event(
             }
         }
         IdleEvent::Options => {}
-        IdleEvent::Playlist => {}
+        IdleEvent::Playlist => {
+            let queue = client.playlist_info()?;
+            context.queue = queue.unwrap_or_default();
+        }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
         IdleEvent::Update => {}
