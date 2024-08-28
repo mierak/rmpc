@@ -1,7 +1,8 @@
+use anyhow::anyhow;
 use anyhow::Context;
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
 
 // file: 03 Diode.flac
 // size: 18183774
@@ -13,7 +14,7 @@ pub struct Listed {
     pub kind: ListingType,
     pub name: String,
     pub size: u64,
-    pub last_modified: String, // TODO timestamp?
+    pub last_modified: String,
 }
 
 #[derive(Debug, Default)]
@@ -31,7 +32,11 @@ impl FromMpd for ListFiles {
 
         self.0
             .last_mut()
-            .context("No element in accumulator while parsing ListFiles")?
+            .context(anyhow!(
+                "No element in accumulator while parsing ListFiles. Key '{}' Value :'{}'",
+                key,
+                value
+            ))?
             .next_internal(key, value)
     }
 }
@@ -47,7 +52,7 @@ impl FromMpd for Listed {
                 self.kind = ListingType::Dir;
                 self.name = value;
             }
-            "size" => self.size = value.parse()?,
+            "size" => self.size = value.parse().logerr(key, &value)?,
             "last-modified" => self.last_modified = value,
             _ => return Ok(LineHandled::No { value }),
         }

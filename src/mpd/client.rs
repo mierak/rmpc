@@ -16,7 +16,7 @@ use log::debug;
 
 type MpdResult<T> = Result<T, MpdError>;
 
-const MAX_SUPPORTED_VERSION: Version = Version {
+const MIN_SUPPORTED_VERSION: Version = Version {
     major: 0,
     minor: 23,
     patch: 5,
@@ -128,9 +128,9 @@ impl<'name> Client<'name> {
 
         debug!(name, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
 
-        if version > MAX_SUPPORTED_VERSION {
+        if version < MIN_SUPPORTED_VERSION {
             status_warn!(
-                "MPD version '{version}' is higher than supported. Maximum supported protocol version is '{MAX_SUPPORTED_VERSION}'. Some features may work incorrectly."
+                "MPD version '{version}' is lower than supported. Minimum supported protocol version is '{MIN_SUPPORTED_VERSION }'. Some features may work incorrectly."
             );
         }
 

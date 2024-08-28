@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
 
 #[derive(Default, Serialize, PartialEq, Eq, Clone)]
 pub struct Song {
@@ -44,9 +44,9 @@ impl FromMpd for Song {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "file" => self.file = value,
-            "id" => self.id = value.parse()?,
+            "id" => self.id = value.parse().logerr(key, &value)?,
             "duration" => {
-                self.duration = Some(Duration::from_secs_f64(value.parse()?));
+                self.duration = Some(Duration::from_secs_f64(value.parse().logerr(key, &value)?));
             }
             "time" | "format" => {} // deprecated or ignored
             key => {

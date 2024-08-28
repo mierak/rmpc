@@ -40,3 +40,32 @@ enum LineHandled {
     Yes,
     No { value: String },
 }
+
+pub trait ParseErrorExt {
+    fn logerr(self, key: &str, value: &str) -> Self;
+}
+
+impl<T: std::str::FromStr> ParseErrorExt for Result<T, anyhow::Error> {
+    fn logerr(self, key: &str, value: &str) -> Self {
+        if self.is_err() {
+            log::error!(key, value; "Failed to parse value");
+        }
+        self
+    }
+}
+impl<T: std::str::FromStr> ParseErrorExt for Result<T, std::num::ParseFloatError> {
+    fn logerr(self, key: &str, value: &str) -> Self {
+        if self.is_err() {
+            log::error!(key, value; "Failed to parse value");
+        }
+        self
+    }
+}
+impl<T: std::str::FromStr> ParseErrorExt for Result<T, std::num::ParseIntError> {
+    fn logerr(self, key: &str, value: &str) -> Self {
+        if self.is_err() {
+            log::error!(key, value; "Failed to parse value");
+        }
+        self
+    }
+}
