@@ -14,7 +14,7 @@ use crate::{
     },
     context::AppContext,
     mpd::{
-        commands::{Song, Status},
+        commands::Song,
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     ui::{
@@ -187,8 +187,8 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn post_render(&mut self, frame: &mut Frame, _status: &Status, config: &Config) -> Result<()> {
-        self.album_art_facade.post_render(frame, config)
+    fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
+        self.album_art_facade.post_render(frame, context.config)
     }
 
     fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {

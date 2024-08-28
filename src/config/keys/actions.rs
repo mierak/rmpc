@@ -156,7 +156,7 @@ impl ToDescription for GlobalAction {
                 description: Some(desc),
                 ..
             } => desc,
-            GlobalAction::ExternalCommand { description: None, .. } => "Execute an exterlnal command",
+            GlobalAction::ExternalCommand { description: None, .. } => "Execute an external command",
             GlobalAction::ExternalCommand {
                 description: Some(desc),
                 ..

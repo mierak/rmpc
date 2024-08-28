@@ -351,7 +351,7 @@ fn main_task<B: Backend + std::io::Write>(
                     match client.get_status() {
                         Ok(status) => context.status = status,
                         Err(err) => {
-                            error!(err:?; "Unable to send render command from status update loop");
+                            error!(err:?; "Unable to update status requested by render loop");
                         }
                     };
                     render_wanted = true;

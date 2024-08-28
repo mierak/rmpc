@@ -149,7 +149,7 @@ macro_rules! screen_call {
 
 impl Ui {
     pub fn post_render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
-        screen_call!(self, state, post_render(frame, &context.status, context.config))
+        screen_call!(self, state, post_render(frame, context))
     }
 
     pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {

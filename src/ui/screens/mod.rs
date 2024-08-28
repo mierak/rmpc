@@ -60,7 +60,7 @@ pub enum Screens {
 pub(super) trait Screen {
     type Actions: ToDescription;
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
-    fn post_render(&mut self, frame: &mut Frame, status: &Status, config: &Config) -> Result<()> {
+    fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
