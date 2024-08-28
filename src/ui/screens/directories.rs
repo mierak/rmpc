@@ -121,11 +121,9 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
 
     fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
         Ok(match item {
-            DirOrSong::Dir { full_path, .. } => client
-                .find(&[Filter::new_with_kind(Tag::File, full_path, FilterKind::StartsWith)])?
-                .into_iter()
-                .map(|mut song| std::mem::take(&mut song))
-                .collect_vec(),
+            DirOrSong::Dir { full_path, .. } => {
+                client.find(&[Filter::new_with_kind(Tag::File, full_path, FilterKind::StartsWith)])?
+            }
             DirOrSong::Song(song) => vec![song.clone()],
         })
     }

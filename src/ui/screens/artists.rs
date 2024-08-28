@@ -168,16 +168,8 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
     fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
         Ok(match item {
             DirOrSong::Dir { name, full_path: _ } => match self.stack().path() {
-                [artist] => client
-                    .find(&[Filter::new(Tag::Album, name), Filter::new(Tag::Artist, artist)])?
-                    .into_iter()
-                    .map(|mut song| std::mem::take(&mut song))
-                    .collect_vec(),
-                [] => client
-                    .find(&[Filter::new(Tag::Artist, name)])?
-                    .into_iter()
-                    .map(|mut song| std::mem::take(&mut song))
-                    .collect_vec(),
+                [artist] => client.find(&[Filter::new(Tag::Album, name), Filter::new(Tag::Artist, artist)])?,
+                [] => client.find(&[Filter::new(Tag::Artist, name)])?,
                 _ => Vec::new(),
             },
             DirOrSong::Song(song) => vec![song.clone()],

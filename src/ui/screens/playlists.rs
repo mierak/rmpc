@@ -6,7 +6,10 @@ use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 use crate::{
     config::{keys::PlaylistsActions, Config},
     context::AppContext,
-    mpd::mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
+    mpd::{
+        commands::Song,
+        mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
+    },
     ui::{
         modals::rename_playlist::RenamePlaylistModal,
         utils::dirstack::{DirStack, DirStackItem},
@@ -169,11 +172,7 @@ impl BrowserScreen<DirOrSong> for PlaylistsScreen {
         self.filter_input_mode
     }
 
-    fn list_songs_in_item(
-        &self,
-        client: &mut impl MpdClient,
-        item: &DirOrSong,
-    ) -> Result<Vec<crate::mpd::commands::Song>> {
+    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
         Ok(match item {
             DirOrSong::Dir { name, .. } => client.list_playlist_info(name, None)?,
             DirOrSong::Song(song) => vec![song.clone()],

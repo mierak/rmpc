@@ -150,11 +150,7 @@ impl BrowserScreen<DirOrSong> for AlbumsScreen {
 
     fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<MpdSong>> {
         match item {
-            DirOrSong::Dir { name, full_path: _ } => Ok(client
-                .find(&[Filter::new(Tag::Album, name)])?
-                .into_iter()
-                .map(|mut song| std::mem::take(&mut song))
-                .collect_vec()),
+            DirOrSong::Dir { name, full_path: _ } => Ok(client.find(&[Filter::new(Tag::Album, name)])?),
             DirOrSong::Song(song) => Ok(vec![song.clone()]),
         }
     }
