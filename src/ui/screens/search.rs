@@ -433,7 +433,17 @@ impl Screen for SearchScreen {
                 }
             }
             Phase::Search => {
-                if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+                if let Some(action) = config.keybinds.global.get(&event.into()) {
+                    match action {
+                        GlobalAction::ExternalCommand { command, .. } => {
+                            let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
+                            run_external(command, create_env(context, songs, client)?);
+
+                            Ok(KeyHandleResultInternal::SkipRender)
+                        }
+                        _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                    }
+                } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
                             self.inputs.next();

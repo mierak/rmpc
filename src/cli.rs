@@ -142,15 +142,22 @@ pub fn create_env<'a>(
         result.push(("CURRENT_SONG", current.file.clone()));
     }
 
-    let songs = selected_songs_paths.into_iter().fold(String::new(), |mut acc, val| {
-        acc.push('\n');
-        acc.push_str(val);
-        acc
-    });
+    let songs = selected_songs_paths
+        .into_iter()
+        .enumerate()
+        .fold(String::new(), |mut acc, (idx, val)| {
+            if idx > 0 {
+                acc.push('\n');
+            }
+            acc.push_str(val);
+            acc
+        });
 
     if !songs.is_empty() {
         result.push(("SELECTED_SONGS", songs));
     }
+
+    result.push(("STATE", context.status.state.to_string()));
 
     Ok(result)
 }
