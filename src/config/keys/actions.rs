@@ -1,4 +1,7 @@
+use itertools::Itertools;
 use strum::Display;
+
+use crate::config::utils::tilde_expand;
 
 use super::ToDescription;
 
@@ -34,6 +37,10 @@ pub enum GlobalAction {
         command: &'static str,
         description: Option<&'static str>,
     },
+    ExternalCommand {
+        command: &'static [&'static str],
+        description: Option<&'static str>,
+    },
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
@@ -64,6 +71,10 @@ pub enum GlobalActionFile {
     CommandMode,
     Command {
         command: String,
+        description: Option<String>,
+    },
+    ExternalCommand {
+        command: Vec<String>,
         description: Option<String>,
     },
 }
@@ -99,6 +110,14 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::AlbumsTab => GlobalAction::AlbumsTab,
             GlobalActionFile::PlaylistsTab => GlobalAction::PlaylistsTab,
             GlobalActionFile::SearchTab => GlobalAction::SearchTab,
+            GlobalActionFile::ExternalCommand { command, description } => GlobalAction::ExternalCommand {
+                command: command
+                    .into_iter()
+                    .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
+                    .collect_vec()
+                    .leak(),
+                description: description.map(|s| s.leak() as &'static str),
+            },
         }
     }
 }
@@ -134,6 +153,11 @@ impl ToDescription for GlobalAction {
             GlobalAction::CommandMode => "Enter command mode",
             GlobalAction::Command { description: None, .. } => "Execute a command",
             GlobalAction::Command {
+                description: Some(desc),
+                ..
+            } => desc,
+            GlobalAction::ExternalCommand { description: None, .. } => "Execute an external command",
+            GlobalAction::ExternalCommand {
                 description: Some(desc),
                 ..
             } => desc,

@@ -5,9 +5,10 @@ use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 
 use crate::{
     config::{keys::DirectoriesActions, Config},
+    context::AppContext,
     mpd::{
-        commands::{lsinfo::FileOrDir, Status},
-        mpd_client::{Filter, MpdClient, Tag},
+        commands::{lsinfo::FileOrDir, Song},
+        mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     ui::{
         utils::dirstack::{DirStack, DirStackItem},
@@ -27,7 +28,7 @@ pub struct DirectoriesScreen {
 
 impl Screen for DirectoriesScreen {
     type Actions = DirectoriesActions;
-    fn render(&mut self, frame: &mut Frame, area: Rect, _status: &Status, config: &Config) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
                 .set_widths(&config.theme.column_widths)
@@ -39,7 +40,7 @@ impl Screen for DirectoriesScreen {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, _status: &mut Status, config: &Config) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if self.stack().path().is_empty() {
             self.stack = DirStack::new(
                 client
@@ -48,7 +49,7 @@ impl Screen for DirectoriesScreen {
                     .map(Into::<DirOrSong>::into)
                     .collect::<Vec<_>>(),
             );
-            let preview = self.prepare_preview(client, config)?;
+            let preview = self.prepare_preview(client, context.config)?;
             self.stack.set_preview(preview);
         }
 
@@ -59,8 +60,7 @@ impl Screen for DirectoriesScreen {
         &mut self,
         event: &mut crate::ui::UiEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             crate::ui::UiEvent::Database => {
@@ -71,7 +71,7 @@ impl Screen for DirectoriesScreen {
                         .map(Into::<DirOrSong>::into)
                         .collect::<Vec<_>>(),
                 );
-                let preview = self.prepare_preview(client, config)?;
+                let preview = self.prepare_preview(client, context.config)?;
                 self.stack.set_preview(preview);
 
                 status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
@@ -85,15 +85,17 @@ impl Screen for DirectoriesScreen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        _status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         if self.filter_input_mode {
             self.handle_filter_input(event, client, config)
         } else if let Some(_action) = config.keybinds.directories.get(&event.into()) {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, config)
+            self.handle_common_action(*action, client, context)
+        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
+            self.handle_global_action(*action, client, context)
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         }
@@ -117,9 +119,21 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         self.filter_input_mode
     }
 
+    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
+        Ok(match item {
+            DirOrSong::Dir { full_path, .. } => {
+                client.find(&[Filter::new_with_kind(Tag::File, full_path, FilterKind::StartsWith)])?
+            }
+            DirOrSong::Song(song) => vec![song.clone()],
+        })
+    }
+
     fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         match item {
-            DirOrSong::Dir(dirname) => {
+            DirOrSong::Dir {
+                name: dirname,
+                full_path: _,
+            } => {
                 let mut next_path = self.stack.path().to_vec();
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
@@ -156,12 +170,15 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         };
 
         match selected {
-            DirOrSong::Dir(_) => {
+            DirOrSong::Dir { .. } => {
                 let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str()))?;
                 let res = new_current
                     .into_iter()
                     .map(|v| match v {
-                        FileOrDir::Dir(d) => DirOrSong::Dir(d.path),
+                        FileOrDir::Dir(d) => DirOrSong::Dir {
+                            name: d.path,
+                            full_path: d.full_path,
+                        },
                         FileOrDir::File(s) => DirOrSong::Song(s),
                     })
                     .sorted()
@@ -179,7 +196,7 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
         config: &Config,
     ) -> Result<Option<Vec<ListItem<'static>>>> {
         match &self.stack.current().selected() {
-            Some(DirOrSong::Dir(_)) => {
+            Some(DirOrSong::Dir { .. }) => {
                 let Some(next_path) = self.stack.next_path() else {
                     log::error!("Failed to move deeper inside dir. Next path is None");
                     return Ok(None);
@@ -194,7 +211,10 @@ impl BrowserScreen<DirOrSong> for DirectoriesScreen {
                 .0
                 .into_iter()
                 .map(|v| match v {
-                    FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
+                    FileOrDir::Dir(dir) => DirOrSong::Dir {
+                        name: dir.path,
+                        full_path: dir.full_path,
+                    },
                     FileOrDir::File(song) => DirOrSong::Song(song),
                 })
                 .sorted()

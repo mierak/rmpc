@@ -57,7 +57,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
 };
 
 impl Modal for AddToPlaylistModal {
-    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::state::State) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
         let popup_area = frame.size().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -127,7 +127,7 @@ impl Modal for AddToPlaylistModal {
         &mut self,
         key: crossterm::event::KeyEvent,
         client: &mut crate::mpd::client::Client<'_>,
-        app: &mut crate::state::State,
+        app: &mut crate::context::AppContext,
     ) -> anyhow::Result<KeyHandleResultInternal> {
         if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
             match action {

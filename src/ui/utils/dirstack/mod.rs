@@ -20,68 +20,22 @@ pub trait DirStackItem {
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item;
 }
 
-impl<'a> DirStackItem for &'a str {
-    type Item = ListItem<'a>;
-    fn as_path(&self) -> &str {
-        self
-    }
-
-    fn matches(&self, _config: &Config, filter: &str) -> bool {
-        self.to_lowercase().contains(&filter.to_lowercase())
-    }
-
-    fn to_list_item(&self, config: &Config, _is_marked: bool, filter: Option<&str>) -> ListItem<'a> {
-        if filter.is_some_and(|filter| self.matches(config, filter)) {
-            ListItem::new(self.to_owned()).style(config.theme.highlighted_item_style)
-        } else {
-            ListItem::new(self.to_owned())
-        }
-    }
-}
-
-impl DirStackItem for String {
-    type Item = ListItem<'static>;
-    fn as_path(&self) -> &str {
-        self
-    }
-
-    fn matches(&self, _config: &Config, filter: &str) -> bool {
-        self.to_lowercase().contains(&filter.to_lowercase())
-    }
-
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
-        let symbols = &config.theme.symbols;
-        let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
-        } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
-        };
-
-        if filter.is_some_and(|filter| self.matches(config, filter)) {
-            ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
-                .style(config.theme.highlighted_item_style)
-        } else {
-            ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
-        }
-    }
-}
-
 impl DirStackItem for DirOrSong {
     type Item = ListItem<'static>;
 
     fn as_path(&self) -> &str {
         match self {
-            DirOrSong::Dir(d) => d,
+            DirOrSong::Dir { name, .. } => name,
             DirOrSong::Song(s) => &s.file,
         }
     }
 
     fn matches(&self, config: &Config, filter: &str) -> bool {
         match self {
-            DirOrSong::Dir(v) => if v.is_empty() { "Untitled" } else { v.as_str() }
+            DirOrSong::Dir { name, .. } => if name.is_empty() { "Untitled" } else { name.as_str() }
                 .to_lowercase()
                 .contains(&filter.to_lowercase()),
-            DirOrSong::Song(s) => s.matches(config, config.theme.browser_song_format.0, filter),
+            DirOrSong::Song(s) => s.matches(config.theme.browser_song_format.0, filter),
         }
     }
 
@@ -94,12 +48,12 @@ impl DirStackItem for DirOrSong {
         };
 
         let value = match self {
-            DirOrSong::Dir(v) => Line::from(vec![
+            DirOrSong::Dir { name, .. } => Line::from(vec![
                 marker_span,
                 Span::from(format!(
                     "{} {}",
                     symbols.dir,
-                    if v.is_empty() { "Untitled" } else { v.as_str() }
+                    if name.is_empty() { "Untitled" } else { name.as_str() }
                 )),
             ]),
             DirOrSong::Song(s) => {
@@ -132,7 +86,7 @@ impl DirStackItem for Song {
     }
 
     fn matches(&self, config: &Config, filter: &str) -> bool {
-        self.matches(config, config.theme.browser_song_format.0, filter)
+        self.matches(config.theme.browser_song_format.0, filter)
     }
 
     fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
@@ -184,5 +138,33 @@ impl ScrollingState for ListState {
 
     fn get_selected_scrolling(&self) -> Option<usize> {
         self.selected()
+    }
+}
+
+#[cfg(test)]
+impl DirStackItem for String {
+    type Item = ListItem<'static>;
+    fn as_path(&self) -> &str {
+        self
+    }
+
+    fn matches(&self, _config: &Config, filter: &str) -> bool {
+        self.to_lowercase().contains(&filter.to_lowercase())
+    }
+
+    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
+        let symbols = &config.theme.symbols;
+        let marker_span = if is_marked {
+            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+        } else {
+            Span::from(" ".repeat(symbols.marker.chars().count()))
+        };
+
+        if filter.is_some_and(|filter| self.matches(config, filter)) {
+            ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
+                .style(config.theme.highlighted_item_style)
+        } else {
+            ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
+        }
     }
 }

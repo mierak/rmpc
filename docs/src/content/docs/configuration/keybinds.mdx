@@ -33,6 +33,26 @@ Keybind syntax is similar to vim keybinds. To map action to letter `a` you write
 you would write `A`. To combine `a` key with a modifiers like `Ctrl` you would write `<C-a>` and likewise for an uppercase
 `A`: `<C-A>`. If a special key like `Tab` is used on its own you have to wrap it angle brackets like so: `<Tab>`.
 
+### ExternalCommand
+
+`ExternalCommand(command: ["/path/to/my/script.sh", "arg1", "arg2"], description: "Description to show in Help modal.")`
+
+Can be used to bind any script/shell command to a key. This command gets info about MPD's and rmpc's state as environment variables.
+All song paths are listed as their path relative to MPD's music directory.
+
+#### Environment
+
+-   `$CURRENT_SONG`: can be used to access the currently playing song.
+-   `$STATE`: Can be one of `Playing`, `Paused` or `Stopped`
+-   `$SELECTED_SONGS`: contains a list of songs that are selected in the various screens. Songs are separated by `\n`, their order is undefined
+    and should not be relied upon.
+    -   In `Browser`, `Albums`, `Playlists` and `Artists` it will list all songs contained in the currently highlighted item and all its subdirectories.
+        If the item is a single song, only that one song will be present. If you mark multiple directories/songs, all of them will be listed
+        in `$SELECTED_SONGS`.
+    -   In `Queue`, only the song under cursor will be listed.
+    -   In `Search`, While on the search stage, all the songs will be listed and while on the song list stage, only the song under cursor or
+        all marked songs will be listed.
+
 ## Default keybinds
 
 Below you can find list of all the possible actions along with a short description and their default values.
@@ -42,34 +62,34 @@ Below you can find list of all the possible actions along with a short descripti
 These keybinds work everywhere (except when a modal is active) and are used to control things like playback, navigation
 between different screens and exiting rmpc.
 
-|    Default Key     | Action         | Info                                                                                                                                                      |
-| :----------------: | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|        `q`         | Quit           | Exit rmpc                                                                                                                                                 |
-|        `~`         | ShowHelp       | Show help modal with the current keybinds and their description                                                                                           |
-|        `:`         | CommandMode    | Enter command mode. Commands that can be used are the same as in the CLI                                                                                  |
-|                    | Command        | Special keybind that allows you to bind commands from CLI to a key. Use like this `Command(command: "play 5", description: "Play 5th song in the queue")` |
-|        `q`         | ShowHelp       | Show keybinds modal                                                                                                                                       |
-|        `O`         | ShowOutputs    | Show MPD outputs config modal                                                                                                                             |
-|        `z`         | ToggleRepeat   | Toggle repeat                                                                                                                                             |
-|        `c`         | ToggleSingle   | Whether to stop playing after single track or repeat track/playlist when repeat is on                                                                     |
-|        `x`         | ToggleRandom   | Toggles random                                                                                                                                            |
-|        `v`         | ToggleConsume  | Remove song from the queue after playing                                                                                                                  |
-|        `p`         | TogglePause    | Pause/Unpause playback                                                                                                                                    |
-|        `s`         | Stop           | Stop playback                                                                                                                                             |
-|        `.`         | VolumeUp       | Raise volume                                                                                                                                              |
-|        `,`         | VolumeDown     | Lower volume                                                                                                                                              |
-|        `f`         | SeekForward    | Seek currently playing track forwards                                                                                                                     |
-|        `b`         | SeekBack       | Seek currently playing track backwards                                                                                                                    |
-|        `>`         | NextTrack      | Play next track in the queue                                                                                                                              |
-|        `<`         | PreviousTrack  | Play previous track in the queue                                                                                                                          |
-|        `3`         | ArtistsTab     | Switch directly to Artists tab                                                                                                                            |
-|        `5`         | PlaylistsTab   | Switch directly to Playlists tab                                                                                                                          |
-|        `2`         | DirectoriesTab | Switch directly to Directories tab                                                                                                                        |
-|        `1`         | QueueTab       | Switch directly to Queue tab                                                                                                                              |
-|        `6`         | SearchTab      | Switch directly to Search tab                                                                                                                             |
-|        `4`         | AlbumsTab      | Switch directly to Albums tab                                                                                                                             |
-|  `Right` / `Tab`   | NextTab        | Switch to next tab                                                                                                                                        |
-| `Left` / `<S-Tab>` | PreviousTab    | Switch to previous tab                                                                                                                                    |
+|    Default Key     | Action          | Info                                                                                                                         |
+| :----------------: | --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+|        `q`         | Quit            | Exit rmpc                                                                                                                    |
+|        `~`         | ShowHelp        | Show help modal with the current keybinds and their description                                                              |
+|        `:`         | CommandMode     | Enter command mode. Commands that can be used are the same as in the CLI                                                     |
+|                    | ExternalCommand | Special keybind that allows you to bind external commands to a key. Check [ExternalCommand](#externalcommand) for more info. |
+|        `q`         | ShowHelp        | Show keybinds modal                                                                                                          |
+|        `O`         | ShowOutputs     | Show MPD outputs config modal                                                                                                |
+|        `z`         | ToggleRepeat    | Toggle repeat                                                                                                                |
+|        `c`         | ToggleSingle    | Whether to stop playing after single track or repeat track/playlist when repeat is on                                        |
+|        `x`         | ToggleRandom    | Toggles random                                                                                                               |
+|        `v`         | ToggleConsume   | Remove song from the queue after playing                                                                                     |
+|        `p`         | TogglePause     | Pause/Unpause playback                                                                                                       |
+|        `s`         | Stop            | Stop playback                                                                                                                |
+|        `.`         | VolumeUp        | Raise volume                                                                                                                 |
+|        `,`         | VolumeDown      | Lower volume                                                                                                                 |
+|        `f`         | SeekForward     | Seek currently playing track forwards                                                                                        |
+|        `b`         | SeekBack        | Seek currently playing track backwards                                                                                       |
+|        `>`         | NextTrack       | Play next track in the queue                                                                                                 |
+|        `<`         | PreviousTrack   | Play previous track in the queue                                                                                             |
+|        `3`         | ArtistsTab      | Switch directly to Artists tab                                                                                               |
+|        `5`         | PlaylistsTab    | Switch directly to Playlists tab                                                                                             |
+|        `2`         | DirectoriesTab  | Switch directly to Directories tab                                                                                           |
+|        `1`         | QueueTab        | Switch directly to Queue tab                                                                                                 |
+|        `6`         | SearchTab       | Switch directly to Search tab                                                                                                |
+|        `4`         | AlbumsTab       | Switch directly to Albums tab                                                                                                |
+|  `Right` / `Tab`   | NextTab         | Switch to next tab                                                                                                           |
+| `Left` / `<S-Tab>` | PreviousTab     | Switch to previous tab                                                                                                       |
 
 ### Navigation
 

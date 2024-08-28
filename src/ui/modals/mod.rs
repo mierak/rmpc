@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{mpd::client::Client, state::State};
+use crate::{context::AppContext, mpd::client::Client};
 
 use super::KeyHandleResultInternal;
 
@@ -18,13 +18,13 @@ pub mod rename_playlist;
 pub mod save_queue;
 
 pub(super) trait Modal: std::fmt::Debug {
-    fn render(&mut self, frame: &mut Frame, _app: &mut crate::state::State) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, _app: &mut crate::context::AppContext) -> Result<()>;
 
     fn handle_key(
         &mut self,
         key: KeyEvent,
         _client: &mut Client<'_>,
-        _app: &mut State,
+        _app: &mut AppContext,
     ) -> Result<KeyHandleResultInternal>;
 }
 

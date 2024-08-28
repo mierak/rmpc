@@ -86,6 +86,10 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         }
     }
 
+    pub fn marked_items(&self) -> impl Iterator<Item = &T> {
+        self.state.marked.iter().filter_map(|idx| self.items.get(*idx))
+    }
+
     pub fn marked(&self) -> &BTreeSet<usize> {
         &self.state.marked
     }

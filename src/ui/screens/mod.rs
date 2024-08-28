@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use anyhow::{Context, Result};
 use crossterm::event::{KeyCode, KeyEvent};
 use either::Either;
+use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
     style::Style,
@@ -13,11 +14,13 @@ use ratatui::{
 use strum::{Display, EnumIter, VariantNames};
 
 use crate::{
+    cli::{create_env, run_external},
     config::{
-        keys::{CommonAction, ToDescription},
+        keys::{CommonAction, GlobalAction, ToDescription},
         theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
         Config,
     },
+    context::AppContext,
     mpd::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
@@ -56,18 +59,18 @@ pub enum Screens {
 #[allow(unused_variables)]
 pub(super) trait Screen {
     type Actions: ToDescription;
-    fn render(&mut self, frame: &mut Frame, area: Rect, status: &Status, config: &Config) -> Result<()>;
-    fn post_render(&mut self, frame: &mut Frame, status: &Status, config: &Config) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
+    fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
+    fn on_hide(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, client: &mut impl MpdClient, status: &mut Status, config: &Config) -> Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
@@ -76,8 +79,7 @@ pub(super) trait Screen {
         &mut self,
         event: &mut UiEvent,
         client: &mut impl MpdClient,
-        status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
@@ -86,8 +88,7 @@ pub(super) trait Screen {
         &mut self,
         event: KeyEvent,
         client: &mut impl MpdClient,
-        status: &mut Status,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal>;
 }
 
@@ -214,14 +215,14 @@ pub(crate) mod browser {
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) enum DirOrSong {
-        Dir(String),
+        Dir { name: String, full_path: String },
         Song(Song),
     }
 
     impl DirOrSong {
         pub fn dir_name_or_file_name(&self) -> Cow<str> {
             match self {
-                DirOrSong::Dir(dir) => Cow::Borrowed(dir),
+                DirOrSong::Dir { name, full_path: _ } => Cow::Borrowed(name),
                 DirOrSong::Song(song) => Cow::Borrowed(&song.file),
             }
         }
@@ -230,8 +231,8 @@ pub(crate) mod browser {
     impl std::cmp::Ord for DirOrSong {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             match (self, other) {
-                (_, DirOrSong::Dir(_)) => Ordering::Greater,
-                (DirOrSong::Dir(_), _) => Ordering::Less,
+                (_, DirOrSong::Dir { .. }) => Ordering::Greater,
+                (DirOrSong::Dir { .. }, _) => Ordering::Less,
                 (DirOrSong::Song(a), DirOrSong::Song(b)) => a.cmp(b),
             }
         }
@@ -265,7 +266,9 @@ pub(crate) mod browser {
     impl From<FileOrDir> for DirOrSong {
         fn from(value: FileOrDir) -> Self {
             match value {
-                FileOrDir::Dir(dir) => DirOrSong::Dir(dir.path),
+                FileOrDir::Dir(crate::mpd::commands::lsinfo::Dir { path, full_path, .. }) => {
+                    DirOrSong::Dir { name: path, full_path }
+                }
                 FileOrDir::File(song) => DirOrSong::Song(song),
             }
         }
@@ -293,9 +296,15 @@ pub(crate) mod browser {
         fn dir_before_song() {
             let mut input = vec![
                 DirOrSong::Song(Song::default()),
-                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(Song::default()),
-                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(Song::default()),
             ];
 
@@ -304,8 +313,14 @@ pub(crate) mod browser {
             assert_eq!(
                 input,
                 vec![
-                    DirOrSong::Dir("a".to_owned()),
-                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
                     DirOrSong::Song(Song::default()),
                     DirOrSong::Song(Song::default()),
                     DirOrSong::Song(Song::default()),
@@ -317,9 +332,15 @@ pub(crate) mod browser {
         fn all_by_track() {
             let mut input = vec![
                 DirOrSong::Song(song("a", Some("8"))),
-                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(song("c", Some("5"))),
             ];
 
@@ -328,8 +349,14 @@ pub(crate) mod browser {
             assert_eq!(
                 input,
                 vec![
-                    DirOrSong::Dir("a".to_owned()),
-                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
                     DirOrSong::Song(song("b", Some("3"))),
                     DirOrSong::Song(song("c", Some("5"))),
                     DirOrSong::Song(song("a", Some("8"))),
@@ -342,9 +369,15 @@ pub(crate) mod browser {
             let mut input = vec![
                 DirOrSong::Song(song("d", Some("10"))),
                 DirOrSong::Song(song("a", None)),
-                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(song("c", None)),
             ];
 
@@ -353,8 +386,14 @@ pub(crate) mod browser {
             assert_eq!(
                 input,
                 vec![
-                    DirOrSong::Dir("a".to_owned()),
-                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
                     DirOrSong::Song(song("b", Some("3"))),
                     DirOrSong::Song(song("d", Some("10"))),
                     DirOrSong::Song(song("a", None)),
@@ -368,9 +407,15 @@ pub(crate) mod browser {
             let mut input = vec![
                 DirOrSong::Song(song("d", Some("10"))),
                 DirOrSong::Song(song("a", Some("lol"))),
-                DirOrSong::Dir("a".to_owned()),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir("z".to_owned()),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
                 DirOrSong::Song(song("c", None)),
             ];
 
@@ -379,8 +424,14 @@ pub(crate) mod browser {
             assert_eq!(
                 input,
                 vec![
-                    DirOrSong::Dir("a".to_owned()),
-                    DirOrSong::Dir("z".to_owned()),
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
                     DirOrSong::Song(song("b", Some("3"))),
                     DirOrSong::Song(song("d", Some("10"))),
                     DirOrSong::Song(song("a", Some("lol"))),
@@ -422,15 +473,17 @@ impl Song {
         }
     }
 
-    pub fn matches(&self, config: &Config, formats: &[&Property<'static, SongProperty>], filter: &str) -> bool {
+    pub fn matches(&self, formats: &[&Property<'static, SongProperty>], filter: &str) -> bool {
         for format in formats {
             let match_found = match &format.kind {
-                PropertyKindOrText::Text(value) => Some(value.matches(config, filter)),
+                PropertyKindOrText::Text(value) => Some(value.to_lowercase().contains(&filter.to_lowercase())),
                 PropertyKindOrText::Property(property) => self.format(property).map_or_else(
-                    || format.default.map(|f| self.matches(config, &[f], filter)),
+                    || format.default.map(|f| self.matches(&[f], filter)),
                     |p| Some(p.to_lowercase().contains(filter)),
                 ),
-                PropertyKindOrText::Group(_) => format.as_string(Some(self)).map(|v| v.matches(config, filter)),
+                PropertyKindOrText::Group(_) => format
+                    .as_string(Some(self))
+                    .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
             };
             if match_found.is_some_and(|v| v) {
                 return true;
@@ -659,6 +712,7 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
+    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &T) -> Result<Vec<Song>>;
     fn move_selected(
         &mut self,
         direction: MoveDirection,
@@ -718,12 +772,47 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
         }
     }
 
+    fn handle_global_action(
+        &mut self,
+        action: GlobalAction,
+        client: &mut impl MpdClient,
+        context: &AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        match action {
+            GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
+                let songs: Vec<_> = self
+                    .stack()
+                    .current()
+                    .marked_items()
+                    .map(|item| self.list_songs_in_item(client, item))
+                    .flatten_ok()
+                    .try_collect()?;
+                let songs = songs.iter().map(|song| song.file.as_str()).collect_vec();
+
+                run_external(command, create_env(context, songs, client)?);
+
+                Ok(KeyHandleResultInternal::SkipRender)
+            }
+            GlobalAction::ExternalCommand { command, .. } => {
+                if let Some(selected) = self.stack().current().selected() {
+                    let songs = self.list_songs_in_item(client, selected)?;
+                    let songs = songs.iter().map(|s| s.file.as_str());
+
+                    run_external(command, create_env(context, songs, client)?);
+                }
+                Ok(KeyHandleResultInternal::SkipRender)
+            }
+            _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+        }
+    }
+
     fn handle_common_action(
         &mut self,
         action: CommonAction,
         client: &mut impl MpdClient,
-        config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
+        let config = context.config;
         match action {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev();
