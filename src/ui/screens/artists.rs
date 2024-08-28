@@ -47,7 +47,7 @@ impl Screen for ArtistsScreen {
                 result
                     .into_iter()
                     .map(|v| DirOrSong::Dir {
-                        full_path: format!("Artists/{}{v}", self.stack().path().join("/")),
+                        full_path: String::new(),
                         name: v,
                     })
                     .collect::<Vec<_>>(),
@@ -74,7 +74,7 @@ impl Screen for ArtistsScreen {
                     result
                         .into_iter()
                         .map(|v| DirOrSong::Dir {
-                            full_path: format!("Artists/{}{v}", self.stack().path().join("/")),
+                            full_path: String::new(),
                             name: v,
                         })
                         .collect::<Vec<_>>(),
@@ -129,7 +129,7 @@ fn list_albums(client: &mut impl MpdClient, artist: &str) -> Result<impl Iterato
         .list_tag(Tag::Album, Some(&[Filter::new(Tag::Artist, artist)]))?
         .into_iter()
         .map(|v| DirOrSong::Dir {
-            full_path: format!("Artists/{artist}/{v}"),
+            full_path: String::new(),
             name: v,
         })
         .sorted())

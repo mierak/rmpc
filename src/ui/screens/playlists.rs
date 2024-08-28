@@ -49,7 +49,7 @@ impl Screen for PlaylistsScreen {
                 .into_iter()
                 .map(|playlist| DirOrSong::Dir {
                     name: playlist.name.clone(),
-                    full_path: playlist.name,
+                    full_path: String::new(),
                 })
                 .sorted()
                 .collect();
@@ -77,7 +77,7 @@ impl Screen for PlaylistsScreen {
                         .into_iter()
                         .map(|playlist| DirOrSong::Dir {
                             name: playlist.name.clone(),
-                            full_path: playlist.name,
+                            full_path: String::new(),
                         })
                         .sorted()
                         .collect_vec(),

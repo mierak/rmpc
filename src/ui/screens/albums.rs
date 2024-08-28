@@ -48,7 +48,7 @@ impl Screen for AlbumsScreen {
                 result
                     .into_iter()
                     .map(|v| DirOrSong::Dir {
-                        full_path: format!("{}{v}", self.stack().path().join("/")),
+                        full_path: String::new(),
                         name: v,
                     })
                     .collect::<Vec<_>>(),
@@ -75,7 +75,7 @@ impl Screen for AlbumsScreen {
                     result
                         .into_iter()
                         .map(|v| DirOrSong::Dir {
-                            full_path: format!("{}{v}", self.stack().path().join("/")),
+                            full_path: String::new(),
                             name: v,
                         })
                         .collect::<Vec<_>>(),
