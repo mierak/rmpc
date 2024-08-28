@@ -5,7 +5,10 @@ use std::io::Write;
 use crate::{
     config::{cli::Command, Config},
     context::AppContext,
-    mpd::{commands::volume::Bound, mpd_client::MpdClient},
+    mpd::{
+        commands::volume::Bound,
+        mpd_client::{Filter, MpdClient, Tag},
+    },
     utils::macros::status_error,
     WorkRequest,
 };
@@ -52,7 +55,35 @@ impl Command {
             Command::EnableOutput { id } => client.enable_output(id)?,
             Command::DisableOutput { id } => client.disable_output(id)?,
             Command::Status => println!("{}", serde_json::ser::to_string(&client.get_status()?)?),
-            Command::Song => println!("{}", serde_json::ser::to_string(&client.get_current_song()?)?),
+            Command::Song { path: Some(paths) } if paths.len() == 1 => {
+                let path = &paths[0];
+                if let Some(song) = client.find_one(&[Filter::new(Tag::File, path.as_str())])? {
+                    println!("{}", serde_json::ser::to_string(&song)?);
+                } else {
+                    println!("Song with path '{path}' not found.");
+                    std::process::exit(1);
+                }
+            }
+            Command::Song { path: Some(paths) } => {
+                let mut songs = Vec::new();
+                for path in &paths {
+                    if let Some(song) = client.find_one(&[Filter::new(Tag::File, path.as_str())])? {
+                        songs.push(song);
+                    } else {
+                        println!("Song with path '{path}' not found.");
+                        std::process::exit(1);
+                    }
+                }
+                println!("{}", serde_json::ser::to_string(&songs)?);
+            }
+            Command::Song { path: None } => {
+                let current_song = client.get_current_song()?;
+                if let Some(song) = current_song {
+                    println!("{}", serde_json::ser::to_string(&song)?);
+                } else {
+                    std::process::exit(1);
+                }
+            }
             Command::Mount { ref name, ref path } => client.mount(name, path)?,
             Command::Unmount { ref name } => client.unmount(name)?,
             Command::ListMounts => println!("{}", serde_json::ser::to_string(&client.list_mounts()?)?),

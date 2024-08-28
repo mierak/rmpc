@@ -94,8 +94,13 @@ pub enum Command {
     },
     /// Prints various information like the playback status
     Status,
-    /// Prints information about the current song
-    Song,
+    /// Prints info about the current song.
+    /// If --path specified, prints information about the song at the given path instead.
+    /// If --path is specified multiple times, prints an array containing all the songs.
+    Song {
+        #[arg(short, long)]
+        path: Option<Vec<String>>,
+    },
     /// Mounts supported storage to MPD
     Mount { name: String, path: String },
     /// Unmounts storage with given name
