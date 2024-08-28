@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
 
 use super::Volume;
 
@@ -37,26 +37,26 @@ impl FromMpd for Status {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "partition" => self.partition = value,
-            "volume" => self.volume = Volume::new(value.parse()?),
+            "volume" => self.volume = Volume::new(value.parse().logerr(key, &value)?),
             "repeat" => self.repeat = value != "0",
             "random" => self.random = value != "0",
-            "single" => self.single = value.parse()?,
-            "consume" => self.consume = value.parse()?,
-            "playlist" => self.playlist = Some(value.parse()?),
+            "single" => self.single = value.parse().logerr(key, &value)?,
+            "consume" => self.consume = value.parse().logerr(key, &value)?,
+            "playlist" => self.playlist = Some(value.parse().logerr(key, &value)?),
             "playlistlength" => self.playlistlength = value.parse()?,
-            "state" => self.state = value.parse()?,
-            "song" => self.song = Some(value.parse()?),
-            "songid" => self.songid = Some(value.parse()?),
-            "nextsong" => self.nextsong = Some(value.parse()?),
-            "nextsongid" => self.nextsongid = Some(value.parse()?),
-            "elapsed" => self.elapsed = Duration::from_secs_f32(value.parse()?),
-            "duration" => self.duration = Duration::from_secs_f32(value.parse()?),
-            "bitrate" if value != "0" => self.bitrate = Some(value.parse()?),
-            "xfade" => self.xfade = Some(value.parse()?),
+            "state" => self.state = value.parse().logerr(key, &value)?,
+            "song" => self.song = Some(value.parse().logerr(key, &value)?),
+            "songid" => self.songid = Some(value.parse().logerr(key, &value)?),
+            "nextsong" => self.nextsong = Some(value.parse().logerr(key, &value)?),
+            "nextsongid" => self.nextsongid = Some(value.parse().logerr(key, &value)?),
+            "elapsed" => self.elapsed = Duration::from_secs_f32(value.parse().logerr(key, &value)?),
+            "duration" => self.duration = Duration::from_secs_f32(value.parse().logerr(key, &value)?),
+            "bitrate" if value != "0" => self.bitrate = Some(value.parse().logerr(key, &value)?),
+            "xfade" => self.xfade = Some(value.parse().logerr(key, &value)?),
             "mixrampdb" => self.mixrampdb = Some(value),
             "mixrampdelay" => self.mixrampdelay = Some(value),
             "audio" => self.audio = Some(value),
-            "updating_db" => self.updating_db = Some(value.parse()?),
+            "updating_db" => self.updating_db = Some(value.parse().logerr(key, &value)?),
             "error" => self.error = Some(value),
             "bitrate" => self.bitrate = None,
             "time" => {} // deprecated

@@ -1,6 +1,7 @@
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 use super::Song;
+use anyhow::anyhow;
 use anyhow::Context;
 
 impl FromMpd for Vec<Song> {
@@ -9,7 +10,11 @@ impl FromMpd for Vec<Song> {
             self.push(Song::default());
         }
         self.last_mut()
-            .context("No element in accumulator while parsing PlayListInfo")?
+            .context(anyhow!(
+                "No element in accumulator while parsing PlayListInfo. Key '{}' Value :'{}'",
+                key,
+                value
+            ))?
             .next_internal(key, value)
     }
 }

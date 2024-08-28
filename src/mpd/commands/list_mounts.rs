@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Context;
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 use serde::Serialize;
@@ -21,7 +22,11 @@ impl FromMpd for Mounts {
 
         self.0
             .last_mut()
-            .context("No element in accumulator while parsing Mounts")?
+            .context(anyhow!(
+                "No element in accumulator while parsing Mounts. Key '{}' Value :'{}'",
+                key,
+                value
+            ))?
             .next_internal(key, value)
     }
 }

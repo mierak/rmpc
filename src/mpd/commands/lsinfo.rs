@@ -1,6 +1,7 @@
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 use super::Song;
+use anyhow::anyhow;
 use anyhow::Context;
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
@@ -29,7 +30,7 @@ impl FromMpd for Dir {
                 value
                     .split('/')
                     .last()
-                    .context("Failed to parse dir name.")?
+                    .context(anyhow!("Failed to parse dir name. Key: '{}' Value: '{}'", key, value))?
                     .clone_into(&mut self.path);
                 self.full_path = value;
             }
@@ -50,11 +51,11 @@ impl FromMpd for LsInfo {
             self.0.push(FileOrDir::Dir(Dir::default()));
         }
 
-        match self
-            .0
-            .last_mut()
-            .context("No element in accumulator while parsing LsInfo")?
-        {
+        match self.0.last_mut().context(anyhow!(
+            "No element in accumulator while parsing LsInfo. Key '{}' Value :'{}'",
+            key,
+            value
+        ))? {
             FileOrDir::Dir(dir) => dir.next_internal(key, value),
             FileOrDir::File(song) => song.next_internal(key, value),
         }

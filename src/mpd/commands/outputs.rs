@@ -1,8 +1,9 @@
+use anyhow::anyhow;
 use anyhow::Context;
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
 
 #[derive(Debug, Serialize, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct Outputs(pub Vec<Output>);
@@ -22,7 +23,11 @@ impl FromMpd for Outputs {
 
         self.0
             .last_mut()
-            .context("No element in accumulator while parsing Outputs")?
+            .context(anyhow!(
+                "No element in accumulator while parsing Outputs. Key '{}' Value :'{}'",
+                key,
+                value
+            ))?
             .next_internal(key, value)
     }
 }
@@ -30,7 +35,7 @@ impl FromMpd for Outputs {
 impl FromMpd for Output {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
-            "outputid" => self.id = value.parse()?,
+            "outputid" => self.id = value.parse().logerr(key, &value)?,
             "outputname" => self.name = value,
             "outputenabled" => match value.as_str() {
                 "0" => self.enabled = false,

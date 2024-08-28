@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Context;
 
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
@@ -28,7 +29,11 @@ impl FromMpd for Vec<Playlist> {
         }
 
         self.last_mut()
-            .context("No element in accumulator while parsing Playlists")?
+            .context(anyhow!(
+                "No element in accumulator while parsing Playlists. Key '{}' Value :'{}'",
+                key,
+                value
+            ))?
             .next_internal(key, value)
     }
 }
