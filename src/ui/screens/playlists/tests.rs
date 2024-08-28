@@ -33,7 +33,7 @@ mod on_idle_event {
                 current.selected(),
                 Some(&DirOrSong::Dir {
                     name: playlist_name.clone(),
-                    full_path: playlist_name.clone()
+                    full_path: String::new()
                 })
             );
 
@@ -43,8 +43,8 @@ mod on_idle_event {
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Dir {
-                    name: playlist_name.clone(),
-                    full_path: playlist_name.clone()
+                    name: playlist_name,
+                    full_path: String::new()
                 })
             );
         }
@@ -127,8 +127,8 @@ mod on_idle_event {
             assert_eq!(
                 screen.stack.previous().selected(),
                 Some(&DirOrSong::Dir {
-                    name: playlist_name.clone(),
-                    full_path: playlist_name
+                    name: playlist_name,
+                    full_path: String::new()
                 })
             );
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 4);
@@ -154,8 +154,8 @@ mod on_idle_event {
             assert_eq!(
                 screen.stack.previous().selected(),
                 Some(&DirOrSong::Dir {
-                    name: playlist_name.clone(),
-                    full_path: playlist_name
+                    name: playlist_name,
+                    full_path: String::new()
                 })
             );
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, last_song_idx - 1);
@@ -181,8 +181,8 @@ mod on_idle_event {
             assert_eq!(
                 screen.stack.previous().selected(),
                 Some(&DirOrSong::Dir {
-                    name: playlist_name.clone(),
-                    full_path: playlist_name
+                    name: playlist_name,
+                    full_path: String::new()
                 })
             );
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);

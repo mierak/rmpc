@@ -51,7 +51,7 @@ impl Screen for PlaylistsScreen {
                 .context("Cannot list playlists")?
                 .into_iter()
                 .map(|playlist| DirOrSong::Dir {
-                    name: playlist.name.clone(),
+                    name: playlist.name,
                     full_path: String::new(),
                 })
                 .sorted()
@@ -79,7 +79,7 @@ impl Screen for PlaylistsScreen {
                         .context("Cannot list playlists")?
                         .into_iter()
                         .map(|playlist| DirOrSong::Dir {
-                            name: playlist.name.clone(),
+                            name: playlist.name,
                             full_path: String::new(),
                         })
                         .sorted()

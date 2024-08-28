@@ -274,124 +274,172 @@ pub(crate) mod browser {
         }
     }
 
-    // #[cfg(test)]
-    // mod test {
-    //     use std::collections::HashMap;
-    //
-    //     use crate::mpd::commands::Song;
-    //
-    //     use super::DirOrSong;
-    //
-    //     fn song(title: &str, track: Option<&str>) -> Song {
-    //         Song {
-    //             metadata: HashMap::from([
-    //                 ("title".to_owned(), title.to_owned()),
-    //                 track.map(|v| ("track".to_owned(), v.to_owned())).into_iter().collect(),
-    //             ]),
-    //             ..Default::default()
-    //         }
-    //     }
-    //
-    //     #[test]
-    //     fn dir_before_song() {
-    //         let mut input = vec![
-    //             DirOrSong::Song(Song::default()),
-    //             DirOrSong::Dir("a".to_owned()),
-    //             DirOrSong::Song(Song::default()),
-    //             DirOrSong::Dir("z".to_owned()),
-    //             DirOrSong::Song(Song::default()),
-    //         ];
-    //
-    //         input.sort();
-    //
-    //         assert_eq!(
-    //             input,
-    //             vec![
-    //                 DirOrSong::Dir("a".to_owned()),
-    //                 DirOrSong::Dir("z".to_owned()),
-    //                 DirOrSong::Song(Song::default()),
-    //                 DirOrSong::Song(Song::default()),
-    //                 DirOrSong::Song(Song::default()),
-    //             ]
-    //         );
-    //     }
-    //
-    //     #[test]
-    //     fn all_by_track() {
-    //         let mut input = vec![
-    //             DirOrSong::Song(song("a", Some("8"))),
-    //             DirOrSong::Dir("a".to_owned()),
-    //             DirOrSong::Song(song("b", Some("3"))),
-    //             DirOrSong::Dir("z".to_owned()),
-    //             DirOrSong::Song(song("c", Some("5"))),
-    //         ];
-    //
-    //         input.sort();
-    //
-    //         assert_eq!(
-    //             input,
-    //             vec![
-    //                 DirOrSong::Dir("a".to_owned()),
-    //                 DirOrSong::Dir("z".to_owned()),
-    //                 DirOrSong::Song(song("b", Some("3"))),
-    //                 DirOrSong::Song(song("c", Some("5"))),
-    //                 DirOrSong::Song(song("a", Some("8"))),
-    //             ]
-    //         );
-    //     }
-    //
-    //     #[test]
-    //     fn by_track_then_title() {
-    //         let mut input = vec![
-    //             DirOrSong::Song(song("d", Some("10"))),
-    //             DirOrSong::Song(song("a", None)),
-    //             DirOrSong::Dir("a".to_owned()),
-    //             DirOrSong::Song(song("b", Some("3"))),
-    //             DirOrSong::Dir("z".to_owned()),
-    //             DirOrSong::Song(song("c", None)),
-    //         ];
-    //
-    //         input.sort();
-    //
-    //         assert_eq!(
-    //             input,
-    //             vec![
-    //                 DirOrSong::Dir("a".to_owned()),
-    //                 DirOrSong::Dir("z".to_owned()),
-    //                 DirOrSong::Song(song("b", Some("3"))),
-    //                 DirOrSong::Song(song("d", Some("10"))),
-    //                 DirOrSong::Song(song("a", None)),
-    //                 DirOrSong::Song(song("c", None)),
-    //             ]
-    //         );
-    //     }
-    //
-    //     #[test]
-    //     fn by_track_then_title_with_unparsable_track() {
-    //         let mut input = vec![
-    //             DirOrSong::Song(song("d", Some("10"))),
-    //             DirOrSong::Song(song("a", Some("lol"))),
-    //             DirOrSong::Dir("a".to_owned()),
-    //             DirOrSong::Song(song("b", Some("3"))),
-    //             DirOrSong::Dir("z".to_owned()),
-    //             DirOrSong::Song(song("c", None)),
-    //         ];
-    //
-    //         input.sort();
-    //
-    //         assert_eq!(
-    //             input,
-    //             vec![
-    //                 DirOrSong::Dir("a".to_owned()),
-    //                 DirOrSong::Dir("z".to_owned()),
-    //                 DirOrSong::Song(song("b", Some("3"))),
-    //                 DirOrSong::Song(song("d", Some("10"))),
-    //                 DirOrSong::Song(song("a", Some("lol"))),
-    //                 DirOrSong::Song(song("c", None)),
-    //             ]
-    //         );
-    //     }
-    // }
+    #[cfg(test)]
+    mod test {
+        use std::collections::HashMap;
+
+        use crate::mpd::commands::Song;
+
+        use super::DirOrSong;
+
+        fn song(title: &str, track: Option<&str>) -> Song {
+            Song {
+                metadata: HashMap::from([
+                    ("title".to_owned(), title.to_owned()),
+                    track.map(|v| ("track".to_owned(), v.to_owned())).into_iter().collect(),
+                ]),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn dir_before_song() {
+            let mut input = vec![
+                DirOrSong::Song(Song::default()),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(Song::default()),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(Song::default()),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Song(Song::default()),
+                    DirOrSong::Song(Song::default()),
+                    DirOrSong::Song(Song::default()),
+                ]
+            );
+        }
+
+        #[test]
+        fn all_by_track() {
+            let mut input = vec![
+                DirOrSong::Song(song("a", Some("8"))),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(song("c", Some("5"))),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Song(song("b", Some("3"))),
+                    DirOrSong::Song(song("c", Some("5"))),
+                    DirOrSong::Song(song("a", Some("8"))),
+                ]
+            );
+        }
+
+        #[test]
+        fn by_track_then_title() {
+            let mut input = vec![
+                DirOrSong::Song(song("d", Some("10"))),
+                DirOrSong::Song(song("a", None)),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(song("c", None)),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Song(song("b", Some("3"))),
+                    DirOrSong::Song(song("d", Some("10"))),
+                    DirOrSong::Song(song("a", None)),
+                    DirOrSong::Song(song("c", None)),
+                ]
+            );
+        }
+
+        #[test]
+        fn by_track_then_title_with_unparsable_track() {
+            let mut input = vec![
+                DirOrSong::Song(song("d", Some("10"))),
+                DirOrSong::Song(song("a", Some("lol"))),
+                DirOrSong::Dir {
+                    name: "a".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Dir {
+                    name: "z".to_owned(),
+                    full_path: String::new(),
+                },
+                DirOrSong::Song(song("c", None)),
+            ];
+
+            input.sort();
+
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir {
+                        name: "a".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Dir {
+                        name: "z".to_owned(),
+                        full_path: String::new()
+                    },
+                    DirOrSong::Song(song("b", Some("3"))),
+                    DirOrSong::Song(song("d", Some("10"))),
+                    DirOrSong::Song(song("a", Some("lol"))),
+                    DirOrSong::Song(song("c", None)),
+                ]
+            );
+        }
+    }
 }
 
 impl Song {

@@ -123,8 +123,8 @@ impl Modal for SaveQueueModal {
                         Ok(()) => {
                             status_info!("Playlist '{}' saved", self.name);
                         }
-                        Err(_err) => {
-                            status_error!("Failed to save playlist '{}'", self.name);
+                        Err(err) => {
+                            status_error!(err:?; "Failed to save playlist '{}'", self.name);
                         }
                     };
                 }
