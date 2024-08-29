@@ -10,7 +10,7 @@ Description, configuration and installation methods can be found on [the rmpc we
 
 ## Main Features
 
-- Album cover art display if your terminal supports [kitty's graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol.html)
+- Album cover art display if your terminal supports either of Kitty, Sixel, Iterm2 protocols, or via ueberzuggpp
 - Ability to play music from youtube
 - Configurable (T)UI
   - Configure what information(if any!) is displayed in the header
@@ -19,7 +19,7 @@ Description, configuration and installation methods can be found on [the rmpc we
   - Every keybind can be changed, vim-like by default
 - Ranger/LF-like three-column browser through your music library
 - Basic playlist management
-- Basic CLI to support scripting
+- Support scripting through basic CLI mode and script hooks
 
 And more to come
 
