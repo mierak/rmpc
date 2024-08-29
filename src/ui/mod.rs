@@ -30,7 +30,6 @@ use crate::{
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     utils::macros::{status_error, try_ret},
-    AppEvent, WorkRequest,
 };
 use crate::{context::AppContext, mpd::version::Version};
 
@@ -77,18 +76,12 @@ pub struct Ui {
     rendered_frames_count: u32,
     current_song: Option<Song>,
     command: Option<String>,
-    work_request_sender: std::sync::mpsc::Sender<WorkRequest>,
 }
 
 impl Ui {
-    pub fn new(
-        config: &Config,
-        app_event_sender: std::sync::mpsc::Sender<AppEvent>,
-        work_request_sender: std::sync::mpsc::Sender<WorkRequest>,
-    ) -> Ui {
+    pub fn new(config: &Config, context: &AppContext) -> Ui {
         Self {
-            work_request_sender,
-            screens: Screens::new(config, app_event_sender),
+            screens: Screens::new(config, context),
             active_screen: screens::Screens::Queue,
             status_message: None,
             rendered_frames_count: 0,
@@ -112,9 +105,9 @@ struct Screens {
 }
 
 impl Screens {
-    fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
+    fn new(config: &Config, context: &AppContext) -> Self {
         Self {
-            queue: QueueScreen::new(config, app_event_sender),
+            queue: QueueScreen::new(config, context),
             #[cfg(debug_assertions)]
             logs: LogsScreen::default(),
             directories: DirectoriesScreen::default(),
@@ -267,7 +260,7 @@ impl Ui {
                 match cmd {
                     Ok(Args { command: Some(cmd), .. }) => {
                         cmd.execute(client, context.config, |request, _| {
-                            if let Err(err) = self.work_request_sender.send(request) {
+                            if let Err(err) = context.work_sender.send(request) {
                                 status_error!("Failed to send work request: {}", err);
                             }
                         })?;
@@ -333,7 +326,7 @@ impl Ui {
                             self.command = None;
                             if let Ok(Args { command: Some(cmd), .. }) = cmd {
                                 cmd.execute(client, context.config, |request, _| {
-                                    if let Err(err) = self.work_request_sender.send(request) {
+                                    if let Err(err) = context.work_sender.send(request) {
                                         status_error!("Failed to send work request: {}", err);
                                     }
                                 })?;

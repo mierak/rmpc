@@ -6,7 +6,6 @@ use ratatui::{layout::Rect, style::Color, Frame};
 use crate::{
     config::{Config, ImageMethod, Size},
     utils::image_proto::ImageProtocol,
-    AppEvent,
 };
 
 use super::{iterm2::Iterm2, kitty::KittyImageState, ImageProto};
@@ -36,19 +35,19 @@ impl AlbumArtFacade {
     pub fn new(
         protocol: ImageProtocol,
         default_album_art: &'static [u8],
-        app_event_sender: std::sync::mpsc::Sender<AppEvent>,
         max_size: Size,
+        request_render: impl Fn(bool) + Send + 'static,
     ) -> Self {
         let proto = match protocol {
             ImageProtocol::Kitty => {
-                ImageState::Kitty(KittyImageState::new(app_event_sender, default_album_art, max_size))
+                ImageState::Kitty(KittyImageState::new(default_album_art, max_size, request_render))
             }
             ImageProtocol::UeberzugWayland => {
                 ImageState::Ueberzug(Ueberzug::new(default_album_art, Layer::Wayland, max_size))
             }
             ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(default_album_art, Layer::X11, max_size)),
-            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(app_event_sender, default_album_art, max_size)),
-            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(app_event_sender, default_album_art, max_size)),
+            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(default_album_art, max_size, request_render)),
+            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(default_album_art, max_size, request_render)),
             ImageProtocol::None => ImageState::None,
         };
         Self {

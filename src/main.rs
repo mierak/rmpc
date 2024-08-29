@@ -168,13 +168,14 @@ fn main() -> Result<()> {
             );
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
-            let state = try_ret!(
-                context::AppContext::try_new(&mut client, config),
-                "Failed to create app state"
+            let tx_clone = tx.clone();
+            let context = try_ret!(
+                context::AppContext::try_new(&mut client, config, tx_clone, worker_tx),
+                "Failed to create app context"
             );
 
             let mut render_loop = RenderLoop::new(tx.clone(), config);
-            if state.status.state == mpd::commands::status::State::Play {
+            if context.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             }
 
@@ -189,16 +190,8 @@ fn main() -> Result<()> {
                 .name("input poll".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
 
-            let tx_clone = tx.clone();
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
-                main_task(
-                    Ui::new(config, tx_clone, worker_tx),
-                    state,
-                    rx,
-                    client,
-                    render_loop,
-                    terminal,
-                );
+                main_task(Ui::new(config, &context), context, rx, client, render_loop, terminal);
             })?;
 
             let mut idle_client = try_ret!(

@@ -1,13 +1,10 @@
+use std::sync::mpsc::channel;
+
 use rstest::fixture;
 
 use crate::{config::Config, context::AppContext, mpd::commands::Status};
 
 pub mod mpd_client;
-
-#[fixture]
-pub fn state() -> AppContext {
-    AppContext::default()
-}
 
 #[fixture]
 pub fn status() -> Status {
@@ -16,7 +13,13 @@ pub fn status() -> Status {
 
 #[fixture]
 pub fn app_context() -> AppContext {
-    AppContext::default()
+    AppContext {
+        status: Status::default(),
+        config: Box::leak(Box::default()),
+        queue: Vec::default(),
+        app_event_sender: channel().0,
+        work_sender: channel().0,
+    }
 }
 
 #[fixture]

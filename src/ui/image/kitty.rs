@@ -19,7 +19,6 @@ use crate::{
         macros::status_error,
         tmux,
     },
-    AppEvent,
 };
 
 use super::ImageProto;
@@ -97,7 +96,7 @@ impl ImageProto for KittyImageState {
 }
 
 impl KittyImageState {
-    pub fn new(sender: Sender<AppEvent>, default_art: &'static [u8], max_size: Size) -> Self {
+    pub fn new(default_art: &'static [u8], max_size: Size, request_render: impl Fn(bool) + Send + 'static) -> Self {
         let compression_request_channel = channel::<(Arc<Vec<_>>, u16, u16)>();
         let rx = compression_request_channel.1;
 
@@ -119,10 +118,7 @@ impl KittyImageState {
                     continue;
                 }
 
-                if let Err(err) = sender.send(AppEvent::RequestRender(false)) {
-                    status_error!(err:?; "Failed to request rerender after image data compression finished");
-                    continue;
-                }
+                request_render(false);
             }
         });
 
