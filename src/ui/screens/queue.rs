@@ -26,7 +26,7 @@ use crate::{
         utils::dirstack::DirState,
         KeyHandleResultInternal, UiEvent,
     },
-    utils::macros::{status_error, status_warn},
+    utils::macros::{status_error, status_warn, try_skip},
     AppEvent,
 };
 use log::error;
@@ -52,13 +52,19 @@ pub struct QueueScreen {
 }
 
 impl QueueScreen {
-    pub fn new(config: &Config, app_event_sender: std::sync::mpsc::Sender<AppEvent>) -> Self {
+    pub fn new(config: &Config, context: &AppContext) -> Self {
+        let sender = context.app_event_sender.clone();
         Self {
             album_art_facade: AlbumArtFacade::new(
                 config.album_art.method.into(),
                 config.theme.default_album_art,
-                app_event_sender,
                 config.album_art.max_size_px,
+                move |full_render: bool| {
+                    try_skip!(
+                        sender.send(AppEvent::RequestRender(full_render)),
+                        "Failed to request render"
+                    );
+                },
             ),
             scrolling_state: DirState::default(),
             filter: None,
@@ -77,12 +83,10 @@ impl QueueScreen {
 
 impl Screen for QueueScreen {
     type Actions = QueueActions;
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        AppContext { config, status, queue }: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+        let AppContext {
+            queue, config, status, ..
+        } = context;
         let queue_len = queue.len();
         let album_art_width = config.theme.album_art_width_percent;
 
@@ -204,17 +208,8 @@ impl Screen for QueueScreen {
         self.album_art_facade.show();
 
         self.scrolling_state.set_content_len(Some(context.queue.len()));
-        if let Some(songid) = status.songid {
-            let idx = context
-                .queue
-                .iter()
-                .enumerate()
-                .find(|(_, song)| song.id == songid)
-                .map(|v| v.0);
-            self.scrolling_state.select(idx);
-        } else {
-            self.scrolling_state.select(Some(0));
-        }
+        self.scrolling_state
+            .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
 
         Ok(())
     }

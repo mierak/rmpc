@@ -7,10 +7,7 @@ use crossterm::{
 };
 use std::{
     io::Write,
-    sync::{
-        mpsc::{channel, Sender},
-        Arc,
-    },
+    sync::{mpsc::channel, Arc},
 };
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
@@ -22,7 +19,6 @@ use crate::{
         macros::try_cont,
         tmux,
     },
-    AppEvent,
 };
 
 use super::ImageProto;
@@ -152,7 +148,7 @@ impl ImageProto for Iterm2 {
 }
 
 impl Iterm2 {
-    pub fn new(app_event_sender: Sender<AppEvent>, default_art: &[u8], max_size: Size) -> Self {
+    pub fn new(default_art: &[u8], max_size: Size, request_render: impl Fn(bool) + Send + 'static) -> Self {
         let (sender, receiver) = channel::<(u16, u16, bool, Arc<Vec<u8>>)>();
         let (encoded_tx, encoded_rx) = channel::<EncodedData>();
 
@@ -160,10 +156,8 @@ impl Iterm2 {
             if let Ok((w, h, full_render, data)) = receiver.recv() {
                 let encoded = try_cont!(Iterm2::encode(w, h, &data, max_size), "Failed to encode data");
                 try_cont!(encoded_tx.send(encoded), "Failed to send encoded data");
-                try_cont!(
-                    app_event_sender.send(AppEvent::RequestRender(full_render)),
-                    "Failed to request render"
-                );
+
+                request_render(full_render);
             }
         });
         let default_art = Arc::new(default_art.to_vec());

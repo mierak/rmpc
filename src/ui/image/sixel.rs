@@ -25,7 +25,6 @@ use crate::{
         macros::{status_error, try_cont, try_skip},
         tmux,
     },
-    AppEvent,
 };
 
 use super::ImageProto;
@@ -129,7 +128,7 @@ impl ImageProto for Sixel {
 }
 
 impl Sixel {
-    pub fn new(app_event_sender: Sender<AppEvent>, default_art: &[u8], max_size: Size) -> Self {
+    pub fn new(default_art: &[u8], max_size: Size, request_render: impl Fn(bool) + Send + 'static) -> Self {
         let (sender, receiver) = channel::<(u16, u16, bool, Arc<Vec<u8>>)>();
         let (encoded_tx, encoded_rx) = channel::<Vec<u8>>();
 
@@ -138,10 +137,8 @@ impl Sixel {
                 let buf = try_cont!(encode(width, height, &data, max_size), "Failed to encode");
 
                 try_skip!(encoded_tx.send(buf), "Failed to send encoded data");
-                try_cont!(
-                    app_event_sender.send(AppEvent::RequestRender(full_render)),
-                    "Failed to request render"
-                );
+
+                request_render(full_render);
             }
         });
         let default_art = Arc::new(default_art.to_vec());
