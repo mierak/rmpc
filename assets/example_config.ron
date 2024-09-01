@@ -74,5 +74,18 @@
             "d":       Delete,
         },
     ),
+    search: (
+        case_sensitive: false,
+        mode: Contains,
+        searchable_tags: [
+            (tag: "any",         label: "Any Tag"),
+            (tag: "artist",      label: "Artist"),
+            (tag: "album",       label: "Album"),
+            (tag: "albumartist", label: "Album Artist"),
+            (tag: "title",       label: "Title"),
+            (tag: "filename",    label: "Filename"),
+            (tag: "genre",       label: "Genre"),
+        ],
+    )
 )
 

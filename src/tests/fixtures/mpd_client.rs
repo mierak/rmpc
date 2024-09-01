@@ -230,7 +230,7 @@ impl MpdClient for TestMpdClient {
     }
 
     /// `FilterKind` not implemented, everything is treated as Contains
-    fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
+    fn find(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>> {
         Ok(self
             .songs
             .iter()
@@ -254,6 +254,7 @@ impl MpdClient for TestMpdClient {
                         Tag::Title => values[3].is_some_and(|a| a.contains(filter.value)),
                         Tag::File => values[4].is_some_and(|a| a.contains(filter.value)),
                         Tag::Genre => values[5].is_some_and(|a| a.contains(filter.value)),
+                        Tag::Custom(_) => false,
                     };
                     if !value {
                         matches = false;
@@ -266,7 +267,7 @@ impl MpdClient for TestMpdClient {
             .collect())
     }
 
-    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
+    fn search(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>> {
         Ok(self
             .songs
             .iter()
@@ -302,6 +303,7 @@ impl MpdClient for TestMpdClient {
                         Tag::Genre => {
                             values[5].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))
                         }
+                        Tag::Custom(_) => false,
                     };
                     if !value {
                         matches = false;
@@ -318,7 +320,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
+    fn find_one(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Option<Song>> {
         let mut res = self.find(filter)?;
         if res.len() > 1 {
             Err(MpdError::Generic("More than one song found".to_string()))
@@ -327,11 +329,11 @@ impl MpdClient for TestMpdClient {
         }
     }
 
-    fn find_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
+    fn find_add(&mut self, _filter: &[Filter<'_, '_>]) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
-    fn list_tag(&mut self, _tag: Tag, _filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
+    fn list_tag(&mut self, _tag: Tag, _filter: Option<&[Filter<'_, '_>]>) -> MpdResult<MpdList> {
         todo!("Not yet implemented")
     }
 
@@ -463,7 +465,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn search_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
+    fn search_add(&mut self, _filter: &[Filter<'_, '_>]) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 }
