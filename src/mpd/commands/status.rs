@@ -38,7 +38,7 @@ impl FromMpd for Status {
         match key {
             "partition" => self.partition = value,
             "volume" if value == "-1" => {
-                log::warn!(command = "volume", key, value = value.as_str(); "Receieved unsupported value");
+                log::warn!(command = "status", key, value = value.as_str(); "Receieved unsupported value");
                 self.volume = Volume::new(0);
             }
             "volume" => self.volume = Volume::new(value.parse().logerr(key, &value)?),
