@@ -37,6 +37,10 @@ impl FromMpd for Status {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "partition" => self.partition = value,
+            "volume" if value == "-1" => {
+                log::warn!(command = "status", key, value = value.as_str(); "Received unsupported value");
+                self.volume = Volume::new(0);
+            }
             "volume" => self.volume = Volume::new(value.parse().logerr(key, &value)?),
             "repeat" => self.repeat = value != "0",
             "random" => self.random = value != "0",
