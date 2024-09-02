@@ -7,26 +7,26 @@ use crate::mpd::mpd_client::FilterKind;
 pub struct Search {
     pub case_sensitive: bool,
     pub mode: FilterKind,
-    pub searchable_tags: &'static [SearchableTag],
+    pub tags: &'static [SearchableTag],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchFile {
     case_sensitive: bool,
     mode: FilterKindFile,
-    searchable_tags: Vec<SearchableTagFile>,
+    tags: Vec<SearchableTagFile>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct SearchableTag {
     pub label: &'static str,
-    pub tag: &'static str,
+    pub value: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchableTagFile {
     label: String,
-    tag: String,
+    value: String,
 }
 
 impl From<SearchFile> for Search {
@@ -34,17 +34,17 @@ impl From<SearchFile> for Search {
         Self {
             case_sensitive: value.case_sensitive,
             mode: value.mode.into(),
-            searchable_tags: if value.searchable_tags.is_empty() {
+            tags: if value.tags.is_empty() {
                 vec![SearchableTag {
                     label: "Any Tag",
-                    tag: "any",
+                    value: "any",
                 }]
             } else {
                 value
-                    .searchable_tags
+                    .tags
                     .into_iter()
-                    .map(|SearchableTagFile { tag, label }| SearchableTag {
-                        tag: tag.leak(),
+                    .map(|SearchableTagFile { value: tag, label }| SearchableTag {
+                        value: tag.leak(),
                         label: label.leak(),
                     })
                     .collect_vec()
@@ -59,33 +59,33 @@ impl Default for SearchFile {
         Self {
             case_sensitive: false,
             mode: FilterKindFile::Contains,
-            searchable_tags: [
+            tags: [
                 SearchableTagFile {
-                    tag: "any".to_string(),
+                    value: "any".to_string(),
                     label: "Any Tag".to_string(),
                 },
                 SearchableTagFile {
-                    tag: "artist".to_string(),
+                    value: "artist".to_string(),
                     label: "Artist".to_string(),
                 },
                 SearchableTagFile {
-                    tag: "album".to_string(),
+                    value: "album".to_string(),
                     label: "Album".to_string(),
                 },
                 SearchableTagFile {
-                    tag: "albumartist".to_string(),
+                    value: "albumartist".to_string(),
                     label: "Album Artist".to_string(),
                 },
                 SearchableTagFile {
-                    tag: "title".to_string(),
+                    value: "title".to_string(),
                     label: "Title".to_string(),
                 },
                 SearchableTagFile {
-                    tag: "filename".to_string(),
+                    value: "filename".to_string(),
                     label: "Filename".to_string(),
                 },
                 SearchableTagFile {
-                    tag: "genre".to_string(),
+                    value: "genre".to_string(),
                     label: "Genre".to_string(),
                 },
             ]

@@ -77,14 +77,14 @@
     search: (
         case_sensitive: false,
         mode: Contains,
-        searchable_tags: [
-            (tag: "any",         label: "Any Tag"),
-            (tag: "artist",      label: "Artist"),
-            (tag: "album",       label: "Album"),
-            (tag: "albumartist", label: "Album Artist"),
-            (tag: "title",       label: "Title"),
-            (tag: "filename",    label: "Filename"),
-            (tag: "genre",       label: "Genre"),
+        tags: [
+            (value: "any",         label: "Any Tag"),
+            (value: "artist",      label: "Artist"),
+            (value: "album",       label: "Album"),
+            (value: "albumartist", label: "Album Artist"),
+            (value: "title",       label: "Title"),
+            (value: "filename",    label: "Filename"),
+            (value: "genre",       label: "Genre"),
         ],
     )
 )

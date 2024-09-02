@@ -722,11 +722,10 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
     pub fn new(search_config: &Search, filter_inputs: [FilterInput; N2], button_inputs: [ButtonInput; N3]) -> Self {
         Self {
             textbox_inputs: search_config
-                .searchable_tags
+                .tags
                 .iter()
                 .map(|tag| Textbox {
-                    filter_key: tag.tag,
-                    // label: " Genre           :",
+                    filter_key: tag.value,
                     label: format!(" {:<16}:", tag.label),
                     value: String::new(),
                 })
