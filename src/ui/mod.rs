@@ -79,9 +79,9 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(config: &Config, context: &AppContext) -> Ui {
+    pub fn new(context: &AppContext) -> Ui {
         Self {
-            screens: Screens::new(config, context),
+            screens: Screens::new(context),
             active_screen: screens::Screens::Queue,
             status_message: None,
             rendered_frames_count: 0,
@@ -105,9 +105,9 @@ struct Screens {
 }
 
 impl Screens {
-    fn new(config: &Config, context: &AppContext) -> Self {
+    fn new(context: &AppContext) -> Self {
         Self {
-            queue: QueueScreen::new(config, context),
+            queue: QueueScreen::new(context),
             #[cfg(debug_assertions)]
             logs: LogsScreen::default(),
             directories: DirectoriesScreen::default(),

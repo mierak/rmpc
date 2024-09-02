@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, ops::AddAssign, time::Duration};
 
 use itertools::Itertools;
 use rstest::fixture;
@@ -64,6 +64,7 @@ pub fn client() -> TestMpdClient {
         current_song_idx: None,
         volume: Volume::new(100),
         status: Status::default(),
+        calls: HashMap::default(),
     }
 }
 
@@ -80,6 +81,7 @@ pub struct TestMpdClient {
     pub playlists: Vec<TestPlaylist>,
     pub volume: Volume,
     pub status: Status,
+    pub calls: HashMap<String, u32>,
 }
 
 type MpdResult<T> = Result<T, MpdError>;
@@ -430,7 +432,11 @@ impl MpdClient for TestMpdClient {
     }
 
     fn find_album_art(&mut self, _path: &str) -> MpdResult<Option<Vec<u8>>> {
-        todo!("Not yet implemented")
+        self.calls
+            .entry("find_album_art".to_string())
+            .or_default()
+            .add_assign(1);
+        Ok(Some(Vec::new()))
     }
 
     fn outputs(&mut self) -> MpdResult<crate::mpd::commands::outputs::Outputs> {

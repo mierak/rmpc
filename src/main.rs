@@ -191,7 +191,7 @@ fn main() -> Result<()> {
                 .spawn(|| input_poll_task(tx_clone))?;
 
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
-                main_task(Ui::new(config, &context), context, rx, client, render_loop, terminal);
+                main_task(Ui::new(&context), context, rx, client, render_loop, terminal);
             })?;
 
             let mut idle_client = try_ret!(
