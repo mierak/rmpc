@@ -16,6 +16,7 @@ use crate::cli::run_external;
 use crate::config::keys::GlobalAction;
 use crate::config::keys::SearchActions;
 use crate::config::Config;
+use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
 use crate::ui::utils::dirstack::Dir;
@@ -33,13 +34,42 @@ use super::{CommonAction, Screen};
 
 #[derive(Debug)]
 pub struct SearchScreen {
-    inputs: InputGroups<7, 2, 1>,
+    inputs: InputGroups<2, 1>,
     phase: Phase,
     preview: Option<Vec<ListItem<'static>>>,
     songs_dir: Dir<Song>,
 }
 
 impl SearchScreen {
+    pub fn new(config: &Config) -> Self {
+        Self {
+            preview: None,
+            phase: Phase::Search,
+            songs_dir: Dir::default(),
+            inputs: InputGroups::new(
+                &config.search,
+                [
+                    FilterInput {
+                        label: " Search mode     :",
+                        variant: FilterInputVariant::SelectFilterKind {
+                            value: config.search.mode,
+                        },
+                    },
+                    FilterInput {
+                        label: " Case Sensistive :",
+                        variant: FilterInputVariant::SelectFilterCaseSensitive {
+                            value: config.search.case_sensitive,
+                        },
+                    },
+                ],
+                [ButtonInput {
+                    label: " Reset",
+                    variant: ButtonInputVariant::Reset,
+                }],
+            ),
+        }
+    }
+
     fn add_current(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
@@ -137,10 +167,12 @@ impl SearchScreen {
         for input in &self.inputs.textbox_inputs {
             match input {
                 Textbox {
-                    value, label, variant, ..
+                    value,
+                    label,
+                    filter_key,
                 } => {
                     let is_focused = matches!(self.inputs.focused(),
-                        FocusedInputGroup::Textboxes(Textbox { variant: variant2, .. }) if variant == variant2);
+                        FocusedInputGroup::Textboxes(Textbox { filter_key: filter_key2, .. }) if filter_key == filter_key2);
 
                     let mut widget = Input::default()
                         .set_borderless(true)
@@ -293,15 +325,17 @@ impl SearchScreen {
         })
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, search_config: &Search) {
         for val in &mut self.inputs.textbox_inputs {
-            let Textbox { ref mut value, .. } = val;
+            let Textbox { value, .. } = val;
             value.clear();
         }
         for val in &mut self.inputs.filter_inputs {
             match val.variant {
-                FilterInputVariant::SelectFilterKind { ref mut value } => *value = FilterKind::Contains,
-                FilterInputVariant::SelectFilterCaseSensitive { ref mut value } => *value = false,
+                FilterInputVariant::SelectFilterKind { ref mut value } => *value = search_config.mode,
+                FilterInputVariant::SelectFilterCaseSensitive { ref mut value } => {
+                    *value = search_config.case_sensitive;
+                }
             }
         }
     }
@@ -483,7 +517,7 @@ impl Screen for SearchScreen {
                                 FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
                                 FocusedInputGroup::Buttons(_) => {
                                     // Reset is the only button in this group at the moment
-                                    self.reset();
+                                    self.reset(&context.config.search);
                                     self.songs_dir = Dir::default();
                                     self.preview = self.prepare_preview(client, config)?;
                                 }
@@ -520,7 +554,15 @@ impl Screen for SearchScreen {
                         }
                         CommonAction::FocusInput => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Add => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Delete => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        CommonAction::Delete => match self.inputs.focused_mut() {
+                            FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
+                                textbox.value.clear();
+                                self.songs_dir = Dir::new(self.search(client)?);
+                                self.preview = self.prepare_preview(client, config)?;
+                                Ok(KeyHandleResultInternal::RenderRequested)
+                            }
+                            _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        },
                     }
                 } else {
                     Ok(KeyHandleResultInternal::KeyNotHandled)
@@ -655,78 +697,6 @@ impl Screen for SearchScreen {
     }
 }
 
-impl Default for SearchScreen {
-    fn default() -> Self {
-        Self {
-            preview: None,
-            phase: Phase::Search,
-            songs_dir: Dir::default(),
-            inputs: InputGroups::new(
-                [
-                    Textbox {
-                        variant: TextboxVariant::AnyTag,
-                        filter_key: Tag::Any,
-                        label: " Any Tag         :",
-                        value: String::new(),
-                    },
-                    Textbox {
-                        variant: TextboxVariant::Artist,
-                        filter_key: Tag::Artist,
-                        label: " Artist          :",
-                        value: String::new(),
-                    },
-                    Textbox {
-                        variant: TextboxVariant::Album,
-                        filter_key: Tag::Album,
-                        label: " Album           :",
-                        value: String::new(),
-                    },
-                    Textbox {
-                        variant: TextboxVariant::AlbumArtist,
-                        filter_key: Tag::AlbumArtist,
-                        label: " Album Artist    :",
-                        value: String::new(),
-                    },
-                    Textbox {
-                        variant: TextboxVariant::Title,
-                        filter_key: Tag::Title,
-                        label: " Title           :",
-                        value: String::new(),
-                    },
-                    Textbox {
-                        variant: TextboxVariant::FileName,
-                        filter_key: Tag::File,
-                        label: " File Name       :",
-                        value: String::new(),
-                    },
-                    Textbox {
-                        variant: TextboxVariant::Genre,
-                        filter_key: Tag::Genre,
-                        label: " Genre           :",
-                        value: String::new(),
-                    },
-                ],
-                [
-                    FilterInput {
-                        label: " Search mode     :",
-                        variant: FilterInputVariant::SelectFilterKind {
-                            value: FilterKind::Contains,
-                        },
-                    },
-                    FilterInput {
-                        label: " Case Sensistive :",
-                        variant: FilterInputVariant::SelectFilterCaseSensitive { value: false },
-                    },
-                ],
-                [ButtonInput {
-                    label: " Reset",
-                    variant: ButtonInputVariant::Reset,
-                }],
-            ),
-        }
-    }
-}
-
 enum FocusedInputGroup<T, F, B> {
     Textboxes(T),
     Filters(F),
@@ -741,21 +711,25 @@ enum FocusedInput {
 }
 
 #[derive(Debug)]
-struct InputGroups<const N1: usize, const N2: usize, const N3: usize> {
-    textbox_inputs: [Textbox; N1],
+struct InputGroups<const N2: usize, const N3: usize> {
+    textbox_inputs: Vec<Textbox>,
     filter_inputs: [FilterInput; N2],
     button_inputs: [ButtonInput; N3],
     focused_idx: FocusedInput,
 }
 
-impl<const N1: usize, const N2: usize, const N3: usize> InputGroups<N1, N2, N3> {
-    pub fn new(
-        textbox_inputs: [Textbox; N1],
-        filter_inputs: [FilterInput; N2],
-        button_inputs: [ButtonInput; N3],
-    ) -> Self {
+impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
+    pub fn new(search_config: &Search, filter_inputs: [FilterInput; N2], button_inputs: [ButtonInput; N3]) -> Self {
         Self {
-            textbox_inputs,
+            textbox_inputs: search_config
+                .tags
+                .iter()
+                .map(|tag| Textbox {
+                    filter_key: tag.value,
+                    label: format!(" {:<16}:", tag.label),
+                    value: String::new(),
+                })
+                .collect_vec(),
             filter_inputs,
             button_inputs,
             focused_idx: FocusedInput::Textboxes(0),
@@ -842,21 +816,9 @@ enum Phase {
 
 #[derive(Debug)]
 struct Textbox {
-    variant: TextboxVariant,
     value: String,
-    label: &'static str,
-    filter_key: Tag,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum TextboxVariant {
-    AnyTag,
-    Artist,
-    Album,
-    AlbumArtist,
-    Title,
-    FileName,
-    Genre,
+    label: String,
+    filter_key: &'static str,
 }
 
 #[derive(Debug)]

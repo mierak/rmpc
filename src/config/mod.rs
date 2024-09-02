@@ -6,6 +6,7 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
+use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use utils::tilde_expand;
@@ -13,6 +14,7 @@ use utils::tilde_expand;
 pub mod cli;
 mod defaults;
 pub mod keys;
+mod search;
 pub mod theme;
 
 use crate::utils::image_proto::{self, ImageProtocol};
@@ -23,6 +25,8 @@ use self::{
     keys::{KeyConfig, KeyConfigFile},
     theme::{ConfigColor, UiConfig, UiConfigFile},
 };
+
+pub use search::Search;
 
 #[derive(Default, Display, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum ImageMethodFile {
@@ -96,6 +100,7 @@ pub struct Config {
     pub theme: UiConfig,
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<&'static [&'static str]>,
+    pub search: Search,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -121,6 +126,8 @@ pub struct ConfigFile {
     pub album_art: AlbumArtConfigFile,
     #[serde(default)]
     pub on_song_change: Option<Vec<String>>,
+    #[serde(default)]
+    pub search: SearchFile,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -151,6 +158,7 @@ impl Default for ConfigFile {
             album_art_max_size_px: Size::default(),
             album_art: AlbumArtConfigFile::default(),
             on_song_change: None,
+            search: SearchFile::default(),
         }
     }
 }
@@ -206,6 +214,7 @@ impl ConfigFile {
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
+            search: self.search.into(),
             album_art: AlbumArtConfig {
                 method: ImageMethod::default(),
                 max_size_px: Size {

@@ -114,7 +114,7 @@ impl Screens {
             albums: AlbumsScreen::default(),
             artists: ArtistsScreen::default(),
             playlists: PlaylistsScreen::default(),
-            search: SearchScreen::default(),
+            search: SearchScreen::new(context.config),
         }
     }
 }
