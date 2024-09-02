@@ -241,11 +241,12 @@ impl Screen for QueueScreen {
                         log::debug!(file = current_song.file.as_str(); "Searching for album art");
                         let album_art = client.find_album_art(current_song.file.as_str())?;
                         self.album_art.set_image(album_art)?;
-                        if context.config.select_current_song_on_change {
-                            self.scrolling_state.select(Some(idx));
-                        }
-                        return Ok(KeyHandleResultInternal::RenderRequested);
                     }
+
+                    if context.config.select_current_song_on_change {
+                        self.scrolling_state.select(Some(idx));
+                    }
+                    return Ok(KeyHandleResultInternal::RenderRequested);
                 }
 
                 Ok(KeyHandleResultInternal::SkipRender)
