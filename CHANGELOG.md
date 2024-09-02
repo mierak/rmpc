@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
 * Allow `-1` as a valid volume value in response to status command for improved backwards compatibility
 * Improved logging of MPD command parsing failures
 * Refactored how image protocol backends request render by moving channels to context
+* Make some things more robust by checking commands supported by MPD server (albumart/readpicture/getvol)
+* Check MPD protocol version for single command
 
 ### Deprecated
 
