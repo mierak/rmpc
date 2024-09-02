@@ -150,15 +150,13 @@ fn main() -> Result<()> {
 
             let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
 
-            let config = Box::leak(Box::new(
-                match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                    Ok(val) => val.into_config(Some(&args.config), false)?,
-                    Err(err) => {
-                        status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                        ConfigFile::default().into_config(None, false)?
-                    }
-                },
-            ));
+            let config = match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
+                Ok(val) => val.into_config(Some(&args.config), false)?,
+                Err(err) => {
+                    status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
+                    ConfigFile::default().into_config(None, false)?
+                }
+            };
 
             try_ret!(tx.send(AppEvent::RequestRender(false)), "Failed to render first frame");
 
@@ -169,12 +167,13 @@ fn main() -> Result<()> {
 
             let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
             let tx_clone = tx.clone();
+
             let context = try_ret!(
                 context::AppContext::try_new(&mut client, config, tx_clone, worker_tx),
                 "Failed to create app context"
             );
 
-            let mut render_loop = RenderLoop::new(tx.clone(), config);
+            let mut render_loop = RenderLoop::new(tx.clone(), context.config);
             if context.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             }
@@ -182,7 +181,7 @@ fn main() -> Result<()> {
             let tx_clone = tx.clone();
             std::thread::Builder::new()
                 .name("worker task".to_owned())
-                .spawn(|| worker_task(worker_rx, tx_clone, config))?;
+                .spawn(|| worker_task(worker_rx, tx_clone, context.config))?;
 
             let tx_clone = tx.clone();
 
@@ -190,14 +189,15 @@ fn main() -> Result<()> {
                 .name("input poll".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
 
+            let mut idle_client = try_ret!(
+                Client::init(context.config.address, "idle", true),
+                "Failed to connect to mpd with idle client"
+            );
+
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
                 main_task(Ui::new(&context), context, rx, client, render_loop, terminal);
             })?;
 
-            let mut idle_client = try_ret!(
-                Client::init(config.address, "idle", true),
-                "Failed to connect to mpd with idle client"
-            );
             idle_client.set_read_timeout(None)?;
             std::thread::Builder::new()
                 .name("idle task".to_owned())
@@ -211,7 +211,7 @@ fn main() -> Result<()> {
                 original_hook(panic);
             }));
 
-            info!(config:?; "Application initialized successfully");
+            info!("Application initialized successfully");
 
             main_task.join().expect("Main task to not fail");
         }
@@ -410,7 +410,14 @@ fn handle_idle_event(
     render_loop: &mut RenderLoop,
 ) -> Result<()> {
     match event {
-        IdleEvent::Mixer => {}
+        IdleEvent::Mixer => {
+            if context.supported_commands.contains("getvol") {
+                context.status.volume = try_ret!(client.get_volume(), "Failed to get volume");
+            } else {
+                context.status = try_ret!(client.get_status(), "Failed to get status");
+            }
+        }
+        IdleEvent::Options => context.status = try_ret!(client.get_status(), "Failed to get status"),
         IdleEvent::Player => {
             let current_song_id = context.status.song;
 
@@ -452,7 +459,6 @@ fn handle_idle_event(
                 };
             }
         }
-        IdleEvent::Options => {}
         IdleEvent::Playlist => {
             let queue = client.playlist_info()?;
             context.queue = queue.unwrap_or_default();

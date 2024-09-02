@@ -87,6 +87,10 @@ pub struct TestMpdClient {
 type MpdResult<T> = Result<T, MpdError>;
 #[allow(clippy::cast_possible_truncation)]
 impl MpdClient for TestMpdClient {
+    fn commands(&mut self) -> MpdResult<MpdList> {
+        todo!("Not yet implemented")
+    }
+
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         todo!()
     }

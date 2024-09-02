@@ -1,4 +1,4 @@
-use std::sync::mpsc::channel;
+use std::{collections::HashSet, sync::mpsc::channel};
 
 use rstest::fixture;
 
@@ -19,6 +19,7 @@ pub fn app_context() -> AppContext {
         queue: Vec::default(),
         app_event_sender: channel().0,
         work_sender: channel().0,
+        supported_commands: HashSet::new(),
     }
 }
 

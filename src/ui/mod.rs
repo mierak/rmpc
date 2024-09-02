@@ -340,8 +340,11 @@ impl Ui {
                         GlobalAction::PreviousTrack if context.status.state == MpdState::Play => client.prev()?,
                         GlobalAction::Stop if context.status.state == MpdState::Play => client.stop()?,
                         GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
-                        GlobalAction::ToggleSingle => client.single(context.status.single.cycle())?,
                         GlobalAction::ToggleRandom => client.random(!context.status.random)?,
+                        GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
+                            client.single(context.status.single.cycle_pre_mpd_24())?;
+                        }
+                        GlobalAction::ToggleSingle => client.single(context.status.single.cycle())?,
                         GlobalAction::ToggleConsume if client.version() < Version::new(0, 24, 0) => {
                             client.consume(context.status.consume.cycle_pre_mpd_24())?;
                         }
@@ -471,8 +474,6 @@ impl Ui {
         client: &mut impl MpdClient,
     ) -> Result<KeyHandleResult> {
         match event {
-            UiEvent::Mixer => context.status.volume = try_ret!(client.get_volume(), "Failed to get volume"),
-            UiEvent::Options => context.status = try_ret!(client.get_status(), "Failed to get status"),
             UiEvent::Player => {
                 self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
             }
@@ -490,6 +491,8 @@ impl Ui {
             UiEvent::Resized { .. } => {}
             UiEvent::ModalOpened => {}
             UiEvent::ModalClosed => {}
+            UiEvent::Mixer => {}
+            UiEvent::Options => {}
             UiEvent::Exit => {}
         }
 

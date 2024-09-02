@@ -61,6 +61,7 @@ impl ValueChange {
 #[allow(dead_code)]
 pub trait MpdClient {
     fn version(&mut self) -> Version;
+    fn commands(&mut self) -> MpdResult<MpdList>;
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
     fn noidle(&mut self) -> MpdResult<()>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
@@ -132,6 +133,12 @@ impl MpdClient for Client<'_> {
     fn version(&mut self) -> Version {
         self.version
     }
+
+    // Lists commands supported by the MPD server
+    fn commands(&mut self) -> MpdResult<MpdList> {
+        self.send("commands").and_then(ProtoClient::read_response)
+    }
+
     // Queries
     fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
         self.send("idle").and_then(ProtoClient::read_response)
@@ -142,7 +149,11 @@ impl MpdClient for Client<'_> {
     }
 
     fn get_volume(&mut self) -> MpdResult<Volume> {
-        self.send("getvol").and_then(ProtoClient::read_response)
+        if self.version < Version::new(0, 23, 0) {
+            Err(MpdError::UnsupportedMpdVersion("getvol can be used since MPD 0.23.0"))
+        } else {
+            self.send("getvol").and_then(ProtoClient::read_response)
+        }
     }
 
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()> {
