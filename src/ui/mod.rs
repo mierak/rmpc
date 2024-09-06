@@ -37,7 +37,6 @@ use crate::{
 };
 use crate::{context::AppContext, mpd::version::Version};
 
-#[cfg(debug_assertions)]
 use self::{modals::Modal, panes::Pane, widgets::header::Header};
 
 pub mod image;

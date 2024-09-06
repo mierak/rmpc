@@ -71,7 +71,6 @@ impl TabScreen {
         area: Rect,
         context: &AppContext,
     ) -> Result<()> {
-        // TODO avoid recursion
         match configured_panes {
             PaneOrSplitWithPosition::Pane(Pane { pane, border, id, .. }) => {
                 let block = Block::default()

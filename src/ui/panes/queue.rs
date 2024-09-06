@@ -70,25 +70,6 @@ impl Pane for QueuePane {
         } = context;
         let queue_len = queue.len();
 
-        // let album_art_width = config.theme.album_art_width_percent;
-
-        // let mut img_queue_constraints = [
-        //     Constraint::Percentage(album_art_width),
-        //     Constraint::Percentage(100 - album_art_width),
-        // ];
-        //
-        // if matches!(config.theme.album_art_position, Position::Right) {
-        //     img_queue_constraints.reverse();
-        // }
-
-        // let [mut img_section, mut queue_section] = *Layout::horizontal(img_queue_constraints).split(area) else {
-        //     return Ok(());
-        // };
-
-        // if matches!(config.theme.album_art_position, Position::Right) {
-        //     std::mem::swap(&mut img_section, &mut queue_section);
-        // }
-
         let header_height = u16::from(config.theme.show_song_table_header);
         let [table_header_section, mut queue_section] =
             *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(area)
