@@ -231,7 +231,6 @@ impl PaneOrSplitFile {
         self.convert_recursive(Geometry::new(0, 0, 100, 100), border_type, Borders::NONE)
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn convert_recursive(
         &self,
         mut available_geometry: Geometry,

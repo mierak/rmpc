@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{KeyCode, KeyEvent},
     execute,
@@ -84,12 +84,7 @@ impl Ui {
             current_song: None,
             modals: Vec::default(),
             command: None,
-            active_tab: *context
-                .config
-                .tabs
-                .names
-                .first()
-                .context("Expected at least one screen")?,
+            active_tab: *context.config.tabs.names.first().context("Expected at least one tab")?,
             tabs: context
                 .config
                 .tabs
@@ -103,7 +98,10 @@ impl Ui {
 
 macro_rules! screen_call {
     ($self:ident, $fn:ident($($param:expr),+)) => {
-        $self.tabs.get_mut(&$self.active_tab).unwrap().$fn(&mut $self.panes, $($param),+)
+        $self.tabs
+            .get_mut(&$self.active_tab)
+            .context(anyhow!("Expected tab '{}' to be defined. Please report this along with your config.", $self.active_tab))?
+            .$fn(&mut $self.panes, $($param),+)
     }
 }
 

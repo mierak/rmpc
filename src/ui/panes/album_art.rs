@@ -1,5 +1,4 @@
 use crate::{
-    config::keys::ToDescription,
     context::AppContext,
     mpd::mpd_client::MpdClient,
     ui::{image::facade::AlbumArtFacade, KeyHandleResultInternal, UiEvent},
@@ -32,13 +31,6 @@ impl AlbumArtPane {
                 },
             ),
         }
-    }
-}
-
-pub enum AlbumArtActions {}
-impl ToDescription for AlbumArtActions {
-    fn to_description(&self) -> &str {
-        ""
     }
 }
 

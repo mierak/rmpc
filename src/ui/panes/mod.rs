@@ -20,7 +20,7 @@ use ratatui::{
     Frame,
 };
 use search::SearchPane;
-use strum::{Display, EnumDiscriminants, EnumIter, VariantNames};
+use strum::Display;
 
 use crate::{
     cli::{create_env, run_external},
@@ -54,8 +54,7 @@ pub mod playlists;
 pub mod queue;
 pub mod search;
 
-#[derive(Debug, Display, EnumDiscriminants, VariantNames)]
-#[strum_discriminants(derive(VariantNames, EnumIter))]
+#[derive(Debug, Display)]
 pub enum Panes<'a> {
     Queue(&'a mut QueuePane),
     #[cfg(debug_assertions)]

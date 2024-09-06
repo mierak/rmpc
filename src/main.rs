@@ -28,7 +28,6 @@ use itertools::Itertools;
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
-use ron::ser::PrettyConfig;
 use rustix::path::Arg;
 use ui::{Level, UiEvent};
 use utils::{
@@ -86,11 +85,7 @@ fn main() -> Result<()> {
     let mut args = Args::parse();
     match args.command {
         Some(Command::Config) => {
-            println!(
-                "{}",
-                ron::ser::to_string_pretty(&ConfigFile::default(), PrettyConfig::default())?
-            );
-            // std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
+            std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
         }
         Some(Command::Theme) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
