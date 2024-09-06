@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - Added `--path` filter to `song` command
 - Added ability to configure the search screen
 - Added this changelog
-- Added `tabs` config, whici lets you customize what tabs you want to use and even mix and match them.
+- Added `tabs` config, which lets you customize what tabs you want to use and even mix and match them.
 
 ### Changed
 
