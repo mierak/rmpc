@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 
 use crate::{
-    config::{keys::PlaylistsActions, Config},
+    config::Config,
     context::AppContext,
     mpd::{
         commands::Song,
@@ -19,19 +19,18 @@ use crate::{
     utils::macros::{status_error, status_info},
 };
 
-use super::{browser::DirOrSong, BrowserScreen, Screen};
+use super::{browser::DirOrSong, BrowserPane, Pane};
 
 #[cfg(test)]
 mod tests;
 
 #[derive(Debug, Default)]
-pub struct PlaylistsScreen {
+pub struct PlaylistsPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
 }
 
-impl Screen for PlaylistsScreen {
-    type Actions = PlaylistsActions;
+impl Pane for PlaylistsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
@@ -155,7 +154,7 @@ impl Screen for PlaylistsScreen {
     }
 }
 
-impl BrowserScreen<DirOrSong> for PlaylistsScreen {
+impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn stack(&self) -> &DirStack<DirOrSong> {
         &self.stack
     }

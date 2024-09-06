@@ -158,6 +158,10 @@ impl Modal for OutputsModal {
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Close => Ok(KeyHandleResultInternal::Modal(None)),
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

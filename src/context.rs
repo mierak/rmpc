@@ -36,7 +36,6 @@ impl AppContext {
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
             config.album_art.method = ImageMethod::None;
-            config.theme.album_art_width_percent = 0;
             status_warn!("Album art is disabled because it is not supported by MPD");
         }
 

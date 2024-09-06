@@ -185,6 +185,10 @@ impl Modal for SaveQueueModal {
                 CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::SkipRender)

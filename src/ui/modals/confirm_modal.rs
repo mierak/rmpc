@@ -135,6 +135,10 @@ impl Modal for ConfirmModal {
                 CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::SkipRender)

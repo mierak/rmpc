@@ -1,5 +1,5 @@
 use crate::{
-    config::{keys::AlbumsActions, Config},
+    config::Config,
     context::AppContext,
     mpd::{
         commands::Song as MpdSong,
@@ -14,21 +14,19 @@ use crate::{
     utils::macros::{status_info, status_warn},
 };
 
-use super::{browser::DirOrSong, BrowserScreen, Screen};
+use super::{browser::DirOrSong, BrowserPane, Pane};
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 
 #[derive(Debug, Default)]
-pub struct AlbumsScreen {
+pub struct AlbumsPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
 }
 
-impl Screen for AlbumsScreen {
-    type Actions = AlbumsActions;
-
+impl Pane for AlbumsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
@@ -131,7 +129,7 @@ fn find_songs(client: &mut impl MpdClient, album: &str, file: &str) -> Result<Ve
         })
 }
 
-impl BrowserScreen<DirOrSong> for AlbumsScreen {
+impl BrowserPane<DirOrSong> for AlbumsPane {
     fn stack(&self) -> &DirStack<DirOrSong> {
         &self.stack
     }

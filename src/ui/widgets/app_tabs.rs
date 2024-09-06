@@ -1,28 +1,31 @@
 use ratatui::widgets::Widget;
-use strum::{IntoEnumIterator, VariantNames};
 
-use crate::config::Config;
+use crate::config::{tabs::TabName, Config};
 
 use super::tabs::Tabs;
 
-pub struct AppTabs<'a, T>
-where
-    T: PartialEq + IntoEnumIterator + VariantNames,
-{
-    active_tab: T,
+pub struct AppTabs<'a> {
+    active_tab: TabName,
     config: &'a Config,
 }
 
-impl<T> Widget for AppTabs<'_, T>
-where
-    T: PartialEq + IntoEnumIterator + VariantNames,
-{
+impl Widget for AppTabs<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let tab_names = T::VARIANTS.iter().map(|e| format!("{e: ^13}")).collect::<Vec<String>>();
+        let tab_names = self
+            .config
+            .tabs
+            .names
+            .iter()
+            .map(|e| format!("  {e: ^9}  "))
+            .collect::<Vec<String>>();
 
-        let Some(selected_tab) = T::iter()
+        let Some(selected_tab) = self
+            .config
+            .tabs
+            .names
+            .iter()
             .enumerate()
-            .find(|(_, t)| *t == self.active_tab)
+            .find(|(_, t)| **t == self.active_tab)
             .map(|(idx, _)| idx)
         else {
             return;
@@ -40,8 +43,8 @@ where
     }
 }
 
-impl<'a, T: PartialEq + IntoEnumIterator + VariantNames> AppTabs<'a, T> {
-    pub fn new(active_tab: T, config: &'a Config) -> Self {
+impl<'a> AppTabs<'a> {
+    pub fn new(active_tab: TabName, config: &'a Config) -> Self {
         Self { active_tab, config }
     }
 }

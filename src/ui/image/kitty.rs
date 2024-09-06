@@ -70,7 +70,7 @@ impl ImageProto for KittyImageState {
         Ok(())
     }
 
-    fn hide(&mut self, _: Option<ratatui::prelude::Color>, _: Rect) -> Result<()> {
+    fn hide(&mut self, _bg_color: Option<ratatui::prelude::Color>, _area: Rect) -> Result<()> {
         Ok(())
     }
 

@@ -1,12 +1,14 @@
-use std::{io::Stdout, ops::AddAssign, time::Duration};
+use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::{
     event::{KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use itertools::Itertools;
 use modals::{keybinds::KeybindsModal, outputs::OutputsModal};
+use panes::{PaneContainer, Panes};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
@@ -15,6 +17,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame, Terminal,
 };
+use tab_screen::TabScreen;
 use widgets::app_tabs::AppTabs;
 
 use crate::{
@@ -22,6 +25,7 @@ use crate::{
     config::{
         cli::Args,
         keys::{CommonAction, GlobalAction},
+        tabs::TabName,
         Config,
     },
     mpd::{
@@ -34,19 +38,12 @@ use crate::{
 use crate::{context::AppContext, mpd::version::Version};
 
 #[cfg(debug_assertions)]
-use self::screens::logs::LogsScreen;
-use self::{
-    modals::Modal,
-    screens::{
-        albums::AlbumsScreen, artists::ArtistsScreen, directories::DirectoriesScreen, playlists::PlaylistsScreen,
-        queue::QueueScreen, search::SearchScreen, Screen,
-    },
-    widgets::header::Header,
-};
+use self::{modals::Modal, panes::Pane, widgets::header::Header};
 
 pub mod image;
 pub mod modals;
-pub mod screens;
+pub mod panes;
+pub mod tab_screen;
 pub mod utils;
 pub mod widgets;
 
@@ -69,80 +66,51 @@ pub struct StatusMessage {
 
 #[derive(Debug)]
 pub struct Ui {
-    screens: Screens,
+    panes: PaneContainer,
     modals: Vec<Box<dyn Modal>>,
-    active_screen: screens::Screens,
     status_message: Option<StatusMessage>,
     rendered_frames_count: u32,
     current_song: Option<Song>,
     command: Option<String>,
+    active_tab: TabName,
+    tabs: HashMap<TabName, TabScreen>,
 }
 
 impl Ui {
-    pub fn new(context: &AppContext) -> Ui {
-        Self {
-            screens: Screens::new(context),
-            active_screen: screens::Screens::Queue,
+    pub fn new(context: &AppContext) -> Result<Ui> {
+        Ok(Self {
+            panes: PaneContainer::new(context),
             status_message: None,
             rendered_frames_count: 0,
             current_song: None,
             modals: Vec::default(),
             command: None,
-        }
+            active_tab: *context
+                .config
+                .tabs
+                .names
+                .first()
+                .context("Expected at least one screen")?,
+            tabs: context
+                .config
+                .tabs
+                .tabs
+                .iter()
+                .map(|(name, screen)| -> Result<_> { Ok((*name, TabScreen::new(&screen.panes))) })
+                .try_collect()?,
+        })
     }
-}
-
-#[derive(Debug)]
-struct Screens {
-    queue: QueueScreen,
-    #[cfg(debug_assertions)]
-    logs: LogsScreen,
-    directories: DirectoriesScreen,
-    albums: AlbumsScreen,
-    artists: ArtistsScreen,
-    playlists: PlaylistsScreen,
-    search: SearchScreen,
-}
-
-impl Screens {
-    fn new(context: &AppContext) -> Self {
-        Self {
-            queue: QueueScreen::new(context),
-            #[cfg(debug_assertions)]
-            logs: LogsScreen::default(),
-            directories: DirectoriesScreen::default(),
-            albums: AlbumsScreen::default(),
-            artists: ArtistsScreen::default(),
-            playlists: PlaylistsScreen::default(),
-            search: SearchScreen::new(context.config),
-        }
-    }
-}
-
-macro_rules! invoke {
-    ($screen:expr, $fn:ident, $($param:expr),+) => {
-        $screen.$fn($($param),+)
-    };
 }
 
 macro_rules! screen_call {
-    ($self:ident, $state:ident, $fn:ident($($param:expr),+)) => {
-        match $self.active_screen {
-            screens::Screens::Queue => invoke!($self.screens.queue, $fn, $($param),+),
-            #[cfg(debug_assertions)]
-            screens::Screens::Logs => invoke!($self.screens.logs, $fn, $($param),+),
-            screens::Screens::Directories => invoke!($self.screens.directories, $fn, $($param),+),
-            screens::Screens::Artists => invoke!($self.screens.artists, $fn, $($param),+),
-            screens::Screens::Albums => invoke!($self.screens.albums, $fn, $($param),+),
-            screens::Screens::Playlists => invoke!($self.screens.playlists, $fn, $($param),+),
-            screens::Screens::Search => invoke!($self.screens.search, $fn, $($param),+),
-        }
+    ($self:ident, $fn:ident($($param:expr),+)) => {
+        $self.tabs.get_mut(&$self.active_tab).unwrap().$fn(&mut $self.panes, $($param),+)
     }
 }
 
 impl Ui {
     pub fn post_render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
-        screen_call!(self, state, post_render(frame, context))
+        screen_call!(self, post_render(frame, context))
     }
 
     pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
@@ -177,7 +145,7 @@ impl Ui {
         frame.render_widget(header, header_area);
 
         if tab_area_height > 0 {
-            let app_tabs = AppTabs::new(self.active_screen, context.config);
+            let app_tabs = AppTabs::new(self.active_tab, context.config);
             frame.render_widget(app_tabs, tabs_area);
         }
 
@@ -216,11 +184,10 @@ impl Ui {
         );
 
         if context.config.theme.draw_borders {
-            screen_call!(self, state, render(frame, content_area, context))?;
+            screen_call!(self, render(frame, content_area, context))?;
         } else {
             screen_call!(
                 self,
-                state,
                 render(
                     frame,
                     ratatui::prelude::Rect {
@@ -287,11 +254,6 @@ impl Ui {
             }
         }
 
-        macro_rules! screen_call_inner {
-            ($fn:ident($($param:expr),+)) => {
-                screen_call!(self, state, $fn($($param),+))?
-            }
-        }
         if let Some(ref mut modal) = self.modals.last_mut() {
             return match modal.handle_key(key, client, context)? {
                 KeyHandleResultInternal::Modal(None) => {
@@ -303,7 +265,7 @@ impl Ui {
             };
         }
 
-        match screen_call_inner!(handle_action(key, client, context)) {
+        match screen_call!(self, handle_action(key, client, context))? {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(Some(modal)) => {
@@ -371,53 +333,61 @@ impl Ui {
                             client.seek_current(ValueChange::Decrease(5))?;
                         }
                         GlobalAction::NextTab => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = self.active_screen.next();
-                            screen_call_inner!(before_show(client, &context));
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = context.config.next_screen(self.active_tab);
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PreviousTab => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = self.active_screen.prev();
-                            screen_call_inner!(before_show(client, &context));
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = context.config.prev_screen(self.active_tab);
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::QueueTab if !matches!(self.active_screen, screens::Screens::Queue) => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = screens::Screens::Queue;
-                            screen_call_inner!(before_show(client, &context));
+                        GlobalAction::SwitchToTab(name) => {
+                            if context.config.tabs.names.contains(name) {
+                                screen_call!(self, on_hide(client, &context))?;
+                                self.active_tab = *name;
+                                screen_call!(self, before_show(client, &context))?;
+                            } else {
+                                status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
+                            }
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::DirectoriesTab
-                            if !matches!(self.active_screen, screens::Screens::Directories) =>
-                        {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = screens::Screens::Directories;
-                            screen_call_inner!(before_show(client, &context));
+                        GlobalAction::QueueTab if self.active_tab != "Queue".into() => {
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = "Queue".into();
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::ArtistsTab if !matches!(self.active_screen, screens::Screens::Artists) => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = screens::Screens::Artists;
-                            screen_call_inner!(before_show(client, &context));
+                        GlobalAction::DirectoriesTab if self.active_tab != "Directories".into() => {
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = "Directories".into();
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::AlbumsTab if !matches!(self.active_screen, screens::Screens::Albums) => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = screens::Screens::Albums;
-                            screen_call_inner!(before_show(client, &context));
+                        GlobalAction::ArtistsTab if self.active_tab != "Artists".into() => {
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = "Artists".into();
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::PlaylistsTab if !matches!(self.active_screen, screens::Screens::Playlists) => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = screens::Screens::Playlists;
-                            screen_call_inner!(before_show(client, &context));
+                        GlobalAction::AlbumsTab if self.active_tab != "Albums".into() => {
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = "Albums".into();
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::SearchTab if !matches!(self.active_screen, screens::Screens::Search) => {
-                            screen_call_inner!(on_hide(client, &context));
-                            self.active_screen = screens::Screens::Search;
-                            screen_call_inner!(before_show(client, &context));
+                        GlobalAction::PlaylistsTab if self.active_tab != "Playlists".into() => {
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = "Playlists".into();
+                            screen_call!(self, before_show(client, &context))?;
+                            return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::SearchTab if self.active_tab != "Search".into() => {
+                            screen_call!(self, on_hide(client, &context))?;
+                            self.active_tab = "Search".into();
+                            screen_call!(self, before_show(client, &context))?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::QueueTab => {}
@@ -456,7 +426,7 @@ impl Ui {
 
     pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
         self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
-        screen_call!(self, state, before_show(client, &context))
+        screen_call!(self, before_show(client, &context))
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {
@@ -483,7 +453,7 @@ impl Ui {
             UiEvent::LogAdded(_) =>
             {
                 #[cfg(debug_assertions)]
-                if matches!(self.active_screen, screens::Screens::Logs) {
+                if self.active_tab == "Logs".into() {
                     return Ok(KeyHandleResult::RenderRequested);
                 }
             }
@@ -498,25 +468,18 @@ impl Ui {
 
         let mut ret = KeyHandleResultInternal::SkipRender;
 
-        for screen in [
-            screens::Screens::Queue,
-            #[cfg(debug_assertions)]
-            screens::Screens::Logs,
-            screens::Screens::Directories,
-            screens::Screens::Albums,
-            screens::Screens::Artists,
-            screens::Screens::Playlists,
-            screens::Screens::Search,
-        ] {
-            let result = match screen {
+        for name in context.config.tabs.active_panes {
+            let result = match self.panes.get_mut(*name) {
                 #[cfg(debug_assertions)]
-                screens::Screens::Logs => self.screens.logs.on_event(&mut event, client, context),
-                screens::Screens::Queue => self.screens.queue.on_event(&mut event, client, context),
-                screens::Screens::Directories => self.screens.directories.on_event(&mut event, client, context),
-                screens::Screens::Albums => self.screens.albums.on_event(&mut event, client, context),
-                screens::Screens::Artists => self.screens.artists.on_event(&mut event, client, context),
-                screens::Screens::Playlists => self.screens.playlists.on_event(&mut event, client, context),
-                screens::Screens::Search => self.screens.search.on_event(&mut event, client, context),
+                Panes::Logs(p) => p.on_event(&mut event, client, context),
+                Panes::Queue(p) => p.on_event(&mut event, client, context),
+                Panes::Directories(p) => p.on_event(&mut event, client, context),
+                Panes::Albums(p) => p.on_event(&mut event, client, context),
+                Panes::Artists(p) => p.on_event(&mut event, client, context),
+                Panes::Playlists(p) => p.on_event(&mut event, client, context),
+                Panes::Search(p) => p.on_event(&mut event, client, context),
+                Panes::AlbumArtists(p) => p.on_event(&mut event, client, context),
+                Panes::AlbumArt(p) => p.on_event(&mut event, client, context),
             };
 
             match self.handle_screen_event_result(result)? {
@@ -673,6 +636,26 @@ impl FilterKind {
 }
 
 impl Config {
+    fn next_screen(&self, current_screen: TabName) -> TabName {
+        let names = self.tabs.names;
+        *names
+            .iter()
+            .enumerate()
+            .find(|(_, s)| **s == current_screen)
+            .and_then(|(idx, _)| names.get((idx + 1) % names.len()))
+            .unwrap_or(&current_screen)
+    }
+
+    fn prev_screen(&self, current_screen: TabName) -> TabName {
+        let names = self.tabs.names;
+        *names
+            .iter()
+            .enumerate()
+            .find(|(_, s)| **s == current_screen)
+            .and_then(|(idx, _)| names.get((if idx == 0 { names.len() - 1 } else { idx - 1 }) % names.len()))
+            .unwrap_or(&current_screen)
+    }
+
     fn as_header_table_block(&self) -> ratatui::widgets::Block {
         if !self.theme.draw_borders {
             return ratatui::widgets::Block::default();
@@ -693,6 +676,10 @@ impl Config {
 
     fn as_border_style(&self) -> ratatui::style::Style {
         self.theme.borders_style
+    }
+
+    fn as_focused_border_style(&self) -> ratatui::style::Style {
+        self.theme.highlight_border_style
     }
 
     fn as_text_style(&self) -> ratatui::style::Style {

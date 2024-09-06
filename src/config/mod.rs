@@ -9,12 +9,14 @@ use itertools::Itertools;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use strum::Display;
+use tabs::{Tabs, TabsFile};
 use utils::tilde_expand;
 
 pub mod cli;
 mod defaults;
 pub mod keys;
 mod search;
+pub mod tabs;
 pub mod theme;
 
 use crate::utils::image_proto::{self, ImageProtocol};
@@ -101,33 +103,36 @@ pub struct Config {
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<&'static [&'static str]>,
     pub search: Search,
+    pub tabs: Tabs,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
     pub address: String,
     #[serde(default)]
-    pub cache_dir: Option<String>,
+    cache_dir: Option<String>,
     #[serde(default)]
     pub theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
-    pub volume_step: u8,
+    volume_step: u8,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
-    pub status_update_interval_ms: Option<u64>,
+    status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
-    pub select_current_song_on_change: bool,
+    select_current_song_on_change: bool,
     #[serde(default)]
-    pub keybinds: KeyConfigFile,
+    keybinds: KeyConfigFile,
     #[serde(default)]
-    pub image_method: Option<ImageMethodFile>,
+    image_method: Option<ImageMethodFile>,
     #[serde(default)]
-    pub album_art_max_size_px: Size,
+    album_art_max_size_px: Size,
     #[serde(default)]
     pub album_art: AlbumArtConfigFile,
     #[serde(default)]
-    pub on_song_change: Option<Vec<String>>,
+    on_song_change: Option<Vec<String>>,
     #[serde(default)]
-    pub search: SearchFile,
+    search: SearchFile,
+    #[serde(default)]
+    tabs: TabsFile,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -159,6 +164,7 @@ impl Default for ConfigFile {
             album_art: AlbumArtConfigFile::default(),
             on_song_change: None,
             search: SearchFile::default(),
+            tabs: TabsFile::default(),
         }
     }
 }
@@ -215,6 +221,7 @@ impl ConfigFile {
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
             search: self.search.into(),
+            tabs: self.tabs.try_into()?,
             album_art: AlbumArtConfig {
                 method: ImageMethod::default(),
                 max_size_px: Size {
@@ -239,30 +246,25 @@ impl ConfigFile {
             tmux::enable_passthrough()?;
         };
 
-        config.album_art.method = if config.theme.album_art_width_percent == 0 {
-            ImageMethod::None
-        } else {
-            match self.image_method.unwrap_or(self.album_art.method) {
-                ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
-                ImageMethodFile::Kitty => ImageMethod::Kitty,
-                ImageMethodFile::UeberzugWayland if image_proto::is_ueberzug_wayland_supported() => {
-                    ImageMethod::UeberzugWayland
-                }
-                ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-                ImageMethodFile::UeberzugX11 if image_proto::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
-                ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
-                ImageMethodFile::Sixel => ImageMethod::Sixel,
-                ImageMethodFile::None => ImageMethod::None,
-                ImageMethodFile::Auto if config.theme.album_art_width_percent == 0 => ImageMethod::None,
-                ImageMethodFile::Auto => match image_proto::determine_image_support(is_tmux)? {
-                    ImageProtocol::Kitty => ImageMethod::Kitty,
-                    ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
-                    ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
-                    ImageProtocol::Iterm2 => ImageMethod::Iterm2,
-                    ImageProtocol::Sixel => ImageMethod::Sixel,
-                    ImageProtocol::None => ImageMethod::Unsupported,
-                },
+        config.album_art.method = match self.image_method.unwrap_or(self.album_art.method) {
+            ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
+            ImageMethodFile::Kitty => ImageMethod::Kitty,
+            ImageMethodFile::UeberzugWayland if image_proto::is_ueberzug_wayland_supported() => {
+                ImageMethod::UeberzugWayland
             }
+            ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
+            ImageMethodFile::UeberzugX11 if image_proto::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
+            ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
+            ImageMethodFile::Sixel => ImageMethod::Sixel,
+            ImageMethodFile::None => ImageMethod::None,
+            ImageMethodFile::Auto => match image_proto::determine_image_support(is_tmux)? {
+                ImageProtocol::Kitty => ImageMethod::Kitty,
+                ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
+                ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
+                ImageProtocol::Iterm2 => ImageMethod::Iterm2,
+                ImageProtocol::Sixel => ImageMethod::Sixel,
+                ImageProtocol::None => ImageMethod::Unsupported,
+            },
         };
 
         match config.album_art.method {
@@ -270,11 +272,8 @@ impl ConfigFile {
                 status_warn!(
                     "Album art is enabled but no image protocol is supported by your terminal, disabling album art"
                 );
-                config.theme.album_art_width_percent = 0;
             }
-            ImageMethod::None => {
-                config.theme.album_art_width_percent = 0;
-            }
+            ImageMethod::None => {}
             ImageMethod::Kitty
             | ImageMethod::UeberzugWayland
             | ImageMethod::UeberzugX11

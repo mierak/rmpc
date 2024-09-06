@@ -7,8 +7,8 @@ use crate::tests::fixtures::app_context;
 use crate::tests::fixtures::mpd_client::{client, TestMpdClient};
 use crate::ui::UiEvent;
 
-use crate::ui::screens::{browser::DirOrSong, playlists::PlaylistsScreen, Screen};
-use crate::ui::screens::{BrowserScreen, CommonAction};
+use crate::ui::panes::{browser::DirOrSong, playlists::PlaylistsPane, Pane};
+use crate::ui::panes::{BrowserPane, CommonAction};
 
 mod on_idle_event {
     use super::*;
@@ -21,7 +21,7 @@ mod on_idle_event {
         #[case(UiEvent::StoredPlaylist)]
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_by_name(
-            mut screen: PlaylistsScreen,
+            mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             app_context: AppContext,
             #[case] mut event: UiEvent,
@@ -53,7 +53,7 @@ mod on_idle_event {
         #[case(UiEvent::StoredPlaylist)]
         #[case(UiEvent::Database)]
         fn selects_the_same_index_when_playlist_not_found_after_refresh(
-            mut screen: PlaylistsScreen,
+            mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             app_context: AppContext,
             #[case] mut event: UiEvent,
@@ -70,7 +70,7 @@ mod on_idle_event {
         #[case(UiEvent::StoredPlaylist)]
         #[case(UiEvent::Database)]
         fn selects_the_last_playlist_when_last_was_selected_and_removed(
-            mut screen: PlaylistsScreen,
+            mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             app_context: AppContext,
             #[case] mut event: UiEvent,
@@ -91,7 +91,7 @@ mod on_idle_event {
         #[case(UiEvent::StoredPlaylist)]
         #[case(UiEvent::Database)]
         fn selects_the_first_playlist_when_first_was_selected_and_removed(
-            mut screen: PlaylistsScreen,
+            mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             app_context: AppContext,
             #[case] mut event: UiEvent,
@@ -112,7 +112,7 @@ mod on_idle_event {
         #[case(UiEvent::StoredPlaylist)]
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_song(
-            #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
             app_context: AppContext,
@@ -138,7 +138,7 @@ mod on_idle_event {
         #[case(UiEvent::StoredPlaylist)]
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_last_song(
-            #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
             app_context: AppContext,
@@ -166,7 +166,7 @@ mod on_idle_event {
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_first_song(
             app_context: AppContext,
-            #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
@@ -193,7 +193,7 @@ mod on_idle_event {
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_song_idx(
             app_context: AppContext,
-            #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
@@ -211,7 +211,7 @@ mod on_idle_event {
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_idx_and_last_song(
             app_context: AppContext,
-            #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
@@ -233,7 +233,7 @@ mod on_idle_event {
         #[case(UiEvent::Database)]
         fn selects_the_same_playlist_idx_and_first_song(
             app_context: AppContext,
-            #[from(screen_in_playlist_2)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
@@ -251,7 +251,7 @@ mod on_idle_event {
         #[case(UiEvent::Database)]
         fn selects_the_first_playlist_and_same_song_idx(
             app_context: AppContext,
-            #[from(screen_in_playlist_0)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_0)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
@@ -269,7 +269,7 @@ mod on_idle_event {
         #[case(UiEvent::Database)]
         fn selects_the_last_playlist_and_same_song_idx(
             app_context: AppContext,
-            #[from(screen_in_playlist_4)] mut screen: PlaylistsScreen,
+            #[from(screen_in_playlist_4)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
@@ -289,8 +289,8 @@ mod on_idle_event {
 }
 
 #[fixture]
-fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsScreen {
-    let mut screen = PlaylistsScreen::default();
+fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+    let mut screen = PlaylistsPane::default();
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(0);
     screen
@@ -300,8 +300,8 @@ fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> P
 }
 
 #[fixture]
-fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsScreen {
-    let mut screen = PlaylistsScreen::default();
+fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+    let mut screen = PlaylistsPane::default();
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
@@ -311,8 +311,8 @@ fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> P
 }
 
 #[fixture]
-fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsScreen {
-    let mut screen = PlaylistsScreen::default();
+fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+    let mut screen = PlaylistsPane::default();
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
@@ -322,8 +322,8 @@ fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> P
 }
 
 #[fixture]
-fn screen(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsScreen {
-    let mut screen = PlaylistsScreen::default();
+fn screen(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+    let mut screen = PlaylistsPane::default();
     screen.before_show(&mut client, &app_context).unwrap();
     screen
 }
