@@ -27,8 +27,6 @@ const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
 #[derive(Default, Clone, Copy)]
 pub struct UiConfig {
-    pub album_art_position: Position,
-    pub album_art_width_percent: u16,
     pub draw_borders: bool,
     pub background_color: Option<Color>,
     pub header_background_color: Option<Color>,
@@ -52,7 +50,7 @@ pub struct UiConfig {
 
 impl std::fmt::Debug for UiConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UiConfig {{ album_art_position: {:?}, album_art_width_percent: {}, draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, tab_bar: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.album_art_position, self.album_art_width_percent, self.draw_borders, self.background_color, self.header_background_color, self.modal_background_color, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.tab_bar, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
+        write!(f, "UiConfig {{ draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, tab_bar: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.draw_borders, self.background_color, self.header_background_color, self.modal_background_color, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.tab_bar, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
     }
 }
 
@@ -65,8 +63,6 @@ pub enum Position {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UiConfigFile {
-    pub(super) album_art_position: Position,
-    pub(super) album_art_width_percent: u16,
     #[serde(default = "defaults::default_true")]
     pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
@@ -94,8 +90,6 @@ pub struct UiConfigFile {
 impl Default for UiConfigFile {
     fn default() -> Self {
         Self {
-            album_art_position: Position::Left,
-            album_art_width_percent: 40,
             default_album_art_path: None,
             draw_borders: true,
             background_color: None,
@@ -200,8 +194,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
 
         Ok(Self {
             background_color: bg_color,
-            album_art_position: value.album_art_position,
-            album_art_width_percent: value.album_art_width_percent,
             draw_borders: value.draw_borders,
             modal_background_color: StringColor(value.modal_background_color).to_color()?.or(bg_color),
             text_color: StringColor(value.text_color).to_color()?,

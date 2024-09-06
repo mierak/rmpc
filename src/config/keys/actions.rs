@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use strum::Display;
 
-use crate::config::utils::tilde_expand;
+use crate::config::{tabs::TabName, utils::tilde_expand};
 
 use super::ToDescription;
 
@@ -24,15 +24,16 @@ pub enum GlobalAction {
     VolumeDown,
     SeekForward,
     SeekBack,
+    CommandMode,
     NextTab,
     PreviousTab,
+    SwitchToTab(TabName),
     QueueTab,
     DirectoriesTab,
     ArtistsTab,
     AlbumsTab,
     PlaylistsTab,
     SearchTab,
-    CommandMode,
     Command {
         command: &'static str,
         description: Option<&'static str>,
@@ -43,7 +44,7 @@ pub enum GlobalAction {
     },
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum GlobalActionFile {
     Quit,
     ShowHelp,
@@ -62,6 +63,7 @@ pub enum GlobalActionFile {
     SeekBack,
     NextTab,
     PreviousTab,
+    SwitchToTab(String),
     QueueTab,
     DirectoriesTab,
     ArtistsTab,
@@ -104,6 +106,7 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::PreviousTab => GlobalAction::PreviousTab,
             GlobalActionFile::NextTab => GlobalAction::NextTab,
             GlobalActionFile::ToggleConsume => GlobalAction::ToggleConsume,
+            GlobalActionFile::SwitchToTab(name) => GlobalAction::SwitchToTab(name.into()),
             GlobalActionFile::QueueTab => GlobalAction::QueueTab,
             GlobalActionFile::DirectoriesTab => GlobalAction::DirectoriesTab,
             GlobalActionFile::ArtistsTab => GlobalAction::ArtistsTab,
@@ -143,6 +146,7 @@ impl ToDescription for GlobalAction {
             GlobalAction::SeekBack => "Seek currently playing track backwards",
             GlobalAction::NextTab => "Switch to next tab",
             GlobalAction::PreviousTab => "Switch to previous tab",
+            GlobalAction::SwitchToTab(name) => format!("Switch directly to {name} tab").leak(),
             GlobalAction::QueueTab => "Switch directly to Queue tab",
             GlobalAction::DirectoriesTab => "Switch directly to Directories tab",
             GlobalAction::ArtistsTab => "Switch directly to Artists tab",
@@ -303,16 +307,20 @@ impl ToDescription for QueueActions {
 
 // Common actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum CommonActionFile {
     Down,
     Up,
+    Right,
+    Left,
+    PaneDown,
+    PaneUp,
+    PaneRight,
+    PaneLeft,
     MoveDown,
     MoveUp,
     DownHalf,
     UpHalf,
-    Right,
-    Left,
     Top,
     Bottom,
     EnterSearch,
@@ -332,12 +340,16 @@ pub enum CommonActionFile {
 pub enum CommonAction {
     Down,
     Up,
+    Right,
+    Left,
+    PaneDown,
+    PaneUp,
+    PaneRight,
+    PaneLeft,
     MoveDown,
     MoveUp,
     DownHalf,
     UpHalf,
-    Right,
-    Left,
     Top,
     Bottom,
     EnterSearch,
@@ -377,6 +389,10 @@ impl ToDescription for CommonAction {
             CommonAction::Close => "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.",
             CommonAction::Confirm => "Confirm whatever action is currently going on",
             CommonAction::FocusInput => "Focuses textbox if any is on the screen and is not focused",
+            CommonAction::PaneDown => "Focus the pane below the current one",
+            CommonAction::PaneUp => "Focus the pane above the current one",
+            CommonAction::PaneRight => "Focus the pane to the right of the current one",
+            CommonAction::PaneLeft => "Focus the pane to the left of the current one",
         }
     }
 }
@@ -405,6 +421,10 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::Confirm => CommonAction::Confirm,
             CommonActionFile::FocusInput => CommonAction::FocusInput,
             CommonActionFile::AddAll => CommonAction::AddAll,
+            CommonActionFile::PaneUp => CommonAction::PaneUp,
+            CommonActionFile::PaneDown => CommonAction::PaneDown,
+            CommonActionFile::PaneLeft => CommonAction::PaneLeft,
+            CommonActionFile::PaneRight => CommonAction::PaneRight,
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    config::{keys::ArtistsActions, Config},
+    config::Config,
     context::AppContext,
     mpd::{
         commands::Song,
@@ -14,20 +14,89 @@ use crate::{
     utils::macros::{status_info, status_warn},
 };
 
-use super::{browser::DirOrSong, BrowserScreen, Screen};
+use super::{browser::DirOrSong, BrowserPane, Pane};
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 
-#[derive(Debug, Default)]
-pub struct ArtistsScreen {
+#[derive(Debug)]
+pub enum ArtistsPaneMode {
+    AlbumArtist,
+    Artist,
+}
+#[derive(Debug)]
+pub struct ArtistsPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
+    mode: ArtistsPaneMode,
 }
 
-impl Screen for ArtistsScreen {
-    type Actions = ArtistsActions;
+impl ArtistsPane {
+    pub fn new(mode: ArtistsPaneMode) -> Self {
+        Self {
+            mode,
+            stack: DirStack::default(),
+            filter_input_mode: false,
+        }
+    }
+
+    fn artist_tag(&self) -> Tag<'_> {
+        match self.mode {
+            ArtistsPaneMode::AlbumArtist => Tag::AlbumArtist,
+            ArtistsPaneMode::Artist => Tag::Artist,
+        }
+    }
+
+    fn list_titles(
+        &self,
+        client: &mut impl MpdClient,
+        artist: &str,
+        album: &str,
+    ) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
+        Ok(client
+            .find(&[Filter::new(self.artist_tag(), artist), Filter::new(Tag::Album, album)])?
+            .into_iter()
+            .map(DirOrSong::Song)
+            .sorted())
+    }
+
+    fn list_albums(
+        &self,
+        client: &mut impl MpdClient,
+        artist: &str,
+    ) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
+        Ok(client
+            .list_tag(Tag::Album, Some(&[Filter::new(self.artist_tag(), artist)]))?
+            .into_iter()
+            .map(|v| DirOrSong::Dir {
+                full_path: String::new(),
+                name: v,
+            })
+            .sorted())
+    }
+
+    fn find_songs(
+        &self,
+        client: &mut impl MpdClient,
+        artist: &str,
+        album: &str,
+        file: &str,
+    ) -> Result<Vec<Song>, MpdError> {
+        client
+            .find(&[
+                Filter::new(Tag::File, file),
+                Filter::new(self.artist_tag(), artist),
+                Filter::new(Tag::Album, album),
+            ])
+            .map(|mut v| {
+                v.sort();
+                v
+            })
+    }
+}
+
+impl Pane for ArtistsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
@@ -42,7 +111,9 @@ impl Screen for ArtistsScreen {
 
     fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if self.stack().path().is_empty() {
-            let result = client.list_tag(Tag::Artist, None).context("Cannot list artists")?;
+            let result = client
+                .list_tag(self.artist_tag(), None)
+                .context("Cannot list artists")?;
             self.stack = DirStack::new(
                 result
                     .into_iter()
@@ -69,7 +140,9 @@ impl Screen for ArtistsScreen {
     ) -> Result<KeyHandleResultInternal> {
         match event {
             crate::ui::UiEvent::Database => {
-                let result = client.list_tag(Tag::Artist, None).context("Cannot list artists")?;
+                let result = client
+                    .list_tag(self.artist_tag(), None)
+                    .context("Cannot list artists")?;
                 self.stack = DirStack::new(
                     result
                         .into_iter()
@@ -112,43 +185,7 @@ impl Screen for ArtistsScreen {
     }
 }
 
-fn list_titles(
-    client: &mut impl MpdClient,
-    artist: &str,
-    album: &str,
-) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
-    Ok(client
-        .find(&[Filter::new(Tag::Artist, artist), Filter::new(Tag::Album, album)])?
-        .into_iter()
-        .map(DirOrSong::Song)
-        .sorted())
-}
-
-fn list_albums(client: &mut impl MpdClient, artist: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
-    Ok(client
-        .list_tag(Tag::Album, Some(&[Filter::new(Tag::Artist, artist)]))?
-        .into_iter()
-        .map(|v| DirOrSong::Dir {
-            full_path: String::new(),
-            name: v,
-        })
-        .sorted())
-}
-
-fn find_songs(client: &mut impl MpdClient, artist: &str, album: &str, file: &str) -> Result<Vec<Song>, MpdError> {
-    client
-        .find(&[
-            Filter::new(Tag::File, file),
-            Filter::new(Tag::Artist, artist),
-            Filter::new(Tag::Album, album),
-        ])
-        .map(|mut v| {
-            v.sort();
-            v
-        })
-}
-
-impl BrowserScreen<DirOrSong> for ArtistsScreen {
+impl BrowserPane<DirOrSong> for ArtistsPane {
     fn stack(&self) -> &DirStack<DirOrSong> {
         &self.stack
     }
@@ -168,8 +205,8 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
     fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
         Ok(match item {
             DirOrSong::Dir { name, full_path: _ } => match self.stack().path() {
-                [artist] => client.find(&[Filter::new(Tag::Album, name), Filter::new(Tag::Artist, artist)])?,
-                [] => client.find(&[Filter::new(Tag::Artist, name)])?,
+                [artist] => client.find(&[Filter::new(Tag::Album, name), Filter::new(self.artist_tag(), artist)])?,
+                [] => client.find(&[Filter::new(self.artist_tag(), name)])?,
                 _ => Vec::new(),
             },
             DirOrSong::Song(song) => vec![song.clone()],
@@ -180,7 +217,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
         match self.stack.path() {
             [artist, album] => {
                 client.find_add(&[
-                    Filter::new(Tag::Artist, artist.as_str()),
+                    Filter::new(self.artist_tag(), artist.as_str()),
                     Filter::new(Tag::Album, album.as_str()),
                     Filter::new(Tag::File, &item.dir_name_or_file_name()),
                 ])?;
@@ -190,7 +227,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
             }
             [artist] => {
                 client.find_add(&[
-                    Filter::new(Tag::Artist, artist.as_str()),
+                    Filter::new(self.artist_tag(), artist.as_str()),
                     Filter::new(Tag::Album, &item.dir_name_or_file_name()),
                 ])?;
 
@@ -198,7 +235,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
-                client.find_add(&[Filter::new(Tag::Artist, &item.dir_name_or_file_name())])?;
+                client.find_add(&[Filter::new(self.artist_tag(), &item.dir_name_or_file_name())])?;
 
                 status_info!("All songs by '{}' added to queue", item.dir_name_or_file_name());
                 Ok(KeyHandleResultInternal::SkipRender)
@@ -211,7 +248,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
         match self.stack.path() {
             [artist, album] => {
                 client.find_add(&[
-                    Filter::new(Tag::Artist, artist.as_str()),
+                    Filter::new(self.artist_tag(), artist.as_str()),
                     Filter::new(Tag::Album, album.as_str()),
                 ])?;
 
@@ -220,7 +257,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [artist] => {
-                client.find_add(&[Filter::new(Tag::Artist, artist.as_str())])?;
+                client.find_add(&[Filter::new(self.artist_tag(), artist.as_str())])?;
 
                 status_info!("All albums by '{artist}' added to queue");
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -245,11 +282,11 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
             [_artist, _album] => self.add(current, client),
             [artist] => {
                 self.stack
-                    .push(list_titles(client, artist, current.as_path())?.collect());
+                    .push(self.list_titles(client, artist, current.as_path())?.collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             [] => {
-                self.stack.push(list_albums(client, current.as_path())?.collect());
+                self.stack.push(self.list_albums(client, current.as_path())?.collect());
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => {
@@ -271,7 +308,7 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
             .map_or(Ok(None), |current| -> Result<_> {
                 Ok(match self.stack.path() {
                     [artist, album] => Some(
-                        find_songs(client, artist, album, current)?
+                        self.find_songs(client, artist, album, current)?
                             .first()
                             .context(anyhow!(
                                 "Expected to find exactly one song: artist: '{}', album: '{}', current: '{}'",
@@ -283,12 +320,12 @@ impl BrowserScreen<DirOrSong> for ArtistsScreen {
                             .collect_vec(),
                     ),
                     [artist] => Some(
-                        list_titles(client, artist, current)?
+                        self.list_titles(client, artist, current)?
                             .map(|s| s.to_list_item(config, false, None))
                             .collect_vec(),
                     ),
                     [] => Some(
-                        list_albums(client, current)?
+                        self.list_albums(client, current)?
                             .map(|s| s.to_list_item(config, false, None))
                             .collect_vec(),
                     ),

@@ -11,7 +11,7 @@ pub use dir::Dir;
 pub use stack::DirStack;
 pub use state::DirState;
 
-use crate::{config::Config, mpd::commands::Song, ui::screens::browser::DirOrSong};
+use crate::{config::Config, mpd::commands::Song, ui::panes::browser::DirOrSong};
 
 pub trait DirStackItem {
     type Item;

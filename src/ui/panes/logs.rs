@@ -16,16 +16,15 @@ use crate::{
     ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
 };
 
-use super::Screen;
+use super::Pane;
 
 #[derive(Debug, Default)]
-pub struct LogsScreen {
+pub struct LogsPane {
     logs: VecDeque<Vec<u8>>,
     scrolling_state: DirState<ListState>,
 }
 
-impl Screen for LogsScreen {
-    type Actions = LogsActions;
+impl Pane for LogsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
         let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
 
@@ -127,6 +126,10 @@ impl Screen for LogsScreen {
                 CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else {
             Ok(KeyHandleResultInternal::KeyNotHandled)

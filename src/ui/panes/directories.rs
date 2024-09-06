@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem, Frame};
 
 use crate::{
-    config::{keys::DirectoriesActions, Config},
+    config::Config,
     context::AppContext,
     mpd::{
         commands::{lsinfo::FileOrDir, Song},
@@ -18,16 +18,15 @@ use crate::{
     utils::macros::{status_info, status_warn},
 };
 
-use super::{browser::DirOrSong, BrowserScreen, Screen};
+use super::{browser::DirOrSong, BrowserPane, Pane};
 
 #[derive(Debug, Default)]
-pub struct DirectoriesScreen {
+pub struct DirectoriesPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
 }
 
-impl Screen for DirectoriesScreen {
-    type Actions = DirectoriesActions;
+impl Pane for DirectoriesPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
@@ -102,7 +101,7 @@ impl Screen for DirectoriesScreen {
     }
 }
 
-impl BrowserScreen<DirOrSong> for DirectoriesScreen {
+impl BrowserPane<DirOrSong> for DirectoriesPane {
     fn stack(&self) -> &DirStack<DirOrSong> {
         &self.stack
     }

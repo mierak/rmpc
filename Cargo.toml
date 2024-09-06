@@ -23,7 +23,7 @@ time = { version = "0.3.36", features = ["macros", "local-offset"] }
 flate2 = { version = "1.0.30" }
 itertools = "0.13.0"
 ron = "0.8.1"
-derive_more = { version = "0.99.18", features = ["into_iterator", "into", "as_ref", "as_mut", "iterator"] }
+derive_more = { version = "1.0.0", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref"] }
 rustix = { version = "0.38.34", features = ["termios", "stdio", "process"] }
 bitflags = { version = "2.6.0", features = ["serde"] }
 log = { version = "0.4.22", features = ["kv"] }

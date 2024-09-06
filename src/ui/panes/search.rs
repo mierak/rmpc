@@ -14,7 +14,6 @@ use ratatui::{
 use crate::cli::create_env;
 use crate::cli::run_external;
 use crate::config::keys::GlobalAction;
-use crate::config::keys::SearchActions;
 use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
@@ -30,17 +29,17 @@ use crate::{
     },
 };
 
-use super::{CommonAction, Screen};
+use super::{CommonAction, Pane};
 
 #[derive(Debug)]
-pub struct SearchScreen {
+pub struct SearchPane {
     inputs: InputGroups<2, 1>,
     phase: Phase,
     preview: Option<Vec<ListItem<'static>>>,
     songs_dir: Dir<Song>,
 }
 
-impl SearchScreen {
+impl SearchPane {
     pub fn new(config: &Config) -> Self {
         Self {
             preview: None,
@@ -341,9 +340,7 @@ impl SearchScreen {
     }
 }
 
-impl Screen for SearchScreen {
-    type Actions = SearchActions;
-
+impl Pane for SearchPane {
     fn render(
         &mut self,
         frame: &mut ratatui::prelude::Frame,
@@ -563,6 +560,10 @@ impl Screen for SearchScreen {
                             }
                             _ => Ok(KeyHandleResultInternal::KeyNotHandled),
                         },
+                        CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
                     }
                 } else {
                     Ok(KeyHandleResultInternal::KeyNotHandled)
@@ -688,6 +689,10 @@ impl Screen for SearchScreen {
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
                     }
                 } else {
                     Ok(KeyHandleResultInternal::KeyNotHandled)

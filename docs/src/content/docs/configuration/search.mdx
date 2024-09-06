@@ -1,8 +1,8 @@
 ---
-title: Search screen
-description: Configuring rmpc's search screen
+title: Search pane
+description: Configuring rmpc's search pane
 sidebar:
-    order: 8
+    order: 80
 ---
 
 import ConfigValue from "../../../components/ConfigValue.tsx";
@@ -23,7 +23,7 @@ What kind if filter to use by default. Default is `Contains`.
 
 <ConfigValue name="tags" customText="<(label: <string>, value: <string>)[]>" />
 
-Array of tags to list as searchable on the Search screen. Each tag consists of a label and value.
+Array of tags to list as searchable on the Search pane. Each tag consists of a label and value.
 If not specified, the [default values](/rmpc/reference/config) are used. If empty array is passed,
 a value of `[(label: "Any Tag", value: "any")]` will be used instead. For a list of supported tags
 refer to [MPD's documentation](https://mpd.readthedocs.io/en/latest/protocol.html#tags). Special

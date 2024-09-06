@@ -6,10 +6,7 @@ use crate::{
     cli::{create_env, run_external},
     config::{
         keys::{GlobalAction, QueueActions},
-        theme::{
-            properties::{Property, SongProperty},
-            Position,
-        },
+        theme::properties::{Property, SongProperty},
     },
     context::AppContext,
     mpd::{
@@ -17,7 +14,6 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     ui::{
-        image::facade::AlbumArtFacade,
         modals::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
             save_queue::SaveQueueModal,
@@ -25,11 +21,7 @@ use crate::{
         utils::dirstack::DirState,
         KeyHandleResultInternal, UiEvent,
     },
-    utils::{
-        image_proto::ImageProtocol,
-        macros::{status_error, status_warn, try_skip},
-    },
-    AppEvent,
+    utils::macros::{status_error, status_warn},
 };
 use log::error;
 use ratatui::{
@@ -40,35 +32,22 @@ use ratatui::{
     Frame,
 };
 
-use super::{CommonAction, Screen};
+use super::{CommonAction, Pane};
 
 #[derive(Debug)]
-pub struct QueueScreen {
+pub struct QueuePane {
     scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
     header: Vec<&'static str>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<&'static Property<'static, SongProperty>>,
-    album_art: AlbumArtFacade,
 }
 
-impl QueueScreen {
+impl QueuePane {
     pub fn new(context: &AppContext) -> Self {
-        let sender = context.app_event_sender.clone();
         let config = context.config;
         Self {
-            album_art: AlbumArtFacade::new(
-                config.album_art.method.into(),
-                config.theme.default_album_art,
-                config.album_art.max_size_px,
-                move |full_render: bool| {
-                    try_skip!(
-                        sender.send(AppEvent::RequestRender(full_render)),
-                        "Failed to request render"
-                    );
-                },
-            ),
             scrolling_state: DirState::default(),
             filter: None,
             filter_input_mode: false,
@@ -84,35 +63,16 @@ impl QueueScreen {
     }
 }
 
-impl Screen for QueueScreen {
-    type Actions = QueueActions;
+impl Pane for QueuePane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
         let AppContext {
             queue, config, status, ..
         } = context;
         let queue_len = queue.len();
-        let album_art_width = config.theme.album_art_width_percent;
-
-        let mut img_queue_constraints = [
-            Constraint::Percentage(album_art_width),
-            Constraint::Percentage(100 - album_art_width),
-        ];
-
-        if matches!(config.theme.album_art_position, Position::Right) {
-            img_queue_constraints.reverse();
-        }
-
-        let [mut img_section, mut queue_section] = *Layout::horizontal(img_queue_constraints).split(area) else {
-            return Ok(());
-        };
-
-        if matches!(config.theme.album_art_position, Position::Right) {
-            std::mem::swap(&mut img_section, &mut queue_section);
-        }
 
         let header_height = u16::from(config.theme.show_song_table_header);
         let [table_header_section, mut queue_section] =
-            *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(queue_section)
+            *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(area)
         else {
             return Ok(());
         };
@@ -189,29 +149,11 @@ impl Screen for QueueScreen {
             queue_section,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
-        self.album_art.render(frame, img_section, config)?;
 
         Ok(())
     }
 
-    fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
-        self.album_art.post_render(frame, context.config)
-    }
-
-    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        let status = &context.status;
-
-        if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
-            let album_art = if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == status.songid) {
-                log::debug!(file = current_song.file.as_str(); "Searching for album art");
-                client.find_album_art(current_song.file.as_str())?
-            } else {
-                None
-            };
-            self.album_art.set_image(album_art)?;
-            self.album_art.show();
-        }
-
+    fn before_show(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         self.scrolling_state.set_content_len(Some(context.queue.len()));
         self.scrolling_state
             .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
@@ -219,52 +161,26 @@ impl Screen for QueueScreen {
         Ok(())
     }
 
-    fn on_hide(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        self.album_art.hide(context.config.theme.background_color)
-    }
-
     fn on_event(
         &mut self,
         event: &mut UiEvent,
-        client: &mut impl MpdClient,
+        _client: &mut impl MpdClient,
         context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event {
             UiEvent::Player => {
-                if let Some((idx, current_song)) = context
+                if let Some((idx, _)) = context
                     .queue
                     .iter()
                     .enumerate()
                     .find(|(_, v)| Some(v.id) == context.status.songid)
                 {
-                    if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
-                        log::debug!(file = current_song.file.as_str(); "Searching for album art");
-                        let album_art = client.find_album_art(current_song.file.as_str())?;
-                        self.album_art.set_image(album_art)?;
-                    }
-
                     if context.config.select_current_song_on_change {
                         self.scrolling_state.select(Some(idx));
                     }
                     return Ok(KeyHandleResultInternal::RenderRequested);
                 }
 
-                Ok(KeyHandleResultInternal::SkipRender)
-            }
-            UiEvent::Resized { columns, rows } => {
-                self.album_art.resize(*columns, *rows);
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            UiEvent::ModalOpened => {
-                self.album_art.hide(context.config.theme.background_color)?;
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            UiEvent::ModalClosed => {
-                self.album_art.show();
-                Ok(KeyHandleResultInternal::RenderRequested)
-            }
-            UiEvent::Exit => {
-                self.album_art.cleanup()?;
                 Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -464,6 +380,10 @@ impl Screen for QueueScreen {
                 CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // queue has its own binding for play
+                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
             }
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
             match action {
@@ -484,7 +404,7 @@ impl Screen for QueueScreen {
     }
 }
 
-impl QueueScreen {
+impl QueuePane {
     pub fn jump_forward(&mut self, queue: &[Song]) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
@@ -523,91 +443,5 @@ impl QueueScreen {
                 break;
             }
         }
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use rstest::rstest;
-
-    use crate::config::Config;
-    use crate::config::Leak;
-    use crate::mpd::commands::Song;
-    use crate::tests::fixtures::app_context;
-    use crate::tests::fixtures::mpd_client::client;
-    use crate::tests::fixtures::mpd_client::TestMpdClient;
-    use crate::ui::screens::Screen;
-    use crate::ui::UiEvent;
-    use crate::{config::ImageMethod, context::AppContext};
-
-    use super::QueueScreen;
-
-    #[rstest]
-    #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::UeberzugWayland, true)]
-    #[case(ImageMethod::UeberzugX11, true)]
-    #[case(ImageMethod::Iterm2, true)]
-    #[case(ImageMethod::Sixel, true)]
-    #[case(ImageMethod::Unsupported, false)]
-    #[case(ImageMethod::None, false)]
-    fn searches_for_album_art_before_show(
-        #[case] method: ImageMethod,
-        #[case] should_search: bool,
-        mut app_context: AppContext,
-        mut client: TestMpdClient,
-    ) {
-        let selected_song_id = 333;
-        let mut config = Config::default();
-        config.album_art.method = method;
-        app_context.config = config.leak();
-        app_context.queue.push(Song {
-            id: selected_song_id,
-            ..Default::default()
-        });
-        app_context.status.songid = Some(selected_song_id);
-        let mut screen = QueueScreen::new(&app_context);
-
-        screen.before_show(&mut client, &app_context).unwrap();
-
-        assert_eq!(
-            client.calls.get("find_album_art").map_or(0, |v| *v),
-            u32::from(should_search)
-        );
-    }
-
-    #[rstest]
-    #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::UeberzugWayland, true)]
-    #[case(ImageMethod::UeberzugX11, true)]
-    #[case(ImageMethod::Iterm2, true)]
-    #[case(ImageMethod::Sixel, true)]
-    #[case(ImageMethod::Unsupported, false)]
-    #[case(ImageMethod::None, false)]
-    fn searches_for_album_art_on_event(
-        #[case] method: ImageMethod,
-        #[case] should_search: bool,
-        mut app_context: AppContext,
-        mut client: TestMpdClient,
-    ) {
-        let selected_song_id = 333;
-        let mut config = Config::default();
-        config.album_art.method = method;
-        app_context.config = config.leak();
-        app_context.queue.push(Song {
-            id: selected_song_id,
-            ..Default::default()
-        });
-        app_context.status.songid = Some(selected_song_id);
-        let mut screen = QueueScreen::new(&app_context);
-
-        screen
-            .on_event(&mut UiEvent::Player, &mut client, &app_context)
-            .unwrap();
-
-        assert_eq!(
-            client.calls.get("find_album_art").map_or(0, |v| *v),
-            u32::from(should_search)
-        );
     }
 }

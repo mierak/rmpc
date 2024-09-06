@@ -2,7 +2,7 @@
 title: theme
 description: Configuring rmpc theme
 sidebar:
-    order: 4
+    order: 40
 ---
 
 import { Steps } from "@astrojs/starlight/components";
@@ -60,7 +60,7 @@ Whether to draw borders in the UI.
 
 ### symbols
 
-Symblos to use in the various browser screens (artist, search, ...)
+Symblos to use in the various browser panes (artist, search, ...)
 
 <ConfigValue name="symbols" type="other" customText="<Symbols>" />
 
@@ -76,7 +76,7 @@ Symblos to use in the various browser screens (artist, search, ...)
 
 <ConfigValue name="marker" type="string" customText="M" />
 
-This symbol is used for selected items in the browser screens.
+This symbol is used for selected items in the browser panes.
 
 ### progress_bar
 
@@ -228,7 +228,7 @@ Configures the columns of the song table. This property is described in its own 
     link="/rmpc/configuration/song-table#property"
 />
 
-Format used to display song in the various browser screens (albums, artists, ...). Is the same format as
+Format used to display song in the various browser panes (albums, artists, ...). Is the same format as
 [song_table_format](/rmpc/configuration/theme#song_table_format) except the styles are ignored.
 
 Defaults to `Track Artist - Title`

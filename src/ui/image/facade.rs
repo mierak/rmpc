@@ -61,6 +61,7 @@ impl AlbumArtFacade {
     pub fn set_image(&mut self, mut data: Option<Vec<u8>>) -> Result<()> {
         let mut hasher = DefaultHasher::new();
         data.hash(&mut hasher);
+        self.last_size.hash(&mut hasher);
         let hash = hasher.finish();
 
         if hash == self.image_data_hash {

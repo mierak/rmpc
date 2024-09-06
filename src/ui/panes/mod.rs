@@ -1,9 +1,17 @@
 use std::borrow::Cow;
 
+use album_art::AlbumArtPane;
+use albums::AlbumsPane;
 use anyhow::{Context, Result};
+use artists::{ArtistsPane, ArtistsPaneMode};
 use crossterm::event::{KeyCode, KeyEvent};
+use directories::DirectoriesPane;
 use either::Either;
 use itertools::Itertools;
+#[cfg(debug_assertions)]
+use logs::LogsPane;
+use playlists::PlaylistsPane;
+use queue::QueuePane;
 use ratatui::{
     prelude::Rect,
     style::Style,
@@ -11,12 +19,14 @@ use ratatui::{
     widgets::ListItem,
     Frame,
 };
-use strum::{Display, EnumIter, VariantNames};
+use search::SearchPane;
+use strum::Display;
 
 use crate::{
     cli::{create_env, run_external},
     config::{
-        keys::{CommonAction, GlobalAction, ToDescription},
+        keys::{CommonAction, GlobalAction},
+        tabs::PaneType,
         theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
         Config,
     },
@@ -34,6 +44,7 @@ use super::{
     KeyHandleResultInternal, UiEvent,
 };
 
+pub mod album_art;
 pub mod albums;
 pub mod artists;
 pub mod directories;
@@ -43,22 +54,69 @@ pub mod playlists;
 pub mod queue;
 pub mod search;
 
-#[derive(Debug, Display, VariantNames, Default, Clone, Copy, EnumIter, PartialEq)]
-pub enum Screens {
-    #[default]
-    Queue,
+#[derive(Debug, Display)]
+pub enum Panes<'a> {
+    Queue(&'a mut QueuePane),
     #[cfg(debug_assertions)]
-    Logs,
-    Directories,
-    Artists,
-    Albums,
-    Playlists,
-    Search,
+    Logs(&'a mut LogsPane),
+    Directories(&'a mut DirectoriesPane),
+    Artists(&'a mut ArtistsPane),
+    AlbumArtists(&'a mut ArtistsPane),
+    Albums(&'a mut AlbumsPane),
+    Playlists(&'a mut PlaylistsPane),
+    Search(&'a mut SearchPane),
+    AlbumArt(&'a mut AlbumArtPane),
 }
 
+#[derive(Debug)]
+pub struct PaneContainer {
+    pub queue: QueuePane,
+    #[cfg(debug_assertions)]
+    pub logs: LogsPane,
+    pub directories: DirectoriesPane,
+    pub albums: AlbumsPane,
+    pub artists: ArtistsPane,
+    pub album_artists: ArtistsPane,
+    pub playlists: PlaylistsPane,
+    pub search: SearchPane,
+    pub album_art: AlbumArtPane,
+}
+
+impl PaneContainer {
+    pub fn new(context: &AppContext) -> Self {
+        Self {
+            queue: QueuePane::new(context),
+            #[cfg(debug_assertions)]
+            logs: LogsPane::default(),
+            directories: DirectoriesPane::default(),
+            albums: AlbumsPane::default(),
+            artists: ArtistsPane::new(ArtistsPaneMode::Artist),
+            album_artists: ArtistsPane::new(ArtistsPaneMode::AlbumArtist),
+            playlists: PlaylistsPane::default(),
+            search: SearchPane::new(context.config),
+            album_art: AlbumArtPane::new(context),
+        }
+    }
+
+    pub fn get_mut(&mut self, screen: PaneType) -> Panes {
+        match screen {
+            PaneType::Queue => Panes::Queue(&mut self.queue),
+            #[cfg(debug_assertions)]
+            PaneType::Logs => Panes::Logs(&mut self.logs),
+            PaneType::Directories => Panes::Directories(&mut self.directories),
+            PaneType::Artists => Panes::Artists(&mut self.artists),
+            PaneType::AlbumArtists => Panes::AlbumArtists(&mut self.album_artists),
+            PaneType::Albums => Panes::Albums(&mut self.albums),
+            PaneType::Playlists => Panes::Playlists(&mut self.playlists),
+            PaneType::Search => Panes::Search(&mut self.search),
+            PaneType::AlbumArt => Panes::AlbumArt(&mut self.album_art),
+        }
+    }
+}
+
+type KeyResult = Result<KeyHandleResultInternal>;
 #[allow(unused_variables)]
-pub(super) trait Screen {
-    type Actions: ToDescription;
+pub(super) trait Pane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
     fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
         Ok(())
@@ -75,55 +133,11 @@ pub(super) trait Screen {
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> KeyResult {
         Ok(KeyHandleResultInternal::SkipRender)
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal>;
-}
-
-impl Screens {
-    pub fn next(self) -> Self {
-        match self {
-            #[cfg(debug_assertions)]
-            Screens::Queue => Screens::Logs,
-            #[cfg(not(debug_assertions))]
-            Screens::Queue => Screens::Directories,
-            #[cfg(debug_assertions)]
-            Screens::Logs => Screens::Directories,
-            Screens::Directories => Screens::Artists,
-            Screens::Artists => Screens::Albums,
-            Screens::Albums => Screens::Playlists,
-            Screens::Playlists => Screens::Search,
-            Screens::Search => Screens::Queue,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        match self {
-            Screens::Queue => Screens::Search,
-            Screens::Search => Screens::Playlists,
-            Screens::Playlists => Screens::Albums,
-            Screens::Albums => Screens::Artists,
-            Screens::Artists => Screens::Directories,
-            #[cfg(not(debug_assertions))]
-            Screens::Directories => Screens::Queue,
-            #[cfg(debug_assertions)]
-            Screens::Directories => Screens::Logs,
-            #[cfg(debug_assertions)]
-            Screens::Logs => Screens::Queue,
-        }
-    }
+    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> KeyResult;
 }
 
 pub mod dirstack {}
@@ -706,7 +720,7 @@ enum MoveDirection {
 }
 
 #[allow(unused)]
-trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
+trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
     fn stack(&self) -> &DirStack<T>;
     fn stack_mut(&mut self) -> &mut DirStack<T>;
     fn set_filter_input_mode_active(&mut self, active: bool);
@@ -938,6 +952,10 @@ trait BrowserScreen<T: DirStackItem + std::fmt::Debug>: Screen {
             CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
             CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender), // todo out?
             CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // todo next?
+            CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
+            CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
+            CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
+            CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
         }
     }
 }

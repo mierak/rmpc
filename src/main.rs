@@ -52,6 +52,7 @@ mod cli;
 mod config;
 mod context;
 mod deps;
+mod geometry;
 mod logging;
 mod mpd;
 mod ui;
@@ -195,7 +196,7 @@ fn main() -> Result<()> {
             );
 
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
-                main_task(Ui::new(&context), context, rx, client, render_loop, terminal);
+                main_task(context, rx, client, render_loop, terminal);
             })?;
 
             idle_client.set_read_timeout(None)?;
@@ -269,13 +270,13 @@ fn worker_task(
 }
 
 fn main_task<B: Backend + std::io::Write>(
-    mut ui: Ui,
     mut context: context::AppContext,
     event_receiver: std::sync::mpsc::Receiver<AppEvent>,
     mut client: Client<'_>,
     mut render_loop: RenderLoop,
     mut terminal: Terminal<B>,
 ) {
+    let mut ui = Ui::new(&context).expect("UI to be created correctly");
     let event_receiver = event_receiver;
     let mut render_wanted = false;
     let mut full_rerender_wanted = false;
@@ -522,7 +523,9 @@ fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
                         error!(error:? = err; "Failed to render request after resize");
                     }
                 }
-                Ok(_) => {}
+                Ok(ev) => {
+                    log::warn!(ev:?; "Unexpected event");
+                }
                 Err(err) => {
                     warn!(error:? = err; "Failed to read input event");
                     continue;
