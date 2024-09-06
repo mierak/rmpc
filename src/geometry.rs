@@ -79,12 +79,16 @@ impl Geometry {
     }
 
     pub fn take_remainder(&mut self) -> Geometry {
-        Geometry::new(
+        let res = Geometry::new(
             self.x + self.taken_size_horiz,
             self.y + self.taken_size_vert,
             self.width - self.taken_size_horiz,
             self.height - self.taken_size_vert,
-        )
+        );
+        self.taken_size_horiz = self.width;
+        self.taken_size_vert = self.height;
+
+        res
     }
 
     pub fn is_directly_above(&self, other: Self) -> bool {
@@ -138,21 +142,118 @@ impl Geometry {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[rustfmt::skip]
 mod tests {
     use ratatui::layout::Direction;
     use test_case::test_case;
 
     use super::Geometry;
 
-    #[test_case(100, 40, 40)]
-    fn test(input: u16, chunk: u16, output: u16) {
-        let mut input = Geometry::new(0, 0, input, 100);
+    //                         x   y   w   h                  x   y    w    h
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0,  25,  10), false; "above, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75,  0,  25,  10), false; "above, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 25,  10,  25), false; "left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 75,  10,  25), false; "right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25,  0,  50,  10), true ; "above")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25, 75,  50,  10), false; "below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 75,  25,  10), false; "below, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75, 75,  25,  10), false; "below, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0, 100,  10), true ; "whole space above")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0,  26,  10), true ; "partial from left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0,  26,  10), true ; "partial from right")]
+    fn is_above(g1: Geometry, g2: Geometry, overlaps: bool) {
+        assert_eq!(g2.is_directly_above(g1), overlaps);
+    }
 
-        assert_eq!(
-            input
-                .take_chunk(Direction::Horizontal, format!("{chunk}%").parse().unwrap())
-                .width,
-            output
-        );
+    //                         x   y   w   h                  x   y    w    h
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0,  25,  10), false; "above, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75,  0,  25,  10), false; "above, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 25,  10,  25), false; "left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 75,  10,  25), false; "right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25,  0,  50,  10), false; "above")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25, 75,  50,  10), true ; "below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 75,  25,  10), false; "below, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75, 75,  25,  10), false; "below, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80, 100,  10), true ; "whole space below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80,  26,  10), true ; "partial from left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80,  26,  10), true ; "partial from right")]
+    fn is_below(g1: Geometry, g2: Geometry, overlaps: bool) {
+        assert_eq!(g2.is_directly_below(g1), overlaps);
+    }
+
+    //                         x   y   w   h                  x   y    w    h
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0,  25,  10), false; "above, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75,  0,  25,  10), false; "above, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 25,  10,  25), true ; "left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75, 25,  10,  25), false; "right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25,  0,  50,  10), false; "above")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25, 75,  50,  10), false; "below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 75,  25,  10), false; "below, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75, 75,  25,  10), false; "below, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80, 100,  10), false; "whole space below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80,  26,  10), false; "partial from left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80,  26,  10), false; "partial from right")]
+    fn is_left(g1: Geometry, g2: Geometry, overlaps: bool) {
+        assert_eq!(g2.is_directly_left(g1), overlaps);
+    }
+
+    //                         x   y   w   h                  x   y    w    h
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0,  0,  25,  10), false; "above, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75,  0,  25,  10), false; "above, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 25,  10,  25), false; "left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75, 25,  10,  25), true ; "right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25,  0,  50,  10), false; "above")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(25, 75,  50,  10), false; "below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 75,  25,  10), false; "below, left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new(75, 75,  25,  10), false; "below, right")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80, 100,  10), false; "whole space below")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80,  26,  10), false; "partial from left")]
+    #[test_case(Geometry::new(25, 25, 50, 50), Geometry::new( 0, 80,  26,  10), false; "partial from right")]
+    fn is_right(g1: Geometry, g2: Geometry, overlaps: bool) {
+        assert_eq!(g2.is_directly_right(g1), overlaps);
+    }
+
+    #[test]
+    fn take_chunk_horizontal() {
+        let mut input = Geometry::new(0, 0, 100, 100);
+
+        let c1 = input.take_chunk(Direction::Horizontal, "20%".parse().unwrap());
+
+        assert_eq!(c1,    Geometry {x:  0, y: 0, width:  20, height: 100, taken_size_horiz:  0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y: 0, width: 100, height: 100, taken_size_horiz: 20, taken_size_vert:   0 });
+
+        let c2 = input.take_chunk(Direction::Horizontal, "20%".parse().unwrap());
+        assert_eq!(c2,    Geometry {x: 20, y: 0, width:  20, height: 100, taken_size_horiz:  0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y: 0, width: 100, height: 100, taken_size_horiz: 40, taken_size_vert:   0 });
+
+        let c3 = input.take_chunk(Direction::Horizontal, "35%".parse().unwrap());
+        assert_eq!(c3,    Geometry {x: 40, y: 0, width:  35, height: 100, taken_size_horiz:  0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y: 0, width: 100, height: 100, taken_size_horiz: 75, taken_size_vert:   0 });
+
+        let c4 = input.take_remainder();
+        assert_eq!(c4,    Geometry {x: 75, y: 0, width:  25, height: 100, taken_size_horiz:   0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y: 0, width: 100, height: 100, taken_size_horiz: 100, taken_size_vert: 100 });
+    }
+
+    #[test]
+    fn take_chunk_vertical() {
+        let mut input = Geometry::new(0, 0, 100, 100);
+
+        let c1 = input.take_chunk(Direction::Vertical, "20%".parse().unwrap());
+
+        assert_eq!(c1,    Geometry {x:  0, y: 0, width: 100, height:  20, taken_size_horiz:  0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y: 0, width: 100, height: 100, taken_size_horiz:  0, taken_size_vert:  20 });
+
+        let c2 = input.take_chunk(Direction::Vertical, "20%".parse().unwrap());
+        assert_eq!(c2,    Geometry {x:  0, y: 20, width: 100, height:  20, taken_size_horiz:  0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y:  0, width: 100, height: 100, taken_size_horiz:  0, taken_size_vert:  40 });
+
+        let c3 = input.take_chunk(Direction::Vertical, "35%".parse().unwrap());
+        assert_eq!(c3,    Geometry {x:  0, y: 40, width: 100, height:  35, taken_size_horiz:  0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y:  0, width: 100, height: 100, taken_size_horiz:  0, taken_size_vert:  75 });
+
+        let c4 = input.take_remainder();
+        assert_eq!(c4,    Geometry {x:  0, y: 75, width: 100, height:  25, taken_size_horiz:   0, taken_size_vert:   0 });
+        assert_eq!(input, Geometry {x:  0, y:  0, width: 100, height: 100, taken_size_horiz: 100, taken_size_vert: 100 });
     }
 }
