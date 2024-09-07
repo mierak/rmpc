@@ -70,14 +70,14 @@ where
             return;
         };
 
-        {
+        if self.widths[2] > 0 {
             let preview = List::new(preview.unwrap_or_default())
                 .highlight_style(self.config.theme.current_item_style)
                 .style(self.config.as_text_style());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
-        {
+        if self.widths[0] > 0 {
             let prev_state = &mut state.previous_mut().state;
             prev_state.set_content_len(Some(previous.len()));
             prev_state.set_viewport_len(Some(previous_area.height.into()));
@@ -105,7 +105,7 @@ where
             );
         }
         let title = state.current().filter.as_ref().map(|v| format!("[FILTER]: {v} "));
-        {
+        if self.widths[1] > 0 {
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_len(Some(items.len()));
             state.set_viewport_len(Some(current_area.height.into()));

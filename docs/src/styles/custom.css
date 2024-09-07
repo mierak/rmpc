@@ -1,3 +1,7 @@
+:root {
+    --sl-content-width: 60rem;
+    --sl-sidebar-width: 18.75rem;
+}
 .code {
     font-family: var(--__sl-font-mono);
     font-size: 13px;

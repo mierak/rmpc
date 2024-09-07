@@ -372,13 +372,13 @@ impl Pane for SearchPane {
         let previous_area = Rect {
             x: previous_area.x,
             y: previous_area.y,
-            width: previous_area.width - 1,
+            width: previous_area.width.saturating_sub(1),
             height: previous_area.height,
         };
         let current_area = Rect {
             x: current_area_init.x,
             y: current_area_init.y,
-            width: current_area_init.width - 1,
+            width: current_area_init.width.saturating_sub(1),
             height: current_area_init.height,
         };
 
