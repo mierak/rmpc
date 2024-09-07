@@ -10,16 +10,16 @@
         "astro": "astro"
     },
     "dependencies": {
-        "@astrojs/check": "^0.7.0",
+        "@astrojs/check": "^0.9.3",
         "@astrojs/react": "^3.6.0",
-        "@astrojs/starlight": "^0.24.2",
-        "@expressive-code/plugin-line-numbers": "^0.35.3",
+        "@astrojs/starlight": "^0.27.0",
+        "@expressive-code/plugin-line-numbers": "^0.36.1",
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",
         "astro": "^4.10.2",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
-        "sharp": "^0.32.5",
+        "sharp": "^0.33.5",
         "typescript": "^5.4.5"
     },
     "devDependencies": {
