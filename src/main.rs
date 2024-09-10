@@ -92,10 +92,7 @@ fn main() -> Result<()> {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
         }
         Some(Command::DebugInfo) => {
-            let config_file = match ConfigFile::read(&args.config) {
-                Ok(val) => val,
-                Err(_err) => ConfigFile::default(),
-            };
+            let config_file = ConfigFile::read(&args.config).unwrap_or_default();
             let config =
                 config_file
                     .clone()
