@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Do not query album art if it is disabled
+- Panic with zero-width browser column
 
 ## [0.4.0] - 2024-08-26
 
