@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Added ability to configure the search screen
 - Added this changelog
 - Added `tabs` config, which lets you customize what tabs you want to use and even mix and match them.
+- Rmpc now respects `MPD_HOST` and `MPD_PORT` environment variables.
 
 ### Changed
 
