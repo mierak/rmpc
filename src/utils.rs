@@ -512,6 +512,10 @@ pub mod env {
             self.vars.lock().unwrap().insert(key, value);
         }
 
+        pub fn clear(&self) {
+            self.vars.lock().unwrap().clear();
+        }
+
         pub fn remove(&self, key: &str) {
             self.vars.lock().unwrap().remove(key);
         }

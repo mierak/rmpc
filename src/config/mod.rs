@@ -327,11 +327,15 @@ pub mod utils {
     }
 
     #[cfg(test)]
+    #[allow(clippy::unwrap_used)]
     mod tests {
-        use crate::utils::env::ENV;
+        use std::sync::{LazyLock, Mutex};
 
         use super::tilde_expand;
+        use crate::utils::env::ENV;
         use test_case::test_case;
+
+        static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
         #[test_case("~", "/home/some_user")]
         #[test_case("~enene", "~enene")]
@@ -340,6 +344,9 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_present(input: &str, expected: &str) {
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
             ENV.set("HOME".to_string(), "/home/some_user".to_string());
             assert_eq!(tilde_expand(input), expected);
         }
@@ -351,6 +358,9 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_not_present(input: &str, expected: &str) {
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
             ENV.remove("HOME");
             assert_eq!(tilde_expand(input), expected);
         }

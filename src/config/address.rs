@@ -57,12 +57,15 @@ impl MpdAddress<'static> {
 
 #[cfg(test)]
 #[rustfmt::skip]
+#[allow(clippy::unwrap_used)]
 mod tests {
+    use std::sync::{LazyLock, Mutex};
+
     use test_case::test_case;
-
     use crate::utils::env::ENV;
-
     use super::MpdAddress;
+
+    static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     //               CLI Arg                 Config            MPD_HOST          MPD_PORT                    Expected                          Description
     #[test_case(Some("127.0.0.1:6600"), "127.0.0.1:7600", Some("192.168.0.1"), Some("6601"), MpdAddress::IpAndPort("127.0.0.1:6600")     ; "prefer CLI over all")]
@@ -77,6 +80,9 @@ mod tests {
     #[test_case( Some("/tmp/cli_sock"), "127.0.0.1:7600",                None,         None, MpdAddress::SocketPath("/tmp/cli_sock")     ; "prefer CLI with socket path over all")]
     #[test_case(                  None,  "/tmp/cfg_sock",                None,         None, MpdAddress::SocketPath("/tmp/cfg_sock")     ; "socket path from config")]
     fn resolves(cli: Option<&str>, config: &str, host: Option<&str>, port: Option<&str>, expected: MpdAddress) {
+        let _guard = TEST_LOCK.lock().unwrap();
+
+        ENV.clear();
         ENV.set("HOME".to_string(), "/home/u123".to_string());
         if let Some(host) = host {
             ENV.set("MPD_HOST".to_string(), host.to_string());
