@@ -126,7 +126,7 @@ impl<'name> Client<'name> {
             )));
         };
 
-        debug!(name, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
+        debug!(name, addr:?, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
 
         if version < MIN_SUPPORTED_VERSION {
             status_warn!(
@@ -169,7 +169,7 @@ impl<'name> Client<'name> {
         self.stream = stream;
         self.version = version;
 
-        debug!(name = self.name, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
+        debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
 
         Ok(self)
     }

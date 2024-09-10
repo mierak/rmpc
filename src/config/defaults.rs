@@ -19,3 +19,15 @@ pub fn default_volume_step() -> u8 {
 pub fn default_progress_update_interval_ms() -> Option<u64> {
     Some(1000)
 }
+
+pub fn mpd_address() -> String {
+    "127.0.0.1:6600".to_string()
+}
+
+pub fn mpd_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+pub fn mpd_port() -> String {
+    "6600".to_string()
+}

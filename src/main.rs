@@ -31,6 +31,7 @@ use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
 use ui::{Level, UiEvent};
 use utils::{
+    env::ENV,
     macros::{status_error, status_info, try_cont, try_skip},
     tmux, DurationExt, ErrorExt,
 };
@@ -91,18 +92,23 @@ fn main() -> Result<()> {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
         }
         Some(Command::DebugInfo) => {
-            let config_file = match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                Ok(val) => val,
-                Err(_err) => ConfigFile::default(),
-            };
-            let config = config_file.clone().into_config(Some(&args.config), false)?;
+            let config_file = ConfigFile::read(&args.config).unwrap_or_default();
+            let config =
+                config_file
+                    .clone()
+                    .into_config(Some(&args.config), std::mem::take(&mut args.address), false)?;
+            let mpd_host = ENV.var("MPD_HOST").unwrap_or_else(|_| "unset".to_string());
+            let mpd_port = ENV.var("MPD_PORT").unwrap_or_else(|_| "unset".to_string());
 
             println!("rmpc {}", env!("VERGEN_GIT_DESCRIBE"));
             println!("\n{:<20} {}", "Config path", args.config.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
 
             println!("\nMPD:");
-            println!("{:<20} {:?}", "Address", config.address);
+            println!("{:<20} {:?}", "Address", config_file.address);
+            println!("{:<20} {:?}", "Resolved Address", config.address);
+            println!("{:<20} {mpd_host}", "MPD_HOST");
+            println!("{:<20} {mpd_port}", "MPD_PORT");
 
             println!("\nYoutube playback:");
             println!("{:<20} {:?}", "Cache dir", config.cache_dir);
@@ -122,12 +128,10 @@ fn main() -> Result<()> {
             println!("rmpc {}", env!("VERGEN_GIT_DESCRIBE"),);
         }
         Some(cmd) => {
-            let config: &'static Config = Box::leak(Box::new(
-                match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                    Ok(val) => val.into_config(Some(&args.config), true)?,
-                    Err(_err) => ConfigFile::default().into_config(None, true)?,
-                },
-            ));
+            let config: &'static Config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
+                Ok(val) => val.into_config(Some(&args.config), std::mem::take(&mut args.address), true)?,
+                Err(_err) => ConfigFile::default().into_config(None, std::mem::take(&mut args.address), true)?,
+            }));
             let mut client = Client::init(config.address, "", true)?;
             cmd.execute(&mut client, config, |work_request, c| {
                 match handle_work_request(work_request, config) {
@@ -151,11 +155,11 @@ fn main() -> Result<()> {
 
             let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
 
-            let config = match ConfigFile::read(&args.config, std::mem::take(&mut args.address)) {
-                Ok(val) => val.into_config(Some(&args.config), false)?,
+            let config = match ConfigFile::read(&args.config) {
+                Ok(val) => val.into_config(Some(&args.config), std::mem::take(&mut args.address), false)?,
                 Err(err) => {
                     status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                    ConfigFile::default().into_config(None, false)?
+                    ConfigFile::default().into_config(None, std::mem::take(&mut args.address), false)?
                 }
             };
 

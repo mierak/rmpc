@@ -6,12 +6,14 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
+use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use tabs::{Tabs, TabsFile};
 use utils::tilde_expand;
 
+pub mod address;
 pub mod cli;
 mod defaults;
 pub mod keys;
@@ -22,6 +24,7 @@ pub mod theme;
 use crate::utils::image_proto::{self, ImageProtocol};
 use crate::utils::macros::status_warn;
 use crate::utils::tmux;
+pub use address::MpdAddress;
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
@@ -69,28 +72,6 @@ impl Default for Size {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum MpdAddress<'a> {
-    IpAndPort(&'a str),
-    SocketPath(&'a str),
-}
-
-impl<'a> From<&'a str> for MpdAddress<'a> {
-    fn from(s: &'a str) -> Self {
-        if let Some((_ip, _port)) = s.split_once(':') {
-            Self::IpAndPort(s)
-        } else {
-            Self::SocketPath(s)
-        }
-    }
-}
-
-impl<'a> Default for MpdAddress<'a> {
-    fn default() -> Self {
-        Self::IpAndPort("127.0.0.1:6600")
-    }
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     pub address: MpdAddress<'static>,
@@ -108,6 +89,7 @@ pub struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
+    #[serde(default = "defaults::mpd_address")]
     pub address: String,
     #[serde(default)]
     cache_dir: Option<String>,
@@ -170,13 +152,10 @@ impl Default for ConfigFile {
 }
 
 impl ConfigFile {
-    pub fn read(path: &PathBuf, address: Option<String>) -> Result<Self> {
+    pub fn read(path: &PathBuf) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         let read = std::io::BufReader::new(file);
-        let mut config: ConfigFile = ron::de::from_reader(read)?;
-        if let Some(address) = address {
-            config.address = address;
-        }
+        let config: ConfigFile = ron::de::from_reader(read)?;
 
         Ok(config)
     }
@@ -197,14 +176,13 @@ impl ConfigFile {
         )
     }
 
-    pub fn into_config(self, config_dir: Option<&Path>, is_cli: bool) -> Result<Config> {
+    pub fn into_config(self, config_dir: Option<&Path>, address_cli: Option<String>, is_cli: bool) -> Result<Config> {
         let theme: UiConfig = config_dir
             .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
             .transpose()?
             .unwrap_or_default()
             .try_into()?;
 
-        let addr: &'static str = self.address.leak();
         let size = self.album_art.max_size_px;
         let mut config = Config {
             theme,
@@ -215,7 +193,7 @@ impl ConfigFile {
                     format!("{v}/").leak()
                 }
             }),
-            address: addr.into(),
+            address: MpdAddress::resolve(address_cli, self.address),
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             keybinds: self.keybinds.into(),
@@ -328,8 +306,10 @@ pub mod utils {
     use std::borrow::Cow;
     use std::path::MAIN_SEPARATOR;
 
+    use crate::utils::env::ENV;
+
     pub fn tilde_expand(inp: &str) -> Cow<str> {
-        let Ok(home) = std::env::var("HOME") else {
+        let Ok(home) = ENV.var("HOME") else {
             return Cow::Borrowed(inp);
         };
 
@@ -347,9 +327,15 @@ pub mod utils {
     }
 
     #[cfg(test)]
+    #[allow(clippy::unwrap_used)]
     mod tests {
+        use std::sync::{LazyLock, Mutex};
+
         use super::tilde_expand;
+        use crate::utils::env::ENV;
         use test_case::test_case;
+
+        static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
         #[test_case("~", "/home/some_user")]
         #[test_case("~enene", "~enene")]
@@ -358,7 +344,10 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_present(input: &str, expected: &str) {
-            std::env::set_var("HOME", "/home/some_user");
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
+            ENV.set("HOME".to_string(), "/home/some_user".to_string());
             assert_eq!(tilde_expand(input), expected);
         }
 
@@ -369,7 +358,10 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_not_present(input: &str, expected: &str) {
-            std::env::remove_var("HOME");
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
+            ENV.remove("HOME");
             assert_eq!(tilde_expand(input), expected);
         }
     }

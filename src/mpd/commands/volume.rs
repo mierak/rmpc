@@ -34,7 +34,7 @@ impl Bound<u8> for Volume {
         self
     }
     fn dec_by(&mut self, step: u8) -> &Self {
-        self.0 = self.0.saturating_sub(step).max(0);
+        self.0 = self.0.saturating_sub(step);
         self
     }
 }
