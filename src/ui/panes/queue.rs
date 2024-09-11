@@ -64,7 +64,13 @@ impl QueuePane {
 }
 
 impl Pane for QueuePane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        _client: &mut impl MpdClient,
+        context: &AppContext,
+    ) -> anyhow::Result<()> {
         let AppContext {
             queue, config, status, ..
         } = context;

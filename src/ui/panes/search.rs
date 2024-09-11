@@ -345,6 +345,7 @@ impl Pane for SearchPane {
         &mut self,
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
+        _client: &mut impl MpdClient,
         AppContext { config, .. }: &AppContext,
     ) -> anyhow::Result<()> {
         let widths = &config.theme.column_widths;

@@ -25,7 +25,13 @@ pub struct LogsPane {
 }
 
 impl Pane for LogsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        _client: &mut impl MpdClient,
+        AppContext { config, .. }: &AppContext,
+    ) -> anyhow::Result<()> {
         let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
 
         let content_len = lines.len();

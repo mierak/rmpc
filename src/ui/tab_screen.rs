@@ -58,8 +58,15 @@ macro_rules! screen_call {
 }
 
 impl TabScreen {
-    pub fn render(&self, panes: &mut PaneContainer, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
-        self.render_recursive(panes, self.panes, frame, area, context)?;
+    pub fn render(
+        &self,
+        panes: &mut PaneContainer,
+        frame: &mut Frame,
+        area: Rect,
+        client: &mut impl MpdClient,
+        context: &AppContext,
+    ) -> Result<()> {
+        self.render_recursive(panes, self.panes, frame, area, client, context)?;
         Ok(())
     }
 
@@ -69,6 +76,7 @@ impl TabScreen {
         configured_panes: &PaneOrSplitWithPosition,
         frame: &mut Frame,
         area: Rect,
+        client: &mut impl MpdClient,
         context: &AppContext,
     ) -> Result<()> {
         match configured_panes {
@@ -81,7 +89,7 @@ impl TabScreen {
                     })
                     .borders(*border);
                 let pane = panes.get_mut(*pane);
-                screen_call!(pane, render(frame, block.inner(area), context))?;
+                screen_call!(pane, render(frame, block.inner(area), client, context))?;
                 frame.render_widget(block, area);
             }
             PaneOrSplitWithPosition::Split {
@@ -94,7 +102,7 @@ impl TabScreen {
                 let areas = Layout::new(*direction, constraints).split(area);
 
                 for (idx, area) in areas.iter().enumerate() {
-                    self.render_recursive(panes, &sub_panes[idx].pane, frame, *area, context)?;
+                    self.render_recursive(panes, &sub_panes[idx].pane, frame, *area, client, context)?;
                 }
             }
         };

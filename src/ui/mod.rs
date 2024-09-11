@@ -110,7 +110,7 @@ impl Ui {
         screen_call!(self, post_render(frame, context))
     }
 
-    pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
+    pub fn render(&mut self, frame: &mut Frame, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         if let Some(bg_color) = context.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
         }
@@ -181,7 +181,7 @@ impl Ui {
         );
 
         if context.config.theme.draw_borders {
-            screen_call!(self, render(frame, content_area, context))?;
+            screen_call!(self, render(frame, content_area, client, context))?;
         } else {
             screen_call!(
                 self,
@@ -193,6 +193,7 @@ impl Ui {
                         width: content_area.width,
                         height: content_area.height,
                     },
+                    client,
                     context
                 )
             )?;

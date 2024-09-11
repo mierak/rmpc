@@ -392,7 +392,7 @@ fn main_task<B: Backend + std::io::Write>(
             }
             terminal
                 .draw(|frame| {
-                    if let Err(err) = ui.render(frame, &mut context) {
+                    if let Err(err) = ui.render(frame, &mut client, &mut context) {
                         error!(error:? = err; "Failed to render a frame");
                     };
                 })
