@@ -99,7 +99,7 @@ impl ImageProto for Iterm2 {
                 self.state = State::Encoding;
             }
             _ => {
-                if let Ok(data) = self.encoded_data_receiver.try_recv() {
+                if let Ok(data) = self.encoded_data_receiver.try_recv_last() {
                     self.encoded_data = Some(data);
                     self.state = State::Encoded;
                 }
@@ -121,9 +121,6 @@ impl ImageProto for Iterm2 {
         if let Some(data) = &self.encoded_data {
             self.clear_area(bg_color, Rect { x, y, width, height })?;
 
-            let mut stdout = std::io::stdout();
-            queue!(stdout, SavePosition)?;
-            queue!(stdout, MoveTo(x, y))?;
             let EncodedData {
                 content,
                 size,
@@ -135,6 +132,10 @@ impl ImageProto for Iterm2 {
             if *id != self.last_id {
                 return Ok(());
             }
+
+            let mut stdout = std::io::stdout();
+            queue!(stdout, SavePosition)?;
+            queue!(stdout, MoveTo(x, y))?;
 
             if tmux::is_inside_tmux() {
                 write!(stdout, "{}", &format!("\x1bPtmux;\x1b\x1b]1337;File=inline=1;size={size};width={width}px;height={height}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x07\x1b\\"))?;
@@ -235,7 +236,7 @@ impl Iterm2 {
 
         let content = base64::engine::general_purpose::STANDARD.encode(&jpg);
 
-        log::debug!(compressed_bytes = content.len(), image_bytes = jpg.len(), elapsed:? = start.elapsed(); "encoded data");
+        log::debug!(id, compressed_bytes = content.len(), image_bytes = jpg.len(), elapsed:? = start.elapsed(); "encoded data");
         Ok(EncodedData {
             content,
             size: jpg.len(),

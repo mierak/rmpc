@@ -90,7 +90,7 @@ impl ImageProto for Sixel {
                 self.state = State::Encoding;
             }
             _ => {
-                if let Ok(data) = self.encoded_data_receiver.try_recv() {
+                if let Ok(data) = self.encoded_data_receiver.try_recv_last() {
                     self.encoded_data = Some(data);
                     self.state = State::Encoded;
                 }
@@ -286,7 +286,7 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size, id: u64) -> Resu
         write!(buf, "\x1b\\")?;
     }
 
-    log::debug!(bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
+    log::debug!(id, bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
     Ok(EncodedData { data: buf, id })
 }
 
