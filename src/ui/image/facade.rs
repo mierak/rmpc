@@ -102,13 +102,12 @@ impl AlbumArtFacade {
         Ok(())
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, _config: &Config) -> anyhow::Result<()> {
-        self.last_size = area;
+    pub fn render(&mut self, frame: &mut Frame, _config: &Config) -> anyhow::Result<()> {
         match &mut self.image_state {
-            ImageState::Kitty(state) => state.render(frame.buffer_mut(), area)?,
-            ImageState::Ueberzug(state) => state.render(frame.buffer_mut(), area)?,
-            ImageState::Iterm2(iterm2) => iterm2.render(frame.buffer_mut(), area)?,
-            ImageState::Sixel(s) => s.render(frame.buffer_mut(), area)?,
+            ImageState::Kitty(state) => state.render(frame.buffer_mut(), self.last_size)?,
+            ImageState::Ueberzug(state) => state.render(frame.buffer_mut(), self.last_size)?,
+            ImageState::Iterm2(iterm2) => iterm2.render(frame.buffer_mut(), self.last_size)?,
+            ImageState::Sixel(s) => s.render(frame.buffer_mut(), self.last_size)?,
             ImageState::None => {}
         };
         Ok(())
@@ -149,6 +148,10 @@ impl AlbumArtFacade {
             ImageState::Sixel(s) => s.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size),
             ImageState::None => Ok(()),
         }
+    }
+
+    pub fn set_size(&mut self, area: Rect) {
+        self.last_size = area;
     }
 }
 

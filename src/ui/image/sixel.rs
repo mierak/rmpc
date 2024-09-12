@@ -23,6 +23,7 @@ use crate::{
     utils::{
         image_proto::{get_image_area_size_px, resize_image},
         macros::{status_error, try_cont, try_skip},
+        mpsc::RecvLast,
         tmux,
     },
 };
@@ -43,23 +44,49 @@ enum State {
 pub struct Sixel {
     default_art: Arc<Vec<u8>>,
     image_data_to_encode: Arc<Vec<u8>>,
-    encoded_data: Option<Vec<u8>>,
-    sender: Sender<(u16, u16, bool, Arc<Vec<u8>>)>,
-    encoded_data_receiver: Receiver<Vec<u8>>,
+    encoded_data: Option<EncodedData>,
+    sender: Sender<DataToEncode>,
+    encoded_data_receiver: Receiver<EncodedData>,
     state: State,
+    last_id: u64,
+}
+
+#[derive(Debug)]
+struct DataToEncode {
+    width: u16,
+    height: u16,
+    wants_full_render: bool,
+    data: Arc<Vec<u8>>,
+    request_id: u64,
+}
+
+#[derive(Debug)]
+struct EncodedData {
+    data: Vec<u8>,
+    id: u64,
 }
 
 impl ImageProto for Sixel {
     fn render(&mut self, _buf: &mut Buffer, Rect { width, height, .. }: Rect) -> anyhow::Result<()> {
         match self.state {
             State::Initial => {
-                self.sender
-                    .send((width, height, false, Arc::clone(&self.image_data_to_encode)))?;
+                self.sender.send(DataToEncode {
+                    width,
+                    height,
+                    wants_full_render: false,
+                    data: Arc::clone(&self.image_data_to_encode),
+                    request_id: self.last_id,
+                })?;
                 self.state = State::Encoding;
             }
             State::Resize => {
-                self.sender
-                    .send((width, height, true, Arc::clone(&self.image_data_to_encode)))?;
+                self.sender.send(DataToEncode {
+                    width,
+                    height,
+                    wants_full_render: true,
+                    data: Arc::clone(&self.image_data_to_encode),
+                    request_id: self.last_id,
+                })?;
                 self.state = State::Encoding;
             }
             _ => {
@@ -82,7 +109,10 @@ impl ImageProto for Sixel {
             return Ok(());
         }
 
-        if let Some(data) = &self.encoded_data {
+        if let Some(EncodedData { data, id }) = &self.encoded_data {
+            if *id != self.last_id {
+                return Ok(());
+            }
             log::debug!(bytes = data.len(); "transmitting data");
             self.clear_area(bg_color, rect)?;
             let mut stdout = std::io::stdout();
@@ -115,6 +145,7 @@ impl ImageProto for Sixel {
     }
 
     fn set_data(&mut self, data: Option<Vec<u8>>) -> anyhow::Result<()> {
+        self.last_id += 1;
         if let Some(data) = data {
             self.image_data_to_encode = Arc::new(data);
         } else {
@@ -129,16 +160,23 @@ impl ImageProto for Sixel {
 
 impl Sixel {
     pub fn new(default_art: &[u8], max_size: Size, request_render: impl Fn(bool) + Send + 'static) -> Self {
-        let (sender, receiver) = channel::<(u16, u16, bool, Arc<Vec<u8>>)>();
-        let (encoded_tx, encoded_rx) = channel::<Vec<u8>>();
+        let (sender, receiver) = channel::<DataToEncode>();
+        let (encoded_tx, encoded_rx) = channel::<EncodedData>();
 
         std::thread::spawn(move || loop {
-            if let Ok((width, height, full_render, data)) = receiver.recv() {
-                let buf = try_cont!(encode(width, height, &data, max_size), "Failed to encode");
+            if let Ok(DataToEncode {
+                width,
+                height,
+                wants_full_render,
+                data,
+                request_id,
+            }) = receiver.recv_last()
+            {
+                let buf = try_cont!(encode(width, height, &data, max_size, request_id), "Failed to encode");
 
                 try_skip!(encoded_tx.send(buf), "Failed to send encoded data");
 
-                request_render(full_render);
+                request_render(wants_full_render);
             }
         });
         let default_art = Arc::new(default_art.to_vec());
@@ -150,6 +188,7 @@ impl Sixel {
             sender,
             encoded_data_receiver: encoded_rx,
             state: State::Initial,
+            last_id: 0,
         }
     }
 
@@ -173,7 +212,7 @@ impl Sixel {
     }
 }
 
-fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8>> {
+fn encode(width: u16, height: u16, data: &[u8], max_size: Size, id: u64) -> Result<EncodedData> {
     let start = Instant::now();
 
     let (iwidth, iheight) = match get_image_area_size_px(width, height, max_size) {
@@ -248,7 +287,7 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
     }
 
     log::debug!(bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
-    Ok(buf)
+    Ok(EncodedData { data: buf, id })
 }
 
 fn put_color<W: Write>(buf: &mut W, byte: u8, color: usize, repeat: u16) -> Result<(), std::io::Error> {

@@ -110,7 +110,7 @@ impl Ui {
         screen_call!(self, post_render(frame, context))
     }
 
-    pub fn render(&mut self, frame: &mut Frame, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
         if let Some(bg_color) = context.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
         }
@@ -181,7 +181,7 @@ impl Ui {
         );
 
         if context.config.theme.draw_borders {
-            screen_call!(self, render(frame, content_area, client, context))?;
+            screen_call!(self, render(frame, content_area, context))?;
         } else {
             screen_call!(
                 self,
@@ -193,7 +193,6 @@ impl Ui {
                         width: content_area.width,
                         height: content_area.height,
                     },
-                    client,
                     context
                 )
             )?;
@@ -265,6 +264,7 @@ impl Ui {
 
         match screen_call!(self, handle_action(key, client, context))? {
             KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
+            KeyHandleResultInternal::FullRenderRequested => return Ok(KeyHandleResult::FullRenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
             KeyHandleResultInternal::Modal(Some(modal)) => {
                 self.modals.push(modal);
@@ -350,43 +350,43 @@ impl Ui {
                             } else {
                                 status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
                             }
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::QueueTab if self.active_tab != "Queue".into() => {
                             screen_call!(self, on_hide(client, &context))?;
                             self.active_tab = "Queue".into();
                             screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::DirectoriesTab if self.active_tab != "Directories".into() => {
                             screen_call!(self, on_hide(client, &context))?;
                             self.active_tab = "Directories".into();
                             screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::ArtistsTab if self.active_tab != "Artists".into() => {
                             screen_call!(self, on_hide(client, &context))?;
                             self.active_tab = "Artists".into();
                             screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::AlbumsTab if self.active_tab != "Albums".into() => {
                             screen_call!(self, on_hide(client, &context))?;
                             self.active_tab = "Albums".into();
                             screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::PlaylistsTab if self.active_tab != "Playlists".into() => {
                             screen_call!(self, on_hide(client, &context))?;
                             self.active_tab = "Playlists".into();
                             screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::SearchTab if self.active_tab != "Search".into() => {
                             screen_call!(self, on_hide(client, &context))?;
                             self.active_tab = "Search".into();
                             screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::FullRenderRequested);
                         }
                         GlobalAction::QueueTab => {}
                         GlobalAction::DirectoriesTab => {}
@@ -482,6 +482,7 @@ impl Ui {
 
             match self.handle_screen_event_result(result)? {
                 KeyHandleResult::RenderRequested => ret = KeyHandleResultInternal::RenderRequested,
+                KeyHandleResult::FullRenderRequested => ret = KeyHandleResultInternal::FullRenderRequested,
                 KeyHandleResult::SkipRender => {}
                 KeyHandleResult::Quit => {}
             }
@@ -494,6 +495,7 @@ impl Ui {
         match result {
             Ok(KeyHandleResultInternal::SkipRender) => Ok(KeyHandleResult::SkipRender),
             Ok(KeyHandleResultInternal::RenderRequested) => Ok(KeyHandleResult::RenderRequested),
+            Ok(KeyHandleResultInternal::FullRenderRequested) => Ok(KeyHandleResult::FullRenderRequested),
             Ok(KeyHandleResultInternal::Modal(Some(modal))) => {
                 self.modals.push(modal);
                 Ok(KeyHandleResult::RenderRequested)
@@ -561,6 +563,8 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
 enum KeyHandleResultInternal {
     /// Action warrants a render
     RenderRequested,
+    /// Action warrants a render with whole window clear
+    FullRenderRequested,
     /// Action does NOT warrant a render
     SkipRender,
     /// Event was not handled and should bubble up
@@ -572,6 +576,8 @@ enum KeyHandleResultInternal {
 pub enum KeyHandleResult {
     /// Action warrants a render
     RenderRequested,
+    /// Action warrants a render with whole window clear
+    FullRenderRequested,
     /// Action does NOT warrant a render
     SkipRender,
     /// Exit the application

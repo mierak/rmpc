@@ -31,13 +31,7 @@ pub struct PlaylistsPane {
 }
 
 impl Pane for PlaylistsPane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        _client: &mut impl MpdClient,
-        AppContext { config, .. }: &AppContext,
-    ) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
                 .set_widths(&config.theme.column_widths)

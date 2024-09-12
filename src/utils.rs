@@ -521,3 +521,35 @@ pub mod env {
         }
     }
 }
+
+pub mod mpsc {
+    #[allow(dead_code)]
+    pub trait RecvLast<T> {
+        fn recv_last(&self) -> Result<T, std::sync::mpsc::RecvError>;
+        fn try_recv_last(&self) -> Result<T, std::sync::mpsc::TryRecvError>;
+    }
+
+    impl<T> RecvLast<T> for std::sync::mpsc::Receiver<T> {
+        /// recv the last message in the channel and drop all the other ones
+        fn recv_last(&self) -> Result<T, std::sync::mpsc::RecvError> {
+            self.recv().map(|data| {
+                let mut result = data;
+                while let Ok(newer_data) = self.try_recv() {
+                    result = newer_data;
+                }
+                result
+            })
+        }
+
+        /// recv the last message in the channel in a non-blocking manner and drop all the other ones
+        fn try_recv_last(&self) -> Result<T, std::sync::mpsc::TryRecvError> {
+            self.try_recv().map(|data| {
+                let mut result = data;
+                while let Ok(newer_data) = self.try_recv() {
+                    result = newer_data;
+                }
+                result
+            })
+        }
+    }
+}

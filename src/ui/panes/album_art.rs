@@ -6,12 +6,14 @@ use crate::{
     AppEvent,
 };
 use anyhow::Result;
+use ratatui::{layout::Rect, Frame};
 
 use super::Pane;
 
 #[derive(Debug)]
 pub struct AlbumArtPane {
     album_art: AlbumArtFacade,
+    image_data: Option<Vec<u8>>,
 }
 
 impl AlbumArtPane {
@@ -19,6 +21,7 @@ impl AlbumArtPane {
         let sender = context.app_event_sender.clone();
         let config = context.config;
         Self {
+            image_data: None,
             album_art: AlbumArtFacade::new(
                 config.album_art.method.into(),
                 config.theme.default_album_art,
@@ -35,13 +38,16 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(
-        &mut self,
-        frame: &mut ratatui::Frame,
-        area: ratatui::prelude::Rect,
-        context: &crate::context::AppContext,
-    ) -> anyhow::Result<()> {
-        self.album_art.render(frame, area, context.config)?;
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+        if let Some(data) = self.image_data.take() {
+            self.album_art.set_size(area);
+            self.album_art.set_image(Some(data))?;
+            self.album_art.show();
+            self.album_art.render(frame, context.config)?;
+        } else {
+            self.album_art.set_size(area);
+            self.album_art.render(frame, context.config)?;
+        }
         Ok(())
     }
 
@@ -68,11 +74,7 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        client: &mut impl crate::mpd::mpd_client::MpdClient,
-        context: &crate::context::AppContext,
-    ) -> anyhow::Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> anyhow::Result<()> {
         if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
             let album_art =
                 if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) {
@@ -84,8 +86,7 @@ impl Pane for AlbumArtPane {
                 } else {
                     None
                 };
-            self.album_art.set_image(album_art)?;
-            self.album_art.show();
+            self.image_data = album_art;
         }
         Ok(())
     }
@@ -140,6 +141,9 @@ impl Pane for AlbumArtPane {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use ratatui::backend::TestBackend;
+    use ratatui::layout::Rect;
+    use ratatui::Terminal;
     use rstest::rstest;
 
     use crate::config::Config;
@@ -148,6 +152,7 @@ mod tests {
     use crate::tests::fixtures::app_context;
     use crate::tests::fixtures::mpd_client::client;
     use crate::tests::fixtures::mpd_client::TestMpdClient;
+    use crate::tests::fixtures::terminal;
     use crate::ui::panes::Pane;
     use crate::ui::UiEvent;
     use crate::{config::ImageMethod, context::AppContext};
@@ -166,7 +171,8 @@ mod tests {
         #[case] method: ImageMethod,
         #[case] should_search: bool,
         mut app_context: AppContext,
-        mut client: TestMpdClient,
+        client: TestMpdClient,
+        mut terminal: Terminal<TestBackend>,
     ) {
         let selected_song_id = 333;
         let mut config = Config::default();
@@ -179,7 +185,9 @@ mod tests {
         app_context.status.songid = Some(selected_song_id);
         let mut screen = AlbumArtPane::new(&app_context);
 
-        screen.before_show(&mut client, &app_context).unwrap();
+        screen
+            .render(&mut terminal.get_frame(), Rect::new(0, 0, 100, 100), &app_context)
+            .unwrap();
 
         assert_eq!(
             client.calls.get("find_album_art").map_or(0, |v| *v),

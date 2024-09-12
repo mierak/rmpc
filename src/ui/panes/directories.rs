@@ -27,13 +27,7 @@ pub struct DirectoriesPane {
 }
 
 impl Pane for DirectoriesPane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        _client: &mut impl MpdClient,
-        AppContext { config, .. }: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
         frame.render_stateful_widget(
             Browser::new(config)
                 .set_widths(&config.theme.column_widths)

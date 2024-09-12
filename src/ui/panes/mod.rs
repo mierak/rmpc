@@ -117,13 +117,7 @@ impl PaneContainer {
 type KeyResult = Result<KeyHandleResultInternal>;
 #[allow(unused_variables)]
 pub(super) trait Pane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
     fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
         Ok(())
     }
