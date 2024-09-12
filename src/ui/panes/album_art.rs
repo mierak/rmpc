@@ -141,9 +141,6 @@ impl Pane for AlbumArtPane {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use ratatui::backend::TestBackend;
-    use ratatui::layout::Rect;
-    use ratatui::Terminal;
     use rstest::rstest;
 
     use crate::config::Config;
@@ -152,7 +149,6 @@ mod tests {
     use crate::tests::fixtures::app_context;
     use crate::tests::fixtures::mpd_client::client;
     use crate::tests::fixtures::mpd_client::TestMpdClient;
-    use crate::tests::fixtures::terminal;
     use crate::ui::panes::Pane;
     use crate::ui::UiEvent;
     use crate::{config::ImageMethod, context::AppContext};
@@ -171,8 +167,7 @@ mod tests {
         #[case] method: ImageMethod,
         #[case] should_search: bool,
         mut app_context: AppContext,
-        client: TestMpdClient,
-        mut terminal: Terminal<TestBackend>,
+        mut client: TestMpdClient,
     ) {
         let selected_song_id = 333;
         let mut config = Config::default();
@@ -185,9 +180,7 @@ mod tests {
         app_context.status.songid = Some(selected_song_id);
         let mut screen = AlbumArtPane::new(&app_context);
 
-        screen
-            .render(&mut terminal.get_frame(), Rect::new(0, 0, 100, 100), &app_context)
-            .unwrap();
+        screen.before_show(&mut client, &app_context).unwrap();
 
         assert_eq!(
             client.calls.get("find_album_art").map_or(0, |v| *v),
