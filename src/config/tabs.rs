@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -101,6 +101,8 @@ impl TryFrom<TabsFile> for Tabs {
                     Ok((names, tabs))
                 },
             )?;
+
+        ensure!(!tabs.is_empty(), "At least one tab is required");
 
         let active_panes = tabs
             .iter()

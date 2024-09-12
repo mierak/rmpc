@@ -320,6 +320,10 @@ fn main_task<B: Backend + std::io::Write>(
                     Ok(ui::KeyHandleResult::RenderRequested) => {
                         render_wanted = true;
                     }
+                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
+                        render_wanted = true;
+                        full_rerender_wanted = true;
+                    }
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
                         render_wanted = true;
@@ -387,7 +391,8 @@ fn main_task<B: Backend + std::io::Write>(
                 continue;
             }
             if full_rerender_wanted {
-                terminal.clear().expect("Terminal clear to succeed");
+                terminal.swap_buffers();
+                terminal.swap_buffers();
                 full_rerender_wanted = false;
             }
             terminal

@@ -17,6 +17,7 @@ use crate::{
     utils::{
         image_proto::{get_image_area_size_px, resize_image},
         macros::status_error,
+        mpsc::RecvLast,
         tmux,
     },
 };
@@ -104,7 +105,7 @@ impl KittyImageState {
         let data_sender = image_data_to_transfer_channel.0;
 
         std::thread::spawn(move || {
-            while let Ok((vec, width, height)) = rx.recv() {
+            while let Ok((vec, width, height)) = rx.recv_last() {
                 let data = match create_data_to_transfer(&vec, width, height, Compression::new(6), max_size) {
                     Ok(data) => data,
                     Err(err) => {

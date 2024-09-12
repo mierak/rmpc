@@ -6,12 +6,14 @@ use crate::{
     AppEvent,
 };
 use anyhow::Result;
+use ratatui::{layout::Rect, Frame};
 
 use super::Pane;
 
 #[derive(Debug)]
 pub struct AlbumArtPane {
     album_art: AlbumArtFacade,
+    image_data: Option<Vec<u8>>,
 }
 
 impl AlbumArtPane {
@@ -19,6 +21,7 @@ impl AlbumArtPane {
         let sender = context.app_event_sender.clone();
         let config = context.config;
         Self {
+            image_data: None,
             album_art: AlbumArtFacade::new(
                 config.album_art.method.into(),
                 config.theme.default_album_art,
@@ -35,13 +38,16 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(
-        &mut self,
-        frame: &mut ratatui::Frame,
-        area: ratatui::prelude::Rect,
-        context: &crate::context::AppContext,
-    ) -> anyhow::Result<()> {
-        self.album_art.render(frame, area, context.config)?;
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+        if let Some(data) = self.image_data.take() {
+            self.album_art.set_size(area);
+            self.album_art.set_image(Some(data))?;
+            self.album_art.show();
+            self.album_art.render(frame, context.config)?;
+        } else {
+            self.album_art.set_size(area);
+            self.album_art.render(frame, context.config)?;
+        }
         Ok(())
     }
 
@@ -68,11 +74,7 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn before_show(
-        &mut self,
-        client: &mut impl crate::mpd::mpd_client::MpdClient,
-        context: &crate::context::AppContext,
-    ) -> anyhow::Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> anyhow::Result<()> {
         if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
             let album_art =
                 if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) {
@@ -84,8 +86,7 @@ impl Pane for AlbumArtPane {
                 } else {
                     None
                 };
-            self.album_art.set_image(album_art)?;
-            self.album_art.show();
+            self.image_data = album_art;
         }
         Ok(())
     }
