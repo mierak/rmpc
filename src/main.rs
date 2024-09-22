@@ -100,10 +100,13 @@ fn main() -> Result<()> {
             let mpd_host = ENV.var("MPD_HOST").unwrap_or_else(|_| "unset".to_string());
             let mpd_port = ENV.var("MPD_PORT").unwrap_or_else(|_| "unset".to_string());
 
-            println!("rmpc {}", env!("CARGO_PKG_VERSION"));
-            if let Some(desc) = option_env!("VERGEN_GIT_DESCRIBE") {
-                println!("git describe {desc}");
-            }
+            println!(
+                "rmpc {}{}",
+                env!("CARGO_PKG_VERSION"),
+                option_env!("VERGEN_GIT_DESCRIBE")
+                    .map(|g| format!(" git {g}"))
+                    .unwrap_or_default()
+            );
             println!("\n{:<20} {}", "Config path", args.config.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
 
@@ -128,10 +131,13 @@ fn main() -> Result<()> {
             println!("{}", UEBERZUGPP.display());
         }
         Some(Command::Version) => {
-            println!("rmpc {}", env!("CARGO_PKG_VERSION"));
-            if let Some(desc) = option_env!("VERGEN_GIT_DESCRIBE") {
-                println!("git describe {desc}");
-            }
+            println!(
+                "rmpc {}{}",
+                env!("CARGO_PKG_VERSION"),
+                option_env!("VERGEN_GIT_DESCRIBE")
+                    .map(|g| format!(" git {g}"))
+                    .unwrap_or_default()
+            );
         }
         Some(cmd) => {
             let config: &'static Config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
