@@ -1,0 +1,18 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { Content, getHeadings } from "../../../CHANGELOG.md";
+---
+
+<StarlightPage frontmatter={{ title: "" }} hasSidebar={false} sidebar={[]} headings={getHeadings()}>
+    <div class="container">
+        <Content />
+    </div>
+</StarlightPage>
+
+<style>
+    .container {
+        /* margin-left: var(--sl-sidebar-width); */
+    }
+    /* --sl-sidebar-width: 18.75rem; */
+    /* --sl-sidebar-pad-x: 1rem; */
+</style>

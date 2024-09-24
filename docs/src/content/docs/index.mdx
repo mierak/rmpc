@@ -11,6 +11,10 @@ hero:
           link: /rmpc/overview/
           icon: right-arrow
           variant: primary
+        - text: Try without installing
+          link: /rmpc/try-without-install
+          icon: right-arrow
+          variant: secondary
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
@@ -21,7 +25,7 @@ import Hero from "../../components/Hero.astro";
 
 <CardGrid stagger>
     <Card title="Install" icon="approve-check">
-        <a href="/rmpc/guides/installation/" style={{ textDecoration: "none" }}>
+        <a href="/rmpc/installation/" style={{ textDecoration: "none" }}>
             Installation instructions
         </a>
     </Card>

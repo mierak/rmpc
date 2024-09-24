@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Refactored how image protocol backends request render by moving channels to context
 - Make some things more robust by checking commands supported by MPD server (albumart/readpicture/getvol)
 - Check MPD protocol version for single command
+- `version` and `debuginfo` commands now always display `CARGO_PKG_VERSION`
 
 ### Deprecated
 
