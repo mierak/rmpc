@@ -10,8 +10,9 @@ import { Code } from "@astrojs/starlight/components";
 
 export const site = import.meta.env.SITE;
 export const base = import.meta.env.BASE_URL;
-export const url = `${site}${base}/try.sh`;
+export const url = `${site}${base}/run-rmpc`;
 export const cmd = `bash <(curl -sL ${url})`;
+import runrmpc from "../../../public/run-rmpc?raw";
 
 You can try rmpc without installing. Simply run the command below in your terminal.
 Credits to zellij for this idea!
@@ -23,6 +24,11 @@ Credits to zellij for this idea!
 :::caution
 Do not run unknown commands from the internet. Always check the source code yourself.
 You can find the source code of the script that will be executed <a href={url} >here</a>.
+
+<details>
+    <summary>Or in this section</summary>
+    <Code code={runrmpc} lang="bash" title="run-rmpc" />
+</details>
 :::
 
 ## Nix

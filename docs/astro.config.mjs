@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import starlightLinksValidator from "starlight-links-validator";
 
 import react from "@astrojs/react";
 
@@ -12,7 +13,11 @@ export default defineConfig({
     },
     integrations: [
         starlight({
-            title: "rmpc wiki",
+            title: "rmpc",
+            plugins: [starlightLinksValidator()],
+            editLink: {
+                baseUrl: "https://github.com/mierak/rmpc/edit/master/docs/",
+            },
             social: {
                 github: "https://github.com/mierak/rmpc",
             },
@@ -22,15 +27,23 @@ export default defineConfig({
                     link: "overview",
                 },
                 {
-                    label: "Guides",
-                    autogenerate: {
-                        directory: "guides",
-                    },
+                    label: "Installation",
+                    link: "installation",
+                },
+                {
+                    label: "Try without installing",
+                    link: "try-without-install",
                 },
                 {
                     label: "Configuration",
                     autogenerate: {
                         directory: "configuration",
+                    },
+                },
+                {
+                    label: "Guides",
+                    autogenerate: {
+                        directory: "guides",
                     },
                 },
                 {
@@ -49,6 +62,7 @@ export default defineConfig({
             customCss: ["./src/styles/custom.css"],
             components: {
                 Hero: "./src/components/Hero.astro",
+                Header: "./src/components/Header.astro",
             },
         }),
         react(),

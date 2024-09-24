@@ -8,7 +8,7 @@ type Props = {
 };
 
 export default function ConfigValue(props: Props) {
-    const { name, type, customText, optional, default: defaultValue, link } = props;
+    const { name, type, customText, optional, link } = props;
     let value;
     let clazz;
     if (type === "string") {
