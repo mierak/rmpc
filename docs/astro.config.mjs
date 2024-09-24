@@ -13,7 +13,7 @@ export default defineConfig({
     },
     integrations: [
         starlight({
-            title: "Rmpc",
+            title: "rmpc",
             plugins: [starlightLinksValidator()],
             editLink: {
                 baseUrl: "https://github.com/mierak/rmpc/edit/master/docs/",
