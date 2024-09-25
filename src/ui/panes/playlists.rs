@@ -298,7 +298,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                         .list_playlist_info(d, None)?
                         .into_iter()
                         .map(DirOrSong::Song)
-                        .map(|s| s.to_list_item(config, false, None))
+                        .map(|s| s.to_list_item_simple(config))
                         .collect_vec(),
                     DirOrSong::Song(song) => client
                         .find_one(&[Filter::new(Tag::File, &song.file)])?

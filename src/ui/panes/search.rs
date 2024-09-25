@@ -92,7 +92,7 @@ impl SearchPane {
         area: ratatui::prelude::Rect,
         config: &Config,
     ) {
-        let title = self.songs_dir.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
+        let title = self.songs_dir.filter().as_ref().map(|v| format!("[FILTER]: {v} "));
         let current = List::new(self.songs_dir.to_list_items(config))
             .block({
                 let mut b = Block::default();
@@ -574,7 +574,7 @@ impl Pane for SearchPane {
             } => {
                 if let Some(CommonAction::Close) = action {
                     *filter_input_on = false;
-                    self.songs_dir.filter = None;
+                    self.songs_dir.set_filter(None, config);
                     self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else if let Some(CommonAction::Confirm) = action {
@@ -585,15 +585,11 @@ impl Pane for SearchPane {
                 } else {
                     match event.code {
                         KeyCode::Char(c) => {
-                            if let Some(ref mut f) = self.songs_dir.filter {
-                                f.push(c);
-                            }
+                            self.songs_dir.push_filter(c, config);
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         KeyCode::Backspace => {
-                            if let Some(ref mut f) = self.songs_dir.filter {
-                                f.pop();
-                            }
+                            self.songs_dir.pop_filter(config);
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -659,7 +655,7 @@ impl Pane for SearchPane {
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::EnterSearch => {
-                            self.songs_dir.filter = Some(String::new());
+                            self.songs_dir.set_filter(Some(String::new()), config);
                             *filter_input_modce = true;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }

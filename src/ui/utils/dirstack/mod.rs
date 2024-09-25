@@ -17,7 +17,16 @@ pub trait DirStackItem {
     type Item;
     fn as_path(&self) -> &str;
     fn matches(&self, config: &Config, filter: &str) -> bool;
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item;
+    fn to_list_item(
+        &self,
+        config: &Config,
+        is_marked: bool,
+        matches_filter: bool,
+        additional_content: Option<String>,
+    ) -> Self::Item;
+    fn to_list_item_simple(&self, config: &Config) -> Self::Item {
+        self.to_list_item(config, false, false, None)
+    }
 }
 
 impl DirStackItem for DirOrSong {
@@ -39,7 +48,13 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
+    fn to_list_item(
+        &self,
+        config: &Config,
+        is_marked: bool,
+        matches_filter: bool,
+        additional_content: Option<String>,
+    ) -> Self::Item {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, config.theme.highlighted_item_style)
@@ -47,7 +62,7 @@ impl DirStackItem for DirOrSong {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
 
-        let value = match self {
+        let mut value = match self {
             DirOrSong::Dir { name, .. } => Line::from(vec![
                 marker_span,
                 Span::from(format!(
@@ -70,7 +85,10 @@ impl DirStackItem for DirOrSong {
                 Line::from(spans.collect_vec())
             }
         };
-        if filter.is_some_and(|filter| self.matches(config, filter)) {
+        if let Some(content) = additional_content {
+            value.push_span(Span::raw(content));
+        }
+        if matches_filter {
             ListItem::from(value).style(config.theme.highlighted_item_style)
         } else {
             ListItem::from(value)
@@ -89,7 +107,13 @@ impl DirStackItem for Song {
         self.matches(config.theme.browser_song_format.0, filter)
     }
 
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
+    fn to_list_item(
+        &self,
+        config: &Config,
+        is_marked: bool,
+        matches_filter: bool,
+        additional_content: Option<String>,
+    ) -> Self::Item {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, config.theme.highlighted_item_style)
@@ -101,14 +125,18 @@ impl DirStackItem for Song {
         let artist = self.artist_str().to_owned();
         let separator_span = Span::from(" - ");
         let icon_span = Span::from(format!("{} ", symbols.song));
-        let mut result = ListItem::new(Line::from(vec![
+        let mut result = vec![
             marker_span,
             icon_span,
             Span::from(artist),
             separator_span,
             Span::from(title),
-        ]));
-        if filter.is_some_and(|filter| DirStackItem::matches(self, config, filter)) {
+        ];
+        if let Some(content) = additional_content {
+            result.push(Span::raw(content));
+        }
+        let mut result = ListItem::new(Line::from(result));
+        if matches_filter {
             result = result.style(config.theme.highlighted_item_style);
         }
 
@@ -152,7 +180,13 @@ impl DirStackItem for String {
         self.to_lowercase().contains(&filter.to_lowercase())
     }
 
-    fn to_list_item(&self, config: &Config, is_marked: bool, filter: Option<&str>) -> Self::Item {
+    fn to_list_item(
+        &self,
+        config: &Config,
+        is_marked: bool,
+        matches_filter: bool,
+        _additional_content: Option<String>,
+    ) -> Self::Item {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
             Span::styled(symbols.marker, config.theme.highlighted_item_style)
@@ -160,7 +194,7 @@ impl DirStackItem for String {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
 
-        if filter.is_some_and(|filter| self.matches(config, filter)) {
+        if matches_filter {
             ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
                 .style(config.theme.highlighted_item_style)
         } else {

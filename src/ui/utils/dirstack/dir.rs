@@ -11,7 +11,8 @@ use super::{state::DirState, DirStackItem};
 pub struct Dir<T: std::fmt::Debug + DirStackItem> {
     pub items: Vec<T>,
     pub state: DirState<ListState>,
-    pub filter: Option<String>,
+    filter: Option<String>,
+    matched_item_count: usize,
 }
 
 impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
@@ -20,6 +21,7 @@ impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
             items: Vec::default(),
             state: DirState::default(),
             filter: None,
+            matched_item_count: 0,
         }
     }
 }
@@ -31,6 +33,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
             items: Vec::new(),
             state: DirState::default(),
             filter: None,
+            matched_item_count: 0,
         };
 
         if !root.is_empty() {
@@ -40,6 +43,14 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         };
 
         result
+    }
+    pub fn new_with_state(items: Vec<T>, state: DirState<ListState>) -> Self {
+        return Self {
+            items,
+            state,
+            filter: None,
+            matched_item_count: 0,
+        };
     }
 
     pub fn replace(&mut self, new_current: Vec<T>) {
@@ -54,11 +65,52 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         self.items = new_current;
     }
 
+    pub fn filter(&self) -> Option<&str> {
+        self.filter.as_deref()
+    }
+
+    pub fn set_filter(&mut self, value: Option<String>, config: &Config) {
+        self.matched_item_count = if let Some(ref filter) = value {
+            self.items.iter().filter(|item| item.matches(config, filter)).count()
+        } else {
+            0
+        };
+        self.filter = value;
+    }
+
+    pub fn push_filter(&mut self, char: char, config: &Config) {
+        if let Some(ref mut filter) = self.filter {
+            filter.push(char);
+            self.matched_item_count = self.items.iter().filter(|item| item.matches(config, filter)).count();
+        }
+    }
+
+    pub fn pop_filter(&mut self, config: &Config) {
+        if let Some(ref mut filter) = self.filter {
+            filter.pop();
+            self.matched_item_count = self.items.iter().filter(|item| item.matches(config, filter)).count();
+        }
+    }
+
     pub fn to_list_items(&self, config: &crate::config::Config) -> Vec<T::Item> {
+        let mut already_matched: u32 = 0;
+        let current_item_idx = self.selected_with_idx().map(|(idx, _)| idx);
         self.items
             .iter()
             .enumerate()
-            .map(|(i, item)| item.to_list_item(config, self.state.marked.contains(&i), self.filter.as_deref()))
+            .map(|(i, item)| {
+                let matches = self.filter.as_ref().is_some_and(|v| item.matches(config, v));
+                let is_current = current_item_idx.is_some_and(|idx| i == idx);
+                if matches {
+                    already_matched = already_matched.saturating_add(1);
+                }
+                let content = if matches && is_current {
+                    Some(format!(" [{already_matched}/{}]", self.matched_item_count))
+                } else {
+                    None
+                };
+                item.to_list_item(config, self.marked().contains(&i), matches, content)
+            })
             .collect()
     }
 
@@ -220,6 +272,7 @@ mod tests {
                 .collect(),
             state: DirState::default(),
             filter: None,
+            matched_item_count: 0,
         };
         res.state.set_content_len(Some(res.items.len()));
         res.state.set_viewport_len(Some(res.items.len()));
@@ -466,6 +519,36 @@ mod tests {
 
             val.jump_previous_matching(&Config::default());
             assert_eq!(val.state.get_selected(), Some(1));
+        }
+    }
+
+    mod matched_item_count {
+        use crate::{config::Config, ui::utils::dirstack::Dir};
+
+        #[test]
+        fn filter_changes_recounts_matched_items() {
+            let mut val: Dir<String> = Dir {
+                items: vec!["aa", "ab", "c", "ad", "padding"]
+                    .into_iter()
+                    .map(ToOwned::to_owned)
+                    .collect(),
+                filter: None,
+                ..Default::default()
+            };
+            val.set_filter(Some("a".to_string()), &Config::default());
+            assert_eq!(val.matched_item_count, 4);
+
+            val.push_filter('d', &Config::default());
+            assert_eq!(val.matched_item_count, 2);
+
+            val.pop_filter(&Config::default());
+            assert_eq!(val.matched_item_count, 4);
+
+            val.pop_filter(&Config::default());
+            assert_eq!(val.matched_item_count, 5);
+
+            val.set_filter(None, &Config::default());
+            assert_eq!(val.matched_item_count, 0);
         }
     }
 }

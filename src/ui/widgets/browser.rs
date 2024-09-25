@@ -78,23 +78,28 @@ where
         }
 
         if self.widths[0] > 0 {
+            let title = state.previous().filter().as_ref().map(|v| format!("[FILTER]: {v} "));
             let prev_state = &mut state.previous_mut().state;
             prev_state.set_content_len(Some(previous.len()));
             prev_state.set_viewport_len(Some(previous_area.height.into()));
 
             let mut previous = List::new(previous).style(self.config.as_text_style());
-            if self.config.theme.draw_borders {
-                previous = previous.block(
-                    Block::default()
-                        .borders(Borders::RIGHT)
-                        .border_style(self.border_style)
-                        .padding(Padding::new(0, 1, 0, 0))
-                        .border_set(LEFT_COLUMN_SYMBOLS),
-                );
+            let mut block = if self.config.theme.draw_borders {
+                Block::default()
+                    .borders(Borders::RIGHT)
+                    .border_style(self.border_style)
+                    .padding(Padding::new(0, 1, 0, 0))
+                    .border_set(LEFT_COLUMN_SYMBOLS)
             } else {
-                previous = previous.block(Block::default().padding(Padding::new(1, 2, 0, 0)));
+                Block::default().padding(Padding::new(1, 2, 0, 0))
             };
-            previous = previous.highlight_style(self.config.theme.current_item_style);
+            if let Some(ref title) = title {
+                block = block.title(title.clone().set_style(self.config.theme.borders_style));
+            }
+
+            previous = previous
+                .block(block)
+                .highlight_style(self.config.theme.current_item_style);
 
             ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
             ratatui::widgets::StatefulWidget::render(
@@ -104,8 +109,8 @@ where
                 prev_state.as_scrollbar_state_ref(),
             );
         }
-        let title = state.current().filter.as_ref().map(|v| format!("[FILTER]: {v} "));
         if self.widths[1] > 0 {
+            let title = state.current().filter().as_ref().map(|v| format!("[FILTER]: {v} "));
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_len(Some(items.len()));
             state.set_viewport_len(Some(current_area.height.into()));

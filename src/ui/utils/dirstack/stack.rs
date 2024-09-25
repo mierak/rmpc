@@ -91,13 +91,8 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
             self.path.push(current.to_owned());
         }
 
-        let state = std::mem::replace(&mut self.current.state, new_state);
-        let items = std::mem::replace(&mut self.current.items, head);
-        self.others.push(Dir {
-            items,
-            state,
-            ..Default::default()
-        });
+        let old_current_dir = std::mem::replace(&mut self.current, Dir::new_with_state(head, new_state));
+        self.others.push(old_current_dir);
     }
 
     pub fn pop(&mut self) -> Option<Dir<T>> {
