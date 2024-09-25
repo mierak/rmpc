@@ -236,7 +236,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     ),
                     [] => Some(
                         list_titles(client, current)?
-                            .map(|v| v.to_list_item(config, false, None))
+                            .map(|v| v.to_list_item_simple(config))
                             .collect_vec(),
                     ),
                     _ => None,

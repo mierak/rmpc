@@ -321,12 +321,12 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     ),
                     [artist] => Some(
                         self.list_titles(client, artist, current)?
-                            .map(|s| s.to_list_item(config, false, None))
+                            .map(|s| s.to_list_item_simple(config))
                             .collect_vec(),
                     ),
                     [] => Some(
                         self.list_albums(client, current)?
-                            .map(|s| s.to_list_item(config, false, None))
+                            .map(|s| s.to_list_item_simple(config))
                             .collect_vec(),
                     ),
                     _ => None,

@@ -217,7 +217,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     FileOrDir::File(song) => DirOrSong::Song(song),
                 })
                 .sorted()
-                .map(|v| v.to_list_item(config, false, None))
+                .map(|v| v.to_list_item_simple(config))
                 .collect();
                 Ok(Some(res))
             }

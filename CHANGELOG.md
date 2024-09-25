@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Added this changelog
 - Added `tabs` config, which lets you customize what tabs you want to use and even mix and match them.
 - Rmpc now respects `MPD_HOST` and `MPD_PORT` environment variables.
+- Display current_match_idx/total_matches in the browser screens when using a filter
 
 ### Changed
 
@@ -36,6 +37,7 @@ All notable changes to this project will be documented in this file.
 
 - Do not query album art if it is disabled
 - Panic with zero-width browser column
+- Browsers now keep their filter when pushed down on the stack
 
 ## [0.4.0] - 2024-08-26
 

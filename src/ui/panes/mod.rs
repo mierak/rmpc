@@ -756,7 +756,7 @@ trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         match config.keybinds.navigation.get(&event.into()) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().filter = None;
+                self.stack_mut().current_mut().set_filter(None, config);
                 let preview = self.prepare_preview(client, config)?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -770,15 +770,11 @@ trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             }
             _ => match event.code {
                 KeyCode::Char(c) => {
-                    if let Some(ref mut f) = self.stack_mut().current_mut().filter {
-                        f.push(c);
-                    }
+                    self.stack_mut().current_mut().push_filter(c, config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {
-                    if let Some(ref mut f) = self.stack_mut().current_mut().filter {
-                        f.pop();
-                    };
+                    self.stack_mut().current_mut().pop_filter(config);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -886,7 +882,7 @@ trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             }
             CommonAction::EnterSearch => {
                 self.set_filter_input_mode_active(true);
-                self.stack_mut().current_mut().filter = Some(String::new());
+                self.stack_mut().current_mut().set_filter(Some(String::new()), config);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::NextResult => {
