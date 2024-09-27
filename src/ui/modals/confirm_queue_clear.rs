@@ -42,7 +42,7 @@ impl Modal for ConfirmQueueClearModal {
             .style(app.config.as_text_style())
             .wrap(Wrap { trim: true });
 
-        let popup_area = frame.size().centered_exact(45, 5);
+        let popup_area = frame.area().centered_exact(45, 5);
         frame.render_widget(Clear, popup_area);
 
         if let Some(bg_color) = app.config.theme.modal_background_color {

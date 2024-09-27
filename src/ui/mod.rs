@@ -112,7 +112,7 @@ impl Ui {
 
     pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
         if let Some(bg_color) = context.config.theme.background_color {
-            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.size());
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.area());
         }
         self.rendered_frames_count.add_assign(1);
         if self
@@ -134,7 +134,7 @@ impl Ui {
             Constraint::Percentage(100),
             Constraint::Min(1),
         ])
-        .split(frame.size()) else {
+        .split(frame.area()) else {
             return Ok(());
         };
 
