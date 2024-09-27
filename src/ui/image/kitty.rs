@@ -176,12 +176,14 @@ fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, ar
             ));
 
             if x > 0 {
-                buf.get_mut(area.left() + x, area.top() + y).set_skip(true);
+                buf.cell_mut((area.left() + x, area.top() + y))
+                    .map(|cell| cell.set_skip(true));
             }
         });
 
         res.push_str("\x1b[39m\n");
-        buf.get_mut(area.left(), area.top() + y).set_symbol(&res);
+        buf.cell_mut((area.left(), area.top() + y))
+            .map(|cell| cell.set_symbol(&res));
     });
 }
 

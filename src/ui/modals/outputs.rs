@@ -34,7 +34,7 @@ impl OutputsModal {
 
 impl Modal for OutputsModal {
     fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
-        let popup_area = frame.size().centered_exact(60, 10);
+        let popup_area = frame.area().centered_exact(60, 10);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

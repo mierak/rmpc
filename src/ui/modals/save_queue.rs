@@ -56,7 +56,7 @@ impl SaveQueueModal {
 
 impl Modal for SaveQueueModal {
     fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
-        let popup_area = frame.size().centered_exact(50, 7);
+        let popup_area = frame.area().centered_exact(50, 7);
         let [body_area, buttons_area] =
             *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
         else {

@@ -74,7 +74,7 @@ impl KeybindsModal<'_> {
 
 impl Modal for KeybindsModal<'_> {
     fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
-        let popup_area = frame.size().centered(90, 90);
+        let popup_area = frame.area().centered(90, 90);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

@@ -351,7 +351,7 @@ pub mod image_proto {
     }
 
     pub fn resize_image(image_data: &[u8], width_px: u16, hegiht_px: u16) -> Result<DynamicImage> {
-        Ok(image::io::Reader::new(Cursor::new(image_data))
+        Ok(image::ImageReader::new(Cursor::new(image_data))
             .with_guessed_format()
             .context("Unable to guess image format")?
             .decode()

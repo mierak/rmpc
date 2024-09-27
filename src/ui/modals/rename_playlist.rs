@@ -62,7 +62,7 @@ impl Modal for RenamePlaylistModal {
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Rename playlist");
 
-        let popup_area = frame.size().centered_exact(50, 7);
+        let popup_area = frame.area().centered_exact(50, 7);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
