@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.5.0] - 2024-09-27
+
+### Added
+
 - Added ability to bind external scripts, they are executed with info about MPD and rmpc in environment variables
 - Added `--path` filter to `song` command
 - Added ability to configure the search screen
@@ -111,7 +119,8 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.0] - 2024-06-21
 
-[unreleased]: https://github.com/mierak/rmpc/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/mierak/rmpc/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/mierak/rmpc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/mierak/rmpc/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mierak/rmpc/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/mierak/rmpc/compare/v0.2.0...v0.2.1
