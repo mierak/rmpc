@@ -9,6 +9,16 @@ pub fn init(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, Flexi
     return init_release(tx);
 }
 
+pub fn init_console() -> Result<LoggerHandle, FlexiLoggerError> {
+    flexi_logger::Logger::try_with_env_or_str("warn")?
+        .log_to_stderr()
+        // status bar is replicated to the normal log file so it is safe to drop
+        .add_writer("status_bar", Box::new(NullWriter))
+        .format_for_stderr(console_format)
+        .set_palette("1;3;15;4;13".to_string())
+        .start()
+}
+
 #[allow(dead_code)]
 fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
     flexi_logger::Logger::try_with_env_or_str("debug")?
@@ -39,6 +49,17 @@ fn init_debug(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, Fle
         .format_for_files(structured_detailed_format)
         .set_palette("1;3;15;4;13".to_string())
         .start()
+}
+
+pub struct NullWriter;
+impl flexi_logger::writers::LogWriter for NullWriter {
+    fn write(&self, _now: &mut flexi_logger::DeferredNow, _record: &log::Record) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn flush(&self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 pub struct StatusBarWriter {
@@ -108,6 +129,29 @@ impl From<log::Level> for crate::ui::Level {
             log::Level::Trace => crate::ui::Level::Trace,
         }
     }
+}
+
+pub fn console_format(
+    w: &mut dyn std::io::Write,
+    _now: &mut flexi_logger::DeferredNow,
+    record: &log::Record,
+) -> anyhow::Result<(), std::io::Error> {
+    let mut visitor = Visitor::new();
+    match record.key_values().visit(&mut visitor) {
+        Ok(()) => {}
+        Err(err) => {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, err));
+        }
+    }
+    let level = record.level();
+
+    write!(
+        w,
+        r#"{:<5}: {} {}"#,
+        flexi_logger::style(level).paint(level.to_string()),
+        &record.args().to_string(),
+        visitor
+    )
 }
 
 pub fn structured_detailed_format(

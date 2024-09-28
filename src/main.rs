@@ -140,6 +140,7 @@ fn main() -> Result<()> {
             );
         }
         Some(cmd) => {
+            logging::init_console().expect("Logger to initialize");
             let config: &'static Config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
                 Ok(val) => val.into_config(Some(&args.config), std::mem::take(&mut args.address), true)?,
                 Err(_err) => ConfigFile::default().into_config(None, std::mem::take(&mut args.address), true)?,
@@ -150,11 +151,11 @@ fn main() -> Result<()> {
                     Ok(WorkDone::YoutubeDowloaded { file_path }) => match c.add(&file_path) {
                         Ok(()) => {}
                         Err(err) => {
-                            eprintln!("Failed to already downloaded youtube video to queue: {err}");
+                            log::error!(path = file_path.as_str(), err = err.to_string().as_str(); "Failed to add already downloaded youtube video to queue");
                         }
                     },
                     Err(err) => {
-                        eprintln!("Failed to handle work request: {err}");
+                        log::error!(err = err.to_string().as_str(); "Failed to handle work request");
                     }
                 }
             })?;
