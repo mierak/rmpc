@@ -52,14 +52,18 @@ impl YtDlp {
 
         let out = command.output()?;
         let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&out.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
         let exit_code = out.status.code();
-        log::debug!(stdout = stdout.as_str(), stderr = stderr.as_str(), exit_code:?; "yt-dlp finished");
+        log::trace!(stdout = stdout.as_str().trim(), stderr = stderr.as_str().trim(), exit_code:?; "yt-dlp finished");
 
         if exit_code != Some(0) {
+            log::error!(stderr = stderr.as_str().trim();"yt-dlp failed");
+            if let Err(err) = id.delete_cached(&self.cache_dir) {
+                log::error!(err = err.to_string().as_str(); "Failed to cleanup after yt-dlp failed");
+            };
             bail!(
-                "yt-dlp failed with exit code: {:?}. Check logs for more details.",
-                exit_code
+                "yt-dlp failed with exit code: {}. Check logs for more details.",
+                exit_code.map_or_else(|| "None".to_string(), |c| c.to_string())
             );
         }
 
@@ -82,13 +86,36 @@ impl VideoId {
             .filter_map(std::result::Result::ok)
             .map(|v| v.path())
             .find(|v| {
-                v.file_name().as_ref().is_some_and(|v| {
-                    v.as_bytes()
-                        .windows(self.0.len())
-                        // NOTE this will likely be a problem if we ever decide to support windows at some point
-                        .any(|window| window == self.0.as_bytes())
-                })
+                v.is_file()
+                    && v.file_name().as_ref().is_some_and(|v| {
+                        v.as_bytes()
+                            .windows(self.0.len())
+                            // NOTE this will likely be a problem if we ever decide to support windows at some point
+                            .any(|window| window == self.0.as_bytes())
+                    })
             }))
+    }
+
+    pub fn delete_cached(&self, cache_dir: &str) -> Result<Vec<PathBuf>> {
+        let files = std::fs::read_dir(cache_dir)?
+            .filter_map(std::result::Result::ok)
+            .map(|v| v.path())
+            .filter(|v| {
+                v.is_file()
+                    && v.file_name().as_ref().is_some_and(|v| {
+                        v.as_bytes()
+                            .windows(self.0.len())
+                            // NOTE this will likely be a problem if we ever decide to support windows at some point
+                            .any(|window| window == self.0.as_bytes())
+                    })
+            })
+            .collect();
+
+        for file in &files {
+            std::fs::remove_file(file)?;
+        }
+
+        Ok(files)
     }
 }
 

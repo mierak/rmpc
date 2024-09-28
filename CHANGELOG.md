@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Rmpc now logs warnings and errors in CLI mode to stderr
+- try to clean up after yt-dlp in case it fails
+
 ## [0.5.0] - 2024-09-27
 
 ### Added
