@@ -350,50 +350,8 @@ impl Ui {
                             } else {
                                 status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
                             }
-                            return Ok(KeyHandleResult::FullRenderRequested);
+                            return Ok(KeyHandleResult::RenderRequested);
                         }
-                        GlobalAction::QueueTab if self.active_tab != "Queue".into() => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = "Queue".into();
-                            screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::FullRenderRequested);
-                        }
-                        GlobalAction::DirectoriesTab if self.active_tab != "Directories".into() => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = "Directories".into();
-                            screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::FullRenderRequested);
-                        }
-                        GlobalAction::ArtistsTab if self.active_tab != "Artists".into() => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = "Artists".into();
-                            screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::FullRenderRequested);
-                        }
-                        GlobalAction::AlbumsTab if self.active_tab != "Albums".into() => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = "Albums".into();
-                            screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::FullRenderRequested);
-                        }
-                        GlobalAction::PlaylistsTab if self.active_tab != "Playlists".into() => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = "Playlists".into();
-                            screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::FullRenderRequested);
-                        }
-                        GlobalAction::SearchTab if self.active_tab != "Search".into() => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = "Search".into();
-                            screen_call!(self, before_show(client, &context))?;
-                            return Ok(KeyHandleResult::FullRenderRequested);
-                        }
-                        GlobalAction::QueueTab => {}
-                        GlobalAction::DirectoriesTab => {}
-                        GlobalAction::ArtistsTab => {}
-                        GlobalAction::AlbumsTab => {}
-                        GlobalAction::PlaylistsTab => {}
-                        GlobalAction::SearchTab => {}
                         GlobalAction::NextTrack => {}
                         GlobalAction::PreviousTrack => {}
                         GlobalAction::Stop => {}

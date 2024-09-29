@@ -394,6 +394,7 @@ fn main_task<B: Backend + std::io::Write>(
                     if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context, &mut client) {
                         error!(error:? = err, event:?; "Ui failed to resize event");
                     }
+                    full_rerender_wanted = true;
                     render_wanted = true;
                 }
             }
@@ -406,6 +407,7 @@ fn main_task<B: Backend + std::io::Write>(
             if full_rerender_wanted {
                 terminal.swap_buffers();
                 terminal.swap_buffers();
+                terminal.clear().expect("Terminal clear after full rerender to succeed");
                 full_rerender_wanted = false;
             }
             terminal
