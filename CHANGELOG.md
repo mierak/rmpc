@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 - Rmpc now logs warnings and errors in CLI mode to stderr
 - try to clean up after yt-dlp in case it fails
+- Album art not clearing properly after direct tab switch
 
 ## [0.5.0] - 2024-09-27
 
