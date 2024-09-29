@@ -406,6 +406,7 @@ fn main_task<B: Backend + std::io::Write>(
             if full_rerender_wanted {
                 terminal.swap_buffers();
                 terminal.swap_buffers();
+                terminal.clear().expect("Terminal clear after full rerender to succeed");
                 full_rerender_wanted = false;
             }
             terminal

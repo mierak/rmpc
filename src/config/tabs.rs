@@ -17,7 +17,7 @@ use crate::{
 use super::Leak;
 
 #[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]
-pub struct TabName(&'static str);
+pub struct TabName(pub &'static str);
 impl From<String> for TabName {
     fn from(value: String) -> Self {
         Self(value.leak())
