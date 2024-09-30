@@ -6,7 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Arrow keys as secondary navigation keybinds alongside hjkl
+
 ### Changed
+
+- Removed left/right arrows as default keybinds for next/previous tab. You can still put these back by editing your config.
 
 ### Fixed
 
