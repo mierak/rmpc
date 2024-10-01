@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Arrow keys as secondary navigation keybinds alongside hjkl
+- Initial mouse support, currently only playback seeking by clicking on the progress bar is supported
 
 ### Changed
 
