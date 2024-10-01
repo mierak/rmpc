@@ -553,3 +553,31 @@ pub mod mpsc {
         }
     }
 }
+
+pub mod mouse_event {
+    use crossterm::event::{MouseEvent as CTMouseEvent, MouseEventKind};
+    use ratatui::layout::Position;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct MouseEvent {
+        pub x: u16,
+        pub y: u16,
+        pub kind: MouseEventKind,
+    }
+
+    impl From<CTMouseEvent> for MouseEvent {
+        fn from(value: CTMouseEvent) -> Self {
+            Self {
+                x: value.column,
+                y: value.row,
+                kind: value.kind,
+            }
+        }
+    }
+
+    impl From<MouseEvent> for Position {
+        fn from(value: MouseEvent) -> Self {
+            Self { x: value.x, y: value.y }
+        }
+    }
+}

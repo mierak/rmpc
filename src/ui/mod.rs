@@ -2,14 +2,16 @@ use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
-    event::{KeyCode, KeyEvent},
+    event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent, MouseButton, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use enum_map::{enum_map, Enum, EnumMap};
 use itertools::Itertools;
 use modals::{keybinds::KeybindsModal, outputs::OutputsModal};
 use panes::{PaneContainer, Panes};
 use ratatui::{
+    layout::Rect,
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
     style::{Color, Style},
     symbols::border,
@@ -33,7 +35,10 @@ use crate::{
         commands::{idle::IdleEvent, volume::Bound, Song, State as MpdState},
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
-    utils::macros::{status_error, try_ret},
+    utils::{
+        macros::{status_error, try_ret},
+        mouse_event::MouseEvent,
+    },
 };
 use crate::{context::AppContext, mpd::version::Version};
 
@@ -73,6 +78,7 @@ pub struct Ui {
     command: Option<String>,
     active_tab: TabName,
     tabs: HashMap<TabName, TabScreen>,
+    areas: EnumMap<Areas, Rect>,
 }
 
 impl Ui {
@@ -92,7 +98,34 @@ impl Ui {
                 .iter()
                 .map(|(name, screen)| -> Result<_> { Ok((*name, TabScreen::new(&screen.panes))) })
                 .try_collect()?,
+            areas: enum_map! {
+                _ => Rect::default()
+            },
         })
+    }
+
+    fn calc_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+        let tab_area_height = match (context.config.theme.tab_bar.enabled, context.config.theme.draw_borders) {
+            (true, true) => 3,
+            (true, false) => 1,
+            (false, _) => 0,
+        };
+
+        let [header_area, tabs_area, content_area, bar_area] = *Layout::vertical([
+            Constraint::Length(u16::try_from(context.config.theme.header.rows.len())?),
+            Constraint::Length(tab_area_height), // Tab bar
+            Constraint::Percentage(100),
+            Constraint::Min(1),
+        ])
+        .split(area) else {
+            return Ok(());
+        };
+        self.areas[Areas::Header] = header_area;
+        self.areas[Areas::Tabs] = tabs_area;
+        self.areas[Areas::Content] = content_area;
+        self.areas[Areas::Bar] = bar_area;
+
+        Ok(())
     }
 }
 
@@ -105,12 +138,22 @@ macro_rules! screen_call {
     }
 }
 
+#[derive(Debug, Enum)]
+enum Areas {
+    Header,
+    Tabs,
+    Content,
+    Bar,
+}
+
 impl Ui {
     pub fn post_render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
         screen_call!(self, post_render(frame, context))
     }
 
     pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
+        self.calc_areas(frame.area(), context)?;
+
         if let Some(bg_color) = context.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.area());
         }
@@ -123,32 +166,17 @@ impl Ui {
             self.status_message = None;
         }
 
-        let tab_area_height = match (context.config.theme.tab_bar.enabled, context.config.theme.draw_borders) {
-            (true, true) => 3,
-            (true, false) => 1,
-            (false, _) => 0,
-        };
-        let [header_area, tabs_area, content_area, bar_area] = *Layout::vertical([
-            Constraint::Length(u16::try_from(context.config.theme.header.rows.len())?),
-            Constraint::Length(tab_area_height), // Tab bar
-            Constraint::Percentage(100),
-            Constraint::Min(1),
-        ])
-        .split(frame.area()) else {
-            return Ok(());
-        };
-
         let header = Header::new(context.config, &context.status, self.current_song.as_ref());
-        frame.render_widget(header, header_area);
+        frame.render_widget(header, self.areas[Areas::Header]);
 
-        if tab_area_height > 0 {
+        if self.areas[Areas::Tabs].height > 0 {
             let app_tabs = AppTabs::new(self.active_tab, context.config);
-            frame.render_widget(app_tabs, tabs_area);
+            frame.render_widget(app_tabs, self.areas[Areas::Tabs]);
         }
 
         if let Some(command) = &self.command {
             let [leader_area, command_area] =
-                *Layout::horizontal([Constraint::Length(1), Constraint::Percentage(100)]).split(bar_area)
+                *Layout::horizontal([Constraint::Length(1), Constraint::Percentage(100)]).split(self.areas[Areas::Bar])
             else {
                 return Ok(());
             };
@@ -163,7 +191,7 @@ impl Ui {
             let status_bar = Paragraph::new(message.to_owned())
                 .alignment(ratatui::prelude::Alignment::Center)
                 .style(Style::default().fg(level.into()).bg(Color::Black));
-            frame.render_widget(status_bar, bar_area);
+            frame.render_widget(status_bar, self.areas[Areas::Bar]);
         } else if context.config.status_update_interval_ms.is_some() {
             let elapsed_bar = context.config.as_styled_progress_bar();
             let elapsed_bar = if context.status.duration == Duration::ZERO {
@@ -171,15 +199,16 @@ impl Ui {
             } else {
                 elapsed_bar.value(context.status.elapsed.as_secs_f32() / context.status.duration.as_secs_f32())
             };
-            frame.render_widget(elapsed_bar, bar_area);
+            frame.render_widget(elapsed_bar, self.areas[Areas::Bar]);
         }
 
         #[cfg(debug_assertions)]
         frame.render_widget(
             Paragraph::new(format!("{} frames", self.rendered_frames_count)),
-            bar_area,
+            self.areas[Areas::Bar],
         );
 
+        let content_area = self.areas[Areas::Content];
         if context.config.theme.draw_borders {
             screen_call!(self, render(frame, content_area, context))?;
         } else {
@@ -203,6 +232,36 @@ impl Ui {
         }
 
         Ok(())
+    }
+
+    pub fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> Result<KeyHandleResult> {
+        match event.kind {
+            MouseEventKind::Down(MouseButton::Left) if self.areas[Areas::Bar].contains(event.into()) => {
+                let second_to_seek_to = context
+                    .status
+                    .duration
+                    .mul_f32(f32::from(event.x) / f32::from(self.areas[Areas::Bar].width))
+                    .as_secs();
+                client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
+
+                return Ok(KeyHandleResult::RenderRequested);
+            }
+            MouseEventKind::Down(_mouse_button) => {}
+            MouseEventKind::Up(_mouse_button) => {}
+            MouseEventKind::Drag(_mouse_button) => {}
+            MouseEventKind::Moved => {}
+            MouseEventKind::ScrollDown => {}
+            MouseEventKind::ScrollUp => {}
+            MouseEventKind::ScrollLeft => {}
+            MouseEventKind::ScrollRight => {}
+        }
+
+        Ok(KeyHandleResult::RenderRequested)
     }
 
     pub fn handle_key(
@@ -502,16 +561,22 @@ impl TryFrom<IdleEvent> for UiEvent {
     }
 }
 
-pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>) -> Result<()> {
+pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>, enable_mouse: bool) -> Result<()> {
+    if enable_mouse {
+        execute!(std::io::stdout(), DisableMouseCapture)?;
+    }
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     Ok(terminal.show_cursor()?)
 }
 
-pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
+pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<Stdout>>> {
     let mut stdout = std::io::stdout();
     enable_raw_mode()?;
     execute!(stdout, EnterAlternateScreen)?;
+    if enable_mouse {
+        execute!(stdout, EnableMouseCapture)?;
+    }
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     terminal.clear()?;
     Ok(terminal)

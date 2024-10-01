@@ -33,6 +33,7 @@ use ui::{Level, UiEvent};
 use utils::{
     env::ENV,
     macros::{status_error, status_info, try_cont, try_skip},
+    mouse_event::MouseEvent,
     tmux, DurationExt, ErrorExt,
 };
 use ytdlp::YtDlp;
@@ -72,7 +73,8 @@ pub enum WorkDone {
 
 #[derive(Debug)]
 pub enum AppEvent {
-    UserInput(KeyEvent),
+    UserKeyInput(KeyEvent),
+    UserMouseInput(MouseEvent),
     Status(String, Level),
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
@@ -183,7 +185,7 @@ fn main() -> Result<()> {
                 "Failed to connect to mpd"
             );
 
-            let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
+            let terminal = try_ret!(ui::setup_terminal(config.enable_mouse), "Failed to setup terminal");
             let tx_clone = tx.clone();
 
             let context = try_ret!(
@@ -322,7 +324,27 @@ fn main_task<B: Backend + std::io::Write>(
 
         if let Some(event) = event {
             match event {
-                AppEvent::UserInput(key) => match ui.handle_key(key, &mut context, &mut client) {
+                AppEvent::UserKeyInput(key) => match ui.handle_key(key, &mut context, &mut client) {
+                    Ok(ui::KeyHandleResult::SkipRender) => continue,
+                    Ok(ui::KeyHandleResult::Quit) => {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
+                            error!(error:? = err, event:?; "Ui failed to handle quit event");
+                        }
+                        break;
+                    }
+                    Ok(ui::KeyHandleResult::RenderRequested) => {
+                        render_wanted = true;
+                    }
+                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
+                        render_wanted = true;
+                        full_rerender_wanted = true;
+                    }
+                    Err(err) => {
+                        status_error!(err:?; "Error: {}", err.to_status());
+                        render_wanted = true;
+                    }
+                },
+                AppEvent::UserMouseInput(ev) => match ui.handle_mouse_event(ev, &mut client, &mut context) {
                     Ok(ui::KeyHandleResult::SkipRender) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
                         if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
@@ -425,7 +447,7 @@ fn main_task<B: Backend + std::io::Write>(
         }
     }
 
-    ui::restore_terminal(&mut terminal).expect("Terminal restore to succeed");
+    ui::restore_terminal(&mut terminal, context.config.enable_mouse).expect("Terminal restore to succeed");
 }
 
 fn handle_idle_event(
@@ -537,8 +559,13 @@ fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
     loop {
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(true) => match crossterm::event::read() {
+                Ok(Event::Mouse(mouse)) => {
+                    if let Err(err) = user_input_tx.send(AppEvent::UserMouseInput(mouse.into())) {
+                        error!(error:? = err; "Failed to send user mouse input");
+                    }
+                }
                 Ok(Event::Key(key)) => {
-                    if let Err(err) = user_input_tx.send(AppEvent::UserInput(key)) {
+                    if let Err(err) = user_input_tx.send(AppEvent::UserKeyInput(key)) {
                         error!(error:? = err; "Failed to send user input");
                     }
                 }
