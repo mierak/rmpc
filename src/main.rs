@@ -185,7 +185,7 @@ fn main() -> Result<()> {
                 "Failed to connect to mpd"
             );
 
-            let terminal = try_ret!(ui::setup_terminal(), "Failed to setup terminal");
+            let terminal = try_ret!(ui::setup_terminal(config.enable_mouse), "Failed to setup terminal");
             let tx_clone = tx.clone();
 
             let context = try_ret!(
@@ -447,7 +447,7 @@ fn main_task<B: Backend + std::io::Write>(
         }
     }
 
-    ui::restore_terminal(&mut terminal).expect("Terminal restore to succeed");
+    ui::restore_terminal(&mut terminal, context.config.enable_mouse).expect("Terminal restore to succeed");
 }
 
 fn handle_idle_event(

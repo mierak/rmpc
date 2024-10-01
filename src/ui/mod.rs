@@ -561,18 +561,22 @@ impl TryFrom<IdleEvent> for UiEvent {
     }
 }
 
-pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>) -> Result<()> {
-    execute!(std::io::stdout(), DisableMouseCapture)?;
+pub fn restore_terminal<B: Backend + std::io::Write>(terminal: &mut Terminal<B>, enable_mouse: bool) -> Result<()> {
+    if enable_mouse {
+        execute!(std::io::stdout(), DisableMouseCapture)?;
+    }
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     Ok(terminal.show_cursor()?)
 }
 
-pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
+pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<Stdout>>> {
     let mut stdout = std::io::stdout();
     enable_raw_mode()?;
     execute!(stdout, EnterAlternateScreen)?;
-    execute!(stdout, EnableMouseCapture)?;
+    if enable_mouse {
+        execute!(stdout, EnableMouseCapture)?;
+    }
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     terminal.clear()?;
     Ok(terminal)

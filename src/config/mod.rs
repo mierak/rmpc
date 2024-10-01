@@ -78,6 +78,7 @@ pub struct Config {
     pub cache_dir: Option<&'static str>,
     pub volume_step: u8,
     pub keybinds: KeyConfig,
+    pub enable_mouse: bool,
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub theme: UiConfig,
@@ -101,6 +102,8 @@ pub struct ConfigFile {
     status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
     select_current_song_on_change: bool,
+    #[serde(default = "defaults::default_true")]
+    enable_mouse: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
     #[serde(default)]
@@ -147,6 +150,7 @@ impl Default for ConfigFile {
             on_song_change: None,
             search: SearchFile::default(),
             tabs: TabsFile::default(),
+            enable_mouse: true,
         }
     }
 }
@@ -196,6 +200,7 @@ impl ConfigFile {
             address: MpdAddress::resolve(address_cli, self.address),
             volume_step: self.volume_step,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
+            enable_mouse: self.enable_mouse,
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
             search: self.search.into(),
