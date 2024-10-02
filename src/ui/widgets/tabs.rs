@@ -66,6 +66,8 @@ pub struct Tabs<'a> {
     divider: Span<'a>,
     /// Alignment of the tabs
     alignment: Alignment,
+    /// Vec of areas that tabs were last rendered in
+    pub areas: Vec<Rect>,
 }
 
 #[allow(unused)]
@@ -74,14 +76,16 @@ impl<'a> Tabs<'a> {
     where
         T: Into<Line<'a>>,
     {
+        let titles: Vec<_> = titles.into_iter().map(Into::into).collect();
         Tabs {
             block: None,
-            titles: titles.into_iter().map(Into::into).collect(),
             selected: 0,
             style: Style::default(),
             highlight_style: Style::default(),
             divider: Span::raw(symbols::line::VERTICAL),
             alignment: Alignment::Left,
+            areas: vec![Rect::default(); titles.len()],
+            titles,
         }
     }
 
@@ -90,7 +94,7 @@ impl<'a> Tabs<'a> {
         self
     }
 
-    pub fn select(mut self, selected: usize) -> Tabs<'a> {
+    pub fn select(&mut self, selected: usize) -> &mut Self {
         self.selected = selected;
         self
     }
@@ -131,10 +135,10 @@ impl<'a> Styled for Tabs<'a> {
     }
 }
 
-impl<'a> Widget for Tabs<'a> {
-    fn render(mut self, area: Rect, buf: &mut Buffer) {
+impl<'a> Widget for &mut Tabs<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         buf.set_style(area, self.style);
-        let tabs_area = match self.block.take() {
+        let tabs_area = match &self.block {
             Some(b) => {
                 let inner_area = b.inner(area);
                 b.render(area, buf);
@@ -154,13 +158,22 @@ impl<'a> Widget for Tabs<'a> {
         );
 
         let titles_length = self.titles.len();
-        for (i, title) in self.titles.into_iter().enumerate() {
+        for (i, title) in self.titles.iter().enumerate() {
             let last_title = titles_length - 1 == i;
             let remaining_width = tabs_area.right().saturating_sub(x);
             if remaining_width == 0 {
+                // make the rest of the areas empty since we ran out of space
+                self.areas[i..].iter_mut().for_each(|a| *a = Rect::default());
                 break;
             }
-            let pos = buf.set_line(x, tabs_area.top(), &title, remaining_width);
+            let pos = buf.set_line(x, tabs_area.top(), title, remaining_width);
+            self.areas[i] = Rect {
+                x,
+                y: tabs_area.top(),
+                width: pos.0 - x,
+                height: 1,
+            };
+
             if i == self.selected {
                 buf.set_style(
                     Rect {
@@ -175,6 +188,10 @@ impl<'a> Widget for Tabs<'a> {
             x = pos.0.saturating_add(1);
             let remaining_width = tabs_area.right().saturating_sub(x);
             if remaining_width == 0 || last_title {
+                if i < self.areas.len() - 2 {
+                    // make the rest of the areas empty since we ran out of space
+                    self.areas[i + 1..].iter_mut().for_each(|a| *a = Rect::default());
+                }
                 break;
             }
             let pos = buf.set_span(x - 1, tabs_area.top(), &self.divider, self.divider.width() as u16);

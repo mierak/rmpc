@@ -69,7 +69,7 @@ pub struct StatusMessage {
 }
 
 #[derive(Debug)]
-pub struct Ui {
+pub struct Ui<'ui> {
     panes: PaneContainer,
     modals: Vec<Box<dyn Modal>>,
     status_message: Option<StatusMessage>,
@@ -79,18 +79,21 @@ pub struct Ui {
     active_tab: TabName,
     tabs: HashMap<TabName, TabScreen>,
     areas: EnumMap<Areas, Rect>,
+    tab_bar: AppTabs<'ui>,
 }
 
-impl Ui {
-    pub fn new(context: &AppContext) -> Result<Ui> {
+impl<'ui> Ui<'ui> {
+    pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
+        let active_tab = *context.config.tabs.names.first().context("Expected at least one tab")?;
         Ok(Self {
             panes: PaneContainer::new(context),
+            tab_bar: AppTabs::new(active_tab, context.config),
             status_message: None,
             rendered_frames_count: 0,
             current_song: None,
             modals: Vec::default(),
             command: None,
-            active_tab: *context.config.tabs.names.first().context("Expected at least one tab")?,
+            active_tab,
             tabs: context
                 .config
                 .tabs
@@ -146,7 +149,7 @@ enum Areas {
     Bar,
 }
 
-impl Ui {
+impl Ui<'_> {
     pub fn post_render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
         screen_call!(self, post_render(frame, context))
     }
@@ -170,8 +173,8 @@ impl Ui {
         frame.render_widget(header, self.areas[Areas::Header]);
 
         if self.areas[Areas::Tabs].height > 0 {
-            let app_tabs = AppTabs::new(self.active_tab, context.config);
-            frame.render_widget(app_tabs, self.areas[Areas::Tabs]);
+            self.tab_bar.set_selected(self.active_tab);
+            self.tab_bar.render(self.areas[Areas::Tabs], frame.buffer_mut());
         }
 
         if let Some(command) = &self.command {
@@ -251,6 +254,20 @@ impl Ui {
 
                 return Ok(KeyHandleResult::RenderRequested);
             }
+            MouseEventKind::Down(MouseButton::Left) if self.areas[Areas::Tabs].contains(event.into()) => {
+                if let Some(tab_name) = self
+                    .tab_bar
+                    .get_tab_idx_at(event.into())
+                    .and_then(|idx| context.config.tabs.names.get(idx))
+                {
+                    if &self.active_tab != tab_name {
+                        screen_call!(self, on_hide(client, &context))?;
+                        self.active_tab = *tab_name;
+                        screen_call!(self, before_show(client, &context))?;
+                        return Ok(KeyHandleResult::RenderRequested);
+                    }
+                }
+            }
             MouseEventKind::Down(_mouse_button) => {}
             MouseEventKind::Up(_mouse_button) => {}
             MouseEventKind::Drag(_mouse_button) => {}
@@ -261,7 +278,7 @@ impl Ui {
             MouseEventKind::ScrollRight => {}
         }
 
-        Ok(KeyHandleResult::RenderRequested)
+        Ok(KeyHandleResult::SkipRender)
     }
 
     pub fn handle_key(
