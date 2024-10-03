@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, MouseButton, MouseEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::Block,
@@ -15,14 +17,16 @@ use crate::{
     geometry::Point,
     mpd::mpd_client::MpdClient,
     ui::KeyHandleResultInternal,
+    utils::{id::Id, mouse_event::MouseEvent},
 };
 
 use super::{Pane as _, PaneContainer, Panes};
 
 #[derive(Debug)]
 pub struct TabScreen {
-    focused: Option<Pane>,
+    focused: Option<Pane>, // can focused ever be none?
     panes: &'static crate::config::tabs::PaneOrSplitWithPosition,
+    pane_areas: HashMap<Id, Rect>,
 }
 
 impl TabScreen {
@@ -36,7 +40,11 @@ impl TabScreen {
                     .cmp(&Point::default().distance(b.geometry.top_left()))
             });
 
-        Self { focused, panes }
+        Self {
+            focused,
+            panes,
+            pane_areas: HashMap::default(),
+        }
     }
 }
 
@@ -58,13 +66,19 @@ macro_rules! screen_call {
 }
 
 impl TabScreen {
-    pub fn render(&self, panes: &mut PaneContainer, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    pub fn render(
+        &mut self,
+        panes: &mut PaneContainer,
+        frame: &mut Frame,
+        area: Rect,
+        context: &AppContext,
+    ) -> Result<()> {
         self.render_recursive(panes, self.panes, frame, area, context)?;
         Ok(())
     }
 
     pub fn render_recursive(
-        &self,
+        &mut self,
         panes: &mut PaneContainer,
         configured_panes: &PaneOrSplitWithPosition,
         frame: &mut Frame,
@@ -81,7 +95,9 @@ impl TabScreen {
                     })
                     .borders(*border);
                 let pane = panes.get_mut(*pane);
-                screen_call!(pane, render(frame, block.inner(area), context))?;
+                let pane_area = block.inner(area);
+                self.pane_areas.insert(*id, pane_area);
+                screen_call!(pane, render(frame, pane_area, context))?;
                 frame.render_widget(block, area);
             }
             PaneOrSplitWithPosition::Split {
@@ -202,6 +218,44 @@ impl TabScreen {
                 let pane = panes.get_mut(focused.pane);
                 screen_call!(pane, handle_action(event, client, context))
             }
+        }
+    }
+
+    pub(in crate::ui) fn handle_mouse_event(
+        &mut self,
+        panes: &mut PaneContainer,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        let mut result = KeyHandleResultInternal::KeyNotHandled;
+        if matches!(event.kind, MouseEventKind::Down(MouseButton::Left)) {
+            let Some(pane) = self
+                .pane_areas
+                .iter()
+                .find(|(_, area)| area.contains(event.into()))
+                .and_then(|(pane_id, _)| {
+                    self.panes
+                        .panes_iter()
+                        .find(|pane| &pane.id == pane_id && pane.focusable)
+                })
+            else {
+                return Ok(KeyHandleResultInternal::KeyNotHandled);
+            };
+            self.focused = Some(pane);
+            result = KeyHandleResultInternal::RenderRequested;
+        }
+
+        let Some(focused) = self.focused else {
+            return Ok(result);
+        };
+
+        let pane = panes.get_mut(focused.pane);
+        match screen_call!(pane, handle_mouse_event(event, client, context))? {
+            KeyHandleResultInternal::Modal(modal) => Ok(KeyHandleResultInternal::Modal(modal)),
+            KeyHandleResultInternal::RenderRequested => Ok(KeyHandleResultInternal::RenderRequested),
+            KeyHandleResultInternal::FullRenderRequested => Ok(KeyHandleResultInternal::FullRenderRequested),
+            _ => Ok(result),
         }
     }
 

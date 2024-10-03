@@ -7,7 +7,11 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Arrow keys as secondary navigation keybinds alongside hjkl
-- Initial mouse support, currently only playback seeking by clicking on the progress bar and changing active tab is supported
+- Initial mouse support, currently support
+  - playback seeking by clicking on the progress bar
+  - changing active tab
+  - changing focused pane in tab splits
+  - scrolling in queue, clicking on table to select song, double click to play song
 
 ### Changed
 

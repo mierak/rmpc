@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEventKind};
 use itertools::Itertools;
 
 use crate::{
@@ -21,7 +21,10 @@ use crate::{
         utils::dirstack::DirState,
         KeyHandleResultInternal, UiEvent,
     },
-    utils::macros::{status_error, status_warn},
+    utils::{
+        macros::{status_error, status_warn},
+        mouse_event::{MouseEvent, TimedEvent},
+    },
 };
 use log::error;
 use ratatui::{
@@ -42,6 +45,8 @@ pub struct QueuePane {
     header: Vec<&'static str>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<&'static Property<'static, SongProperty>>,
+    table_area: Rect,
+    last_click: Option<TimedEvent<usize>>,
 }
 
 impl QueuePane {
@@ -59,6 +64,8 @@ impl QueuePane {
                 .map(|v| Constraint::Percentage(v.width_percent))
                 .collect_vec(),
             column_formats: config.theme.song_table_format.iter().map(|v| v.prop).collect_vec(),
+            table_area: Rect::default(),
+            last_click: None,
         }
     }
 }
@@ -80,7 +87,7 @@ impl Pane for QueuePane {
         self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
         self.scrolling_state.set_content_len(Some(queue_len));
 
-        let widths = Layout::horizontal(self.column_widths.clone()).split(table_header_section);
+        let widths = Layout::horizontal(&self.column_widths).split(table_header_section);
         let formats = &config.theme.song_table_format;
 
         let table_items = queue
@@ -122,23 +129,26 @@ impl Pane for QueuePane {
         }
 
         let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
+        let table_block = {
+            let mut b = Block::default()
+                .padding(table_padding)
+                .border_style(config.as_border_style().bold());
+            if config.theme.show_song_table_header {
+                b = b.borders(Borders::TOP);
+            }
+            if let Some(ref title) = title {
+                b = b.title(title.clone().blue());
+            }
+            b
+        };
         let table = Table::new(table_items, self.column_widths.clone())
-            .block({
-                let mut b = Block::default()
-                    .padding(table_padding)
-                    .border_style(config.as_border_style().bold());
-                if config.theme.show_song_table_header {
-                    b = b.borders(Borders::TOP);
-                }
-                if let Some(ref title) = title {
-                    b = b.title(title.clone().blue());
-                }
-                b
-            })
             .style(config.as_text_style())
             .highlight_style(config.theme.current_item_style);
 
-        frame.render_stateful_widget(table, queue_section, self.scrolling_state.as_render_state_ref());
+        let table_area = table_block.inner(queue_section);
+        self.table_area = table_area;
+        frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
+        frame.render_widget(table_block, queue_section);
 
         if config.theme.show_song_table_header {
             queue_section.y = queue_section.y.saturating_add(1);
@@ -182,6 +192,50 @@ impl Pane for QueuePane {
                 }
 
                 Ok(KeyHandleResultInternal::SkipRender)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        if !self.table_area.contains(event.into()) {
+            return Ok(KeyHandleResultInternal::SkipRender);
+        }
+
+        match event.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
+                let offset = self.scrolling_state.as_render_state_ref().offset();
+                let idx_to_select = clicked_row + offset;
+
+                if self.last_click.is_some_and(|c| c.is_doubled(&idx_to_select)) {
+                    if let Some(song) = context.queue.get(idx_to_select) {
+                        client.play_id(song.id)?;
+                    }
+                } else if self // to not select last song if clicking on an empty space after table
+                    .scrolling_state
+                    .content_len()
+                    .is_some_and(|len| idx_to_select < len)
+                {
+                    self.scrolling_state.select(Some(idx_to_select));
+                }
+
+                self.last_click = Some(TimedEvent::new(idx_to_select));
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            MouseEventKind::ScrollDown => {
+                self.scrolling_state.next_non_wrapping();
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            MouseEventKind::ScrollUp => {
+                self.scrolling_state.prev_non_wrapping();
+                Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }

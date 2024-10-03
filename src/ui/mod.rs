@@ -245,6 +245,10 @@ impl Ui<'_> {
     ) -> Result<KeyHandleResult> {
         match event.kind {
             MouseEventKind::Down(MouseButton::Left) if self.areas[Areas::Bar].contains(event.into()) => {
+                if !matches!(context.status.state, crate::mpd::commands::State::Play) {
+                    return Ok(KeyHandleResult::SkipRender);
+                }
+
                 let second_to_seek_to = context
                     .status
                     .duration
@@ -252,7 +256,7 @@ impl Ui<'_> {
                     .as_secs();
                 client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
 
-                return Ok(KeyHandleResult::RenderRequested);
+                Ok(KeyHandleResult::RenderRequested)
             }
             MouseEventKind::Down(MouseButton::Left) if self.areas[Areas::Tabs].contains(event.into()) => {
                 if let Some(tab_name) = self
@@ -267,18 +271,29 @@ impl Ui<'_> {
                         return Ok(KeyHandleResult::RenderRequested);
                     }
                 }
-            }
-            MouseEventKind::Down(_mouse_button) => {}
-            MouseEventKind::Up(_mouse_button) => {}
-            MouseEventKind::Drag(_mouse_button) => {}
-            MouseEventKind::Moved => {}
-            MouseEventKind::ScrollDown => {}
-            MouseEventKind::ScrollUp => {}
-            MouseEventKind::ScrollLeft => {}
-            MouseEventKind::ScrollRight => {}
-        }
 
-        Ok(KeyHandleResult::SkipRender)
+                Ok(KeyHandleResult::SkipRender)
+            }
+            _ if self.areas[Areas::Content].contains(event.into()) => {
+                match screen_call!(self, handle_mouse_event(event, client, context))? {
+                    KeyHandleResultInternal::RenderRequested => Ok(KeyHandleResult::RenderRequested),
+                    KeyHandleResultInternal::FullRenderRequested => Ok(KeyHandleResult::FullRenderRequested),
+                    KeyHandleResultInternal::SkipRender => Ok(KeyHandleResult::SkipRender),
+                    KeyHandleResultInternal::KeyNotHandled => Ok(KeyHandleResult::SkipRender),
+                    KeyHandleResultInternal::Modal(Some(modal)) => {
+                        self.modals.push(modal);
+                        self.on_event(UiEvent::ModalOpened, context, client)?;
+                        return Ok(KeyHandleResult::RenderRequested);
+                    }
+                    KeyHandleResultInternal::Modal(None) => {
+                        self.modals.pop();
+                        self.on_event(UiEvent::ModalClosed, context, client)?;
+                        return Ok(KeyHandleResult::RenderRequested);
+                    }
+                }
+            }
+            _ => Ok(KeyHandleResult::SkipRender),
+        }
     }
 
     pub fn handle_key(
