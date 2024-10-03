@@ -27,6 +27,10 @@ impl<T: ScrollingState> DirState<T> {
         self
     }
 
+    pub fn content_len(&mut self) -> Option<usize> {
+        self.content_len
+    }
+
     pub fn first(&mut self) {
         if self.content_len.is_some_and(|v| v > 0) {
             self.select(Some(0));
@@ -44,6 +48,36 @@ impl<T: ScrollingState> DirState<T> {
             }
         } else {
             self.select(None);
+        }
+    }
+
+    pub fn prev_non_wrapping(&mut self) {
+        if let Some(item_count) = self.content_len {
+            match self.get_selected() {
+                Some(0) => {
+                    self.select(Some(0));
+                }
+                Some(i) => {
+                    self.select(Some(i.saturating_sub(1)));
+                }
+                None if item_count > 0 => self.select(Some(item_count.saturating_sub(1))),
+                None => self.select(None),
+            };
+        }
+    }
+
+    pub fn next_non_wrapping(&mut self) {
+        if let Some(item_count) = self.content_len {
+            match self.get_selected() {
+                Some(i) if i == item_count.saturating_sub(1) => {
+                    self.select(Some(item_count.saturating_sub(1)));
+                }
+                Some(i) => {
+                    self.select(Some(i + 1));
+                }
+                None if item_count > 0 => self.select(Some(0)),
+                None => self.select(None),
+            };
         }
     }
 

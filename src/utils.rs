@@ -428,7 +428,7 @@ pub mod id {
 
     static LAST_ID: AtomicUsize = AtomicUsize::new(1);
 
-    #[derive(Debug, derive_more::Deref, Clone, Copy, Eq, PartialEq)]
+    #[derive(Debug, derive_more::Deref, Clone, Copy, Eq, PartialEq, Hash)]
     pub struct Id(usize);
 
     pub fn new() -> Id {
@@ -555,14 +555,42 @@ pub mod mpsc {
 }
 
 pub mod mouse_event {
+    use std::time::{Duration, Instant};
+
     use crossterm::event::{MouseEvent as CTMouseEvent, MouseEventKind};
     use ratatui::layout::Position;
+
+    // maybe make the timout configurable?
+    const DOUBLE_CLICK_TIMEOUT: Duration = Duration::from_millis(500);
 
     #[derive(Debug, Clone, Copy)]
     pub struct MouseEvent {
         pub x: u16,
         pub y: u16,
         pub kind: MouseEventKind,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct TimedEvent<T: std::cmp::Eq> {
+        data: T,
+        time: Instant,
+    }
+
+    impl<T: std::cmp::Eq> TimedEvent<T> {
+        pub fn new(data: T) -> Self {
+            Self {
+                data,
+                time: Instant::now(),
+            }
+        }
+
+        pub fn is_doubled(&self, data: &T) -> bool {
+            if data != &self.data {
+                return false;
+            }
+
+            self.time.elapsed() < DOUBLE_CLICK_TIMEOUT
+        }
     }
 
     impl From<CTMouseEvent> for MouseEvent {

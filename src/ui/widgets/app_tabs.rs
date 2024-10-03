@@ -30,8 +30,6 @@ impl AppTabs<'_> {
 
         self.tabs.select(selected_tab);
         self.tabs.render(area, buf);
-
-        log::debug!(len = self.tabs.areas.len(), areas:? = self.tabs.areas; "areas");
     }
 
     pub fn set_selected(&mut self, tab: TabName) -> &mut Self {

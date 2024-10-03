@@ -35,7 +35,7 @@ use crate::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
     },
-    utils::DurationExt,
+    utils::{mouse_event::MouseEvent, DurationExt},
 };
 
 use super::{
@@ -138,6 +138,15 @@ pub(super) trait Pane {
     }
 
     fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> KeyResult;
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> KeyResult {
+        Ok(KeyHandleResultInternal::KeyNotHandled)
+    }
 }
 
 pub mod dirstack {}
