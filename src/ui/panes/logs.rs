@@ -14,6 +14,7 @@ use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
     ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
+    utils::mouse_event::{MouseEvent, MouseEventKind},
 };
 
 use super::Pane;
@@ -22,6 +23,7 @@ use super::Pane;
 pub struct LogsPane {
     logs: VecDeque<Vec<u8>>,
     scrolling_state: DirState<ListState>,
+    logs_area: Rect,
 }
 
 impl Pane for LogsPane {
@@ -45,6 +47,7 @@ impl Pane for LogsPane {
             area,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
+        self.logs_area = area;
 
         Ok(())
     }
@@ -68,6 +71,29 @@ impl Pane for LogsPane {
             Ok(KeyHandleResultInternal::RenderRequested)
         } else {
             Ok(KeyHandleResultInternal::SkipRender)
+        }
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        _client: &mut impl MpdClient,
+        _context: &mut AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        if !self.logs_area.contains(event.into()) {
+            return Ok(KeyHandleResultInternal::SkipRender);
+        }
+
+        match event.kind {
+            MouseEventKind::ScrollUp => {
+                self.scrolling_state.prev_non_wrapping();
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            MouseEventKind::ScrollDown => {
+                self.scrolling_state.next_non_wrapping();
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
         }
     }
 

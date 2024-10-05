@@ -198,6 +198,14 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         self.state.prev();
     }
 
+    pub fn next_non_wrapping(&mut self) {
+        self.state.next_non_wrapping();
+    }
+
+    pub fn prev_non_wrapping(&mut self) {
+        self.state.prev_non_wrapping();
+    }
+
     pub fn select_idx(&mut self, idx: usize) {
         self.state.select(Some(idx));
     }

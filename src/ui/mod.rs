@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent, MouseButton, MouseEventKind},
+    event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -37,13 +37,14 @@ use crate::{
     },
     utils::{
         macros::{status_error, try_ret},
-        mouse_event::MouseEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
     },
 };
 use crate::{context::AppContext, mpd::version::Version};
 
 use self::{modals::Modal, panes::Pane, widgets::header::Header};
 
+pub mod browser;
 pub mod image;
 pub mod modals;
 pub mod panes;
@@ -80,6 +81,23 @@ pub struct Ui<'ui> {
     tabs: HashMap<TabName, TabScreen>,
     areas: EnumMap<Areas, Rect>,
     tab_bar: AppTabs<'ui>,
+}
+
+macro_rules! screen_call {
+    ($self:ident, $fn:ident($($param:expr),+)) => {
+        $self.tabs
+            .get_mut(&$self.active_tab)
+            .context(anyhow!("Expected tab '{}' to be defined. Please report this along with your config.", $self.active_tab))?
+            .$fn(&mut $self.panes, $($param),+)
+    }
+}
+
+#[derive(Debug, Enum)]
+enum Areas {
+    Header,
+    Tabs,
+    Content,
+    Bar,
 }
 
 impl<'ui> Ui<'ui> {
@@ -130,28 +148,15 @@ impl<'ui> Ui<'ui> {
 
         Ok(())
     }
-}
-
-macro_rules! screen_call {
-    ($self:ident, $fn:ident($($param:expr),+)) => {
-        $self.tabs
-            .get_mut(&$self.active_tab)
-            .context(anyhow!("Expected tab '{}' to be defined. Please report this along with your config.", $self.active_tab))?
-            .$fn(&mut $self.panes, $($param),+)
-    }
-}
-
-#[derive(Debug, Enum)]
-enum Areas {
-    Header,
-    Tabs,
-    Content,
-    Bar,
-}
-
-impl Ui<'_> {
     pub fn post_render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
         screen_call!(self, post_render(frame, context))
+    }
+
+    fn change_tab(&mut self, new_tab: TabName, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        screen_call!(self, on_hide(client, &context))?;
+        self.active_tab = new_tab;
+        screen_call!(self, before_show(client, &context))?;
+        Ok(())
     }
 
     pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
@@ -244,7 +249,7 @@ impl Ui<'_> {
         context: &mut AppContext,
     ) -> Result<KeyHandleResult> {
         match event.kind {
-            MouseEventKind::Down(MouseButton::Left) if self.areas[Areas::Bar].contains(event.into()) => {
+            MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
                 if !matches!(context.status.state, crate::mpd::commands::State::Play) {
                     return Ok(KeyHandleResult::SkipRender);
                 }
@@ -258,16 +263,22 @@ impl Ui<'_> {
 
                 Ok(KeyHandleResult::RenderRequested)
             }
-            MouseEventKind::Down(MouseButton::Left) if self.areas[Areas::Tabs].contains(event.into()) => {
+            MouseEventKind::ScrollDown if self.areas[Areas::Tabs].contains(event.into()) => {
+                self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
+                return Ok(KeyHandleResult::RenderRequested);
+            }
+            MouseEventKind::ScrollUp if self.areas[Areas::Tabs].contains(event.into()) => {
+                self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
+                return Ok(KeyHandleResult::RenderRequested);
+            }
+            MouseEventKind::LeftClick if self.areas[Areas::Tabs].contains(event.into()) => {
                 if let Some(tab_name) = self
                     .tab_bar
                     .get_tab_idx_at(event.into())
                     .and_then(|idx| context.config.tabs.names.get(idx))
                 {
                     if &self.active_tab != tab_name {
-                        screen_call!(self, on_hide(client, &context))?;
-                        self.active_tab = *tab_name;
-                        screen_call!(self, before_show(client, &context))?;
+                        self.change_tab(*tab_name, client, context)?;
                         return Ok(KeyHandleResult::RenderRequested);
                     }
                 }
@@ -422,22 +433,16 @@ impl Ui<'_> {
                             client.seek_current(ValueChange::Decrease(5))?;
                         }
                         GlobalAction::NextTab => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = context.config.next_screen(self.active_tab);
-                            screen_call!(self, before_show(client, &context))?;
+                            self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::PreviousTab => {
-                            screen_call!(self, on_hide(client, &context))?;
-                            self.active_tab = context.config.prev_screen(self.active_tab);
-                            screen_call!(self, before_show(client, &context))?;
+                            self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
                             return Ok(KeyHandleResult::RenderRequested);
                         }
                         GlobalAction::SwitchToTab(name) => {
                             if context.config.tabs.names.contains(name) {
-                                screen_call!(self, on_hide(client, &context))?;
-                                self.active_tab = *name;
-                                screen_call!(self, before_show(client, &context))?;
+                                self.change_tab(*name, client, context)?;
                             } else {
                                 status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
                             }
@@ -490,6 +495,8 @@ impl Ui<'_> {
         context: &mut AppContext,
         client: &mut impl MpdClient,
     ) -> Result<KeyHandleResult> {
+        let mut ret = KeyHandleResultInternal::SkipRender;
+
         match event {
             UiEvent::Player => {
                 self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
@@ -501,7 +508,7 @@ impl Ui<'_> {
             {
                 #[cfg(debug_assertions)]
                 if self.active_tab == "Logs".into() {
-                    return Ok(KeyHandleResult::RenderRequested);
+                    ret = KeyHandleResultInternal::RenderRequested;
                 }
             }
             UiEvent::Update => {}
@@ -512,8 +519,6 @@ impl Ui<'_> {
             UiEvent::Options => {}
             UiEvent::Exit => {}
         }
-
-        let mut ret = KeyHandleResultInternal::SkipRender;
 
         for name in context.config.tabs.active_panes {
             let result = match self.panes.get_mut(*name) {

@@ -147,6 +147,7 @@ impl DirStackItem for Song {
 pub trait ScrollingState {
     fn select_scrolling(&mut self, idx: Option<usize>);
     fn get_selected_scrolling(&self) -> Option<usize>;
+    fn offset(&self) -> usize;
 }
 
 impl ScrollingState for TableState {
@@ -157,6 +158,10 @@ impl ScrollingState for TableState {
     fn get_selected_scrolling(&self) -> Option<usize> {
         self.selected()
     }
+
+    fn offset(&self) -> usize {
+        self.offset()
+    }
 }
 
 impl ScrollingState for ListState {
@@ -166,6 +171,10 @@ impl ScrollingState for ListState {
 
     fn get_selected_scrolling(&self) -> Option<usize> {
         self.selected()
+    }
+
+    fn offset(&self) -> usize {
+        self.offset()
     }
 }
 

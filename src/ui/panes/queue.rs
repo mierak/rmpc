@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent};
 use itertools::Itertools;
 
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
     },
     utils::{
         macros::{status_error, status_warn},
-        mouse_event::{MouseEvent, TimedEvent},
+        mouse_event::{MouseEvent, MouseEventKind},
     },
 };
 use log::error;
@@ -46,7 +46,6 @@ pub struct QueuePane {
     column_widths: Vec<Constraint>,
     column_formats: Vec<&'static Property<'static, SongProperty>>,
     table_area: Rect,
-    last_click: Option<TimedEvent<usize>>,
 }
 
 impl QueuePane {
@@ -65,7 +64,6 @@ impl QueuePane {
                 .collect_vec(),
             column_formats: config.theme.song_table_format.iter().map(|v| v.prop).collect_vec(),
             table_area: Rect::default(),
-            last_click: None,
         }
     }
 }
@@ -208,26 +206,42 @@ impl Pane for QueuePane {
         }
 
         match event.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
+            MouseEventKind::LeftClick => {
                 let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
-                let offset = self.scrolling_state.as_render_state_ref().offset();
-                let idx_to_select = clicked_row + offset;
-
-                if self.last_click.is_some_and(|c| c.is_doubled(&idx_to_select)) {
-                    if let Some(song) = context.queue.get(idx_to_select) {
-                        client.play_id(song.id)?;
-                    }
-                } else if self // to not select last song if clicking on an empty space after table
-                    .scrolling_state
-                    .content_len()
-                    .is_some_and(|len| idx_to_select < len)
-                {
-                    self.scrolling_state.select(Some(idx_to_select));
+                if let Some(idx) = self.scrolling_state.get_at_rendered_row(clicked_row) {
+                    self.scrolling_state.select(Some(idx));
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                } else {
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
+            }
+            MouseEventKind::DoubleClick => {
+                let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
 
-                self.last_click = Some(TimedEvent::new(idx_to_select));
+                if let Some(song) = self
+                    .scrolling_state
+                    .get_at_rendered_row(clicked_row)
+                    .and_then(|idx| context.queue.get(idx))
+                {
+                    client.play_id(song.id)?;
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                } else {
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
+            }
+            MouseEventKind::MiddleClick => {
+                let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
 
-                Ok(KeyHandleResultInternal::RenderRequested)
+                if let Some(selected_song) = self
+                    .scrolling_state
+                    .get_at_rendered_row(clicked_row)
+                    .and_then(|idx| context.queue.get(idx))
+                {
+                    client.delete_id(selected_song.id)?;
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                } else {
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
             }
             MouseEventKind::ScrollDown => {
                 self.scrolling_state.next_non_wrapping();
@@ -237,7 +251,7 @@ impl Pane for QueuePane {
                 self.scrolling_state.prev_non_wrapping();
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
+            MouseEventKind::RightClick => Ok(KeyHandleResultInternal::SkipRender),
         }
     }
 

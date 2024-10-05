@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
   - playback seeking by clicking on the progress bar
   - changing active tab
   - changing focused pane in tab splits
-  - scrolling in queue, clicking on table to select song, double click to play song
+  - scrolling in queue, clicking on table to select song, double click to play song, middle click to remove from queue
+  - browser panes, double click to enter dir/add song, middle click to whole dir/song, scrolling, click next/previous area to advance/return
 
 ### Changed
 
@@ -22,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Rmpc now logs warnings and errors in CLI mode to stderr
 - try to clean up after yt-dlp in case it fails
 - Album art not clearing properly after direct tab switch
+- Events being duplicated when panes were present in multiple tabs
 
 ## [0.5.0] - 2024-09-27
 

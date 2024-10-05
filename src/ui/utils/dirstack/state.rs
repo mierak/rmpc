@@ -27,7 +27,7 @@ impl<T: ScrollingState> DirState<T> {
         self
     }
 
-    pub fn content_len(&mut self) -> Option<usize> {
+    pub fn content_len(&self) -> Option<usize> {
         self.content_len
     }
 
@@ -213,6 +213,18 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn as_scrollbar_state_ref(&mut self) -> &mut ScrollbarState {
         &mut self.scrollbar_state
+    }
+
+    pub fn get_at_rendered_row(&self, row: usize) -> Option<usize> {
+        let offset = self.inner.offset();
+        let idx_to_select = row + offset;
+
+        // to not select last song if clicking on an empty space after table
+        if self.content_len().is_some_and(|len| idx_to_select < len) {
+            Some(idx_to_select)
+        } else {
+            None
+        }
     }
 }
 

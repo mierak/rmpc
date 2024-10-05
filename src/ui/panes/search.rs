@@ -40,7 +40,8 @@ pub struct SearchPane {
 }
 
 impl SearchPane {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(context: &AppContext) -> Self {
+        let config = context.config;
         Self {
             preview: None,
             phase: Phase::Search,
