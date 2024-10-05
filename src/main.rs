@@ -33,7 +33,7 @@ use ui::{Level, UiEvent};
 use utils::{
     env::ENV,
     macros::{status_error, status_info, try_cont, try_skip},
-    mouse_event::MouseEvent,
+    mouse_event::{MouseEvent, MouseEventTracker},
     tmux, DurationExt, ErrorExt,
 };
 use ytdlp::YtDlp;
@@ -556,12 +556,15 @@ fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEve
 
 fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
     let user_input_tx = user_input_tx;
+    let mut mouse_event_tracker = MouseEventTracker::default();
     loop {
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(true) => match crossterm::event::read() {
                 Ok(Event::Mouse(mouse)) => {
-                    if let Err(err) = user_input_tx.send(AppEvent::UserMouseInput(mouse.into())) {
-                        error!(error:? = err; "Failed to send user mouse input");
+                    if let Some(ev) = mouse_event_tracker.track_and_get(mouse) {
+                        if let Err(err) = user_input_tx.send(AppEvent::UserMouseInput(ev)) {
+                            error!(error:? = err; "Failed to send user mouse input");
+                        }
                     }
                 }
                 Ok(Event::Key(key)) => {

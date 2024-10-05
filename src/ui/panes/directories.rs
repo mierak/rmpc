@@ -1,7 +1,11 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
-use ratatui::{prelude::Rect, widgets::ListItem, Frame};
+use ratatui::{
+    prelude::Rect,
+    widgets::{ListItem, StatefulWidget},
+    Frame,
+};
 
 use crate::{
     config::Config,
@@ -11,30 +15,39 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     ui::{
+        browser::BrowserPane,
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
         KeyHandleResultInternal,
     },
-    utils::macros::{status_info, status_warn},
+    utils::{
+        macros::{status_info, status_warn},
+        mouse_event::MouseEvent,
+    },
 };
 
-use super::{browser::DirOrSong, BrowserPane, Pane};
+use super::{browser::DirOrSong, Pane};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DirectoriesPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
+    browser: Browser<DirOrSong>,
+}
+
+impl DirectoriesPane {
+    pub fn new(context: &AppContext) -> Self {
+        Self {
+            stack: DirStack::default(),
+            filter_input_mode: false,
+            browser: Browser::new(context.config),
+        }
+    }
 }
 
 impl Pane for DirectoriesPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
-        frame.render_stateful_widget(
-            Browser::new(config)
-                .set_widths(&config.theme.column_widths)
-                .set_border_style(config.as_border_style()),
-            area,
-            &mut self.stack,
-        );
+    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> anyhow::Result<()> {
+        self.browser.render(area, frame.buffer_mut(), &mut self.stack);
 
         Ok(())
     }
@@ -78,6 +91,15 @@ impl Pane for DirectoriesPane {
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        self.handle_mouse_action(event, client, context)
     }
 
     fn handle_action(
@@ -226,5 +248,8 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 .map(|v| v.to_preview(&config.theme.symbols).collect())),
             None => Ok(None),
         }
+    }
+    fn browser_areas(&self) -> [Rect; 3] {
+        self.browser.areas
     }
 }

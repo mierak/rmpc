@@ -7,18 +7,26 @@ use crate::{
         mpd_client::{Filter, MpdClient, Tag},
     },
     ui::{
+        browser::BrowserPane,
         utils::dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
         KeyHandleResultInternal,
     },
-    utils::macros::{status_info, status_warn},
+    utils::{
+        macros::{status_info, status_warn},
+        mouse_event::MouseEvent,
+    },
 };
 
-use super::{browser::DirOrSong, BrowserPane, Pane};
+use super::{browser::DirOrSong, Pane};
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::KeyEvent;
 use itertools::Itertools;
-use ratatui::{prelude::Rect, widgets::ListItem, Frame};
+use ratatui::{
+    prelude::Rect,
+    widgets::{ListItem, StatefulWidget},
+    Frame,
+};
 
 #[derive(Debug)]
 pub enum ArtistsPaneMode {
@@ -30,14 +38,16 @@ pub struct ArtistsPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
     mode: ArtistsPaneMode,
+    browser: Browser<DirOrSong>,
 }
 
 impl ArtistsPane {
-    pub fn new(mode: ArtistsPaneMode) -> Self {
+    pub fn new(mode: ArtistsPaneMode, context: &AppContext) -> Self {
         Self {
             mode,
             stack: DirStack::default(),
             filter_input_mode: false,
+            browser: Browser::new(context.config),
         }
     }
 
@@ -97,14 +107,8 @@ impl ArtistsPane {
 }
 
 impl Pane for ArtistsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> Result<()> {
-        frame.render_stateful_widget(
-            Browser::new(config)
-                .set_widths(&config.theme.column_widths)
-                .set_border_style(config.as_border_style()),
-            area,
-            &mut self.stack,
-        );
+    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+        self.browser.render(area, frame.buffer_mut(), &mut self.stack);
 
         Ok(())
     }
@@ -162,6 +166,15 @@ impl Pane for ArtistsPane {
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        self.handle_mouse_action(event, client, context)
     }
 
     fn handle_action(
@@ -332,5 +345,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     _ => None,
                 })
             })
+    }
+    fn browser_areas(&self) -> [Rect; 3] {
+        self.browser.areas
     }
 }

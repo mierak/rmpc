@@ -5,10 +5,11 @@ use rstest::{fixture, rstest};
 use crate::context::AppContext;
 use crate::tests::fixtures::app_context;
 use crate::tests::fixtures::mpd_client::{client, TestMpdClient};
+use crate::ui::browser::BrowserPane;
 use crate::ui::UiEvent;
 
+use crate::ui::panes::CommonAction;
 use crate::ui::panes::{browser::DirOrSong, playlists::PlaylistsPane, Pane};
-use crate::ui::panes::{BrowserPane, CommonAction};
 
 mod on_idle_event {
     use super::*;
@@ -290,7 +291,7 @@ mod on_idle_event {
 
 #[fixture]
 fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::default();
+    let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(0);
     screen
@@ -301,7 +302,7 @@ fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> P
 
 #[fixture]
 fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::default();
+    let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
@@ -312,7 +313,7 @@ fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> P
 
 #[fixture]
 fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::default();
+    let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(2);
     screen
@@ -323,7 +324,7 @@ fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> P
 
 #[fixture]
 fn screen(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::default();
+    let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen
 }

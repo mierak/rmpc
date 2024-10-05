@@ -43,7 +43,7 @@ enum PaneTypeFile {
     AlbumArt,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum PaneType {
     Queue,
     #[cfg(debug_assertions)]
@@ -107,6 +107,8 @@ impl TryFrom<TabsFile> for Tabs {
         let active_panes = tabs
             .iter()
             .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane))
+            .sorted()
+            .dedup()
             .collect_vec()
             .leak();
 

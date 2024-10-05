@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use crossterm::event::{KeyEvent, MouseButton, MouseEventKind};
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::Block,
@@ -17,7 +17,10 @@ use crate::{
     geometry::Point,
     mpd::mpd_client::MpdClient,
     ui::KeyHandleResultInternal,
-    utils::{id::Id, mouse_event::MouseEvent},
+    utils::{
+        id::Id,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
 };
 
 use super::{Pane as _, PaneContainer, Panes};
@@ -229,7 +232,7 @@ impl TabScreen {
         context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
         let mut result = KeyHandleResultInternal::KeyNotHandled;
-        if matches!(event.kind, MouseEventKind::Down(MouseButton::Left)) {
+        if matches!(event.kind, MouseEventKind::LeftClick) {
             let Some(pane) = self
                 .pane_areas
                 .iter()

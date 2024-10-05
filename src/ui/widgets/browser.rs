@@ -6,31 +6,23 @@ use crate::config::Config;
 use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
 
 #[derive(Debug)]
-pub struct Browser<'a, T: std::fmt::Debug + DirStackItem> {
+pub struct Browser<T: std::fmt::Debug + DirStackItem> {
     state_type_marker: std::marker::PhantomData<T>,
-    widths: &'a [u16; 3],
-    config: &'a Config,
+    widths: Vec<u16>,
+    config: &'static Config,
     border_style: Style,
+    pub areas: [Rect; 3],
 }
 
-impl<'a, T: std::fmt::Debug + DirStackItem> Browser<'a, T> {
-    pub fn new(config: &'a Config) -> Self {
+impl<T: std::fmt::Debug + DirStackItem> Browser<T> {
+    pub fn new(config: &'static Config) -> Self {
         Self {
             state_type_marker: std::marker::PhantomData,
-            widths: &[20, 38, 42],
+            widths: config.theme.column_widths.to_vec(),
             config,
-            border_style: Style::default(),
+            border_style: config.as_border_style(),
+            areas: [Rect::default(); 3],
         }
-    }
-
-    pub fn set_widths(mut self, widths: &'a [u16; 3]) -> Self {
-        self.widths = widths;
-        self
-    }
-
-    pub fn set_border_style(mut self, border_style: Style) -> Self {
-        self.border_style = border_style;
-        self
     }
 }
 const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
@@ -45,7 +37,7 @@ const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::PLAIN
 };
 
-impl<'a, T> StatefulWidget for Browser<'_, T>
+impl<'a, T> StatefulWidget for &mut Browser<T>
 where
     T: std::fmt::Debug + DirStackItem<Item = ListItem<'a>>,
 {
@@ -69,6 +61,7 @@ where
         .split(area) else {
             return;
         };
+        self.areas = [previous_area, current_area, preview_area];
 
         if self.widths[2] > 0 {
             let preview = List::new(preview.unwrap_or_default())
