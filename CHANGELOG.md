@@ -11,8 +11,8 @@ All notable changes to this project will be documented in this file.
   - playback seeking by clicking on the progress bar
   - changing active tab
   - changing focused pane in tab splits
-  - scrolling in queue, clicking on table to select song, double click to play song
-  - browser panes, double click to enter dir/add song, scrolling, click next/previous area to advance/return
+  - scrolling in queue, clicking on table to select song, double click to play song, middle click to remove from queue
+  - browser panes, double click to enter dir/add song, middle click to whole dir/song, scrolling, click next/previous area to advance/return
 
 ### Changed
 
