@@ -249,6 +249,18 @@ impl<'ui> Ui<'ui> {
         context: &mut AppContext,
     ) -> Result<KeyHandleResult> {
         match event.kind {
+            MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
+                client.pause_toggle()?;
+                Ok(KeyHandleResult::RenderRequested)
+            }
+            MouseEventKind::ScrollUp if self.areas[Areas::Header].contains(event.into()) => {
+                client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
+                Ok(KeyHandleResult::RenderRequested)
+            }
+            MouseEventKind::ScrollDown if self.areas[Areas::Header].contains(event.into()) => {
+                client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
+                Ok(KeyHandleResult::RenderRequested)
+            }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
                 if !matches!(context.status.state, crate::mpd::commands::State::Play) {
                     return Ok(KeyHandleResult::SkipRender);
