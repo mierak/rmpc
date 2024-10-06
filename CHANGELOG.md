@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Removed left/right arrows as default keybinds for next/previous tab. You can still put these back by editing your config.
+- Filtering is now incremental
 
 ### Fixed
 
