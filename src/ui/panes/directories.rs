@@ -47,7 +47,9 @@ impl DirectoriesPane {
 
 impl Pane for DirectoriesPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> anyhow::Result<()> {
-        self.browser.render(area, frame.buffer_mut(), &mut self.stack);
+        self.browser
+            .set_filter_input_active(self.filter_input_mode)
+            .render(area, frame.buffer_mut(), &mut self.stack);
 
         Ok(())
     }

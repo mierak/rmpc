@@ -93,7 +93,17 @@ impl SearchPane {
         area: ratatui::prelude::Rect,
         config: &Config,
     ) {
-        let title = self.songs_dir.filter().as_ref().map(|v| format!("[FILTER]: {v} "));
+        let title = self.songs_dir.filter().as_ref().map(|v| {
+            format!(
+                "[FILTER]: {v}{} ",
+                if matches!(self.phase, Phase::BrowseResults { filter_input_on: true }) {
+                    "█"
+                } else {
+                    ""
+                }
+            )
+        });
+
         let current = List::new(self.songs_dir.to_list_items(config))
             .block({
                 let mut b = Block::default();

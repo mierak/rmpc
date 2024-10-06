@@ -126,7 +126,10 @@ impl Pane for QueuePane {
             frame.render_widget(header_table, table_header_section);
         }
 
-        let title = self.filter.as_ref().map(|v| format!("[FILTER]: {v} "));
+        let title = self
+            .filter
+            .as_ref()
+            .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }));
         let table_block = {
             let mut b = Block::default()
                 .padding(table_padding)
