@@ -61,9 +61,9 @@ where
         .split(area) else {
             return;
         };
-        self.areas = [previous_area, current_area, preview_area];
 
         if self.widths[2] > 0 {
+            self.areas[2] = preview_area;
             let preview = List::new(preview.unwrap_or_default())
                 .highlight_style(self.config.theme.current_item_style)
                 .style(self.config.as_text_style());
@@ -90,11 +90,12 @@ where
                 block = block.title(title.clone().set_style(self.config.theme.borders_style));
             }
 
-            previous = previous
-                .block(block)
-                .highlight_style(self.config.theme.current_item_style);
+            previous = previous.highlight_style(self.config.theme.current_item_style);
 
-            ratatui::widgets::StatefulWidget::render(previous, previous_area, buf, prev_state.as_render_state_ref());
+            let inner_block = block.inner(previous_area);
+            self.areas[0] = inner_block;
+            ratatui::widgets::StatefulWidget::render(previous, inner_block, buf, prev_state.as_render_state_ref());
+            ratatui::widgets::Widget::render(block, previous_area, buf);
             ratatui::widgets::StatefulWidget::render(
                 self.config.as_styled_scrollbar(),
                 previous_area.inner(scrollbar_margin),
@@ -108,24 +109,27 @@ where
             state.set_content_len(Some(items.len()));
             state.set_viewport_len(Some(current_area.height.into()));
 
+            let block = {
+                let mut b = Block::default();
+                if self.config.theme.draw_borders {
+                    b = b
+                        .borders(Borders::RIGHT)
+                        .border_style(self.border_style)
+                        .border_set(MIDDLE_COLUMN_SYMBOLS);
+                }
+                if let Some(ref title) = title {
+                    b = b.title(title.clone().set_style(self.config.theme.borders_style));
+                }
+                b.padding(Padding::new(0, 1, 0, 0))
+            };
             let current = List::new(current)
-                .block({
-                    let mut b = Block::default();
-                    if self.config.theme.draw_borders {
-                        b = b
-                            .borders(Borders::RIGHT)
-                            .border_style(self.border_style)
-                            .border_set(MIDDLE_COLUMN_SYMBOLS);
-                    }
-                    if let Some(ref title) = title {
-                        b = b.title(title.clone().set_style(self.config.theme.borders_style));
-                    }
-                    b.padding(Padding::new(0, 1, 0, 0))
-                })
                 .highlight_style(self.config.theme.current_item_style)
                 .style(self.config.as_text_style());
 
-            ratatui::widgets::StatefulWidget::render(current, current_area, buf, state.as_render_state_ref());
+            let inner_block = block.inner(current_area);
+            ratatui::widgets::StatefulWidget::render(current, inner_block, buf, state.as_render_state_ref());
+            self.areas[1] = inner_block;
+            ratatui::widgets::Widget::render(block, current_area, buf);
             ratatui::widgets::StatefulWidget::render(
                 self.config.as_styled_scrollbar(),
                 current_area.inner(scrollbar_margin),
