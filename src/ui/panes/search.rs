@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use anyhow::Context;
 use anyhow::Result;
 use crossterm::event::KeyCode;
@@ -21,6 +23,8 @@ use crate::mpd::commands::Song;
 use crate::ui::utils::dirstack::Dir;
 use crate::utils::macros::status_info;
 use crate::utils::macros::status_warn;
+use crate::utils::mouse_event::MouseEvent;
+use crate::utils::mouse_event::MouseEventKind;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
     ui::{
@@ -37,6 +41,8 @@ pub struct SearchPane {
     phase: Phase,
     preview: Option<Vec<ListItem<'static>>>,
     songs_dir: Dir<Song>,
+    input_areas: Rc<[Rect]>,
+    column_areas: [Rect; 3],
 }
 
 impl SearchPane {
@@ -67,6 +73,8 @@ impl SearchPane {
                     variant: ButtonInputVariant::Reset,
                 }],
             ),
+            input_areas: Rc::default(),
+            column_areas: [Rect::default(); 3],
         }
     }
 
@@ -93,16 +101,25 @@ impl SearchPane {
         area: ratatui::prelude::Rect,
         config: &Config,
     ) {
-        let title = self.songs_dir.filter().as_ref().map(|v| format!("[FILTER]: {v} "));
-        let current = List::new(self.songs_dir.to_list_items(config))
-            .block({
-                let mut b = Block::default();
-                if let Some(ref title) = title {
-                    b = b.title(title.clone().set_style(config.theme.borders_style));
+        let title = self.songs_dir.filter().as_ref().map(|v| {
+            format!(
+                "[FILTER]: {v}{} ",
+                if matches!(self.phase, Phase::BrowseResults { filter_input_on: true }) {
+                    "█"
+                } else {
+                    ""
                 }
-                b.padding(Padding::new(0, 2, 0, 0))
-            })
-            .highlight_style(config.theme.current_item_style);
+            )
+        });
+
+        let block = {
+            let mut b = Block::default();
+            if let Some(ref title) = title {
+                b = b.title(title.clone().set_style(config.theme.borders_style));
+            }
+            b.padding(Padding::new(0, 2, 0, 0))
+        };
+        let current = List::new(self.songs_dir.to_list_items(config)).highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
         directory.state.set_content_len(Some(directory.items.len()));
@@ -116,7 +133,11 @@ impl SearchPane {
             width: area.width + 1,
             height: area.height,
         };
-        frame.render_stateful_widget(current, area, directory.state.as_render_state_ref());
+        let inner_block = block.inner(area);
+
+        self.column_areas[1] = inner_block;
+        frame.render_widget(block, area);
+        frame.render_stateful_widget(current, inner_block, directory.state.as_render_state_ref());
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
             area,
@@ -162,6 +183,8 @@ impl SearchPane {
                 .map(|_| Constraint::Length(1)),
         )
         .split(area);
+
+        self.input_areas = Rc::clone(&input_areas);
 
         let mut idx = 0;
         for input in &self.inputs.textbox_inputs {
@@ -339,6 +362,61 @@ impl SearchPane {
             }
         }
     }
+
+    fn activate_input(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        match self.inputs.focused_mut() {
+            FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
+            FocusedInputGroup::Buttons(_) => {
+                // Reset is the only button in this group at the moment
+                self.reset(&context.config.search);
+                self.songs_dir = Dir::default();
+                self.preview = self.prepare_preview(client, context.config)?;
+            }
+            FocusedInputGroup::Filters(FilterInput {
+                variant: FilterInputVariant::SelectFilterKind { ref mut value },
+                ..
+            }) => {
+                value.cycle();
+                self.songs_dir = Dir::new(self.search(client)?);
+                self.preview = self.prepare_preview(client, context.config)?;
+            }
+            FocusedInputGroup::Filters(FilterInput {
+                variant: FilterInputVariant::SelectFilterCaseSensitive { ref mut value },
+                ..
+            }) => {
+                *value = !*value;
+                self.songs_dir = Dir::new(self.search(client)?);
+                self.preview = self.prepare_preview(client, context.config)?;
+            }
+        };
+        Ok(())
+    }
+
+    fn get_clicked_input(&self, event: MouseEvent) -> Option<FocusedInput> {
+        for i in 0..self.inputs.textbox_inputs.len() {
+            if self.input_areas[i].contains(event.into()) {
+                return Some(FocusedInput::Textboxes(i));
+            }
+        }
+
+        // have to account for the separator between inputs/filter config inputs
+        let start = self.inputs.textbox_inputs.len() + 1;
+        for i in start..start + self.inputs.filter_inputs.len() {
+            if self.input_areas[i].contains(event.into()) {
+                return Some(FocusedInput::Filters(i - start));
+            }
+        }
+
+        // have to account for the separator between filter config inputs/buttons
+        let start = start + self.inputs.filter_inputs.len() + 1;
+        for i in start..start + self.inputs.button_inputs.len() {
+            if self.input_areas[i].contains(event.into()) {
+                return Some(FocusedInput::Buttons(i - start));
+            }
+        }
+
+        None
+    }
 }
 
 impl Pane for SearchPane {
@@ -385,6 +463,7 @@ impl Pane for SearchPane {
 
         match self.phase {
             Phase::Search | Phase::SearchTextboxInput => {
+                self.column_areas[1] = current_area;
                 self.render_input_column(frame, current_area, config);
             }
             Phase::BrowseResults { filter_input_on: _ } => {
@@ -397,6 +476,9 @@ impl Pane for SearchPane {
             let preview = List::new(preview.clone()).highlight_style(config.theme.current_item_style);
             frame.render_widget(preview, preview_area);
         }
+
+        self.column_areas[0] = previous_area;
+        self.column_areas[2] = preview_area;
 
         Ok(())
     }
@@ -416,6 +498,102 @@ impl Pane for SearchPane {
                 status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
                 Ok(KeyHandleResultInternal::SkipRender)
             }
+            _ => Ok(KeyHandleResultInternal::SkipRender),
+        }
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut impl MpdClient,
+        context: &mut AppContext,
+    ) -> Result<KeyHandleResultInternal> {
+        match event.kind {
+            MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
+                self.phase = Phase::Search;
+                self.preview = self.prepare_preview(client, context.config)?;
+
+                Ok(KeyHandleResultInternal::RenderRequested)
+            }
+            MouseEventKind::LeftClick if self.column_areas[2].contains(event.into()) => match self.phase {
+                Phase::SearchTextboxInput | Phase::Search => {
+                    if self.songs_dir.items.is_empty() {
+                        Ok(KeyHandleResultInternal::SkipRender)
+                    } else {
+                        self.phase = Phase::BrowseResults { filter_input_on: false };
+                        self.preview = self.prepare_preview(client, context.config)?;
+                        Ok(KeyHandleResultInternal::RenderRequested)
+                    }
+                }
+                Phase::BrowseResults { .. } => self.add_current(client),
+            },
+            MouseEventKind::LeftClick if self.column_areas[1].contains(event.into()) => match self.phase {
+                Phase::SearchTextboxInput | Phase::Search => {
+                    if matches!(self.phase, Phase::SearchTextboxInput) {
+                        self.phase = Phase::Search;
+                        self.songs_dir = Dir::new(self.search(client)?);
+                        self.preview = self.prepare_preview(client, context.config)?;
+                    }
+
+                    if let Some(input) = self.get_clicked_input(event) {
+                        self.inputs.focused_idx = input;
+                    }
+
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                Phase::BrowseResults { .. } => {
+                    let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
+                    if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
+                        self.songs_dir.select_idx(idx);
+                        self.preview = self.prepare_preview(client, context.config)?;
+                        Ok(KeyHandleResultInternal::RenderRequested)
+                    } else {
+                        Ok(KeyHandleResultInternal::SkipRender)
+                    }
+                }
+            },
+            MouseEventKind::DoubleClick => match self.phase {
+                Phase::SearchTextboxInput | Phase::Search => {
+                    if self.get_clicked_input(event).is_some() {
+                        self.activate_input(client, context)?;
+                        Ok(KeyHandleResultInternal::RenderRequested)
+                    } else {
+                        Ok(KeyHandleResultInternal::SkipRender)
+                    }
+                }
+                Phase::BrowseResults { .. } => self.add_current(client),
+            },
+            MouseEventKind::ScrollDown => match self.phase {
+                Phase::SearchTextboxInput | Phase::Search => {
+                    if matches!(self.phase, Phase::SearchTextboxInput) {
+                        self.phase = Phase::Search;
+                        self.songs_dir = Dir::new(self.search(client)?);
+                        self.preview = self.prepare_preview(client, context.config)?;
+                    }
+                    self.inputs.next_non_wrapping();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                Phase::BrowseResults { .. } => {
+                    self.songs_dir.next_non_wrapping();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+            },
+            MouseEventKind::ScrollUp => match self.phase {
+                Phase::SearchTextboxInput | Phase::Search => {
+                    if matches!(self.phase, Phase::SearchTextboxInput) {
+                        self.phase = Phase::Search;
+                        self.songs_dir = Dir::new(self.search(client)?);
+                        self.preview = self.prepare_preview(client, context.config)?;
+                    }
+
+                    self.inputs.prev_non_wrapping();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+                Phase::BrowseResults { .. } => {
+                    self.songs_dir.prev_non_wrapping();
+                    Ok(KeyHandleResultInternal::RenderRequested)
+                }
+            },
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
     }
@@ -511,31 +689,7 @@ impl Pane for SearchPane {
                         CommonAction::Rename => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Close => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::Confirm => {
-                            match self.inputs.focused_mut() {
-                                FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
-                                FocusedInputGroup::Buttons(_) => {
-                                    // Reset is the only button in this group at the moment
-                                    self.reset(&context.config.search);
-                                    self.songs_dir = Dir::default();
-                                    self.preview = self.prepare_preview(client, config)?;
-                                }
-                                FocusedInputGroup::Filters(FilterInput {
-                                    variant: FilterInputVariant::SelectFilterKind { ref mut value },
-                                    ..
-                                }) => {
-                                    value.cycle();
-                                    self.songs_dir = Dir::new(self.search(client)?);
-                                    self.preview = self.prepare_preview(client, config)?;
-                                }
-                                FocusedInputGroup::Filters(FilterInput {
-                                    variant: FilterInputVariant::SelectFilterCaseSensitive { ref mut value },
-                                    ..
-                                }) => {
-                                    *value = !*value;
-                                    self.songs_dir = Dir::new(self.search(client)?);
-                                    self.preview = self.prepare_preview(client, config)?;
-                                }
-                            }
+                            self.activate_input(client, context)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::FocusInput
@@ -762,6 +916,27 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
         }
     }
 
+    pub fn next_non_wrapping(&mut self) {
+        match self.focused_idx {
+            FocusedInput::Textboxes(idx) if idx == self.textbox_inputs.len() - 1 => {
+                self.focused_idx = FocusedInput::Filters(0);
+            }
+            FocusedInput::Textboxes(ref mut idx) => {
+                *idx += 1;
+            }
+            FocusedInput::Filters(idx) if idx == self.filter_inputs.len() - 1 => {
+                self.focused_idx = FocusedInput::Buttons(0);
+            }
+            FocusedInput::Filters(ref mut idx) => {
+                *idx += 1;
+            }
+            FocusedInput::Buttons(idx) if idx == self.button_inputs.len() - 1 => {}
+            FocusedInput::Buttons(ref mut idx) => {
+                *idx += 1;
+            }
+        }
+    }
+
     pub fn next(&mut self) {
         match self.focused_idx {
             FocusedInput::Textboxes(idx) if idx == self.textbox_inputs.len() - 1 => {
@@ -781,6 +956,27 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
             }
             FocusedInput::Buttons(ref mut idx) => {
                 *idx += 1;
+            }
+        }
+    }
+
+    pub fn prev_non_wrapping(&mut self) {
+        match self.focused_idx {
+            FocusedInput::Textboxes(0) => {}
+            FocusedInput::Textboxes(ref mut idx) => {
+                *idx -= 1;
+            }
+            FocusedInput::Filters(0) => {
+                self.focused_idx = FocusedInput::Textboxes(self.textbox_inputs.len() - 1);
+            }
+            FocusedInput::Filters(ref mut idx) => {
+                *idx -= 1;
+            }
+            FocusedInput::Buttons(0) => {
+                self.focused_idx = FocusedInput::Filters(self.filter_inputs.len() - 1);
+            }
+            FocusedInput::Buttons(ref mut idx) => {
+                *idx -= 1;
             }
         }
     }

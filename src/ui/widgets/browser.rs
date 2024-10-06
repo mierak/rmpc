@@ -12,6 +12,7 @@ pub struct Browser<T: std::fmt::Debug + DirStackItem> {
     config: &'static Config,
     border_style: Style,
     pub areas: [Rect; 3],
+    filter_input_active: bool,
 }
 
 impl<T: std::fmt::Debug + DirStackItem> Browser<T> {
@@ -22,7 +23,13 @@ impl<T: std::fmt::Debug + DirStackItem> Browser<T> {
             config,
             border_style: config.as_border_style(),
             areas: [Rect::default(); 3],
+            filter_input_active: false,
         }
+    }
+
+    pub fn set_filter_input_active(&mut self, value: bool) -> &mut Self {
+        self.filter_input_active = value;
+        self
     }
 }
 const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
@@ -104,7 +111,11 @@ where
             );
         }
         if self.widths[1] > 0 {
-            let title = state.current().filter().as_ref().map(|v| format!("[FILTER]: {v} "));
+            let title = state
+                .current()
+                .filter()
+                .as_ref()
+                .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_active { "█" } else { "" }));
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_len(Some(items.len()));
             state.set_viewport_len(Some(current_area.height.into()));
