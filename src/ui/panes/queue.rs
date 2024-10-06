@@ -266,7 +266,6 @@ impl Pane for QueuePane {
             match config.keybinds.navigation.get(&event.into()) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    self.jump_forward(&context.queue);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Some(CommonAction::Close) => {
@@ -279,6 +278,7 @@ impl Pane for QueuePane {
                         if let Some(ref mut f) = self.filter {
                             f.push(c);
                         };
+                        self.jump_first(&context.queue);
                         Ok(KeyHandleResultInternal::RenderRequested)
                     }
                     KeyCode::Backspace => {
@@ -511,5 +511,18 @@ impl QueuePane {
                 break;
             }
         }
+    }
+
+    pub fn jump_first(&mut self, queue: &[Song]) {
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+
+        queue
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.matches(self.column_formats.as_slice(), filter))
+            .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx)));
     }
 }

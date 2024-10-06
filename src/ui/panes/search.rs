@@ -580,13 +580,13 @@ impl Pane for SearchPane {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else if let Some(CommonAction::Confirm) = action {
                     *filter_input_on = false;
-                    self.songs_dir.jump_next_matching(config);
-                    self.preview = self.prepare_preview(client, config)?;
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
                     match event.code {
                         KeyCode::Char(c) => {
                             self.songs_dir.push_filter(c, config);
+                            self.songs_dir.jump_first_matching(config);
+                            self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         KeyCode::Backspace => {

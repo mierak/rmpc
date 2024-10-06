@@ -70,14 +70,14 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().jump_next_matching(config);
-                let preview = self.prepare_preview(client, config)?;
-                self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => match event.code {
                 KeyCode::Char(c) => {
                     self.stack_mut().current_mut().push_filter(c, config);
+                    self.stack_mut().current_mut().jump_first_matching(config);
+                    let preview = self.prepare_preview(client, config)?;
+                    self.stack_mut().set_preview(preview);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 KeyCode::Backspace => {

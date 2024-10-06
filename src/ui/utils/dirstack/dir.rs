@@ -265,6 +265,19 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
             }
         }
     }
+
+    pub fn jump_first_matching(&mut self, config: &Config) {
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+
+        self.items
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.matches(config, filter))
+            .inspect(|(idx, _)| self.state.select(Some(*idx)));
+    }
 }
 
 #[cfg(test)]
