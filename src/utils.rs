@@ -116,12 +116,28 @@ impl ErrorExt for MpdError {
 
 #[allow(dead_code)]
 pub mod tmux {
-    pub fn is_inside_tmux() -> bool {
+    use std::sync::LazyLock;
+
+    pub static IS_TMUX: LazyLock<bool> = LazyLock::new(|| {
         std::env::var("TMUX").is_ok_and(|v| !v.is_empty()) && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
+    });
+
+    pub fn is_inside_tmux() -> bool {
+        *IS_TMUX
     }
 
     pub fn wrap(input: &str) -> String {
         format!("\x1bPtmux;{},\x1b\\", input.replace('\x1b', "\x1b\x1b"))
+    }
+
+    pub fn wrap_print_if_needed(input: &str) {
+        if *IS_TMUX {
+            print!("\x1bPtmux;");
+            print!("{}", input.replace('\x1b', "\x1b\x1b"));
+            print!("\x1b\\");
+        } else {
+            print!("{input}");
+        }
     }
 
     pub fn wrap_print(input: &str) {
@@ -155,8 +171,11 @@ pub mod image_proto {
     use anyhow::Context;
     use anyhow::Result;
     use crossterm::terminal::WindowSize;
+    use image::codecs::gif::GifDecoder;
     use image::codecs::jpeg::JpegEncoder;
+    use image::AnimationDecoder;
     use image::DynamicImage;
+    use image::ImageDecoder;
     use rustix::path::Arg;
 
     use crate::config::Size;
@@ -381,6 +400,28 @@ pub mod image_proto {
         let h = cell_height * area_height_col;
 
         (w.min(max_size_px.width), h.min(max_size_px.height))
+    }
+
+    pub struct GifData<'frames> {
+        pub frames: image::Frames<'frames>,
+        pub dimensions: (u32, u32),
+    }
+
+    pub fn get_gif_frames(data: &[u8]) -> Result<Option<GifData<'_>>> {
+        // http://www.matthewflickinger.com/lab/whatsinagif/bits_and_bytes.asp
+        if data.len() < 6 || data[0..6] != *b"GIF89a" {
+            return Ok(None);
+        }
+
+        if GifDecoder::new(Cursor::new(data))?.into_frames().take(2).count() > 1 {
+            let gif = GifDecoder::new(Cursor::new(data))?;
+            Ok(Some(GifData {
+                dimensions: gif.dimensions(),
+                frames: gif.into_frames(),
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     #[cfg(test)]

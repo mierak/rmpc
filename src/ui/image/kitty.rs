@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use itertools::Itertools;
 use std::{
     io::Write,
     sync::{
@@ -15,7 +16,7 @@ use ratatui::prelude::{Buffer, Rect};
 use crate::{
     config::Size,
     utils::{
-        image_proto::{get_image_area_size_px, resize_image},
+        image_proto::{get_gif_frames, get_image_area_size_px, resize_image},
         macros::status_error,
         mpsc::RecvLast,
         tmux,
@@ -60,7 +61,12 @@ impl ImageProto for KittyImageState {
 
         if let Ok(data) = state.compression_finished_receiver.try_recv() {
             state.idx = state.idx.wrapping_add(1);
-            transfer_data(&data.content, width, height, data.img_width, data.img_height, state);
+            match data {
+                Data::ImageData(data) => {
+                    transfer_image_data(&data.content, width, height, data.img_width, data.img_height, state);
+                }
+                Data::AnimationData(data) => transfer_animation_data(data, width, height, state),
+            }
         }
 
         create_unicode_placeholder_grid(state, buf, rect);
@@ -145,23 +151,46 @@ fn create_data_to_transfer(
     let start_time = Instant::now();
     log::debug!(bytes = image_data.len(); "Compressing image data");
     let (w, h) = get_image_area_size_px(width, height, max_size)?;
-    let image = resize_image(image_data, w, h)?;
 
-    let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
-    e.write_all(image.to_rgba8().as_raw())
-        .context("Error occured when writing image bytes to zlib encoder")?;
+    if let Some(data) = get_gif_frames(image_data)? {
+        let frames = data.frames;
+        let (width, height) = data.dimensions;
+        let frames: Vec<AnimationFrame> = frames
+            .map_ok(|frame| {
+                let delay = frame.delay().numer_denom_ms();
 
-    let content = base64::engine::general_purpose::STANDARD.encode(
-        e.finish()
-            .context("Error occured when flushing image bytes to zlib encoder")?,
-    );
+                AnimationFrame {
+                    delay: delay.0 / delay.1,
+                    content: base64::engine::general_purpose::STANDARD.encode(frame.buffer().as_raw()),
+                }
+            })
+            .try_collect()?;
 
-    log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
-    Ok(Data {
-        content,
-        img_width: image.width(),
-        img_height: image.height(),
-    })
+        Ok(Data::AnimationData(AnimationData {
+            frames,
+            is_compressed: false,
+            img_width: width,
+            img_height: height,
+        }))
+    } else {
+        let image = resize_image(image_data, w, h)?;
+
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
+        e.write_all(image.to_rgba8().as_raw())
+            .context("Error occured when writing image bytes to zlib encoder")?;
+
+        let content = base64::engine::general_purpose::STANDARD.encode(
+            e.finish()
+                .context("Error occured when flushing image bytes to zlib encoder")?,
+        );
+
+        log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
+        Ok(Data::ImageData(ImageData {
+            content,
+            img_width: image.width(),
+            img_height: image.height(),
+        }))
+    }
 }
 
 fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, area: Rect) {
@@ -187,7 +216,74 @@ fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, ar
     });
 }
 
-fn transfer_data(content: &str, cols: u16, rows: u16, img_width: u32, img_height: u32, state: &mut KittyImageState) {
+fn transfer_animation_data(data: AnimationData, cols: u16, rows: u16, state: &mut KittyImageState) {
+    let start_time = Instant::now();
+    let AnimationData {
+        frames,
+        is_compressed,
+        img_width,
+        img_height,
+    } = data;
+
+    log::debug!(frames = frames.len(), img_width, img_height, rows, cols; "Transferring animation data");
+
+    if frames.len() < 2 {
+        log::warn!("Less than two frames, invalid animation data");
+        return;
+    }
+
+    let mut first_frame_iter = frames[0].content.chars().peekable();
+    let chunk: String = first_frame_iter.by_ref().take(4096).collect();
+
+    let m = i32::from(first_frame_iter.peek().is_some());
+    let delay = frames[0].delay;
+
+    // Create image and transfer first frame
+    let create_img = &format!(
+        "\x1b_Gi={},f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
+        state.idx, compression = if is_compressed { ",o=z" } else { ""} 
+    );
+    tmux::wrap_print_if_needed(create_img);
+
+    // Transfer the rest of the first frame if any
+    while first_frame_iter.peek().is_some() {
+        let chunk: String = first_frame_iter.by_ref().take(4096).collect();
+        let m = i32::from(first_frame_iter.peek().is_some());
+        tmux::wrap_print_if_needed(&format!("\x1b_Gi={},m={m};{chunk}\x1b\\", state.idx));
+    }
+
+    // Transfer rest of the frames, skip first because it was already transferred
+    for AnimationFrame { delay, content, .. } in frames.iter().skip(1) {
+        let mut frame_iter = content.chars().peekable();
+        let chunk: String = frame_iter.by_ref().take(4096).collect();
+
+        let next_frame = &format!(
+            "\x1b_Gi={},a=f,t=d,m={m},z={delay},q=2,s={img_width},v={img_height}{compression};{chunk}\x1b\\",
+            state.idx,
+            compression = if is_compressed { ",o=z" } else { "" }
+        );
+
+        tmux::wrap_print_if_needed(next_frame);
+        while frame_iter.peek().is_some() {
+            let chunk: String = frame_iter.by_ref().take(4096).collect();
+            let m = i32::from(frame_iter.peek().is_some());
+            tmux::wrap_print_if_needed(&format!("\x1b_Ga=f,i={},m={m};{chunk}\x1b\\", state.idx));
+        }
+    }
+
+    // Run the animation
+    tmux::wrap_print_if_needed(&format!("\x1b_Ga=a,i={},s=3\x1b\\", state.idx));
+    log::debug!(duration:? = start_time.elapsed(); "Transfer finished");
+}
+
+fn transfer_image_data(
+    content: &str,
+    cols: u16,
+    rows: u16,
+    img_width: u32,
+    img_height: u32,
+    state: &mut KittyImageState,
+) {
     let start_time = Instant::now();
     log::debug!(bytes = content.len(), img_width, img_height, rows, cols; "Transferring compressed image data");
     let mut iter = content.chars().peekable();
@@ -199,31 +295,36 @@ fn transfer_data(content: &str, cols: u16, rows: u16, img_width: u32, img_height
         state.idx, img_width, img_height, cols, rows, first
     );
 
-    if tmux::is_inside_tmux() {
-        log::trace!("Using tmux wrap");
-        tmux::wrap_print(delete_all_images);
-        tmux::wrap_print(virtual_image_placement);
+    tmux::wrap_print_if_needed(delete_all_images);
+    tmux::wrap_print_if_needed(virtual_image_placement);
 
-        while iter.peek().is_some() {
-            let chunk: String = iter.by_ref().take(4096).collect();
-            let m = i32::from(iter.peek().is_some());
-            tmux::wrap_print(&format!("\x1b_Gm={m};{chunk}\x1b\\"));
-        }
-    } else {
-        print!("{delete_all_images}");
-        print!("{virtual_image_placement}");
-
-        while iter.peek().is_some() {
-            let chunk: String = iter.by_ref().take(4096).collect();
-            let m = i32::from(iter.peek().is_some());
-            print!("\x1b_Gm={m};{chunk}\x1b\\");
-        }
+    while iter.peek().is_some() {
+        let chunk: String = iter.by_ref().take(4096).collect();
+        let m = i32::from(iter.peek().is_some());
+        tmux::wrap_print_if_needed(&format!("\x1b_Gm={m};{chunk}\x1b\\"));
     }
     log::debug!(duration:? = start_time.elapsed(); "Transfer finished");
 }
 
-struct Data {
+enum Data {
+    ImageData(ImageData),
+    AnimationData(AnimationData),
+}
+
+struct ImageData {
     content: String,
+    img_width: u32,
+    img_height: u32,
+}
+
+struct AnimationFrame {
+    content: String,
+    delay: u32,
+}
+
+struct AnimationData {
+    frames: Vec<AnimationFrame>,
+    is_compressed: bool,
     img_width: u32,
     img_height: u32,
 }

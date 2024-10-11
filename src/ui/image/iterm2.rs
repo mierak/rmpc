@@ -18,7 +18,7 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 use crate::{
     config::Size,
     utils::{
-        image_proto::{get_image_area_size_px, jpg_encode, resize_image},
+        image_proto::{get_gif_frames, get_image_area_size_px, jpg_encode, resize_image},
         macros::try_cont,
         mpsc::RecvLast,
         tmux,
@@ -224,24 +224,29 @@ impl Iterm2 {
                 bail!("Failed to get image size, err: {}", err);
             }
         };
-        let image = match resize_image(data, iwidth, iheight) {
-            Ok(v) => v,
-            Err(err) => {
-                bail!("Failed to resize image, err: {}", err);
-            }
-        };
-        let Ok(jpg) = jpg_encode(&image) else {
-            bail!("Failed to encode image as jpg")
+
+        let (len, data) = if get_gif_frames(data)?.is_some() {
+            log::debug!("encoding animated gif");
+            (data.len(), base64::engine::general_purpose::STANDARD.encode(data))
+        } else {
+            let image = match resize_image(data, iwidth, iheight) {
+                Ok(v) => v,
+                Err(err) => {
+                    bail!("Failed to resize image, err: {}", err);
+                }
+            };
+            let Ok(jpg) = jpg_encode(&image) else {
+                bail!("Failed to encode image as jpg")
+            };
+            (jpg.len(), base64::engine::general_purpose::STANDARD.encode(&jpg))
         };
 
-        let content = base64::engine::general_purpose::STANDARD.encode(&jpg);
-
-        log::debug!(id, compressed_bytes = content.len(), image_bytes = jpg.len(), elapsed:? = start.elapsed(); "encoded data");
+        log::debug!(id, compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(); "encoded data");
         Ok(EncodedData {
-            content,
-            size: jpg.len(),
-            width: image.width(),
-            height: image.height(),
+            content: data,
+            size: len,
+            width: u32::from(iwidth),
+            height: u32::from(iheight),
             id,
         })
     }
