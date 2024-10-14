@@ -34,7 +34,7 @@ use utils::{
     env::ENV,
     macros::{status_error, status_info, try_cont, try_skip},
     mouse_event::{MouseEvent, MouseEventTracker},
-    tmux, DurationExt, ErrorExt,
+    DurationExt, ErrorExt,
 };
 use ytdlp::YtDlp;
 
@@ -57,6 +57,7 @@ mod deps;
 mod geometry;
 mod logging;
 mod mpd;
+mod tmux;
 mod ui;
 mod utils;
 mod ytdlp;

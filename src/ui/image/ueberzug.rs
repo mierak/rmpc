@@ -19,6 +19,7 @@ use sysinfo::ProcessesToUpdate;
 use sysinfo::System;
 
 use crate::config::Size;
+use crate::tmux;
 use crate::utils::macros::try_cont;
 use crate::utils::macros::try_skip;
 
@@ -68,8 +69,12 @@ impl ImageProto for Ueberzug {
     fn render(&mut self, _: &mut Buffer, Rect { x, y, width, height }: Rect) -> Result<()> {
         if self.needs_render {
             self.needs_render = false;
-            self.sender
-                .send(Action::Add(UEBERZUG_ALBUM_ART_PATH, x, y, width, height))?;
+            // We should not command ueberzugpp to rerender when rmpc is inside TMUX session
+            // without any attached clients or the pane which rmpc resides in is not visible
+            if !tmux::is_in_tmux_and_hidden()? {
+                self.sender
+                    .send(Action::Add(UEBERZUG_ALBUM_ART_PATH, x, y, width, height))?;
+            }
         }
         Ok(())
     }

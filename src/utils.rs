@@ -114,56 +114,6 @@ impl ErrorExt for MpdError {
     }
 }
 
-#[allow(dead_code)]
-pub mod tmux {
-    use std::sync::LazyLock;
-
-    pub static IS_TMUX: LazyLock<bool> = LazyLock::new(|| {
-        std::env::var("TMUX").is_ok_and(|v| !v.is_empty()) && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
-    });
-
-    pub fn is_inside_tmux() -> bool {
-        *IS_TMUX
-    }
-
-    pub fn wrap(input: &str) -> String {
-        format!("\x1bPtmux;{},\x1b\\", input.replace('\x1b', "\x1b\x1b"))
-    }
-
-    pub fn wrap_print_if_needed(input: &str) {
-        if *IS_TMUX {
-            print!("\x1bPtmux;");
-            print!("{}", input.replace('\x1b', "\x1b\x1b"));
-            print!("\x1b\\");
-        } else {
-            print!("{input}");
-        }
-    }
-
-    pub fn wrap_print(input: &str) {
-        print!("\x1bPtmux;");
-        print!("{}", input.replace('\x1b', "\x1b\x1b"));
-        print!("\x1b\\");
-    }
-
-    pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
-        let mut cmd = std::process::Command::new("tmux");
-        let cmd = cmd.args(["show", "-Ap", "allow-passthrough"]);
-        let stdout = cmd.output()?.stdout;
-
-        Ok(String::from_utf8_lossy(&stdout).trim_end().ends_with("on"))
-    }
-
-    pub fn enable_passthrough() -> anyhow::Result<()> {
-        let mut cmd = std::process::Command::new("tmux");
-        let cmd = cmd.args(["set", "-p", "allow-passthrough"]);
-        match cmd.output() {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow::anyhow!("Failed to enable tmux passthrough, '{e}'")),
-        }
-    }
-}
-
 pub mod image_proto {
     use std::env;
     use std::io::Cursor;

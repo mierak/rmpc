@@ -15,11 +15,11 @@ use ratatui::prelude::{Buffer, Rect};
 
 use crate::{
     config::Size,
+    tmux,
     utils::{
         image_proto::{get_gif_frames, get_image_area_size_px, resize_image},
         macros::status_error,
         mpsc::RecvLast,
-        tmux,
     },
 };
 

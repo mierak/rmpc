@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - try to clean up after yt-dlp in case it fails
 - Album art not clearing properly after direct tab switch
 - Events being duplicated when panes were present in multiple tabs
+- Ueberzugpp redrawing album art while in an inactive TMUX window/session
 
 ## [0.5.0] - 2024-09-27
 
