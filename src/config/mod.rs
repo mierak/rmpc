@@ -21,9 +21,9 @@ mod search;
 pub mod tabs;
 pub mod theme;
 
+use crate::tmux;
 use crate::utils::image_proto::{self, ImageProtocol};
 use crate::utils::macros::status_warn;
-use crate::utils::tmux;
 pub use address::MpdAddress;
 
 use self::{
