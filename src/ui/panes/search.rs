@@ -125,7 +125,7 @@ impl SearchPane {
         directory.state.set_content_len(Some(directory.items.len()));
         directory.state.set_viewport_len(Some(area.height.into()));
         if !directory.items.is_empty() && directory.state.get_selected().is_none() {
-            directory.state.select(Some(0));
+            directory.state.select(Some(0), 0);
         }
         let area = Rect {
             x: area.x,
@@ -544,7 +544,7 @@ impl Pane for SearchPane {
                 Phase::BrowseResults { .. } => {
                     let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
                     if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
-                        self.songs_dir.select_idx(idx);
+                        self.songs_dir.select_idx(idx, context.config.scrolloff);
                         self.preview = self.prepare_preview(client, context.config)?;
                         Ok(KeyHandleResultInternal::RenderRequested)
                     } else {
@@ -574,7 +574,7 @@ impl Pane for SearchPane {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Phase::BrowseResults { .. } => {
-                    self.songs_dir.next_non_wrapping();
+                    self.songs_dir.next_non_wrapping(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
             },
@@ -590,7 +590,7 @@ impl Pane for SearchPane {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 Phase::BrowseResults { .. } => {
-                    self.songs_dir.prev_non_wrapping();
+                    self.songs_dir.prev_non_wrapping(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
             },
@@ -772,24 +772,24 @@ impl Pane for SearchPane {
                 } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
-                            self.songs_dir.next();
+                            self.songs_dir.next(context.config.scrolloff);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Up => {
-                            self.songs_dir.prev();
+                            self.songs_dir.prev(context.config.scrolloff);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::MoveDown => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::MoveUp => Ok(KeyHandleResultInternal::KeyNotHandled),
                         CommonAction::DownHalf => {
-                            self.songs_dir.next_half_viewport();
+                            self.songs_dir.next_half_viewport(context.config.scrolloff);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::UpHalf => {
-                            self.songs_dir.prev_half_viewport();
+                            self.songs_dir.prev_half_viewport(context.config.scrolloff);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
@@ -826,7 +826,7 @@ impl Pane for SearchPane {
                         }
                         CommonAction::Select => {
                             self.songs_dir.toggle_mark_selected();
-                            self.songs_dir.next();
+                            self.songs_dir.next(context.config.scrolloff);
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Rename => Ok(KeyHandleResultInternal::KeyNotHandled),

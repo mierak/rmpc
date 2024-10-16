@@ -15,6 +15,10 @@ pub fn default_volume_step() -> u8 {
     5
 }
 
+pub fn default_scrolloff() -> usize {
+    0
+}
+
 #[allow(clippy::unnecessary_wraps)]
 pub fn default_progress_update_interval_ms() -> Option<u64> {
     Some(1000)

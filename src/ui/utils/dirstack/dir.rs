@@ -37,7 +37,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         };
 
         if !root.is_empty() {
-            result.state.select(Some(0));
+            result.state.select(Some(0), 0);
             result.state.set_content_len(Some(root.len()));
             result.items = root;
         };
@@ -51,18 +51,6 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
             filter: None,
             matched_item_count: 0,
         };
-    }
-
-    pub fn replace(&mut self, new_current: Vec<T>) {
-        if new_current.is_empty() {
-            self.state.select(None);
-        } else if self.state.get_selected().is_some_and(|v| v > new_current.len() - 1) {
-            self.state.select(Some(new_current.len() - 1));
-        } else {
-            self.state.select(Some(0));
-        }
-        self.state.set_content_len(Some(new_current.len()));
-        self.items = new_current;
     }
 
     pub fn filter(&self) -> Option<&str> {
@@ -190,32 +178,32 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         }
     }
 
-    pub fn next(&mut self) {
-        self.state.next();
+    pub fn next(&mut self, scrolloff: usize) {
+        self.state.next(scrolloff);
     }
 
-    pub fn prev(&mut self) {
-        self.state.prev();
+    pub fn prev(&mut self, scrolloff: usize) {
+        self.state.prev(scrolloff);
     }
 
-    pub fn next_non_wrapping(&mut self) {
-        self.state.next_non_wrapping();
+    pub fn next_non_wrapping(&mut self, scrolloff: usize) {
+        self.state.next_non_wrapping(scrolloff);
     }
 
-    pub fn prev_non_wrapping(&mut self) {
-        self.state.prev_non_wrapping();
+    pub fn prev_non_wrapping(&mut self, scrolloff: usize) {
+        self.state.prev_non_wrapping(scrolloff);
     }
 
-    pub fn select_idx(&mut self, idx: usize) {
-        self.state.select(Some(idx));
+    pub fn select_idx(&mut self, idx: usize, scrolloff: usize) {
+        self.state.select(Some(idx), scrolloff);
     }
 
-    pub fn next_half_viewport(&mut self) {
-        self.state.next_half_viewport();
+    pub fn next_half_viewport(&mut self, scrolloff: usize) {
+        self.state.next_half_viewport(scrolloff);
     }
 
-    pub fn prev_half_viewport(&mut self) {
-        self.state.prev_half_viewport();
+    pub fn prev_half_viewport(&mut self, scrolloff: usize) {
+        self.state.prev_half_viewport(scrolloff);
     }
 
     pub fn last(&mut self) {
@@ -240,7 +228,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         for i in selected + 1..length + selected {
             let i = i % length;
             if self.items[i].matches(config, filter) {
-                self.state.select(Some(i));
+                self.state.select(Some(i), config.scrolloff);
                 break;
             }
         }
@@ -260,7 +248,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         for i in (0..length).rev() {
             let i = (i + selected) % length;
             if self.items[i].matches(config, filter) {
-                self.state.select(Some(i));
+                self.state.select(Some(i), config.scrolloff);
                 break;
             }
         }
@@ -276,7 +264,7 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
             .iter()
             .enumerate()
             .find(|(_, item)| item.matches(config, filter))
-            .inspect(|(idx, _)| self.state.select(Some(*idx)));
+            .inspect(|(idx, _)| self.state.select(Some(*idx), config.scrolloff));
     }
 }
 
@@ -306,7 +294,7 @@ mod tests {
         #[test]
         fn returns_none() {
             let mut subject = create_subject();
-            subject.state.select(None);
+            subject.state.select(None, 0);
 
             let result = subject.selected();
 
@@ -316,7 +304,7 @@ mod tests {
         #[test]
         fn returns_item() {
             let mut subject = create_subject();
-            subject.state.select(Some(2));
+            subject.state.select(Some(2), 0);
 
             let result = subject.selected();
 
@@ -330,7 +318,7 @@ mod tests {
         #[test]
         fn returns_none() {
             let mut subject = create_subject();
-            subject.state.select(None);
+            subject.state.select(None, 0);
 
             let result = subject.selected_with_idx();
 
@@ -340,7 +328,7 @@ mod tests {
         #[test]
         fn returns_item() {
             let mut subject = create_subject();
-            subject.state.select(Some(2));
+            subject.state.select(Some(2), 0);
 
             let result = subject.selected_with_idx();
 
@@ -360,9 +348,9 @@ mod tests {
             subject.state.mark(1);
             subject.state.unmark(3);
 
-            subject.state.select(Some(2));
+            subject.state.select(Some(2), 0);
             subject.toggle_mark_selected();
-            subject.state.select(Some(3));
+            subject.state.select(Some(3), 0);
             subject.toggle_mark_selected();
 
             assert_eq!(subject.marked(), &BTreeSet::from([1, 3]));
@@ -387,7 +375,7 @@ mod tests {
         fn marks_selected() {
             let mut subject = create_subject();
             subject.state.mark(2);
-            subject.state.select(Some(3));
+            subject.state.select(Some(3), 0);
 
             subject.mark_selected();
 
@@ -415,54 +403,11 @@ mod tests {
             let mut subject = create_subject();
             subject.state.mark(2);
             subject.state.mark(3);
-            subject.state.select(Some(2));
+            subject.state.select(Some(2), 0);
 
             subject.unmark_selected();
 
             assert_eq!(subject.marked(), &BTreeSet::from([3]));
-        }
-    }
-
-    mod replace {
-
-        use super::create_subject;
-
-        #[test]
-        fn selects_none_when_new_state_is_empty() {
-            let mut subject = create_subject();
-            subject.state.select(Some(2));
-            assert_eq!(subject.selected().unwrap(), "c");
-
-            subject.replace(Vec::default());
-
-            assert_eq!(subject.selected(), None);
-        }
-
-        #[test]
-        fn selects_first_element() {
-            let mut subject = create_subject();
-            subject.state.select(Some(2));
-            assert_eq!(subject.selected().unwrap(), "c");
-
-            subject.replace(
-                vec!["q", "w", "f", "p", "b"]
-                    .into_iter()
-                    .map(ToOwned::to_owned)
-                    .collect(),
-            );
-
-            assert_eq!(subject.selected().unwrap(), "q");
-        }
-
-        #[test]
-        fn selects_last_element_if_previous_selected_was_higher_than_new_len() {
-            let mut subject = create_subject();
-            subject.state.select(Some(4));
-            assert_eq!(subject.selected().unwrap(), "f");
-
-            subject.replace(vec!["q", "w"].into_iter().map(ToOwned::to_owned).collect());
-
-            assert_eq!(subject.selected().unwrap(), "w");
         }
     }
 
@@ -505,7 +450,7 @@ mod tests {
             };
             val.state.set_viewport_len(Some(2));
             val.state.set_content_len(Some(val.items.len()));
-            val.state.select(Some(0));
+            val.state.select(Some(0), 0);
 
             val.filter = Some("a".to_string());
 
@@ -531,7 +476,7 @@ mod tests {
             };
             val.state.set_content_len(Some(val.items.len()));
             val.state.set_viewport_len(Some(2));
-            val.state.select(Some(4));
+            val.state.select(Some(4), 0);
 
             val.filter = Some("a".to_string());
 

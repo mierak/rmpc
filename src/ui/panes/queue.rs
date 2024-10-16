@@ -82,7 +82,6 @@ impl Pane for QueuePane {
             return Ok(());
         };
 
-        self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
         self.scrolling_state.set_content_len(Some(queue_len));
 
         let widths = Layout::horizontal(&self.column_widths).split(table_header_section);
@@ -155,6 +154,7 @@ impl Pane for QueuePane {
             queue_section.y = queue_section.y.saturating_add(1);
             queue_section.height = queue_section.height.saturating_sub(1);
         }
+        self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
             queue_section,
@@ -166,8 +166,13 @@ impl Pane for QueuePane {
 
     fn before_show(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         self.scrolling_state.set_content_len(Some(context.queue.len()));
+        let scrolloff = if self.table_area == Rect::default() {
+            0
+        } else {
+            context.config.scrolloff
+        };
         self.scrolling_state
-            .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
+            .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)), scrolloff);
 
         Ok(())
     }
@@ -187,7 +192,7 @@ impl Pane for QueuePane {
                     .find(|(_, v)| Some(v.id) == context.status.songid)
                 {
                     if context.config.select_current_song_on_change {
-                        self.scrolling_state.select(Some(idx));
+                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
                     }
                     return Ok(KeyHandleResultInternal::RenderRequested);
                 }
@@ -212,7 +217,7 @@ impl Pane for QueuePane {
             MouseEventKind::LeftClick => {
                 let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(clicked_row) {
-                    self.scrolling_state.select(Some(idx));
+                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)
@@ -247,11 +252,11 @@ impl Pane for QueuePane {
                 }
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next_non_wrapping();
+                self.scrolling_state.next_non_wrapping(context.config.scrolloff);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev_non_wrapping();
+                self.scrolling_state.prev_non_wrapping(context.config.scrolloff);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::RightClick => Ok(KeyHandleResultInternal::SkipRender),
@@ -281,7 +286,7 @@ impl Pane for QueuePane {
                         if let Some(ref mut f) = self.filter {
                             f.push(c);
                         };
-                        self.jump_first(&context.queue);
+                        self.jump_first(&context.queue, context.config.scrolloff);
                         Ok(KeyHandleResultInternal::RenderRequested)
                     }
                     KeyCode::Backspace => {
@@ -351,13 +356,13 @@ impl Pane for QueuePane {
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
-                        self.scrolling_state.prev();
+                        self.scrolling_state.prev(context.config.scrolloff);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     if !context.queue.is_empty() {
-                        self.scrolling_state.next();
+                        self.scrolling_state.next(context.config.scrolloff);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
@@ -380,7 +385,7 @@ impl Pane for QueuePane {
 
                     let new_idx = idx.saturating_sub(1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
-                    self.scrolling_state.select(Some(new_idx));
+                    self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => {
@@ -401,18 +406,18 @@ impl Pane for QueuePane {
 
                     let new_idx = (idx + 1).min(context.queue.len() - 1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
-                    self.scrolling_state.select(Some(new_idx));
+                    self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::DownHalf => {
                     if !context.queue.is_empty() {
-                        self.scrolling_state.next_half_viewport();
+                        self.scrolling_state.next_half_viewport(context.config.scrolloff);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
                     if !context.queue.is_empty() {
-                        self.scrolling_state.prev_half_viewport();
+                        self.scrolling_state.prev_half_viewport(context.config.scrolloff);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
@@ -436,11 +441,11 @@ impl Pane for QueuePane {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(&context.queue);
+                    self.jump_forward(&context.queue, context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(&context.queue);
+                    self.jump_back(&context.queue, context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
@@ -476,7 +481,7 @@ impl Pane for QueuePane {
 }
 
 impl QueuePane {
-    pub fn jump_forward(&mut self, queue: &[Song]) {
+    pub fn jump_forward(&mut self, queue: &[Song], scrolloff: usize) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -490,13 +495,13 @@ impl QueuePane {
         for i in selected + 1..length + selected {
             let i = i % length;
             if queue[i].matches(self.column_formats.as_slice(), filter) {
-                self.scrolling_state.select(Some(i));
+                self.scrolling_state.select(Some(i), scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self, queue: &[Song]) {
+    pub fn jump_back(&mut self, queue: &[Song], scrolloff: usize) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -510,13 +515,13 @@ impl QueuePane {
         for i in (0..length).rev() {
             let i = (i + selected) % length;
             if queue[i].matches(self.column_formats.as_slice(), filter) {
-                self.scrolling_state.select(Some(i));
+                self.scrolling_state.select(Some(i), scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_first(&mut self, queue: &[Song]) {
+    pub fn jump_first(&mut self, queue: &[Song], scrolloff: usize) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -526,6 +531,6 @@ impl QueuePane {
             .iter()
             .enumerate()
             .find(|(_, item)| item.matches(self.column_formats.as_slice(), filter))
-            .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx)));
+            .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx), scrolloff));
     }
 }

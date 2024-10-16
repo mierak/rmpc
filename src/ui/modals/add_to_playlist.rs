@@ -8,6 +8,7 @@ use ratatui::{
 
 use crate::{
     config::keys::CommonAction,
+    context::AppContext,
     mpd::mpd_client::MpdClient,
     ui::{
         utils::dirstack::DirState,
@@ -38,7 +39,7 @@ impl AddToPlaylistModal {
     pub fn new(uri: String, playlists: Vec<String>) -> Self {
         let mut scrolling_state = DirState::default();
         if !playlists.is_empty() {
-            scrolling_state.select(Some(0));
+            scrolling_state.select(Some(0), 0);
         }
         Self {
             button_group: ButtonGroupState::default(),
@@ -127,9 +128,9 @@ impl Modal for AddToPlaylistModal {
         &mut self,
         key: crossterm::event::KeyEvent,
         client: &mut crate::mpd::client::Client<'_>,
-        app: &mut crate::context::AppContext,
+        context: &mut AppContext,
     ) -> anyhow::Result<KeyHandleResultInternal> {
-        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
+        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::Down => {
                     match self.focused {
@@ -142,7 +143,7 @@ impl Modal for AddToPlaylistModal {
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group.first();
                             } else {
-                                self.scrolling_state.next();
+                                self.scrolling_state.next(context.config.scrolloff);
                             }
                         }
                         FocusedComponent::Buttons => {
@@ -163,7 +164,7 @@ impl Modal for AddToPlaylistModal {
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group.last();
                             } else {
-                                self.scrolling_state.prev();
+                                self.scrolling_state.prev(context.config.scrolloff);
                             }
                         }
                         FocusedComponent::Buttons => {

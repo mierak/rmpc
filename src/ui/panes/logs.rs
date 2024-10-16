@@ -78,7 +78,7 @@ impl Pane for LogsPane {
         &mut self,
         event: MouseEvent,
         _client: &mut impl MpdClient,
-        _context: &mut AppContext,
+        context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
         if !self.logs_area.contains(event.into()) {
             return Ok(KeyHandleResultInternal::SkipRender);
@@ -86,11 +86,11 @@ impl Pane for LogsPane {
 
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev_non_wrapping();
+                self.scrolling_state.prev_non_wrapping(context.config.scrolloff);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next_non_wrapping();
+                self.scrolling_state.next_non_wrapping(context.config.scrolloff);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -114,19 +114,19 @@ impl Pane for LogsPane {
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport();
+                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport();
+                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev();
+                    self.scrolling_state.prev(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next();
+                    self.scrolling_state.next(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {

@@ -77,6 +77,7 @@ pub struct Config {
     pub address: MpdAddress<'static>,
     pub cache_dir: Option<&'static str>,
     pub volume_step: u8,
+    pub scrolloff: usize,
     pub keybinds: KeyConfig,
     pub enable_mouse: bool,
     pub status_update_interval_ms: Option<u64>,
@@ -98,6 +99,8 @@ pub struct ConfigFile {
     pub theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
     volume_step: u8,
+    #[serde(default = "defaults::default_scrolloff")]
+    pub scrolloff: usize,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
@@ -140,6 +143,7 @@ impl Default for ConfigFile {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
             volume_step: 5,
+            scrolloff: 0,
             status_update_interval_ms: Some(1000),
             theme: None,
             cache_dir: None,
@@ -199,6 +203,7 @@ impl ConfigFile {
             }),
             address: MpdAddress::resolve(address_cli, self.address),
             volume_step: self.volume_step,
+            scrolloff: self.scrolloff,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             enable_mouse: self.enable_mouse,
             keybinds: self.keybinds.into(),

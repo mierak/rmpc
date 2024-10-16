@@ -1,6 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
-use crate::config::keys::{CommonAction, Key, ToDescription};
+use crate::{
+    config::keys::{CommonAction, Key, ToDescription},
+    context::AppContext,
+};
 use anyhow::bail;
 use ratatui::{
     layout::{Constraint, Layout, Margin},
@@ -66,7 +69,7 @@ impl KeybindsModal<'_> {
 
         let mut scrolling_state = DirState::default();
         if !rows.is_empty() {
-            scrolling_state.select(Some(0));
+            scrolling_state.select(Some(0), 0);
         }
         Self { scrolling_state, rows }
     }
@@ -154,24 +157,24 @@ impl Modal for KeybindsModal<'_> {
         &mut self,
         key: crossterm::event::KeyEvent,
         _client: &mut crate::mpd::client::Client<'_>,
-        app: &mut crate::context::AppContext,
+        context: &mut AppContext,
     ) -> anyhow::Result<KeyHandleResultInternal> {
-        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
+        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport();
+                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport();
+                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev();
+                    self.scrolling_state.prev(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next();
+                    self.scrolling_state.next(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
