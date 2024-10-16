@@ -134,6 +134,11 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         let position = event.into();
         match event.kind {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick if prev_area.contains(position) => {
+                let clicked_row: usize = event.y.saturating_sub(prev_area.y).into();
+                let prev_stack = self.stack_mut().previous_mut();
+                if let Some(idx_to_select) = prev_stack.state.get_at_rendered_row(clicked_row) {
+                    prev_stack.select_idx(idx_to_select, context.config.scrolloff);
+                }
                 self.stack_mut().pop();
                 let preview = self
                     .prepare_preview(client, context.config)
@@ -193,7 +198,21 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 }
             }
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick if preview_area.contains(position) => {
+                let clicked_row: usize = event.y.saturating_sub(preview_area.y).into();
+                // Offset does not need to be accounted for since it is always scrolled all the way
+                // to the top when going deeper
+                let idx_to_select = self.stack().preview().and_then(|preview| {
+                    if clicked_row < preview.len() {
+                        Some(clicked_row)
+                    } else {
+                        None
+                    }
+                });
+
                 let res = self.next(client)?;
+                self.stack_mut()
+                    .current_mut()
+                    .select_idx(idx_to_select.unwrap_or_default(), 0);
 
                 let preview = self
                     .prepare_preview(client, context.config)

@@ -280,6 +280,10 @@ impl<T: ScrollingState> DirState<T> {
             None
         }
     }
+
+    pub fn offset(&self) -> usize {
+        self.inner.offset()
+    }
 }
 
 #[cfg(test)]
