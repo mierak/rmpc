@@ -656,11 +656,19 @@ impl Pane for SearchPane {
                 } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
-                            self.inputs.next();
+                            if config.wrap_scroll {
+                                self.inputs.next();
+                            } else {
+                                self.inputs.next_non_wrapping();
+                            }
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Up => {
-                            self.inputs.prev();
+                            if config.wrap_scroll {
+                                self.inputs.prev();
+                            } else {
+                                self.inputs.prev_non_wrapping();
+                            }
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::MoveDown => Ok(KeyHandleResultInternal::KeyNotHandled),
