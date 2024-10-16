@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 - Removed left/right arrows as default keybinds for next/previous tab. You can still put these back by editing your config.
 - Filtering is now incremental
-- Up/Down actions do not wrap around anymore. You can get the previous behavior back with the `wrap_scroll` config option
+- Up/Down actions do not wrap around anymore. You can get the previous behavior back with the `wrap_navigation` config option
 
 ### Fixed
 
