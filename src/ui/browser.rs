@@ -235,7 +235,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             CommonAction::Up => {
                 self.stack_mut()
                     .current_mut()
-                    .prev(config.scrolloff, config.wrap_scroll);
+                    .prev(config.scrolloff, config.wrap_navigation);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -243,7 +243,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             CommonAction::Down => {
                 self.stack_mut()
                     .current_mut()
-                    .next(config.scrolloff, config.wrap_scroll);
+                    .next(config.scrolloff, config.wrap_navigation);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -317,7 +317,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.stack_mut().current_mut().toggle_mark_selected();
                 self.stack_mut()
                     .current_mut()
-                    .next(context.config.scrolloff, context.config.wrap_scroll);
+                    .next(context.config.scrolloff, context.config.wrap_navigation);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)

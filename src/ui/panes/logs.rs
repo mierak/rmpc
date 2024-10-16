@@ -122,11 +122,13 @@ impl Pane for LogsPane {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev(context.config.scrolloff, config.wrap_scroll);
+                    self.scrolling_state
+                        .prev(context.config.scrolloff, config.wrap_navigation);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next(context.config.scrolloff, config.wrap_scroll);
+                    self.scrolling_state
+                        .next(context.config.scrolloff, config.wrap_navigation);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {

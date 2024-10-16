@@ -656,7 +656,7 @@ impl Pane for SearchPane {
                 } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
                     match action {
                         CommonAction::Down => {
-                            if config.wrap_scroll {
+                            if config.wrap_navigation {
                                 self.inputs.next();
                             } else {
                                 self.inputs.next_non_wrapping();
@@ -664,7 +664,7 @@ impl Pane for SearchPane {
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Up => {
-                            if config.wrap_scroll {
+                            if config.wrap_navigation {
                                 self.inputs.prev();
                             } else {
                                 self.inputs.prev_non_wrapping();
@@ -781,13 +781,13 @@ impl Pane for SearchPane {
                     match action {
                         CommonAction::Down => {
                             self.songs_dir
-                                .next(context.config.scrolloff, context.config.wrap_scroll);
+                                .next(context.config.scrolloff, context.config.wrap_navigation);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Up => {
                             self.songs_dir
-                                .prev(context.config.scrolloff, context.config.wrap_scroll);
+                                .prev(context.config.scrolloff, context.config.wrap_navigation);
                             self.preview = self.prepare_preview(client, config)?;
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
@@ -837,7 +837,7 @@ impl Pane for SearchPane {
                         CommonAction::Select => {
                             self.songs_dir.toggle_mark_selected();
                             self.songs_dir
-                                .next(context.config.scrolloff, context.config.wrap_scroll);
+                                .next(context.config.scrolloff, context.config.wrap_navigation);
                             Ok(KeyHandleResultInternal::RenderRequested)
                         }
                         CommonAction::Rename => Ok(KeyHandleResultInternal::KeyNotHandled),

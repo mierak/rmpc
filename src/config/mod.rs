@@ -78,7 +78,7 @@ pub struct Config {
     pub cache_dir: Option<&'static str>,
     pub volume_step: u8,
     pub scrolloff: usize,
-    pub wrap_scroll: bool,
+    pub wrap_navigation: bool,
     pub keybinds: KeyConfig,
     pub enable_mouse: bool,
     pub status_update_interval_ms: Option<u64>,
@@ -103,7 +103,7 @@ pub struct ConfigFile {
     #[serde(default = "defaults::default_scrolloff")]
     scrolloff: usize,
     #[serde(default = "defaults::default_false")]
-    wrap_scroll: bool,
+    wrap_navigation: bool,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
@@ -158,7 +158,7 @@ impl Default for ConfigFile {
             search: SearchFile::default(),
             tabs: TabsFile::default(),
             enable_mouse: true,
-            wrap_scroll: false,
+            wrap_navigation: false,
         }
     }
 }
@@ -208,7 +208,7 @@ impl ConfigFile {
             address: MpdAddress::resolve(address_cli, self.address),
             volume_step: self.volume_step,
             scrolloff: self.scrolloff,
-            wrap_scroll: self.wrap_scroll,
+            wrap_navigation: self.wrap_navigation,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             enable_mouse: self.enable_mouse,
             keybinds: self.keybinds.into(),

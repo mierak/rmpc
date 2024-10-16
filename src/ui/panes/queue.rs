@@ -357,14 +357,14 @@ impl Pane for QueuePane {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
                         self.scrolling_state
-                            .prev(context.config.scrolloff, context.config.wrap_scroll);
+                            .prev(context.config.scrolloff, context.config.wrap_navigation);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     if !context.queue.is_empty() {
                         self.scrolling_state
-                            .next(context.config.scrolloff, context.config.wrap_scroll);
+                            .next(context.config.scrolloff, context.config.wrap_navigation);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
