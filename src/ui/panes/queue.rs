@@ -252,11 +252,11 @@ impl Pane for QueuePane {
                 }
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next_non_wrapping(context.config.scrolloff);
+                self.scrolling_state.next(context.config.scrolloff, false);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev_non_wrapping(context.config.scrolloff);
+                self.scrolling_state.prev(context.config.scrolloff, false);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::RightClick => Ok(KeyHandleResultInternal::SkipRender),
@@ -356,13 +356,15 @@ impl Pane for QueuePane {
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
-                        self.scrolling_state.prev(context.config.scrolloff);
+                        self.scrolling_state
+                            .prev(context.config.scrolloff, context.config.wrap_scroll);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
                     if !context.queue.is_empty() {
-                        self.scrolling_state.next(context.config.scrolloff);
+                        self.scrolling_state
+                            .next(context.config.scrolloff, context.config.wrap_scroll);
                     }
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }

@@ -7,6 +7,8 @@
     cache_dir: None,
     on_song_change: None,
     volume_step: 5,
+    scrolloff: 0,
+    wrap_scroll: false,
     enable_mouse: true,
     status_update_interval_ms: 1000,
     select_current_song_on_change: false,

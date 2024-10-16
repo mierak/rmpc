@@ -84,7 +84,13 @@ Determines the step when changing volume with the volume up and down keybinds. D
 <ConfigValue name="scrolloff" type="number" />
 
 Minimal number of screen lines to keep above and below the cursor. Cursor will always be in the middle of the screen
-if set to value bigger than half the viewport height.
+if set to value bigger than half the viewport height. Default is `0`.
+
+### wrap_scroll
+
+<ConfigValue name="wrap_scroll" type="bool" />
+
+Whether to wrap around on Up/Down action in queue/browser panes upon reaching bottom/top. Default is `false`.
 
 ### enable_mouse
 

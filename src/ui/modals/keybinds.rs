@@ -170,11 +170,13 @@ impl Modal for KeybindsModal<'_> {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev(context.config.scrolloff);
+                    self.scrolling_state
+                        .prev(context.config.scrolloff, context.config.wrap_scroll);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next(context.config.scrolloff);
+                    self.scrolling_state
+                        .next(context.config.scrolloff, context.config.wrap_scroll);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {

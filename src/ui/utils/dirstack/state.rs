@@ -51,7 +51,23 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
-    pub fn prev_non_wrapping(&mut self, scrolloff: usize) {
+    pub fn next(&mut self, scrolloff: usize, wrap: bool) {
+        if wrap {
+            self.next_wrapping(scrolloff);
+        } else {
+            self.next_non_wrapping(scrolloff);
+        }
+    }
+
+    pub fn prev(&mut self, scrolloff: usize, wrap: bool) {
+        if wrap {
+            self.prev_wrapping(scrolloff);
+        } else {
+            self.prev_non_wrapping(scrolloff);
+        }
+    }
+
+    fn prev_non_wrapping(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             match self.get_selected() {
                 Some(0) => {
@@ -66,7 +82,7 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
-    pub fn next_non_wrapping(&mut self, scrolloff: usize) {
+    fn next_non_wrapping(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             match self.get_selected() {
                 Some(i) if i == item_count.saturating_sub(1) => {
@@ -81,7 +97,7 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
-    pub fn next(&mut self, scrolloff: usize) {
+    fn next_wrapping(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             let i = match self.get_selected() {
                 Some(i) => {
@@ -100,7 +116,7 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
-    pub fn prev(&mut self, scrolloff: usize) {
+    fn prev_wrapping(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             let i = match self.get_selected() {
                 Some(i) => {
@@ -372,7 +388,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(None);
 
-            subject.next(0);
+            subject.next(0, true);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -382,7 +398,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(0));
 
-            subject.next(0);
+            subject.next(0, true);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -393,7 +409,7 @@ mod tests {
             subject.set_content_len(Some(10));
             subject.select(None, 0);
 
-            subject.next(0);
+            subject.next(0, true);
 
             assert_eq!(subject.get_selected(), Some(0));
         }
@@ -404,7 +420,7 @@ mod tests {
             subject.set_content_len(Some(10));
             subject.select(Some(5), 0);
 
-            subject.next(0);
+            subject.next(0, true);
 
             assert_eq!(subject.get_selected(), Some(6));
         }
@@ -415,7 +431,7 @@ mod tests {
             subject.set_content_len(Some(10));
             subject.select(Some(9), 0);
 
-            subject.next(0);
+            subject.next(0, true);
 
             assert_eq!(subject.get_selected(), Some(0));
         }
@@ -431,7 +447,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(None);
 
-            subject.prev(0);
+            subject.prev(0, true);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -441,7 +457,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(0));
 
-            subject.prev(0);
+            subject.prev(0, true);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -452,7 +468,7 @@ mod tests {
             subject.set_content_len(Some(10));
             subject.select(None, 0);
 
-            subject.prev(0);
+            subject.prev(0, true);
 
             assert_eq!(subject.get_selected(), Some(9));
         }
@@ -463,7 +479,7 @@ mod tests {
             subject.set_content_len(Some(10));
             subject.select(Some(5), 0);
 
-            subject.prev(0);
+            subject.prev(0, true);
 
             assert_eq!(subject.get_selected(), Some(4));
         }
@@ -474,7 +490,7 @@ mod tests {
             subject.set_content_len(Some(10));
             subject.select(Some(0), 0);
 
-            subject.prev(0);
+            subject.prev(0, true);
 
             assert_eq!(subject.get_selected(), Some(9));
         }
