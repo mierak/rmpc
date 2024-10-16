@@ -465,16 +465,27 @@ impl Pane for SearchPane {
             Phase::Search | Phase::SearchTextboxInput => {
                 self.column_areas[1] = current_area;
                 self.render_input_column(frame, current_area, config);
+
+                // Render preview at offset to allow click to select
+                if let Some(preview) = &self
+                    .preview
+                    .as_ref()
+                    .and_then(|preview| preview.get(self.songs_dir.state.offset()..))
+                {
+                    frame.render_widget(
+                        List::new(preview.to_vec()).highlight_style(config.theme.current_item_style),
+                        preview_area,
+                    );
+                }
             }
             Phase::BrowseResults { filter_input_on: _ } => {
                 self.render_song_column(frame, current_area, config);
                 self.render_input_column(frame, previous_area, config);
+                if let Some(preview) = &self.preview {
+                    let preview = List::new(preview.clone()).highlight_style(config.theme.current_item_style);
+                    frame.render_widget(preview, preview_area);
+                }
             }
-        }
-
-        if let Some(preview) = &self.preview {
-            let preview = List::new(preview.clone()).highlight_style(config.theme.current_item_style);
-            frame.render_widget(preview, preview_area);
         }
 
         self.column_areas[0] = previous_area;
@@ -504,13 +515,20 @@ impl Pane for SearchPane {
 
     fn handle_mouse_event(
         &mut self,
-        event: MouseEvent,
+        mut event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
+                // Modify x coord to belong to middle column in order to satisfy the condition
+                // inside get_clicked_input. This is fine because phase is switched to Search.
+                // A bit hacky, but wcyd.
+                event.x = self.input_areas[1].x;
+                if let Some(input) = self.get_clicked_input(event) {
+                    self.inputs.focused_idx = input;
+                }
                 self.preview = self.prepare_preview(client, context.config)?;
 
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -521,6 +539,15 @@ impl Pane for SearchPane {
                         Ok(KeyHandleResultInternal::SkipRender)
                     } else {
                         self.phase = Phase::BrowseResults { filter_input_on: false };
+
+                        let clicked_row: usize = event.y.saturating_sub(self.column_areas[2].y).into();
+                        if let Some(idx_to_select) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
+                            self.songs_dir
+                                .state
+                                .set_viewport_len(Some(self.column_areas[2].height as usize));
+                            self.songs_dir.select_idx(idx_to_select, context.config.scrolloff);
+                        }
+
                         self.preview = self.prepare_preview(client, context.config)?;
                         Ok(KeyHandleResultInternal::RenderRequested)
                     }
