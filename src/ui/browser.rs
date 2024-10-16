@@ -160,7 +160,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
                 if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
-                    self.stack_mut().current_mut().select_idx(idx_to_select);
+                    self.stack_mut()
+                        .current_mut()
+                        .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
                         self.add(item, client)?;
                     }
@@ -178,7 +180,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
                 if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
-                    self.stack_mut().current_mut().select_idx(idx_to_select);
+                    self.stack_mut()
+                        .current_mut()
+                        .select_idx(idx_to_select, context.config.scrolloff);
                     let preview = self
                         .prepare_preview(client, context.config)
                         .context("Cannot prepare preview")?;
@@ -199,7 +203,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
-                self.stack_mut().current_mut().prev_non_wrapping();
+                self.stack_mut()
+                    .current_mut()
+                    .prev_non_wrapping(context.config.scrolloff);
                 let preview = self
                     .prepare_preview(client, context.config)
                     .context("Cannot prepare preview")?;
@@ -208,7 +214,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
-                self.stack_mut().current_mut().next_non_wrapping();
+                self.stack_mut()
+                    .current_mut()
+                    .next_non_wrapping(context.config.scrolloff);
                 let preview = self
                     .prepare_preview(client, context.config)
                     .context("Cannot prepare preview")?;
@@ -229,13 +237,13 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         let config = context.config;
         match action {
             CommonAction::Up => {
-                self.stack_mut().current_mut().prev();
+                self.stack_mut().current_mut().prev(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::Down => {
-                self.stack_mut().current_mut().next();
+                self.stack_mut().current_mut().next(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -249,13 +257,17 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 Ok(res)
             }
             CommonAction::DownHalf => {
-                self.stack_mut().current_mut().next_half_viewport();
+                self.stack_mut()
+                    .current_mut()
+                    .next_half_viewport(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             CommonAction::UpHalf => {
-                self.stack_mut().current_mut().prev_half_viewport();
+                self.stack_mut()
+                    .current_mut()
+                    .prev_half_viewport(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)
@@ -303,7 +315,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             }
             CommonAction::Select => {
                 self.stack_mut().current_mut().toggle_mark_selected();
-                self.stack_mut().current_mut().next();
+                self.stack_mut().current_mut().next(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(KeyHandleResultInternal::RenderRequested)

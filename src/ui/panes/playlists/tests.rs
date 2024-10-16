@@ -29,7 +29,7 @@ mod on_idle_event {
         ) {
             let current = screen.stack.current_mut();
             let playlist_name = client.playlists[2].name.clone();
-            current.select_idx(2);
+            current.select_idx(2, 0);
             assert_eq!(
                 current.selected(),
                 Some(&DirOrSong::Dir {
@@ -59,7 +59,7 @@ mod on_idle_event {
             app_context: AppContext,
             #[case] mut event: UiEvent,
         ) {
-            screen.stack.current_mut().select_idx(2);
+            screen.stack.current_mut().select_idx(2, 0);
 
             client.playlists.remove(2);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -77,7 +77,7 @@ mod on_idle_event {
             #[case] mut event: UiEvent,
         ) {
             let playlist_count = client.playlists.len();
-            screen.stack.current_mut().select_idx(playlist_count - 1);
+            screen.stack.current_mut().select_idx(playlist_count - 1, 0);
 
             client.playlists.pop();
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -97,7 +97,7 @@ mod on_idle_event {
             app_context: AppContext,
             #[case] mut event: UiEvent,
         ) {
-            screen.stack.current_mut().select_idx(0);
+            screen.stack.current_mut().select_idx(0, 0);
 
             client.playlists.remove(0);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -119,7 +119,7 @@ mod on_idle_event {
             app_context: AppContext,
         ) {
             let playlist_name = client.playlists[2].name.clone();
-            screen.stack.current_mut().select_idx(5);
+            screen.stack.current_mut().select_idx(5, 0);
             client.playlists[2].songs_indices.remove(0);
 
             client.playlists.remove(1);
@@ -146,7 +146,7 @@ mod on_idle_event {
         ) {
             let playlist_name = client.playlists[2].name.clone();
             let last_song_idx = screen.stack.current().items.len() - 1;
-            screen.stack.current_mut().select_idx(last_song_idx);
+            screen.stack.current_mut().select_idx(last_song_idx, 0);
             client.playlists[2].songs_indices.remove(last_song_idx);
 
             client.playlists.remove(1);
@@ -172,7 +172,7 @@ mod on_idle_event {
             #[case] mut event: UiEvent,
         ) {
             let playlist_name = client.playlists[2].name.clone();
-            screen.stack.current_mut().select_idx(0);
+            screen.stack.current_mut().select_idx(0, 0);
             client.playlists[2].songs_indices.remove(0);
 
             client.playlists.remove(1);
@@ -198,7 +198,7 @@ mod on_idle_event {
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
-            screen.stack.current_mut().select_idx(5);
+            screen.stack.current_mut().select_idx(5, 0);
 
             client.playlists.remove(2);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -217,7 +217,7 @@ mod on_idle_event {
             #[case] mut event: UiEvent,
         ) {
             let playlist_len = screen.stack.current().items.len();
-            screen.stack.current_mut().select_idx(playlist_len - 1);
+            screen.stack.current_mut().select_idx(playlist_len - 1, 0);
 
             client.playlists.remove(2);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -238,7 +238,7 @@ mod on_idle_event {
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
-            screen.stack.current_mut().select_idx(0);
+            screen.stack.current_mut().select_idx(0, 0);
 
             client.playlists.remove(2);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -256,7 +256,7 @@ mod on_idle_event {
             mut client: TestMpdClient,
             #[case] mut event: UiEvent,
         ) {
-            screen.stack.current_mut().select_idx(5);
+            screen.stack.current_mut().select_idx(5, 0);
 
             client.playlists.remove(0);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -275,7 +275,7 @@ mod on_idle_event {
             #[case] mut event: UiEvent,
         ) {
             let playlist_count = client.playlists.len();
-            screen.stack.current_mut().select_idx(5);
+            screen.stack.current_mut().select_idx(5, 0);
 
             client.playlists.remove(playlist_count - 1);
             screen.on_event(&mut event, &mut client, &app_context).unwrap();
@@ -293,7 +293,7 @@ mod on_idle_event {
 fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
-    screen.stack.current_mut().select_idx(0);
+    screen.stack.current_mut().select_idx(0, 0);
     screen
         .handle_common_action(CommonAction::Right, &mut client, &app_context)
         .unwrap();
@@ -304,7 +304,7 @@ fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> P
 fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
-    screen.stack.current_mut().select_idx(2);
+    screen.stack.current_mut().select_idx(2, 0);
     screen
         .handle_common_action(CommonAction::Right, &mut client, &app_context)
         .unwrap();
@@ -315,7 +315,7 @@ fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> P
 fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
-    screen.stack.current_mut().select_idx(2);
+    screen.stack.current_mut().select_idx(2, 0);
     screen
         .handle_common_action(CommonAction::Right, &mut client, &app_context)
         .unwrap();

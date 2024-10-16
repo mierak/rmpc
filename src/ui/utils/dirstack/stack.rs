@@ -83,7 +83,7 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
     pub fn push(&mut self, head: Vec<T>) {
         let mut new_state = DirState::default();
         if !head.is_empty() {
-            new_state.select(Some(0));
+            new_state.select(Some(0), 0);
         };
         new_state.set_content_len(Some(head.len()));
 
@@ -146,7 +146,7 @@ mod tests {
         fn returns_none_when_nothing_is_selected() {
             let input = vec!["test".to_owned(), "test2".to_owned(), "test3".to_owned()];
             let mut subject: DirStack<String> = DirStack::new(input.clone());
-            subject.current_mut().state.select(None);
+            subject.current_mut().state.select(None, 0);
 
             let result = subject.next_path();
 
@@ -157,10 +157,10 @@ mod tests {
         fn returns_correct_path() {
             let level1 = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
             let mut subject: DirStack<String> = DirStack::new(level1.clone());
-            subject.current_mut().state.select(Some(1));
+            subject.current_mut().state.select(Some(1), 0);
             let level2 = vec!["d".to_owned(), "e".to_owned(), "f".to_owned()];
             subject.push(level2);
-            subject.current_mut().state.select(Some(2));
+            subject.current_mut().state.select(Some(2), 0);
 
             let result = subject.next_path();
 
@@ -175,9 +175,9 @@ mod tests {
         fn puts_current_to_top_of_others_and_new_input_to_current() {
             let input = vec!["test".to_owned(), "test2".to_owned(), "test3".to_owned()];
             let mut subject: DirStack<String> = DirStack::new(input.clone());
-            subject.current_mut().state.select(Some(1));
+            subject.current_mut().state.select(Some(1), 0);
             let input2 = vec!["test4".to_owned(), "test3".to_owned(), "test4".to_owned()];
-            subject.previous_mut().state.select(Some(2));
+            subject.previous_mut().state.select(Some(2), 0);
 
             subject.push(input2.clone());
 

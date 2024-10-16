@@ -7,6 +7,7 @@ use ratatui::{
 
 use crate::{
     config::keys::CommonAction,
+    context::AppContext,
     mpd::{commands::Output, mpd_client::MpdClient},
     ui::{utils::dirstack::DirState, KeyHandleResultInternal},
 };
@@ -100,24 +101,24 @@ impl Modal for OutputsModal {
         &mut self,
         key: crossterm::event::KeyEvent,
         client: &mut crate::mpd::client::Client<'_>,
-        app: &mut crate::context::AppContext,
+        context: &mut AppContext,
     ) -> anyhow::Result<KeyHandleResultInternal> {
-        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
+        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport();
+                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport();
+                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev();
+                    self.scrolling_state.prev(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next();
+                    self.scrolling_state.next(context.config.scrolloff);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {

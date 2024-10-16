@@ -148,6 +148,7 @@ pub trait ScrollingState {
     fn select_scrolling(&mut self, idx: Option<usize>);
     fn get_selected_scrolling(&self) -> Option<usize>;
     fn offset(&self) -> usize;
+    fn set_offset(&mut self, value: usize);
 }
 
 impl ScrollingState for TableState {
@@ -162,6 +163,10 @@ impl ScrollingState for TableState {
     fn offset(&self) -> usize {
         self.offset()
     }
+
+    fn set_offset(&mut self, value: usize) {
+        *self.offset_mut() = value;
+    }
 }
 
 impl ScrollingState for ListState {
@@ -175,6 +180,10 @@ impl ScrollingState for ListState {
 
     fn offset(&self) -> usize {
         self.offset()
+    }
+
+    fn set_offset(&mut self, value: usize) {
+        *self.offset_mut() = value;
     }
 }
 

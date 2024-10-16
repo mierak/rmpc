@@ -108,7 +108,10 @@ impl Pane for PlaylistsPane {
                             .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
                             .or_else(|| self.stack().current().selected_with_idx())
                             .map(|(idx, _)| idx);
-                        new_stack.current_mut().state.select(idx_to_select);
+                        new_stack
+                            .current_mut()
+                            .state
+                            .select(idx_to_select, context.config.scrolloff);
 
                         self.stack = new_stack;
                     }
@@ -121,7 +124,10 @@ impl Pane for PlaylistsPane {
                             .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
                             .or_else(|| self.stack().previous().selected_with_idx())
                             .map(|(idx, _)| idx);
-                        new_stack.current_mut().state.select(playlist_idx_to_select);
+                        new_stack
+                            .current_mut()
+                            .state
+                            .select(playlist_idx_to_select, context.config.scrolloff);
 
                         let previous_song_index = self.stack.current().selected_with_idx().map(|(idx, _)| idx);
                         self.stack = new_stack;
@@ -133,7 +139,10 @@ impl Pane for PlaylistsPane {
                             .find_position(|p| matches!(p, DirOrSong::Song(s) if s.file == song.file))
                             .map(|(idx, _)| idx)
                             .or(previous_song_index);
-                        self.stack.current_mut().state.select(idx_to_select);
+                        self.stack
+                            .current_mut()
+                            .state
+                            .select(idx_to_select, context.config.scrolloff);
                     }
                     None => {}
                 }

@@ -33,55 +33,55 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn first(&mut self) {
         if self.content_len.is_some_and(|v| v > 0) {
-            self.select(Some(0));
+            self.select(Some(0), 0);
         } else {
-            self.select(None);
+            self.select(None, 0);
         }
     }
 
     pub fn last(&mut self) {
         if let Some(item_count) = self.content_len {
             if item_count > 0 {
-                self.select(Some(item_count.saturating_sub(1)));
+                self.select(Some(item_count.saturating_sub(1)), 0);
             } else {
-                self.select(None);
+                self.select(None, 0);
             }
         } else {
-            self.select(None);
+            self.select(None, 0);
         }
     }
 
-    pub fn prev_non_wrapping(&mut self) {
+    pub fn prev_non_wrapping(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             match self.get_selected() {
                 Some(0) => {
-                    self.select(Some(0));
+                    self.select(Some(0), scrolloff);
                 }
                 Some(i) => {
-                    self.select(Some(i.saturating_sub(1)));
+                    self.select(Some(i.saturating_sub(1)), scrolloff);
                 }
-                None if item_count > 0 => self.select(Some(item_count.saturating_sub(1))),
-                None => self.select(None),
+                None if item_count > 0 => self.select(Some(item_count.saturating_sub(1)), scrolloff),
+                None => self.select(None, scrolloff),
             };
         }
     }
 
-    pub fn next_non_wrapping(&mut self) {
+    pub fn next_non_wrapping(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             match self.get_selected() {
                 Some(i) if i == item_count.saturating_sub(1) => {
-                    self.select(Some(item_count.saturating_sub(1)));
+                    self.select(Some(item_count.saturating_sub(1)), scrolloff);
                 }
                 Some(i) => {
-                    self.select(Some(i + 1));
+                    self.select(Some(i + 1), scrolloff);
                 }
-                None if item_count > 0 => self.select(Some(0)),
-                None => self.select(None),
+                None if item_count > 0 => self.select(Some(0), scrolloff),
+                None => self.select(None, scrolloff),
             };
         }
     }
 
-    pub fn next(&mut self) {
+    pub fn next(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             let i = match self.get_selected() {
                 Some(i) => {
@@ -94,13 +94,13 @@ impl<T: ScrollingState> DirState<T> {
                 None if item_count > 0 => Some(0),
                 None => None,
             };
-            self.select(i);
+            self.select(i, scrolloff);
         } else {
-            self.select(None);
+            self.select(None, scrolloff);
         }
     }
 
-    pub fn prev(&mut self) {
+    pub fn prev(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             let i = match self.get_selected() {
                 Some(i) => {
@@ -113,43 +113,81 @@ impl<T: ScrollingState> DirState<T> {
                 None if item_count > 0 => Some(item_count.saturating_sub(1)),
                 None => None,
             };
-            self.select(i);
+            self.select(i, scrolloff);
         } else {
-            self.select(None);
+            self.select(None, scrolloff);
         }
     }
 
-    pub fn next_half_viewport(&mut self) {
+    pub fn next_half_viewport(&mut self, scrolloff: usize) {
         if let Some(item_count) = self.content_len {
             if let Some(viewport) = self.viewport_len {
                 self.select(
                     self.get_selected()
                         .map(|i| i.saturating_add(viewport / 2).min(item_count.saturating_sub(1))),
+                    scrolloff,
                 );
             } else {
-                self.select(None);
+                self.select(None, scrolloff);
             }
         } else {
-            self.select(None);
+            self.select(None, scrolloff);
         }
     }
 
-    pub fn prev_half_viewport(&mut self) {
+    pub fn prev_half_viewport(&mut self, scrolloff: usize) {
         if self.content_len.is_some() {
             if let Some(viewport) = self.viewport_len {
-                self.select(self.get_selected().map(|i| i.saturating_sub(viewport / 2).max(0)));
+                self.select(
+                    self.get_selected().map(|i| i.saturating_sub(viewport / 2).max(0)),
+                    scrolloff,
+                );
             } else {
-                self.select(None);
+                self.select(None, scrolloff);
             }
         } else {
-            self.select(None);
+            self.select(None, scrolloff);
         }
     }
 
-    pub fn select(&mut self, idx: Option<usize>) {
-        let idx = idx.map(|idx| idx.max(0).min(self.content_len.map_or(0, |len| len.saturating_sub(1))));
+    pub fn select(&mut self, idx: Option<usize>, scrolloff: usize) {
+        let content_len = self.content_len.unwrap_or_default();
+        let idx = idx.map(|idx| idx.max(0).min(content_len.saturating_sub(1)));
         self.inner.select_scrolling(idx);
+        self.apply_scrolloff(scrolloff);
         self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0));
+    }
+
+    fn apply_scrolloff(&mut self, scrolloff: usize) {
+        if scrolloff == 0 {
+            return;
+        }
+
+        let vieport_len = self.viewport_len.unwrap_or_default();
+        let offset = self.inner.offset();
+        let idx = self.get_selected().unwrap_or_default();
+        let content_len = self.content_len.unwrap_or_default();
+        let max_offset = content_len.saturating_sub(vieport_len);
+
+        // Always place cursor in the middle of the screen when scrolloff is too big
+        if scrolloff * 2 >= vieport_len {
+            self.inner
+                .set_offset(idx.saturating_sub(vieport_len / 2).min(max_offset));
+            return;
+        }
+
+        let scrolloff_start_down = (offset + vieport_len).saturating_sub(scrolloff + 1);
+        if idx > scrolloff_start_down {
+            let new_offset = (offset + (idx.saturating_sub(scrolloff_start_down))).min(max_offset);
+            self.inner.set_offset(new_offset);
+            return;
+        }
+
+        if idx < offset + scrolloff {
+            self.inner
+                .set_offset(offset.saturating_sub((offset + scrolloff).saturating_sub(idx)));
+            return;
+        }
     }
 
     #[allow(clippy::comparison_chain)]
@@ -334,7 +372,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(None);
 
-            subject.next();
+            subject.next(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -344,7 +382,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(0));
 
-            subject.next();
+            subject.next(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -353,9 +391,9 @@ mod tests {
         fn switches_to_first_item_when_nothing_is_selected() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(10));
-            subject.select(None);
+            subject.select(None, 0);
 
-            subject.next();
+            subject.next(0);
 
             assert_eq!(subject.get_selected(), Some(0));
         }
@@ -364,9 +402,9 @@ mod tests {
         fn switches_to_next_item() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(10));
-            subject.select(Some(5));
+            subject.select(Some(5), 0);
 
-            subject.next();
+            subject.next(0);
 
             assert_eq!(subject.get_selected(), Some(6));
         }
@@ -375,9 +413,9 @@ mod tests {
         fn wraps_around() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(10));
-            subject.select(Some(9));
+            subject.select(Some(9), 0);
 
-            subject.next();
+            subject.next(0);
 
             assert_eq!(subject.get_selected(), Some(0));
         }
@@ -393,7 +431,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(None);
 
-            subject.prev();
+            subject.prev(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -403,7 +441,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(0));
 
-            subject.prev();
+            subject.prev(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -412,9 +450,9 @@ mod tests {
         fn switches_to_last_item_when_nothing_is_selected() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(10));
-            subject.select(None);
+            subject.select(None, 0);
 
-            subject.prev();
+            subject.prev(0);
 
             assert_eq!(subject.get_selected(), Some(9));
         }
@@ -423,9 +461,9 @@ mod tests {
         fn switches_to_prev_item() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(10));
-            subject.select(Some(5));
+            subject.select(Some(5), 0);
 
-            subject.prev();
+            subject.prev(0);
 
             assert_eq!(subject.get_selected(), Some(4));
         }
@@ -434,9 +472,9 @@ mod tests {
         fn wraps_around() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(10));
-            subject.select(Some(0));
+            subject.select(Some(0), 0);
 
-            subject.prev();
+            subject.prev(0);
 
             assert_eq!(subject.get_selected(), Some(9));
         }
@@ -453,7 +491,7 @@ mod tests {
             subject.set_content_len(None);
             subject.set_viewport_len(Some(5));
 
-            subject.next_half_viewport();
+            subject.next_half_viewport(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -464,7 +502,7 @@ mod tests {
             subject.set_content_len(Some(5));
             subject.set_viewport_len(None);
 
-            subject.next_half_viewport();
+            subject.next_half_viewport(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -474,9 +512,9 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(20));
             subject.set_viewport_len(Some(10));
-            subject.select(Some(8));
+            subject.select(Some(8), 0);
 
-            subject.next_half_viewport();
+            subject.next_half_viewport(0);
 
             assert_eq!(subject.get_selected(), Some(13));
         }
@@ -486,9 +524,9 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(20));
             subject.set_viewport_len(Some(10));
-            subject.select(Some(16));
+            subject.select(Some(16), 0);
 
-            subject.next_half_viewport();
+            subject.next_half_viewport(0);
 
             assert_eq!(subject.get_selected(), Some(19));
         }
@@ -505,7 +543,7 @@ mod tests {
             subject.set_content_len(None);
             subject.set_viewport_len(Some(5));
 
-            subject.prev_half_viewport();
+            subject.prev_half_viewport(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -516,7 +554,7 @@ mod tests {
             subject.set_content_len(Some(5));
             subject.set_viewport_len(None);
 
-            subject.prev_half_viewport();
+            subject.prev_half_viewport(0);
 
             assert_eq!(subject.get_selected(), None);
         }
@@ -526,9 +564,9 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(20));
             subject.set_viewport_len(Some(10));
-            subject.select(Some(8));
+            subject.select(Some(8), 0);
 
-            subject.prev_half_viewport();
+            subject.prev_half_viewport(0);
 
             assert_eq!(subject.get_selected(), Some(3));
         }
@@ -538,9 +576,9 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(20));
             subject.set_viewport_len(Some(10));
-            subject.select(Some(4));
+            subject.select(Some(4), 0);
 
-            subject.prev_half_viewport();
+            subject.prev_half_viewport(0);
 
             assert_eq!(subject.get_selected(), Some(0));
         }
@@ -557,7 +595,7 @@ mod tests {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(100));
 
-            subject.select(Some(150));
+            subject.select(Some(150), 0);
 
             assert_eq!(subject.get_selected(), Some(99));
         }
@@ -574,7 +612,7 @@ mod tests {
         fn does_nothing_when_no_content() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(100));
-            subject.select(Some(50));
+            subject.select(Some(50), 0);
             subject.mark(5);
             assert_eq!(subject.get_selected(), Some(50));
             assert_eq!(subject.marked, BTreeSet::from([5]));
@@ -590,7 +628,7 @@ mod tests {
         fn does_nothing_when_removing_outside_range() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(100));
-            subject.select(Some(50));
+            subject.select(Some(50), 0);
             subject.mark(5);
             assert_eq!(subject.get_selected(), Some(50));
             assert_eq!(subject.marked, BTreeSet::from([5]));
@@ -605,7 +643,7 @@ mod tests {
         fn properly_filters_marked_elements() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(100));
-            subject.select(Some(50));
+            subject.select(Some(50), 0);
             (0..100).step_by(10).for_each(|v| {
                 subject.mark(v);
             });
@@ -619,7 +657,7 @@ mod tests {
         fn selects_last_element_when_last_was_selected() {
             let mut subject: DirState<ListState> = DirState::default();
             subject.set_content_len(Some(100));
-            subject.select(Some(99));
+            subject.select(Some(99), 0);
 
             subject.remove(51);
 
@@ -715,6 +753,91 @@ mod tests {
             subject.toggle_mark(10);
 
             assert_eq!(subject.marked, BTreeSet::from([10]));
+        }
+    }
+
+    mod scrolloff {
+        use ratatui::widgets::ListState;
+
+        use crate::ui::utils::dirstack::{DirState, ScrollingState};
+
+        #[test]
+        fn big_scrolloff_should_keep_cursor_in_the_middle() {
+            let scrolloff = 999;
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+
+            subject.select(Some(50), scrolloff);
+
+            assert_eq!(subject.inner.offset(), 45);
+        }
+
+        #[test]
+        fn should_not_apply_scrolloff_top_at_edge() {
+            let scrolloff = 5;
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(20));
+            subject.inner.set_offset(35);
+
+            subject.select(Some(40), scrolloff);
+
+            assert_eq!(subject.inner.offset(), 35);
+        }
+
+        #[test]
+        fn should_apply_scrolloff_top() {
+            let scrolloff = 5;
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(20));
+            subject.inner.set_offset(35);
+
+            subject.select(Some(37), scrolloff);
+
+            assert_eq!(subject.inner.offset(), 32);
+        }
+
+        #[test]
+        fn should_not_apply_scrolloff_bottom_at_edge() {
+            let scrolloff = 5;
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(20));
+            subject.inner.set_offset(55);
+
+            subject.select(Some(69), scrolloff);
+
+            assert_eq!(subject.inner.offset(), 55);
+        }
+
+        #[test]
+        fn should_apply_scrolloff_bottom() {
+            let scrolloff = 5;
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(20));
+            subject.inner.set_offset(55);
+
+            subject.select(Some(72), scrolloff);
+
+            assert_eq!(subject.inner.offset(), 58);
+        }
+
+        #[test]
+        fn scrolloff_does_not_put_offset_out_of_bounds() {
+            let scrolloff = 5;
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(20));
+            subject.inner.set_offset(55);
+
+            subject.select(Some(0), scrolloff);
+            assert_eq!(subject.inner.offset(), 0);
+
+            subject.select(Some(99), scrolloff);
+            assert_eq!(subject.inner.offset(), 80);
         }
     }
 }
