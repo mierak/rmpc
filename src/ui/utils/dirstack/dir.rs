@@ -178,20 +178,12 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         }
     }
 
-    pub fn next(&mut self, scrolloff: usize) {
-        self.state.next(scrolloff);
+    pub fn next(&mut self, scrolloff: usize, wrap: bool) {
+        self.state.next(scrolloff, wrap);
     }
 
-    pub fn prev(&mut self, scrolloff: usize) {
-        self.state.prev(scrolloff);
-    }
-
-    pub fn next_non_wrapping(&mut self, scrolloff: usize) {
-        self.state.next_non_wrapping(scrolloff);
-    }
-
-    pub fn prev_non_wrapping(&mut self, scrolloff: usize) {
-        self.state.prev_non_wrapping(scrolloff);
+    pub fn prev(&mut self, scrolloff: usize, wrap: bool) {
+        self.state.prev(scrolloff, wrap);
     }
 
     pub fn select_idx(&mut self, idx: usize, scrolloff: usize) {

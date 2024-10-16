@@ -143,7 +143,7 @@ impl Modal for AddToPlaylistModal {
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group.first();
                             } else {
-                                self.scrolling_state.next(context.config.scrolloff);
+                                self.scrolling_state.next(context.config.scrolloff, true);
                             }
                         }
                         FocusedComponent::Buttons => {
@@ -164,7 +164,7 @@ impl Modal for AddToPlaylistModal {
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group.last();
                             } else {
-                                self.scrolling_state.prev(context.config.scrolloff);
+                                self.scrolling_state.prev(context.config.scrolloff, true);
                             }
                         }
                         FocusedComponent::Buttons => {

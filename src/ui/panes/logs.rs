@@ -86,11 +86,11 @@ impl Pane for LogsPane {
 
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev_non_wrapping(context.config.scrolloff);
+                self.scrolling_state.prev(context.config.scrolloff, false);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next_non_wrapping(context.config.scrolloff);
+                self.scrolling_state.next(context.config.scrolloff, false);
                 Ok(KeyHandleResultInternal::RenderRequested)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
@@ -122,11 +122,13 @@ impl Pane for LogsPane {
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev(context.config.scrolloff);
+                    self.scrolling_state
+                        .prev(context.config.scrolloff, config.wrap_navigation);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next(context.config.scrolloff);
+                    self.scrolling_state
+                        .next(context.config.scrolloff, config.wrap_navigation);
                     Ok(KeyHandleResultInternal::RenderRequested)
                 }
                 CommonAction::Bottom => {
