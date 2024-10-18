@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Album art not clearing properly after direct tab switch
 - Events being duplicated when panes were present in multiple tabs
 - Ueberzugpp redrawing album art while in an inactive TMUX window/session
+- Fix improper scrollbar rendering with some symbols being empty
 
 ## [0.5.0] - 2024-09-27
 
