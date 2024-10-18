@@ -777,12 +777,16 @@ impl Config {
     }
 
     fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
+        let symbols = self.theme.scrollbar.symbols;
+        let track = if symbols[0].is_empty() { None } else { Some(symbols[0]) };
+        let begin = if symbols[2].is_empty() { None } else { Some(symbols[2]) };
+        let end = if symbols[3].is_empty() { None } else { Some(symbols[3]) };
         ratatui::widgets::Scrollbar::default()
             .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-            .track_symbol(Some(self.theme.scrollbar.symbols[0]))
+            .track_symbol(track)
             .thumb_symbol(self.theme.scrollbar.symbols[1])
-            .begin_symbol(Some(self.theme.scrollbar.symbols[2]))
-            .end_symbol(Some(self.theme.scrollbar.symbols[3]))
+            .begin_symbol(begin)
+            .end_symbol(end)
             .track_style(self.theme.scrollbar.track_style)
             .begin_style(self.theme.scrollbar.ends_style)
             .end_style(self.theme.scrollbar.ends_style)
