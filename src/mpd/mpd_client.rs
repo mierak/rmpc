@@ -61,6 +61,7 @@ impl ValueChange {
 #[allow(dead_code)]
 pub trait MpdClient {
     fn version(&mut self) -> Version;
+    fn password(&mut self, password: &str) -> MpdResult<()>;
     fn commands(&mut self) -> MpdResult<MpdList>;
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update>;
@@ -134,6 +135,11 @@ pub trait MpdClient {
 impl MpdClient for Client<'_> {
     fn version(&mut self) -> Version {
         self.version
+    }
+
+    fn password(&mut self, password: &str) -> MpdResult<()> {
+        self.send(&format!("password {password}"))
+            .and_then(ProtoClient::read_ok)
     }
 
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update> {

@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use address::MpdPassword;
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
@@ -75,6 +76,7 @@ impl Default for Size {
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     pub address: MpdAddress<'static>,
+    pub password: Option<MpdPassword<'static>>,
     pub cache_dir: Option<&'static str>,
     pub volume_step: u8,
     pub scrolloff: usize,
@@ -94,6 +96,8 @@ pub struct Config {
 pub struct ConfigFile {
     #[serde(default = "defaults::mpd_address")]
     pub address: String,
+    #[serde(default)]
+    password: Option<String>,
     #[serde(default)]
     cache_dir: Option<String>,
     #[serde(default)]
@@ -159,6 +163,7 @@ impl Default for ConfigFile {
             tabs: TabsFile::default(),
             enable_mouse: true,
             wrap_navigation: false,
+            password: None,
         }
     }
 }
@@ -188,7 +193,13 @@ impl ConfigFile {
         )
     }
 
-    pub fn into_config(self, config_dir: Option<&Path>, address_cli: Option<String>, is_cli: bool) -> Result<Config> {
+    pub fn into_config(
+        self,
+        config_dir: Option<&Path>,
+        address_cli: Option<String>,
+        password_cli: Option<String>,
+        is_cli: bool,
+    ) -> Result<Config> {
         let theme: UiConfig = config_dir
             .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
             .transpose()?
@@ -196,6 +207,7 @@ impl ConfigFile {
             .try_into()?;
 
         let size = self.album_art.max_size_px;
+        let (address, password) = MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let mut config = Config {
             theme,
             cache_dir: self.cache_dir.map(|v| -> &'static str {
@@ -205,7 +217,8 @@ impl ConfigFile {
                     format!("{v}/").leak()
                 }
             }),
-            address: MpdAddress::resolve(address_cli, self.address),
+            address,
+            password,
             volume_step: self.volume_step,
             scrolloff: self.scrolloff,
             wrap_navigation: self.wrap_navigation,

@@ -3,6 +3,7 @@
 #![enable(unwrap_variant_newtypes)]
 (
     address: "127.0.0.1:6600",
+    password: None,
     theme: None,
     cache_dir: None,
     on_song_change: None,

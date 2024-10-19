@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Support for basic control with mouse. Check docs for more info.
 - Scrolloff option to keep some context the various lists/tables
 - Update/rescan CLI commands to refresh MPD's database
+- Support MPD password via config, env vars and CLI
 
 ### Changed
 

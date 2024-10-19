@@ -10,6 +10,9 @@ pub struct Args {
     #[arg(short, long)]
     /// Override the address to connect to. Defaults to value in the config file.
     pub address: Option<String>,
+    #[arg(short, long)]
+    /// Override the MPD password
+    pub password: Option<String>,
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]

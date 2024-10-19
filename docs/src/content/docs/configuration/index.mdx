@@ -34,12 +34,21 @@ The address to connect to. Address can be either an IP address with a port or a 
 
 The order of precedence is as follows:
 
-1. `--address` passed to rmpc as command line argument
+1. `--address` and `--password` passed to rmpc as command line arguments
 2. `$MPD_HOST` and `$MPD_PORT` environment variables
     - If `$MPD_PORT` is not provided and `$MPD_HOST` starts with `~` or `/`, it is assumed to be a path to a unix socket
     - If `$MPD_PORT` is not provided and `$MPD_HOST` is an IP address and, the default port of `6600` is used
-3. The `address` value from config file
+    - Password can be provided via `$MPD_HOST` in the `password@host` format.
+3. The `address` and `password` values from config file
 4. And finally, if none of the above are provided, the default of `127.0.0.1:6600` is used
+
+Address and password from different sources cannot be mixed and matched.
+
+### password
+
+<ConfigValue name="password" type="string" />
+
+Provide MPD with password upon connecting. Set to `None` or omit completely if your MPD is not configured to use a password.
 
 ### cache_dir
 
