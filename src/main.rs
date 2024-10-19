@@ -532,7 +532,7 @@ fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEve
     let mut error_count = 0;
     let sender = sender;
     loop {
-        let events = match idle_client.idle() {
+        let events = match idle_client.idle(None) {
             Ok(val) => val,
             Err(err) => {
                 if error_count > 5 {

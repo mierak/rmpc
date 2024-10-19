@@ -6,7 +6,7 @@ use rstest::fixture;
 use crate::mpd::{
     commands::{
         list::MpdList, list_playlist::FileList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo,
-        Playlist, Song, Status, Volume,
+        Playlist, Song, Status, Update, Volume,
     },
     errors::MpdError,
     mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
@@ -91,8 +91,8 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
-        todo!()
+    fn idle(&mut self, _subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>> {
+        todo!("Not yet implemented")
     }
 
     fn noidle(&mut self) -> MpdResult<()> {
@@ -476,6 +476,14 @@ impl MpdClient for TestMpdClient {
     }
 
     fn search_add(&mut self, _filter: &[Filter<'_, '_>]) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn update(&mut self, _path: Option<&str>) -> MpdResult<Update> {
+        todo!("Not yet implemented")
+    }
+
+    fn rescan(&mut self, _path: Option<&str>) -> MpdResult<Update> {
         todo!("Not yet implemented")
     }
 }

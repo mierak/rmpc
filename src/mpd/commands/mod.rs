@@ -9,6 +9,7 @@ pub mod lsinfo;
 pub mod outputs;
 pub mod playlist_info;
 pub mod status;
+pub mod update;
 pub mod volume;
 
 pub use self::current_song::Song;
@@ -20,4 +21,5 @@ pub use self::lsinfo::LsInfo;
 pub use self::outputs::Output;
 pub use self::status::State;
 pub use self::status::Status;
+pub use self::update::Update;
 pub use self::volume::Volume;

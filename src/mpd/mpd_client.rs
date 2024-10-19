@@ -10,7 +10,7 @@ use super::{
     client::Client,
     commands::{
         list::MpdList, list_playlist::FileList, outputs::Outputs, status::OnOffOneshot, volume::Bound, IdleEvent,
-        ListFiles, LsInfo, Mounts, Playlist, Song, Status, Volume,
+        ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     proto_client::ProtoClient,
@@ -62,7 +62,9 @@ impl ValueChange {
 pub trait MpdClient {
     fn version(&mut self) -> Version;
     fn commands(&mut self) -> MpdResult<MpdList>;
-    fn idle(&mut self) -> MpdResult<Vec<IdleEvent>>;
+    fn update(&mut self, path: Option<&str>) -> MpdResult<Update>;
+    fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update>;
+    fn idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>>;
     fn noidle(&mut self) -> MpdResult<()>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
@@ -134,14 +136,37 @@ impl MpdClient for Client<'_> {
         self.version
     }
 
+    fn update(&mut self, path: Option<&str>) -> MpdResult<Update> {
+        if let Some(path) = path {
+            self.send(&format!("update {path}"))
+                .and_then(ProtoClient::read_response)
+        } else {
+            self.send("update").and_then(ProtoClient::read_response)
+        }
+    }
+
+    fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update> {
+        if let Some(path) = path {
+            self.send(&format!("rescan {path}"))
+                .and_then(ProtoClient::read_response)
+        } else {
+            self.send("rescan").and_then(ProtoClient::read_response)
+        }
+    }
+
     // Lists commands supported by the MPD server
     fn commands(&mut self) -> MpdResult<MpdList> {
         self.send("commands").and_then(ProtoClient::read_response)
     }
 
     // Queries
-    fn idle(&mut self) -> MpdResult<Vec<IdleEvent>> {
-        self.send("idle").and_then(ProtoClient::read_response)
+    fn idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>> {
+        if let Some(subsystem) = subsystem {
+            self.send(&format!("idle {subsystem}"))
+                .and_then(ProtoClient::read_response)
+        } else {
+            self.send("idle").and_then(ProtoClient::read_response)
+        }
     }
 
     fn noidle(&mut self) -> MpdResult<()> {

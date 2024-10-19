@@ -6,7 +6,7 @@ use crate::{
     config::{cli::Command, Config},
     context::AppContext,
     mpd::{
-        commands::volume::Bound,
+        commands::{volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
     utils::macros::status_error,
@@ -26,6 +26,25 @@ impl Command {
         F: FnMut(WorkRequest, &mut C),
     {
         match self {
+            ref cmd @ Command::Update { ref path, wait } | ref cmd @ Command::Rescan { ref path, wait } => {
+                let crate::mpd::commands::Update { job_id } = if matches!(cmd, Command::Update { .. }) {
+                    client.update(path.as_deref())?
+                } else {
+                    client.rescan(path.as_deref())?
+                };
+
+                if wait {
+                    loop {
+                        client.idle(Some(IdleEvent::Update))?;
+                        let crate::mpd::commands::Status { updating_db, .. } = client.get_status()?;
+                        match updating_db {
+                            Some(current_id) if current_id > job_id => break,
+                            Some(_id) => continue,
+                            None => break,
+                        }
+                    }
+                }
+            }
             Command::Play { position: None } => client.play()?,
             Command::Play { position: Some(pos) } => client.play_pos(pos)?,
             Command::Pause => client.pause()?,
