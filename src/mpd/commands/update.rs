@@ -7,8 +7,8 @@ pub struct Update {
 }
 
 impl FromMpd for Update {
-    fn next_internal(&mut self, _key: &str, value: String) -> Result<LineHandled, MpdError> {
-        match value.as_str() {
+    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+        match key {
             "updating_db" => self.job_id = value.parse()?,
             _ => return Ok(LineHandled::No { value }),
         };

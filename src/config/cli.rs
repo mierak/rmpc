@@ -17,6 +17,22 @@ pub struct Args {
 pub enum Command {
     /// Prints the default config. Can be used to bootstrap your config file.
     Config,
+    /// Scan MPD's music directory for updates.
+    Update {
+        /// If supplied, MPD will update only the provided directory/file. If not specified, everything is updated.
+        path: Option<String>,
+        /// Rmpc will wait for the update job to finish before returning.
+        #[arg(short, long, default_value = "false")]
+        wait: bool,
+    },
+    /// Scan MPD's music directory for updates. Also rescans unmodified files.
+    Rescan {
+        /// If supplied, MPD will update only the provided directory/file. If not specified, everything is updated.
+        path: Option<String>,
+        /// Rmpc will wait for the update job to finish before returning.
+        #[arg(short, long, default_value = "false")]
+        wait: bool,
+    },
     /// Prints the default theme. Can be used to bootstrap your theme file.
     Theme,
     /// Saves the current album art to a file.

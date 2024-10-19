@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Arrow keys as secondary navigation keybinds alongside hjkl
 - Support for basic control with mouse. Check docs for more info.
 - Scrolloff option to keep some context the various lists/tables
+- Update/rescan CLI commands to refresh MPD's database
 
 ### Changed
 
