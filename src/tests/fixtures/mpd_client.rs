@@ -486,4 +486,8 @@ impl MpdClient for TestMpdClient {
     fn rescan(&mut self, _path: Option<&str>) -> MpdResult<Update> {
         todo!("Not yet implemented")
     }
+
+    fn password(&mut self, _password: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }

@@ -96,10 +96,12 @@ fn main() -> Result<()> {
         }
         Some(Command::DebugInfo) => {
             let config_file = ConfigFile::read(&args.config).unwrap_or_default();
-            let config =
-                config_file
-                    .clone()
-                    .into_config(Some(&args.config), std::mem::take(&mut args.address), false)?;
+            let config = config_file.clone().into_config(
+                Some(&args.config),
+                std::mem::take(&mut args.address),
+                std::mem::take(&mut args.password),
+                false,
+            )?;
             let mpd_host = ENV.var("MPD_HOST").unwrap_or_else(|_| "unset".to_string());
             let mpd_port = ENV.var("MPD_PORT").unwrap_or_else(|_| "unset".to_string());
 
@@ -145,10 +147,20 @@ fn main() -> Result<()> {
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");
             let config: &'static Config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
-                Ok(val) => val.into_config(Some(&args.config), std::mem::take(&mut args.address), true)?,
-                Err(_err) => ConfigFile::default().into_config(None, std::mem::take(&mut args.address), true)?,
+                Ok(val) => val.into_config(
+                    Some(&args.config),
+                    std::mem::take(&mut args.address),
+                    std::mem::take(&mut args.password),
+                    true,
+                )?,
+                Err(_err) => ConfigFile::default().into_config(
+                    None,
+                    std::mem::take(&mut args.address),
+                    std::mem::take(&mut args.password),
+                    true,
+                )?,
             }));
-            let mut client = Client::init(config.address, "", true)?;
+            let mut client = Client::init(config.address, config.password, "", true)?;
             cmd.execute(&mut client, config, |work_request, c| {
                 match handle_work_request(work_request, config) {
                     Ok(WorkDone::YoutubeDowloaded { file_path }) => match c.add(&file_path) {
@@ -172,17 +184,27 @@ fn main() -> Result<()> {
             let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
 
             let config = match ConfigFile::read(&args.config) {
-                Ok(val) => val.into_config(Some(&args.config), std::mem::take(&mut args.address), false)?,
+                Ok(val) => val.into_config(
+                    Some(&args.config),
+                    std::mem::take(&mut args.address),
+                    std::mem::take(&mut args.password),
+                    false,
+                )?,
                 Err(err) => {
                     status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
-                    ConfigFile::default().into_config(None, std::mem::take(&mut args.address), false)?
+                    ConfigFile::default().into_config(
+                        None,
+                        std::mem::take(&mut args.address),
+                        std::mem::take(&mut args.password),
+                        false,
+                    )?
                 }
             };
 
             try_ret!(tx.send(AppEvent::RequestRender(false)), "Failed to render first frame");
 
             let mut client = try_ret!(
-                Client::init(config.address, "command", true),
+                Client::init(config.address, config.password, "command", true),
                 "Failed to connect to mpd"
             );
 
@@ -211,7 +233,7 @@ fn main() -> Result<()> {
                 .spawn(|| input_poll_task(tx_clone))?;
 
             let mut idle_client = try_ret!(
-                Client::init(context.config.address, "idle", true),
+                Client::init(context.config.address, context.config.password, "idle", true),
                 "Failed to connect to mpd with idle client"
             );
 

@@ -4,7 +4,11 @@ use std::{
     os::unix::net::UnixStream,
 };
 
-use crate::{config::MpdAddress, utils::macros::status_warn};
+use crate::{
+    config::{address::MpdPassword, MpdAddress},
+    mpd::mpd_client::MpdClient,
+    utils::macros::status_warn,
+};
 
 use super::{
     errors::MpdError,
@@ -28,6 +32,7 @@ pub struct Client<'name> {
     stream: TcpOrUnixStream,
     reconnect: bool,
     addr: MpdAddress<'name>,
+    password: Option<MpdPassword<'name>>,
     pub version: Version,
 }
 
@@ -106,7 +111,12 @@ impl std::io::Write for TcpOrUnixStream {
 
 #[allow(dead_code)]
 impl<'name> Client<'name> {
-    pub fn init(addr: MpdAddress<'name>, name: &'name str, reconnect: bool) -> MpdResult<Client<'name>> {
+    pub fn init(
+        addr: MpdAddress<'name>,
+        password: Option<MpdPassword<'name>>,
+        name: &'name str,
+        reconnect: bool,
+    ) -> MpdResult<Client<'name>> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
@@ -134,14 +144,22 @@ impl<'name> Client<'name> {
             );
         }
 
-        Ok(Self {
+        let mut client = Self {
             name,
             rx,
             stream,
             reconnect,
             addr,
+            password,
             version,
-        })
+        };
+
+        if let Some(MpdPassword(password)) = password {
+            debug!("Used password auth to MPD");
+            client.password(password)?;
+        }
+
+        Ok(client)
     }
 
     fn reconnect(&mut self) -> MpdResult<&Client> {
@@ -170,6 +188,11 @@ impl<'name> Client<'name> {
         self.version = version;
 
         debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
+
+        if let Some(MpdPassword(password)) = self.password {
+            debug!("Used password auth to MPD");
+            self.password(password)?;
+        }
 
         Ok(self)
     }
