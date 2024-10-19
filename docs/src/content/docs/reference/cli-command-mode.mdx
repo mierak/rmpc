@@ -24,6 +24,8 @@ Usage: rmpc [OPTIONS] [COMMAND]
 
 Commands:
   config         Prints the default config. Can be used to bootstrap your config file
+  update         Scan MPD's music directory for updates
+  rescan         Scan MPD's music directory for updates. Also rescans unmodified files
   theme          Prints the default theme. Can be used to bootstrap your theme file
   albumart       Saves the current album art to a file. Exit codes: * 0: Success * 1: Error * 2: No album art found * 3: No song playing
   debuginfo      Prints information about optional runtime dependencies
@@ -49,7 +51,7 @@ Commands:
   enableoutput   Enable MPD output
   disableoutput  Disable MPD output
   status         Prints various information like the playback status
-  song           Prints information about the current song
+  song           Prints info about the current song. If --path specified, prints information about the song at the given path instead. If --path is specified multiple times, prints an array containing all the songs
   mount          Mounts supported storage to MPD
   unmount        Unmounts storage with given name
   listmounts     List currently mounted storages
