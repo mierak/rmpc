@@ -1,0 +1,19 @@
+name: Feature request
+description: Help improve rmpc by requesting a new functionality.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the feature you would like to be added to rmpc. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Do you have an idea how this could be achieved?
+    validations:
+      required: false
