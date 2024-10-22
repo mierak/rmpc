@@ -1,0 +1,83 @@
+name: Bug Report
+description: Help improve rmpc by reporting an issue.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Short description of the issue you are observing, you can include screenshots, videos or other files if relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can the issue be reproduced?
+    validations:
+      required: true
+
+  - type: textarea
+    id: resolution
+    attributes:
+      label: Expected behavior
+      description: What is the correct behavior?
+
+  - type: input
+    id: terminal
+    attributes:
+      label: What terminal emulator are you running rmpc in?
+      description: Please provide what terminal emulator and its version here.
+      placeholder: e.g. kitty 0.36.4
+    validations:
+      required: false
+
+  - type: textarea
+    id: debuginfo
+    attributes:
+      label: rmpc debuginfo
+      description: Please paste the output of `rmpc debuginfo` here.
+      value: |
+        <details>
+          <summary>rmpc debuginfo</summary>
+
+          ```sh
+        Paste the output here
+          ```
+        </details>
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Config file
+      description: Please copy and paste the contents of your config file (and theme if relevant) here.
+      value: |
+        <details>
+          <summary>rmpc config</summary>
+
+          ```ron
+        Paste the output here
+          ```
+        </details>
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste the contents of `/tmp/rmpc.log` here
+      value: |
+        <details>
+          <summary>rmpc log</summary>
+
+          ```
+        Paste the contents here
+          ```
+        </details>
+    validations:
+      required: false
+
