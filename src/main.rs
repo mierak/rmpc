@@ -102,7 +102,10 @@ fn main() -> Result<()> {
                 std::mem::take(&mut args.password),
                 false,
             )?;
-            let mpd_host = ENV.var("MPD_HOST").unwrap_or_else(|_| "unset".to_string());
+            let mut mpd_host = ENV.var("MPD_HOST").unwrap_or_else(|_| "unset".to_string());
+            if let Some(at_idx) = mpd_host.find('@') {
+                mpd_host.replace_range(..at_idx, "***");
+            }
             let mpd_port = ENV.var("MPD_PORT").unwrap_or_else(|_| "unset".to_string());
 
             println!(
