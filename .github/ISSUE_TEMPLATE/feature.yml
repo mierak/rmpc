@@ -1,6 +1,6 @@
 name: Feature request
 description: Help improve rmpc by requesting a new functionality.
-labels: ["bug"]
+labels: ["enhancement"]
 body:
   - type: textarea
     id: description
