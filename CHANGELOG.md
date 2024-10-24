@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Events being duplicated when panes were present in multiple tabs
 - Ueberzugpp redrawing album art while in an inactive TMUX window/session
 - Fix improper scrollbar rendering with some symbols being empty
+- Removed duplicated tags in metadata view of a song
 
 ## [0.5.0] - 2024-09-27
 
