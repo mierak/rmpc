@@ -66,8 +66,8 @@ impl Command {
                 request_work(WorkRequest::DownloadYoutube { url }, client);
             }
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
-            Command::Config => bail!("Cannot use config command here."),
-            Command::Theme => bail!("Cannot use theme command here."),
+            Command::Config { .. } => bail!("Cannot use config command here."),
+            Command::Theme { .. } => bail!("Cannot use theme command here."),
             Command::Version => bail!("Cannot use version command here."),
             Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::ToggleOutput { id } => client.toggle_output(id)?,
