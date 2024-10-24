@@ -38,6 +38,7 @@ url = "2.5.2"
 sysinfo = "0.31.4"
 color_quant = "1.1.0"
 enum-map = "2.7.3"
+textwrap = "0.16.1"
 
 [build-dependencies]
 clap = { workspace = true }

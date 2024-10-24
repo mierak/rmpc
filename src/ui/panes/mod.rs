@@ -215,7 +215,11 @@ pub(crate) mod browser {
                 ]));
             }
 
-            for (k, v) in &self.metadata {
+            for (k, v) in self
+                .metadata
+                .iter()
+                .filter(|(key, _)| !["title", "album", "artist", "duration"].contains(&(*key).as_str()))
+            {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
                     Span::styled(k.clone(), key_style),
