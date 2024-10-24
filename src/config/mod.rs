@@ -177,13 +177,18 @@ impl ConfigFile {
         Ok(config)
     }
 
+    pub fn theme_path(&self, config_dir: &Path) -> Option<PathBuf> {
+        self.theme.as_ref().map(|theme_name| {
+            PathBuf::from(config_dir)
+                .join("themes")
+                .join(format!("{theme_name}.ron"))
+        })
+    }
+
     fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile> {
-        self.theme.as_ref().map_or_else(
+        self.theme_path(config_dir).map_or_else(
             || Ok(UiConfigFile::default()),
-            |theme_name| -> Result<_> {
-                let path = PathBuf::from(config_dir)
-                    .join("themes")
-                    .join(format!("{theme_name}.ron"));
+            |path| {
                 let file = std::fs::File::open(&path)
                     .with_context(|| format!("Failed to open theme file {:?}", path.to_string_lossy()))?;
                 let read = std::io::BufReader::new(file);
@@ -195,12 +200,12 @@ impl ConfigFile {
 
     pub fn into_config(
         self,
-        config_dir: Option<&Path>,
+        config_path: Option<&Path>,
         address_cli: Option<String>,
         password_cli: Option<String>,
         is_cli: bool,
     ) -> Result<Config> {
-        let theme: UiConfig = config_dir
+        let theme: UiConfig = config_path
             .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
             .transpose()?
             .unwrap_or_default()

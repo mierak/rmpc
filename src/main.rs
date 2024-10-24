@@ -13,9 +13,14 @@
     clippy::redundant_closure_for_method_calls,
     unused_macros
 )]
-use std::{io::Write, ops::Sub, sync::mpsc::TryRecvError, time::Duration};
+use std::{
+    io::{Read, Write},
+    ops::Sub,
+    sync::mpsc::TryRecvError,
+    time::Duration,
+};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use cli::run_external;
 use config::{
@@ -88,11 +93,34 @@ pub enum AppEvent {
 fn main() -> Result<()> {
     let mut args = Args::parse();
     match args.command {
-        Some(Command::Config) => {
+        Some(Command::Config { current: false }) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
         }
-        Some(Command::Theme) => {
+        Some(Command::Theme { current: false }) => {
             std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
+        }
+        Some(Command::Config { current: true }) => {
+            let mut file = std::fs::File::open(&args.config)
+                .with_context(|| format!("Config file was not found at '{}'", args.config.to_string_lossy()))?;
+            let mut config = String::new();
+            file.read_to_string(&mut config)?;
+            println!("{config}");
+        }
+        Some(Command::Theme { current: true }) => {
+            let config_file = ConfigFile::read(&args.config)
+                .with_context(|| format!("Config file was not found at '{}'", args.config.to_string_lossy()))?;
+            let config_dir = args
+                .config
+                .parent()
+                .with_context(|| format!("Invalid config path '{}'", args.config.to_string_lossy()))?;
+            let theme_path = config_file
+                .theme_path(config_dir)
+                .context("No theme file specified in the config. Default theme is used.")?;
+            let mut file = std::fs::File::open(&theme_path)
+                .with_context(|| format!("Theme file was not found at '{}'", theme_path.to_string_lossy()))?;
+            let mut theme = String::new();
+            file.read_to_string(&mut theme)?;
+            println!("{theme}");
         }
         Some(Command::DebugInfo) => {
             let config_file = ConfigFile::read(&args.config).unwrap_or_default();

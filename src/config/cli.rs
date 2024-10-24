@@ -19,7 +19,17 @@ pub struct Args {
 #[clap(rename_all = "lower")]
 pub enum Command {
     /// Prints the default config. Can be used to bootstrap your config file.
-    Config,
+    Config {
+        /// If provided, print the current config instead of the default one.
+        #[arg(short, long, default_value = "false")]
+        current: bool,
+    },
+    /// Prints the default theme. Can be used to bootstrap your theme file.
+    Theme {
+        /// If provided, print the current theme instead of the default one.
+        #[arg(short, long, default_value = "false")]
+        current: bool,
+    },
     /// Scan MPD's music directory for updates.
     Update {
         /// If supplied, MPD will update only the provided directory/file. If not specified, everything is updated.
@@ -36,8 +46,6 @@ pub enum Command {
         #[arg(short, long, default_value = "false")]
         wait: bool,
     },
-    /// Prints the default theme. Can be used to bootstrap your theme file.
-    Theme,
     /// Saves the current album art to a file.
     /// Exit codes:
     ///   * 0: Success
