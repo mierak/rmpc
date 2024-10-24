@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Scrolloff option to keep some context the various lists/tables
 - Update/rescan CLI commands to refresh MPD's database
 - Support MPD password via config, env vars and CLI
+- ShowInfo action to queue pane. Displays metadata of the song under cursor in a modal popup.
 
 ### Changed
 
