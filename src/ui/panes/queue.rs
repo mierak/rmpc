@@ -16,7 +16,7 @@ use crate::{
     ui::{
         modals::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
-            save_queue::SaveQueueModal,
+            save_queue::SaveQueueModal, song_info::SongInfoModal,
         },
         utils::dirstack::DirState,
         KeyHandleResultInternal, UiEvent,
@@ -348,6 +348,20 @@ impl Pane for QueuePane {
                             playlists,
                         )))))
                     } else {
+                        Ok(KeyHandleResultInternal::SkipRender)
+                    }
+                }
+                QueueActions::ShowInfo => {
+                    if let Some(selected_song) = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx))
+                    {
+                        Ok(KeyHandleResultInternal::Modal(Some(Box::new(SongInfoModal::new(
+                            selected_song.clone(),
+                        )))))
+                    } else {
+                        status_error!("No song selected");
                         Ok(KeyHandleResultInternal::SkipRender)
                     }
                 }
