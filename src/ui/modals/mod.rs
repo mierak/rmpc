@@ -16,6 +16,7 @@ pub mod keybinds;
 pub mod outputs;
 pub mod rename_playlist;
 pub mod save_queue;
+pub mod song_info;
 
 pub(super) trait Modal: std::fmt::Debug {
     fn render(&mut self, frame: &mut Frame, _app: &mut crate::context::AppContext) -> Result<()>;

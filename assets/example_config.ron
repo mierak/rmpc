@@ -82,6 +82,7 @@
             "<C-s>":   Save,
             "a":       AddToPlaylist,
             "d":       Delete,
+            "i":       ShowInfo,
         },
     ),
     search: (
