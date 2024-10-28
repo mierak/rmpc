@@ -12,12 +12,14 @@ All notable changes to this project will be documented in this file.
 - Update/rescan CLI commands to refresh MPD's database
 - Support MPD password via config, env vars and CLI
 - ShowInfo action to queue pane. Displays metadata of the song under cursor in a modal popup.
+- ShowCurrentSongInfo global action. Displays metadata of the song currently playing song in a modal popup.
 
 ### Changed
 
 - Removed left/right arrows as default keybinds for next/previous tab. You can still put these back by editing your config.
 - Filtering is now incremental
 - Up/Down actions do not wrap around anymore. You can get the previous behavior back with the `wrap_navigation` config option
+- Allow seeking while paused
 
 ### Fixed
 

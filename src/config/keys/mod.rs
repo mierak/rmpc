@@ -73,6 +73,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('q'), modifiers: M::NONE  }, G::Quit),
                 (Key { key: K::Char(':'), modifiers: M::NONE  }, G::CommandMode),
                 (Key { key: K::Char('~'), modifiers: M::NONE  }, G::ShowHelp),
+                (Key { key: K::Char('I'), modifiers: M::SHIFT }, G::ShowCurrentSongInfo),
                 (Key { key: K::Char('O'), modifiers: M::SHIFT }, G::ShowOutputs),
                 (Key { key: K::Char('>'), modifiers: M::NONE  }, G::NextTrack),
                 (Key { key: K::Char('<'), modifiers: M::NONE  }, G::PreviousTrack),
