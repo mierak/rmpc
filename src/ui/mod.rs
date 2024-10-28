@@ -262,7 +262,10 @@ impl<'ui> Ui<'ui> {
                 Ok(KeyHandleResult::RenderRequested)
             }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
-                if !matches!(context.status.state, crate::mpd::commands::State::Play) {
+                if !matches!(
+                    context.status.state,
+                    crate::mpd::commands::State::Play | crate::mpd::commands::State::Pause
+                ) {
                     return Ok(KeyHandleResult::SkipRender);
                 }
 
@@ -438,10 +441,14 @@ impl<'ui> Ui<'ui> {
                         GlobalAction::VolumeDown => {
                             client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
                         }
-                        GlobalAction::SeekForward if context.status.state == MpdState::Play => {
+                        GlobalAction::SeekForward
+                            if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
+                        {
                             client.seek_current(ValueChange::Increase(5))?;
                         }
-                        GlobalAction::SeekBack if context.status.state == MpdState::Play => {
+                        GlobalAction::SeekBack
+                            if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
+                        {
                             client.seek_current(ValueChange::Decrease(5))?;
                         }
                         GlobalAction::NextTab => {
