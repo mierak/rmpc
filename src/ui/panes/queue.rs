@@ -143,7 +143,7 @@ impl Pane for QueuePane {
         };
         let table = Table::new(table_items, self.column_widths.clone())
             .style(config.as_text_style())
-            .highlight_style(config.theme.current_item_style);
+            .row_highlight_style(config.theme.current_item_style);
 
         let table_area = table_block.inner(queue_section);
         self.table_area = table_area;

@@ -136,7 +136,7 @@ impl Modal for SongInfoModal {
         )
         .column_spacing(1)
         .style(app.config.as_text_style())
-        .highlight_style(app.config.theme.current_item_style);
+        .row_highlight_style(app.config.theme.current_item_style);
 
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);

@@ -74,7 +74,7 @@ impl Modal for OutputsModal {
         .column_spacing(0)
         .style(app.config.as_text_style())
         .header(Row::new(["Id", "Name", "Enabled"]))
-        .highlight_style(app.config.theme.current_item_style);
+        .row_highlight_style(app.config.theme.current_item_style);
 
         frame.render_widget(block, popup_area);
         frame.render_stateful_widget(

@@ -12,43 +12,43 @@ readme = "README.md"
 
 [dependencies]
 clap = { workspace = true }
-anyhow = "1.0.89"
+anyhow = "1.0.91"
 base64 = "0.22.1"
 crossterm = { version = "0.28.1", features = ["serde"] }
-image = "0.25.2"
-ratatui = { version = "0.28.1", features = ["all-widgets"] }
-serde = { version = "1.0.210", features = ["derive"] }
+image = "0.25.4"
+ratatui = { version = "0.29.0", features = ["all-widgets"] }
+serde = { version = "1.0.214", features = ["derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 time = { version = "0.3.36", features = ["macros", "local-offset"] }
 flate2 = { version = "1.0.34" }
 itertools = "0.13.0"
 ron = "0.8.1"
 derive_more = { version = "1.0.0", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref"] }
-rustix = { version = "0.38.37", features = ["termios", "stdio", "process"] }
+rustix = { version = "0.38.38", features = ["termios", "stdio", "process"] }
 bitflags = { version = "2.6.0", features = ["serde"] }
 log = { version = "0.4.22", features = ["kv"] }
-flexi_logger = "0.29.0"
+flexi_logger = "0.29.4"
 chrono = "0.4.38"
-serde_with = "3.9.0"
-serde_json = "1.0.128"
+serde_with = "3.11.0"
+serde_json = "1.0.132"
 either = "1.13.0"
 walkdir = "2.5.0"
 which = "6.0.3"
 url = "2.5.2"
-sysinfo = "0.31.4"
+sysinfo = "0.32.0"
 color_quant = "1.1.0"
 enum-map = "2.7.3"
 textwrap = "0.16.1"
 
 [build-dependencies]
 clap = { workspace = true }
-clap_complete = "4.5.29"
-clap_mangen = "0.2.23"
+clap_complete = "4.5.35"
+clap_mangen = "0.2.24"
 vergen-gitcl = { version = "1.0.1", features = ["build"] }
 
 [dev-dependencies]
-rstest = "0.22.0"
+rstest = "0.23.0"
 test-case = "3.3.1"
 
 [workspace.dependencies]
-clap = { version = "4.5.18", features = ["derive", "cargo", "string" ] }
+clap = { version = "4.5.20", features = ["derive", "cargo", "string" ] }

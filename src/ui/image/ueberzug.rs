@@ -222,7 +222,11 @@ impl UeberzugDaemon {
     fn is_deamon_running(&self, pid: Pid) -> bool {
         let mut system = System::new();
         let infopid = sysinfo::Pid::from_u32(pid.0 as u32);
-        system.refresh_processes_specifics(ProcessesToUpdate::Some(&[infopid]), ProcessRefreshKind::everything());
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::Some(&[infopid]),
+            true,
+            ProcessRefreshKind::everything(),
+        );
 
         system.process(infopid).is_some()
     }

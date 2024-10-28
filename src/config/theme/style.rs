@@ -97,38 +97,35 @@ impl ToConfigOr for StyleFile {
 #[allow(clippy::similar_names)]
 impl ToConfigOr for Option<StyleFile> {
     fn to_config_or(&self, default_fg: Option<RColor>, default_bg: Option<RColor>) -> Result<ratatui::style::Style> {
-        match self {
-            Some(val) => {
-                let fg: Option<ConfigColor> = val.fg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
-                let fg: Option<RColor> = fg.map(Into::into).or(default_fg);
+        if let Some(val) = self {
+            let fg: Option<ConfigColor> = val.fg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+            let fg: Option<RColor> = fg.map(Into::into).or(default_fg);
 
-                let bg: Option<ConfigColor> = val.bg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
-                let bg: Option<RColor> = bg.map(Into::into).or(default_bg);
+            let bg: Option<ConfigColor> = val.bg.as_ref().map(|s| s.as_bytes().try_into()).transpose()?;
+            let bg: Option<RColor> = bg.map(Into::into).or(default_bg);
 
-                let modifiers = val
-                    .modifiers
-                    .as_ref()
-                    .map_or(ratatui::style::Modifier::empty(), Into::into);
+            let modifiers = val
+                .modifiers
+                .as_ref()
+                .map_or(ratatui::style::Modifier::empty(), Into::into);
 
-                let mut result = ratatui::style::Style::default();
-                if let Some(fg) = fg {
-                    result = result.fg(fg);
-                }
-                if let Some(bg) = bg {
-                    result = result.bg(bg);
-                }
-                Ok(result.add_modifier(modifiers))
+            let mut result = ratatui::style::Style::default();
+            if let Some(fg) = fg {
+                result = result.fg(fg);
             }
-            None => {
-                let mut result = ratatui::style::Style::default();
-                if let Some(fg) = default_fg {
-                    result = result.fg(fg);
-                }
-                if let Some(bg) = default_bg {
-                    result = result.bg(bg);
-                }
-                Ok(result)
+            if let Some(bg) = bg {
+                result = result.bg(bg);
             }
+            Ok(result.add_modifier(modifiers))
+        } else {
+            let mut result = ratatui::style::Style::default();
+            if let Some(fg) = default_fg {
+                result = result.fg(fg);
+            }
+            if let Some(bg) = default_bg {
+                result = result.bg(bg);
+            }
+            Ok(result)
         }
     }
 }
