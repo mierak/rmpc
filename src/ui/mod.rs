@@ -8,7 +8,7 @@ use crossterm::{
 };
 use enum_map::{enum_map, Enum, EnumMap};
 use itertools::Itertools;
-use modals::{keybinds::KeybindsModal, outputs::OutputsModal};
+use modals::{keybinds::KeybindsModal, outputs::OutputsModal, song_info::SongInfoModal};
 use panes::{PaneContainer, Panes};
 use ratatui::{
     layout::Rect,
@@ -36,7 +36,7 @@ use crate::{
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     utils::{
-        macros::{status_error, try_ret},
+        macros::{status_error, status_info, try_ret},
         mouse_event::{MouseEvent, MouseEventKind},
     },
 };
@@ -485,6 +485,16 @@ impl<'ui> Ui<'ui> {
                             self.modals.push(Box::new(OutputsModal::new(client.outputs()?.0)));
                             self.on_event(UiEvent::ModalOpened, context, client)?;
                             return Ok(KeyHandleResult::RenderRequested);
+                        }
+                        GlobalAction::ShowCurrentSongInfo => {
+                            if let Some(current_song) = context.get_current_song(client)? {
+                                self.modals.push(Box::new(SongInfoModal::new(current_song)));
+                                self.on_event(UiEvent::ModalOpened, context, client)?;
+                                return Ok(KeyHandleResult::RenderRequested);
+                            }
+
+                            status_info!("No song is currently playing");
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                     }
                     Ok(KeyHandleResult::SkipRender)
