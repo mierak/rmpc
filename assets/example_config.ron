@@ -42,6 +42,7 @@
             "z":       ToggleRepeat,
             "b":       SeekBack,
             "~":       ShowHelp,
+            "I":       ShowCurrentSongInfo,
             "O":       ShowOutputs,
         },
         navigation: {
