@@ -1,4 +1,3 @@
-
 use std::time::{Duration, Instant};
 
 use crossterm::event::{MouseButton, MouseEvent as CTMouseEvent, MouseEventKind as CTMouseEventKind};
