@@ -5,7 +5,7 @@ use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
-    widgets::{Block, List, ListState, Padding},
+    widgets::{List, ListState},
     Frame,
 };
 
@@ -26,9 +26,24 @@ pub struct LogsPane {
     logs_area: Rect,
 }
 
+const INDENT_LEN: usize = 4;
+const INDENT: &str = "    ";
+
 impl Pane for LogsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
+        let max_line_width = (area.width as usize).saturating_sub(INDENT_LEN + 3);
         let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
+        let lines: Vec<_> = lines
+            .iter()
+            .flat_map(|l| {
+                let mut lines = textwrap::wrap(l, textwrap::Options::new(max_line_width));
+                lines
+                    .iter_mut()
+                    .skip(1)
+                    .for_each(|v| *v = std::borrow::Cow::Owned(textwrap::indent(v, INDENT)));
+                lines
+            })
+            .collect();
 
         let content_len = lines.len();
         self.scrolling_state.set_content_len(Some(content_len));
@@ -39,14 +54,15 @@ impl Pane for LogsPane {
 
         let logs_wg = List::new(lines)
             .style(config.as_text_style())
-            .highlight_style(config.theme.current_item_style)
-            .block(Block::default().padding(Padding::right(5)));
-        frame.render_stateful_widget(logs_wg, area, self.scrolling_state.as_render_state_ref());
+            .highlight_style(config.theme.current_item_style);
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
             area,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
+        let mut area = area;
+        area.width = area.width.saturating_sub(1);
+        frame.render_stateful_widget(logs_wg, area, self.scrolling_state.as_render_state_ref());
         self.logs_area = area;
 
         Ok(())
