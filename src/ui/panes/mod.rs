@@ -31,7 +31,7 @@ use crate::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
     },
-    utils::{mouse_event::MouseEvent, DurationExt},
+    shared::{ext::duration::DurationExt, mouse_event::MouseEvent},
 };
 
 use super::{widgets::volume::Volume, KeyHandleResultInternal, UiEvent};

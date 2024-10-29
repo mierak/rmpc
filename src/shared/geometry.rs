@@ -1,6 +1,6 @@
 use ratatui::layout::Direction;
 
-use crate::utils::percent::Percent;
+use super::percent::Percent;
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub struct Point {

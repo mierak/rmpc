@@ -7,7 +7,7 @@ use std::{
 use crate::{
     config::{address::MpdPassword, MpdAddress},
     mpd::mpd_client::MpdClient,
-    utils::macros::status_warn,
+    shared::macros::status_warn,
 };
 
 use super::{

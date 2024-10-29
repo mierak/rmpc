@@ -14,15 +14,15 @@ use crate::{
         commands::{lsinfo::FileOrDir, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
-    ui::{
-        browser::BrowserPane,
-        utils::dirstack::{DirStack, DirStackItem},
-        widgets::browser::Browser,
-        KeyHandleResultInternal,
-    },
-    utils::{
+    shared::{
         macros::{status_info, status_warn},
         mouse_event::MouseEvent,
+    },
+    ui::{
+        browser::BrowserPane,
+        dirstack::{DirStack, DirStackItem},
+        widgets::browser::Browser,
+        KeyHandleResultInternal,
     },
 };
 

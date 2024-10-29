@@ -9,7 +9,7 @@ use crate::{
         commands::{volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
-    utils::macros::status_error,
+    shared::macros::status_error,
     WorkRequest,
 };
 use anyhow::bail;

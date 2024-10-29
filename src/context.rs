@@ -7,7 +7,7 @@ use crate::{
         commands::{Song, Status},
         mpd_client::MpdClient,
     },
-    utils::macros::status_warn,
+    shared::macros::status_warn,
     AppEvent, WorkRequest,
 };
 use anyhow::Result;

@@ -11,7 +11,7 @@ use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
     ui::{
-        utils::dirstack::DirState,
+        dirstack::DirState,
         widgets::button::{Button, ButtonGroup, ButtonGroupState},
     },
 };

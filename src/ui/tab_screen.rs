@@ -14,13 +14,13 @@ use crate::{
         tabs::{Pane, PaneOrSplitWithPosition, SubPaneWithPosition},
     },
     context::AppContext,
-    geometry::Point,
     mpd::mpd_client::MpdClient,
-    ui::KeyHandleResultInternal,
-    utils::{
+    shared::{
+        geometry::Point,
         id::Id,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    ui::KeyHandleResultInternal,
 };
 
 use super::{Pane as _, PaneContainer, Panes};

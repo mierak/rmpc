@@ -4,7 +4,7 @@ use anyhow::Result;
 use derive_more::Deref;
 use strum::AsRefStr;
 
-use crate::utils::{macros::status_error, ErrorExt};
+use crate::shared::{ext::error::ErrorExt, macros::status_error};
 
 use super::{
     client::Client,

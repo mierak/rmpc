@@ -3,7 +3,7 @@ use ratatui::widgets::{Block, Borders, List, ListItem, Padding, StatefulWidget};
 use style::Styled;
 
 use crate::config::Config;
-use crate::ui::utils::dirstack::{Dir, DirStack, DirStackItem};
+use crate::ui::dirstack::{Dir, DirStack, DirStackItem};
 
 #[derive(Debug)]
 pub struct Browser<T: std::fmt::Debug + DirStackItem> {

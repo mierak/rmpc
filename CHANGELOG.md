@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Refactor and split utils module
+
 ### Fixed
 
 ## [0.6.0] - 2024-10-28

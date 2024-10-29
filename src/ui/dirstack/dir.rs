@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use log::error;
 use ratatui::widgets::ListState;
 
-use crate::{config::Config, utils::macros::status_warn};
+use crate::{config::Config, shared::macros::status_warn};
 
 use super::{state::DirState, DirStackItem};
 
@@ -406,7 +406,7 @@ mod tests {
     mod remove {
         use std::collections::BTreeSet;
 
-        use crate::ui::utils::dirstack::dir::tests::create_subject;
+        use crate::ui::dirstack::dir::tests::create_subject;
 
         #[test]
         fn does_nothing_when_outside_range() {
@@ -432,7 +432,7 @@ mod tests {
     }
 
     mod jump_next_matching {
-        use crate::{config::Config, ui::utils::dirstack::Dir};
+        use crate::{config::Config, ui::dirstack::Dir};
 
         #[test]
         fn jumps_by_half_viewport() {
@@ -455,7 +455,7 @@ mod tests {
     }
 
     mod jump_previous_matching {
-        use crate::{config::Config, ui::utils::dirstack::Dir};
+        use crate::{config::Config, ui::dirstack::Dir};
 
         #[test]
         fn jumps_by_half_viewport() {
@@ -481,7 +481,7 @@ mod tests {
     }
 
     mod matched_item_count {
-        use crate::{config::Config, ui::utils::dirstack::Dir};
+        use crate::{config::Config, ui::dirstack::Dir};
 
         #[test]
         fn filter_changes_recounts_matched_items() {
