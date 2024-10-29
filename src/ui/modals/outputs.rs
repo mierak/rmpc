@@ -9,7 +9,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{commands::Output, mpd_client::MpdClient},
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal},
+    ui::{dirstack::DirState, KeyHandleResultInternal},
 };
 
 use super::{Modal, RectExt};

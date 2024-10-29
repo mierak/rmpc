@@ -1,8 +1,8 @@
 use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
+    shared::{image::ImageProtocol, macros::try_skip},
     ui::{image::facade::AlbumArtFacade, KeyHandleResultInternal, UiEvent},
-    utils::{image_proto::ImageProtocol, macros::try_skip},
     AppEvent,
 };
 use anyhow::Result;

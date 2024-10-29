@@ -19,9 +19,9 @@ use sysinfo::ProcessesToUpdate;
 use sysinfo::System;
 
 use crate::config::Size;
+use crate::shared::macros::try_cont;
+use crate::shared::macros::try_skip;
 use crate::tmux;
-use crate::utils::macros::try_cont;
-use crate::utils::macros::try_skip;
 
 use super::ImageProto;
 

@@ -313,7 +313,7 @@ mod tests {
     mod first {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn when_content_is_none() {
@@ -349,7 +349,7 @@ mod tests {
     mod last {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn when_content_is_none() {
@@ -385,7 +385,7 @@ mod tests {
     mod next {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn when_content_is_none() {
@@ -444,7 +444,7 @@ mod tests {
     mod prev {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn when_content_is_none() {
@@ -503,7 +503,7 @@ mod tests {
     mod next_half_viewport {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn when_content_is_none() {
@@ -555,7 +555,7 @@ mod tests {
     mod prev_half_viewport {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn when_content_is_none() {
@@ -608,7 +608,7 @@ mod tests {
 
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn select_last_element_when_out_of_bounds() {
@@ -626,7 +626,7 @@ mod tests {
 
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn does_nothing_when_no_content() {
@@ -700,7 +700,7 @@ mod tests {
 
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::DirState;
+        use crate::ui::dirstack::DirState;
 
         #[test]
         fn unmark_all_clears_map() {
@@ -779,7 +779,7 @@ mod tests {
     mod scrolloff {
         use ratatui::widgets::ListState;
 
-        use crate::ui::utils::dirstack::{DirState, ScrollingState};
+        use crate::ui::dirstack::{DirState, ScrollingState};
 
         #[test]
         fn big_scrolloff_should_keep_cursor_in_the_middle() {

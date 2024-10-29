@@ -12,11 +12,11 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
+    shared::macros::{status_error, status_info},
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
     },
-    utils::macros::{status_error, status_info},
 };
 
 use super::{KeyHandleResultInternal, RectExt};

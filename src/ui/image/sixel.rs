@@ -20,12 +20,12 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use crate::{
     config::Size,
-    tmux,
-    utils::{
-        image_proto::{get_image_area_size_px, resize_image},
+    shared::{
+        ext::mpsc::RecvLast,
+        image::{get_image_area_size_px, resize_image},
         macros::{status_error, try_cont, try_skip},
-        mpsc::RecvLast,
     },
+    tmux,
 };
 
 use super::ImageProto;

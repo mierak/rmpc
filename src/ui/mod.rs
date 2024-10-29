@@ -35,7 +35,7 @@ use crate::{
         commands::{idle::IdleEvent, volume::Bound, Song, State as MpdState},
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
-    utils::{
+    shared::{
         macros::{status_error, status_info, try_ret},
         mouse_event::{MouseEvent, MouseEventKind},
     },
@@ -45,11 +45,11 @@ use crate::{context::AppContext, mpd::version::Version};
 use self::{modals::Modal, panes::Pane, widgets::header::Header};
 
 pub mod browser;
+pub mod dirstack;
 pub mod image;
 pub mod modals;
 pub mod panes;
 pub mod tab_screen;
-pub mod utils;
 pub mod widgets;
 
 #[derive(Debug)]

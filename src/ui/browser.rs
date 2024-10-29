@@ -11,12 +11,12 @@ use crate::{
     },
     context::AppContext,
     mpd::{commands::Song, mpd_client::MpdClient},
-    utils::mouse_event::{MouseEvent, MouseEventKind},
+    shared::mouse_event::{MouseEvent, MouseEventKind},
 };
 
 use super::{
+    dirstack::{DirStack, DirStackItem},
     panes::Pane,
-    utils::dirstack::{DirStack, DirStackItem},
     KeyHandleResultInternal,
 };
 

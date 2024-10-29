@@ -109,7 +109,7 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
 #[cfg(test)]
 mod tests {
     mod new {
-        use crate::ui::utils::dirstack::DirStack;
+        use crate::ui::dirstack::DirStack;
 
         #[test]
         fn creates_with_correct_current() {
@@ -140,7 +140,7 @@ mod tests {
     }
 
     mod next_path {
-        use crate::ui::utils::dirstack::DirStack;
+        use crate::ui::dirstack::DirStack;
 
         #[test]
         fn returns_none_when_nothing_is_selected() {
@@ -169,7 +169,7 @@ mod tests {
     }
 
     mod push {
-        use crate::ui::utils::dirstack::DirStack;
+        use crate::ui::dirstack::DirStack;
 
         #[test]
         fn puts_current_to_top_of_others_and_new_input_to_current() {
@@ -189,7 +189,7 @@ mod tests {
     }
 
     mod pop {
-        use crate::ui::utils::dirstack::DirStack;
+        use crate::ui::dirstack::DirStack;
 
         #[test]
         fn previous_element_is_moved_to_current() {

@@ -1,4 +1,4 @@
-use crate::utils::env::ENV;
+use crate::shared::env::ENV;
 
 use super::utils::tilde_expand;
 
@@ -134,7 +134,7 @@ mod tests {
     use std::sync::{LazyLock, Mutex};
 
     use test_case::test_case;
-    use crate::utils::env::ENV;
+    use crate::shared::env::ENV;
     use super::{MpdAddress, MpdPassword};
 
     static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));

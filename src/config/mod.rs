@@ -22,9 +22,10 @@ mod search;
 pub mod tabs;
 pub mod theme;
 
+use crate::shared::image;
+use crate::shared::image::ImageProtocol;
+use crate::shared::macros::status_warn;
 use crate::tmux;
-use crate::utils::image_proto::{self, ImageProtocol};
-use crate::utils::macros::status_warn;
 pub use address::MpdAddress;
 
 use self::{
@@ -260,15 +261,13 @@ impl ConfigFile {
         config.album_art.method = match self.image_method.unwrap_or(self.album_art.method) {
             ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
             ImageMethodFile::Kitty => ImageMethod::Kitty,
-            ImageMethodFile::UeberzugWayland if image_proto::is_ueberzug_wayland_supported() => {
-                ImageMethod::UeberzugWayland
-            }
+            ImageMethodFile::UeberzugWayland if image::is_ueberzug_wayland_supported() => ImageMethod::UeberzugWayland,
             ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-            ImageMethodFile::UeberzugX11 if image_proto::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
+            ImageMethodFile::UeberzugX11 if image::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
             ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
             ImageMethodFile::Sixel => ImageMethod::Sixel,
             ImageMethodFile::None => ImageMethod::None,
-            ImageMethodFile::Auto => match image_proto::determine_image_support(is_tmux)? {
+            ImageMethodFile::Auto => match image::determine_image_support(is_tmux)? {
                 ImageProtocol::Kitty => ImageMethod::Kitty,
                 ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
                 ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
@@ -339,7 +338,7 @@ pub mod utils {
     use std::borrow::Cow;
     use std::path::MAIN_SEPARATOR;
 
-    use crate::utils::env::ENV;
+    use crate::shared::env::ENV;
 
     pub fn tilde_expand(inp: &str) -> Cow<str> {
         let Ok(home) = ENV.var("HOME") else {
@@ -365,7 +364,7 @@ pub mod utils {
         use std::sync::{LazyLock, Mutex};
 
         use super::tilde_expand;
-        use crate::utils::env::ENV;
+        use crate::shared::env::ENV;
         use test_case::test_case;
 
         static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));

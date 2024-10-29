@@ -6,12 +6,10 @@ use std::collections::HashMap;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::shared::{
     geometry::Geometry,
-    utils::{
-        id::{self, Id},
-        percent::Percent,
-    },
+    id::{self, Id},
+    percent::Percent,
 };
 
 use super::Leak;

@@ -3,10 +3,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use anyhow::Result;
 use ratatui::{layout::Rect, style::Color, Frame};
 
-use crate::{
-    config::{Config, ImageMethod, Size},
-    utils::image_proto::ImageProtocol,
-};
+use crate::config::{Config, ImageMethod, Size};
+use crate::shared::image::ImageProtocol;
 
 use super::{iterm2::Iterm2, kitty::KittyImageState, ImageProto};
 use super::{

@@ -20,11 +20,11 @@ use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
-use crate::ui::utils::dirstack::Dir;
-use crate::utils::macros::status_info;
-use crate::utils::macros::status_warn;
-use crate::utils::mouse_event::MouseEvent;
-use crate::utils::mouse_event::MouseEventKind;
+use crate::shared::macros::status_info;
+use crate::shared::macros::status_warn;
+use crate::shared::mouse_event::MouseEvent;
+use crate::shared::mouse_event::MouseEventKind;
+use crate::ui::dirstack::Dir;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
     ui::{

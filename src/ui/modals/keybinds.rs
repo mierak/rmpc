@@ -14,7 +14,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::ui::{utils::dirstack::DirState, KeyHandleResultInternal};
+use crate::ui::{dirstack::DirState, KeyHandleResultInternal};
 
 use super::{Modal, RectExt};
 

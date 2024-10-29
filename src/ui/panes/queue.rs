@@ -13,17 +13,17 @@ use crate::{
         commands::Song,
         mpd_client::{MpdClient, QueueMoveTarget},
     },
+    shared::{
+        macros::{status_error, status_warn},
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
     ui::{
+        dirstack::DirState,
         modals::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
             save_queue::SaveQueueModal, song_info::SongInfoModal,
         },
-        utils::dirstack::DirState,
         KeyHandleResultInternal, UiEvent,
-    },
-    utils::{
-        macros::{status_error, status_warn},
-        mouse_event::{MouseEvent, MouseEventKind},
     },
 };
 use log::error;

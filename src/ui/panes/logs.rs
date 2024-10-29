@@ -13,8 +13,8 @@ use crate::{
     config::keys::{CommonAction, LogsActions},
     context::AppContext,
     mpd::mpd_client::MpdClient,
-    ui::{utils::dirstack::DirState, KeyHandleResultInternal, UiEvent},
-    utils::mouse_event::{MouseEvent, MouseEventKind},
+    shared::mouse_event::{MouseEvent, MouseEventKind},
+    ui::{dirstack::DirState, KeyHandleResultInternal, UiEvent},
 };
 
 use super::Pane;

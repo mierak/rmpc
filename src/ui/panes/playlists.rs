@@ -14,16 +14,16 @@ use crate::{
         commands::Song,
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
-    ui::{
-        browser::{BrowserPane, MoveDirection},
-        modals::rename_playlist::RenamePlaylistModal,
-        utils::dirstack::{DirStack, DirStackItem},
-        widgets::browser::Browser,
-        KeyHandleResultInternal, UiEvent,
-    },
-    utils::{
+    shared::{
         macros::{status_error, status_info},
         mouse_event::MouseEvent,
+    },
+    ui::{
+        browser::{BrowserPane, MoveDirection},
+        dirstack::{DirStack, DirStackItem},
+        modals::rename_playlist::RenamePlaylistModal,
+        widgets::browser::Browser,
+        KeyHandleResultInternal, UiEvent,
     },
 };
 

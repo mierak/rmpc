@@ -28,26 +28,28 @@ use config::{
     ConfigFile,
 };
 use crossterm::event::{Event, KeyEvent};
-use deps::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP};
 use itertools::Itertools;
 use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
-use ui::{Level, UiEvent};
-use utils::{
+use shared::dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP};
+use shared::{
     env::ENV,
+    ext::{duration::DurationExt, error::ErrorExt},
+    logging,
     macros::{status_error, status_info, try_cont, try_skip},
     mouse_event::{MouseEvent, MouseEventTracker},
-    DurationExt, ErrorExt,
+    tmux,
+    ytdlp::YtDlp,
 };
-use ytdlp::YtDlp;
+use ui::{Level, UiEvent};
 
 use crate::{
     config::Config,
     mpd::mpd_client::MpdClient,
+    shared::macros::{status_warn, try_ret},
     ui::Ui,
-    utils::macros::{status_warn, try_ret},
 };
 
 #[cfg(test)]
@@ -58,14 +60,9 @@ mod tests {
 mod cli;
 mod config;
 mod context;
-mod deps;
-mod geometry;
-mod logging;
 mod mpd;
-mod tmux;
+mod shared;
 mod ui;
-mod utils;
-mod ytdlp;
 
 #[derive(Debug)]
 pub enum WorkRequest {
@@ -301,7 +298,7 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
                 bail!("Youtube support requires 'cache_dir' to be configured")
             };
 
-            if let Err(unsupported_list) = crate::deps::is_youtube_supported(config.address) {
+            if let Err(unsupported_list) = shared::dependencies::is_youtube_supported(config.address) {
                 status_warn!(
                     "Youtube support requires the following and may thus not work properly: {}",
                     unsupported_list.join(", ")

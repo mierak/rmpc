@@ -17,12 +17,12 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 use crate::{
     config::Size,
-    tmux,
-    utils::{
-        image_proto::{get_gif_frames, get_image_area_size_px, jpg_encode, resize_image},
+    shared::{
+        ext::mpsc::RecvLast,
+        image::{get_gif_frames, get_image_area_size_px, jpg_encode, resize_image},
         macros::try_cont,
-        mpsc::RecvLast,
     },
+    tmux,
 };
 
 use super::ImageProto;
