@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display};
 use crate::{
     config::keys::{CommonAction, Key, ToDescription},
     context::AppContext,
+    shared::macros::pop_modal,
 };
 use anyhow::bail;
 use ratatui::{
@@ -163,29 +164,41 @@ impl Modal for KeybindsModal<'_> {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, context.config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, context.config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
@@ -199,7 +212,10 @@ impl Modal for KeybindsModal<'_> {
                 CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::Modal(None)),
+                CommonAction::Close => {
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
+                }
                 CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),

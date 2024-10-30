@@ -51,6 +51,10 @@ impl AppContext {
         })
     }
 
+    pub fn render(&self) -> Result<(), std::sync::mpsc::SendError<AppEvent>> {
+        self.app_event_sender.send(AppEvent::RequestRender(false))
+    }
+
     pub fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
         self.status
             .songid

@@ -53,33 +53,28 @@ macro_rules! status_warn {
         }};
     }
 
-macro_rules! status_trace {
-        ($($t:tt)*) => {{
-            log::trace!($($t)*);
-            log::trace!(target: "{status_bar}", $($t)*);
-        }};
-    }
+macro_rules! modal {
+    ( $i:ident, $e:expr ) => {{
+        $i.app_event_sender
+            .send(crate::AppEvent::UiAppEvent(crate::ui::UiAppEvent::Modal(
+                crate::ui::ModalWrapper(Box::new($e)),
+            )))?;
+    }};
+}
 
-macro_rules! status_debug {
-        ($($t:tt)*) => {{
-            log::debug!($($t)*);
-            log::debug!(target: "{status_bar}", $($t)*);
-        }};
-    }
+macro_rules! pop_modal {
+    ( $i:ident ) => {{
+        $i.app_event_sender
+            .send(crate::AppEvent::UiAppEvent(crate::ui::UiAppEvent::PopModal))?;
+    }};
+}
 
-#[allow(unused_imports)]
-pub(crate) use status_debug;
-#[allow(unused_imports)]
+pub(crate) use modal;
+pub(crate) use pop_modal;
+
 pub(crate) use status_error;
-#[allow(unused_imports)]
 pub(crate) use status_info;
-#[allow(unused_imports)]
-pub(crate) use status_trace;
-#[allow(unused_imports)]
 pub(crate) use status_warn;
-#[allow(unused_imports)]
 pub(crate) use try_cont;
-#[allow(unused_imports)]
 pub(crate) use try_ret;
-#[allow(unused_imports)]
 pub(crate) use try_skip;

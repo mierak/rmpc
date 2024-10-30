@@ -43,7 +43,7 @@ use shared::{
     tmux,
     ytdlp::YtDlp,
 };
-use ui::{Level, UiEvent};
+use ui::{Level, UiAppEvent, UiEvent};
 
 use crate::{
     config::Config,
@@ -85,6 +85,7 @@ pub enum AppEvent {
     RequestRender(bool),
     Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
+    UiAppEvent(UiAppEvent),
 }
 
 fn main() -> Result<()> {
@@ -383,9 +384,6 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                         break;
                     }
-                    Ok(ui::KeyHandleResult::RenderRequested) => {
-                        render_wanted = true;
-                    }
                     Ok(ui::KeyHandleResult::FullRenderRequested) => {
                         render_wanted = true;
                         full_rerender_wanted = true;
@@ -402,9 +400,6 @@ fn main_task<B: Backend + std::io::Write>(
                             error!(error:? = err, event:?; "Ui failed to handle quit event");
                         }
                         break;
-                    }
-                    Ok(ui::KeyHandleResult::RenderRequested) => {
-                        render_wanted = true;
                     }
                     Ok(ui::KeyHandleResult::FullRenderRequested) => {
                         render_wanted = true;
@@ -470,6 +465,24 @@ fn main_task<B: Backend + std::io::Write>(
                     full_rerender_wanted = true;
                     render_wanted = true;
                 }
+                AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut context, &mut client) {
+                    Ok(ui::KeyHandleResult::SkipRender) => continue,
+                    Ok(ui::KeyHandleResult::Quit) => {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
+                            error!(error:? = err; "Ui failed to handle ui app event");
+                            // error!(error:? = err, event:?; "Ui failed to handle quit event");
+                        }
+                        break;
+                    }
+                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
+                        render_wanted = true;
+                        full_rerender_wanted = true;
+                    }
+                    Err(err) => {
+                        status_error!(err:?; "Error: {}", err.to_status());
+                        render_wanted = true;
+                    }
+                },
             }
         }
         if render_wanted {

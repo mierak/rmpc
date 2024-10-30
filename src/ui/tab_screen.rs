@@ -152,7 +152,8 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             Some(CommonAction::PaneDown) => {
                 self.focused = Some(
@@ -173,7 +174,8 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             Some(CommonAction::PaneRight) => {
                 self.focused = Some(
@@ -194,7 +196,8 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             Some(CommonAction::PaneLeft) => {
                 self.focused = Some(
@@ -215,7 +218,8 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             Some(_) | None => {
                 let pane = panes.get_mut(focused.pane);
@@ -231,7 +235,7 @@ impl TabScreen {
         client: &mut impl MpdClient,
         context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
-        let mut result = KeyHandleResultInternal::KeyNotHandled;
+        let result = KeyHandleResultInternal::KeyNotHandled;
         if matches!(event.kind, MouseEventKind::LeftClick) {
             let Some(pane) = self
                 .pane_areas
@@ -246,7 +250,7 @@ impl TabScreen {
                 return Ok(KeyHandleResultInternal::KeyNotHandled);
             };
             self.focused = Some(pane);
-            result = KeyHandleResultInternal::RenderRequested;
+            context.render()?;
         }
 
         let Some(focused) = self.focused else {
@@ -255,8 +259,6 @@ impl TabScreen {
 
         let pane = panes.get_mut(focused.pane);
         match screen_call!(pane, handle_mouse_event(event, client, context))? {
-            KeyHandleResultInternal::Modal(modal) => Ok(KeyHandleResultInternal::Modal(modal)),
-            KeyHandleResultInternal::RenderRequested => Ok(KeyHandleResultInternal::RenderRequested),
             KeyHandleResultInternal::FullRenderRequested => Ok(KeyHandleResultInternal::FullRenderRequested),
             _ => Ok(result),
         }

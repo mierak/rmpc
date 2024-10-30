@@ -10,6 +10,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::mpd_client::MpdClient,
+    shared::macros::pop_modal,
     ui::{
         dirstack::DirState,
         widgets::button::{Button, ButtonGroup, ButtonGroupState},
@@ -155,7 +156,9 @@ impl Modal for AddToPlaylistModal {
                             }
                         }
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     match self.focused {
@@ -176,28 +179,35 @@ impl Modal for AddToPlaylistModal {
                             }
                         }
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => match self.focused {
                     FocusedComponent::Playlists => {
                         self.focused = FocusedComponent::Buttons;
                         self.button_group.first();
-                        Ok(KeyHandleResultInternal::RenderRequested)
+
+                        context.render()?;
+                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                     FocusedComponent::Buttons if self.button_group.selected == 0 => {
                         if let Some(selected) = self.scrolling_state.get_selected() {
                             client.add_to_playlist(&self.playlists[selected], &self.uri, None)?;
                         }
-                        Ok(KeyHandleResultInternal::Modal(None))
+                        pop_modal!(context);
+                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                     FocusedComponent::Buttons => {
                         self.button_group = ButtonGroupState::default();
-                        Ok(KeyHandleResultInternal::Modal(None))
+                        pop_modal!(context);
+                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                 },
                 CommonAction::Close => {
                     self.button_group = ButtonGroupState::default();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),

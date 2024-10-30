@@ -36,7 +36,7 @@ use crate::{
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     shared::{
-        macros::{status_error, status_info, try_ret},
+        macros::{modal, status_error, status_info, try_ret},
         mouse_event::{MouseEvent, MouseEventKind},
     },
 };
@@ -251,15 +251,18 @@ impl<'ui> Ui<'ui> {
         match event.kind {
             MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
                 client.pause_toggle()?;
-                Ok(KeyHandleResult::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Header].contains(event.into()) => {
                 client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
-                Ok(KeyHandleResult::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Header].contains(event.into()) => {
                 client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
-                Ok(KeyHandleResult::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
                 if !matches!(
@@ -276,15 +279,18 @@ impl<'ui> Ui<'ui> {
                     .as_secs();
                 client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
 
-                Ok(KeyHandleResult::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Tabs].contains(event.into()) => {
                 self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
-                return Ok(KeyHandleResult::RenderRequested);
+                context.render()?;
+                return Ok(KeyHandleResult::SkipRender);
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Tabs].contains(event.into()) => {
                 self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
-                return Ok(KeyHandleResult::RenderRequested);
+                context.render()?;
+                return Ok(KeyHandleResult::SkipRender);
             }
             MouseEventKind::LeftClick if self.areas[Areas::Tabs].contains(event.into()) => {
                 if let Some(tab_name) = self
@@ -294,7 +300,8 @@ impl<'ui> Ui<'ui> {
                 {
                     if &self.active_tab != tab_name {
                         self.change_tab(*tab_name, client, context)?;
-                        return Ok(KeyHandleResult::RenderRequested);
+                        context.render()?;
+                        return Ok(KeyHandleResult::SkipRender);
                     }
                 }
 
@@ -302,20 +309,9 @@ impl<'ui> Ui<'ui> {
             }
             _ if self.areas[Areas::Content].contains(event.into()) => {
                 match screen_call!(self, handle_mouse_event(event, client, context))? {
-                    KeyHandleResultInternal::RenderRequested => Ok(KeyHandleResult::RenderRequested),
                     KeyHandleResultInternal::FullRenderRequested => Ok(KeyHandleResult::FullRenderRequested),
                     KeyHandleResultInternal::SkipRender => Ok(KeyHandleResult::SkipRender),
                     KeyHandleResultInternal::KeyNotHandled => Ok(KeyHandleResult::SkipRender),
-                    KeyHandleResultInternal::Modal(Some(modal)) => {
-                        self.modals.push(modal);
-                        self.on_event(UiEvent::ModalOpened, context, client)?;
-                        return Ok(KeyHandleResult::RenderRequested);
-                    }
-                    KeyHandleResultInternal::Modal(None) => {
-                        self.modals.pop();
-                        self.on_event(UiEvent::ModalClosed, context, client)?;
-                        return Ok(KeyHandleResult::RenderRequested);
-                    }
                 }
             }
             _ => Ok(KeyHandleResult::SkipRender),
@@ -332,7 +328,8 @@ impl<'ui> Ui<'ui> {
         if let Some(ref mut command) = self.command {
             if let Some(CommonAction::Close) = action {
                 self.command = None;
-                return Ok(KeyHandleResult::RenderRequested);
+                context.render()?;
+                return Ok(KeyHandleResult::SkipRender);
             } else if let Some(CommonAction::Confirm) = action {
                 let cmd = command.parse();
                 log::debug!("Executing command: {:?}", cmd);
@@ -352,17 +349,20 @@ impl<'ui> Ui<'ui> {
                     _ => {}
                 }
 
-                return Ok(KeyHandleResult::RenderRequested);
+                context.render()?;
+                return Ok(KeyHandleResult::SkipRender);
             }
 
             match key.code {
                 KeyCode::Char(c) => {
                     command.push(c);
-                    return Ok(KeyHandleResult::RenderRequested);
+                    context.render()?;
+                    return Ok(KeyHandleResult::SkipRender);
                 }
                 KeyCode::Backspace => {
                     command.pop();
-                    return Ok(KeyHandleResult::RenderRequested);
+                    context.render()?;
+                    return Ok(KeyHandleResult::SkipRender);
                 }
                 _ => return Ok(KeyHandleResult::SkipRender),
             }
@@ -370,29 +370,13 @@ impl<'ui> Ui<'ui> {
 
         if let Some(ref mut modal) = self.modals.last_mut() {
             return match modal.handle_key(key, client, context)? {
-                KeyHandleResultInternal::Modal(None) => {
-                    self.modals.pop();
-                    self.on_event(UiEvent::ModalClosed, context, client)?;
-                    Ok(KeyHandleResult::RenderRequested)
-                }
                 r => Ok(r.into()),
             };
         }
 
         match screen_call!(self, handle_action(key, client, context))? {
-            KeyHandleResultInternal::RenderRequested => return Ok(KeyHandleResult::RenderRequested),
             KeyHandleResultInternal::FullRenderRequested => return Ok(KeyHandleResult::FullRenderRequested),
             KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
-            KeyHandleResultInternal::Modal(Some(modal)) => {
-                self.modals.push(modal);
-                self.on_event(UiEvent::ModalOpened, context, client)?;
-                return Ok(KeyHandleResult::RenderRequested);
-            }
-            KeyHandleResultInternal::Modal(None) => {
-                self.modals.pop();
-                self.on_event(UiEvent::ModalClosed, context, client)?;
-                return Ok(KeyHandleResult::RenderRequested);
-            }
             KeyHandleResultInternal::KeyNotHandled => {
                 if let Some(action) = context.config.keybinds.global.get(&key.into()) {
                     match action {
@@ -411,7 +395,8 @@ impl<'ui> Ui<'ui> {
                         }
                         GlobalAction::CommandMode => {
                             self.command = Some(String::new());
-                            return Ok(KeyHandleResult::RenderRequested);
+                            context.render()?;
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::NextTrack if context.status.state == MpdState::Play => client.next()?,
                         GlobalAction::PreviousTrack if context.status.state == MpdState::Play => client.prev()?,
@@ -453,19 +438,22 @@ impl<'ui> Ui<'ui> {
                         }
                         GlobalAction::NextTab => {
                             self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            context.render()?;
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::PreviousTab => {
                             self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            context.render()?;
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::SwitchToTab(name) => {
                             if context.config.tabs.names.contains(name) {
                                 self.change_tab(*name, client, context)?;
+                                context.render()?;
                             } else {
                                 status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
                             }
-                            return Ok(KeyHandleResult::RenderRequested);
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::NextTrack => {}
                         GlobalAction::PreviousTrack => {}
@@ -477,20 +465,17 @@ impl<'ui> Ui<'ui> {
                         }
                         GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                         GlobalAction::ShowHelp => {
-                            self.modals.push(Box::new(KeybindsModal::new(context)));
-                            self.on_event(UiEvent::ModalOpened, context, client)?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            let modal = KeybindsModal::new(context);
+                            modal!(context, modal);
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::ShowOutputs => {
-                            self.modals.push(Box::new(OutputsModal::new(client.outputs()?.0)));
-                            self.on_event(UiEvent::ModalOpened, context, client)?;
-                            return Ok(KeyHandleResult::RenderRequested);
+                            modal!(context, OutputsModal::new(client.outputs()?.0));
+                            return Ok(KeyHandleResult::SkipRender);
                         }
                         GlobalAction::ShowCurrentSongInfo => {
                             if let Some(current_song) = context.get_current_song(client)? {
-                                self.modals.push(Box::new(SongInfoModal::new(current_song)));
-                                self.on_event(UiEvent::ModalOpened, context, client)?;
-                                return Ok(KeyHandleResult::RenderRequested);
+                                modal!(context, SongInfoModal::new(current_song));
                             }
 
                             status_info!("No song is currently playing");
@@ -518,6 +503,28 @@ impl<'ui> Ui<'ui> {
         });
     }
 
+    pub fn on_ui_app_event(
+        &mut self,
+        event: UiAppEvent,
+        context: &mut AppContext,
+        client: &mut impl MpdClient,
+    ) -> Result<KeyHandleResult> {
+        match event {
+            UiAppEvent::Modal(modal) => {
+                self.modals.push(modal.0);
+                self.on_event(UiEvent::ModalOpened, context, client)?;
+                context.render()?;
+                Ok(KeyHandleResult::SkipRender)
+            }
+            UiAppEvent::PopModal => {
+                self.modals.pop();
+                self.on_event(UiEvent::ModalClosed, context, client)?;
+                context.render()?;
+                Ok(KeyHandleResult::SkipRender)
+            }
+        }
+    }
+
     pub fn on_event(
         &mut self,
         mut event: UiEvent,
@@ -530,22 +537,19 @@ impl<'ui> Ui<'ui> {
             UiEvent::Player => {
                 self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
             }
-            UiEvent::Playlist => {}
             UiEvent::Database => {}
             UiEvent::StoredPlaylist => {}
             UiEvent::LogAdded(_) =>
             {
                 #[cfg(debug_assertions)]
                 if self.active_tab == "Logs".into() {
-                    ret = KeyHandleResultInternal::RenderRequested;
+                    context.render()?;
+                    ret = KeyHandleResultInternal::SkipRender;
                 }
             }
-            UiEvent::Update => {}
             UiEvent::Resized { .. } => {}
             UiEvent::ModalOpened => {}
             UiEvent::ModalClosed => {}
-            UiEvent::Mixer => {}
-            UiEvent::Options => {}
             UiEvent::Exit => {}
         }
 
@@ -564,7 +568,6 @@ impl<'ui> Ui<'ui> {
             };
 
             match self.handle_screen_event_result(result)? {
-                KeyHandleResult::RenderRequested => ret = KeyHandleResultInternal::RenderRequested,
                 KeyHandleResult::FullRenderRequested => ret = KeyHandleResultInternal::FullRenderRequested,
                 KeyHandleResult::SkipRender => {}
                 KeyHandleResult::Quit => {}
@@ -577,16 +580,7 @@ impl<'ui> Ui<'ui> {
     fn handle_screen_event_result(&mut self, result: Result<KeyHandleResultInternal>) -> Result<KeyHandleResult> {
         match result {
             Ok(KeyHandleResultInternal::SkipRender) => Ok(KeyHandleResult::SkipRender),
-            Ok(KeyHandleResultInternal::RenderRequested) => Ok(KeyHandleResult::RenderRequested),
             Ok(KeyHandleResultInternal::FullRenderRequested) => Ok(KeyHandleResult::FullRenderRequested),
-            Ok(KeyHandleResultInternal::Modal(Some(modal))) => {
-                self.modals.push(modal);
-                Ok(KeyHandleResult::RenderRequested)
-            }
-            Ok(KeyHandleResultInternal::Modal(None)) => {
-                self.modals.pop();
-                Ok(KeyHandleResult::RenderRequested)
-            }
             Ok(KeyHandleResultInternal::KeyNotHandled) => Ok(KeyHandleResult::SkipRender),
             Err(err) => Err(err),
         }
@@ -594,15 +588,19 @@ impl<'ui> Ui<'ui> {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
+pub struct ModalWrapper(Box<dyn Modal + Send + Sync>);
+
+#[derive(Debug)]
+pub enum UiAppEvent {
+    Modal(ModalWrapper),
+    PopModal,
+}
+
+#[derive(Debug)]
 pub enum UiEvent {
     Player,
-    Mixer,
-    Playlist,
-    Options,
     Database,
     StoredPlaylist,
-    Update,
     LogAdded(Vec<u8>),
     Resized { columns: u16, rows: u16 },
     ModalOpened,
@@ -616,10 +614,6 @@ impl TryFrom<IdleEvent> for UiEvent {
     fn try_from(event: IdleEvent) -> Result<Self, ()> {
         Ok(match event {
             IdleEvent::Player => UiEvent::Player,
-            IdleEvent::Update => UiEvent::Update,
-            IdleEvent::Mixer => UiEvent::Mixer,
-            IdleEvent::Playlist => UiEvent::Playlist,
-            IdleEvent::Options => UiEvent::Options,
             IdleEvent::Database => UiEvent::Database,
             IdleEvent::StoredPlaylist => UiEvent::StoredPlaylist,
             _ => return Err(()),
@@ -650,21 +644,15 @@ pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<St
 
 #[derive(Debug)]
 enum KeyHandleResultInternal {
-    /// Action warrants a render
-    RenderRequested,
     /// Action warrants a render with whole window clear
     FullRenderRequested,
     /// Action does NOT warrant a render
     SkipRender,
     /// Event was not handled and should bubble up
     KeyNotHandled,
-    /// Display a modal
-    Modal(Option<Box<dyn Modal>>),
 }
 
 pub enum KeyHandleResult {
-    /// Action warrants a render
-    RenderRequested,
     /// Action warrants a render with whole window clear
     FullRenderRequested,
     /// Action does NOT warrant a render
@@ -677,7 +665,7 @@ impl From<KeyHandleResultInternal> for KeyHandleResult {
     fn from(value: KeyHandleResultInternal) -> Self {
         match value {
             KeyHandleResultInternal::SkipRender => KeyHandleResult::SkipRender,
-            _ => KeyHandleResult::RenderRequested,
+            _ => KeyHandleResult::FullRenderRequested,
         }
     }
 }

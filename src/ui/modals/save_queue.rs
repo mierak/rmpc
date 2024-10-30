@@ -12,7 +12,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    shared::macros::{status_error, status_info},
+    shared::macros::{pop_modal, status_error, status_info},
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
@@ -110,13 +110,15 @@ impl Modal for SaveQueueModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        app: &mut AppContext,
+        context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
-        let action = app.config.keybinds.navigation.get(&key.into());
+        let action = context.config.keybinds.navigation.get(&key.into());
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
-                return Ok(KeyHandleResultInternal::RenderRequested);
+
+                context.render()?;
+                return Ok(KeyHandleResultInternal::SkipRender);
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 {
                     match client.save_queue_as_playlist(&self.name, None) {
@@ -129,17 +131,22 @@ impl Modal for SaveQueueModal {
                     };
                 }
                 self.on_hide();
-                return Ok(KeyHandleResultInternal::Modal(None));
+                pop_modal!(context);
+                return Ok(KeyHandleResultInternal::SkipRender);
             }
 
             match key.code {
                 KeyCode::Char(c) => {
                     self.name.push(c);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 KeyCode::Backspace => {
                     self.name.pop();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 _ => Ok(KeyHandleResultInternal::SkipRender),
             }
@@ -147,27 +154,32 @@ impl Modal for SaveQueueModal {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Close => {
                     self.on_hide();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 {
                         client.save_queue_as_playlist(&self.name, None)?;
                         status_info!("Playlist '{}' saved", self.name);
                     }
-                    self.on_hide();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
-                    Ok(KeyHandleResultInternal::RenderRequested)
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),

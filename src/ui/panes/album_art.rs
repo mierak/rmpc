@@ -111,7 +111,9 @@ impl Pane for AlbumArtPane {
                         let album_art = client.find_album_art(current_song.file.as_str())?;
                         log::debug!(elapsed:? = start.elapsed(), size = album_art.as_ref().map(|v|v.len()); "Found album art");
                         self.album_art.set_image(album_art)?;
-                        return Ok(KeyHandleResultInternal::RenderRequested);
+
+                        context.render()?;
+                        return Ok(KeyHandleResultInternal::SkipRender);
                     }
                 }
 
@@ -119,15 +121,21 @@ impl Pane for AlbumArtPane {
             }
             UiEvent::Resized { columns, rows } => {
                 self.album_art.resize(*columns, *rows);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::ModalOpened => {
                 self.album_art.hide(context.config.theme.background_color)?;
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::ModalClosed => {
                 self.album_art.show();
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::Exit => {
                 self.album_art.cleanup()?;

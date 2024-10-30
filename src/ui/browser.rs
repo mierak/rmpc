@@ -32,7 +32,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
     fn browser_areas(&self) -> [Rect; 3];
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
+    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal>;
     fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &T) -> Result<Vec<Song>>;
     fn move_selected(
         &mut self,
@@ -46,12 +46,18 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         client: &mut impl MpdClient,
         config: &Config,
     ) -> Result<Option<Vec<ListItem<'static>>>>;
-    fn add(&self, item: &T, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
-    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal>;
-    fn delete(&self, item: &T, index: usize, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &T, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal>;
+    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal>;
+    fn delete(
+        &self,
+        item: &T,
+        index: usize,
+        client: &mut impl MpdClient,
+        context: &AppContext,
+    ) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
-    fn rename(&self, item: &T, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn rename(&self, item: &T, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
         Ok(KeyHandleResultInternal::SkipRender)
     }
     fn handle_filter_input(
@@ -59,6 +65,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         event: KeyEvent,
         client: &mut impl MpdClient,
         config: &Config,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         match config.keybinds.navigation.get(&event.into()) {
             Some(CommonAction::Close) => {
@@ -66,11 +73,13 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.stack_mut().current_mut().set_filter(None, config);
                 let preview = self.prepare_preview(client, config)?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => match event.code {
                 KeyCode::Char(c) => {
@@ -78,11 +87,13 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     self.stack_mut().current_mut().jump_first_matching(config);
                     let preview = self.prepare_preview(client, config)?;
                     self.stack_mut().set_preview(preview);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 KeyCode::Backspace => {
                     self.stack_mut().current_mut().pop_filter(config);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 _ => Ok(KeyHandleResultInternal::SkipRender),
             },
@@ -145,21 +156,22 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
 
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::DoubleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
                 if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
-                    let res = self.next(client)?;
+                    let res = self.next(client, context)?;
                     let preview = self
                         .prepare_preview(client, context.config)
                         .context("Cannot prepare preview")?;
                     self.stack_mut().set_preview(preview);
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+
+                    context.render()?;
                 }
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::MiddleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
@@ -169,17 +181,17 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        self.add(item, client)?;
+                        self.add(item, client, context)?;
                     }
 
                     let preview = self
                         .prepare_preview(client, context.config)
                         .context("Cannot prepare preview")?;
                     self.stack_mut().set_preview(preview);
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+
+                    context.render()?;
                 }
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::LeftClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
@@ -192,10 +204,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                         .prepare_preview(client, context.config)
                         .context("Cannot prepare preview")?;
                     self.stack_mut().set_preview(preview);
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+                    context.render()?;
                 }
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick if preview_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(preview_area.y).into();
@@ -209,7 +220,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     }
                 });
 
-                let res = self.next(client)?;
+                let res = self.next(client, context)?;
                 self.stack_mut()
                     .current_mut()
                     .select_idx(idx_to_select.unwrap_or_default(), 0);
@@ -219,7 +230,8 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
 
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
                 self.stack_mut().current_mut().prev(context.config.scrolloff, false);
@@ -228,7 +240,8 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
 
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
                 self.stack_mut().current_mut().next(context.config.scrolloff, false);
@@ -237,7 +250,8 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
 
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
@@ -257,7 +271,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .prev(config.scrolloff, config.wrap_navigation);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Down => {
                 self.stack_mut()
@@ -265,7 +281,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .next(config.scrolloff, config.wrap_navigation);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::MoveUp => {
                 let res = self.move_selected(MoveDirection::Up, client)?;
@@ -281,7 +299,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .next_half_viewport(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::UpHalf => {
                 self.stack_mut()
@@ -289,22 +309,28 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .prev_half_viewport(context.config.scrolloff);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Bottom => {
                 self.stack_mut().current_mut().last();
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Top => {
                 self.stack_mut().current_mut().first();
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Right => {
-                let res = self.next(client)?;
+                let res = self.next(client, context)?;
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
                 Ok(res)
@@ -313,24 +339,32 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.stack_mut().pop();
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::EnterSearch => {
                 self.set_filter_input_mode_active(true);
                 self.stack_mut().current_mut().set_filter(Some(String::new()), config);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::NextResult => {
                 self.stack_mut().current_mut().jump_next_matching(config);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::PreviousResult => {
                 self.stack_mut().current_mut().jump_previous_matching(config);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Select => {
                 self.stack_mut().current_mut().toggle_mark_selected();
@@ -339,45 +373,52 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     .next(context.config.scrolloff, context.config.wrap_navigation);
                 let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
                 self.stack_mut().set_preview(preview);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, client)?;
+                    self.add(item, client, context)?;
                 }
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Add => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, client)
+                    self.add(item, client, context)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
-                self.add_all(client)?;
-                Ok(KeyHandleResultInternal::RenderRequested)
+                self.add_all(client, context)?;
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.delete(item, *idx, client)?;
+                    self.delete(item, *idx, client, context)?;
                 }
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Delete => {
                 if let Some((index, item)) = self.stack().current().selected_with_idx() {
-                    self.delete(item, index, client)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+                    self.delete(item, index, client, context)?;
+                    context.render()?;
                 }
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             CommonAction::Rename => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.rename(item, client)
+                    self.rename(item, client, context)
                 } else {
                     Ok(KeyHandleResultInternal::SkipRender)
                 }

@@ -112,7 +112,7 @@ impl Pane for DirectoriesPane {
     ) -> Result<KeyHandleResultInternal> {
         let config = context.config;
         if self.filter_input_mode {
-            self.handle_filter_input(event, client, config)
+            self.handle_filter_input(event, client, config, context)
         } else if let Some(_action) = config.keybinds.directories.get(&event.into()) {
             Ok(KeyHandleResultInternal::KeyNotHandled)
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
@@ -151,7 +151,12 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         })
     }
 
-    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn add(
+        &self,
+        item: &DirOrSong,
+        client: &mut impl MpdClient,
+        context: &AppContext,
+    ) -> Result<KeyHandleResultInternal> {
         match item {
             DirOrSong::Dir {
                 name: dirname,
@@ -171,25 +176,28 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 }
             }
         };
-        Ok(KeyHandleResultInternal::RenderRequested)
+
+        context.render()?;
+        Ok(KeyHandleResultInternal::SkipRender)
     }
 
-    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
         client.add(&path)?;
         status_info!("Directory '{path}' added to queue");
 
-        Ok(KeyHandleResultInternal::RenderRequested)
+        context.render()?;
+        Ok(KeyHandleResultInternal::SkipRender)
     }
 
-    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
         let Some(selected) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(KeyHandleResultInternal::RenderRequested);
+            return Ok(KeyHandleResultInternal::SkipRender);
         };
         let Some(next_path) = self.stack.next_path() else {
             log::error!("Failed to move deeper inside dir. Next path is None");
-            return Ok(KeyHandleResultInternal::RenderRequested);
+            return Ok(KeyHandleResultInternal::SkipRender);
         };
 
         match selected {
@@ -207,9 +215,11 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     .sorted()
                     .collect();
                 self.stack.push(res);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
-            t @ DirOrSong::Song(_) => self.add(t, client),
+            t @ DirOrSong::Song(_) => self.add(t, client, context),
         }
     }
 

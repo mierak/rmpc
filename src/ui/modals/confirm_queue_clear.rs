@@ -12,6 +12,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
+    shared::macros::pop_modal,
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
@@ -83,28 +84,34 @@ impl Modal for ConfirmQueueClearModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        app: &mut AppContext,
+        context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
-        if let Some(action) = app.config.keybinds.navigation.get(&key.into()) {
+        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.button_group.prev();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Close => {
                     self.button_group = ButtonGroupState::default();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 {
                         client.clear()?;
                     }
                     self.button_group = ButtonGroupState::default();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),

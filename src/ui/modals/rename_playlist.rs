@@ -12,7 +12,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    shared::macros::status_info,
+    shared::macros::{pop_modal, status_info},
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
@@ -108,30 +108,37 @@ impl Modal for RenamePlaylistModal {
         &mut self,
         key: KeyEvent,
         client: &mut Client<'_>,
-        app: &mut AppContext,
+        context: &mut AppContext,
     ) -> Result<KeyHandleResultInternal> {
-        let action = app.config.keybinds.navigation.get(&key.into());
+        let action = context.config.keybinds.navigation.get(&key.into());
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
-                return Ok(KeyHandleResultInternal::RenderRequested);
+
+                context.render()?;
+                return Ok(KeyHandleResultInternal::SkipRender);
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 && self.playlist_name != self.new_name {
                     client.rename_playlist(&self.playlist_name, &self.new_name)?;
                     status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
                 }
                 self.on_hide();
-                return Ok(KeyHandleResultInternal::Modal(None));
+                pop_modal!(context);
+                return Ok(KeyHandleResultInternal::SkipRender);
             }
 
             match key.code {
                 KeyCode::Char(c) => {
                     self.new_name.push(c);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 KeyCode::Backspace => {
                     self.new_name.pop();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 _ => Ok(KeyHandleResultInternal::SkipRender),
             }
@@ -139,15 +146,20 @@ impl Modal for RenamePlaylistModal {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Close => {
                     self.on_hide();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 && self.playlist_name != self.new_name {
@@ -155,11 +167,14 @@ impl Modal for RenamePlaylistModal {
                         status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
                     }
                     self.on_hide();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),

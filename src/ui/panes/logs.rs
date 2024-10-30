@@ -77,17 +77,17 @@ impl Pane for LogsPane {
         &mut self,
         event: &mut UiEvent,
         _client: &mut impl MpdClient,
-        _context: &AppContext,
+        context: &AppContext,
     ) -> Result<KeyHandleResultInternal> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
                 self.logs.pop_front();
             }
-            Ok(KeyHandleResultInternal::RenderRequested)
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
+
+            context.render()?;
         }
+        Ok(KeyHandleResultInternal::SkipRender)
     }
 
     fn handle_mouse_event(
@@ -103,11 +103,15 @@ impl Pane for LogsPane {
         match event.kind {
             MouseEventKind::ScrollUp => {
                 self.scrolling_state.prev(context.config.scrolloff, false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::ScrollDown => {
                 self.scrolling_state.next(context.config.scrolloff, false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
+                Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => Ok(KeyHandleResultInternal::SkipRender),
         }
@@ -124,36 +128,50 @@ impl Pane for LogsPane {
             match action {
                 LogsActions::Clear => {
                     self.logs.clear();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
             }
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
+                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
