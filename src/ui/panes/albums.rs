@@ -14,7 +14,7 @@ use crate::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal,
+        UiEvent,
     },
 };
 
@@ -75,12 +75,7 @@ impl Pane for AlbumsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut crate::ui::UiEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
             crate::ui::UiEvent::Database => {
                 let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
@@ -99,10 +94,10 @@ impl Pane for AlbumsPane {
                 self.stack.set_preview(preview);
 
                 status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -110,28 +105,22 @@ impl Pane for AlbumsPane {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         self.handle_mouse_action(event, client, context)
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
         if self.filter_input_mode {
-            self.handle_filter_input(event, client, config, context)
-        } else if let Some(_action) = config.keybinds.albums.get(&event.into()) {
-            Ok(KeyHandleResultInternal::SkipRender)
+            self.handle_filter_input(event, client, config, context)?;
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, context)
+            self.handle_common_action(*action, client, context)?;
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            self.handle_global_action(*action, client, context)
+            self.handle_global_action(*action, client, context)?;
         } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
+            // TODO the event should bubble up
         }
+        Ok(())
     }
 }
 
@@ -176,34 +165,31 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         };
 
         match self.stack.path() {
-            [_album] => self.add(current, client, context),
+            [_album] => {
+                self.add(current, client, context)?;
+            }
             [] => {
                 let res = list_titles(client, current.as_path())?;
                 self.stack.push(res.collect());
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             _ => {
                 log::error!("Unexpected nesting in Artists dir structure");
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-        }
+        };
+
+        Ok(())
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match self.stack.path() {
             [album] => {
                 client.find_add(&[
@@ -213,37 +199,36 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
 
                 status_info!("'{}' added to queue", item.dir_name_or_file_name());
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             [] => {
                 client.find_add(&[Filter::new(Tag::Album, &item.dir_name_or_file_name())])?;
 
                 status_info!("Album '{}' added to queue", &item.dir_name_or_file_name());
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
-    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
+    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match self.stack.path() {
             [album] => {
                 client.find_add(&[Filter::new(Tag::Album, album.as_str())])?;
                 status_info!("Album '{}' added to queue", album);
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             [] => {
                 client.add("/")?; // add the whole library
                 status_info!("All albums added to queue");
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+        Ok(())
     }
 
     fn prepare_preview(

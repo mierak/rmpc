@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-use super::{KeyHandleResultInternal, RectExt};
+use super::RectExt;
 
 use super::Modal;
 
@@ -55,7 +55,7 @@ impl SaveQueueModal {
 }
 
 impl Modal for SaveQueueModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(50, 7);
         let [body_area, buttons_area] =
             *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
@@ -106,19 +106,14 @@ impl Modal for SaveQueueModal {
         Ok(())
     }
 
-    fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         let action = context.config.keybinds.navigation.get(&key.into());
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
 
                 context.render()?;
-                return Ok(KeyHandleResultInternal::SkipRender);
+                return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 {
                     match client.save_queue_as_playlist(&self.name, None) {
@@ -132,7 +127,7 @@ impl Modal for SaveQueueModal {
                 }
                 self.on_hide();
                 pop_modal!(context);
-                return Ok(KeyHandleResultInternal::SkipRender);
+                return Ok(());
             }
 
             match key.code {
@@ -140,15 +135,13 @@ impl Modal for SaveQueueModal {
                     self.name.push(c);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 KeyCode::Backspace => {
                     self.name.pop();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
         } else if let Some(action) = action {
             match action {
@@ -156,18 +149,15 @@ impl Modal for SaveQueueModal {
                     self.button_group.next();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.button_group.next();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Close => {
                     self.on_hide();
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 {
@@ -175,35 +165,14 @@ impl Modal for SaveQueueModal {
                         status_info!("Playlist '{}' saved", self.name);
                     }
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
-        }
+        };
+
+        Ok(())
     }
 }

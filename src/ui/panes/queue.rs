@@ -23,7 +23,7 @@ use crate::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
             save_queue::SaveQueueModal, song_info::SongInfoModal,
         },
-        KeyHandleResultInternal, UiEvent,
+        UiEvent,
     },
 };
 use log::error;
@@ -177,12 +177,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::Player => {
                 if let Some((idx, _)) = context
@@ -196,13 +191,12 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    return Ok(KeyHandleResultInternal::SkipRender);
                 }
-
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -210,9 +204,9 @@ impl Pane for QueuePane {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         if !self.table_area.contains(event.into()) {
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         }
 
         match event.kind {
@@ -223,7 +217,6 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::DoubleClick => {
                 let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
@@ -236,7 +229,6 @@ impl Pane for QueuePane {
                     client.play_id(song.id)?;
                     context.render()?;
                 }
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::MiddleClick => {
                 let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
@@ -249,28 +241,22 @@ impl Pane for QueuePane {
                     client.delete_id(selected_song.id)?;
                     context.render()?;
                 }
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::ScrollDown => {
                 self.scrolling_state.next(context.config.scrolloff, false);
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::ScrollUp => {
                 self.scrolling_state.prev(context.config.scrolloff, false);
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            MouseEventKind::RightClick => Ok(KeyHandleResultInternal::SkipRender),
+            MouseEventKind::RightClick => {}
         }
+
+        Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
         if self.filter_input_mode {
             match config.keybinds.navigation.get(&event.into()) {
@@ -278,14 +264,12 @@ impl Pane for QueuePane {
                     self.filter_input_mode = false;
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 Some(CommonAction::Close) => {
                     self.filter_input_mode = false;
                     self.filter = None;
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 _ => match event.code {
                     KeyCode::Char(c) => {
@@ -295,7 +279,6 @@ impl Pane for QueuePane {
                         self.jump_first(&context.queue, context.config.scrolloff);
 
                         context.render()?;
-                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                     KeyCode::Backspace => {
                         if let Some(ref mut f) = self.filter {
@@ -303,9 +286,8 @@ impl Pane for QueuePane {
                         };
 
                         context.render()?;
-                        Ok(KeyHandleResultInternal::SkipRender)
                     }
-                    _ => Ok(KeyHandleResultInternal::SkipRender),
+                    _ => {}
                 },
             }
         } else if let Some(action) = config.keybinds.queue.get(&event.into()) {
@@ -323,11 +305,9 @@ impl Pane for QueuePane {
                     } else {
                         status_error!("No song selected");
                     }
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::DeleteAll => {
                     modal!(context, ConfirmQueueClearModal::default());
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::Play => {
                     if let Some(selected_song) = self
@@ -337,11 +317,9 @@ impl Pane for QueuePane {
                     {
                         client.play_id(selected_song.id)?;
                     }
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::Save => {
                     modal!(context, SaveQueueModal::default());
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::AddToPlaylist => {
                     if let Some(selected_song) = self
@@ -357,7 +335,6 @@ impl Pane for QueuePane {
                             .collect_vec();
                         modal!(context, AddToPlaylistModal::new(selected_song.file.clone(), playlists,));
                     }
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 QueueActions::ShowInfo => {
                     if let Some(selected_song) = self
@@ -369,7 +346,6 @@ impl Pane for QueuePane {
                     } else {
                         status_error!("No song selected");
                     }
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
             }
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
@@ -381,7 +357,6 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Down => {
                     if !context.queue.is_empty() {
@@ -390,15 +365,14 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveUp => {
                     if context.queue.is_empty() {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
 
                     let Some(selected) = self
@@ -406,34 +380,32 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
 
                     let new_idx = idx.saturating_sub(1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => {
                     if context.queue.is_empty() {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
                     let Some(selected) = self
                         .scrolling_state
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
 
                     let new_idx = (idx + 1).min(context.queue.len() - 1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::DownHalf => {
                     if !context.queue.is_empty() {
@@ -441,7 +413,6 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::UpHalf => {
                     if !context.queue.is_empty() {
@@ -449,7 +420,6 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Bottom => {
                     if !context.queue.is_empty() {
@@ -457,7 +427,6 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Top => {
                     if !context.queue.is_empty() {
@@ -465,41 +434,37 @@ impl Pane for QueuePane {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => {}
+                CommonAction::Left => {}
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
                     self.filter = Some(String::new());
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::NextResult => {
                     self.jump_forward(&context.queue, context.config.scrolloff);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::PreviousResult => {
                     self.jump_back(&context.queue, context.config.scrolloff);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // queue has its own binding for play
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => {}
+                CommonAction::Add => {}
+                CommonAction::AddAll => {}
+                CommonAction::Delete => {}
+                CommonAction::Rename => {}
+                CommonAction::Close => {}
+                CommonAction::FocusInput => {}
+                CommonAction::Confirm => {} // queue has its own binding for play
+                CommonAction::PaneDown => {}
+                CommonAction::PaneUp => {}
+                CommonAction::PaneRight => {}
+                CommonAction::PaneLeft => {}
             }
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
             match action {
@@ -510,13 +475,12 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
                     run_external(command, create_env(context, song, client)?);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
-        }
+        };
+
+        Ok(())
     }
 }
 

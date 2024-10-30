@@ -7,8 +7,6 @@ use ratatui::{
 
 use crate::{context::AppContext, mpd::client::Client};
 
-use super::KeyHandleResultInternal;
-
 pub mod add_to_playlist;
 pub mod confirm_modal;
 pub mod confirm_queue_clear;
@@ -21,12 +19,7 @@ pub mod song_info;
 pub(super) trait Modal: std::fmt::Debug {
     fn render(&mut self, frame: &mut Frame, _app: &mut crate::context::AppContext) -> Result<()>;
 
-    fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        _client: &mut Client<'_>,
-        _app: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal>;
+    fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, _app: &mut AppContext) -> Result<()>;
 }
 
 #[allow(dead_code)]

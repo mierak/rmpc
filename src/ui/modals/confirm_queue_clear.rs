@@ -16,7 +16,7 @@ use crate::{
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
-use super::{KeyHandleResultInternal, RectExt};
+use super::RectExt;
 
 use super::Modal;
 
@@ -32,7 +32,7 @@ pub struct ConfirmQueueClearModal {
 }
 
 impl Modal for ConfirmQueueClearModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -80,30 +80,22 @@ impl Modal for ConfirmQueueClearModal {
         Ok(())
     }
 
-    fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.button_group.prev();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Close => {
                     self.button_group = ButtonGroupState::default();
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 {
@@ -111,32 +103,11 @@ impl Modal for ConfirmQueueClearModal {
                     }
                     self.button_group = ButtonGroupState::default();
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
-        }
+        };
+
+        Ok(())
     }
 }

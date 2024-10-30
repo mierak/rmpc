@@ -34,7 +34,7 @@ use crate::{
     shared::{ext::duration::DurationExt, mouse_event::MouseEvent},
 };
 
-use super::{widgets::volume::Volume, KeyHandleResultInternal, UiEvent};
+use super::{widgets::volume::Volume, UiEvent};
 
 pub mod album_art;
 pub mod albums;
@@ -106,7 +106,6 @@ impl PaneContainer {
     }
 }
 
-type KeyResult = Result<KeyHandleResultInternal>;
 #[allow(unused_variables)]
 pub(super) trait Pane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
@@ -125,19 +124,19 @@ pub(super) trait Pane {
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> KeyResult {
-        Ok(KeyHandleResultInternal::SkipRender)
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        Ok(())
     }
 
-    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> KeyResult;
+    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
 
     fn handle_mouse_event(
         &mut self,
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> KeyResult {
-        Ok(KeyHandleResultInternal::KeyNotHandled)
+    ) -> Result<()> {
+        Ok(())
     }
 }
 

@@ -2,10 +2,11 @@ use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
     shared::{image::ImageProtocol, macros::try_skip},
-    ui::{image::facade::AlbumArtFacade, KeyHandleResultInternal, UiEvent},
+    ui::{image::facade::AlbumArtFacade, UiEvent},
     AppEvent,
 };
 use anyhow::Result;
+use crossterm::event::KeyEvent;
 use ratatui::{layout::Rect, Frame};
 
 use super::Pane;
@@ -38,7 +39,7 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         if let Some(data) = self.image_data.take() {
             self.album_art.set_size(area);
             self.album_art.set_image(Some(data))?;
@@ -56,25 +57,16 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        _event: crossterm::event::KeyEvent,
-        _client: &mut impl crate::mpd::mpd_client::MpdClient,
-        _context: &crate::context::AppContext,
-    ) -> anyhow::Result<crate::ui::KeyHandleResultInternal> {
-        Ok(crate::ui::KeyHandleResultInternal::KeyNotHandled)
+    fn handle_action(&mut self, _event: KeyEvent, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
+        Ok(())
     }
 
-    fn on_hide(
-        &mut self,
-        _client: &mut impl crate::mpd::mpd_client::MpdClient,
-        context: &crate::context::AppContext,
-    ) -> anyhow::Result<()> {
+    fn on_hide(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         self.album_art.hide(context.config.theme.background_color)?;
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> anyhow::Result<()> {
+    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
             let album_art =
                 if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) {
@@ -91,12 +83,7 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::Player => {
                 if let Some((_, current_song)) = context
@@ -113,36 +100,31 @@ impl Pane for AlbumArtPane {
                         self.album_art.set_image(album_art)?;
 
                         context.render()?;
-                        return Ok(KeyHandleResultInternal::SkipRender);
                     }
                 }
-
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::Resized { columns, rows } => {
                 self.album_art.resize(*columns, *rows);
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::ModalOpened => {
                 self.album_art.hide(context.config.theme.background_color)?;
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::ModalClosed => {
                 self.album_art.show();
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             UiEvent::Exit => {
                 self.album_art.cleanup()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 }
 

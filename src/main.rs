@@ -377,16 +377,12 @@ fn main_task<B: Backend + std::io::Write>(
         if let Some(event) = event {
             match event {
                 AppEvent::UserKeyInput(key) => match ui.handle_key(key, &mut context, &mut client) {
-                    Ok(ui::KeyHandleResult::SkipRender) => continue,
+                    Ok(ui::KeyHandleResult::None) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
                         if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
                             error!(error:? = err, event:?; "Ui failed to handle quit event");
                         }
                         break;
-                    }
-                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
-                        render_wanted = true;
-                        full_rerender_wanted = true;
                     }
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
@@ -394,17 +390,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 },
                 AppEvent::UserMouseInput(ev) => match ui.handle_mouse_event(ev, &mut client, &mut context) {
-                    Ok(ui::KeyHandleResult::SkipRender) => continue,
-                    Ok(ui::KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
-                            error!(error:? = err, event:?; "Ui failed to handle quit event");
-                        }
-                        break;
-                    }
-                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
-                        render_wanted = true;
-                        full_rerender_wanted = true;
-                    }
+                    Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
                         render_wanted = true;
@@ -466,18 +452,7 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut context, &mut client) {
-                    Ok(ui::KeyHandleResult::SkipRender) => continue,
-                    Ok(ui::KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
-                            error!(error:? = err; "Ui failed to handle ui app event");
-                            // error!(error:? = err, event:?; "Ui failed to handle quit event");
-                        }
-                        break;
-                    }
-                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
-                        render_wanted = true;
-                        full_rerender_wanted = true;
-                    }
+                    Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
                         render_wanted = true;

@@ -23,7 +23,7 @@ use crate::{
         dirstack::{DirStack, DirStackItem},
         modals::rename_playlist::RenamePlaylistModal,
         widgets::browser::Browser,
-        KeyHandleResultInternal, UiEvent,
+        UiEvent,
     },
 };
 
@@ -79,12 +79,7 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::StoredPlaylist | UiEvent::Database => {
                 let mut new_stack = DirStack::new(
@@ -153,10 +148,11 @@ impl Pane for PlaylistsPane {
                 self.stack.set_preview(preview);
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -164,28 +160,22 @@ impl Pane for PlaylistsPane {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         self.handle_mouse_action(event, client, context)
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
         if self.filter_input_mode {
-            self.handle_filter_input(event, client, config, context)
-        } else if let Some(_action) = config.keybinds.playlists.get(&event.into()) {
-            Ok(KeyHandleResultInternal::SkipRender)
+            self.handle_filter_input(event, client, config, context)?;
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, context)
+            self.handle_common_action(*action, client, context)?;
         } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            self.handle_global_action(*action, client, context)
+            self.handle_global_action(*action, client, context)?;
         } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
+            // TODO the event should bubble up
         }
+        Ok(())
     }
 }
 
@@ -213,42 +203,34 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         })
     }
 
-    fn delete(
-        &self,
-        item: &DirOrSong,
-        index: usize,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn delete(&self, item: &DirOrSong, index: usize, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 client.delete_playlist(d)?;
                 status_info!("Playlist '{d}' deleted");
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             DirOrSong::Song(s) => {
                 let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
-                    return Ok(KeyHandleResultInternal::SkipRender);
+                    return Ok(());
                 };
                 client.delete_from_playlist(playlist, &SingleOrRange::single(index))?;
                 status_info!("File '{}' deleted from playlist '{playlist}'", s.file);
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-        }
+        };
+        Ok(())
     }
 
-    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
+    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match self.stack().path() {
             [playlist] => {
                 client.load_playlist(playlist)?;
                 status_info!("Playlist '{playlist}' added to queue");
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             [] => {
                 for playlist in &self.stack().current().items {
@@ -257,25 +239,20 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 status_info!("All playlists added to queue");
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 client.load_playlist(d)?;
                 status_info!("Playlist '{d}' added to queue");
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             DirOrSong::Song(s) => {
                 client.add(&s.file)?;
@@ -284,32 +261,29 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 }
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-        }
+        };
+
+        Ok(())
     }
 
-    fn rename(
-        &self,
-        item: &DirOrSong,
-        _client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn rename(&self, item: &DirOrSong, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 modal!(context, RenamePlaylistModal::new(d.clone()));
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            DirOrSong::Song(_) => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            DirOrSong::Song(_) => {}
+        };
+
+        Ok(())
     }
 
-    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
 
             context.render()?;
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         };
 
         match selected {
@@ -318,23 +292,20 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            DirOrSong::Song(_song) => self.add(selected, client, context),
-        }
+            DirOrSong::Song(_song) => self.add(selected, client, context)?,
+        };
+
+        Ok(())
     }
 
-    fn move_selected(
-        &mut self,
-        direction: MoveDirection,
-        client: &mut impl MpdClient,
-    ) -> Result<KeyHandleResultInternal> {
+    fn move_selected(&mut self, direction: MoveDirection, client: &mut impl MpdClient) -> Result<()> {
         let Some((idx, selected)) = self.stack().current().selected_with_idx() else {
             status_error!("Failed to move playlist. No playlist selected");
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         };
         let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         };
 
         match selected {
@@ -346,8 +317,9 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 };
                 client.move_in_playlist(playlist, &SingleOrRange::single(idx), new_idx)?;
             }
-        }
-        Ok(KeyHandleResultInternal::SkipRender)
+        };
+
+        Ok(())
     }
 
     fn prepare_preview(

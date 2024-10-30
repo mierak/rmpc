@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-use super::{KeyHandleResultInternal, RectExt};
+use super::RectExt;
 
 use super::Modal;
 
@@ -54,7 +54,7 @@ impl RenamePlaylistModal {
 }
 
 impl Modal for RenamePlaylistModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -104,19 +104,14 @@ impl Modal for RenamePlaylistModal {
         Ok(())
     }
 
-    fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         let action = context.config.keybinds.navigation.get(&key.into());
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
 
                 context.render()?;
-                return Ok(KeyHandleResultInternal::SkipRender);
+                return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 && self.playlist_name != self.new_name {
                     client.rename_playlist(&self.playlist_name, &self.new_name)?;
@@ -124,7 +119,7 @@ impl Modal for RenamePlaylistModal {
                 }
                 self.on_hide();
                 pop_modal!(context);
-                return Ok(KeyHandleResultInternal::SkipRender);
+                return Ok(());
             }
 
             match key.code {
@@ -132,15 +127,13 @@ impl Modal for RenamePlaylistModal {
                     self.new_name.push(c);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 KeyCode::Backspace => {
                     self.new_name.pop();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
         } else if let Some(action) = action {
             match action {
@@ -148,18 +141,15 @@ impl Modal for RenamePlaylistModal {
                     self.button_group.next();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.button_group.next();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Close => {
                     self.on_hide();
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 && self.playlist_name != self.new_name {
@@ -168,37 +158,16 @@ impl Modal for RenamePlaylistModal {
                     }
                     self.on_hide();
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
-        }
+        };
+
+        Ok(())
     }
 }

@@ -14,7 +14,7 @@ use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
     shared::mouse_event::{MouseEvent, MouseEventKind},
-    ui::{dirstack::DirState, KeyHandleResultInternal, UiEvent},
+    ui::{dirstack::DirState, UiEvent},
 };
 
 use super::Pane;
@@ -73,12 +73,7 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
@@ -87,7 +82,8 @@ impl Pane for LogsPane {
 
             context.render()?;
         }
-        Ok(KeyHandleResultInternal::SkipRender)
+
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -95,9 +91,9 @@ impl Pane for LogsPane {
         event: MouseEvent,
         _client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         if !self.logs_area.contains(event.into()) {
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         }
 
         match event.kind {
@@ -105,24 +101,19 @@ impl Pane for LogsPane {
                 self.scrolling_state.prev(context.config.scrolloff, false);
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
             MouseEventKind::ScrollDown => {
                 self.scrolling_state.next(context.config.scrolloff, false);
 
                 context.render()?;
-                Ok(KeyHandleResultInternal::SkipRender)
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        _client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn handle_action(&mut self, event: KeyEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
         if let Some(action) = config.keybinds.logs.get(&event.into()) {
             match action {
@@ -130,7 +121,6 @@ impl Pane for LogsPane {
                     self.logs.clear();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
             }
         } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
@@ -139,62 +129,56 @@ impl Pane for LogsPane {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, config.wrap_navigation);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, config.wrap_navigation);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => {}
+                CommonAction::Left => {}
+                CommonAction::EnterSearch => {}
+                CommonAction::NextResult => {}
+                CommonAction::PreviousResult => {}
+                CommonAction::Add => {}
+                CommonAction::Select => {}
+                CommonAction::Delete => {}
+                CommonAction::Rename => {}
+                CommonAction::MoveUp => {}
+                CommonAction::MoveDown => {}
+                CommonAction::Close => {}
+                CommonAction::Confirm => {}
+                CommonAction::FocusInput => {}
+                CommonAction::AddAll => {}
+                CommonAction::PaneDown => {}
+                CommonAction::PaneUp => {}
+                CommonAction::PaneRight => {}
+                CommonAction::PaneLeft => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
+
+        Ok(())
     }
 }

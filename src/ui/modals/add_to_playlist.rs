@@ -1,15 +1,18 @@
+use anyhow::Result;
+use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols,
     widgets::{Block, Borders, Clear, List, ListState},
+    Frame,
 };
 
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::mpd_client::MpdClient,
+    mpd::{client::Client, mpd_client::MpdClient},
     shared::macros::pop_modal,
     ui::{
         dirstack::DirState,
@@ -17,7 +20,7 @@ use crate::{
     },
 };
 
-use super::{KeyHandleResultInternal, RectExt};
+use super::RectExt;
 
 use super::Modal;
 
@@ -59,7 +62,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
 };
 
 impl Modal for AddToPlaylistModal {
-    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -125,12 +128,7 @@ impl Modal for AddToPlaylistModal {
         Ok(())
     }
 
-    fn handle_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        client: &mut crate::mpd::client::Client<'_>,
-        context: &mut AppContext,
-    ) -> anyhow::Result<KeyHandleResultInternal> {
+    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::Down => {
@@ -158,7 +156,6 @@ impl Modal for AddToPlaylistModal {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     match self.focused {
@@ -181,7 +178,6 @@ impl Modal for AddToPlaylistModal {
                     }
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Confirm => match self.focused {
                     FocusedComponent::Playlists => {
@@ -189,50 +185,26 @@ impl Modal for AddToPlaylistModal {
                         self.button_group.first();
 
                         context.render()?;
-                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                     FocusedComponent::Buttons if self.button_group.selected == 0 => {
                         if let Some(selected) = self.scrolling_state.get_selected() {
                             client.add_to_playlist(&self.playlists[selected], &self.uri, None)?;
                         }
                         pop_modal!(context);
-                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                     FocusedComponent::Buttons => {
                         self.button_group = ButtonGroupState::default();
                         pop_modal!(context);
-                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                 },
                 CommonAction::Close => {
                     self.button_group = ButtonGroupState::default();
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
-        }
+        };
+
+        Ok(())
     }
 }

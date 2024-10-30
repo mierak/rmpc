@@ -247,29 +247,26 @@ impl<'ui> Ui<'ui> {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
                 client.pause_toggle()?;
                 context.render()?;
-                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Header].contains(event.into()) => {
                 client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
                 context.render()?;
-                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Header].contains(event.into()) => {
                 client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
                 context.render()?;
-                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
                 if !matches!(
                     context.status.state,
                     crate::mpd::commands::State::Play | crate::mpd::commands::State::Pause
                 ) {
-                    return Ok(KeyHandleResult::SkipRender);
+                    return Ok(());
                 }
 
                 let second_to_seek_to = context
@@ -280,17 +277,14 @@ impl<'ui> Ui<'ui> {
                 client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
 
                 context.render()?;
-                Ok(KeyHandleResult::SkipRender)
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Tabs].contains(event.into()) => {
                 self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
                 context.render()?;
-                return Ok(KeyHandleResult::SkipRender);
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Tabs].contains(event.into()) => {
                 self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
                 context.render()?;
-                return Ok(KeyHandleResult::SkipRender);
             }
             MouseEventKind::LeftClick if self.areas[Areas::Tabs].contains(event.into()) => {
                 if let Some(tab_name) = self
@@ -301,21 +295,16 @@ impl<'ui> Ui<'ui> {
                     if &self.active_tab != tab_name {
                         self.change_tab(*tab_name, client, context)?;
                         context.render()?;
-                        return Ok(KeyHandleResult::SkipRender);
+                        return Ok(());
                     }
                 }
-
-                Ok(KeyHandleResult::SkipRender)
             }
             _ if self.areas[Areas::Content].contains(event.into()) => {
-                match screen_call!(self, handle_mouse_event(event, client, context))? {
-                    KeyHandleResultInternal::FullRenderRequested => Ok(KeyHandleResult::FullRenderRequested),
-                    KeyHandleResultInternal::SkipRender => Ok(KeyHandleResult::SkipRender),
-                    KeyHandleResultInternal::KeyNotHandled => Ok(KeyHandleResult::SkipRender),
-                }
+                screen_call!(self, handle_mouse_event(event, client, context))?;
             }
-            _ => Ok(KeyHandleResult::SkipRender),
+            _ => {}
         }
+        Ok(())
     }
 
     pub fn handle_key(
@@ -329,7 +318,7 @@ impl<'ui> Ui<'ui> {
             if let Some(CommonAction::Close) = action {
                 self.command = None;
                 context.render()?;
-                return Ok(KeyHandleResult::SkipRender);
+                return Ok(KeyHandleResult::None);
             } else if let Some(CommonAction::Confirm) = action {
                 let cmd = command.parse();
                 log::debug!("Executing command: {:?}", cmd);
@@ -350,144 +339,130 @@ impl<'ui> Ui<'ui> {
                 }
 
                 context.render()?;
-                return Ok(KeyHandleResult::SkipRender);
+                return Ok(KeyHandleResult::None);
             }
 
             match key.code {
                 KeyCode::Char(c) => {
                     command.push(c);
                     context.render()?;
-                    return Ok(KeyHandleResult::SkipRender);
                 }
                 KeyCode::Backspace => {
                     command.pop();
                     context.render()?;
-                    return Ok(KeyHandleResult::SkipRender);
                 }
-                _ => return Ok(KeyHandleResult::SkipRender),
+                _ => {}
             }
+
+            return Ok(KeyHandleResult::None);
         }
 
         if let Some(ref mut modal) = self.modals.last_mut() {
-            return match modal.handle_key(key, client, context)? {
-                r => Ok(r.into()),
-            };
+            modal.handle_key(key, client, context)?;
+            return Ok(KeyHandleResult::None);
         }
 
-        match screen_call!(self, handle_action(key, client, context))? {
-            KeyHandleResultInternal::FullRenderRequested => return Ok(KeyHandleResult::FullRenderRequested),
-            KeyHandleResultInternal::SkipRender => return Ok(KeyHandleResult::SkipRender),
-            KeyHandleResultInternal::KeyNotHandled => {
-                if let Some(action) = context.config.keybinds.global.get(&key.into()) {
-                    match action {
-                        GlobalAction::Command { command, .. } => {
-                            let cmd = command.parse();
-                            log::debug!("executing {:?}", cmd);
+        screen_call!(self, handle_action(key, client, context))?;
 
-                            self.command = None;
-                            if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                                cmd.execute(client, context.config, |request, _| {
-                                    if let Err(err) = context.work_sender.send(request) {
-                                        status_error!("Failed to send work request: {}", err);
-                                    }
-                                })?;
-                            }
-                        }
-                        GlobalAction::CommandMode => {
-                            self.command = Some(String::new());
-                            context.render()?;
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::NextTrack if context.status.state == MpdState::Play => client.next()?,
-                        GlobalAction::PreviousTrack if context.status.state == MpdState::Play => client.prev()?,
-                        GlobalAction::Stop if context.status.state == MpdState::Play => client.stop()?,
-                        GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
-                        GlobalAction::ToggleRandom => client.random(!context.status.random)?,
-                        GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
-                            client.single(context.status.single.cycle_pre_mpd_24())?;
-                        }
-                        GlobalAction::ToggleSingle => client.single(context.status.single.cycle())?,
-                        GlobalAction::ToggleConsume if client.version() < Version::new(0, 24, 0) => {
-                            client.consume(context.status.consume.cycle_pre_mpd_24())?;
-                        }
-                        GlobalAction::ToggleConsume => {
-                            client.consume(context.status.consume.cycle())?;
-                        }
-                        GlobalAction::TogglePause
-                            if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
-                        {
-                            client.pause_toggle()?;
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::TogglePause => {}
-                        GlobalAction::VolumeUp => {
-                            client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
-                        }
-                        GlobalAction::VolumeDown => {
-                            client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
-                        }
-                        GlobalAction::SeekForward
-                            if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
-                        {
-                            client.seek_current(ValueChange::Increase(5))?;
-                        }
-                        GlobalAction::SeekBack
-                            if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
-                        {
-                            client.seek_current(ValueChange::Decrease(5))?;
-                        }
-                        GlobalAction::NextTab => {
-                            self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
-                            context.render()?;
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::PreviousTab => {
-                            self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
-                            context.render()?;
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::SwitchToTab(name) => {
-                            if context.config.tabs.names.contains(name) {
-                                self.change_tab(*name, client, context)?;
-                                context.render()?;
-                            } else {
-                                status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
-                            }
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::NextTrack => {}
-                        GlobalAction::PreviousTrack => {}
-                        GlobalAction::Stop => {}
-                        GlobalAction::SeekBack => {}
-                        GlobalAction::SeekForward => {}
-                        GlobalAction::ExternalCommand { command, .. } => {
-                            run_external(command, create_env(context, std::iter::empty::<&str>(), client)?);
-                        }
-                        GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
-                        GlobalAction::ShowHelp => {
-                            let modal = KeybindsModal::new(context);
-                            modal!(context, modal);
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::ShowOutputs => {
-                            modal!(context, OutputsModal::new(client.outputs()?.0));
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
-                        GlobalAction::ShowCurrentSongInfo => {
-                            if let Some(current_song) = context.get_current_song(client)? {
-                                modal!(context, SongInfoModal::new(current_song));
-                            }
+        if let Some(action) = context.config.keybinds.global.get(&key.into()) {
+            match action {
+                GlobalAction::Command { command, .. } => {
+                    let cmd = command.parse();
+                    log::debug!("executing {:?}", cmd);
 
-                            status_info!("No song is currently playing");
-                            return Ok(KeyHandleResult::SkipRender);
-                        }
+                    self.command = None;
+                    if let Ok(Args { command: Some(cmd), .. }) = cmd {
+                        cmd.execute(client, context.config, |request, _| {
+                            if let Err(err) = context.work_sender.send(request) {
+                                status_error!("Failed to send work request: {}", err);
+                            }
+                        })?;
                     }
-                    Ok(KeyHandleResult::SkipRender)
-                } else {
-                    Ok(KeyHandleResult::SkipRender)
+                }
+                GlobalAction::CommandMode => {
+                    self.command = Some(String::new());
+                    context.render()?;
+                }
+                GlobalAction::NextTrack if context.status.state == MpdState::Play => client.next()?,
+                GlobalAction::PreviousTrack if context.status.state == MpdState::Play => client.prev()?,
+                GlobalAction::Stop if context.status.state == MpdState::Play => client.stop()?,
+                GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
+                GlobalAction::ToggleRandom => client.random(!context.status.random)?,
+                GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
+                    client.single(context.status.single.cycle_pre_mpd_24())?;
+                }
+                GlobalAction::ToggleSingle => client.single(context.status.single.cycle())?,
+                GlobalAction::ToggleConsume if client.version() < Version::new(0, 24, 0) => {
+                    client.consume(context.status.consume.cycle_pre_mpd_24())?;
+                }
+                GlobalAction::ToggleConsume => {
+                    client.consume(context.status.consume.cycle())?;
+                }
+                GlobalAction::TogglePause
+                    if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
+                {
+                    client.pause_toggle()?;
+                }
+                GlobalAction::TogglePause => {}
+                GlobalAction::VolumeUp => {
+                    client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
+                }
+                GlobalAction::VolumeDown => {
+                    client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
+                }
+                GlobalAction::SeekForward
+                    if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
+                {
+                    client.seek_current(ValueChange::Increase(5))?;
+                }
+                GlobalAction::SeekBack
+                    if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
+                {
+                    client.seek_current(ValueChange::Decrease(5))?;
+                }
+                GlobalAction::NextTab => {
+                    self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
+                    context.render()?;
+                }
+                GlobalAction::PreviousTab => {
+                    self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
+                    context.render()?;
+                }
+                GlobalAction::SwitchToTab(name) => {
+                    if context.config.tabs.names.contains(name) {
+                        self.change_tab(*name, client, context)?;
+                        context.render()?;
+                    } else {
+                        status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
+                    }
+                }
+                GlobalAction::NextTrack => {}
+                GlobalAction::PreviousTrack => {}
+                GlobalAction::Stop => {}
+                GlobalAction::SeekBack => {}
+                GlobalAction::SeekForward => {}
+                GlobalAction::ExternalCommand { command, .. } => {
+                    run_external(command, create_env(context, std::iter::empty::<&str>(), client)?);
+                }
+                GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
+                GlobalAction::ShowHelp => {
+                    let modal = KeybindsModal::new(context);
+                    modal!(context, modal);
+                }
+                GlobalAction::ShowOutputs => {
+                    modal!(context, OutputsModal::new(client.outputs()?.0));
+                }
+                GlobalAction::ShowCurrentSongInfo => {
+                    if let Some(current_song) = context.get_current_song(client)? {
+                        modal!(context, SongInfoModal::new(current_song));
+                    }
+
+                    status_info!("No song is currently playing");
                 }
             }
-        }
+        };
+
+        Ok(KeyHandleResult::None)
     }
 
     pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
@@ -508,21 +483,20 @@ impl<'ui> Ui<'ui> {
         event: UiAppEvent,
         context: &mut AppContext,
         client: &mut impl MpdClient,
-    ) -> Result<KeyHandleResult> {
+    ) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
                 self.modals.push(modal.0);
                 self.on_event(UiEvent::ModalOpened, context, client)?;
                 context.render()?;
-                Ok(KeyHandleResult::SkipRender)
             }
             UiAppEvent::PopModal => {
                 self.modals.pop();
                 self.on_event(UiEvent::ModalClosed, context, client)?;
                 context.render()?;
-                Ok(KeyHandleResult::SkipRender)
             }
         }
+        Ok(())
     }
 
     pub fn on_event(
@@ -530,9 +504,7 @@ impl<'ui> Ui<'ui> {
         mut event: UiEvent,
         context: &mut AppContext,
         client: &mut impl MpdClient,
-    ) -> Result<KeyHandleResult> {
-        let mut ret = KeyHandleResultInternal::SkipRender;
-
+    ) -> Result<()> {
         match event {
             UiEvent::Player => {
                 self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
@@ -544,7 +516,6 @@ impl<'ui> Ui<'ui> {
                 #[cfg(debug_assertions)]
                 if self.active_tab == "Logs".into() {
                     context.render()?;
-                    ret = KeyHandleResultInternal::SkipRender;
                 }
             }
             UiEvent::Resized { .. } => {}
@@ -554,7 +525,7 @@ impl<'ui> Ui<'ui> {
         }
 
         for name in context.config.tabs.active_panes {
-            let result = match self.panes.get_mut(*name) {
+            match self.panes.get_mut(*name) {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => p.on_event(&mut event, client, context),
                 Panes::Queue(p) => p.on_event(&mut event, client, context),
@@ -565,25 +536,10 @@ impl<'ui> Ui<'ui> {
                 Panes::Search(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArtists(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArt(p) => p.on_event(&mut event, client, context),
-            };
-
-            match self.handle_screen_event_result(result)? {
-                KeyHandleResult::FullRenderRequested => ret = KeyHandleResultInternal::FullRenderRequested,
-                KeyHandleResult::SkipRender => {}
-                KeyHandleResult::Quit => {}
-            }
+            }?;
         }
 
-        Ok(ret.into())
-    }
-
-    fn handle_screen_event_result(&mut self, result: Result<KeyHandleResultInternal>) -> Result<KeyHandleResult> {
-        match result {
-            Ok(KeyHandleResultInternal::SkipRender) => Ok(KeyHandleResult::SkipRender),
-            Ok(KeyHandleResultInternal::FullRenderRequested) => Ok(KeyHandleResult::FullRenderRequested),
-            Ok(KeyHandleResultInternal::KeyNotHandled) => Ok(KeyHandleResult::SkipRender),
-            Err(err) => Err(err),
-        }
+        Ok(())
     }
 }
 
@@ -642,32 +598,11 @@ pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<St
     Ok(terminal)
 }
 
-#[derive(Debug)]
-enum KeyHandleResultInternal {
-    /// Action warrants a render with whole window clear
-    FullRenderRequested,
-    /// Action does NOT warrant a render
-    SkipRender,
-    /// Event was not handled and should bubble up
-    KeyNotHandled,
-}
-
 pub enum KeyHandleResult {
-    /// Action warrants a render with whole window clear
-    FullRenderRequested,
     /// Action does NOT warrant a render
-    SkipRender,
+    None,
     /// Exit the application
     Quit,
-}
-
-impl From<KeyHandleResultInternal> for KeyHandleResult {
-    fn from(value: KeyHandleResultInternal) -> Self {
-        match value {
-            KeyHandleResultInternal::SkipRender => KeyHandleResult::SkipRender,
-            _ => KeyHandleResult::FullRenderRequested,
-        }
-    }
 }
 
 impl From<&Level> for Color {

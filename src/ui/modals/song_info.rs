@@ -1,4 +1,11 @@
-use crate::{config::keys::CommonAction, context::AppContext, mpd::commands::Song, shared::macros::pop_modal};
+use crate::{
+    config::keys::CommonAction,
+    context::AppContext,
+    mpd::{client::Client, commands::Song},
+    shared::macros::pop_modal,
+};
+use anyhow::Result;
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Margin},
     style::Style,
@@ -8,7 +15,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::ui::{dirstack::DirState, KeyHandleResultInternal};
+use crate::ui::dirstack::DirState;
 
 use super::{Modal, RectExt};
 
@@ -36,7 +43,7 @@ impl SongInfoModal {
 }
 
 impl Modal for SongInfoModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered(80, 80);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -153,77 +160,48 @@ impl Modal for SongInfoModal {
         return Ok(());
     }
 
-    fn handle_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        _client: &mut crate::mpd::client::Client<'_>,
-        context: &mut AppContext,
-    ) -> anyhow::Result<KeyHandleResultInternal> {
+    fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, context.config.wrap_navigation);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, context.config.wrap_navigation);
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
                     context.render()?;
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
                 CommonAction::Close => {
                     pop_modal!(context);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
-        }
+        };
+
+        Ok(())
     }
 }
