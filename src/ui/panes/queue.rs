@@ -268,28 +268,29 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
-                _ => match event.code() {
-                    KeyCode::Char(c) => {
-                        if let Some(ref mut f) = self.filter {
-                            f.push(c);
-                        };
-                        self.jump_first(&context.queue, context.config.scrolloff);
+                _ => {
+                    event.stop_propagation();
+                    match event.code() {
+                        KeyCode::Char(c) => {
+                            if let Some(ref mut f) = self.filter {
+                                f.push(c);
+                            };
+                            self.jump_first(&context.queue, context.config.scrolloff);
 
-                        context.render()?;
-                    }
-                    KeyCode::Backspace => {
-                        if let Some(ref mut f) = self.filter {
-                            f.pop();
-                        };
+                            context.render()?;
+                        }
+                        KeyCode::Backspace => {
+                            if let Some(ref mut f) = self.filter {
+                                f.pop();
+                            };
 
-                        context.render()?;
+                            context.render()?;
+                        }
+                        _ => {}
                     }
-                    _ => {}
-                },
+                }
             }
-            event.stop_propagation();
         } else if let Some(action) = event.as_queue_action(context) {
-            event.stop_propagation();
             match action {
                 QueueActions::Delete => {
                     if let Some(selected_song) = self
@@ -348,7 +349,6 @@ impl Pane for QueuePane {
                 }
             }
         } else if let Some(action) = event.as_common_action(context) {
-            event.stop_propagation();
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
@@ -466,14 +466,20 @@ impl Pane for QueuePane {
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
             }
-        } else if let Some(GlobalAction::ExternalCommand { command, .. }) = event.as_global_action(context) {
-            event.stop_propagation();
-            let song = self
-                .scrolling_state
-                .get_selected()
-                .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
+        } else if let Some(action) = event.as_global_action(context) {
+            match action {
+                GlobalAction::ExternalCommand { command, .. } => {
+                    let song = self
+                        .scrolling_state
+                        .get_selected()
+                        .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
-            run_external(command, create_env(context, song, client)?);
+                    run_external(command, create_env(context, song, client)?);
+                }
+                _ => {
+                    event.abandon();
+                }
+            }
         };
 
         Ok(())

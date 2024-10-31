@@ -13,7 +13,7 @@ use panes::{PaneContainer, Panes};
 use ratatui::{
     layout::Rect,
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
-    style::{Color, Style},
+    style::{Color, Style, Stylize},
     symbols::border,
     text::Text,
     widgets::{Block, Borders, Paragraph},
@@ -212,10 +212,18 @@ impl<'ui> Ui<'ui> {
         }
 
         #[cfg(debug_assertions)]
-        frame.render_widget(
-            Paragraph::new(format!("{} frames", self.rendered_frames_count)),
-            self.areas[Areas::Bar],
-        );
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            let text = format!("{} frames", self.rendered_frames_count);
+            let mut area = self.areas[Areas::Bar];
+            area.width = text.chars().count() as u16;
+            frame.render_widget(
+                Text::from(text)
+                    .fg(context.config.theme.text_color.unwrap_or_default())
+                    .bg(context.config.theme.background_color.unwrap_or_default()),
+                area,
+            );
+        }
 
         let content_area = self.areas[Areas::Content];
 
@@ -313,8 +321,8 @@ impl<'ui> Ui<'ui> {
         context: &mut AppContext,
         client: &mut Client<'_>,
     ) -> Result<KeyHandleResult> {
-        let action = key.as_common_action(context);
         if let Some(ref mut command) = self.command {
+            let action = key.as_common_action(context);
             if let Some(CommonAction::Close) = action {
                 self.command = None;
                 context.render()?;

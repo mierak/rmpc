@@ -32,36 +32,52 @@ impl KeyEvent {
         self.already_handled = true;
     }
 
-    pub fn as_common_action(&self, context: &AppContext) -> Option<CommonAction> {
+    pub fn abandon(&mut self) {
+        self.already_handled = false;
+    }
+
+    pub fn as_common_action(&mut self, context: &AppContext) -> Option<CommonAction> {
         if self.already_handled {
             None
+        } else if let Some(action) = context.config.keybinds.navigation.get(&self.inner.into()) {
+            self.already_handled = true;
+            Some(*action)
         } else {
-            context.config.keybinds.navigation.get(&self.inner.into()).copied()
+            None
         }
     }
 
-    pub fn as_global_action(&self, context: &AppContext) -> Option<GlobalAction> {
+    pub fn as_global_action(&mut self, context: &AppContext) -> Option<GlobalAction> {
         if self.already_handled {
             None
+        } else if let Some(action) = context.config.keybinds.global.get(&self.inner.into()) {
+            self.already_handled = true;
+            Some(*action)
         } else {
-            context.config.keybinds.global.get(&self.inner.into()).copied()
+            None
         }
     }
 
     #[cfg(debug_assertions)]
-    pub fn as_logs_action(&self, context: &AppContext) -> Option<LogsActions> {
+    pub fn as_logs_action(&mut self, context: &AppContext) -> Option<LogsActions> {
         if self.already_handled {
             None
+        } else if let Some(action) = context.config.keybinds.logs.get(&self.inner.into()) {
+            self.already_handled = true;
+            Some(*action)
         } else {
-            context.config.keybinds.logs.get(&self.inner.into()).copied()
+            None
         }
     }
 
-    pub fn as_queue_action(&self, context: &AppContext) -> Option<QueueActions> {
+    pub fn as_queue_action(&mut self, context: &AppContext) -> Option<QueueActions> {
         if self.already_handled {
             None
+        } else if let Some(action) = context.config.keybinds.queue.get(&self.inner.into()) {
+            self.already_handled = true;
+            Some(*action)
         } else {
-            context.config.keybinds.queue.get(&self.inner.into()).copied()
+            None
         }
     }
 }

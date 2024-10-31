@@ -75,23 +75,24 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.set_filter_input_mode_active(false);
                 context.render()?;
             }
-            _ => match event.code() {
-                KeyCode::Char(c) => {
-                    self.stack_mut().current_mut().push_filter(c, config);
-                    self.stack_mut().current_mut().jump_first_matching(config);
-                    let preview = self.prepare_preview(client, config)?;
-                    self.stack_mut().set_preview(preview);
-                    context.render()?;
+            _ => {
+                event.stop_propagation();
+                match event.code() {
+                    KeyCode::Char(c) => {
+                        self.stack_mut().current_mut().push_filter(c, config);
+                        self.stack_mut().current_mut().jump_first_matching(config);
+                        let preview = self.prepare_preview(client, config)?;
+                        self.stack_mut().set_preview(preview);
+                        context.render()?;
+                    }
+                    KeyCode::Backspace => {
+                        self.stack_mut().current_mut().pop_filter(config);
+                        context.render()?;
+                    }
+                    _ => {}
                 }
-                KeyCode::Backspace => {
-                    self.stack_mut().current_mut().pop_filter(config);
-                    context.render()?;
-                }
-                _ => {}
-            },
+            }
         };
-
-        event.stop_propagation();
 
         Ok(())
     }
@@ -109,7 +110,6 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         let config = context.config;
         match action {
             GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
-                event.stop_propagation();
                 let songs: Vec<_> = self
                     .stack()
                     .current()
@@ -122,7 +122,6 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 run_external(command, create_env(context, songs, client)?);
             }
             GlobalAction::ExternalCommand { command, .. } => {
-                event.stop_propagation();
                 if let Some(selected) = self.stack().current().selected() {
                     let songs = self.list_songs_in_item(client, selected)?;
                     let songs = songs.iter().map(|s| s.file.as_str());
@@ -130,7 +129,9 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     run_external(command, create_env(context, songs, client)?);
                 }
             }
-            _ => {}
+            _ => {
+                event.abandon();
+            }
         };
 
         Ok(())
@@ -263,7 +264,6 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         let Some(action) = event.as_common_action(context) else {
             return Ok(());
         };
-        event.stop_propagation();
         let config = context.config;
 
         match action {
@@ -379,6 +379,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 }
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
+                log::debug!("add all");
                 self.add_all(client, context)?;
 
                 context.render()?;

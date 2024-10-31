@@ -121,7 +121,6 @@ impl Pane for LogsPane {
     ) -> Result<()> {
         let config = context.config;
         if let Some(action) = event.as_logs_action(context) {
-            event.stop_propagation();
             match action {
                 LogsActions::Clear => {
                     self.logs.clear();
@@ -130,7 +129,6 @@ impl Pane for LogsPane {
                 }
             }
         } else if let Some(action) = event.as_common_action(context) {
-            event.stop_propagation();
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);

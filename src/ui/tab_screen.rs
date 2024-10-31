@@ -152,7 +152,6 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
-                event.stop_propagation();
             }
             Some(CommonAction::PaneDown) => {
                 self.focused = Some(
@@ -174,7 +173,6 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
-                event.stop_propagation();
             }
             Some(CommonAction::PaneRight) => {
                 self.focused = Some(
@@ -196,7 +194,6 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
-                event.stop_propagation();
             }
             Some(CommonAction::PaneLeft) => {
                 self.focused = Some(
@@ -218,9 +215,9 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
-                event.stop_propagation();
             }
             Some(_) | None => {
+                event.abandon();
                 let pane = panes.get_mut(focused.pane);
                 screen_call!(pane, handle_action(event, client, context))?;
             }

@@ -628,27 +628,25 @@ impl Pane for SearchPane {
 
     fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
-        let action = event.as_common_action(context);
         match &mut self.phase {
-            Phase::SearchTextboxInput => {
-                event.stop_propagation();
+            Phase::SearchTextboxInput => match event.as_common_action(context) {
+                Some(CommonAction::Close) => {
+                    self.phase = Phase::Search;
+                    self.songs_dir = Dir::new(self.search(client)?);
+                    self.preview = self.prepare_preview(client, config)?;
 
-                match action {
-                    Some(CommonAction::Close) => {
-                        self.phase = Phase::Search;
-                        self.songs_dir = Dir::new(self.search(client)?);
-                        self.preview = self.prepare_preview(client, config)?;
+                    context.render()?;
+                }
+                Some(CommonAction::Confirm) => {
+                    self.phase = Phase::Search;
+                    self.songs_dir = Dir::new(self.search(client)?);
+                    self.preview = self.prepare_preview(client, config)?;
 
-                        context.render()?;
-                    }
-                    Some(CommonAction::Confirm) => {
-                        self.phase = Phase::Search;
-                        self.songs_dir = Dir::new(self.search(client)?);
-                        self.preview = self.prepare_preview(client, config)?;
-
-                        context.render()?;
-                    }
-                    _ => match event.code() {
+                    context.render()?;
+                }
+                _ => {
+                    event.stop_propagation();
+                    match event.code() {
                         KeyCode::Char(c) => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
                                 value.push(c);
@@ -666,18 +664,18 @@ impl Pane for SearchPane {
                             FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
                         },
                         _ => {}
-                    },
+                    }
                 }
-            }
+            },
             Phase::Search => {
                 if let Some(action) = event.as_global_action(context) {
                     if let GlobalAction::ExternalCommand { command, .. } = action {
                         let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
                         run_external(command, create_env(context, songs, client)?);
-                        event.stop_propagation();
+                    } else {
+                        event.abandon();
                     }
                 } else if let Some(action) = event.as_common_action(context) {
-                    event.stop_propagation();
                     match action {
                         CommonAction::Down => {
                             if config.wrap_navigation {
@@ -766,23 +764,22 @@ impl Pane for SearchPane {
             }
             Phase::BrowseResults {
                 filter_input_on: filter_input_on @ true,
-            } => {
-                event.stop_propagation();
+            } => match event.as_common_action(context) {
+                Some(CommonAction::Close) => {
+                    *filter_input_on = false;
+                    self.songs_dir.set_filter(None, config);
+                    self.preview = self.prepare_preview(client, config)?;
 
-                match action {
-                    Some(CommonAction::Close) => {
-                        *filter_input_on = false;
-                        self.songs_dir.set_filter(None, config);
-                        self.preview = self.prepare_preview(client, config)?;
+                    context.render()?;
+                }
+                Some(CommonAction::Confirm) => {
+                    *filter_input_on = false;
 
-                        context.render()?;
-                    }
-                    Some(CommonAction::Confirm) => {
-                        *filter_input_on = false;
-
-                        context.render()?;
-                    }
-                    _ => match event.code() {
+                    context.render()?;
+                }
+                _ => {
+                    event.stop_propagation();
+                    match event.code() {
                         KeyCode::Char(c) => {
                             self.songs_dir.push_filter(c, config);
                             self.songs_dir.jump_first_matching(config);
@@ -796,9 +793,9 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         _ => {}
-                    },
+                    }
                 }
-            }
+            },
             Phase::BrowseResults {
                 filter_input_on: filter_input_modce @ false,
             } => {
@@ -807,18 +804,16 @@ impl Pane for SearchPane {
                         GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
                             let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
                             run_external(command, create_env(context, songs, client)?);
-                            event.stop_propagation();
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
                             run_external(command, create_env(context, selected, client)?);
-                            event.stop_propagation();
                         }
-                        _ => {}
+                        _ => {
+                            event.abandon();
+                        }
                     }
                 } else if let Some(action) = event.as_common_action(context) {
-                    event.stop_propagation();
-
                     match action {
                         CommonAction::Down => {
                             self.songs_dir
