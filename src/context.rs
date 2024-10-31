@@ -19,21 +19,7 @@ pub struct AppContext {
     pub supported_commands: HashSet<String>,
     pub app_event_sender: Sender<AppEvent>,
     pub work_sender: Sender<WorkRequest>,
-    needs_render: Cell<bool>,
-}
-
-impl Default for AppContext {
-    fn default() -> Self {
-        Self {
-            status: Status::default(),
-            config: Box::leak(Box::default()),
-            queue: Vec::default(),
-            app_event_sender: std::sync::mpsc::channel().0,
-            work_sender: std::sync::mpsc::channel().0,
-            supported_commands: HashSet::new(),
-            needs_render: Cell::new(false),
-        }
-    }
+    pub needs_render: Cell<bool>,
 }
 
 impl AppContext {
