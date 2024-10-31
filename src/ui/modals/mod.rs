@@ -1,11 +1,10 @@
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Constraint, Layout, Rect},
     Frame,
 };
 
-use crate::{context::AppContext, mpd::client::Client};
+use crate::{context::AppContext, mpd::client::Client, shared::key_event::KeyEvent};
 
 pub mod add_to_playlist;
 pub mod confirm_modal;
@@ -19,7 +18,7 @@ pub mod song_info;
 pub(super) trait Modal: std::fmt::Debug {
     fn render(&mut self, frame: &mut Frame, _app: &mut crate::context::AppContext) -> Result<()>;
 
-    fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, _app: &mut AppContext) -> Result<()>;
+    fn handle_key(&mut self, key: &mut KeyEvent, _client: &mut Client<'_>, _app: &mut AppContext) -> Result<()>;
 }
 
 #[allow(dead_code)]

@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
@@ -13,7 +12,10 @@ use crate::{
     config::keys::{CommonAction, LogsActions},
     context::AppContext,
     mpd::mpd_client::MpdClient,
-    shared::mouse_event::{MouseEvent, MouseEventKind},
+    shared::{
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
     ui::{dirstack::DirState, UiEvent},
 };
 
@@ -73,14 +75,12 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
                 self.logs.pop_front();
             }
-
-            context.render()?;
         }
 
         Ok(())
@@ -113,9 +113,15 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: KeyEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn handle_action(
+        &mut self,
+        event: &mut KeyEvent,
+        _client: &mut impl MpdClient,
+        context: &AppContext,
+    ) -> Result<()> {
         let config = context.config;
-        if let Some(action) = config.keybinds.logs.get(&event.into()) {
+        if let Some(action) = event.as_logs_action(context) {
+            event.stop_propagation();
             match action {
                 LogsActions::Clear => {
                     self.logs.clear();
@@ -123,7 +129,8 @@ impl Pane for LogsPane {
                     context.render()?;
                 }
             }
-        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+        } else if let Some(action) = event.as_common_action(context) {
+            event.stop_propagation();
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);

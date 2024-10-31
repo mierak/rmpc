@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use itertools::Itertools;
 
 use crate::{
@@ -14,6 +14,7 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     shared::{
+        key_event::KeyEvent,
         macros::{modal, status_error, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
@@ -256,10 +257,9 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        let config = context.config;
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if self.filter_input_mode {
-            match config.keybinds.navigation.get(&event.into()) {
+            match event.as_common_action(context) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
 
@@ -271,7 +271,7 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
-                _ => match event.code {
+                _ => match event.code() {
                     KeyCode::Char(c) => {
                         if let Some(ref mut f) = self.filter {
                             f.push(c);
@@ -290,7 +290,9 @@ impl Pane for QueuePane {
                     _ => {}
                 },
             }
-        } else if let Some(action) = config.keybinds.queue.get(&event.into()) {
+            event.stop_propagation();
+        } else if let Some(action) = event.as_queue_action(context) {
+            event.stop_propagation();
             match action {
                 QueueActions::Delete => {
                     if let Some(selected_song) = self
@@ -348,7 +350,8 @@ impl Pane for QueuePane {
                     }
                 }
             }
-        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+        } else if let Some(action) = event.as_common_action(context) {
+            event.stop_propagation();
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
@@ -466,18 +469,14 @@ impl Pane for QueuePane {
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
             }
-        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            match action {
-                GlobalAction::ExternalCommand { command, .. } => {
-                    let song = self
-                        .scrolling_state
-                        .get_selected()
-                        .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
+        } else if let Some(GlobalAction::ExternalCommand { command, .. }) = event.as_global_action(context) {
+            event.stop_propagation();
+            let song = self
+                .scrolling_state
+                .get_selected()
+                .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
-                    run_external(command, create_env(context, song, client)?);
-                }
-                _ => {}
-            }
+            run_external(command, create_env(context, song, client)?);
         };
 
         Ok(())

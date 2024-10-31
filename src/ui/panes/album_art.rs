@@ -1,12 +1,11 @@
 use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
-    shared::{image::ImageProtocol, macros::try_skip},
+    shared::{image::ImageProtocol, key_event::KeyEvent, macros::try_skip},
     ui::{image::facade::AlbumArtFacade, UiEvent},
     AppEvent,
 };
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use ratatui::{layout::Rect, Frame};
 
 use super::Pane;
@@ -57,7 +56,12 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: KeyEvent, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
+    fn handle_action(
+        &mut self,
+        _event: &mut KeyEvent,
+        _client: &mut impl MpdClient,
+        _context: &AppContext,
+    ) -> Result<()> {
         Ok(())
     }
 

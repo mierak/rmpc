@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::mpsc::Sender};
+use std::{cell::Cell, collections::HashSet, sync::mpsc::Sender};
 
 use crate::{
     config::{Config, ImageMethod, Leak},
@@ -19,6 +19,21 @@ pub struct AppContext {
     pub supported_commands: HashSet<String>,
     pub app_event_sender: Sender<AppEvent>,
     pub work_sender: Sender<WorkRequest>,
+    needs_render: Cell<bool>,
+}
+
+impl Default for AppContext {
+    fn default() -> Self {
+        Self {
+            status: Status::default(),
+            config: Box::leak(Box::default()),
+            queue: Vec::default(),
+            app_event_sender: std::sync::mpsc::channel().0,
+            work_sender: std::sync::mpsc::channel().0,
+            supported_commands: HashSet::new(),
+            needs_render: Cell::new(false),
+        }
+    }
 }
 
 impl AppContext {
@@ -48,11 +63,21 @@ impl AppContext {
             supported_commands,
             app_event_sender,
             work_sender,
+            needs_render: Cell::new(false),
         })
     }
 
     pub fn render(&self) -> Result<(), std::sync::mpsc::SendError<AppEvent>> {
+        if self.needs_render.get() {
+            return Ok(());
+        }
+
+        self.needs_render.replace(true);
         self.app_event_sender.send(AppEvent::RequestRender(false))
+    }
+
+    pub fn finish_frame(&self) {
+        self.needs_render.replace(false);
     }
 
     pub fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {

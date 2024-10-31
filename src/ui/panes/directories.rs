@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
@@ -15,6 +14,7 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
+        key_event::KeyEvent,
         macros::{status_info, status_warn},
         mouse_event::MouseEvent,
     },
@@ -99,17 +99,10 @@ impl Pane for DirectoriesPane {
         self.handle_mouse_action(event, client, context)
     }
 
-    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        let config = context.config;
-        if self.filter_input_mode {
-            self.handle_filter_input(event, client, config, context)?;
-        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, context)?;
-        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            self.handle_global_action(*action, client, context)?;
-        } else {
-            // TODO the event should bubble up
-        }
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        self.handle_filter_input(event, client, context)?;
+        self.handle_common_action(event, client, context)?;
+        self.handle_global_action(event, client, context)?;
         Ok(())
     }
 }

@@ -3,7 +3,6 @@ use std::rc::Rc;
 use anyhow::Context;
 use anyhow::Result;
 use crossterm::event::KeyCode;
-use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::layout::Alignment;
 use ratatui::layout::Rect;
@@ -21,6 +20,7 @@ use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
+use crate::shared::key_event::KeyEvent;
 use crate::shared::macros::status_info;
 use crate::shared::macros::status_warn;
 use crate::shared::mouse_event::MouseEvent;
@@ -629,25 +629,29 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
-        let action = config.keybinds.navigation.get(&event.into());
+        let action = event.as_common_action(context);
         match &mut self.phase {
             Phase::SearchTextboxInput => {
-                if let Some(CommonAction::Close) = action {
-                    self.phase = Phase::Search;
-                    self.songs_dir = Dir::new(self.search(client)?);
-                    self.preview = self.prepare_preview(client, config)?;
+                event.stop_propagation();
 
-                    context.render()?;
-                } else if let Some(CommonAction::Confirm) = action {
-                    self.phase = Phase::Search;
-                    self.songs_dir = Dir::new(self.search(client)?);
-                    self.preview = self.prepare_preview(client, config)?;
+                match action {
+                    Some(CommonAction::Close) => {
+                        self.phase = Phase::Search;
+                        self.songs_dir = Dir::new(self.search(client)?);
+                        self.preview = self.prepare_preview(client, config)?;
 
-                    context.render()?;
-                } else {
-                    match event.code {
+                        context.render()?;
+                    }
+                    Some(CommonAction::Confirm) => {
+                        self.phase = Phase::Search;
+                        self.songs_dir = Dir::new(self.search(client)?);
+                        self.preview = self.prepare_preview(client, config)?;
+
+                        context.render()?;
+                    }
+                    _ => match event.code() {
                         KeyCode::Char(c) => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
                                 value.push(c);
@@ -665,19 +669,18 @@ impl Pane for SearchPane {
                             FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
                         },
                         _ => {}
-                    }
+                    },
                 }
             }
             Phase::Search => {
-                if let Some(action) = config.keybinds.global.get(&event.into()) {
-                    match action {
-                        GlobalAction::ExternalCommand { command, .. } => {
-                            let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                            run_external(command, create_env(context, songs, client)?);
-                        }
-                        _ => {}
+                if let Some(action) = event.as_global_action(context) {
+                    if let GlobalAction::ExternalCommand { command, .. } = action {
+                        let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
+                        run_external(command, create_env(context, songs, client)?);
+                        event.stop_propagation();
                     }
-                } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+                } else if let Some(action) = event.as_common_action(context) {
+                    event.stop_propagation();
                     match action {
                         CommonAction::Down => {
                             if config.wrap_navigation {
@@ -767,18 +770,22 @@ impl Pane for SearchPane {
             Phase::BrowseResults {
                 filter_input_on: filter_input_on @ true,
             } => {
-                if let Some(CommonAction::Close) = action {
-                    *filter_input_on = false;
-                    self.songs_dir.set_filter(None, config);
-                    self.preview = self.prepare_preview(client, config)?;
+                event.stop_propagation();
 
-                    context.render()?;
-                } else if let Some(CommonAction::Confirm) = action {
-                    *filter_input_on = false;
+                match action {
+                    Some(CommonAction::Close) => {
+                        *filter_input_on = false;
+                        self.songs_dir.set_filter(None, config);
+                        self.preview = self.prepare_preview(client, config)?;
 
-                    context.render()?;
-                } else {
-                    match event.code {
+                        context.render()?;
+                    }
+                    Some(CommonAction::Confirm) => {
+                        *filter_input_on = false;
+
+                        context.render()?;
+                    }
+                    _ => match event.code() {
                         KeyCode::Char(c) => {
                             self.songs_dir.push_filter(c, config);
                             self.songs_dir.jump_first_matching(config);
@@ -792,25 +799,29 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         _ => {}
-                    }
+                    },
                 }
             }
             Phase::BrowseResults {
                 filter_input_on: filter_input_modce @ false,
             } => {
-                if let Some(action) = config.keybinds.global.get(&event.into()) {
+                if let Some(action) = event.as_global_action(context) {
                     match action {
                         GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
                             let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
                             run_external(command, create_env(context, songs, client)?);
+                            event.stop_propagation();
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
                             run_external(command, create_env(context, selected, client)?);
+                            event.stop_propagation();
                         }
                         _ => {}
                     }
-                } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+                } else if let Some(action) = event.as_common_action(context) {
+                    event.stop_propagation();
+
                     match action {
                         CommonAction::Down => {
                             self.songs_dir
@@ -840,11 +851,7 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Right => {
-                            self.add_current(client, context)?;
-
-                            context.render()?;
-                        }
+                        CommonAction::Right => self.add_current(client, context)?,
                         CommonAction::Left => {
                             self.phase = Phase::Search;
                             self.preview = self.prepare_preview(client, config)?;
@@ -896,11 +903,7 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => {
-                            self.add_current(client, context)?;
-
-                            context.render()?;
-                        }
+                        CommonAction::Add => self.add_current(client, context)?,
                         CommonAction::AddAll => {
                             self.search_add(client)?;
                             status_info!("All found songs added to queue");

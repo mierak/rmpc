@@ -376,7 +376,7 @@ fn main_task<B: Backend + std::io::Write>(
 
         if let Some(event) = event {
             match event {
-                AppEvent::UserKeyInput(key) => match ui.handle_key(key, &mut context, &mut client) {
+                AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context, &mut client) {
                     Ok(ui::KeyHandleResult::None) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
                         if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
@@ -481,6 +481,8 @@ fn main_task<B: Backend + std::io::Write>(
             if let Err(err) = ui.post_render(&mut terminal.get_frame(), &mut context) {
                 error!(error:? = err; "Failed handle post render phase");
             };
+
+            context.finish_frame();
             last_render = now;
             render_wanted = false;
         }

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListItem};
 
@@ -11,7 +11,10 @@ use crate::{
     },
     context::AppContext,
     mpd::{commands::Song, mpd_client::MpdClient},
-    shared::mouse_event::{MouseEvent, MouseEventKind},
+    shared::{
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
 };
 
 use super::{
@@ -51,12 +54,16 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
     }
     fn handle_filter_input(
         &mut self,
-        event: KeyEvent,
+        event: &mut KeyEvent,
         client: &mut impl MpdClient,
-        config: &Config,
         context: &AppContext,
     ) -> Result<()> {
-        match config.keybinds.navigation.get(&event.into()) {
+        if !self.is_filter_input_mode_active() {
+            return Ok(());
+        }
+
+        let config = context.config;
+        match event.as_common_action(context) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().set_filter(None, config);
@@ -68,7 +75,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.set_filter_input_mode_active(false);
                 context.render()?;
             }
-            _ => match event.code {
+            _ => match event.code() {
                 KeyCode::Char(c) => {
                     self.stack_mut().current_mut().push_filter(c, config);
                     self.stack_mut().current_mut().jump_first_matching(config);
@@ -84,18 +91,25 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             },
         };
 
+        event.stop_propagation();
+
         Ok(())
     }
 
     fn handle_global_action(
         &mut self,
-        action: GlobalAction,
+        event: &mut KeyEvent,
         client: &mut impl MpdClient,
         context: &AppContext,
     ) -> Result<()> {
+        let Some(action) = event.as_global_action(context) else {
+            return Ok(());
+        };
+
+        let config = context.config;
         match action {
             GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
-                // TODO event should not bubble up
+                event.stop_propagation();
                 let songs: Vec<_> = self
                     .stack()
                     .current()
@@ -108,7 +122,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 run_external(command, create_env(context, songs, client)?);
             }
             GlobalAction::ExternalCommand { command, .. } => {
-                // TODO event should not bubble up
+                event.stop_propagation();
                 if let Some(selected) = self.stack().current().selected() {
                     let songs = self.list_songs_in_item(client, selected)?;
                     let songs = songs.iter().map(|s| s.file.as_str());
@@ -242,11 +256,16 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
 
     fn handle_common_action(
         &mut self,
-        action: CommonAction,
+        event: &mut KeyEvent,
         client: &mut impl MpdClient,
         context: &AppContext,
     ) -> Result<()> {
+        let Some(action) = event.as_common_action(context) else {
+            return Ok(());
+        };
+        event.stop_propagation();
         let config = context.config;
+
         match action {
             CommonAction::Up => {
                 self.stack_mut()

@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent},
+    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -27,15 +27,16 @@ use crate::{
     config::{
         cli::Args,
         keys::{CommonAction, GlobalAction},
-        tabs::TabName,
+        tabs::{PaneType, TabName},
         Config,
     },
     mpd::{
         client::Client,
-        commands::{idle::IdleEvent, volume::Bound, Song, State as MpdState},
+        commands::{idle::IdleEvent, volume::Bound, Song, State},
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     shared::{
+        key_event::KeyEvent,
         macros::{modal, status_error, status_info, try_ret},
         mouse_event::{MouseEvent, MouseEventKind},
     },
@@ -217,6 +218,8 @@ impl<'ui> Ui<'ui> {
         );
 
         let content_area = self.areas[Areas::Content];
+
+        // TODO double check and remove...
         if context.config.theme.draw_borders {
             screen_call!(self, render(frame, content_area, context))?;
         } else {
@@ -262,10 +265,7 @@ impl<'ui> Ui<'ui> {
                 context.render()?;
             }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
-                if !matches!(
-                    context.status.state,
-                    crate::mpd::commands::State::Play | crate::mpd::commands::State::Pause
-                ) {
+                if !matches!(context.status.state, State::Play | State::Pause) {
                     return Ok(());
                 }
 
@@ -309,11 +309,11 @@ impl<'ui> Ui<'ui> {
 
     pub fn handle_key(
         &mut self,
-        key: KeyEvent,
+        key: &mut KeyEvent,
         context: &mut AppContext,
         client: &mut Client<'_>,
     ) -> Result<KeyHandleResult> {
-        let action = context.config.keybinds.navigation.get(&key.into());
+        let action = key.as_common_action(context);
         if let Some(ref mut command) = self.command {
             if let Some(CommonAction::Close) = action {
                 self.command = None;
@@ -342,7 +342,7 @@ impl<'ui> Ui<'ui> {
                 return Ok(KeyHandleResult::None);
             }
 
-            match key.code {
+            match key.code() {
                 KeyCode::Char(c) => {
                     command.push(c);
                     context.render()?;
@@ -364,7 +364,7 @@ impl<'ui> Ui<'ui> {
 
         screen_call!(self, handle_action(key, client, context))?;
 
-        if let Some(action) = context.config.keybinds.global.get(&key.into()) {
+        if let Some(action) = key.as_global_action(context) {
             match action {
                 GlobalAction::Command { command, .. } => {
                     let cmd = command.parse();
@@ -383,9 +383,9 @@ impl<'ui> Ui<'ui> {
                     self.command = Some(String::new());
                     context.render()?;
                 }
-                GlobalAction::NextTrack if context.status.state == MpdState::Play => client.next()?,
-                GlobalAction::PreviousTrack if context.status.state == MpdState::Play => client.prev()?,
-                GlobalAction::Stop if context.status.state == MpdState::Play => client.stop()?,
+                GlobalAction::NextTrack if context.status.state == State::Play => client.next()?,
+                GlobalAction::PreviousTrack if context.status.state == State::Play => client.prev()?,
+                GlobalAction::Stop if context.status.state == State::Play => client.stop()?,
                 GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
                 GlobalAction::ToggleRandom => client.random(!context.status.random)?,
                 GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
@@ -398,9 +398,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::ToggleConsume => {
                     client.consume(context.status.consume.cycle())?;
                 }
-                GlobalAction::TogglePause
-                    if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
-                {
+                GlobalAction::TogglePause if matches!(context.status.state, State::Play | State::Pause) => {
                     client.pause_toggle()?;
                 }
                 GlobalAction::TogglePause => {}
@@ -410,14 +408,10 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::VolumeDown => {
                     client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
                 }
-                GlobalAction::SeekForward
-                    if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
-                {
+                GlobalAction::SeekForward if matches!(context.status.state, State::Play | State::Pause) => {
                     client.seek_current(ValueChange::Increase(5))?;
                 }
-                GlobalAction::SeekBack
-                    if context.status.state == MpdState::Play || context.status.state == MpdState::Pause =>
-                {
+                GlobalAction::SeekBack if matches!(context.status.state, State::Play | State::Pause) => {
                     client.seek_current(ValueChange::Decrease(5))?;
                 }
                 GlobalAction::NextTab => {
@@ -429,8 +423,8 @@ impl<'ui> Ui<'ui> {
                     context.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
-                    if context.config.tabs.names.contains(name) {
-                        self.change_tab(*name, client, context)?;
+                    if context.config.tabs.names.contains(&name) {
+                        self.change_tab(name, client, context)?;
                         context.render()?;
                     } else {
                         status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
@@ -511,10 +505,13 @@ impl<'ui> Ui<'ui> {
             }
             UiEvent::Database => {}
             UiEvent::StoredPlaylist => {}
-            UiEvent::LogAdded(_) =>
-            {
+            UiEvent::LogAdded(_) => {
                 #[cfg(debug_assertions)]
-                if self.active_tab == "Logs".into() {
+                if self
+                    .tabs
+                    .get(&self.active_tab)
+                    .is_some_and(|tab| tab.panes.panes_iter().any(|pane| matches!(pane.pane, PaneType::Logs)))
+                {
                     context.render()?;
                 }
             }
@@ -553,6 +550,7 @@ pub enum UiAppEvent {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum UiEvent {
     Player,
     Database,

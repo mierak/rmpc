@@ -5,10 +5,9 @@ use crate::{
     config::keys::{CommonAction, Key, ToDescription},
     context::AppContext,
     mpd::client::Client,
-    shared::macros::pop_modal,
+    shared::{key_event::KeyEvent, macros::pop_modal},
 };
 use anyhow::bail;
-use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Margin},
     style::Style,
@@ -157,8 +156,8 @@ impl Modal for KeybindsModal<'_> {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: KeyEvent, _client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
+    fn handle_key(&mut self, key: &mut KeyEvent, _client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);

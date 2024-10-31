@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::Block,
@@ -18,6 +17,7 @@ use crate::{
     shared::{
         geometry::Point,
         id::Id,
+        key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
 };
@@ -27,7 +27,7 @@ use super::{Pane as _, PaneContainer, Panes};
 #[derive(Debug)]
 pub struct TabScreen {
     focused: Option<Pane>, // can focused ever be none?
-    panes: &'static crate::config::tabs::PaneOrSplitWithPosition,
+    pub panes: &'static crate::config::tabs::PaneOrSplitWithPosition,
     pane_areas: HashMap<Id, Rect>,
 }
 
@@ -123,7 +123,7 @@ impl TabScreen {
     pub(in crate::ui) fn handle_action(
         &mut self,
         panes: &mut PaneContainer,
-        event: KeyEvent,
+        event: &mut KeyEvent,
         client: &mut impl MpdClient,
         context: &AppContext,
     ) -> Result<()> {
@@ -131,7 +131,7 @@ impl TabScreen {
             return Ok(());
         };
 
-        match context.config.keybinds.navigation.get(&event.into()) {
+        match event.as_common_action(context) {
             Some(CommonAction::PaneUp) => {
                 self.focused = Some(
                     self.panes
@@ -152,6 +152,7 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
+                event.stop_propagation();
             }
             Some(CommonAction::PaneDown) => {
                 self.focused = Some(
@@ -173,6 +174,7 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
+                event.stop_propagation();
             }
             Some(CommonAction::PaneRight) => {
                 self.focused = Some(
@@ -194,6 +196,7 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
+                event.stop_propagation();
             }
             Some(CommonAction::PaneLeft) => {
                 self.focused = Some(
@@ -215,6 +218,7 @@ impl TabScreen {
                         .0,
                 );
                 context.render()?;
+                event.stop_propagation();
             }
             Some(_) | None => {
                 let pane = panes.get_mut(focused.pane);

@@ -42,7 +42,6 @@ pub mod duration {
 }
 
 pub mod mpsc {
-    #[allow(dead_code)]
     pub trait RecvLast<T> {
         fn recv_last(&self) -> Result<T, std::sync::mpsc::RecvError>;
         fn try_recv_last(&self) -> Result<T, std::sync::mpsc::TryRecvError>;

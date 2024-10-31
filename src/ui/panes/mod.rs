@@ -4,7 +4,6 @@ use album_art::AlbumArtPane;
 use albums::AlbumsPane;
 use anyhow::Result;
 use artists::{ArtistsPane, ArtistsPaneMode};
-use crossterm::event::KeyEvent;
 use directories::DirectoriesPane;
 use either::Either;
 #[cfg(debug_assertions)]
@@ -31,7 +30,7 @@ use crate::{
         commands::{status::OnOffOneshot, volume::Bound, Song, Status},
         mpd_client::MpdClient,
     },
-    shared::{ext::duration::DurationExt, mouse_event::MouseEvent},
+    shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
 };
 
 use super::{widgets::volume::Volume, UiEvent};
@@ -128,7 +127,7 @@ pub(super) trait Pane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
 
     fn handle_mouse_event(
         &mut self,

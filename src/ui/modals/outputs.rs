@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Margin},
     style::Style,
@@ -11,7 +10,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, commands::Output, mpd_client::MpdClient},
-    shared::macros::pop_modal,
+    shared::{key_event::KeyEvent, macros::pop_modal},
     ui::dirstack::DirState,
 };
 
@@ -100,8 +99,8 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
+    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use ratatui::{
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
@@ -12,7 +12,10 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    shared::macros::{pop_modal, status_info},
+    shared::{
+        key_event::KeyEvent,
+        macros::{pop_modal, status_info},
+    },
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
@@ -104,8 +107,8 @@ impl Modal for RenamePlaylistModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
-        let action = context.config.keybinds.navigation.get(&key.into());
+    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        let action = key.as_common_action(context);
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
@@ -122,7 +125,7 @@ impl Modal for RenamePlaylistModal {
                 return Ok(());
             }
 
-            match key.code {
+            match key.code() {
                 KeyCode::Char(c) => {
                     self.new_name.push(c);
 

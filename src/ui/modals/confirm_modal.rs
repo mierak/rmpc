@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use ratatui::{
     prelude::{Constraint, Layout, Margin},
     style::Style,
@@ -12,7 +11,7 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    shared::macros::pop_modal,
+    shared::{key_event::KeyEvent, macros::pop_modal},
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
@@ -92,8 +91,8 @@ impl Modal for ConfirmModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
+    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
