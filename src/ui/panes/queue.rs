@@ -15,7 +15,7 @@ use crate::{
     },
     shared::{
         key_event::KeyEvent,
-        macros::{modal, status_error, status_warn},
+        macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
@@ -172,8 +172,10 @@ impl Pane for QueuePane {
         } else {
             context.config.scrolloff
         };
-        self.scrolling_state
-            .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)), scrolloff);
+        if self.scrolling_state.get_selected().is_none() {
+            self.scrolling_state
+                .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)), scrolloff);
+        }
 
         Ok(())
     }
@@ -316,6 +318,14 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx))
                     {
                         client.play_id(selected_song.id)?;
+                    }
+                }
+                QueueActions::JumpToCurrent => {
+                    if let Some((idx, _)) = context.find_current_song_in_queue() {
+                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                        context.render()?;
+                    } else {
+                        status_info!("No song is currently playing");
                     }
                 }
                 QueueActions::Save => {

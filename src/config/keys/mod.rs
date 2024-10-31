@@ -147,6 +147,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('s'), modifiers: M::CONTROL }, Q::Save),
                 (Key { key: K::Char('a'), modifiers: M::NONE    }, Q::AddToPlaylist),
                 (Key { key: K::Char('i'), modifiers: M::NONE    }, Q::ShowInfo),
+                (Key { key: K::Char('C'), modifiers: M::SHIFT   }, Q::JumpToCurrent),
             ]),
         }
     }

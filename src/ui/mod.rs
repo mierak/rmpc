@@ -462,9 +462,9 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::ShowCurrentSongInfo => {
                     if let Some(current_song) = context.get_current_song(client)? {
                         modal!(context, SongInfoModal::new(current_song));
+                    } else {
+                        status_info!("No song is currently playing");
                     }
-
-                    status_info!("No song is currently playing");
                 }
             }
         };

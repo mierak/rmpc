@@ -6,8 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- JumpToCurrent Queue action to make the cursor jump to the currently playing song
+
 ### Changed
 
+- Queue table now remembers cursor position when you switch tabs
 - Refactor and split utils module
 
 ### Fixed

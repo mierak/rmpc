@@ -186,6 +186,8 @@ mod tests {
     #[rstest]
     #[case("a",            Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::NONE })]
     #[case("A",            Key { key: KeyCode::Char('A'), modifiers: KeyModifiers::SHIFT })]
+    #[case("c",            Key { key: KeyCode::Char('c'), modifiers: KeyModifiers::NONE })]
+    #[case("C",            Key { key: KeyCode::Char('C'), modifiers: KeyModifiers::SHIFT })]
     #[case("<C-a>",        Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL })]
     #[case("<C-A>",        Key { key: KeyCode::Char('A'), modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT })]
     #[case("<C-S-Tab>",    Key { key: KeyCode::BackTab,   modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT })]
