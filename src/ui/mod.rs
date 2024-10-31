@@ -42,7 +42,7 @@ use crate::{
     },
     shared::{
         key_event::KeyEvent,
-        macros::{modal, status_error, status_info, try_ret},
+        macros::{modal, status_error, status_info, status_warn, try_ret},
         mouse_event::{MouseEvent, MouseEventKind},
     },
 };
@@ -516,7 +516,9 @@ impl<'ui> Ui<'ui> {
             UiEvent::Player => {
                 self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
             }
-            UiEvent::Database => {}
+            UiEvent::Database => {
+                status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
+            }
             UiEvent::StoredPlaylist => {}
             UiEvent::LogAdded(_) => {
                 #[cfg(debug_assertions)]

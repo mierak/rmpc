@@ -6,11 +6,7 @@ use crate::{
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{
-        key_event::KeyEvent,
-        macros::{status_info, status_warn},
-        mouse_event::MouseEvent,
-    },
+    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -33,6 +29,7 @@ pub struct AlbumsPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
+    initialized: bool,
 }
 
 impl AlbumsPane {
@@ -41,6 +38,7 @@ impl AlbumsPane {
             stack: DirStack::default(),
             filter_input_mode: false,
             browser: Browser::new(context.config),
+            initialized: false,
         }
     }
 }
@@ -55,7 +53,7 @@ impl Pane for AlbumsPane {
     }
 
     fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        if self.stack().path().is_empty() {
+        if !self.initialized {
             let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
             self.stack = DirStack::new(
                 result
@@ -70,6 +68,7 @@ impl Pane for AlbumsPane {
                 .prepare_preview(client, context.config)
                 .context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
+            self.initialized = true;
         }
 
         Ok(())
@@ -92,7 +91,7 @@ impl Pane for AlbumsPane {
                 .context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
 
-            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+            context.render()?;
         };
         Ok(())
     }

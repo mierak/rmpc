@@ -13,11 +13,7 @@ use crate::{
         commands::{lsinfo::FileOrDir, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
-    shared::{
-        key_event::KeyEvent,
-        macros::{status_info, status_warn},
-        mouse_event::MouseEvent,
-    },
+    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -33,6 +29,7 @@ pub struct DirectoriesPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
+    initialized: bool,
 }
 
 impl DirectoriesPane {
@@ -41,6 +38,7 @@ impl DirectoriesPane {
             stack: DirStack::default(),
             filter_input_mode: false,
             browser: Browser::new(context.config),
+            initialized: false,
         }
     }
 }
@@ -55,7 +53,7 @@ impl Pane for DirectoriesPane {
     }
 
     fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        if self.stack().path().is_empty() {
+        if !self.initialized {
             self.stack = DirStack::new(
                 client
                     .lsinfo(None)?
@@ -65,6 +63,7 @@ impl Pane for DirectoriesPane {
             );
             let preview = self.prepare_preview(client, context.config)?;
             self.stack.set_preview(preview);
+            self.initialized = true;
         }
 
         Ok(())
@@ -82,7 +81,7 @@ impl Pane for DirectoriesPane {
             let preview = self.prepare_preview(client, context.config)?;
             self.stack.set_preview(preview);
 
-            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+            context.render()?;
         };
         Ok(())
     }
