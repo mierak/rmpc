@@ -71,21 +71,18 @@ impl Pane for DirectoriesPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        match event {
-            crate::ui::UiEvent::Database => {
-                self.stack = DirStack::new(
-                    client
-                        .lsinfo(None)?
-                        .into_iter()
-                        .map(Into::<DirOrSong>::into)
-                        .collect::<Vec<_>>(),
-                );
-                let preview = self.prepare_preview(client, context.config)?;
-                self.stack.set_preview(preview);
+        if let crate::ui::UiEvent::Database = event {
+            self.stack = DirStack::new(
+                client
+                    .lsinfo(None)?
+                    .into_iter()
+                    .map(Into::<DirOrSong>::into)
+                    .collect::<Vec<_>>(),
+            );
+            let preview = self.prepare_preview(client, context.config)?;
+            self.stack.set_preview(preview);
 
-                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
-            }
-            _ => {}
+            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
         };
         Ok(())
     }

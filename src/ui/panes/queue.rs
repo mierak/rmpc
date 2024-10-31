@@ -179,22 +179,19 @@ impl Pane for QueuePane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        match event {
-            UiEvent::Player => {
-                if let Some((idx, _)) = context
-                    .queue
-                    .iter()
-                    .enumerate()
-                    .find(|(_, v)| Some(v.id) == context.status.songid)
-                {
-                    if context.config.select_current_song_on_change {
-                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    }
-
-                    context.render()?;
+        if let UiEvent::Player = event {
+            if let Some((idx, _)) = context
+                .queue
+                .iter()
+                .enumerate()
+                .find(|(_, v)| Some(v.id) == context.status.songid)
+            {
+                if context.config.select_current_song_on_change {
+                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
                 }
+
+                context.render()?;
             }
-            _ => {}
         };
 
         Ok(())

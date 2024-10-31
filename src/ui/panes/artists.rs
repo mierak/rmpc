@@ -139,28 +139,25 @@ impl Pane for ArtistsPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        match event {
-            crate::ui::UiEvent::Database => {
-                let result = client
-                    .list_tag(self.artist_tag(), None)
-                    .context("Cannot list artists")?;
-                self.stack = DirStack::new(
-                    result
-                        .into_iter()
-                        .map(|v| DirOrSong::Dir {
-                            full_path: String::new(),
-                            name: v,
-                        })
-                        .collect::<Vec<_>>(),
-                );
-                let preview = self
-                    .prepare_preview(client, context.config)
-                    .context("Cannot prepare preview")?;
-                self.stack.set_preview(preview);
+        if let crate::ui::UiEvent::Database = event {
+            let result = client
+                .list_tag(self.artist_tag(), None)
+                .context("Cannot list artists")?;
+            self.stack = DirStack::new(
+                result
+                    .into_iter()
+                    .map(|v| DirOrSong::Dir {
+                        full_path: String::new(),
+                        name: v,
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            let preview = self
+                .prepare_preview(client, context.config)
+                .context("Cannot prepare preview")?;
+            self.stack.set_preview(preview);
 
-                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
-            }
-            _ => {}
+            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
         };
         Ok(())
     }

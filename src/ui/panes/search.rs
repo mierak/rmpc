@@ -496,15 +496,12 @@ impl Pane for SearchPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        match event {
-            crate::ui::UiEvent::Database => {
-                self.songs_dir = Dir::default();
-                self.preview = self.prepare_preview(client, context.config)?;
-                self.phase = Phase::Search;
+        if let crate::ui::UiEvent::Database = event {
+            self.songs_dir = Dir::default();
+            self.preview = self.prepare_preview(client, context.config)?;
+            self.phase = Phase::Search;
 
-                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
-            }
-            _ => {}
+            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
         }
 
         Ok(())
