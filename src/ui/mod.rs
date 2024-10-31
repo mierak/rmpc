@@ -1,5 +1,7 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
+#[cfg(debug_assertions)]
+use crate::config::tabs::PaneType;
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -10,10 +12,13 @@ use enum_map::{enum_map, Enum, EnumMap};
 use itertools::Itertools;
 use modals::{keybinds::KeybindsModal, outputs::OutputsModal, song_info::SongInfoModal};
 use panes::{PaneContainer, Panes};
+#[cfg(debug_assertions)]
+use ratatui::style::Stylize;
+
 use ratatui::{
     layout::Rect,
     prelude::{Backend, Constraint, CrosstermBackend, Layout},
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     symbols::border,
     text::Text,
     widgets::{Block, Borders, Paragraph},
@@ -27,7 +32,7 @@ use crate::{
     config::{
         cli::Args,
         keys::{CommonAction, GlobalAction},
-        tabs::{PaneType, TabName},
+        tabs::TabName,
         Config,
     },
     mpd::{
