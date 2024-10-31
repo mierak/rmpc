@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Queue table now remembers cursor position when you switch tabs
+- Browser panes now remember cursor position in the root level when you switch tabs
 - Refactor and split utils module
 
 ### Fixed

@@ -20,7 +20,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_by_name(
             mut screen: PlaylistsPane,
             mut client: TestMpdClient,
@@ -52,7 +51,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_index_when_playlist_not_found_after_refresh(
             mut screen: PlaylistsPane,
             mut client: TestMpdClient,
@@ -69,7 +67,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_last_playlist_when_last_was_selected_and_removed(
             mut screen: PlaylistsPane,
             mut client: TestMpdClient,
@@ -90,7 +87,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_first_playlist_when_first_was_selected_and_removed(
             mut screen: PlaylistsPane,
             mut client: TestMpdClient,
@@ -111,7 +107,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_song(
             #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
@@ -137,7 +132,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_last_song(
             #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
             mut client: TestMpdClient,
@@ -164,7 +158,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_first_song(
             app_context: AppContext,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
@@ -191,7 +184,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_and_song_idx(
             app_context: AppContext,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
@@ -209,7 +201,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_idx_and_last_song(
             app_context: AppContext,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
@@ -231,7 +222,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_same_playlist_idx_and_first_song(
             app_context: AppContext,
             #[from(screen_in_playlist_2)] mut screen: PlaylistsPane,
@@ -249,7 +239,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_first_playlist_and_same_song_idx(
             app_context: AppContext,
             #[from(screen_in_playlist_0)] mut screen: PlaylistsPane,
@@ -267,7 +256,6 @@ mod on_idle_event {
 
         #[rstest]
         #[case(UiEvent::StoredPlaylist)]
-        #[case(UiEvent::Database)]
         fn selects_the_last_playlist_and_same_song_idx(
             app_context: AppContext,
             #[from(screen_in_playlist_4)] mut screen: PlaylistsPane,

@@ -37,6 +37,7 @@ pub struct PlaylistsPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
+    initialized: bool,
 }
 
 impl PlaylistsPane {
@@ -45,6 +46,7 @@ impl PlaylistsPane {
             stack: DirStack::default(),
             filter_input_mode: false,
             browser: Browser::new(context.config),
+            initialized: false,
         }
     }
 }
@@ -59,7 +61,7 @@ impl Pane for PlaylistsPane {
     }
 
     fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        if self.stack().path().is_empty() {
+        if !self.initialized {
             let playlists: Vec<_> = client
                 .list_playlists()
                 .context("Cannot list playlists")?
@@ -75,13 +77,32 @@ impl Pane for PlaylistsPane {
                 .prepare_preview(client, context.config)
                 .context("Cannot prepare preview")?;
             self.stack.set_preview(preview);
+            self.initialized = true;
         }
         Ok(())
     }
 
     fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::StoredPlaylist | UiEvent::Database => {
+            UiEvent::Database => {
+                let playlists: Vec<_> = client
+                    .list_playlists()
+                    .context("Cannot list playlists")?
+                    .into_iter()
+                    .map(|playlist| DirOrSong::Dir {
+                        name: playlist.name,
+                        full_path: String::new(),
+                    })
+                    .sorted()
+                    .collect();
+                self.stack = DirStack::new(playlists);
+                let preview = self
+                    .prepare_preview(client, context.config)
+                    .context("Cannot prepare preview")?;
+                self.stack.set_preview(preview);
+                context.render()?;
+            }
+            UiEvent::StoredPlaylist => {
                 let mut new_stack = DirStack::new(
                     client
                         .list_playlists()
