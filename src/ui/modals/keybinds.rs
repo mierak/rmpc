@@ -1,8 +1,11 @@
+use anyhow::Result;
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use crate::{
     config::keys::{CommonAction, Key, ToDescription},
     context::AppContext,
+    mpd::client::Client,
+    shared::{key_event::KeyEvent, macros::pop_modal},
 };
 use anyhow::bail;
 use ratatui::{
@@ -14,7 +17,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::ui::{dirstack::DirState, KeyHandleResultInternal};
+use crate::ui::dirstack::DirState;
 
 use super::{Modal, RectExt};
 
@@ -53,7 +56,7 @@ fn add_binds<'a, V: Display + ToDescription>(
 }
 
 impl KeybindsModal<'_> {
-    pub fn new(app: &mut crate::context::AppContext) -> Self {
+    pub fn new(app: &mut AppContext) -> Self {
         let keybinds = &app.config.keybinds;
         let header_style = app.config.theme.current_item_style;
 
@@ -76,7 +79,7 @@ impl KeybindsModal<'_> {
 }
 
 impl Modal for KeybindsModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered(90, 90);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -153,62 +156,48 @@ impl Modal for KeybindsModal<'_> {
         return Ok(());
     }
 
-    fn handle_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        _client: &mut crate::mpd::client::Client<'_>,
-        context: &mut AppContext,
-    ) -> anyhow::Result<KeyHandleResultInternal> {
-        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
+    fn handle_key(&mut self, key: &mut KeyEvent, _client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, context.config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, context.config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::Modal(None)),
-                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Close => {
+                    pop_modal!(context);
+                }
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
-        }
+        };
+
+        Ok(())
     }
 }

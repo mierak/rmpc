@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
@@ -13,8 +12,11 @@ use crate::{
     config::keys::{CommonAction, LogsActions},
     context::AppContext,
     mpd::mpd_client::MpdClient,
-    shared::mouse_event::{MouseEvent, MouseEventKind},
-    ui::{dirstack::DirState, KeyHandleResultInternal, UiEvent},
+    shared::{
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{dirstack::DirState, UiEvent},
 };
 
 use super::Pane;
@@ -73,21 +75,15 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _client: &mut impl MpdClient,
-        _context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
                 self.logs.pop_front();
             }
-            Ok(KeyHandleResultInternal::RenderRequested)
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
         }
+
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -95,88 +91,99 @@ impl Pane for LogsPane {
         event: MouseEvent,
         _client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         if !self.logs_area.contains(event.into()) {
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         }
 
         match event.kind {
             MouseEventKind::ScrollUp => {
                 self.scrolling_state.prev(context.config.scrolloff, false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
             }
             MouseEventKind::ScrollDown => {
                 self.scrolling_state.next(context.config.scrolloff, false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
     fn handle_action(
         &mut self,
-        event: KeyEvent,
+        event: &mut KeyEvent,
         _client: &mut impl MpdClient,
         context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         let config = context.config;
-        if let Some(action) = config.keybinds.logs.get(&event.into()) {
+        if let Some(action) = event.as_logs_action(context) {
             match action {
                 LogsActions::Clear => {
                     self.logs.clear();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
             }
-        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+        } else if let Some(action) = event.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => {}
+                CommonAction::Left => {}
+                CommonAction::EnterSearch => {}
+                CommonAction::NextResult => {}
+                CommonAction::PreviousResult => {}
+                CommonAction::Add => {}
+                CommonAction::Select => {}
+                CommonAction::Delete => {}
+                CommonAction::Rename => {}
+                CommonAction::MoveUp => {}
+                CommonAction::MoveDown => {}
+                CommonAction::Close => {}
+                CommonAction::Confirm => {}
+                CommonAction::FocusInput => {}
+                CommonAction::AddAll => {}
+                CommonAction::PaneDown => {}
+                CommonAction::PaneUp => {}
+                CommonAction::PaneRight => {}
+                CommonAction::PaneLeft => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
+
+        Ok(())
     }
 }

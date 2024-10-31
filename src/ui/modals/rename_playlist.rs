@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use ratatui::{
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
@@ -12,14 +12,17 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    shared::macros::status_info,
+    shared::{
+        key_event::KeyEvent,
+        macros::{pop_modal, status_info},
+    },
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
     },
 };
 
-use super::{KeyHandleResultInternal, RectExt};
+use super::RectExt;
 
 use super::Modal;
 
@@ -54,7 +57,7 @@ impl RenamePlaylistModal {
 }
 
 impl Modal for RenamePlaylistModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -104,50 +107,52 @@ impl Modal for RenamePlaylistModal {
         Ok(())
     }
 
-    fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        client: &mut Client<'_>,
-        app: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        let action = app.config.keybinds.navigation.get(&key.into());
+    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        let action = key.as_common_action(context);
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
-                return Ok(KeyHandleResultInternal::RenderRequested);
+
+                context.render()?;
+                return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group.selected == 0 && self.playlist_name != self.new_name {
                     client.rename_playlist(&self.playlist_name, &self.new_name)?;
                     status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
                 }
                 self.on_hide();
-                return Ok(KeyHandleResultInternal::Modal(None));
+                pop_modal!(context);
+                return Ok(());
             }
 
-            match key.code {
+            match key.code() {
                 KeyCode::Char(c) => {
                     self.new_name.push(c);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 KeyCode::Backspace => {
                     self.new_name.pop();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                _ => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
         } else if let Some(action) = action {
             match action {
                 CommonAction::Down => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Up => {
                     self.button_group.next();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Close => {
                     self.on_hide();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
                 }
                 CommonAction::Confirm => {
                     if self.button_group.selected == 0 && self.playlist_name != self.new_name {
@@ -155,35 +160,17 @@ impl Modal for RenamePlaylistModal {
                         status_info!("Playlist '{}' renamed to '{}'", self.playlist_name, self.new_name);
                     }
                     self.on_hide();
-                    Ok(KeyHandleResultInternal::Modal(None))
+                    pop_modal!(context);
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::DownHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::UpHalf => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Top => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Bottom => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
-        }
+        };
+
+        Ok(())
     }
 }

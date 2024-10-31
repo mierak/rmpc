@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
+use crossterm::event::{KeyEvent, KeyModifiers};
 use rstest::{fixture, rstest};
 
 use crate::context::AppContext;
@@ -8,7 +9,6 @@ use crate::tests::fixtures::mpd_client::{client, TestMpdClient};
 use crate::ui::browser::BrowserPane;
 use crate::ui::UiEvent;
 
-use crate::ui::panes::CommonAction;
 use crate::ui::panes::{browser::DirOrSong, playlists::PlaylistsPane, Pane};
 
 mod on_idle_event {
@@ -294,8 +294,9 @@ fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> P
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(0, 0);
+    let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &app_context)
+        .handle_common_action(&mut right.into(), &mut client, &app_context)
         .unwrap();
     screen
 }
@@ -305,8 +306,9 @@ fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> P
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(2, 0);
+    let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &app_context)
+        .handle_common_action(&mut right.into(), &mut client, &app_context)
         .unwrap();
     screen
 }
@@ -316,8 +318,9 @@ fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> P
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&mut client, &app_context).unwrap();
     screen.stack.current_mut().select_idx(2, 0);
+    let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
     screen
-        .handle_common_action(CommonAction::Right, &mut client, &app_context)
+        .handle_common_action(&mut right.into(), &mut client, &app_context)
         .unwrap();
     screen
 }

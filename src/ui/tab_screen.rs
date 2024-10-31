@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     widgets::Block,
@@ -18,9 +17,9 @@ use crate::{
     shared::{
         geometry::Point,
         id::Id,
+        key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::KeyHandleResultInternal,
 };
 
 use super::{Pane as _, PaneContainer, Panes};
@@ -28,7 +27,7 @@ use super::{Pane as _, PaneContainer, Panes};
 #[derive(Debug)]
 pub struct TabScreen {
     focused: Option<Pane>, // can focused ever be none?
-    panes: &'static crate::config::tabs::PaneOrSplitWithPosition,
+    pub panes: &'static crate::config::tabs::PaneOrSplitWithPosition,
     pane_areas: HashMap<Id, Rect>,
 }
 
@@ -124,15 +123,15 @@ impl TabScreen {
     pub(in crate::ui) fn handle_action(
         &mut self,
         panes: &mut PaneContainer,
-        event: KeyEvent,
+        event: &mut KeyEvent,
         client: &mut impl MpdClient,
         context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         let Some(focused) = self.focused else {
-            return Ok(KeyHandleResultInternal::KeyNotHandled);
+            return Ok(());
         };
 
-        match context.config.keybinds.navigation.get(&event.into()) {
+        match event.as_common_action(context) {
             Some(CommonAction::PaneUp) => {
                 self.focused = Some(
                     self.panes
@@ -152,7 +151,7 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
             Some(CommonAction::PaneDown) => {
                 self.focused = Some(
@@ -173,7 +172,7 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
             Some(CommonAction::PaneRight) => {
                 self.focused = Some(
@@ -194,7 +193,7 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
             Some(CommonAction::PaneLeft) => {
                 self.focused = Some(
@@ -215,13 +214,16 @@ impl TabScreen {
                         })
                         .0,
                 );
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
             Some(_) | None => {
+                event.abandon();
                 let pane = panes.get_mut(focused.pane);
-                screen_call!(pane, handle_action(event, client, context))
+                screen_call!(pane, handle_action(event, client, context))?;
             }
-        }
+        };
+
+        Ok(())
     }
 
     pub(in crate::ui) fn handle_mouse_event(
@@ -230,8 +232,7 @@ impl TabScreen {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        let mut result = KeyHandleResultInternal::KeyNotHandled;
+    ) -> Result<()> {
         if matches!(event.kind, MouseEventKind::LeftClick) {
             let Some(pane) = self
                 .pane_areas
@@ -243,23 +244,18 @@ impl TabScreen {
                         .find(|pane| &pane.id == pane_id && pane.focusable)
                 })
             else {
-                return Ok(KeyHandleResultInternal::KeyNotHandled);
+                return Ok(());
             };
             self.focused = Some(pane);
-            result = KeyHandleResultInternal::RenderRequested;
+            context.render()?;
         }
 
         let Some(focused) = self.focused else {
-            return Ok(result);
+            return Ok(());
         };
 
         let pane = panes.get_mut(focused.pane);
-        match screen_call!(pane, handle_mouse_event(event, client, context))? {
-            KeyHandleResultInternal::Modal(modal) => Ok(KeyHandleResultInternal::Modal(modal)),
-            KeyHandleResultInternal::RenderRequested => Ok(KeyHandleResultInternal::RenderRequested),
-            KeyHandleResultInternal::FullRenderRequested => Ok(KeyHandleResultInternal::FullRenderRequested),
-            _ => Ok(result),
-        }
+        screen_call!(pane, handle_mouse_event(event, client, context))
     }
 
     pub fn post_render(&mut self, panes: &mut PaneContainer, frame: &mut Frame, context: &AppContext) -> Result<()> {

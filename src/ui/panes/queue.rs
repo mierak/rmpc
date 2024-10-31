@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use itertools::Itertools;
 
 use crate::{
@@ -14,7 +14,8 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     shared::{
-        macros::{status_error, status_warn},
+        key_event::KeyEvent,
+        macros::{modal, status_error, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
@@ -23,7 +24,7 @@ use crate::{
             add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
             save_queue::SaveQueueModal, song_info::SongInfoModal,
         },
-        KeyHandleResultInternal, UiEvent,
+        UiEvent,
     },
 };
 use log::error;
@@ -177,30 +178,23 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        match event {
-            UiEvent::Player => {
-                if let Some((idx, _)) = context
-                    .queue
-                    .iter()
-                    .enumerate()
-                    .find(|(_, v)| Some(v.id) == context.status.songid)
-                {
-                    if context.config.select_current_song_on_change {
-                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    }
-                    return Ok(KeyHandleResultInternal::RenderRequested);
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        if let UiEvent::Player = event {
+            if let Some((idx, _)) = context
+                .queue
+                .iter()
+                .enumerate()
+                .find(|(_, v)| Some(v.id) == context.status.songid)
+            {
+                if context.config.select_current_song_on_change {
+                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
                 }
 
-                Ok(KeyHandleResultInternal::SkipRender)
+                context.render()?;
             }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+        };
+
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -208,9 +202,9 @@ impl Pane for QueuePane {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         if !self.table_area.contains(event.into()) {
-            return Ok(KeyHandleResultInternal::SkipRender);
+            return Ok(());
         }
 
         match event.kind {
@@ -218,9 +212,8 @@ impl Pane for QueuePane {
                 let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(clicked_row) {
                     self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+
+                    context.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
@@ -232,9 +225,7 @@ impl Pane for QueuePane {
                     .and_then(|idx| context.queue.get(idx))
                 {
                     client.play_id(song.id)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+                    context.render()?;
                 }
             }
             MouseEventKind::MiddleClick => {
@@ -246,59 +237,60 @@ impl Pane for QueuePane {
                     .and_then(|idx| context.queue.get(idx))
                 {
                     client.delete_id(selected_song.id)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    Ok(KeyHandleResultInternal::SkipRender)
+                    context.render()?;
                 }
             }
             MouseEventKind::ScrollDown => {
                 self.scrolling_state.next(context.config.scrolloff, false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
             MouseEventKind::ScrollUp => {
                 self.scrolling_state.prev(context.config.scrolloff, false);
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
-            MouseEventKind::RightClick => Ok(KeyHandleResultInternal::SkipRender),
+            MouseEventKind::RightClick => {}
         }
+
+        Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        let config = context.config;
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if self.filter_input_mode {
-            match config.keybinds.navigation.get(&event.into()) {
+            match event.as_common_action(context) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 Some(CommonAction::Close) => {
                     self.filter_input_mode = false;
                     self.filter = None;
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                _ => match event.code {
-                    KeyCode::Char(c) => {
-                        if let Some(ref mut f) = self.filter {
-                            f.push(c);
-                        };
-                        self.jump_first(&context.queue, context.config.scrolloff);
-                        Ok(KeyHandleResultInternal::RenderRequested)
+                _ => {
+                    event.stop_propagation();
+                    match event.code() {
+                        KeyCode::Char(c) => {
+                            if let Some(ref mut f) = self.filter {
+                                f.push(c);
+                            };
+                            self.jump_first(&context.queue, context.config.scrolloff);
+
+                            context.render()?;
+                        }
+                        KeyCode::Backspace => {
+                            if let Some(ref mut f) = self.filter {
+                                f.pop();
+                            };
+
+                            context.render()?;
+                        }
+                        _ => {}
                     }
-                    KeyCode::Backspace => {
-                        if let Some(ref mut f) = self.filter {
-                            f.pop();
-                        };
-                        Ok(KeyHandleResultInternal::RenderRequested)
-                    }
-                    _ => Ok(KeyHandleResultInternal::SkipRender),
-                },
+                }
             }
-        } else if let Some(action) = config.keybinds.queue.get(&event.into()) {
+        } else if let Some(action) = event.as_queue_action(context) {
             match action {
                 QueueActions::Delete => {
                     if let Some(selected_song) = self
@@ -313,11 +305,10 @@ impl Pane for QueuePane {
                     } else {
                         status_error!("No song selected");
                     }
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                QueueActions::DeleteAll => Ok(KeyHandleResultInternal::Modal(Some(Box::new(
-                    ConfirmQueueClearModal::default(),
-                )))),
+                QueueActions::DeleteAll => {
+                    modal!(context, ConfirmQueueClearModal::default());
+                }
                 QueueActions::Play => {
                     if let Some(selected_song) = self
                         .scrolling_state
@@ -326,11 +317,10 @@ impl Pane for QueuePane {
                     {
                         client.play_id(selected_song.id)?;
                     }
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                QueueActions::Save => Ok(KeyHandleResultInternal::Modal(Some(
-                    Box::new(SaveQueueModal::default()),
-                ))),
+                QueueActions::Save => {
+                    modal!(context, SaveQueueModal::default());
+                }
                 QueueActions::AddToPlaylist => {
                     if let Some(selected_song) = self
                         .scrolling_state
@@ -343,12 +333,7 @@ impl Pane for QueuePane {
                             .map(|v| v.name)
                             .sorted()
                             .collect_vec();
-                        Ok(KeyHandleResultInternal::Modal(Some(Box::new(AddToPlaylistModal::new(
-                            selected_song.file.clone(),
-                            playlists,
-                        )))))
-                    } else {
-                        Ok(KeyHandleResultInternal::SkipRender)
+                        modal!(context, AddToPlaylistModal::new(selected_song.file.clone(), playlists,));
                     }
                 }
                 QueueActions::ShowInfo => {
@@ -357,38 +342,37 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     {
-                        Ok(KeyHandleResultInternal::Modal(Some(Box::new(SongInfoModal::new(
-                            selected_song.clone(),
-                        )))))
+                        modal!(context, SongInfoModal::new(selected_song.clone()));
                     } else {
                         status_error!("No song selected");
-                        Ok(KeyHandleResultInternal::SkipRender)
                     }
                 }
             }
-        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+        } else if let Some(action) = event.as_common_action(context) {
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
                         self.scrolling_state
                             .prev(context.config.scrolloff, context.config.wrap_navigation);
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Down => {
                     if !context.queue.is_empty() {
                         self.scrolling_state
                             .next(context.config.scrolloff, context.config.wrap_navigation);
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::MoveUp => {
                     if context.queue.is_empty() {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
 
                     let Some(selected) = self
@@ -396,88 +380,93 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
 
                     let new_idx = idx.saturating_sub(1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::MoveDown => {
                     if context.queue.is_empty() {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     }
 
                     let Some(idx) = self.scrolling_state.get_selected() else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
                     let Some(selected) = self
                         .scrolling_state
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
 
                     let new_idx = (idx + 1).min(context.queue.len() - 1);
                     client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
                 CommonAction::DownHalf => {
                     if !context.queue.is_empty() {
                         self.scrolling_state.next_half_viewport(context.config.scrolloff);
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::UpHalf => {
                     if !context.queue.is_empty() {
                         self.scrolling_state.prev_half_viewport(context.config.scrolloff);
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Bottom => {
                     if !context.queue.is_empty() {
                         self.scrolling_state.last();
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Top => {
                     if !context.queue.is_empty() {
                         self.scrolling_state.first();
                     }
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Right => {}
+                CommonAction::Left => {}
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
                     self.filter = Some(String::new());
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::NextResult => {
                     self.jump_forward(&context.queue, context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::PreviousResult => {
                     self.jump_back(&context.queue, context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Confirm => Ok(KeyHandleResultInternal::SkipRender), // queue has its own binding for play
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Select => {}
+                CommonAction::Add => {}
+                CommonAction::AddAll => {}
+                CommonAction::Delete => {}
+                CommonAction::Rename => {}
+                CommonAction::Close => {}
+                CommonAction::FocusInput => {}
+                CommonAction::Confirm => {} // queue has its own binding for play
+                CommonAction::PaneDown => {}
+                CommonAction::PaneUp => {}
+                CommonAction::PaneRight => {}
+                CommonAction::PaneLeft => {}
             }
-        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
+        } else if let Some(action) = event.as_global_action(context) {
             match action {
                 GlobalAction::ExternalCommand { command, .. } => {
                     let song = self
@@ -486,13 +475,14 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
                     run_external(command, create_env(context, song, client)?);
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                _ => {
+                    event.abandon();
+                }
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
-        }
+        };
+
+        Ok(())
     }
 }
 

@@ -43,7 +43,7 @@ use shared::{
     tmux,
     ytdlp::YtDlp,
 };
-use ui::{Level, UiEvent};
+use ui::{Level, UiAppEvent, UiEvent};
 
 use crate::{
     config::Config,
@@ -85,6 +85,7 @@ pub enum AppEvent {
     RequestRender(bool),
     Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
+    UiAppEvent(UiAppEvent),
 }
 
 fn main() -> Result<()> {
@@ -375,20 +376,13 @@ fn main_task<B: Backend + std::io::Write>(
 
         if let Some(event) = event {
             match event {
-                AppEvent::UserKeyInput(key) => match ui.handle_key(key, &mut context, &mut client) {
-                    Ok(ui::KeyHandleResult::SkipRender) => continue,
+                AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context, &mut client) {
+                    Ok(ui::KeyHandleResult::None) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
                         if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
                             error!(error:? = err, event:?; "Ui failed to handle quit event");
                         }
                         break;
-                    }
-                    Ok(ui::KeyHandleResult::RenderRequested) => {
-                        render_wanted = true;
-                    }
-                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
-                        render_wanted = true;
-                        full_rerender_wanted = true;
                     }
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
@@ -396,20 +390,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 },
                 AppEvent::UserMouseInput(ev) => match ui.handle_mouse_event(ev, &mut client, &mut context) {
-                    Ok(ui::KeyHandleResult::SkipRender) => continue,
-                    Ok(ui::KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
-                            error!(error:? = err, event:?; "Ui failed to handle quit event");
-                        }
-                        break;
-                    }
-                    Ok(ui::KeyHandleResult::RenderRequested) => {
-                        render_wanted = true;
-                    }
-                    Ok(ui::KeyHandleResult::FullRenderRequested) => {
-                        render_wanted = true;
-                        full_rerender_wanted = true;
-                    }
+                    Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
                         render_wanted = true;
@@ -470,6 +451,13 @@ fn main_task<B: Backend + std::io::Write>(
                     full_rerender_wanted = true;
                     render_wanted = true;
                 }
+                AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut context, &mut client) {
+                    Ok(()) => {}
+                    Err(err) => {
+                        status_error!(err:?; "Error: {}", err.to_status());
+                        render_wanted = true;
+                    }
+                },
             }
         }
         if render_wanted {
@@ -493,6 +481,8 @@ fn main_task<B: Backend + std::io::Write>(
             if let Err(err) = ui.post_render(&mut terminal.get_frame(), &mut context) {
                 error!(error:? = err; "Failed handle post render phase");
             };
+
+            context.finish_frame();
             last_render = now;
             render_wanted = false;
         }

@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyEvent;
 use itertools::Itertools;
 use ratatui::{
     prelude::Rect,
@@ -15,6 +14,7 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
+        key_event::KeyEvent,
         macros::{status_info, status_warn},
         mouse_event::MouseEvent,
     },
@@ -22,7 +22,7 @@ use crate::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        KeyHandleResultInternal,
+        UiEvent,
     },
 };
 
@@ -70,29 +70,21 @@ impl Pane for DirectoriesPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut crate::ui::UiEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        match event {
-            crate::ui::UiEvent::Database => {
-                self.stack = DirStack::new(
-                    client
-                        .lsinfo(None)?
-                        .into_iter()
-                        .map(Into::<DirOrSong>::into)
-                        .collect::<Vec<_>>(),
-                );
-                let preview = self.prepare_preview(client, context.config)?;
-                self.stack.set_preview(preview);
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        if let crate::ui::UiEvent::Database = event {
+            self.stack = DirStack::new(
+                client
+                    .lsinfo(None)?
+                    .into_iter()
+                    .map(Into::<DirOrSong>::into)
+                    .collect::<Vec<_>>(),
+            );
+            let preview = self.prepare_preview(client, context.config)?;
+            self.stack.set_preview(preview);
 
-                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
-                Ok(KeyHandleResultInternal::SkipRender)
-            }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+        };
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -100,28 +92,15 @@ impl Pane for DirectoriesPane {
         event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         self.handle_mouse_action(event, client, context)
     }
 
-    fn handle_action(
-        &mut self,
-        event: KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        let config = context.config;
-        if self.filter_input_mode {
-            self.handle_filter_input(event, client, config)
-        } else if let Some(_action) = config.keybinds.directories.get(&event.into()) {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
-        } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
-            self.handle_common_action(*action, client, context)
-        } else if let Some(action) = config.keybinds.global.get(&event.into()) {
-            self.handle_global_action(*action, client, context)
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
-        }
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        self.handle_filter_input(event, client, context)?;
+        self.handle_common_action(event, client, context)?;
+        self.handle_global_action(event, client, context)?;
+        Ok(())
     }
 }
 
@@ -151,7 +130,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         })
     }
 
-    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir {
                 name: dirname,
@@ -171,25 +150,30 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 }
             }
         };
-        Ok(KeyHandleResultInternal::RenderRequested)
+
+        context.render()?;
+
+        Ok(())
     }
 
-    fn add_all(&self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
         client.add(&path)?;
         status_info!("Directory '{path}' added to queue");
 
-        Ok(KeyHandleResultInternal::RenderRequested)
+        context.render()?;
+
+        Ok(())
     }
 
-    fn next(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let Some(selected) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(KeyHandleResultInternal::RenderRequested);
+            return Ok(());
         };
         let Some(next_path) = self.stack.next_path() else {
             log::error!("Failed to move deeper inside dir. Next path is None");
-            return Ok(KeyHandleResultInternal::RenderRequested);
+            return Ok(());
         };
 
         match selected {
@@ -207,10 +191,15 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     .sorted()
                     .collect();
                 self.stack.push(res);
-                Ok(KeyHandleResultInternal::RenderRequested)
+
+                context.render()?;
             }
-            t @ DirOrSong::Song(_) => self.add(t, client),
-        }
+            t @ DirOrSong::Song(_) => {
+                self.add(t, client, context)?;
+            }
+        };
+
+        Ok(())
     }
 
     fn prepare_preview(

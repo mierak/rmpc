@@ -1,9 +1,13 @@
-use std::{collections::HashSet, sync::mpsc::channel};
+use std::{cell::Cell, collections::HashSet, sync::mpsc::channel};
 
 use ratatui::{backend::TestBackend, Terminal};
 use rstest::fixture;
 
-use crate::{config::Config, context::AppContext, mpd::commands::Status};
+use crate::{
+    config::{Config, ConfigFile, Leak},
+    context::AppContext,
+    mpd::commands::Status,
+};
 
 pub mod mpd_client;
 
@@ -14,13 +18,22 @@ pub fn status() -> Status {
 
 #[fixture]
 pub fn app_context() -> AppContext {
+    let chan1 = channel();
+    let chan2 = channel();
+    chan1.1.leak();
+    chan2.1.leak();
+    let config = ConfigFile::default()
+        .into_config(None, None, None, true)
+        .expect("Test default config to convert correctly")
+        .leak();
     AppContext {
         status: Status::default(),
-        config: Box::leak(Box::default()),
+        config,
         queue: Vec::default(),
-        app_event_sender: channel().0,
-        work_sender: channel().0,
+        app_event_sender: chan1.0,
+        work_sender: chan2.0,
         supported_commands: HashSet::new(),
+        needs_render: Cell::new(false),
     }
 }
 

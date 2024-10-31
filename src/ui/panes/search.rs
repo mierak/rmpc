@@ -20,17 +20,16 @@ use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
+use crate::shared::key_event::KeyEvent;
 use crate::shared::macros::status_info;
 use crate::shared::macros::status_warn;
 use crate::shared::mouse_event::MouseEvent;
 use crate::shared::mouse_event::MouseEventKind;
 use crate::ui::dirstack::Dir;
+use crate::ui::UiEvent;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
-    ui::{
-        widgets::{button::Button, input::Input},
-        KeyHandleResultInternal,
-    },
+    ui::widgets::{button::Button, input::Input},
 };
 
 use super::{CommonAction, Pane};
@@ -78,21 +77,23 @@ impl SearchPane {
         }
     }
 
-    fn add_current(&mut self, client: &mut impl MpdClient) -> Result<KeyHandleResultInternal> {
+    fn add_current(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
                 let item = &self.songs_dir.items[*idx];
                 client.add(&item.file)?;
             }
             status_info!("Added {} songs queue", self.songs_dir.marked().len());
-            Ok(KeyHandleResultInternal::RenderRequested)
+
+            context.render()?;
         } else if let Some(item) = self.songs_dir.selected() {
             client.add(&item.file)?;
             status_info!("Added '{}' to queue", item.file);
-            Ok(KeyHandleResultInternal::RenderRequested)
-        } else {
-            Ok(KeyHandleResultInternal::SkipRender)
+
+            context.render()?;
         }
+
+        Ok(())
     }
 
     fn render_song_column(
@@ -494,23 +495,16 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut crate::ui::UiEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<KeyHandleResultInternal> {
-        match event {
-            crate::ui::UiEvent::Database => {
-                self.songs_dir = Dir::default();
-                self.preview = self.prepare_preview(client, context.config)?;
-                self.phase = Phase::Search;
+    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        if let crate::ui::UiEvent::Database = event {
+            self.songs_dir = Dir::default();
+            self.preview = self.prepare_preview(client, context.config)?;
+            self.phase = Phase::Search;
 
-                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
-                Ok(KeyHandleResultInternal::SkipRender)
-            }
-            _ => Ok(KeyHandleResultInternal::SkipRender),
+            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
         }
+
+        Ok(())
     }
 
     fn handle_mouse_event(
@@ -518,7 +512,7 @@ impl Pane for SearchPane {
         mut event: MouseEvent,
         client: &mut impl MpdClient,
         context: &mut AppContext,
-    ) -> Result<KeyHandleResultInternal> {
+    ) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
@@ -531,13 +525,11 @@ impl Pane for SearchPane {
                 }
                 self.preview = self.prepare_preview(client, context.config)?;
 
-                Ok(KeyHandleResultInternal::RenderRequested)
+                context.render()?;
             }
             MouseEventKind::LeftClick if self.column_areas[2].contains(event.into()) => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
-                    if self.songs_dir.items.is_empty() {
-                        Ok(KeyHandleResultInternal::SkipRender)
-                    } else {
+                    if !self.songs_dir.items.is_empty() {
                         self.phase = Phase::BrowseResults { filter_input_on: false };
 
                         let clicked_row: usize = event.y.saturating_sub(self.column_areas[2].y).into();
@@ -549,10 +541,13 @@ impl Pane for SearchPane {
                         }
 
                         self.preview = self.prepare_preview(client, context.config)?;
-                        Ok(KeyHandleResultInternal::RenderRequested)
+
+                        context.render()?;
                     }
                 }
-                Phase::BrowseResults { .. } => self.add_current(client),
+                Phase::BrowseResults { .. } => {
+                    self.add_current(client, context)?;
+                }
             },
             MouseEventKind::LeftClick if self.column_areas[1].contains(event.into()) => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
@@ -566,16 +561,15 @@ impl Pane for SearchPane {
                         self.inputs.focused_idx = input;
                     }
 
-                    Ok(KeyHandleResultInternal::RenderRequested)
+                    context.render()?;
                 }
                 Phase::BrowseResults { .. } => {
                     let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
                     if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
                         self.songs_dir.select_idx(idx, context.config.scrolloff);
                         self.preview = self.prepare_preview(client, context.config)?;
-                        Ok(KeyHandleResultInternal::RenderRequested)
-                    } else {
-                        Ok(KeyHandleResultInternal::SkipRender)
+
+                        context.render()?;
                     }
                 }
             },
@@ -583,12 +577,13 @@ impl Pane for SearchPane {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if self.get_clicked_input(event).is_some() {
                         self.activate_input(client, context)?;
-                        Ok(KeyHandleResultInternal::RenderRequested)
-                    } else {
-                        Ok(KeyHandleResultInternal::SkipRender)
+
+                        context.render()?;
                     }
                 }
-                Phase::BrowseResults { .. } => self.add_current(client),
+                Phase::BrowseResults { .. } => {
+                    self.add_current(client, context)?;
+                }
             },
             MouseEventKind::ScrollDown => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
@@ -598,11 +593,13 @@ impl Pane for SearchPane {
                         self.preview = self.prepare_preview(client, context.config)?;
                     }
                     self.inputs.next_non_wrapping();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 Phase::BrowseResults { .. } => {
                     self.songs_dir.next(context.config.scrolloff, false);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
             },
             MouseEventKind::ScrollUp => match self.phase {
@@ -614,73 +611,71 @@ impl Pane for SearchPane {
                     }
 
                     self.inputs.prev_non_wrapping();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 Phase::BrowseResults { .. } => {
                     self.songs_dir.prev(context.config.scrolloff, false);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
             },
-            _ => Ok(KeyHandleResultInternal::SkipRender),
-        }
+            _ => {}
+        };
+
+        Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        event: crossterm::event::KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> anyhow::Result<crate::ui::KeyHandleResultInternal> {
+    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         let config = context.config;
-        let action = config.keybinds.navigation.get(&event.into());
         match &mut self.phase {
-            Phase::SearchTextboxInput => {
-                if let Some(CommonAction::Close) = action {
+            Phase::SearchTextboxInput => match event.as_common_action(context) {
+                Some(CommonAction::Close) => {
                     self.phase = Phase::Search;
                     self.songs_dir = Dir::new(self.search(client)?);
                     self.preview = self.prepare_preview(client, config)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else if let Some(CommonAction::Confirm) = action {
+
+                    context.render()?;
+                }
+                Some(CommonAction::Confirm) => {
                     self.phase = Phase::Search;
                     self.songs_dir = Dir::new(self.search(client)?);
                     self.preview = self.prepare_preview(client, config)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    match event.code {
+
+                    context.render()?;
+                }
+                _ => {
+                    event.stop_propagation();
+                    match event.code() {
                         KeyCode::Char(c) => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
                                 value.push(c);
-                                Ok(KeyHandleResultInternal::RenderRequested)
+
+                                context.render()?;
                             }
-                            FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {
-                                Ok(KeyHandleResultInternal::SkipRender)
-                            }
+                            FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
                         },
                         KeyCode::Backspace => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
                                 value.pop();
-                                Ok(KeyHandleResultInternal::RenderRequested)
+
+                                context.render()?;
                             }
-                            FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {
-                                Ok(KeyHandleResultInternal::SkipRender)
-                            }
+                            FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
                         },
-                        _ => Ok(KeyHandleResultInternal::SkipRender),
+                        _ => {}
                     }
                 }
-            }
+            },
             Phase::Search => {
-                if let Some(action) = config.keybinds.global.get(&event.into()) {
-                    match action {
-                        GlobalAction::ExternalCommand { command, .. } => {
-                            let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                            run_external(command, create_env(context, songs, client)?);
-
-                            Ok(KeyHandleResultInternal::SkipRender)
-                        }
-                        _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                if let Some(action) = event.as_global_action(context) {
+                    if let GlobalAction::ExternalCommand { command, .. } = action {
+                        let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
+                        run_external(command, create_env(context, songs, client)?);
+                    } else {
+                        event.abandon();
                     }
-                } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+                } else if let Some(action) = event.as_common_action(context) {
                     match action {
                         CommonAction::Down => {
                             if config.wrap_navigation {
@@ -688,7 +683,8 @@ impl Pane for SearchPane {
                             } else {
                                 self.inputs.next_non_wrapping();
                             }
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::Up => {
                             if config.wrap_navigation {
@@ -696,198 +692,226 @@ impl Pane for SearchPane {
                             } else {
                                 self.inputs.prev_non_wrapping();
                             }
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::MoveDown => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::MoveUp => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::DownHalf => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::UpHalf => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        CommonAction::MoveDown => {}
+                        CommonAction::MoveUp => {}
+                        CommonAction::DownHalf => {}
+                        CommonAction::UpHalf => {}
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
                             self.phase = Phase::BrowseResults { filter_input_on: false };
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::Right => Ok(KeyHandleResultInternal::RenderRequested),
-                        CommonAction::Left => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        CommonAction::Right => {
+                            // TODO Check if needed to render
+                        }
+                        CommonAction::Left => {}
                         CommonAction::Top => {
                             self.inputs.first();
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::Bottom => {
                             self.inputs.last();
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::EnterSearch => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::NextResult => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::PreviousResult => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Select => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Rename => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Close => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        CommonAction::EnterSearch => {}
+                        CommonAction::NextResult => {}
+                        CommonAction::PreviousResult => {}
+                        CommonAction::Select => {}
+                        CommonAction::Rename => {}
+                        CommonAction::Close => {}
                         CommonAction::Confirm => {
                             self.activate_input(client, context)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+                            context.render()?;
                         }
                         CommonAction::FocusInput
                             if matches!(self.inputs.focused(), FocusedInputGroup::Textboxes(_)) =>
                         {
                             self.phase = Phase::SearchTextboxInput;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::AddAll => {
                             self.search_add(client)?;
 
                             status_info!("All found songs added to queue");
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::FocusInput => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Add => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        CommonAction::FocusInput => {}
+                        CommonAction::Add => {}
                         CommonAction::Delete => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
                                 textbox.value.clear();
                                 self.songs_dir = Dir::new(self.search(client)?);
                                 self.preview = self.prepare_preview(client, config)?;
-                                Ok(KeyHandleResultInternal::RenderRequested)
+
+                                context.render()?;
                             }
-                            _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                            _ => {}
                         },
-                        CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::PaneDown => {}
+                        CommonAction::PaneUp => {}
+                        CommonAction::PaneRight => {}
+                        CommonAction::PaneLeft => {}
                     }
-                } else {
-                    Ok(KeyHandleResultInternal::KeyNotHandled)
                 }
             }
             Phase::BrowseResults {
                 filter_input_on: filter_input_on @ true,
-            } => {
-                if let Some(CommonAction::Close) = action {
+            } => match event.as_common_action(context) {
+                Some(CommonAction::Close) => {
                     *filter_input_on = false;
                     self.songs_dir.set_filter(None, config);
                     self.preview = self.prepare_preview(client, config)?;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else if let Some(CommonAction::Confirm) = action {
+
+                    context.render()?;
+                }
+                Some(CommonAction::Confirm) => {
                     *filter_input_on = false;
-                    Ok(KeyHandleResultInternal::RenderRequested)
-                } else {
-                    match event.code {
+
+                    context.render()?;
+                }
+                _ => {
+                    event.stop_propagation();
+                    match event.code() {
                         KeyCode::Char(c) => {
                             self.songs_dir.push_filter(c, config);
                             self.songs_dir.jump_first_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         KeyCode::Backspace => {
                             self.songs_dir.pop_filter(config);
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        _ => Ok(KeyHandleResultInternal::SkipRender),
+                        _ => {}
                     }
                 }
-            }
+            },
             Phase::BrowseResults {
                 filter_input_on: filter_input_modce @ false,
             } => {
-                if let Some(action) = config.keybinds.global.get(&event.into()) {
+                if let Some(action) = event.as_global_action(context) {
                     match action {
                         GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
                             let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
                             run_external(command, create_env(context, songs, client)?);
-
-                            Ok(KeyHandleResultInternal::SkipRender)
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
                             run_external(command, create_env(context, selected, client)?);
-                            Ok(KeyHandleResultInternal::SkipRender)
                         }
-                        _ => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        _ => {
+                            event.abandon();
+                        }
                     }
-                } else if let Some(action) = config.keybinds.navigation.get(&event.into()) {
+                } else if let Some(action) = event.as_common_action(context) {
                     match action {
                         CommonAction::Down => {
                             self.songs_dir
                                 .next(context.config.scrolloff, context.config.wrap_navigation);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::Up => {
                             self.songs_dir
                                 .prev(context.config.scrolloff, context.config.wrap_navigation);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::MoveDown => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::MoveUp => Ok(KeyHandleResultInternal::KeyNotHandled),
+                        CommonAction::MoveDown => {}
+                        CommonAction::MoveUp => {}
                         CommonAction::DownHalf => {
                             self.songs_dir.next_half_viewport(context.config.scrolloff);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::UpHalf => {
                             self.songs_dir.prev_half_viewport(context.config.scrolloff);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::Right => self.add_current(client),
+                        CommonAction::Right => self.add_current(client, context)?,
                         CommonAction::Left => {
                             self.phase = Phase::Search;
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::Top => {
                             self.songs_dir.first();
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::Bottom => {
                             self.songs_dir.last();
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::EnterSearch => {
                             self.songs_dir.set_filter(Some(String::new()), config);
                             *filter_input_modce = true;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::NextResult => {
                             self.songs_dir.jump_next_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::PreviousResult => {
                             self.songs_dir.jump_previous_matching(config);
                             self.preview = self.prepare_preview(client, config)?;
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
                         CommonAction::Select => {
                             self.songs_dir.toggle_mark_selected();
                             self.songs_dir
                                 .next(context.config.scrolloff, context.config.wrap_navigation);
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::Rename => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Close => Ok(KeyHandleResultInternal::KeyNotHandled),
-                        CommonAction::Confirm => self.add_current(client),
-                        CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::Add => self.add_current(client),
+                        CommonAction::Rename => {}
+                        CommonAction::Close => {}
+                        CommonAction::Confirm => {
+                            self.add_current(client, context)?;
+
+                            context.render()?;
+                        }
+                        CommonAction::FocusInput => {}
+                        CommonAction::Add => self.add_current(client, context)?,
                         CommonAction::AddAll => {
                             self.search_add(client)?;
                             status_info!("All found songs added to queue");
-                            Ok(KeyHandleResultInternal::RenderRequested)
+
+                            context.render()?;
                         }
-                        CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                        CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                        CommonAction::Delete => {}
+                        CommonAction::PaneDown => {}
+                        CommonAction::PaneUp => {}
+                        CommonAction::PaneRight => {}
+                        CommonAction::PaneLeft => {}
                     }
-                } else {
-                    Ok(KeyHandleResultInternal::KeyNotHandled)
                 }
             }
-        }
+        };
+        Ok(())
     }
 }
 

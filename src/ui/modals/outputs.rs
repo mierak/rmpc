@@ -1,3 +1,4 @@
+use anyhow::Result;
 use ratatui::{
     layout::{Constraint, Margin},
     style::Style,
@@ -8,8 +9,9 @@ use ratatui::{
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::{commands::Output, mpd_client::MpdClient},
-    ui::{dirstack::DirState, KeyHandleResultInternal},
+    mpd::{client::Client, commands::Output, mpd_client::MpdClient},
+    shared::{key_event::KeyEvent, macros::pop_modal},
+    ui::dirstack::DirState,
 };
 
 use super::{Modal, RectExt};
@@ -34,7 +36,7 @@ impl OutputsModal {
 }
 
 impl Modal for OutputsModal {
-    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut crate::context::AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut AppContext) -> anyhow::Result<()> {
         let popup_area = frame.area().centered_exact(60, 10);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -97,46 +99,47 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        client: &mut crate::mpd::client::Client<'_>,
-        context: &mut AppContext,
-    ) -> anyhow::Result<KeyHandleResultInternal> {
-        if let Some(action) = context.config.keybinds.navigation.get(&key.into()) {
+    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+        if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::UpHalf => {
                     self.scrolling_state.prev_half_viewport(context.config.scrolloff);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Up => {
                     self.scrolling_state
                         .prev(context.config.scrolloff, context.config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Down => {
                     self.scrolling_state
                         .next(context.config.scrolloff, context.config.wrap_navigation);
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
-                    Ok(KeyHandleResultInternal::RenderRequested)
+
+                    context.render()?;
                 }
                 CommonAction::Confirm => {
                     let Some(idx) = self.scrolling_state.get_selected() else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
                     let Some(output) = self.outputs.get(idx) else {
-                        return Ok(KeyHandleResultInternal::SkipRender);
+                        return Ok(());
                     };
                     client.toggle_output(output.id)?;
                     self.outputs = client.outputs()?.0;
@@ -144,30 +147,13 @@ impl Modal for OutputsModal {
                     if idx >= self.outputs.len() {
                         self.scrolling_state.last();
                     }
-
-                    Ok(KeyHandleResultInternal::SkipRender)
                 }
-                CommonAction::Right => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Left => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::EnterSearch => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::NextResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PreviousResult => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Add => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::AddAll => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Select => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Delete => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Rename => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::MoveDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::Close => Ok(KeyHandleResultInternal::Modal(None)),
-                CommonAction::FocusInput => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneDown => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneUp => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneRight => Ok(KeyHandleResultInternal::SkipRender),
-                CommonAction::PaneLeft => Ok(KeyHandleResultInternal::SkipRender),
+                CommonAction::Close => {
+                    pop_modal!(context);
+                }
+                _ => {}
             }
-        } else {
-            Ok(KeyHandleResultInternal::KeyNotHandled)
         }
+        Ok(())
     }
 }
