@@ -269,6 +269,7 @@ pub enum QueueActionsFile {
     Save,
     AddToPlaylist,
     ShowInfo,
+    JumpToCurrent,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
@@ -279,6 +280,7 @@ pub enum QueueActions {
     Save,
     AddToPlaylist,
     ShowInfo,
+    JumpToCurrent,
 }
 
 impl From<QueueActionsFile> for QueueActions {
@@ -290,6 +292,7 @@ impl From<QueueActionsFile> for QueueActions {
             QueueActionsFile::Save => QueueActions::Save,
             QueueActionsFile::AddToPlaylist => QueueActions::AddToPlaylist,
             QueueActionsFile::ShowInfo => QueueActions::ShowInfo,
+            QueueActionsFile::JumpToCurrent => QueueActions::JumpToCurrent,
         }
     }
 }
@@ -303,6 +306,7 @@ impl ToDescription for QueueActions {
             QueueActions::Save => "Save current queue as a new playlist",
             QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist",
             QueueActions::ShowInfo => "Show metadata of the song under cursor in a modal popup",
+            QueueActions::JumpToCurrent => "Moves the cursor in Queue table to the currently playing song",
         }
     }
 }
