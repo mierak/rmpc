@@ -159,6 +159,8 @@ impl<'name> Client<'name> {
             client.password(password)?;
         }
 
+        client.binary_limit(1024 * 1024 * 5)?;
+
         Ok(client)
     }
 
@@ -193,6 +195,8 @@ impl<'name> Client<'name> {
             debug!("Used password auth to MPD");
             self.password(password)?;
         }
+
+        self.binary_limit(1024 * 1024 * 5)?;
 
         Ok(self)
     }

@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Queue table now remembers cursor position when you switch tabs
 - Browser panes now remember cursor position in the root level when you switch tabs
 - Refactor and split utils module
+- Set binary limit to 5MB
 
 ### Fixed
 
