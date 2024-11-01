@@ -490,4 +490,8 @@ impl MpdClient for TestMpdClient {
     fn password(&mut self, _password: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
+
+    fn binary_limit(&mut self, _limit: u64) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }

@@ -196,6 +196,8 @@ impl<'name> Client<'name> {
             self.password(password)?;
         }
 
+        self.binary_limit(1024 * 1024 * 5)?;
+
         Ok(self)
     }
 
