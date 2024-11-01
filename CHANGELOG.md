@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Songs not being sorted below directories in the Directories pane
+- Scrolloff issues in Playlists pane after rename/move
+
 ## [0.6.0] - 2024-10-28
 
 ### Added
