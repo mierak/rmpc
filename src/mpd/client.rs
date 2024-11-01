@@ -159,6 +159,8 @@ impl<'name> Client<'name> {
             client.password(password)?;
         }
 
+        client.binary_limit(1024 * 1024 * 5)?;
+
         Ok(client)
     }
 
