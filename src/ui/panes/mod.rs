@@ -248,8 +248,9 @@ pub(crate) mod browser {
     impl std::cmp::Ord for DirOrSong {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             match (self, other) {
-                (_, DirOrSong::Dir { .. }) => Ordering::Greater,
-                (DirOrSong::Dir { .. }, _) => Ordering::Less,
+                (DirOrSong::Dir { name: a, .. }, DirOrSong::Dir { name: b, .. }) => a.cmp(b),
+                (DirOrSong::Song(_), DirOrSong::Dir { .. }) => Ordering::Greater,
+                (DirOrSong::Dir { .. }, DirOrSong::Song(_)) => Ordering::Less,
                 (DirOrSong::Song(a), DirOrSong::Song(b)) => a.cmp(b),
             }
         }

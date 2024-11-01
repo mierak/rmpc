@@ -15,6 +15,10 @@ pub struct DirState<T: ScrollingState> {
 
 #[allow(dead_code)]
 impl<T: ScrollingState> DirState<T> {
+    pub fn viewport_len(&self) -> Option<usize> {
+        self.viewport_len
+    }
+
     pub fn set_viewport_len(&mut self, viewport_len: Option<usize>) -> &Self {
         self.viewport_len = viewport_len;
         self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
