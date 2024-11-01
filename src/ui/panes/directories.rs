@@ -59,6 +59,7 @@ impl Pane for DirectoriesPane {
                     .lsinfo(None)?
                     .into_iter()
                     .map(Into::<DirOrSong>::into)
+                    .sorted()
                     .collect::<Vec<_>>(),
             );
             let preview = self.prepare_preview(client, context.config)?;

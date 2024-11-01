@@ -115,6 +115,7 @@ impl Pane for PlaylistsPane {
                         .sorted()
                         .collect_vec(),
                 );
+                let old_viewport_len = self.stack.current().state.viewport_len();
 
                 match self.stack.current_mut().selected_mut() {
                     Some(DirOrSong::Dir { name: playlist, .. }) => {
@@ -124,6 +125,8 @@ impl Pane for PlaylistsPane {
                             .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
                             .or_else(|| self.stack().current().selected_with_idx())
                             .map(|(idx, _)| idx);
+
+                        new_stack.current_mut().state.set_viewport_len(old_viewport_len);
                         new_stack
                             .current_mut()
                             .state
@@ -140,6 +143,8 @@ impl Pane for PlaylistsPane {
                             .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
                             .or_else(|| self.stack().previous().selected_with_idx())
                             .map(|(idx, _)| idx);
+
+                        new_stack.current_mut().state.set_viewport_len(old_viewport_len);
                         new_stack
                             .current_mut()
                             .state
@@ -155,6 +160,7 @@ impl Pane for PlaylistsPane {
                             .find_position(|p| matches!(p, DirOrSong::Song(s) if s.file == song.file))
                             .map(|(idx, _)| idx)
                             .or(previous_song_index);
+                        self.stack.current_mut().state.set_viewport_len(old_viewport_len);
                         self.stack
                             .current_mut()
                             .state
