@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use ratatui::{layout::Rect, Frame};
+use regex::Regex;
 
 use super::Pane;
 
@@ -35,6 +36,23 @@ impl AlbumArtPane {
             ),
         }
     }
+}
+
+fn fetch_album_art(client: &mut impl MpdClient, context: &AppContext) -> Result<Option<Vec<u8>>> {
+    if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
+        if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) {
+            // Skip if it looks like a protocol (e.g., a webradio)
+            let protocol_pattern = Regex::new(r"^[a-z]+://").expect("Failed to create protocol regex");
+            if !protocol_pattern.is_match(current_song.file.as_str()) {
+                let start = std::time::Instant::now();
+                log::debug!(file = current_song.file.as_str(); "Searching for album art");
+                let result = client.find_album_art(current_song.file.as_str())?;
+                log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
+                return Ok(result);
+            }
+        }
+    }
+    return Ok(None);
 }
 
 impl Pane for AlbumArtPane {
@@ -71,41 +89,17 @@ impl Pane for AlbumArtPane {
     }
 
     fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
-            let album_art =
-                if let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) {
-                    let start = std::time::Instant::now();
-                    log::debug!(file = current_song.file.as_str(); "Searching for album art");
-                    let result = client.find_album_art(current_song.file.as_str())?;
-                    log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
-                    result
-                } else {
-                    None
-                };
-            self.image_data = album_art;
-        }
+        self.image_data = fetch_album_art(client, context)?;
         Ok(())
     }
 
     fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::Player => {
-                if let Some((_, current_song)) = context
-                    .queue
-                    .iter()
-                    .enumerate()
-                    .find(|(_, v)| Some(v.id) == context.status.songid)
-                {
-                    if !matches!(context.config.album_art.method.into(), ImageProtocol::None) {
-                        let start = std::time::Instant::now();
-                        log::debug!(file = current_song.file.as_str(); "Searching for album art");
-                        let album_art = client.find_album_art(current_song.file.as_str())?;
-                        log::debug!(elapsed:? = start.elapsed(), size = album_art.as_ref().map(|v|v.len()); "Found album art");
-                        self.album_art.set_image(album_art)?;
+                let album_art = fetch_album_art(client, context)?;
+                self.album_art.set_image(album_art)?;
 
-                        context.render()?;
-                    }
-                }
+                context.render()?;
             }
             UiEvent::Resized { columns, rows } => {
                 self.album_art.resize(*columns, *rows);

@@ -1583,6 +1583,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "ratatui",
+ "regex",
  "ron",
  "rstest",
  "rustix",
