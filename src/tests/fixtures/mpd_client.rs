@@ -494,4 +494,8 @@ impl MpdClient for TestMpdClient {
     fn binary_limit(&mut self, _limit: u64) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
+
+    fn decoders(&mut self) -> MpdResult<crate::mpd::commands::decoders::Decoders> {
+        todo!("Not yet implemented")
+    }
 }

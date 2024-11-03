@@ -10,7 +10,7 @@ use crossterm::{
 };
 use enum_map::{enum_map, Enum, EnumMap};
 use itertools::Itertools;
-use modals::{keybinds::KeybindsModal, outputs::OutputsModal, song_info::SongInfoModal};
+use modals::{decoders::DecodersModal, keybinds::KeybindsModal, outputs::OutputsModal, song_info::SongInfoModal};
 use panes::{PaneContainer, Panes};
 #[cfg(debug_assertions)]
 use ratatui::style::Stylize;
@@ -463,6 +463,9 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::ShowOutputs => {
                     modal!(context, OutputsModal::new(client.outputs()?.0));
+                }
+                GlobalAction::ShowDecoders => {
+                    modal!(context, DecodersModal::new(client.decoders()?.0));
                 }
                 GlobalAction::ShowCurrentSongInfo => {
                     if let Some(current_song) = context.get_current_song(client)? {

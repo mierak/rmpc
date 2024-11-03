@@ -9,8 +9,8 @@ use crate::shared::{ext::error::ErrorExt, macros::status_error};
 use super::{
     client::Client,
     commands::{
-        list::MpdList, list_playlist::FileList, outputs::Outputs, status::OnOffOneshot, volume::Bound, IdleEvent,
-        ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
+        decoders::Decoders, list::MpdList, list_playlist::FileList, outputs::Outputs, status::OnOffOneshot,
+        volume::Bound, IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     proto_client::ProtoClient,
@@ -131,6 +131,8 @@ pub trait MpdClient {
     fn toggle_output(&mut self, id: u32) -> MpdResult<()>;
     fn enable_output(&mut self, id: u32) -> MpdResult<()>;
     fn disable_output(&mut self, id: u32) -> MpdResult<()>;
+    // Decoders
+    fn decoders(&mut self) -> MpdResult<Decoders>;
 }
 
 impl MpdClient for Client<'_> {
@@ -524,6 +526,11 @@ impl MpdClient for Client<'_> {
 
     fn disable_output(&mut self, id: u32) -> MpdResult<()> {
         self.send(&format!("disableoutput {id}")).and_then(ProtoClient::read_ok)
+    }
+
+    // Decoders
+    fn decoders(&mut self) -> MpdResult<Decoders> {
+        self.send("decoders").and_then(ProtoClient::read_response)
     }
 }
 

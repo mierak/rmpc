@@ -45,6 +45,7 @@
             "~":       ShowHelp,
             "I":       ShowCurrentSongInfo,
             "O":       ShowOutputs,
+            "P":       ShowDecoders,
         },
         navigation: {
             "k":       Up,

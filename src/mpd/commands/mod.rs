@@ -1,4 +1,5 @@
 pub mod current_song;
+pub mod decoders;
 pub mod idle;
 pub mod list;
 pub mod list_files;
@@ -13,6 +14,7 @@ pub mod update;
 pub mod volume;
 
 pub use self::current_song::Song;
+pub use self::decoders::Decoder;
 pub use self::idle::IdleEvent;
 pub use self::list_files::ListFiles;
 pub use self::list_mounts::Mounts;
