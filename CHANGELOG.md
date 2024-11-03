@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - JumpToCurrent Queue action to make the cursor jump to the currently playing song
+- Mouse support for modal popups
 
 ### Changed
 
