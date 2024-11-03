@@ -309,7 +309,7 @@ impl Pane for QueuePane {
                     }
                 }
                 QueueActions::DeleteAll => {
-                    modal!(context, ConfirmQueueClearModal::default());
+                    modal!(context, ConfirmQueueClearModal::new(context));
                 }
                 QueueActions::Play => {
                     if let Some(selected_song) = self
@@ -329,7 +329,7 @@ impl Pane for QueuePane {
                     }
                 }
                 QueueActions::Save => {
-                    modal!(context, SaveQueueModal::default());
+                    modal!(context, SaveQueueModal::new(context));
                 }
                 QueueActions::AddToPlaylist => {
                     if let Some(selected_song) = self
@@ -343,7 +343,10 @@ impl Pane for QueuePane {
                             .map(|v| v.name)
                             .sorted()
                             .collect_vec();
-                        modal!(context, AddToPlaylistModal::new(selected_song.file.clone(), playlists,));
+                        modal!(
+                            context,
+                            AddToPlaylistModal::new(selected_song.file.clone(), playlists, context)
+                        );
                     }
                 }
                 QueueActions::ShowInfo => {

@@ -5,11 +5,15 @@ use crate::{
     config::keys::{CommonAction, Key, ToDescription},
     context::AppContext,
     mpd::client::Client,
-    shared::{key_event::KeyEvent, macros::pop_modal},
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
 };
 use anyhow::bail;
 use ratatui::{
-    layout::{Constraint, Layout, Margin},
+    layout::{Constraint, Layout, Margin, Rect},
     style::Style,
     symbols::border,
     text::Line,
@@ -25,6 +29,7 @@ use super::{Modal, RectExt};
 pub struct KeybindsModal<'a> {
     scrolling_state: DirState<TableState>,
     rows: Vec<Row<'a>>,
+    table_area: Rect,
 }
 
 fn add_binds<'a, V: Display + ToDescription>(
@@ -74,7 +79,11 @@ impl KeybindsModal<'_> {
         if !rows.is_empty() {
             scrolling_state.select(Some(0), 0);
         }
-        Self { scrolling_state, rows }
+        Self {
+            scrolling_state,
+            rows,
+            table_area: Rect::default(),
+        }
     }
 }
 
@@ -134,16 +143,16 @@ impl Modal for KeybindsModal<'_> {
         .style(app.config.as_text_style())
         .row_highlight_style(app.config.theme.current_item_style);
 
+        let table_area = table_area.inner(Margin {
+            horizontal: 1,
+            vertical: 0,
+        });
+
+        self.table_area = table_area;
+
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);
-        frame.render_stateful_widget(
-            table,
-            table_area.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-            self.scrolling_state.as_render_state_ref(),
-        );
+        frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
             popup_area.inner(Margin {
@@ -197,6 +206,39 @@ impl Modal for KeybindsModal<'_> {
                 _ => {}
             }
         };
+
+        Ok(())
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        _client: &mut Client<'_>,
+        context: &mut AppContext,
+    ) -> Result<()> {
+        if !self.table_area.contains(event.into()) {
+            return Ok(());
+        }
+
+        match event.kind {
+            MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
+                let y: usize = event.y.saturating_sub(self.table_area.y).into();
+                if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
+                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                    context.render()?;
+                }
+            }
+            MouseEventKind::MiddleClick => {}
+            MouseEventKind::RightClick => {}
+            MouseEventKind::ScrollDown => {
+                self.scrolling_state.next(context.config.scrolloff, false);
+                context.render()?;
+            }
+            MouseEventKind::ScrollUp => {
+                self.scrolling_state.prev(context.config.scrolloff, false);
+                context.render()?;
+            }
+        }
 
         Ok(())
     }

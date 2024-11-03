@@ -261,9 +261,14 @@ impl<'ui> Ui<'ui> {
     pub fn handle_mouse_event(
         &mut self,
         event: MouseEvent,
-        client: &mut impl MpdClient,
+        client: &mut Client<'_>,
         context: &mut AppContext,
     ) -> Result<()> {
+        if let Some(ref mut modal) = self.modals.last_mut() {
+            modal.handle_mouse_event(event, client, context)?;
+            return Ok(());
+        }
+
         match event.kind {
             MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
                 client.pause_toggle()?;

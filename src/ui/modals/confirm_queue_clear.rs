@@ -11,7 +11,11 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
-    shared::{key_event::KeyEvent, macros::pop_modal},
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
@@ -25,12 +29,36 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-#[derive(Default, Debug)]
-pub struct ConfirmQueueClearModal {
-    button_group: ButtonGroupState,
+#[derive(Debug)]
+pub struct ConfirmQueueClearModal<'a> {
+    button_group_state: ButtonGroupState,
+    button_group: ButtonGroup<'a>,
 }
 
-impl Modal for ConfirmQueueClearModal {
+impl ConfirmQueueClearModal<'_> {
+    pub fn new(context: &AppContext) -> Self {
+        let mut button_group_state = ButtonGroupState::default();
+        let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
+        button_group_state.set_button_count(buttons.len());
+        let button_group = ButtonGroup::default()
+            .active_style(context.config.theme.current_item_style)
+            .inactive_style(context.config.as_text_style())
+            .buttons(buttons)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(BUTTON_GROUP_SYMBOLS)
+                    .border_style(context.config.as_border_style()),
+            );
+
+        Self {
+            button_group_state,
+            button_group,
+        }
+    }
+}
+
+impl Modal for ConfirmQueueClearModal<'_> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
@@ -54,19 +82,6 @@ impl Modal for ConfirmQueueClearModal {
             return Ok(());
         };
 
-        let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
-        self.button_group.set_button_count(buttons.len());
-        let group = ButtonGroup::default()
-            .active_style(app.config.theme.current_item_style)
-            .inactive_style(app.config.as_text_style())
-            .buttons(buttons)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(app.config.as_border_style()),
-            );
-
         frame.render_widget(
             text,
             block.inner(popup_area).inner(Margin {
@@ -75,7 +90,7 @@ impl Modal for ConfirmQueueClearModal {
             }),
         );
         frame.render_widget(block, text_area);
-        frame.render_stateful_widget(group, buttons_area, &mut self.button_group);
+        frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
         Ok(())
     }
 
@@ -83,30 +98,73 @@ impl Modal for ConfirmQueueClearModal {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Down => {
-                    self.button_group.next();
+                    self.button_group_state.next();
 
                     context.render()?;
                 }
                 CommonAction::Up => {
-                    self.button_group.prev();
+                    self.button_group_state.prev();
 
                     context.render()?;
                 }
                 CommonAction::Close => {
-                    self.button_group = ButtonGroupState::default();
+                    self.button_group_state = ButtonGroupState::default();
                     pop_modal!(context);
                 }
                 CommonAction::Confirm => {
-                    if self.button_group.selected == 0 {
+                    if self.button_group_state.selected == 0 {
                         client.clear()?;
                     }
-                    self.button_group = ButtonGroupState::default();
+                    self.button_group_state = ButtonGroupState::default();
                     pop_modal!(context);
                 }
                 _ => {}
             }
         };
 
+        Ok(())
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut Client<'_>,
+        context: &mut AppContext,
+    ) -> Result<()> {
+        match event.kind {
+            MouseEventKind::LeftClick => {
+                if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
+                    self.button_group_state.select(idx);
+                    context.render()?;
+                }
+            }
+            MouseEventKind::DoubleClick => {
+                match self.button_group.get_button_idx_at(event.into()) {
+                    Some(0) => {
+                        client.clear()?;
+                        pop_modal!(context);
+                    }
+                    Some(_) => {
+                        pop_modal!(context);
+                    }
+                    None => {}
+                };
+            }
+            MouseEventKind::MiddleClick => {}
+            MouseEventKind::RightClick => {}
+            MouseEventKind::ScrollUp => {
+                if self.button_group.get_button_idx_at(event.into()).is_some() {
+                    self.button_group_state.prev();
+                    context.render()?;
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if self.button_group.get_button_idx_at(event.into()).is_some() {
+                    self.button_group_state.next();
+                    context.render()?;
+                }
+            }
+        }
         Ok(())
     }
 }
