@@ -21,11 +21,25 @@ use crate::{
 
 use super::Pane;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LogsPane {
     logs: VecDeque<Vec<u8>>,
     scrolling_state: DirState<ListState>,
     logs_area: Rect,
+    should_scroll_to_last: bool,
+    scroll_enabled: bool,
+}
+
+impl LogsPane {
+    pub fn new() -> Self {
+        Self {
+            scroll_enabled: true,
+            logs: VecDeque::new(),
+            scrolling_state: DirState::default(),
+            logs_area: Rect::default(),
+            should_scroll_to_last: false,
+        }
+    }
 }
 
 const INDENT_LEN: usize = 4;
@@ -50,7 +64,8 @@ impl Pane for LogsPane {
         let content_len = lines.len();
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(area.height.into()));
-        if self.scrolling_state.get_selected().is_none() {
+        if self.scroll_enabled && (self.scrolling_state.get_selected().is_none() || self.should_scroll_to_last) {
+            self.should_scroll_to_last = false;
             self.scrolling_state.last();
         }
 
@@ -75,12 +90,14 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
                 self.logs.pop_front();
             }
+            self.should_scroll_to_last = true;
+            context.render()?;
         }
 
         Ok(())
@@ -126,6 +143,9 @@ impl Pane for LogsPane {
                     self.logs.clear();
 
                     context.render()?;
+                }
+                LogsActions::ToggleScroll => {
+                    self.scroll_enabled ^= true;
                 }
             }
         } else if let Some(action) = event.as_common_action(context) {

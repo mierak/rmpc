@@ -78,7 +78,7 @@ impl PaneContainer {
         Self {
             queue: QueuePane::new(context),
             #[cfg(debug_assertions)]
-            logs: LogsPane::default(),
+            logs: LogsPane::new(),
             directories: DirectoriesPane::new(context),
             albums: AlbumsPane::new(context),
             artists: ArtistsPane::new(ArtistsPaneMode::Artist, context),
