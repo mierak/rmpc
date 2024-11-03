@@ -65,6 +65,7 @@ impl Command {
             Command::AddYt { url } => {
                 request_work(WorkRequest::DownloadYoutube { url }, client);
             }
+            Command::Decoders => println!("{}", serde_json::ser::to_string(&client.decoders()?)?),
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
             Command::Config { .. } => bail!("Cannot use config command here."),
             Command::Theme { .. } => bail!("Cannot use theme command here."),

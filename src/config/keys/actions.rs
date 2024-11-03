@@ -13,6 +13,7 @@ pub enum GlobalAction {
     ShowHelp,
     ShowCurrentSongInfo,
     ShowOutputs,
+    ShowDecoders,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -45,6 +46,7 @@ pub enum GlobalActionFile {
     ShowHelp,
     ShowCurrentSongInfo,
     ShowOutputs,
+    ShowDecoders,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -82,6 +84,7 @@ impl From<GlobalActionFile> for GlobalAction {
         match value {
             GlobalActionFile::Quit => GlobalAction::Quit,
             GlobalActionFile::ShowOutputs => GlobalAction::ShowOutputs,
+            GlobalActionFile::ShowDecoders => GlobalAction::ShowDecoders,
             GlobalActionFile::ShowCurrentSongInfo => GlobalAction::ShowCurrentSongInfo,
             GlobalActionFile::CommandMode => GlobalAction::CommandMode,
             GlobalActionFile::Command { command, description } => GlobalAction::Command {
@@ -127,6 +130,7 @@ impl ToDescription for GlobalAction {
         match self {
             GlobalAction::Quit => "Exit rmpc",
             GlobalAction::ShowOutputs => "Show MPD outputs config",
+            GlobalAction::ShowDecoders => "Show MPD decoder plugins",
             GlobalAction::ShowCurrentSongInfo => "Show metadata of the currently playing song in a modal popup",
             GlobalAction::ToggleRepeat => "Toggle repeat",
             GlobalAction::ToggleSingle => {

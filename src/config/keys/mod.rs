@@ -75,6 +75,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('~'), modifiers: M::NONE  }, G::ShowHelp),
                 (Key { key: K::Char('I'), modifiers: M::SHIFT }, G::ShowCurrentSongInfo),
                 (Key { key: K::Char('O'), modifiers: M::SHIFT }, G::ShowOutputs),
+                (Key { key: K::Char('P'), modifiers: M::SHIFT }, G::ShowDecoders),
                 (Key { key: K::Char('>'), modifiers: M::NONE  }, G::NextTrack),
                 (Key { key: K::Char('<'), modifiers: M::NONE  }, G::PreviousTrack),
                 (Key { key: K::Char('s'), modifiers: M::NONE  }, G::Stop),

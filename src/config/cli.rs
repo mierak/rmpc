@@ -119,6 +119,8 @@ pub enum Command {
         // Id of the output to disable
         id: u32,
     },
+    /// List MPD decoder plugins
+    Decoders,
     /// Prints various information like the playback status
     Status,
     /// Prints info about the current song.

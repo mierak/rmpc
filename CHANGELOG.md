@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - JumpToCurrent Queue action to make the cursor jump to the currently playing song
 - Mouse support for modal popups
+- List available decoder plugins from MPD via `ShowDecoders` action or `rmpc decoders`
 
 ### Changed
 
