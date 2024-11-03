@@ -16,6 +16,7 @@
     album_art: (
         method: Auto,
         max_size_px: (width: 600, height: 600),
+        disabled_protocols: ["http://", "https://"],
     ),
     keybinds: (
         global: {
