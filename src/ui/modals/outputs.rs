@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ratatui::{
-    layout::{Constraint, Margin},
+    layout::{Constraint, Margin, Rect},
     style::Style,
     symbols::border,
     widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
@@ -10,7 +10,11 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, commands::Output, mpd_client::MpdClient},
-    shared::{key_event::KeyEvent, macros::pop_modal},
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
     ui::dirstack::DirState,
 };
 
@@ -19,6 +23,7 @@ use super::{Modal, RectExt};
 #[derive(Debug)]
 pub struct OutputsModal {
     scrolling_state: DirState<TableState>,
+    outputs_table_area: Rect,
     outputs: Vec<Output>,
 }
 
@@ -27,11 +32,30 @@ impl OutputsModal {
         let mut result = Self {
             outputs,
             scrolling_state: DirState::default(),
+            outputs_table_area: Rect::default(),
         };
         result.scrolling_state.set_content_len(Some(result.outputs.len()));
         result.scrolling_state.first();
 
         result
+    }
+
+    pub fn toggle_selected_output(&mut self, client: &mut Client<'_>) -> Result<()> {
+        let Some(idx) = self.scrolling_state.get_selected() else {
+            return Ok(());
+        };
+        let Some(output) = self.outputs.get(idx) else {
+            return Ok(());
+        };
+
+        client.toggle_output(output.id)?;
+        self.outputs = client.outputs()?.0;
+
+        if idx >= self.outputs.len() {
+            self.scrolling_state.last();
+        }
+
+        Ok(())
     }
 }
 
@@ -78,15 +102,14 @@ impl Modal for OutputsModal {
         .header(Row::new(["Id", "Name", "Enabled"]))
         .row_highlight_style(app.config.theme.current_item_style);
 
+        let table_area = table_area.inner(Margin {
+            horizontal: 1,
+            vertical: 0,
+        });
+        self.outputs_table_area = table_area;
+
         frame.render_widget(block, popup_area);
-        frame.render_stateful_widget(
-            table,
-            table_area.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-            self.scrolling_state.as_render_state_ref(),
-        );
+        frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
             popup_area.inner(Margin {
@@ -135,18 +158,7 @@ impl Modal for OutputsModal {
                     context.render()?;
                 }
                 CommonAction::Confirm => {
-                    let Some(idx) = self.scrolling_state.get_selected() else {
-                        return Ok(());
-                    };
-                    let Some(output) = self.outputs.get(idx) else {
-                        return Ok(());
-                    };
-                    client.toggle_output(output.id)?;
-                    self.outputs = client.outputs()?.0;
-
-                    if idx >= self.outputs.len() {
-                        self.scrolling_state.last();
-                    }
+                    self.toggle_selected_output(client)?;
                 }
                 CommonAction::Close => {
                     pop_modal!(context);
@@ -154,6 +166,44 @@ impl Modal for OutputsModal {
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut Client<'_>,
+        context: &mut AppContext,
+    ) -> Result<()> {
+        match event.kind {
+            MouseEventKind::LeftClick if self.outputs_table_area.contains(event.into()) => {
+                let y: usize = event.y.saturating_sub(self.outputs_table_area.y).into();
+                let y = y.saturating_sub(1); // Subtract one to account for table header
+                if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
+                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                    context.render()?;
+                }
+            }
+            MouseEventKind::DoubleClick if self.outputs_table_area.contains(event.into()) => {
+                self.toggle_selected_output(client)?;
+                context.render()?;
+            }
+            MouseEventKind::MiddleClick => {}
+            MouseEventKind::RightClick => {}
+            MouseEventKind::ScrollDown if self.outputs_table_area.contains(event.into()) => {
+                self.scrolling_state.next(context.config.scrolloff, false);
+                context.render()?;
+            }
+            MouseEventKind::ScrollUp if self.outputs_table_area.contains(event.into()) => {
+                self.scrolling_state.prev(context.config.scrolloff, false);
+                context.render()?;
+            }
+            MouseEventKind::LeftClick => {}
+            MouseEventKind::DoubleClick => {}
+            MouseEventKind::ScrollDown => {}
+            MouseEventKind::ScrollUp => {}
+        }
+
         Ok(())
     }
 }

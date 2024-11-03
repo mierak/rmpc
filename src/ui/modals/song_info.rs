@@ -2,11 +2,15 @@ use crate::{
     config::keys::CommonAction,
     context::AppContext,
     mpd::{client::Client, commands::Song},
-    shared::{key_event::KeyEvent, macros::pop_modal},
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
 };
 use anyhow::Result;
 use ratatui::{
-    layout::{Constraint, Layout, Margin},
+    layout::{Constraint, Layout, Margin, Rect},
     style::Style,
     symbols::border,
     text::Text,
@@ -21,6 +25,7 @@ use super::{Modal, RectExt};
 #[derive(Debug)]
 pub struct SongInfoModal {
     scrolling_state: DirState<TableState>,
+    table_area: Rect,
     song: Song,
 }
 
@@ -28,7 +33,11 @@ impl SongInfoModal {
     pub fn new(song: Song) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
-        Self { scrolling_state, song }
+        Self {
+            scrolling_state,
+            song,
+            table_area: Rect::default(),
+        }
     }
 
     #[allow(clippy::cast_possible_truncation)]
@@ -144,6 +153,8 @@ impl Modal for SongInfoModal {
         .style(app.config.as_text_style())
         .row_highlight_style(app.config.theme.current_item_style);
 
+        self.table_area = table_area;
+
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
@@ -200,6 +211,39 @@ impl Modal for SongInfoModal {
                 _ => {}
             }
         };
+
+        Ok(())
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        _client: &mut Client<'_>,
+        context: &mut AppContext,
+    ) -> Result<()> {
+        if !self.table_area.contains(event.into()) {
+            return Ok(());
+        }
+
+        match event.kind {
+            MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
+                let y: usize = event.y.saturating_sub(self.table_area.y).into();
+                if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
+                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                    context.render()?;
+                }
+            }
+            MouseEventKind::MiddleClick => {}
+            MouseEventKind::RightClick => {}
+            MouseEventKind::ScrollDown => {
+                self.scrolling_state.next(context.config.scrolloff, false);
+                context.render()?;
+            }
+            MouseEventKind::ScrollUp => {
+                self.scrolling_state.prev(context.config.scrolloff, false);
+                context.render()?;
+            }
+        }
 
         Ok(())
     }

@@ -1,4 +1,5 @@
 use ratatui::{
+    layout::{Position, Rect},
     prelude::{Alignment, Constraint, Direction, Layout},
     style::{Style, Stylize},
     widgets::{Block, StatefulWidget, Widget},
@@ -46,12 +47,22 @@ impl<'a> Button<'a> {
         self.label_alignment = alignment;
         self
     }
+
+    pub fn set_style(&mut self, style: Style) {
+        self.style = style;
+    }
 }
 
 impl<'a> Widget for Button<'a> {
     fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+        (&mut self).render(area, buf);
+    }
+}
+
+impl<'a> Widget for &mut Button<'a> {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         buf.set_style(area, self.style);
-        let area = match self.block.take() {
+        let area = match &self.block {
             Some(b) => {
                 let inner_area = b.inner(area);
                 b.render(area, buf);
@@ -72,7 +83,7 @@ impl<'a> Widget for Button<'a> {
 #[derive(Default, Debug)]
 pub struct ButtonGroupState {
     pub selected: usize,
-    button_conut: usize,
+    button_count: usize,
 }
 
 #[derive(Debug)]
@@ -82,6 +93,7 @@ pub struct ButtonGroup<'a> {
     active_style: Style,
     inactive_style: Style,
     direction: Direction,
+    pub areas: Vec<Rect>,
 }
 
 impl<'a> Default for ButtonGroup<'a> {
@@ -92,16 +104,17 @@ impl<'a> Default for ButtonGroup<'a> {
             active_style: Style::default().reversed(),
             inactive_style: Style::default(),
             direction: Direction::Horizontal,
+            areas: Vec::default(),
         }
     }
 }
 
-impl<'a> StatefulWidget for ButtonGroup<'a> {
+impl<'a> StatefulWidget for &mut ButtonGroup<'a> {
     type State = ButtonGroupState;
 
-    fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
         // buf.set_style(area, self.inactive_style);
-        let area = match self.block.take() {
+        let area = match &self.block {
             Some(b) => {
                 let inner_area = b.inner(area);
                 b.render(area, buf);
@@ -121,13 +134,13 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
             .constraints(constraints)
             .split(area);
 
-        self.buttons.into_iter().enumerate().for_each(|(idx, button)| {
-            let mut button = button;
+        self.buttons.iter_mut().enumerate().for_each(|(idx, button)| {
             if idx == state.selected {
-                button = button.style(self.active_style);
+                button.set_style(self.active_style);
             } else {
-                button = button.style(self.inactive_style);
+                button.set_style(self.inactive_style);
             }
+            self.areas[idx] = chunks[idx];
             button.render(chunks[idx], buf);
         });
     }
@@ -136,12 +149,14 @@ impl<'a> StatefulWidget for ButtonGroup<'a> {
 #[allow(dead_code)]
 impl<'a> ButtonGroup<'a> {
     pub fn buttons(mut self, buttons: Vec<Button<'a>>) -> Self {
+        self.areas = vec![Rect::default(); buttons.len()];
         self.buttons = buttons;
         self
     }
 
     pub fn add_button(mut self, button: Button<'a>) -> Self {
         self.buttons.push(button);
+        self.areas.push(Rect::default());
         self
     }
 
@@ -159,33 +174,50 @@ impl<'a> ButtonGroup<'a> {
         self.active_style = style;
         self
     }
+
     pub fn inactive_style(mut self, style: Style) -> Self {
         self.inactive_style = style;
         self
+    }
+
+    pub fn set_active_style(&mut self, style: Style) {
+        self.active_style = style;
+    }
+
+    pub fn get_button_idx_at(&self, position: Position) -> Option<usize> {
+        self.areas
+            .iter()
+            .enumerate()
+            .find(|(_, area)| area.contains(position))
+            .map(|v| v.0)
     }
 }
 
 impl ButtonGroupState {
     pub fn button_count(&mut self) -> usize {
-        self.button_conut
+        self.button_count
     }
 
     pub fn set_button_count(&mut self, count: usize) -> &Self {
-        self.button_conut = count;
+        self.button_count = count;
         self
+    }
+
+    pub fn select(&mut self, value: usize) {
+        self.selected = value.min(self.button_count);
     }
 
     pub fn next(&mut self) {
         // todo handle empty buttons
         self.selected = self.selected.saturating_add(1);
-        if self.selected > self.button_conut - 1 {
+        if self.selected > self.button_count - 1 {
             self.selected = 0;
         }
     }
 
     pub fn prev(&mut self) {
         if self.selected == 0 {
-            self.selected = self.button_conut - 1;
+            self.selected = self.button_count - 1;
         } else {
             self.selected = self.selected.saturating_sub(1);
         }
@@ -196,6 +228,6 @@ impl ButtonGroupState {
     }
 
     pub fn last(&mut self) {
-        self.selected = self.button_conut.saturating_sub(1);
+        self.selected = self.button_count.saturating_sub(1);
     }
 }

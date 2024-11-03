@@ -54,13 +54,6 @@ impl std::fmt::Debug for UiConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq, Clone, Copy)]
-pub enum Position {
-    #[default]
-    Left,
-    Right,
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UiConfigFile {
     #[serde(default = "defaults::default_true")]

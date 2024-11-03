@@ -290,7 +290,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn rename(&self, item: &DirOrSong, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
-                modal!(context, RenamePlaylistModal::new(d.clone()));
+                modal!(context, RenamePlaylistModal::new(d.clone(), context));
             }
             DirOrSong::Song(_) => {}
         };

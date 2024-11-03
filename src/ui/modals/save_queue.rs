@@ -1,6 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use ratatui::{
+    layout::Rect,
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols::{self, border},
@@ -15,6 +16,7 @@ use crate::{
     shared::{
         key_event::KeyEvent,
         macros::{pop_modal, status_error, status_info},
+        mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::{
         button::{Button, ButtonGroup, ButtonGroupState},
@@ -33,31 +35,48 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
 };
 
 #[derive(Debug)]
-pub struct SaveQueueModal {
-    button_group: ButtonGroupState,
+pub struct SaveQueueModal<'a> {
+    button_group_state: ButtonGroupState,
+    button_group: ButtonGroup<'a>,
     input_focused: bool,
     name: String,
+    input_area: Rect,
 }
 
-impl Default for SaveQueueModal {
-    fn default() -> Self {
+impl SaveQueueModal<'_> {
+    pub fn new(context: &AppContext) -> Self {
+        let mut button_group_state = ButtonGroupState::default();
+        let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
+        button_group_state.set_button_count(buttons.len());
+        let button_group = ButtonGroup::default()
+            .inactive_style(context.config.as_text_style())
+            .buttons(buttons)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(BUTTON_GROUP_SYMBOLS)
+                    .border_style(context.config.as_border_style()),
+            );
+
         Self {
-            button_group: ButtonGroupState::default(),
+            button_group, // todo
+            button_group_state,
             input_focused: true,
             name: String::new(),
+            input_area: Rect::default(),
         }
     }
 }
 
-impl SaveQueueModal {
+impl SaveQueueModal<'_> {
     fn on_hide(&mut self) {
-        self.button_group = ButtonGroupState::default();
+        self.button_group_state = ButtonGroupState::default();
         self.name = String::new();
         self.input_focused = true;
     }
 }
 
-impl Modal for SaveQueueModal {
+impl Modal for SaveQueueModal<'_> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(50, 7);
         let [body_area, buttons_area] =
@@ -86,26 +105,16 @@ impl Modal for SaveQueueModal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
-        let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
-        self.button_group.set_button_count(buttons.len());
-        let group = ButtonGroup::default()
-            .active_style(if self.input_focused {
-                Style::default().reversed()
-            } else {
-                app.config.theme.current_item_style
-            })
-            .inactive_style(app.config.as_text_style())
-            .buttons(buttons)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(app.config.as_border_style()),
-            );
+        self.button_group.set_active_style(if self.input_focused {
+            Style::default().reversed()
+        } else {
+            app.config.theme.current_item_style
+        });
 
+        self.input_area = body_area;
         frame.render_widget(input, block.inner(body_area));
         frame.render_widget(block, body_area);
-        frame.render_stateful_widget(group, buttons_area, &mut self.button_group);
+        frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
         Ok(())
     }
 
@@ -118,7 +127,7 @@ impl Modal for SaveQueueModal {
                 context.render()?;
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
-                if self.button_group.selected == 0 {
+                if self.button_group_state.selected == 0 {
                     match client.save_queue_as_playlist(&self.name, None) {
                         Ok(()) => {
                             status_info!("Playlist '{}' saved", self.name);
@@ -149,12 +158,12 @@ impl Modal for SaveQueueModal {
         } else if let Some(action) = action {
             match action {
                 CommonAction::Down => {
-                    self.button_group.next();
+                    self.button_group_state.next();
 
                     context.render()?;
                 }
                 CommonAction::Up => {
-                    self.button_group.next();
+                    self.button_group_state.next();
 
                     context.render()?;
                 }
@@ -163,7 +172,7 @@ impl Modal for SaveQueueModal {
                     pop_modal!(context);
                 }
                 CommonAction::Confirm => {
-                    if self.button_group.selected == 0 {
+                    if self.button_group_state.selected == 0 {
                         client.save_queue_as_playlist(&self.name, None)?;
                         status_info!("Playlist '{}' saved", self.name);
                     }
@@ -176,6 +185,59 @@ impl Modal for SaveQueueModal {
             }
         };
 
+        Ok(())
+    }
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut Client<'_>,
+        context: &mut AppContext,
+    ) -> Result<()> {
+        match event.kind {
+            MouseEventKind::LeftClick => {
+                if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
+                    self.button_group_state.select(idx);
+                    self.input_focused = false;
+                    context.render()?;
+                }
+            }
+            MouseEventKind::DoubleClick => {
+                match self.button_group.get_button_idx_at(event.into()) {
+                    Some(0) => {
+                        client.save_queue_as_playlist(&self.name, None)?;
+                        status_info!("Playlist '{}' saved", self.name);
+                        context.render()?;
+                        pop_modal!(context);
+                    }
+                    Some(_) => {
+                        pop_modal!(context);
+                    }
+                    None => {
+                        if self.input_area.contains(event.into()) {
+                            self.input_focused = true;
+                            context.render()?;
+                        }
+                    }
+                };
+            }
+            MouseEventKind::MiddleClick => {}
+            MouseEventKind::RightClick => {}
+            MouseEventKind::ScrollUp => {
+                if self.button_group.get_button_idx_at(event.into()).is_some() {
+                    self.input_focused = false;
+                    self.button_group_state.prev();
+                    context.render()?;
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if self.button_group.get_button_idx_at(event.into()).is_some() {
+                    self.input_focused = false;
+                    self.button_group_state.next();
+                    context.render()?;
+                }
+            }
+        }
         Ok(())
     }
 }

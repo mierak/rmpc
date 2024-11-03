@@ -4,7 +4,11 @@ use ratatui::{
     Frame,
 };
 
-use crate::{context::AppContext, mpd::client::Client, shared::key_event::KeyEvent};
+use crate::{
+    context::AppContext,
+    mpd::client::Client,
+    shared::{key_event::KeyEvent, mouse_event::MouseEvent},
+};
 
 pub mod add_to_playlist;
 pub mod confirm_modal;
@@ -19,6 +23,13 @@ pub(super) trait Modal: std::fmt::Debug {
     fn render(&mut self, frame: &mut Frame, _app: &mut crate::context::AppContext) -> Result<()>;
 
     fn handle_key(&mut self, key: &mut KeyEvent, _client: &mut Client<'_>, _app: &mut AppContext) -> Result<()>;
+
+    fn handle_mouse_event(
+        &mut self,
+        event: MouseEvent,
+        client: &mut Client<'_>,
+        context: &mut AppContext,
+    ) -> Result<()>;
 }
 
 #[allow(dead_code)]

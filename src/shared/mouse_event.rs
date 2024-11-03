@@ -83,11 +83,11 @@ pub struct MouseEvent {
 #[derive(Debug, Clone, Copy)]
 pub enum MouseEventKind {
     LeftClick,
+    DoubleClick,
     MiddleClick,
     RightClick,
-    DoubleClick,
-    ScrollUp,
     ScrollDown,
+    ScrollUp,
 }
 
 #[derive(Debug, Clone, Copy)]
