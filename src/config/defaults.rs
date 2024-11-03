@@ -35,3 +35,7 @@ pub fn mpd_host() -> String {
 pub fn mpd_port() -> String {
     "6600".to_string()
 }
+
+pub fn disabled_album_art_protos() -> Vec<String> {
+    ["http://", "https://"].into_iter().map(|p| p.to_owned()).collect()
+}

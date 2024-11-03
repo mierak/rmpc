@@ -19,15 +19,15 @@ The method can be overriden in the config file. Please refer to the [Configurati
 If your terminal is not listed here and you experience issues. Please disable the image method in the [config file](#method).
 Some of the terminals do not correctly report their size, thus some tweaking is needed. For those you need to set [max_size_px](#max_size_px).
 
-| Terminal  | Protocol                  | Tmux    | Additional Info                                                                                                                                                       |
-| --------- | ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Kitty     | Kitty                     | yes     | -                                                                                                                                                                     |
-| WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                     |
-| vscode    | ITerm2                    | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                                                                                                              |
-| Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                              |
-| Foot      | Sixel                     | yes     | Limited image size [in tmux](#sixel)                                                                                                                                  |
-| Alacritty | Ueberzug                  | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                             |
-| Others    | Ueberzug/Sixel/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other protocols or disabling album_art altogether if you experience issues. |
+| Terminal  | Backend                   | Tmux    | Additional Info                                                                                                                                                      |
+| --------- | ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kitty     | Kitty                     | yes     | -                                                                                                                                                                    |
+| WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                    |
+| vscode    | ITerm2                    | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                                                                                                             |
+| Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                             |
+| Foot      | Sixel                     | yes     | Limited image size [in tmux](#sixel)                                                                                                                                 |
+| Alacritty | Ueberzug                  | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                            |
+| Others    | Ueberzug/Sixel/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other backends or disabling album_art altogether if you experience issues. |
 
 ## Configuration
 
@@ -49,7 +49,14 @@ You should not set this option unless needed because preferred image methods wil
 themselves. This is needed only for terminals that do not report their size correctly. Default is `(600, 600)`.
 `(0, 0)` means no practical limit. Ueberzug method is not influenced by this setting.
 
-## Protocols
+### disabled_protocols
+
+<ConfigValue name="disabled_protocols" type="other" customText="string[]" />
+
+Album art will NOT be fetched and displayed for songs with path starting with any of the given protocols. Set to empty array
+to enable all protocols. Defaults to `["http://", "https://]`
+
+## Backends
 
 ### Kitty
 

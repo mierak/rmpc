@@ -137,12 +137,15 @@ pub struct AlbumArtConfigFile {
     pub method: ImageMethodFile,
     #[serde(default)]
     pub max_size_px: Size,
+    #[serde(default = "defaults::disabled_album_art_protos")]
+    pub disabled_protocols: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct AlbumArtConfig {
     pub method: ImageMethod,
     pub max_size_px: Size,
+    pub disabled_protocols: Vec<&'static str>,
 }
 
 impl Default for ConfigFile {
@@ -158,7 +161,10 @@ impl Default for ConfigFile {
             image_method: None,
             select_current_song_on_change: false,
             album_art_max_size_px: Size::default(),
-            album_art: AlbumArtConfigFile::default(),
+            album_art: AlbumArtConfigFile {
+                disabled_protocols: defaults::disabled_album_art_protos(),
+                ..Default::default()
+            },
             on_song_change: None,
             search: SearchFile::default(),
             tabs: TabsFile::default(),
@@ -240,6 +246,12 @@ impl ConfigFile {
                     width: if size.width == 0 { u16::MAX } else { size.width },
                     height: if size.height == 0 { u16::MAX } else { size.height },
                 },
+                disabled_protocols: self
+                    .album_art
+                    .disabled_protocols
+                    .into_iter()
+                    .map(|proto| proto.leak() as &'static _)
+                    .collect(),
             },
             on_song_change: self.on_song_change.map(|arr| {
                 arr.into_iter()
