@@ -232,6 +232,7 @@ impl From<DirectoriesActionsFile> for DirectoriesActions {
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum LogsActionsFile {
     Clear,
+    ToggleScroll,
 }
 
 #[cfg(debug_assertions)]
@@ -239,6 +240,7 @@ pub enum LogsActionsFile {
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum LogsActions {
     Clear,
+    ToggleScroll,
 }
 
 #[cfg(debug_assertions)]
@@ -246,6 +248,7 @@ impl From<LogsActionsFile> for LogsActions {
     fn from(value: LogsActionsFile) -> Self {
         match value {
             LogsActionsFile::Clear => LogsActions::Clear,
+            LogsActionsFile::ToggleScroll => LogsActions::ToggleScroll,
         }
     }
 }
@@ -255,6 +258,7 @@ impl ToDescription for LogsActions {
     fn to_description(&self) -> &str {
         match self {
             LogsActions::Clear => "Clear logs",
+            LogsActions::ToggleScroll => "Toggle automatic scrolling when log gets added",
         }
     }
 }
