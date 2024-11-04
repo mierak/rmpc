@@ -57,7 +57,6 @@ impl SongInfoModal {
                 Cell::from(Text::from(value.unwrap_or_default())),
             ])
         })
-        // Row::new([Cell::from(Text::from(key)), Cell::from(Text::from(value))]).height(lines as u16)
     }
 }
 
