@@ -71,3 +71,57 @@ pub mod mpsc {
         }
     }
 }
+
+pub mod iter {
+    use std::iter::Fuse;
+
+    pub struct ZipLongest2<A, B, C>
+    where
+        A: Iterator,
+        B: Iterator,
+        C: Iterator,
+    {
+        iter_a: Fuse<A>,
+        iter_b: Fuse<B>,
+        iter_c: Fuse<C>,
+    }
+
+    impl<A, B, C> Iterator for ZipLongest2<A, B, C>
+    where
+        A: Iterator,
+        B: Iterator,
+        C: Iterator,
+    {
+        type Item = (
+            Option<<A as Iterator>::Item>,
+            Option<<B as Iterator>::Item>,
+            Option<<C as Iterator>::Item>,
+        );
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match (self.iter_a.next(), self.iter_b.next(), self.iter_c.next()) {
+                (None, None, None) => None,
+                item => Some(item),
+            }
+        }
+    }
+
+    pub trait IntoZipLongest2: Iterator {
+        fn zip_longest2<B: Iterator, C: Iterator>(self, b: B, c: C) -> ZipLongest2<Self, B, C>
+        where
+            Self: Sized;
+    }
+
+    impl<A: Iterator> IntoZipLongest2 for A {
+        fn zip_longest2<B: Iterator, C: Iterator>(self, b: B, c: C) -> ZipLongest2<Self, B, C>
+        where
+            Self: Sized,
+        {
+            ZipLongest2 {
+                iter_a: self.fuse(),
+                iter_b: b.fuse(),
+                iter_c: c.fuse(),
+            }
+        }
+    }
+}
