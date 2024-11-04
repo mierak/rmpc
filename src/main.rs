@@ -234,7 +234,7 @@ fn main() -> Result<()> {
 
             let mut client = try_ret!(
                 Client::init(config.address, config.password, "command", true),
-                "Failed to connect to mpd"
+                "Failed to connect to MPD"
             );
 
             let terminal = try_ret!(ui::setup_terminal(config.enable_mouse), "Failed to setup terminal");
@@ -263,7 +263,7 @@ fn main() -> Result<()> {
 
             let mut idle_client = try_ret!(
                 Client::init(context.config.address, context.config.password, "idle", true),
-                "Failed to connect to mpd with idle client"
+                "Failed to connect to MPD with idle client"
             );
 
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
@@ -380,7 +380,7 @@ fn main_task<B: Backend + std::io::Write>(
                     Ok(ui::KeyHandleResult::None) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
                         if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
-                            error!(error:? = err, event:?; "Ui failed to handle quit event");
+                            error!(error:? = err, event:?; "UI failed to handle quit event");
                         }
                         break;
                     }
@@ -402,7 +402,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::Log(msg) => {
                     if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut context, &mut client) {
-                        error!(error:? = err; "Ui failed to handle log event");
+                        error!(error:? = err; "UI failed to handle log event");
                     }
                 }
                 AppEvent::IdleEvent(event) => {
@@ -411,7 +411,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     if let Ok(ev) = event.try_into() {
                         if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
-                            status_error!(error:? = err, event:?; "Ui failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
+                            status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
                     render_wanted = true;
@@ -446,7 +446,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::Resized { columns, rows } => {
                     if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context, &mut client) {
-                        error!(error:? = err, event:?; "Ui failed to resize event");
+                        error!(error:? = err, event:?; "UI failed to resize event");
                     }
                     full_rerender_wanted = true;
                     render_wanted = true;

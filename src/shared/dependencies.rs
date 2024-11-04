@@ -39,7 +39,7 @@ pub fn is_youtube_supported(mpd_address: MpdAddress) -> Result<(), Vec<String>> 
         unsupported.push("python-mutagen".to_string());
     }
     if matches!(mpd_address, MpdAddress::IpAndPort(_)) {
-        unsupported.push("socket connection to mpd".to_string());
+        unsupported.push("socket connection to MPD".to_string());
     }
 
     if unsupported.is_empty() {

@@ -481,7 +481,7 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
-        self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
+        self.current_song = try_ret!(client.get_current_song(), "Failed to get current song");
         screen_call!(self, before_show(client, &context))
     }
 

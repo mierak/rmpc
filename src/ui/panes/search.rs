@@ -61,7 +61,7 @@ impl SearchPane {
                         },
                     },
                     FilterInput {
-                        label: " Case Sensistive :",
+                        label: " Case sensitive  :",
                         variant: FilterInputVariant::SelectFilterCaseSensitive {
                             value: config.search.case_sensitive,
                         },
@@ -83,7 +83,7 @@ impl SearchPane {
                 let item = &self.songs_dir.items[*idx];
                 client.add(&item.file)?;
             }
-            status_info!("Added {} songs queue", self.songs_dir.marked().len());
+            status_info!("Added {} songs to queue", self.songs_dir.marked().len());
 
             context.render()?;
         } else if let Some(item) = self.songs_dir.selected() {
