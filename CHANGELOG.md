@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Refactor and split utils module
 - Set binary limit to 5MB
 - Disabled album arts for songs over http(s). Can be brought back by changing `album_art.disabled_protocols`
+- Improves the usability and clarity of the queue deletion confirmation modal
 
 ### Fixed
 
