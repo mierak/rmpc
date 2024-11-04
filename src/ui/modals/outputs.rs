@@ -72,7 +72,7 @@ impl Modal for OutputsModal {
             .border_set(border::ROUNDED)
             .border_style(app.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
-            .title("Keybinds");
+            .title("Outputs");
 
         let table_area = popup_area.inner(Margin {
             horizontal: 1,

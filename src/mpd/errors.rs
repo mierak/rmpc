@@ -28,8 +28,8 @@ impl Display for MpdError {
             MpdError::Generic(msg) => write!(f, "GenericError: '{msg}'"),
             MpdError::ClientClosed => write!(f, "Client has been already closed."),
             MpdError::Mpd(err) => write!(f, "MpdError: '{err}'"),
-            MpdError::ValueExpected(val) => write!(f, "Expected value from mpd but got '{val}'"),
-            MpdError::UnsupportedMpdVersion(val) => write!(f, "Unsupported mpd version: '{val}'"),
+            MpdError::ValueExpected(val) => write!(f, "Expected value from MPD but got '{val}'"),
+            MpdError::UnsupportedMpdVersion(val) => write!(f, "Unsupported MPD version: '{val}'"),
         }
     }
 }

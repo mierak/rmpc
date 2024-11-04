@@ -136,11 +136,11 @@ impl<'name> Client<'name> {
             )));
         };
 
-        debug!(name, addr:?, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initiazed");
+        debug!(name, addr:?, version = version.to_string().as_str(), handshake = buf.trim(); "MPD client initialized");
 
         if version < MIN_SUPPORTED_VERSION {
             status_warn!(
-                "MPD version '{version}' is lower than supported. Minimum supported protocol version is '{MIN_SUPPORTED_VERSION }'. Some features may work incorrectly."
+                "MPD version '{version}' is lower than supported. Minimum supported protocol version is '{MIN_SUPPORTED_VERSION}'. Some features may work incorrectly."
             );
         }
 
@@ -189,7 +189,7 @@ impl<'name> Client<'name> {
         self.stream = stream;
         self.version = version;
 
-        debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initiazed");
+        debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initialized");
 
         if let Some(MpdPassword(password)) = self.password {
             debug!("Used password auth to MPD");
