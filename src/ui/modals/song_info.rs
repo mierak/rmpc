@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use anyhow::Result;
+use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::Style,
@@ -41,12 +42,21 @@ impl SongInfoModal {
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    fn row<'a>(key: &'a str, key_width: u16, value: &'a str, value_width: u16) -> Row<'a> {
-        let key = textwrap::fill(key, key_width as usize);
-        let value = textwrap::fill(value, value_width as usize);
-        let lines = key.lines().count().max(value.lines().count());
+    fn row<'a>(key: &'a str, key_width: u16, value: &'a str, value_width: u16) -> impl Iterator<Item = Row<'a>> {
+        let key = textwrap::wrap(key, key_width as usize);
+        let value = textwrap::wrap(value, value_width as usize);
 
-        Row::new([Cell::from(Text::from(key)), Cell::from(Text::from(value))]).height(lines as u16)
+        key.into_iter().zip_longest(value).map(|item| {
+            let (key, value) = match item {
+                itertools::EitherOrBoth::Both(key, value) => (Some(key), Some(value)),
+                itertools::EitherOrBoth::Left(key) => (Some(key), None),
+                itertools::EitherOrBoth::Right(value) => (None, Some(value)),
+            };
+            Row::new([
+                Cell::from(Text::from(key.unwrap_or_default())),
+                Cell::from(Text::from(value.unwrap_or_default())),
+            ])
+        })
     }
 }
 
@@ -85,10 +95,10 @@ impl Modal for SongInfoModal {
         let Self { song, .. } = self;
         let mut rows = Vec::new();
 
-        rows.push(SongInfoModal::row("File", tag_area.width, &song.file, value_area.width));
+        rows.extend(SongInfoModal::row("File", tag_area.width, &song.file, value_area.width));
         let file_name = song.file_name().unwrap_or_default();
         if !file_name.is_empty() {
-            rows.push(SongInfoModal::row(
+            rows.extend(SongInfoModal::row(
                 "Filename",
                 tag_area.width,
                 &file_name,
@@ -96,13 +106,13 @@ impl Modal for SongInfoModal {
             ));
         };
         if let Some(title) = song.title() {
-            rows.push(SongInfoModal::row("Title", tag_area.width, title, value_area.width));
+            rows.extend(SongInfoModal::row("Title", tag_area.width, title, value_area.width));
         }
         if let Some(artist) = song.artist() {
-            rows.push(SongInfoModal::row("Artist", tag_area.width, artist, value_area.width));
+            rows.extend(SongInfoModal::row("Artist", tag_area.width, artist, value_area.width));
         }
         if let Some(album) = song.album() {
-            rows.push(SongInfoModal::row("Album", tag_area.width, album, value_area.width));
+            rows.extend(SongInfoModal::row("Album", tag_area.width, album, value_area.width));
         }
         let duration = song
             .duration
@@ -110,7 +120,7 @@ impl Modal for SongInfoModal {
             .map(|d| d.as_secs().to_string())
             .unwrap_or_default();
         if !duration.is_empty() {
-            rows.push(SongInfoModal::row(
+            rows.extend(SongInfoModal::row(
                 "Duration",
                 tag_area.width,
                 &duration,
@@ -118,13 +128,12 @@ impl Modal for SongInfoModal {
             ));
         }
 
-        for (k, v) in song
-            .metadata
-            .iter()
-            .filter(|(key, _)| !["title", "album", "artist", "duration"].contains(&(*key).as_str()))
-        {
-            rows.push(SongInfoModal::row(k, tag_area.width, v, value_area.width));
-        }
+        rows.extend(
+            song.metadata
+                .iter()
+                .filter(|(key, _)| !["title", "album", "artist", "duration"].contains(&(*key).as_str()))
+                .flat_map(|(k, v)| SongInfoModal::row(k, tag_area.width, v, value_area.width)),
+        );
 
         self.scrolling_state.set_content_len(Some(rows.len()));
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));

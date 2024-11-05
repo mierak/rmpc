@@ -1,4 +1,5 @@
 use anyhow::Result;
+use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::Style,
@@ -13,6 +14,7 @@ use crate::{
     context::AppContext,
     mpd::{client::Client, commands::Decoder},
     shared::{
+        ext::iter::IntoZipLongest2,
         key_event::KeyEvent,
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -26,11 +28,20 @@ use super::{Modal, RectExt};
 pub struct DecodersModal {
     scrolling_state: DirState<TableState>,
     table_area: Rect,
-    decoders: Vec<Decoder>,
+    decoders: Vec<(String, String, String)>,
 }
 
 impl DecodersModal {
     pub fn new(decoders: Vec<Decoder>) -> Self {
+        let decoders = decoders
+            .into_iter()
+            .map(|decoder| {
+                let name = decoder.name.clone();
+                let mime = decoder.mime_types.join(", ");
+                let suffixes = decoder.suffixes.join(", ");
+                (name, mime, suffixes)
+            })
+            .collect();
         let mut result = Self {
             decoders,
             scrolling_state: DirState::default(),
@@ -46,22 +57,24 @@ impl DecodersModal {
     fn row<'a>(
         name: &'a str,
         name_width: u16,
-        mime: &'a [String],
+        mime: &'a str,
         mime_width: u16,
-        suffixes: &'a [String],
+        suffixes: &'a str,
         suffixes_width: u16,
-    ) -> Row<'a> {
-        let name = textwrap::fill(name, name_width as usize);
-        let mime = textwrap::fill(mime.join(", ").as_str(), mime_width as usize);
-        let suffixes = textwrap::fill(suffixes.join(", ").as_str(), suffixes_width as usize);
-        let lines = mime.lines().count().max(suffixes.lines().count());
+    ) -> impl Iterator<Item = Row<'a>> {
+        let name = textwrap::wrap(name, name_width as usize);
+        let mime = textwrap::wrap(mime, mime_width as usize);
+        let suffixes = textwrap::wrap(suffixes, suffixes_width as usize);
 
-        Row::new([
-            Cell::from(Text::from(name)),
-            Cell::from(Text::from(mime)),
-            Cell::from(Text::from(suffixes)),
-        ])
-        .height(lines as u16)
+        name.into_iter()
+            .zip_longest2(mime.into_iter(), suffixes.into_iter())
+            .map(|(name, mime, suffix)| {
+                Row::new([
+                    Cell::from(Text::from(name.unwrap_or_default())),
+                    Cell::from(Text::from(mime.unwrap_or_default())),
+                    Cell::from(Text::from(suffix.unwrap_or_default())),
+                ])
+            })
     }
 }
 
@@ -99,20 +112,19 @@ impl Modal for DecodersModal {
         mime_area.width = mime_area.width.saturating_sub(1); // account for the column spacing
 
         let Self { decoders, .. } = self;
-        let mut rows = Vec::new();
-
-        for decoder in decoders.iter() {
-            let row = DecodersModal::row(
-                &decoder.name,
-                name_area.width,
-                &decoder.mime_types,
-                mime_area.width,
-                &decoder.suffixes,
-                suffix_area.width,
-            );
-
-            rows.push(row);
-        }
+        let rows = decoders
+            .iter()
+            .flat_map(|(name, mime, suffixes)| {
+                DecodersModal::row(
+                    name,
+                    name_area.width,
+                    mime,
+                    mime_area.width,
+                    suffixes,
+                    suffix_area.width,
+                )
+            })
+            .collect_vec();
 
         self.scrolling_state.set_content_len(Some(rows.len()));
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
@@ -218,7 +230,6 @@ impl Modal for DecodersModal {
         match event.kind {
             MouseEventKind::LeftClick if self.table_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.table_area.y).into();
-                let y = y.saturating_sub(1); // Subtract one to account for table header
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
                     self.scrolling_state.select(Some(idx), context.config.scrolloff);
                     context.render()?;
