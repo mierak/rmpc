@@ -37,17 +37,17 @@
     song_table_format: [
         (
             prop: (kind: Property(Artist), style: (fg: "#b7bdf8"), default: (kind: Text("Unknown"))),
-            width_percent: 49,
+            width: "50%",
             alignment: Right,
         ),
         (
             prop: (kind: Text("-"), style: (fg: "#b7bdf8"), default: (kind: Text("Unknown"))),
-            width_percent: 2,
+            width: "1",
             alignment: Center,
         ),
         (
             prop: (kind: Property(Title), style: (fg: "#7dc4e4"), default: (kind: Text("Unknown"))),
-            width_percent: 49,
+            width: "50%",
         ),
     ],
     header: (

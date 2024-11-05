@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Set binary limit to 5MB
 - Disabled album arts for songs over http(s). Can be brought back by changing `album_art.disabled_protocols`
 - Improves the usability and clarity of the queue deletion confirmation modal
+- `width_percent` config option in `song_table_format`. Replaced by `width`.
 
 ### Fixed
 
@@ -25,6 +26,10 @@ All notable changes to this project will be documented in this file.
 - Scrolloff issues in Playlists pane after rename/move
 - Few typos in UI and internal messages
 - Click to select and rendering issues in SongInfo and Decoder modals
+
+### Deprecated
+
+- `width_percent` config option in `song_table_format`. It will continue to work for now, but will be removed in the future.
 
 ## [0.6.0] - 2024-10-28
 

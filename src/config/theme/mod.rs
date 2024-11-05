@@ -18,7 +18,7 @@ mod queue_table;
 mod scrollbar;
 mod style;
 
-pub use self::queue_table::SongTableColumn;
+pub use self::queue_table::{PercentOrLength, SongTableColumn};
 pub use style::{ConfigColor, StyleFile};
 
 use super::defaults;

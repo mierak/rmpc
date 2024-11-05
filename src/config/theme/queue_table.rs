@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -11,6 +11,24 @@ use super::properties::{
 use super::style::ToConfigOr;
 use super::StyleFile;
 
+#[derive(Debug, Clone)]
+pub enum PercentOrLength {
+    Percent(u16),
+    Length(u16),
+}
+
+impl std::str::FromStr for PercentOrLength {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if s.ends_with('%') {
+            Ok(PercentOrLength::Percent(s.trim_end_matches('%').parse()?))
+        } else {
+            Ok(PercentOrLength::Length(s.parse()?))
+        }
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongTableColumnFile {
@@ -21,21 +39,17 @@ pub struct SongTableColumnFile {
     /// If not set, the property name will be used
     pub(super) label: Option<String>,
     /// Width of the column in percent
-    pub(super) width_percent: u16,
+    pub(super) width_percent: Option<u16>,
+    pub(super) width: Option<String>,
     /// Text alignment of the text in the column
     pub(super) alignment: Option<Alignment>,
-}
-impl std::fmt::Display for SongTableColumnFile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} {}% {:?}", self.prop, self.width_percent, self.alignment)
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct SongTableColumn {
     pub prop: &'static Property<'static, SongProperty>,
     pub label: &'static str,
-    pub width_percent: u16,
+    pub width: PercentOrLength,
     pub alignment: Alignment,
 }
 
@@ -59,7 +73,8 @@ impl Default for QueueTableColumnsFile {
                     style: None,
                 },
                 label: None,
-                width_percent: 20,
+                width_percent: None,
+                width: Some("20%".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
@@ -73,7 +88,8 @@ impl Default for QueueTableColumnsFile {
                     style: None,
                 },
                 label: None,
-                width_percent: 35,
+                width_percent: None,
+                width: Some("35%".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
@@ -95,7 +111,8 @@ impl Default for QueueTableColumnsFile {
                     }),
                 },
                 label: None,
-                width_percent: 30,
+                width_percent: None,
+                width: Some("30%".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
@@ -109,7 +126,8 @@ impl Default for QueueTableColumnsFile {
                     style: None,
                 },
                 label: None,
-                width_percent: 15,
+                width_percent: None,
+                width: Some("15%".to_string()),
                 alignment: Some(Alignment::Right),
             },
         ])
@@ -120,10 +138,6 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
     type Error = anyhow::Error;
 
     fn try_from(value: QueueTableColumnsFile) -> Result<Self, Self::Error> {
-        if value.0.iter().map(|v| v.width_percent).sum::<u16>() > 100 {
-            anyhow::bail!("Song table format width percent sum is greater than 100");
-        }
-
         Ok(QueueTableColumns(
             value
                 .0
@@ -139,7 +153,17 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                     Ok(SongTableColumn {
                         prop: prop.leak(),
                         label: label.leak(),
-                        width_percent: v.width_percent,
+                        width: v
+                            .width
+                            .as_ref()
+                            .map_or_else(
+                                || -> Result<Option<PercentOrLength>> {
+                                    Ok(v.width_percent.map(PercentOrLength::Percent))
+                                },
+                                |width| -> Result<Option<PercentOrLength>> { Ok(Some(width.parse()?)) },
+                            )
+                            .context("Failed to parse width in song table column width.")?
+                            .context("Invalid width config. Song table column width must be specified.")?,
                         alignment: v.alignment.unwrap_or(Alignment::Left),
                     })
                 })

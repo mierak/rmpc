@@ -22,10 +22,13 @@ Describes a single column in the song table. This is a recursive data structure.
 <ConfigValue name="prop" type="other" customText="<property>" link="#property" />
 Property of the song to display in the column. Described in [its own section](#property)
 
-### width_percent
+### width
 
-<ConfigValue name="width_percent" type="number" />
-Percentage of the table reserved for this column. Sum of these value must be 100.
+<ConfigValue name="width_percent" type="string" />
+Portion of the table width reserved for this column. Can be one of:
+
+-   Exact value: `"5"` which will result in 5 column width
+-   Percentage: `"50%"` which will result in half the table width
 
 ### alignment
 
