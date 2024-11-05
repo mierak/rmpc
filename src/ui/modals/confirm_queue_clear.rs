@@ -1,6 +1,7 @@
 use anyhow::Result;
 use ratatui::{
-    prelude::{Constraint, Layout, Margin},
+    layout::Alignment,
+    prelude::{Constraint, Layout},
     style::Style,
     symbols::{self, border},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
@@ -8,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    config::keys::CommonAction,
+    config::keys::{CommonAction, GlobalAction},
     context::AppContext,
     mpd::{client::Client, mpd_client::MpdClient},
     shared::{
@@ -38,7 +39,7 @@ pub struct ConfirmQueueClearModal<'a> {
 impl ConfirmQueueClearModal<'_> {
     pub fn new(context: &AppContext) -> Self {
         let mut button_group_state = ButtonGroupState::default();
-        let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
+        let buttons = vec![Button::default().label("Clear"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
             .active_style(context.config.theme.current_item_style)
@@ -60,36 +61,32 @@ impl ConfirmQueueClearModal<'_> {
 
 impl Modal for ConfirmQueueClearModal<'_> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
-        let block = Block::default()
-            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-            .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
-            .title_alignment(ratatui::prelude::Alignment::Center)
-            .title("Clear the queue?");
-        let text = Paragraph::new("Are you sure you want to clear the queue?")
-            .style(app.config.as_text_style())
-            .wrap(Wrap { trim: true });
-
-        let popup_area = frame.area().centered_exact(45, 5);
+        let popup_area = frame.area().centered_exact(45, 6);
         frame.render_widget(Clear, popup_area);
 
         if let Some(bg_color) = app.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
-        let [text_area, buttons_area] =
-            *Layout::vertical([Constraint::Length(2), Constraint::Max(3)]).split(popup_area)
+
+        let block = Block::default()
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .border_set(border::ROUNDED)
+            .border_style(app.config.as_border_style())
+            .title_alignment(ratatui::prelude::Alignment::Center);
+
+        let paragraph = Paragraph::new("Are you sure you want to clear the queue? This action cannot be undone.")
+            .style(app.config.as_text_style())
+            .wrap(Wrap { trim: true })
+            .block(block.clone())
+            .alignment(Alignment::Center);
+
+        let [content_area, buttons_area] =
+            *Layout::vertical([Constraint::Min(3), Constraint::Length(3)]).split(popup_area)
         else {
             return Ok(());
         };
 
-        frame.render_widget(
-            text,
-            block.inner(popup_area).inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
-        frame.render_widget(block, text_area);
+        frame.render_widget(paragraph, content_area);
         frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
         Ok(())
     }
@@ -97,14 +94,12 @@ impl Modal for ConfirmQueueClearModal<'_> {
     fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
-                CommonAction::Down => {
+                CommonAction::Right => {
                     self.button_group_state.next();
-
                     context.render()?;
                 }
-                CommonAction::Up => {
+                CommonAction::Left => {
                     self.button_group_state.prev();
-
                     context.render()?;
                 }
                 CommonAction::Close => {
@@ -120,7 +115,19 @@ impl Modal for ConfirmQueueClearModal<'_> {
                 }
                 _ => {}
             }
-        };
+        } else if let Some(action) = key.as_global_action(context) {
+            match action {
+                GlobalAction::NextTab => {
+                    self.button_group_state.next();
+                    context.render()?;
+                }
+                GlobalAction::PreviousTab => {
+                    self.button_group_state.prev();
+                    context.render()?;
+                }
+                _ => {}
+            }
+        }
 
         Ok(())
     }
