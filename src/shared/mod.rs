@@ -6,6 +6,7 @@ pub mod id;
 pub mod image;
 pub mod key_event;
 pub mod logging;
+pub mod lrc;
 pub mod macros;
 pub mod mouse_event;
 pub mod percent;

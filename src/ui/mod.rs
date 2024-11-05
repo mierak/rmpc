@@ -537,6 +537,7 @@ impl<'ui> Ui<'ui> {
                 Panes::Search(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArtists(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArt(p) => p.on_event(&mut event, client, context),
+                Panes::Lyrics(p) => p.on_event(&mut event, client, context),
             }?;
         }
 

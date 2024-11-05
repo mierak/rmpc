@@ -63,6 +63,7 @@ macro_rules! screen_call {
             Panes::Playlists(s) => s.$fn($($param),+),
             Panes::Search(s) => s.$fn($($param),+),
             Panes::AlbumArt(s) => s.$fn($($param),+),
+            Panes::Lyrics(s) => s.$fn($($param),+),
         }
     }
 }
