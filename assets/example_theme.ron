@@ -39,25 +39,25 @@
             prop: (kind: Property(Artist),
                 default: (kind: Text("Unknown"))
             ),
-            width_percent: 20,
+            width: "20%",
         ),
         (
             prop: (kind: Property(Title),
                 default: (kind: Text("Unknown"))
             ),
-            width_percent: 35,
+            width: "35%",
         ),
         (
             prop: (kind: Property(Album), style: (fg: "white"),
                 default: (kind: Text("Unknown Album"), style: (fg: "white"))
             ),
-            width_percent: 30,
+            width: "30%",
         ),
         (
             prop: (kind: Property(Duration),
                 default: (kind: Text("-"))
             ),
-            width_percent: 15,
+            width: "15%",
             alignment: Right,
         ),
     ],
