@@ -18,8 +18,11 @@ impl FromStr for Lrc {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut lines = Vec::new();
-        let mut metadata = HashMap::new();
+        let mut offset: Option<i64> = None;
+        let mut ret = Self {
+            lines: Vec::new(),
+            metadata: HashMap::new(),
+        };
 
         for s in s.lines() {
             if s.is_empty() {
@@ -47,7 +50,13 @@ impl FromStr for Lrc {
                     milis += seconds.parse::<u64>()? * 1000;
                     milis += hundreths.parse::<u64>()? * 10;
 
-                    lines.push(LrcLine {
+                    milis = match offset {
+                        Some(offset) if offset > 0 => milis.saturating_sub(offset.unsigned_abs()),
+                        Some(offset) if offset < 0 => milis.saturating_add(offset.unsigned_abs()),
+                        _ => milis,
+                    };
+
+                    ret.lines.push(LrcLine {
                         time: Duration::from_millis(milis),
                         content: line.to_owned(),
                     });
@@ -56,7 +65,12 @@ impl FromStr for Lrc {
                     let (key, value) = meta_or_time
                         .split_once(':')
                         .with_context(|| format!("Invalid metadata line: '{meta_or_time}'"))?;
-                    metadata.insert(key.trim().to_string(), value.trim().to_string());
+                    match key.trim() {
+                        "offset" => offset = Some(value.trim().parse()?),
+                        _ => {
+                            ret.metadata.insert(key.trim().to_string(), value.trim().to_string());
+                        }
+                    }
                 }
                 None => {
                     bail!("Invalid lrc metadata/timestamp: '{meta_or_time}'");
@@ -64,7 +78,7 @@ impl FromStr for Lrc {
             }
         }
 
-        Ok(Self { lines, metadata })
+        Ok(ret)
     }
 }
 
@@ -80,7 +94,7 @@ mod tests {
         let input = r"[t1: asdf ]
 [t2:123]
 [length: 2:23]
-[offset: -15000]
+[offset: +0]
 
 [00:01.86]line with dot before hundredths
 [00:04.73]line with colon before hundredths
@@ -110,10 +124,68 @@ mod tests {
                         content: "line with long time".to_string()
                     },
                 ],
-                metadata: [("t1", "asdf"), ("t2", "123"), ("length", "2:23"), ("offset", "-15000"),]
+                metadata: [("t1", "asdf"), ("t2", "123"), ("length", "2:23")]
                     .iter()
                     .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
                     .collect::<HashMap<_, _>>()
+            }
+        );
+    }
+
+    #[test]
+    fn lrc_offset_earlier() {
+        let input = r"
+[offset: +1000]
+
+[00:01.86]line1
+[00:04.73]line2
+";
+
+        let result: Lrc = input.parse().unwrap();
+
+        assert_eq!(
+            result,
+            Lrc {
+                lines: vec![
+                    LrcLine {
+                        time: Duration::from_millis(860),
+                        content: "line1".to_string()
+                    },
+                    LrcLine {
+                        time: Duration::from_millis(3730),
+                        content: "line2".to_string()
+                    },
+                ],
+                metadata: HashMap::new()
+            }
+        );
+    }
+
+    #[test]
+    fn lrc_offset_later() {
+        let input = r"
+[offset: -1000]
+
+[00:01.86]line1
+[00:04.73]line2
+";
+
+        let result: Lrc = input.parse().unwrap();
+
+        assert_eq!(
+            result,
+            Lrc {
+                lines: vec![
+                    LrcLine {
+                        time: Duration::from_millis(2860),
+                        content: "line1".to_string()
+                    },
+                    LrcLine {
+                        time: Duration::from_millis(5730),
+                        content: "line2".to_string()
+                    },
+                ],
+                metadata: HashMap::new()
             }
         );
     }
