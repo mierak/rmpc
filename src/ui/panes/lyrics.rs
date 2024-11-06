@@ -1,4 +1,6 @@
-use anyhow::Result;
+use std::{fs, path::PathBuf};
+
+use anyhow::{bail, Result};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
@@ -9,7 +11,7 @@ use ratatui::{
 use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
-    shared::{key_event::KeyEvent, lrc::Lrc},
+    shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
     ui::UiEvent,
 };
 
@@ -18,11 +20,42 @@ use super::Pane;
 #[derive(Debug)]
 pub struct LyricsPane {
     current_lyrics: Option<Lrc>,
+    initialized: bool,
 }
 
 impl LyricsPane {
     pub fn new(_context: &AppContext) -> Self {
-        Self { current_lyrics: None }
+        Self {
+            current_lyrics: None,
+            initialized: false,
+        }
+    }
+
+    fn find_lrc(context: &AppContext) -> Result<Option<Lrc>> {
+        let Some((_, song)) = context.find_current_song_in_queue() else {
+            return Ok(None);
+        };
+
+        let Some(lyrics_dir) = context.config.lyrics_dir else {
+            return Ok(None);
+        };
+
+        let mut path: PathBuf = PathBuf::from(lyrics_dir);
+        path.push(&song.file);
+        let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy())) else {
+            bail!("No file stem for lyrics path: {path:?}");
+        };
+
+        path.pop();
+        path.push(stem);
+        match fs::read_to_string(&path) {
+            Ok(lrc) => Ok(Some(lrc.parse()?)),
+            Err(err) if matches!(err.kind(), std::io::ErrorKind::NotFound) => {
+                log::trace!(path:?; "LRC file not found");
+                Ok(None)
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 }
 
@@ -35,6 +68,7 @@ impl Pane for LyricsPane {
             .lines
             .iter()
             .enumerate()
+            .filter(|line| line.1.time > elapsed)
             .min_by(|a, b| a.1.time.abs_diff(elapsed).cmp(&b.1.time.abs_diff(elapsed)))
         else {
             return Ok(());
@@ -55,13 +89,11 @@ impl Pane for LyricsPane {
 
             let darken = (middle_row as usize).abs_diff(i) > 0;
 
-            let p = Text::from(line.content.clone())
-                .alignment(ratatui::layout::Alignment::Center)
-                .style(if darken {
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default())
-                } else {
-                    context.config.theme.highlighted_item_style
-                });
+            let p = Text::from(line.content.clone()).centered().style(if darken {
+                Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+            } else {
+                context.config.theme.highlighted_item_style
+            });
 
             frame.render_widget(p, areas[i]);
         }
@@ -69,9 +101,32 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        if !self.initialized {
+            match Self::find_lrc(context) {
+                Ok(lrc) => {
+                    self.current_lyrics = lrc;
+                }
+                Err(err) => {
+                    status_error!("Failed to load lyrics file: '{err}'");
+                }
+            }
+            self.initialized = true;
+        }
+
+        Ok(())
+    }
+
+    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if let UiEvent::Player = event {
-            // self.current_lyrics = load_lyrics_somehow();
+            match Self::find_lrc(context) {
+                Ok(lrc) => {
+                    self.current_lyrics = lrc;
+                }
+                Err(err) => {
+                    status_error!("Failed to load lyrics file: '{err}'");
+                }
+            }
         }
         Ok(())
     }
