@@ -212,6 +212,12 @@ impl<'name> Client<'name> {
     pub fn send<'cmd>(&mut self, command: &'cmd str) -> Result<ProtoClient<'cmd, '_, Self>, MpdError> {
         ProtoClient::new(command, self)
     }
+
+    fn clear_read_buf(&mut self) -> Result<()> {
+        log::trace!("Reinitialized read buffer");
+        self.rx = BufReader::new(self.stream.try_clone()?);
+        Ok(())
+    }
 }
 
 impl<'name> SocketClient for Client<'name> {
@@ -225,5 +231,9 @@ impl<'name> SocketClient for Client<'name> {
 
     fn read(&mut self) -> &mut impl BufRead {
         &mut self.rx
+    }
+
+    fn clear_read_buf(&mut self) -> Result<()> {
+        self.clear_read_buf()
     }
 }

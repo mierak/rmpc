@@ -1,4 +1,9 @@
-use std::{collections::HashMap, ops::AddAssign, time::Duration};
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader, Cursor},
+    ops::AddAssign,
+    time::Duration,
+};
 
 use itertools::Itertools;
 use rstest::fixture;
@@ -10,6 +15,7 @@ use crate::mpd::{
     },
     errors::MpdError,
     mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
+    proto_client::SocketClient,
 };
 
 #[fixture]
@@ -65,6 +71,7 @@ pub fn client() -> TestMpdClient {
         volume: Volume::new(100),
         status: Status::default(),
         calls: HashMap::default(),
+        rx: BufReader::new(Box::new(Cursor::new(String::new()))),
     }
 }
 
@@ -73,7 +80,6 @@ pub struct TestPlaylist {
     pub name: String,
 }
 
-#[derive(Default)]
 pub struct TestMpdClient {
     pub songs: Vec<Song>,
     pub queue: Vec<usize>,
@@ -82,6 +88,17 @@ pub struct TestMpdClient {
     pub volume: Volume,
     pub status: Status,
     pub calls: HashMap<String, u32>,
+    pub rx: BufReader<Box<dyn BufRead>>,
+}
+
+impl TestMpdClient {
+    pub fn set_read_content(&mut self, content: Box<dyn BufRead>) {
+        self.rx = BufReader::new(Box::new(content));
+    }
+
+    pub fn set_read(&mut self, read: BufReader<Box<dyn BufRead>>) {
+        self.rx = read;
+    }
 }
 
 type MpdResult<T> = Result<T, MpdError>;
@@ -497,5 +514,23 @@ impl MpdClient for TestMpdClient {
 
     fn decoders(&mut self) -> MpdResult<crate::mpd::commands::decoders::Decoders> {
         todo!("Not yet implemented")
+    }
+}
+
+impl SocketClient for TestMpdClient {
+    fn reconnect(&mut self) -> MpdResult<&impl SocketClient> {
+        Ok(self)
+    }
+
+    fn write(&mut self, _bytes: &[u8]) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn read(&mut self) -> &mut impl BufRead {
+        &mut self.rx
+    }
+
+    fn clear_read_buf(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }
