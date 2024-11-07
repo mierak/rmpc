@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Scrolloff issues in Playlists pane after rename/move
 - Few typos in UI and internal messages
 - Click to select and rendering issues in SongInfo and Decoder modals
+- Read stream not being emptied after encountering error while reading MPD's response
 
 ### Deprecated
 
