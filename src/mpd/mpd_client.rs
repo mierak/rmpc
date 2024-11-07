@@ -595,7 +595,6 @@ impl std::fmt::Display for Ranges {
     }
 }
 
-// TODO: rework
 impl From<&BTreeSet<usize>> for Ranges {
     fn from(value: &BTreeSet<usize>) -> Self {
         let res = value

@@ -59,7 +59,7 @@ impl SaveQueueModal<'_> {
             );
 
         Self {
-            button_group, // todo
+            button_group,
             button_group_state,
             input_focused: true,
             name: String::new(),

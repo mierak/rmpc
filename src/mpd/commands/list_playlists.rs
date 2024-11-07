@@ -6,7 +6,7 @@ use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 #[derive(Default, Debug)]
 pub struct Playlist {
     pub name: String,
-    pub last_modified: String, // TODO timestamp?
+    pub last_modified: String,
 }
 
 impl FromMpd for Playlist {

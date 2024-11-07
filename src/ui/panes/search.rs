@@ -709,9 +709,7 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Right => {
-                            // TODO Check if needed to render
-                        }
+                        CommonAction::Right => {}
                         CommonAction::Left => {}
                         CommonAction::Top => {
                             self.inputs.first();

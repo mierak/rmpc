@@ -406,11 +406,11 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 }
             }
             CommonAction::FocusInput => {}
-            CommonAction::Close => {} // todo out?
+            CommonAction::Close => {}
             CommonAction::Confirm if self.stack().current().marked().is_empty() => {
                 self.open(client, context)?;
             }
-            CommonAction::Confirm => {} // todo next?
+            CommonAction::Confirm => {}
             CommonAction::PaneDown => {}
             CommonAction::PaneUp => {}
             CommonAction::PaneRight => {}
