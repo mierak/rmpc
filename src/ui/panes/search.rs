@@ -20,6 +20,7 @@ use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
+use crate::shared::ext::mpd_client::MpdClientExt;
 use crate::shared::key_event::KeyEvent;
 use crate::shared::macros::status_info;
 use crate::shared::macros::status_warn;
@@ -77,7 +78,7 @@ impl SearchPane {
         }
     }
 
-    fn add_current(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn add_current(&mut self, autoplay: bool, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
                 let item = &self.songs_dir.items[*idx];
@@ -89,6 +90,9 @@ impl SearchPane {
         } else if let Some(item) = self.songs_dir.selected() {
             client.add(&item.file)?;
             status_info!("Added '{}' to queue", item.file);
+            if autoplay {
+                client.play_last(context)?;
+            }
 
             context.render()?;
         }
@@ -546,7 +550,7 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(client, context)?;
+                    self.add_current(false, client, context)?;
                 }
             },
             MouseEventKind::LeftClick if self.column_areas[1].contains(event.into()) => match self.phase {
@@ -582,7 +586,7 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(client, context)?;
+                    self.add_current(false, client, context)?;
                 }
             },
             MouseEventKind::ScrollDown => match self.phase {
@@ -843,7 +847,7 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Right => self.add_current(client, context)?,
+                        CommonAction::Right => self.add_current(false, client, context)?,
                         CommonAction::Left => {
                             self.phase = Phase::Search;
                             self.preview = self.prepare_preview(client, config)?;
@@ -890,12 +894,12 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.add_current(client, context)?;
+                            self.add_current(true, client, context)?;
 
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => self.add_current(client, context)?,
+                        CommonAction::Add => self.add_current(false, client, context)?,
                         CommonAction::AddAll => {
                             self.search_add(client)?;
                             status_info!("All found songs added to queue");

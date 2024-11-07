@@ -6,7 +6,7 @@ use crate::{
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
+    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -101,6 +101,38 @@ impl ArtistsPane {
                 v.sort();
                 v
             })
+    }
+
+    fn open_or_play(&mut self, autoplay: bool, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        let Some(current) = self.stack.current().selected() else {
+            log::error!("Failed to move deeper inside dir. Current value is None");
+            return Ok(());
+        };
+
+        match self.stack.path() {
+            [_artist, _album] => {
+                self.add(current, client, context)?;
+                if autoplay {
+                    client.play_last(context)?;
+                }
+            }
+            [artist] => {
+                self.stack
+                    .push(self.list_titles(client, artist, current.as_path())?.collect());
+
+                context.render()?;
+            }
+            [] => {
+                self.stack.push(self.list_albums(client, current.as_path())?.collect());
+                context.render()?;
+            }
+            _ => {
+                log::error!("Unexpected nesting in Artists dir structure");
+                context.render()?;
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -268,33 +300,12 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         Ok(())
     }
 
+    fn open(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        self.open_or_play(true, client, context)
+    }
+
     fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        let Some(current) = self.stack.current().selected() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
-        };
-
-        match self.stack.path() {
-            [_artist, _album] => {
-                self.add(current, client, context)?;
-            }
-            [artist] => {
-                self.stack
-                    .push(self.list_titles(client, artist, current.as_path())?.collect());
-
-                context.render()?;
-            }
-            [] => {
-                self.stack.push(self.list_albums(client, current.as_path())?.collect());
-                context.render()?;
-            }
-            _ => {
-                log::error!("Unexpected nesting in Artists dir structure");
-                context.render()?;
-            }
-        };
-
-        Ok(())
+        self.open_or_play(false, client, context)
     }
 
     fn prepare_preview(

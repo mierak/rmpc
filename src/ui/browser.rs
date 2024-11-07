@@ -46,6 +46,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
     ) -> Result<Option<Vec<ListItem<'static>>>>;
     fn add(&self, item: &T, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
     fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
+    fn open(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
     fn delete(&self, item: &T, index: usize, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         Ok(())
     }
@@ -405,7 +406,10 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 }
             }
             CommonAction::FocusInput => {}
-            CommonAction::Close => {}   // todo out?
+            CommonAction::Close => {} // todo out?
+            CommonAction::Confirm if self.stack().current().marked().is_empty() => {
+                self.open(client, context)?;
+            }
             CommonAction::Confirm => {} // todo next?
             CommonAction::PaneDown => {}
             CommonAction::PaneUp => {}

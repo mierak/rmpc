@@ -125,3 +125,36 @@ pub mod iter {
         }
     }
 }
+
+pub mod mpd_client {
+    use crate::{
+        context::AppContext,
+        mpd::{
+            errors::{ErrorCode, MpdError, MpdFailureResponse},
+            mpd_client::MpdClient,
+        },
+    };
+
+    pub trait MpdClientExt {
+        fn play_last(&mut self, context: &AppContext) -> Result<(), MpdError>;
+    }
+
+    impl<T: MpdClient> MpdClientExt for T {
+        fn play_last(&mut self, context: &AppContext) -> Result<(), MpdError> {
+            match self.play_pos(context.queue.len()) {
+                Ok(()) => {}
+                Err(MpdError::Mpd(MpdFailureResponse {
+                    code: ErrorCode::Argument,
+                    ..
+                })) => {
+                    // This can happen when multiple clients modify the queue at the same
+                    // time. But a more robust solution would require refetching the whole
+                    // queue and searching for the added song. This should be good enough.
+                    log::warn!("Failed to autoplay song");
+                }
+                Err(err) => return Err(err),
+            };
+            Ok(())
+        }
+    }
+}

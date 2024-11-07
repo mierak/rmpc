@@ -160,9 +160,9 @@ impl MpdClient for TestMpdClient {
         Ok(())
     }
 
-    fn play_pos(&mut self, pos: u32) -> MpdResult<()> {
-        if (pos as usize) < self.queue.len() {
-            self.current_song_idx = Some(pos as usize);
+    fn play_pos(&mut self, pos: usize) -> MpdResult<()> {
+        if (pos) < self.queue.len() {
+            self.current_song_idx = Some(pos);
             self.status.state = crate::mpd::commands::State::Play;
             Ok(())
         } else {
