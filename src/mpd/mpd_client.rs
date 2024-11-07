@@ -80,7 +80,7 @@ pub trait MpdClient {
     fn unpause(&mut self) -> MpdResult<()>;
     fn next(&mut self) -> MpdResult<()>;
     fn prev(&mut self) -> MpdResult<()>;
-    fn play_pos(&mut self, pos: u32) -> MpdResult<()>;
+    fn play_pos(&mut self, pos: usize) -> MpdResult<()>;
     fn play(&mut self) -> MpdResult<()>;
     fn play_id(&mut self, id: u32) -> MpdResult<()>;
     fn stop(&mut self) -> MpdResult<()>;
@@ -238,7 +238,7 @@ impl MpdClient for Client<'_> {
         self.send("previous").and_then(ProtoClient::read_ok)
     }
 
-    fn play_pos(&mut self, pos: u32) -> MpdResult<()> {
+    fn play_pos(&mut self, pos: usize) -> MpdResult<()> {
         self.send(&format!("play {pos}")).and_then(ProtoClient::read_ok)
     }
 

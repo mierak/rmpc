@@ -14,6 +14,7 @@ use crate::{
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
     shared::{
+        ext::mpd_client::MpdClientExt,
         key_event::KeyEvent,
         macros::{modal, status_error, status_info},
         mouse_event::MouseEvent,
@@ -48,6 +49,32 @@ impl PlaylistsPane {
             browser: Browser::new(context.config),
             initialized: false,
         }
+    }
+
+    fn open_or_play(&mut self, autoplay: bool, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        let Some(selected) = self.stack().current().selected() else {
+            log::error!("Failed to move deeper inside dir. Current value is None");
+
+            context.render()?;
+            return Ok(());
+        };
+
+        match selected {
+            DirOrSong::Dir { name: playlist, .. } => {
+                let info = client.list_playlist_info(playlist, None)?;
+                self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
+
+                context.render()?;
+            }
+            DirOrSong::Song(_song) => {
+                self.add(selected, client, context)?;
+                if autoplay {
+                    client.play_last(context)?;
+                }
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -298,25 +325,12 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
+    fn open(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        self.open_or_play(true, client, context)
+    }
+
     fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        let Some(selected) = self.stack().current().selected() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-
-            context.render()?;
-            return Ok(());
-        };
-
-        match selected {
-            DirOrSong::Dir { name: playlist, .. } => {
-                let info = client.list_playlist_info(playlist, None)?;
-                self.stack_mut().push(info.into_iter().map(DirOrSong::Song).collect());
-
-                context.render()?;
-            }
-            DirOrSong::Song(_song) => self.add(selected, client, context)?,
-        };
-
-        Ok(())
+        self.open_or_play(false, client, context)
     }
 
     fn move_selected(&mut self, direction: MoveDirection, client: &mut impl MpdClient) -> Result<()> {

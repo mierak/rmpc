@@ -401,7 +401,7 @@ impl ToDescription for CommonAction {
             CommonAction::Delete => "Delete. For example a playlist, song from a playlist or wipe the current queue",
             CommonAction::Rename => "Rename. Currently only for playlists",
             CommonAction::Close => "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.",
-            CommonAction::Confirm => "Confirm whatever action is currently going on",
+            CommonAction::Confirm => "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor",
             CommonAction::FocusInput => "Focuses textbox if any is on the screen and is not focused",
             CommonAction::PaneDown => "Focus the pane below the current one",
             CommonAction::PaneUp => "Focus the pane above the current one",

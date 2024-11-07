@@ -64,7 +64,7 @@ pub enum Command {
     /// Plays song at the position in the current playlist. Defaults to current paused song.
     Play {
         /// Index of the song in the queue
-        position: Option<u32>,
+        position: Option<usize>,
     },
     /// Pause playback
     Pause,

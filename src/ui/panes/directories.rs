@@ -13,7 +13,7 @@ use crate::{
         commands::{lsinfo::FileOrDir, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
-    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
+    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -40,6 +40,45 @@ impl DirectoriesPane {
             browser: Browser::new(context.config),
             initialized: false,
         }
+    }
+
+    fn open_or_play(&mut self, autoplay: bool, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        let Some(selected) = self.stack.current().selected() else {
+            log::error!("Failed to move deeper inside dir. Current value is None");
+            return Ok(());
+        };
+        let Some(next_path) = self.stack.next_path() else {
+            log::error!("Failed to move deeper inside dir. Next path is None");
+            return Ok(());
+        };
+
+        match selected {
+            DirOrSong::Dir { .. } => {
+                let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str()))?;
+                let res = new_current
+                    .into_iter()
+                    .map(|v| match v {
+                        FileOrDir::Dir(d) => DirOrSong::Dir {
+                            name: d.path,
+                            full_path: d.full_path,
+                        },
+                        FileOrDir::File(s) => DirOrSong::Song(s),
+                    })
+                    .sorted()
+                    .collect();
+                self.stack.push(res);
+
+                context.render()?;
+            }
+            t @ DirOrSong::Song(_) => {
+                self.add(t, client, context)?;
+                if autoplay {
+                    client.play_last(context)?;
+                }
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -166,40 +205,12 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         Ok(())
     }
 
+    fn open(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+        self.open_or_play(true, client, context)
+    }
+
     fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        let Some(selected) = self.stack.current().selected() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
-        };
-        let Some(next_path) = self.stack.next_path() else {
-            log::error!("Failed to move deeper inside dir. Next path is None");
-            return Ok(());
-        };
-
-        match selected {
-            DirOrSong::Dir { .. } => {
-                let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str()))?;
-                let res = new_current
-                    .into_iter()
-                    .map(|v| match v {
-                        FileOrDir::Dir(d) => DirOrSong::Dir {
-                            name: d.path,
-                            full_path: d.full_path,
-                        },
-                        FileOrDir::File(s) => DirOrSong::Song(s),
-                    })
-                    .sorted()
-                    .collect();
-                self.stack.push(res);
-
-                context.render()?;
-            }
-            t @ DirOrSong::Song(_) => {
-                self.add(t, client, context)?;
-            }
-        };
-
-        Ok(())
+        self.open_or_play(false, client, context)
     }
 
     fn prepare_preview(
