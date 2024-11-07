@@ -296,61 +296,71 @@ mod tests {
 
     mod read_mpd_line {
 
-        use std::io::Cursor;
+        use std::io::{BufReader, Cursor};
+
+        use crate::tests::fixtures::mpd_client::{client, TestMpdClient};
+        use rstest::rstest;
 
         use crate::mpd::{
             errors::{ErrorCode, MpdError, MpdFailureResponse},
-            proto_client::{tests::TestClient, MpdLine, ProtoClient},
+            proto_client::{MpdLine, ProtoClient},
         };
 
-        //     #[test]
-        //     fn returns_ok() {
-        //         let result = ProtoClient::<TestClient>::read_line(&mut Cursor::new(b"OK enenene"));
-        //
-        //         assert_eq!(Ok(MpdLine::Ok), result);
-        //     }
-        //
-        //     #[test]
-        //     fn returns_ok_for_list_ok() {
-        //         let result = ProtoClient::<TestClient>::read_line(&mut Cursor::new(b"list_OK enenene"));
-        //
-        //         assert_eq!(Ok(MpdLine::Ok), result);
-        //     }
-        //
-        //     #[test]
-        //     fn returns_mpd_err() {
-        //         let err = MpdFailureResponse {
-        //             code: ErrorCode::PlayerSync,
-        //             command_list_index: 2,
-        //             command: "some_cmd".to_string(),
-        //             message: "error message boi".to_string(),
-        //         };
-        //
-        //         let result =
-        //             ProtoClient::<TestClient>::read_line(&mut Cursor::new(b"ACK [55@2] {some_cmd} error message boi"));
-        //
-        //         assert_eq!(Err(MpdError::Mpd(err)), result);
-        //     }
-        //
-        //     #[test]
-        //     fn returns_client_closed_on_broken_pipe() {
-        //         struct Mock;
-        //         impl std::io::BufRead for Mock {
-        //             fn consume(&mut self, _amt: usize) {}
-        //             fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
-        //                 Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
-        //             }
-        //         }
-        //         impl std::io::Read for Mock {
-        //             fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
-        //                 Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
-        //             }
-        //         }
-        //
-        //         let result = ProtoClient::<TestClient>::read_line(&mut Mock);
-        //
-        //         assert_eq!(Err(MpdError::ClientClosed), result);
-        //     }
+        #[rstest]
+        fn returns_ok(mut client: TestMpdClient) {
+            client.set_read_content(Box::new(Cursor::new(b"OK enenene")));
+            let mut client = ProtoClient::new("", &mut client).unwrap();
+            let result = client.read_line();
+
+            assert_eq!(Ok(MpdLine::Ok), result);
+        }
+
+        #[rstest]
+        fn returns_ok_for_list_ok(mut client: TestMpdClient) {
+            client.set_read_content(Box::new(Cursor::new(b"list_OK enenene")));
+            let mut client = ProtoClient::new("", &mut client).unwrap();
+            let result = client.read_line();
+
+            assert_eq!(Ok(MpdLine::Ok), result);
+        }
+
+        #[rstest]
+        fn returns_mpd_err(mut client: TestMpdClient) {
+            let err = MpdFailureResponse {
+                code: ErrorCode::PlayerSync,
+                command_list_index: 2,
+                command: "some_cmd".to_string(),
+                message: "error message boi".to_string(),
+            };
+
+            client.set_read_content(Box::new(Cursor::new(b"ACK [55@2] {some_cmd} error message boi")));
+            let mut client = ProtoClient::new("", &mut client).unwrap();
+            let result = client.read_line();
+
+            assert_eq!(Err(MpdError::Mpd(err)), result);
+        }
+
+        #[rstest]
+        fn returns_client_closed_on_broken_pipe(mut client: TestMpdClient) {
+            struct Mock;
+            impl std::io::BufRead for Mock {
+                fn consume(&mut self, _amt: usize) {}
+                fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                    Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+                }
+            }
+            impl std::io::Read for Mock {
+                fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+                }
+            }
+
+            client.set_read(BufReader::new(Box::new(Mock)));
+            let mut client = ProtoClient::new("", &mut client).unwrap();
+            let result = client.read_line();
+
+            assert_eq!(Err(MpdError::ClientClosed), result);
+        }
     }
 
     mod response {
