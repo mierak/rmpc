@@ -554,7 +554,6 @@ fn handle_idle_event(
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
         IdleEvent::Update => {}
-        // TODO: handle these events eventually ?
         IdleEvent::Output
         | IdleEvent::Partition
         | IdleEvent::Sticker

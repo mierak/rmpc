@@ -199,7 +199,7 @@ impl<'ui> Ui<'ui> {
                 .alignment(ratatui::prelude::Alignment::Left)
                 .style(context.config.as_text_style());
 
-            frame.render_widget(Text::from(":"), leader_area); // TODO: use key from config
+            frame.render_widget(Text::from(":"), leader_area);
             frame.render_widget(status_bar, command_area);
         } else if let Some(StatusMessage { message, level, .. }) = &self.status_message {
             let status_bar = Paragraph::new(message.to_owned())
@@ -230,26 +230,7 @@ impl<'ui> Ui<'ui> {
             );
         }
 
-        let content_area = self.areas[Areas::Content];
-
-        // TODO double check and remove...
-        if context.config.theme.draw_borders {
-            screen_call!(self, render(frame, content_area, context))?;
-        } else {
-            screen_call!(
-                self,
-                render(
-                    frame,
-                    ratatui::prelude::Rect {
-                        x: content_area.x,
-                        y: content_area.y,
-                        width: content_area.width,
-                        height: content_area.height,
-                    },
-                    context
-                )
-            )?;
-        }
+        screen_call!(self, render(frame, self.areas[Areas::Content], context))?;
 
         for modal in &mut self.modals {
             modal.render(frame, context)?;
