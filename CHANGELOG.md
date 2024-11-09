@@ -28,6 +28,8 @@ All notable changes to this project will be documented in this file.
 - Few typos in UI and internal messages
 - Click to select and rendering issues in SongInfo and Decoder modals
 - Read stream not being emptied after encountering error while reading MPD's response
+- Rows not wrapping in the keybinds modal when the screen is too small
+- Unchecked panic inside the volume widget when volume exceeds certain value
 
 ### Deprecated
 
