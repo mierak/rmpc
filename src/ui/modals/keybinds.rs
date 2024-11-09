@@ -125,8 +125,6 @@ impl Modal for KeybindsModal {
         action_area.width = action_area.width.saturating_sub(1); // account for the column spacing
         desc_area.width = desc_area.width.saturating_sub(2); // account for the column spacing
 
-        // log::debug!(key_area:?, action_area:?, desc_area:?, frame:? = popup_area, w = frame.area().width; "areas");
-
         let keybinds = &app.config.keybinds;
         let header_style = app.config.theme.current_item_style;
 
