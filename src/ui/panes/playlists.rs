@@ -22,7 +22,7 @@ use crate::{
     ui::{
         browser::{BrowserPane, MoveDirection},
         dirstack::{DirStack, DirStackItem},
-        modals::rename_playlist::RenamePlaylistModal,
+        modals::{confirm_playlist_delete::ConfirmPlaylistDeleteModal, rename_playlist::RenamePlaylistModal},
         widgets::browser::Browser,
         UiEvent,
     },
@@ -253,10 +253,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn delete(&self, item: &DirOrSong, index: usize, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
-                client.delete_playlist(d)?;
-                status_info!("Playlist '{d}' deleted");
-
-                context.render()?;
+                modal!(context, ConfirmPlaylistDeleteModal::new(d.clone(), context));
             }
             DirOrSong::Song(s) => {
                 let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {

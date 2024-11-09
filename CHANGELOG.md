@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Disabled album arts for songs over http(s). Can be brought back by changing `album_art.disabled_protocols`
 - Improves the usability and clarity of the queue deletion confirmation modal
 - `width_percent` config option in `song_table_format`. Replaced by `width`.
+- Deletion of a playlist now requires user confirmation
 
 ### Fixed
 
