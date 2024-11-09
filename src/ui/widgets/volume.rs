@@ -52,8 +52,8 @@ impl<'a> Volume<'a> {
 
 impl Volume<'_> {
     pub fn get_str(value: u8) -> String {
-        let i = value / 13;
-        format!("Volume: {:<7} {:>3}%", CHARS[0..i as usize].join(""), value)
+        let i = std::cmp::min((value / 13) as usize, CHARS.len());
+        format!("Volume: {:<7} {:>3}%", CHARS[0..i].join(""), value)
     }
 }
 
