@@ -207,7 +207,7 @@ mod tests {
         let mut screen = AlbumArtPane::new(&app_context);
 
         screen
-            .on_event(&mut UiEvent::Player, &mut client, &app_context)
+            .on_event(&mut UiEvent::SongChanged, &mut client, &app_context)
             .unwrap();
 
         assert_eq!(
