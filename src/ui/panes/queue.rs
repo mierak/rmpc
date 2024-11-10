@@ -99,7 +99,7 @@ impl Pane for QueuePane {
             .map(|song| {
                 let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
                 let columns = (0..formats.len()).map(|i| {
-                    song.as_line_ellipsized(formats[i].prop, widths[i].width.into())
+                    song.as_line_ellipsized(formats[i].prop, widths[i].width.into(), &config.theme.symbols)
                         .unwrap_or_default()
                         .alignment(formats[i].alignment.into())
                 });

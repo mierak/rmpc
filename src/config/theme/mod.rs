@@ -131,6 +131,7 @@ impl Default for UiConfigFile {
                 song: "S".to_owned(),
                 dir: "D".to_owned(),
                 marker: "M".to_owned(),
+                ellipsis: Some("...".to_owned()),
             },
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
@@ -157,6 +158,7 @@ pub struct SymbolsFile {
     pub(super) song: String,
     pub(super) dir: String,
     pub(super) marker: String,
+    pub(super) ellipsis: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -164,6 +166,7 @@ pub struct SymbolsConfig {
     pub song: &'static str,
     pub dir: &'static str,
     pub marker: &'static str,
+    pub ellipsis: &'static str,
 }
 
 impl From<SymbolsFile> for SymbolsConfig {
@@ -172,6 +175,7 @@ impl From<SymbolsFile> for SymbolsConfig {
             song: value.song.leak(),
             dir: value.dir.leak(),
             marker: value.marker.leak(),
+            ellipsis: value.ellipsis.unwrap_or_else(|| "...".to_string()).leak(),
         }
     }
 }
