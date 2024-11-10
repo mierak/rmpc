@@ -2,12 +2,13 @@ use std::{io::BufRead, io::BufReader, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use itertools::Itertools;
+use serde::Serialize;
 use walkdir::WalkDir;
 
 use crate::mpd::commands::Song;
 
 use super::{parse_length, Lrc};
-#[derive(Debug, Eq, PartialEq, Default)]
+#[derive(Debug, Eq, PartialEq, Default, Serialize)]
 pub struct LrcIndex {
     index: Vec<LrcIndexEntry>,
 }
@@ -56,7 +57,7 @@ impl LrcIndex {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Serialize)]
 pub struct LrcIndexEntry {
     pub path: PathBuf,
     /// ti

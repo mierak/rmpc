@@ -30,6 +30,8 @@ pub enum Command {
         #[arg(short, long, default_value = "false")]
         current: bool,
     },
+    /// Index the lyrics dir and display result, meant only for debugging purposes
+    LyricsIndex,
     /// Scan MPD's music directory for updates.
     Update {
         /// If supplied, MPD will update only the provided directory/file. If not specified, everything is updated.
