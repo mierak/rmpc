@@ -90,7 +90,7 @@ impl Pane for LyricsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::Player => match context.find_lrc() {
+            UiEvent::SongChanged => match context.find_lrc() {
                 Ok(lrc) => {
                     self.current_lyrics = lrc;
                     context.render()?;

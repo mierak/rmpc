@@ -524,6 +524,7 @@ impl<'ui> Ui<'ui> {
             UiEvent::ModalClosed => {}
             UiEvent::Exit => {}
             UiEvent::LyricsIndexed => {}
+            UiEvent::SongChanged => {}
         }
 
         for name in context.config.tabs.active_panes {
@@ -567,6 +568,7 @@ pub enum UiEvent {
     ModalClosed,
     Exit,
     LyricsIndexed,
+    SongChanged,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
