@@ -373,6 +373,7 @@ fn main_task<B: Backend + std::io::Write>(
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
+    let mut additional_evs = Vec::new();
     ui.before_show(&mut context, &mut client)
         .expect("Initial render init to succeed");
 
@@ -425,12 +426,16 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 }
                 AppEvent::IdleEvent(event) => {
-                    if let Err(err) = handle_idle_event(event, &mut context, &mut client, &mut render_loop) {
-                        status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
-                    }
-                    if let Ok(ev) = event.try_into() {
-                        if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
-                            status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
+                    match handle_idle_event(event, &mut context, &mut client, &mut render_loop, &mut additional_evs) {
+                        Ok(()) => {
+                            for ev in additional_evs.drain(..) {
+                                if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
+                                    status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
                     render_wanted = true;
@@ -521,6 +526,7 @@ fn handle_idle_event(
     context: &mut context::AppContext,
     client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
+    result_ui_evs: &mut Vec<UiEvent>,
 ) -> Result<()> {
     match event {
         IdleEvent::Mixer => {
@@ -568,6 +574,7 @@ fn handle_idle_event(
                         }
                     };
 
+                    result_ui_evs.push(UiEvent::SongChanged);
                     run_external(command, env);
                 };
             }
@@ -589,6 +596,10 @@ fn handle_idle_event(
             warn!(event:?; "Received unhandled event");
         }
     };
+
+    if let Ok(ev) = event.try_into() {
+        result_ui_evs.push(ev);
+    }
     Ok(())
 }
 

@@ -101,7 +101,7 @@ impl Pane for AlbumArtPane {
 
     fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::Player => {
+            UiEvent::SongChanged => {
                 self.album_art
                     .set_image(AlbumArtPane::fetch_album_art(client, context)?)?;
                 context.render()?;
@@ -207,7 +207,7 @@ mod tests {
         let mut screen = AlbumArtPane::new(&app_context);
 
         screen
-            .on_event(&mut UiEvent::Player, &mut client, &app_context)
+            .on_event(&mut UiEvent::SongChanged, &mut client, &app_context)
             .unwrap();
 
         assert_eq!(
