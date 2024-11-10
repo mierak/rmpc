@@ -7,7 +7,7 @@ use crate::{
         commands::{Song, Status},
         mpd_client::MpdClient,
     },
-    shared::macros::status_warn,
+    shared::{lrc::LrcIndex, macros::status_warn},
     AppEvent, WorkRequest,
 };
 use anyhow::Result;
@@ -20,6 +20,7 @@ pub struct AppContext {
     pub app_event_sender: Sender<AppEvent>,
     pub work_sender: Sender<WorkRequest>,
     pub needs_render: Cell<bool>,
+    pub lrc_index: LrcIndex,
 }
 
 impl AppContext {
@@ -43,6 +44,7 @@ impl AppContext {
         log::info!(config:? = config; "Resolved config");
 
         Ok(Self {
+            lrc_index: LrcIndex::default(),
             config: config.leak(),
             status,
             queue,

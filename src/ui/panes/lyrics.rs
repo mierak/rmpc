@@ -48,14 +48,22 @@ impl LyricsPane {
 
         path.pop();
         path.push(stem);
+        log::debug!(path:?; "getting lrc at path");
         match fs::read_to_string(&path) {
-            Ok(lrc) => Ok(Some(lrc.parse()?)),
+            Ok(lrc) => return Ok(Some(lrc.parse()?)),
             Err(err) if matches!(err.kind(), std::io::ErrorKind::NotFound) => {
-                log::trace!(path:?; "LRC file not found");
-                Ok(None)
+                log::trace!(path:?; "Lyrics not found");
             }
-            Err(err) => Err(err.into()),
+            Err(err) => {
+                log::error!(err:?; "Encountered error when searching for sidecar lyrics");
+            }
         }
+
+        if let Ok(Some(lrc)) = context.lrc_index.find_lrc_for_song(song) {
+            return Ok(Some(lrc));
+        };
+
+        Ok(None)
     }
 }
 
@@ -118,15 +126,26 @@ impl Pane for LyricsPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        if let UiEvent::Player = event {
-            match Self::find_lrc(context) {
+        match event {
+            UiEvent::Player => match Self::find_lrc(context) {
                 Ok(lrc) => {
                     self.current_lyrics = lrc;
+                    context.render()?;
                 }
                 Err(err) => {
                     status_error!("Failed to load lyrics file: '{err}'");
                 }
-            }
+            },
+            UiEvent::LyricsIndexed if self.current_lyrics.is_none() => match Self::find_lrc(context) {
+                Ok(lrc) => {
+                    self.current_lyrics = lrc;
+                    context.render()?;
+                }
+                Err(err) => {
+                    status_error!("Failed to load lyrics file: '{err}'");
+                }
+            },
+            _ => {}
         }
         Ok(())
     }

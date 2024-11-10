@@ -7,6 +7,7 @@ use crate::{
     config::{Config, ConfigFile, Leak},
     context::AppContext,
     mpd::commands::Status,
+    shared::lrc::LrcIndex,
 };
 
 pub mod mpd_client;
@@ -34,6 +35,7 @@ pub fn app_context() -> AppContext {
         work_sender: chan2.0,
         supported_commands: HashSet::new(),
         needs_render: Cell::new(false),
+        lrc_index: LrcIndex::default(),
     }
 }
 

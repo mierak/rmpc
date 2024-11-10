@@ -1,6 +1,8 @@
-use std::{collections::HashMap, str::FromStr, time::Duration};
+use std::{str::FromStr, time::Duration};
 
-use anyhow::{bail, Context};
+use anyhow::{bail, Context, Result};
+
+use super::parse_length;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct LrcLine {
@@ -11,7 +13,16 @@ pub struct LrcLine {
 #[derive(Debug, Eq, PartialEq)]
 pub struct Lrc {
     pub lines: Vec<LrcLine>,
-    pub metadata: HashMap<String, String>,
+    /// ti
+    pub title: Option<String>,
+    /// ar
+    pub artist: Option<String>,
+    /// al
+    pub album: Option<String>,
+    /// au
+    pub author: Option<String>,
+    /// length
+    pub length: Option<Duration>,
 }
 
 impl FromStr for Lrc {
@@ -19,13 +30,17 @@ impl FromStr for Lrc {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut offset: Option<i64> = None;
-        let mut ret = Self {
+        let mut result = Self {
             lines: Vec::new(),
-            metadata: HashMap::new(),
+            title: None,
+            artist: None,
+            album: None,
+            author: None,
+            length: None,
         };
 
         for s in s.lines() {
-            if s.is_empty() {
+            if s.is_empty() || s.starts_with('#') {
                 continue;
             }
 
@@ -56,7 +71,7 @@ impl FromStr for Lrc {
                         _ => milis,
                     };
 
-                    ret.lines.push(LrcLine {
+                    result.lines.push(LrcLine {
                         time: Duration::from_millis(milis),
                         content: line.to_owned(),
                     });
@@ -67,9 +82,12 @@ impl FromStr for Lrc {
                         .with_context(|| format!("Invalid metadata line: '{meta_or_time}'"))?;
                     match key.trim() {
                         "offset" => offset = Some(value.trim().parse()?),
-                        _ => {
-                            ret.metadata.insert(key.trim().to_string(), value.trim().to_string());
-                        }
+                        "ti" => result.title = Some(value.trim().to_owned()),
+                        "ar" => result.artist = Some(value.trim().to_owned()),
+                        "al" => result.album = Some(value.trim().to_owned()),
+                        "au" => result.author = Some(value.trim().to_owned()),
+                        "length" => result.length = Some(parse_length(value.trim())?),
+                        _ => {}
                     }
                 }
                 None => {
@@ -78,21 +96,23 @@ impl FromStr for Lrc {
             }
         }
 
-        Ok(ret)
+        Ok(result)
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use std::{collections::HashMap, time::Duration};
+    use std::time::Duration;
 
-    use crate::shared::lrc::{Lrc, LrcLine};
+    use crate::shared::lrc::{lyrics::LrcLine, Lrc};
 
     #[test]
     fn lrc() {
-        let input = r"[t1: asdf ]
-[t2:123]
+        let input = r"[ti: asdf ]
+[ar:123]
+[al:333]
+[au:444]
 [length: 2:23]
 [offset: +0]
 
@@ -106,6 +126,11 @@ mod tests {
         assert_eq!(
             result,
             Lrc {
+                title: Some("asdf".to_string()),
+                artist: Some("123".to_string()),
+                album: Some("333".to_string()),
+                author: Some("444".to_string()),
+                length: Some(Duration::from_secs(143)),
                 lines: vec![
                     LrcLine {
                         time: Duration::from_millis(1860),
@@ -124,10 +149,6 @@ mod tests {
                         content: "line with long time".to_string()
                     },
                 ],
-                metadata: [("t1", "asdf"), ("t2", "123"), ("length", "2:23")]
-                    .iter()
-                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                    .collect::<HashMap<_, _>>()
             }
         );
     }
@@ -146,6 +167,11 @@ mod tests {
         assert_eq!(
             result,
             Lrc {
+                title: None,
+                artist: None,
+                album: None,
+                author: None,
+                length: None,
                 lines: vec![
                     LrcLine {
                         time: Duration::from_millis(860),
@@ -156,7 +182,6 @@ mod tests {
                         content: "line2".to_string()
                     },
                 ],
-                metadata: HashMap::new()
             }
         );
     }
@@ -175,6 +200,11 @@ mod tests {
         assert_eq!(
             result,
             Lrc {
+                title: None,
+                artist: None,
+                album: None,
+                author: None,
+                length: None,
                 lines: vec![
                     LrcLine {
                         time: Duration::from_millis(2860),
@@ -185,7 +215,6 @@ mod tests {
                         content: "line2".to_string()
                     },
                 ],
-                metadata: HashMap::new()
             }
         );
     }
