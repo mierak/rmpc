@@ -1,6 +1,4 @@
-use std::{fs, path::PathBuf};
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
@@ -29,41 +27,6 @@ impl LyricsPane {
             current_lyrics: None,
             initialized: false,
         }
-    }
-
-    fn find_lrc(context: &AppContext) -> Result<Option<Lrc>> {
-        let Some((_, song)) = context.find_current_song_in_queue() else {
-            return Ok(None);
-        };
-
-        let Some(lyrics_dir) = context.config.lyrics_dir else {
-            return Ok(None);
-        };
-
-        let mut path: PathBuf = PathBuf::from(lyrics_dir);
-        path.push(&song.file);
-        let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy())) else {
-            bail!("No file stem for lyrics path: {path:?}");
-        };
-
-        path.pop();
-        path.push(stem);
-        log::debug!(path:?; "getting lrc at path");
-        match fs::read_to_string(&path) {
-            Ok(lrc) => return Ok(Some(lrc.parse()?)),
-            Err(err) if matches!(err.kind(), std::io::ErrorKind::NotFound) => {
-                log::trace!(path:?; "Lyrics not found");
-            }
-            Err(err) => {
-                log::error!(err:?; "Encountered error when searching for sidecar lyrics");
-            }
-        }
-
-        if let Ok(Some(lrc)) = context.lrc_index.find_lrc_for_song(song) {
-            return Ok(Some(lrc));
-        };
-
-        Ok(None)
     }
 }
 
@@ -111,7 +74,7 @@ impl Pane for LyricsPane {
 
     fn before_show(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            match Self::find_lrc(context) {
+            match context.find_lrc() {
                 Ok(lrc) => {
                     self.current_lyrics = lrc;
                 }
@@ -127,7 +90,7 @@ impl Pane for LyricsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::Player => match Self::find_lrc(context) {
+            UiEvent::Player => match context.find_lrc() {
                 Ok(lrc) => {
                     self.current_lyrics = lrc;
                     context.render()?;
@@ -136,7 +99,7 @@ impl Pane for LyricsPane {
                     status_error!("Failed to load lyrics file: '{err}'");
                 }
             },
-            UiEvent::LyricsIndexed if self.current_lyrics.is_none() => match Self::find_lrc(context) {
+            UiEvent::LyricsIndexed if self.current_lyrics.is_none() => match context.find_lrc() {
                 Ok(lrc) => {
                     self.current_lyrics = lrc;
                     context.render()?;

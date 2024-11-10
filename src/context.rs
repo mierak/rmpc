@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet, sync::mpsc::Sender};
+use std::{cell::Cell, collections::HashSet, path::PathBuf, sync::mpsc::Sender};
 
 use crate::{
     config::{Config, ImageMethod, Leak},
@@ -7,10 +7,13 @@ use crate::{
         commands::{Song, Status},
         mpd_client::MpdClient,
     },
-    shared::{lrc::LrcIndex, macros::status_warn},
+    shared::{
+        lrc::{Lrc, LrcIndex},
+        macros::status_warn,
+    },
     AppEvent, WorkRequest,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 pub struct AppContext {
     pub config: &'static Config,
@@ -82,5 +85,40 @@ impl AppContext {
         } else {
             Ok(client.get_current_song()?)
         }
+    }
+
+    pub fn find_lrc(&self) -> Result<Option<Lrc>> {
+        let Some((_, song)) = self.find_current_song_in_queue() else {
+            return Ok(None);
+        };
+
+        let Some(lyrics_dir) = self.config.lyrics_dir else {
+            return Ok(None);
+        };
+
+        let mut path: PathBuf = PathBuf::from(lyrics_dir);
+        path.push(&song.file);
+        let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy())) else {
+            bail!("No file stem for lyrics path: {path:?}");
+        };
+
+        path.pop();
+        path.push(stem);
+        log::debug!(path:?; "getting lrc at path");
+        match std::fs::read_to_string(&path) {
+            Ok(lrc) => return Ok(Some(lrc.parse()?)),
+            Err(err) if matches!(err.kind(), std::io::ErrorKind::NotFound) => {
+                log::trace!(path:?; "Lyrics not found");
+            }
+            Err(err) => {
+                log::error!(err:?; "Encountered error when searching for sidecar lyrics");
+            }
+        }
+
+        if let Ok(Some(lrc)) = self.lrc_index.find_lrc_for_song(song) {
+            return Ok(Some(lrc));
+        };
+
+        Ok(None)
     }
 }
