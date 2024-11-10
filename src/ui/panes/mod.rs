@@ -8,6 +8,7 @@ use directories::DirectoriesPane;
 use either::Either;
 #[cfg(debug_assertions)]
 use logs::LogsPane;
+use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
 use queue::QueuePane;
 use ratatui::{
@@ -41,6 +42,7 @@ pub mod artists;
 pub mod directories;
 #[cfg(debug_assertions)]
 pub mod logs;
+pub mod lyrics;
 pub mod playlists;
 pub mod queue;
 pub mod search;
@@ -57,6 +59,7 @@ pub enum Panes<'a> {
     Playlists(&'a mut PlaylistsPane),
     Search(&'a mut SearchPane),
     AlbumArt(&'a mut AlbumArtPane),
+    Lyrics(&'a mut LyricsPane),
 }
 
 #[derive(Debug)]
@@ -71,6 +74,7 @@ pub struct PaneContainer {
     pub playlists: PlaylistsPane,
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
+    pub lyrics: LyricsPane,
 }
 
 impl PaneContainer {
@@ -86,6 +90,7 @@ impl PaneContainer {
             playlists: PlaylistsPane::new(context),
             search: SearchPane::new(context),
             album_art: AlbumArtPane::new(context),
+            lyrics: LyricsPane::new(context),
         }
     }
 
@@ -101,6 +106,7 @@ impl PaneContainer {
             PaneType::Playlists => Panes::Playlists(&mut self.playlists),
             PaneType::Search => Panes::Search(&mut self.search),
             PaneType::AlbumArt => Panes::AlbumArt(&mut self.album_art),
+            PaneType::Lyrics => Panes::Lyrics(&mut self.lyrics),
         }
     }
 }

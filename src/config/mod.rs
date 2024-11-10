@@ -79,6 +79,7 @@ pub struct Config {
     pub address: MpdAddress<'static>,
     pub password: Option<MpdPassword<'static>>,
     pub cache_dir: Option<&'static str>,
+    pub lyrics_dir: Option<&'static str>,
     pub volume_step: u8,
     pub scrolloff: usize,
     pub wrap_navigation: bool,
@@ -101,6 +102,8 @@ pub struct ConfigFile {
     password: Option<String>,
     #[serde(default)]
     cache_dir: Option<String>,
+    #[serde(default)]
+    lyrics_dir: Option<String>,
     #[serde(default)]
     pub theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
@@ -158,6 +161,7 @@ impl Default for ConfigFile {
             status_update_interval_ms: Some(1000),
             theme: None,
             cache_dir: None,
+            lyrics_dir: None,
             image_method: None,
             select_current_song_on_change: false,
             album_art_max_size_px: Size::default(),
@@ -222,12 +226,17 @@ impl ConfigFile {
         let (address, password) = MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let mut config = Config {
             theme,
-            cache_dir: self.cache_dir.map(|v| -> &'static str {
+            cache_dir: self
+                .cache_dir
+                .map(|v| if v.ends_with('/') { v } else { format!("{v}/") }.leak() as &'static _),
+            lyrics_dir: self.lyrics_dir.map(|v| {
+                let v = tilde_expand(&v);
                 if v.ends_with('/') {
-                    v.leak()
+                    v.into_owned()
                 } else {
-                    format!("{v}/").leak()
+                    format!("{v}/")
                 }
+                .leak() as &'static _
             }),
             address,
             password,

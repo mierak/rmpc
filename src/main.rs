@@ -16,6 +16,7 @@
 use std::{
     io::{Read, Write},
     ops::Sub,
+    path::PathBuf,
     sync::mpsc::TryRecvError,
     time::Duration,
 };
@@ -33,7 +34,10 @@ use log::{error, info, trace, warn};
 use mpd::{client::Client, commands::idle::IdleEvent};
 use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
-use shared::dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP};
+use shared::{
+    dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
+    lrc::LrcIndex,
+};
 use shared::{
     env::ENV,
     ext::{duration::DurationExt, error::ErrorExt},
@@ -67,11 +71,13 @@ mod ui;
 #[derive(Debug)]
 pub enum WorkRequest {
     DownloadYoutube { url: String },
+    IndexLyrics { lyrics_dir: &'static str },
 }
 
 #[derive(Debug)]
 pub enum WorkDone {
     YoutubeDowloaded { file_path: String },
+    LyricsIndexed { index: LrcIndex },
 }
 
 #[derive(Debug)]
@@ -198,6 +204,7 @@ fn main() -> Result<()> {
                             log::error!(path = file_path.as_str(), err = err.to_string().as_str(); "Failed to add already downloaded youtube video to queue");
                         }
                     },
+                    Ok(WorkDone::LyricsIndexed { .. }) => {}, // lrc indexing does not make sense in cli mode
                     Err(err) => {
                         log::error!(err = err.to_string().as_str(); "Failed to handle work request");
                     }
@@ -230,6 +237,12 @@ fn main() -> Result<()> {
                 }
             };
 
+            if let Some(lyrics_dir) = config.lyrics_dir {
+                try_ret!(
+                    worker_tx.send(WorkRequest::IndexLyrics { lyrics_dir }),
+                    "Failed to request lyrics indexing"
+                );
+            }
             try_ret!(tx.send(AppEvent::RequestRender(false)), "Failed to render first frame");
 
             let mut client = try_ret!(
@@ -312,6 +325,12 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
             let file_path = ytdlp.download(&url)?;
 
             Ok(WorkDone::YoutubeDowloaded { file_path })
+        }
+        WorkRequest::IndexLyrics { lyrics_dir } => {
+            let start = std::time::Instant::now();
+            let index = LrcIndex::index(&PathBuf::from(lyrics_dir))?;
+            log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
+            Ok(WorkDone::LyricsIndexed { index })
         }
     }
 }
@@ -439,6 +458,12 @@ fn main_task<B: Backend + std::io::Write>(
                                 status_error!(err:?; "Failed to add '{file_path}' to the queue");
                             }
                         };
+                    }
+                    WorkDone::LyricsIndexed { index } => {
+                        context.lrc_index = index;
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context, &mut client) {
+                            error!(error:? = err; "UI failed to resize event");
+                        }
                     }
                 },
                 AppEvent::WorkDone(Err(err)) => {

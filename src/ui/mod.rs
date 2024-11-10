@@ -523,6 +523,7 @@ impl<'ui> Ui<'ui> {
             UiEvent::ModalOpened => {}
             UiEvent::ModalClosed => {}
             UiEvent::Exit => {}
+            UiEvent::LyricsIndexed => {}
         }
 
         for name in context.config.tabs.active_panes {
@@ -537,6 +538,7 @@ impl<'ui> Ui<'ui> {
                 Panes::Search(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArtists(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArt(p) => p.on_event(&mut event, client, context),
+                Panes::Lyrics(p) => p.on_event(&mut event, client, context),
             }?;
         }
 
@@ -564,6 +566,7 @@ pub enum UiEvent {
     ModalOpened,
     ModalClosed,
     Exit,
+    LyricsIndexed,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
