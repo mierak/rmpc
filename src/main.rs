@@ -327,8 +327,9 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
             Ok(WorkDone::YoutubeDowloaded { file_path })
         }
         WorkRequest::IndexLyrics { lyrics_dir } => {
+            let start = std::time::Instant::now();
             let index = LrcIndex::index(&PathBuf::from(lyrics_dir))?;
-            log::info!(found_count = index.len(); "Indexed lrc files");
+            log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
             Ok(WorkDone::LyricsIndexed { index })
         }
     }
