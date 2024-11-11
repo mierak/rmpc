@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - List available decoder plugins from MPD via `ShowDecoders` action or `rmpc decoders`
 - Ability to add and instantly play song under cursor. Bound to `Confirm` action
 - A new `Lyrics` pane used to display synchronized lyrics.
+- Missing default keybind for the Album Artists tab
 
 ### Changed
 
@@ -22,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Improves the usability and clarity of the queue deletion confirmation modal
 - `width_percent` config option in `song_table_format`. Replaced by `width`.
 - Deletion of a playlist now requires user confirmation
+- Default keybinds for tabs to make space for the Album Artists tab
 
 ### Fixed
 

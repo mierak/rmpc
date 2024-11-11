@@ -93,9 +93,10 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('1'), modifiers: M::NONE  }, G::SwitchToTab("Queue".to_string())),
                 (Key { key: K::Char('2'), modifiers: M::NONE  }, G::SwitchToTab("Directories".to_string())),
                 (Key { key: K::Char('3'), modifiers: M::NONE  }, G::SwitchToTab("Artists".to_string())),
-                (Key { key: K::Char('4'), modifiers: M::NONE  }, G::SwitchToTab("Albums".to_string())),
-                (Key { key: K::Char('5'), modifiers: M::NONE  }, G::SwitchToTab("Playlists".to_string())),
-                (Key { key: K::Char('6'), modifiers: M::NONE  }, G::SwitchToTab("Search".to_string())),
+                (Key { key: K::Char('4'), modifiers: M::NONE  }, G::SwitchToTab("Album Artists".to_string())),
+                (Key { key: K::Char('5'), modifiers: M::NONE  }, G::SwitchToTab("Albums".to_string())),
+                (Key { key: K::Char('6'), modifiers: M::NONE  }, G::SwitchToTab("Playlists".to_string())),
+                (Key { key: K::Char('7'), modifiers: M::NONE  }, G::SwitchToTab("Search".to_string())),
             ]),
             navigation: HashMap::from([
                 (Key { key: K::Char('k'), modifiers: M::NONE    }, C::Up),
