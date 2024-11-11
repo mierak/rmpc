@@ -94,12 +94,21 @@ impl Pane for QueuePane {
         let widths = Layout::horizontal(&self.column_widths).split(table_header_section);
         let formats = &config.theme.song_table_format;
 
+        let table_padding = Padding::new(1, 2, 0, 0);
+        let table_padding_leftright = (table_padding.left as usize) + (table_padding.right as usize);
+
+        let ellipsis_len = config.theme.symbols.ellipsis.chars().count();
         let table_items = queue
             .iter()
             .map(|song| {
                 let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
                 let columns = (0..formats.len()).map(|i| {
-                    song.as_line_ellipsized(formats[i].prop, widths[i].width.into(), &config.theme.symbols)
+                    let mut max_len: usize = widths[i].width.into();
+                    if max_len > i + table_padding_leftright + ellipsis_len {
+                        max_len -= i + table_padding_leftright;
+                    }
+
+                    song.as_line_ellipsized(formats[i].prop, max_len, &config.theme.symbols)
                         .unwrap_or_default()
                         .alignment(formats[i].alignment.into())
                 });
@@ -119,8 +128,6 @@ impl Pane for QueuePane {
             })
             .collect_vec();
 
-        let mut table_padding = Padding::right(2);
-        table_padding.left = 1;
         if config.theme.show_song_table_header {
             let header_table = Table::default()
                 .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
