@@ -693,7 +693,9 @@ impl StringExt for Cow<'_, str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}{}",
-                self.chars().take(max_len.saturating_sub(4)).collect::<String>(),
+                self.chars()
+                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
+                    .collect::<String>(),
                 symbols.ellipsis,
             ))
         } else {
@@ -707,7 +709,9 @@ impl StringExt for &str {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}{}",
-                self.chars().take(max_len.saturating_sub(4)).collect::<String>(),
+                self.chars()
+                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
+                    .collect::<String>(),
                 symbols.ellipsis,
             ))
         } else {
@@ -721,7 +725,9 @@ impl StringExt for String {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}{}",
-                self.chars().take(max_len.saturating_sub(4)).collect::<String>(),
+                self.chars()
+                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
+                    .collect::<String>(),
                 symbols.ellipsis,
             ))
         } else {
