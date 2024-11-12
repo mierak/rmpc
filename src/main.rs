@@ -542,7 +542,7 @@ fn handle_idle_event(
         }
         IdleEvent::Options => context.status = try_ret!(client.get_status(), "Failed to get status"),
         IdleEvent::Player => {
-            let current_song_id = context.status.song;
+            let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
 
             context.status = try_ret!(client.get_status(), "Failed get status");
 
@@ -559,7 +559,11 @@ fn handle_idle_event(
                 }
             }
 
-            if context.status.song.is_some_and(|id| Some(id) != current_song_id) {
+            if context
+                .find_current_song_in_queue()
+                .map(|(_, song)| song.id)
+                .is_some_and(|id| Some(id) != current_song_id)
+            {
                 if let Some(command) = context.config.on_song_change {
                     let env = match context.get_current_song(client) {
                         Ok(Some(song)) => song
@@ -585,9 +589,10 @@ fn handle_idle_event(
                         }
                     };
 
-                    result_ui_evs.insert(UiEvent::SongChanged);
                     run_external(command, env);
                 };
+
+                result_ui_evs.insert(UiEvent::SongChanged);
             }
         }
         IdleEvent::Playlist => {

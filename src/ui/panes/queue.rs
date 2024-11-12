@@ -77,9 +77,7 @@ impl QueuePane {
 
 impl Pane for QueuePane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
-        let AppContext {
-            queue, config, status, ..
-        } = context;
+        let AppContext { queue, config, .. } = context;
         let queue_len = queue.len();
 
         let header_height = u16::from(config.theme.show_song_table_header);
@@ -97,7 +95,11 @@ impl Pane for QueuePane {
         let table_items = queue
             .iter()
             .map(|song| {
-                let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
+                let is_current = context
+                    .find_current_song_in_queue()
+                    .map(|(_, song)| song.id)
+                    .is_some_and(|v| v == song.id);
+
                 let columns = (0..formats.len()).map(|i| {
                     song.as_line_ellipsized(formats[i].prop, widths[i].width.into())
                         .unwrap_or_default()
