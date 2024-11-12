@@ -41,7 +41,7 @@ impl AlbumArtPane {
             return Ok(None);
         };
 
-        let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) else {
+        let Some((_, current_song)) = context.find_current_song_in_queue() else {
             return Ok(None);
         };
 
@@ -139,6 +139,7 @@ mod tests {
     use crate::config::Config;
     use crate::config::Leak;
     use crate::mpd::commands::Song;
+    use crate::mpd::commands::State;
     use crate::tests::fixtures::app_context;
     use crate::tests::fixtures::mpd_client::client;
     use crate::tests::fixtures::mpd_client::TestMpdClient;
@@ -171,6 +172,7 @@ mod tests {
             ..Default::default()
         });
         app_context.status.songid = Some(selected_song_id);
+        app_context.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&app_context);
 
         screen.before_show(&mut client, &app_context).unwrap();
@@ -204,6 +206,7 @@ mod tests {
             ..Default::default()
         });
         app_context.status.songid = Some(selected_song_id);
+        app_context.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&app_context);
 
         screen

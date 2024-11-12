@@ -4,7 +4,7 @@ use crate::{
     config::{Config, ImageMethod, Leak},
     mpd::{
         client::Client,
-        commands::{Song, Status},
+        commands::{Song, State, Status},
         mpd_client::MpdClient,
     },
     shared::{
@@ -72,6 +72,10 @@ impl AppContext {
     }
 
     pub fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
+        if self.status.state == State::Stop {
+            return None;
+        }
+
         self.status
             .songid
             .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))

@@ -14,6 +14,7 @@
     unused_macros
 )]
 use std::{
+    collections::HashSet,
     io::{Read, Write},
     ops::Sub,
     path::PathBuf,
@@ -31,7 +32,10 @@ use config::{
 use crossterm::event::{Event, KeyEvent};
 use itertools::Itertools;
 use log::{error, info, trace, warn};
-use mpd::{client::Client, commands::idle::IdleEvent};
+use mpd::{
+    client::Client,
+    commands::{idle::IdleEvent, State},
+};
 use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
 use shared::{
@@ -373,7 +377,7 @@ fn main_task<B: Backend + std::io::Write>(
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
-    let mut additional_evs = Vec::new();
+    let mut additional_evs = HashSet::new();
     ui.before_show(&mut context, &mut client)
         .expect("Initial render init to succeed");
 
@@ -428,7 +432,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::IdleEvent(event) => {
                     match handle_idle_event(event, &mut context, &mut client, &mut render_loop, &mut additional_evs) {
                         Ok(()) => {
-                            for ev in additional_evs.drain(..) {
+                            for ev in additional_evs.drain() {
                                 if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
                                     status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                                 }
@@ -526,7 +530,7 @@ fn handle_idle_event(
     context: &mut context::AppContext,
     client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
-    result_ui_evs: &mut Vec<UiEvent>,
+    result_ui_evs: &mut HashSet<UiEvent>,
 ) -> Result<()> {
     match event {
         IdleEvent::Mixer => {
@@ -538,17 +542,28 @@ fn handle_idle_event(
         }
         IdleEvent::Options => context.status = try_ret!(client.get_status(), "Failed to get status"),
         IdleEvent::Player => {
-            let current_song_id = context.status.song;
+            let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
 
             context.status = try_ret!(client.get_status(), "Failed get status");
 
-            if context.status.state == mpd::commands::status::State::Play {
-                try_skip!(render_loop.start(), "Failed to start render loop");
-            } else {
-                try_skip!(render_loop.stop(), "Failed to stop render loop");
+            match context.status.state {
+                State::Play => {
+                    try_skip!(render_loop.start(), "Failed to start render loop");
+                }
+                State::Pause => {
+                    try_skip!(render_loop.stop(), "Failed to stop render loop");
+                }
+                State::Stop => {
+                    result_ui_evs.insert(UiEvent::SongChanged);
+                    try_skip!(render_loop.stop(), "Failed to stop render loop");
+                }
             }
 
-            if context.status.song.is_some_and(|id| Some(id) != current_song_id) {
+            if context
+                .find_current_song_in_queue()
+                .map(|(_, song)| song.id)
+                .is_some_and(|id| Some(id) != current_song_id)
+            {
                 if let Some(command) = context.config.on_song_change {
                     let env = match context.get_current_song(client) {
                         Ok(Some(song)) => song
@@ -574,9 +589,10 @@ fn handle_idle_event(
                         }
                     };
 
-                    result_ui_evs.push(UiEvent::SongChanged);
                     run_external(command, env);
                 };
+
+                result_ui_evs.insert(UiEvent::SongChanged);
             }
         }
         IdleEvent::Playlist => {
@@ -598,7 +614,7 @@ fn handle_idle_event(
     };
 
     if let Ok(ev) = event.try_into() {
-        result_ui_evs.push(ev);
+        result_ui_evs.insert(ev);
     }
     Ok(())
 }
