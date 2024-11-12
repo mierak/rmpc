@@ -4,7 +4,7 @@ use crate::{
     config::{Config, ImageMethod, Leak},
     mpd::{
         client::Client,
-        commands::{Song, Status},
+        commands::{Song, State, Status},
         mpd_client::MpdClient,
     },
     shared::{
@@ -33,9 +33,14 @@ impl AppContext {
         app_event_sender: Sender<AppEvent>,
         work_sender: Sender<WorkRequest>,
     ) -> Result<Self> {
-        let status = client.get_status()?;
+        let mut status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
         let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
+
+        if status.state == State::Stop {
+            status.song = None;
+            status.songid = None;
+        }
 
         log::info!(supported_commands:? = supported_commands; "Supported commands by server");
 

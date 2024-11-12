@@ -42,7 +42,7 @@ use crate::{
     },
     shared::{
         key_event::KeyEvent,
-        macros::{modal, status_error, status_info, status_warn, try_ret},
+        macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
 };
@@ -384,7 +384,7 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::NextTrack if context.status.state == State::Play => client.next()?,
                 GlobalAction::PreviousTrack if context.status.state == State::Play => client.prev()?,
-                GlobalAction::Stop if context.status.state == State::Play => client.stop()?,
+                GlobalAction::Stop if matches!(context.status.state, State::Play | State::Pause) => client.stop()?,
                 GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
                 GlobalAction::ToggleRandom => client.random(!context.status.random)?,
                 GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
@@ -462,7 +462,7 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
-        self.current_song = try_ret!(client.get_current_song(), "Failed to get current song");
+        self.current_song = context.find_current_song_in_queue().map(|(_, song)| song).cloned();
         screen_call!(self, before_show(client, &context))
     }
 
@@ -503,7 +503,7 @@ impl<'ui> Ui<'ui> {
     ) -> Result<()> {
         match event {
             UiEvent::Player => {
-                self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
+                self.current_song = context.find_current_song_in_queue().map(|(_, song)| song).cloned();
             }
             UiEvent::Database => {
                 status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
@@ -556,7 +556,7 @@ pub enum UiAppEvent {
     PopModal,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum UiEvent {
     Player,

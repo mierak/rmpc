@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Ability to add and instantly play song under cursor. Bound to `Confirm` action
 - A new `Lyrics` pane used to display synchronized lyrics.
 - Missing default keybind for the Album Artists tab
+- Allow stop action to work in paused state
 
 ### Changed
 
@@ -25,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Deletion of a playlist now requires user confirmation
 - Default keybinds for tabs to make space for the Album Artists tab
 - Swapped default single and consume keybinds
+- Clear album art and song in the header when the playback stops
 
 ### Fixed
 
