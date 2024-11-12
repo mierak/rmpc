@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - `width_percent` config option in `song_table_format`. Replaced by `width`.
 - Deletion of a playlist now requires user confirmation
 - Default keybinds for tabs to make space for the Album Artists tab
+- Swapped default single and consume keybinds
 
 ### Fixed
 
