@@ -39,6 +39,7 @@ enum PaneTypeFile {
     Playlists,
     Search,
     AlbumArt,
+    Lyrics,
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
@@ -53,11 +54,12 @@ pub enum PaneType {
     Playlists,
     Search,
     AlbumArt,
+    Lyrics,
 }
 
 impl PaneTypeFile {
     pub fn is_focusable(self) -> bool {
-        !matches!(self, PaneTypeFile::AlbumArt)
+        !matches!(self, PaneTypeFile::AlbumArt | PaneTypeFile::Lyrics)
     }
 }
 
@@ -74,6 +76,7 @@ impl From<&PaneTypeFile> for PaneType {
             PaneTypeFile::Playlists => PaneType::Playlists,
             PaneTypeFile::Search => PaneType::Search,
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
+            PaneTypeFile::Lyrics => PaneType::Lyrics,
         }
     }
 }

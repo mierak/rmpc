@@ -78,9 +78,7 @@ impl QueuePane {
 
 impl Pane for QueuePane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
-        let AppContext {
-            queue, config, status, ..
-        } = context;
+        let AppContext { queue, config, .. } = context;
         let queue_len = queue.len();
 
         let title = self
@@ -131,7 +129,11 @@ impl Pane for QueuePane {
         let table_items = queue
             .iter()
             .map(|song| {
-                let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
+                let is_current = context
+                    .find_current_song_in_queue()
+                    .map(|(_, song)| song.id)
+                    .is_some_and(|v| v == song.id);
+
                 let columns = (0..formats.len()).map(|i| {
                     let max_len: usize = widths[i].width.into();
 
@@ -204,18 +206,12 @@ impl Pane for QueuePane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        if let UiEvent::Player = event {
-            if let Some((idx, _)) = context
-                .queue
-                .iter()
-                .enumerate()
-                .find(|(_, v)| Some(v.id) == context.status.songid)
-            {
+        if let UiEvent::SongChanged = event {
+            if let Some((idx, _)) = context.find_current_song_in_queue() {
                 if context.config.select_current_song_on_change {
                     self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                    context.render()?;
                 }
-
-                context.render()?;
             }
         };
 

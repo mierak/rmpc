@@ -1,6 +1,6 @@
 use anyhow::Result;
 use itertools::Itertools;
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 
 use crate::{
     config::{cli::Command, Config},
@@ -9,7 +9,7 @@ use crate::{
         commands::{volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::macros::status_error,
+    shared::{lrc::LrcIndex, macros::status_error},
     WorkRequest,
 };
 use anyhow::bail;
@@ -18,7 +18,7 @@ impl Command {
     pub fn execute<F, C>(
         self,
         client: &mut C,
-        _config: &'static Config,
+        config: &'static Config,
         mut request_work: F,
     ) -> Result<(), anyhow::Error>
     where
@@ -44,6 +44,15 @@ impl Command {
                         }
                     }
                 }
+            }
+            Command::LyricsIndex => {
+                let Some(dir) = config.lyrics_dir else {
+                    bail!("Lyrics dir is not configured");
+                };
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&LrcIndex::index(&PathBuf::from(dir))?)?
+                );
             }
             Command::Play { position: None } => client.play()?,
             Command::Play { position: Some(pos) } => client.play_pos(pos)?,

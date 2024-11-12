@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - List available decoder plugins from MPD via `ShowDecoders` action or `rmpc decoders`
 - Ability to add and instantly play song under cursor. Bound to `Confirm` action
 - Theme: add `symbols.ellipsis` to customize the ellipsis when text need to be truncated
+- A new `Lyrics` pane used to display synchronized lyrics.
+- Missing default keybind for the Album Artists tab
+- Allow stop action to work in paused state
 
 ### Changed
 
@@ -22,6 +25,9 @@ All notable changes to this project will be documented in this file.
 - Improves the usability and clarity of the queue deletion confirmation modal
 - `width_percent` config option in `song_table_format`. Replaced by `width`.
 - Deletion of a playlist now requires user confirmation
+- Default keybinds for tabs to make space for the Album Artists tab
+- Swapped default single and consume keybinds
+- Clear album art and song in the header when the playback stops
 
 ### Fixed
 
@@ -32,6 +38,7 @@ All notable changes to this project will be documented in this file.
 - Read stream not being emptied after encountering error while reading MPD's response
 - Rows not wrapping in the keybinds modal when the screen is too small
 - Unchecked panic inside the volume widget when volume exceeds certain value
+- Several things that should have happened on song change were happening on every `Player` event, ie. seeking
 
 ### Deprecated
 

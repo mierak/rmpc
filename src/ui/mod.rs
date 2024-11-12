@@ -37,12 +37,12 @@ use crate::{
     },
     mpd::{
         client::Client,
-        commands::{idle::IdleEvent, volume::Bound, Song, State},
+        commands::{idle::IdleEvent, volume::Bound, State},
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     shared::{
         key_event::KeyEvent,
-        macros::{modal, status_error, status_info, status_warn, try_ret},
+        macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
 };
@@ -81,7 +81,6 @@ pub struct Ui<'ui> {
     modals: Vec<Box<dyn Modal>>,
     status_message: Option<StatusMessage>,
     rendered_frames_count: u32,
-    current_song: Option<Song>,
     command: Option<String>,
     active_tab: TabName,
     tabs: HashMap<TabName, TabScreen>,
@@ -114,7 +113,6 @@ impl<'ui> Ui<'ui> {
             tab_bar: AppTabs::new(active_tab, context.config),
             status_message: None,
             rendered_frames_count: 0,
-            current_song: None,
             modals: Vec::default(),
             command: None,
             active_tab,
@@ -180,7 +178,7 @@ impl<'ui> Ui<'ui> {
             self.status_message = None;
         }
 
-        let header = Header::new(context.config, &context.status, self.current_song.as_ref());
+        let header = Header::new(context);
         frame.render_widget(header, self.areas[Areas::Header]);
 
         if self.areas[Areas::Tabs].height > 0 {
@@ -384,7 +382,7 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::NextTrack if context.status.state == State::Play => client.next()?,
                 GlobalAction::PreviousTrack if context.status.state == State::Play => client.prev()?,
-                GlobalAction::Stop if context.status.state == State::Play => client.stop()?,
+                GlobalAction::Stop if matches!(context.status.state, State::Play | State::Pause) => client.stop()?,
                 GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
                 GlobalAction::ToggleRandom => client.random(!context.status.random)?,
                 GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
@@ -462,7 +460,6 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
-        self.current_song = try_ret!(client.get_current_song(), "Failed to get current song");
         screen_call!(self, before_show(client, &context))
     }
 
@@ -502,9 +499,7 @@ impl<'ui> Ui<'ui> {
         client: &mut impl MpdClient,
     ) -> Result<()> {
         match event {
-            UiEvent::Player => {
-                self.current_song = try_ret!(client.get_current_song(), "Failed get current song");
-            }
+            UiEvent::Player => {}
             UiEvent::Database => {
                 status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
             }
@@ -523,6 +518,8 @@ impl<'ui> Ui<'ui> {
             UiEvent::ModalOpened => {}
             UiEvent::ModalClosed => {}
             UiEvent::Exit => {}
+            UiEvent::LyricsIndexed => {}
+            UiEvent::SongChanged => {}
         }
 
         for name in context.config.tabs.active_panes {
@@ -537,6 +534,7 @@ impl<'ui> Ui<'ui> {
                 Panes::Search(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArtists(p) => p.on_event(&mut event, client, context),
                 Panes::AlbumArt(p) => p.on_event(&mut event, client, context),
+                Panes::Lyrics(p) => p.on_event(&mut event, client, context),
             }?;
         }
 
@@ -553,7 +551,7 @@ pub enum UiAppEvent {
     PopModal,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum UiEvent {
     Player,
@@ -564,6 +562,8 @@ pub enum UiEvent {
     ModalOpened,
     ModalClosed,
     Exit,
+    LyricsIndexed,
+    SongChanged,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {

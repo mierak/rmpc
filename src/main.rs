@@ -14,8 +14,10 @@
     unused_macros
 )]
 use std::{
+    collections::HashSet,
     io::{Read, Write},
     ops::Sub,
+    path::PathBuf,
     sync::mpsc::TryRecvError,
     time::Duration,
 };
@@ -30,10 +32,16 @@ use config::{
 use crossterm::event::{Event, KeyEvent};
 use itertools::Itertools;
 use log::{error, info, trace, warn};
-use mpd::{client::Client, commands::idle::IdleEvent};
+use mpd::{
+    client::Client,
+    commands::{idle::IdleEvent, State},
+};
 use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
-use shared::dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP};
+use shared::{
+    dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
+    lrc::LrcIndex,
+};
 use shared::{
     env::ENV,
     ext::{duration::DurationExt, error::ErrorExt},
@@ -67,11 +75,13 @@ mod ui;
 #[derive(Debug)]
 pub enum WorkRequest {
     DownloadYoutube { url: String },
+    IndexLyrics { lyrics_dir: &'static str },
 }
 
 #[derive(Debug)]
 pub enum WorkDone {
     YoutubeDowloaded { file_path: String },
+    LyricsIndexed { index: LrcIndex },
 }
 
 #[derive(Debug)]
@@ -198,6 +208,7 @@ fn main() -> Result<()> {
                             log::error!(path = file_path.as_str(), err = err.to_string().as_str(); "Failed to add already downloaded youtube video to queue");
                         }
                     },
+                    Ok(WorkDone::LyricsIndexed { .. }) => {}, // lrc indexing does not make sense in cli mode
                     Err(err) => {
                         log::error!(err = err.to_string().as_str(); "Failed to handle work request");
                     }
@@ -230,6 +241,12 @@ fn main() -> Result<()> {
                 }
             };
 
+            if let Some(lyrics_dir) = config.lyrics_dir {
+                try_ret!(
+                    worker_tx.send(WorkRequest::IndexLyrics { lyrics_dir }),
+                    "Failed to request lyrics indexing"
+                );
+            }
             try_ret!(tx.send(AppEvent::RequestRender(false)), "Failed to render first frame");
 
             let mut client = try_ret!(
@@ -313,6 +330,12 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
 
             Ok(WorkDone::YoutubeDowloaded { file_path })
         }
+        WorkRequest::IndexLyrics { lyrics_dir } => {
+            let start = std::time::Instant::now();
+            let index = LrcIndex::index(&PathBuf::from(lyrics_dir))?;
+            log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
+            Ok(WorkDone::LyricsIndexed { index })
+        }
     }
 }
 
@@ -354,6 +377,7 @@ fn main_task<B: Backend + std::io::Write>(
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
+    let mut additional_evs = HashSet::new();
     ui.before_show(&mut context, &mut client)
         .expect("Initial render init to succeed");
 
@@ -406,12 +430,16 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 }
                 AppEvent::IdleEvent(event) => {
-                    if let Err(err) = handle_idle_event(event, &mut context, &mut client, &mut render_loop) {
-                        status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
-                    }
-                    if let Ok(ev) = event.try_into() {
-                        if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
-                            status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
+                    match handle_idle_event(event, &mut context, &mut client, &mut render_loop, &mut additional_evs) {
+                        Ok(()) => {
+                            for ev in additional_evs.drain() {
+                                if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
+                                    status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
                     render_wanted = true;
@@ -439,6 +467,12 @@ fn main_task<B: Backend + std::io::Write>(
                                 status_error!(err:?; "Failed to add '{file_path}' to the queue");
                             }
                         };
+                    }
+                    WorkDone::LyricsIndexed { index } => {
+                        context.lrc_index = index;
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context, &mut client) {
+                            error!(error:? = err; "UI failed to resize event");
+                        }
                     }
                 },
                 AppEvent::WorkDone(Err(err)) => {
@@ -496,6 +530,7 @@ fn handle_idle_event(
     context: &mut context::AppContext,
     client: &mut Client<'_>,
     render_loop: &mut RenderLoop,
+    result_ui_evs: &mut HashSet<UiEvent>,
 ) -> Result<()> {
     match event {
         IdleEvent::Mixer => {
@@ -507,17 +542,28 @@ fn handle_idle_event(
         }
         IdleEvent::Options => context.status = try_ret!(client.get_status(), "Failed to get status"),
         IdleEvent::Player => {
-            let current_song_id = context.status.song;
+            let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
 
             context.status = try_ret!(client.get_status(), "Failed get status");
 
-            if context.status.state == mpd::commands::status::State::Play {
-                try_skip!(render_loop.start(), "Failed to start render loop");
-            } else {
-                try_skip!(render_loop.stop(), "Failed to stop render loop");
+            match context.status.state {
+                State::Play => {
+                    try_skip!(render_loop.start(), "Failed to start render loop");
+                }
+                State::Pause => {
+                    try_skip!(render_loop.stop(), "Failed to stop render loop");
+                }
+                State::Stop => {
+                    result_ui_evs.insert(UiEvent::SongChanged);
+                    try_skip!(render_loop.stop(), "Failed to stop render loop");
+                }
             }
 
-            if context.status.song.is_some_and(|id| Some(id) != current_song_id) {
+            if context
+                .find_current_song_in_queue()
+                .map(|(_, song)| song.id)
+                .is_some_and(|id| Some(id) != current_song_id)
+            {
                 if let Some(command) = context.config.on_song_change {
                     let env = match context.get_current_song(client) {
                         Ok(Some(song)) => song
@@ -545,6 +591,8 @@ fn handle_idle_event(
 
                     run_external(command, env);
                 };
+
+                result_ui_evs.insert(UiEvent::SongChanged);
             }
         }
         IdleEvent::Playlist => {
@@ -564,6 +612,10 @@ fn handle_idle_event(
             warn!(event:?; "Received unhandled event");
         }
     };
+
+    if let Ok(ev) = event.try_into() {
+        result_ui_evs.insert(ev);
+    }
     Ok(())
 }
 
