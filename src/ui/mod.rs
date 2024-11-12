@@ -180,7 +180,7 @@ impl<'ui> Ui<'ui> {
             self.status_message = None;
         }
 
-        let header = Header::new(context.config, &context.status, self.current_song.as_ref());
+        let header = Header::new(context);
         frame.render_widget(header, self.areas[Areas::Header]);
 
         if self.areas[Areas::Tabs].height > 0 {

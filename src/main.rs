@@ -550,13 +550,11 @@ fn handle_idle_event(
                 State::Play => {
                     try_skip!(render_loop.start(), "Failed to start render loop");
                 }
-                State::Stop => {
-                    context.status.song = None;
-                    context.status.songid = None;
-                    result_ui_evs.insert(UiEvent::SongChanged);
+                State::Pause => {
                     try_skip!(render_loop.stop(), "Failed to stop render loop");
                 }
-                State::Pause => {
+                State::Stop => {
+                    result_ui_evs.insert(UiEvent::SongChanged);
                     try_skip!(render_loop.stop(), "Failed to stop render loop");
                 }
             }

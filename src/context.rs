@@ -33,14 +33,9 @@ impl AppContext {
         app_event_sender: Sender<AppEvent>,
         work_sender: Sender<WorkRequest>,
     ) -> Result<Self> {
-        let mut status = client.get_status()?;
+        let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
         let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
-
-        if status.state == State::Stop {
-            status.song = None;
-            status.songid = None;
-        }
 
         log::info!(supported_commands:? = supported_commands; "Supported commands by server");
 
@@ -77,6 +72,10 @@ impl AppContext {
     }
 
     pub fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
+        if self.status.state == State::Stop {
+            return None;
+        }
+
         self.status
             .songid
             .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))

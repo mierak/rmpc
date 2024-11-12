@@ -41,7 +41,7 @@ impl AlbumArtPane {
             return Ok(None);
         };
 
-        let Some(current_song) = context.queue.iter().find(|v| Some(v.id) == context.status.songid) else {
+        let Some((_, current_song)) = context.find_current_song_in_queue() else {
             return Ok(None);
         };
 
