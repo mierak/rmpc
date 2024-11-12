@@ -37,7 +37,7 @@ use crate::{
     },
     mpd::{
         client::Client,
-        commands::{idle::IdleEvent, volume::Bound, Song, State},
+        commands::{idle::IdleEvent, volume::Bound, State},
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     shared::{
@@ -81,7 +81,6 @@ pub struct Ui<'ui> {
     modals: Vec<Box<dyn Modal>>,
     status_message: Option<StatusMessage>,
     rendered_frames_count: u32,
-    current_song: Option<Song>,
     command: Option<String>,
     active_tab: TabName,
     tabs: HashMap<TabName, TabScreen>,
@@ -114,7 +113,6 @@ impl<'ui> Ui<'ui> {
             tab_bar: AppTabs::new(active_tab, context.config),
             status_message: None,
             rendered_frames_count: 0,
-            current_song: None,
             modals: Vec::default(),
             command: None,
             active_tab,
@@ -462,7 +460,6 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
-        self.current_song = context.find_current_song_in_queue().map(|(_, song)| song).cloned();
         screen_call!(self, before_show(client, &context))
     }
 
@@ -502,9 +499,7 @@ impl<'ui> Ui<'ui> {
         client: &mut impl MpdClient,
     ) -> Result<()> {
         match event {
-            UiEvent::Player => {
-                self.current_song = context.find_current_song_in_queue().map(|(_, song)| song).cloned();
-            }
+            UiEvent::Player => {}
             UiEvent::Database => {
                 status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
             }
