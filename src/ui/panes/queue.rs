@@ -32,10 +32,11 @@ use crate::{
 };
 use log::error;
 use ratatui::{
+    layout::Flex,
     prelude::{Constraint, Layout, Rect},
     style::Stylize,
     text::Line,
-    widgets::{Block, Borders, Padding, Row, Table, TableState},
+    widgets::{Block, Borders, Row, Table, TableState},
     Frame,
 };
 
@@ -82,31 +83,57 @@ impl Pane for QueuePane {
         } = context;
         let queue_len = queue.len();
 
-        let header_height = u16::from(config.theme.show_song_table_header);
-        let [table_header_section, mut queue_section] =
-            *Layout::vertical([Constraint::Min(header_height), Constraint::Percentage(100)]).split(area)
-        else {
-            return Ok(());
+        let title = self
+            .filter
+            .as_ref()
+            .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }));
+
+        let table_block = {
+            let mut b = Block::default().border_style(config.as_border_style().bold());
+            if config.theme.show_song_table_header {
+                b = b.borders(Borders::TOP);
+            }
+            if let Some(ref title) = title {
+                b = b.title(title.clone().blue());
+            }
+            b
         };
+
+        let header_height = u16::from(config.theme.show_song_table_header);
+
+        let [data_area, scrollbar_area] =
+            Layout::horizontal([Constraint::Percentage(100), Constraint::Length(1)]).areas(area);
+
+        let [table_header_section, mut queue_section] =
+            Layout::vertical([Constraint::Length(header_height), Constraint::Min(0)])
+                .horizontal_margin(1)
+                .areas(data_area);
+
+        let constraints = if config.theme.show_song_table_header {
+            vec![Constraint::Length(header_height + 1), Constraint::Min(0)]
+        } else {
+            vec![Constraint::Min(0)]
+        };
+        let scrollbar_index = usize::from(config.theme.show_song_table_header);
+        let scrollbar_area = Layout::vertical(constraints).split(scrollbar_area)[scrollbar_index];
+
+        let table_area = table_block.inner(queue_section);
 
         self.scrolling_state.set_content_len(Some(queue_len));
 
-        let widths = Layout::horizontal(&self.column_widths).split(table_header_section);
+        let widths = Layout::horizontal(self.column_widths.clone())
+            .flex(Flex::Start)
+            .spacing(1)
+            .split(table_area);
+
         let formats = &config.theme.song_table_format;
 
-        let table_padding = Padding::new(1, 2, 0, 0);
-        let table_padding_leftright = (table_padding.left as usize) + (table_padding.right as usize);
-
-        let ellipsis_len = config.theme.symbols.ellipsis.chars().count();
         let table_items = queue
             .iter()
             .map(|song| {
                 let is_current = status.songid.as_ref().is_some_and(|v| *v == song.id);
                 let columns = (0..formats.len()).map(|i| {
-                    let mut max_len: usize = widths[i].width.into();
-                    if max_len > i + table_padding_leftright + ellipsis_len {
-                        max_len -= i + table_padding_leftright;
-                    }
+                    let max_len: usize = widths[i].width.into();
 
                     song.as_line_ellipsized(formats[i].prop, max_len, &config.theme.symbols)
                         .unwrap_or_default()
@@ -135,31 +162,14 @@ impl Pane for QueuePane {
                 })))
                 .style(config.as_text_style())
                 .widths(self.column_widths.clone())
-                .block(config.as_header_table_block().padding(table_padding));
+                .block(config.as_header_table_block());
             frame.render_widget(header_table, table_header_section);
         }
 
-        let title = self
-            .filter
-            .as_ref()
-            .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }));
-        let table_block = {
-            let mut b = Block::default()
-                .padding(table_padding)
-                .border_style(config.as_border_style().bold());
-            if config.theme.show_song_table_header {
-                b = b.borders(Borders::TOP);
-            }
-            if let Some(ref title) = title {
-                b = b.title(title.clone().blue());
-            }
-            b
-        };
         let table = Table::new(table_items, self.column_widths.clone())
             .style(config.as_text_style())
             .row_highlight_style(config.theme.current_item_style);
 
-        let table_area = table_block.inner(queue_section);
         self.table_area = table_area;
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_widget(table_block, queue_section);
@@ -171,7 +181,7 @@ impl Pane for QueuePane {
         self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
-            queue_section,
+            scrollbar_area,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 
