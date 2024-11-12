@@ -24,7 +24,10 @@ use crate::{
     config::{
         keys::CommonAction,
         tabs::PaneType,
-        theme::properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
+        theme::{
+            properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
+            SymbolsConfig,
+        },
     },
     context::AppContext,
     mpd::{
@@ -520,33 +523,39 @@ impl Song {
         &'song self,
         format: &'static Property<'static, SongProperty>,
         max_len: usize,
+        symbols: &SymbolsConfig,
     ) -> Option<Line<'song>> {
-        format.default.and_then(|f| self.as_line_ellipsized(f, max_len))
+        format
+            .default
+            .and_then(|f| self.as_line_ellipsized(f, max_len, symbols))
     }
 
     pub fn as_line_ellipsized<'song>(
         &'song self,
         format: &'static Property<'static, SongProperty>,
         max_len: usize,
+        symbols: &SymbolsConfig,
     ) -> Option<Line<'song>> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
-            PropertyKindOrText::Text(value) => Some(Line::styled((*value).ellipsize(max_len).to_string(), style)),
+            PropertyKindOrText::Text(value) => {
+                Some(Line::styled((*value).ellipsize(max_len, symbols).to_string(), style))
+            }
             PropertyKindOrText::Property(property) => self.format(property).map_or_else(
-                || self.default_as_line_ellipsized(format, max_len),
-                |v| Some(Line::styled(v.ellipsize(max_len).into_owned(), style)),
+                || self.default_as_line_ellipsized(format, max_len, symbols),
+                |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
             ),
             PropertyKindOrText::Group(group) => {
                 let mut buf = Line::default();
                 for grformat in *group {
-                    if let Some(res) = self.as_line_ellipsized(grformat, max_len) {
+                    if let Some(res) = self.as_line_ellipsized(grformat, max_len, symbols) {
                         for span in res.spans {
                             buf.push_span(span);
                         }
                     } else {
                         return format
                             .default
-                            .and_then(|format| self.as_line_ellipsized(format, max_len));
+                            .and_then(|format| self.as_line_ellipsized(format, max_len, symbols));
                     }
                 }
                 return Some(buf);
@@ -682,15 +691,18 @@ impl Property<'static, PropertyKind> {
 }
 
 pub(crate) trait StringExt {
-    fn ellipsize(&self, max_len: usize) -> Cow<str>;
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str>;
 }
 
 impl StringExt for Cow<'_, str> {
-    fn ellipsize(&self, max_len: usize) -> Cow<str> {
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
-                "{}...",
-                self.chars().take(max_len.saturating_sub(4)).collect::<String>()
+                "{}{}",
+                self.chars()
+                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
+                    .collect::<String>(),
+                symbols.ellipsis,
             ))
         } else {
             Cow::Borrowed(self)
@@ -699,11 +711,14 @@ impl StringExt for Cow<'_, str> {
 }
 
 impl StringExt for &str {
-    fn ellipsize(&self, max_len: usize) -> Cow<str> {
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
-                "{}...",
-                self.chars().take(max_len.saturating_sub(4)).collect::<String>()
+                "{}{}",
+                self.chars()
+                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
+                    .collect::<String>(),
+                symbols.ellipsis,
             ))
         } else {
             Cow::Borrowed(self)
@@ -712,11 +727,14 @@ impl StringExt for &str {
 }
 
 impl StringExt for String {
-    fn ellipsize(&self, max_len: usize) -> Cow<str> {
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
-                "{}...",
-                self.chars().take(max_len.saturating_sub(4)).collect::<String>()
+                "{}{}",
+                self.chars()
+                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
+                    .collect::<String>(),
+                symbols.ellipsis,
             ))
         } else {
             Cow::Borrowed(self)

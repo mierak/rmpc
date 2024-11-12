@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Mouse support for modal popups
 - List available decoder plugins from MPD via `ShowDecoders` action or `rmpc decoders`
 - Ability to add and instantly play song under cursor. Bound to `Confirm` action
+- Theme: add `symbols.ellipsis` to customize the ellipsis when text need to be truncated
 - A new `Lyrics` pane used to display synchronized lyrics.
 - Missing default keybind for the Album Artists tab
 - Allow stop action to work in paused state
