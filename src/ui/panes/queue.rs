@@ -109,10 +109,10 @@ impl Pane for QueuePane {
                 .horizontal_margin(1)
                 .areas(data_area);
 
-        let constraints = if config.theme.show_song_table_header {
-            vec![Constraint::Length(header_height + 1), Constraint::Min(0)]
+        let constraints: &[Constraint] = if config.theme.show_song_table_header {
+            &[Constraint::Length(header_height + 1), Constraint::Min(0)]
         } else {
-            vec![Constraint::Min(0)]
+            &[Constraint::Min(0)]
         };
         let scrollbar_index = usize::from(config.theme.show_song_table_header);
         let scrollbar_area = Layout::vertical(constraints).split(scrollbar_area)[scrollbar_index];
