@@ -24,8 +24,8 @@ use crate::{
     ui::{
         dirstack::DirState,
         modals::{
-            add_to_playlist::AddToPlaylistModal, confirm_queue_clear::ConfirmQueueClearModal,
-            save_queue::SaveQueueModal, song_info::SongInfoModal,
+            add_to_playlist::AddToPlaylistModal, confirm_modal::ConfirmModal, save_queue::SaveQueueModal,
+            song_info::SongInfoModal,
         },
         UiEvent,
     },
@@ -328,7 +328,15 @@ impl Pane for QueuePane {
                     }
                 }
                 QueueActions::DeleteAll => {
-                    modal!(context, ConfirmQueueClearModal::new(context));
+                    modal!(
+                        context,
+                        ConfirmModal::new(context)
+                            .message("Are you sure you want to clear the queue? This action cannot be undone.")
+                            .on_confirm(|client| Ok(client.clear()?))
+                            .confirm_label("Clear")
+                            .size(45, 6)
+                    );
+                    // modal!(context, ConfirmQueueClearModal::new(context));
                 }
                 QueueActions::Play => {
                     if let Some(selected_song) = self

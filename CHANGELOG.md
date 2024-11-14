@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - Default keybinds for tabs to make space for the Album Artists tab
 - Swapped default single and consume keybinds
 - Clear album art and song in the header when the playback stops
+- Refactored confirm modal into a generic one
 
 ### Fixed
 

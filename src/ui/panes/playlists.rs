@@ -22,7 +22,7 @@ use crate::{
     ui::{
         browser::{BrowserPane, MoveDirection},
         dirstack::{DirStack, DirStackItem},
-        modals::{confirm_playlist_delete::ConfirmPlaylistDeleteModal, rename_playlist::RenamePlaylistModal},
+        modals::{confirm_modal::ConfirmModal, rename_playlist::RenamePlaylistModal},
         widgets::browser::Browser,
         UiEvent,
     },
@@ -253,7 +253,19 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn delete(&self, item: &DirOrSong, index: usize, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
-                modal!(context, ConfirmPlaylistDeleteModal::new(d.clone(), context));
+                let d = d.clone();
+                modal!(
+                    context,
+                    ConfirmModal::new(context)
+                        .message("Are you sure you want to delete this playlist? This action cannot be undone.")
+                        .on_confirm(move |client| {
+                            client.delete_playlist(&d)?;
+                            status_info!("Playlist '{d}' deleted");
+                            Ok(())
+                        })
+                        .confirm_label("Delete")
+                        .size(45, 6)
+                );
             }
             DirOrSong::Song(s) => {
                 let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
