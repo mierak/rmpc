@@ -88,7 +88,7 @@ pub struct ButtonGroupState {
 
 #[derive(Debug)]
 pub struct ButtonGroup<'a> {
-    buttons: Vec<Button<'a>>,
+    pub buttons: Vec<Button<'a>>,
     block: Option<Block<'a>>,
     active_style: Style,
     inactive_style: Style,
