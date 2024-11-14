@@ -336,7 +336,6 @@ impl Pane for QueuePane {
                             .confirm_label("Clear")
                             .size(45, 6)
                     );
-                    // modal!(context, ConfirmQueueClearModal::new(context));
                 }
                 QueueActions::Play => {
                     if let Some(selected_song) = self
