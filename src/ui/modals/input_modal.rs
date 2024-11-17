@@ -12,10 +12,10 @@ use ratatui::{
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::{client::Client, mpd_client::MpdClient},
+    mpd::client::Client,
     shared::{
         key_event::KeyEvent,
-        macros::{pop_modal, status_error, status_info},
+        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::{
@@ -34,23 +34,36 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-#[derive(Debug)]
-pub struct SaveQueueModal<'a> {
+pub struct InputModal<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     input_focused: bool,
-    name: String,
     input_area: Rect,
+    callback: Option<C>,
+    value: String,
+    title: &'a str,
+    input_label: &'a str,
 }
 
-impl SaveQueueModal<'_> {
+impl<'a, Callback: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> std::fmt::Debug for InputModal<'_, Callback> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "InputModal(message = {}, button_group = {:?}, button_group_state = {:?})",
+            self.input_label, self.button_group, self.button_group_state,
+        )
+    }
+}
+
+impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> InputModal<'a, C> {
     pub fn new(context: &AppContext) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
+
         let button_group = ButtonGroup::default()
-            .inactive_style(context.config.as_text_style())
             .buttons(buttons)
+            .inactive_style(context.config.as_text_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -59,51 +72,71 @@ impl SaveQueueModal<'_> {
             );
 
         Self {
-            button_group,
             button_group_state,
+            button_group,
             input_focused: true,
-            name: String::new(),
             input_area: Rect::default(),
+            callback: None,
+            value: String::new(),
+            input_label: "",
+            title: "",
         }
     }
-}
 
-impl SaveQueueModal<'_> {
-    fn on_hide(&mut self) {
-        self.button_group_state = ButtonGroupState::default();
-        self.name = String::new();
-        self.input_focused = true;
+    pub fn confirm_label(mut self, label: &'a str) -> Self {
+        let buttons = vec![Button::default().label(label), Button::default().label("Cancel")];
+        self.button_group = self.button_group.buttons(buttons);
+        self
+    }
+
+    pub fn on_confirm(mut self, callback: C) -> Self {
+        self.callback = Some(callback);
+        self
+    }
+
+    pub fn input_label(mut self, label: &'a str) -> Self {
+        self.input_label = label;
+        self
+    }
+
+    pub fn title(mut self, message: &'a str) -> Self {
+        self.input_label = message;
+        self
+    }
+
+    pub fn initial_value(mut self, value: String) -> Self {
+        self.value = value;
+        self
     }
 }
 
-impl Modal for SaveQueueModal<'_> {
+impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+        let block = Block::default()
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .border_set(border::ROUNDED)
+            .border_style(app.config.as_border_style())
+            .title_alignment(ratatui::prelude::Alignment::Center)
+            .title(self.title);
+
         let popup_area = frame.area().centered_exact(50, 7);
+        frame.render_widget(Clear, popup_area);
+        if let Some(bg_color) = app.config.theme.modal_background_color {
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
+        }
         let [body_area, buttons_area] =
             *Layout::vertical([Constraint::Length(4), Constraint::Max(3)]).split(popup_area)
         else {
             return Ok(());
         };
 
-        let block = Block::default()
-            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-            .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
-            .title_alignment(ratatui::prelude::Alignment::Center)
-            .title("Save queue as playlist");
-
         let input = Input::default()
-            .set_label("Playlist name:")
+            .set_label(self.input_label)
             .set_label_style(app.config.as_text_style())
-            .set_text(&self.name)
+            .set_text(&self.value)
             .set_focused(self.input_focused)
             .set_focused_style(app.config.theme.highlight_border_style)
             .set_unfocused_style(app.config.as_border_style());
-
-        frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
-            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
-        }
 
         self.button_group.set_active_style(if self.input_focused {
             Style::default().reversed()
@@ -112,6 +145,7 @@ impl Modal for SaveQueueModal<'_> {
         });
 
         self.input_area = body_area;
+
         frame.render_widget(input, block.inner(body_area));
         frame.render_widget(block, body_area);
         frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
@@ -128,28 +162,22 @@ impl Modal for SaveQueueModal<'_> {
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group_state.selected == 0 {
-                    match client.save_queue_as_playlist(&self.name, None) {
-                        Ok(()) => {
-                            status_info!("Playlist '{}' saved", self.name);
-                        }
-                        Err(err) => {
-                            status_error!(err:?; "Failed to save playlist '{}'", self.name);
-                        }
-                    };
+                    if let Some(ref mut callback) = self.callback {
+                        (callback)(client, &self.value)?;
+                    }
                 }
-                self.on_hide();
                 pop_modal!(context);
                 return Ok(());
             }
 
             match key.code() {
                 KeyCode::Char(c) => {
-                    self.name.push(c);
+                    self.value.push(c);
 
                     context.render()?;
                 }
                 KeyCode::Backspace => {
-                    self.name.pop();
+                    self.value.pop();
 
                     context.render()?;
                 }
@@ -168,18 +196,20 @@ impl Modal for SaveQueueModal<'_> {
                     context.render()?;
                 }
                 CommonAction::Close => {
-                    self.on_hide();
                     pop_modal!(context);
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
-                        client.save_queue_as_playlist(&self.name, None)?;
-                        status_info!("Playlist '{}' saved", self.name);
+                        if let Some(ref mut callback) = self.callback {
+                            (callback)(client, &self.value)?;
+                        }
                     }
                     pop_modal!(context);
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
+
+                    context.render()?;
                 }
                 _ => {}
             }
@@ -205,9 +235,9 @@ impl Modal for SaveQueueModal<'_> {
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        client.save_queue_as_playlist(&self.name, None)?;
-                        status_info!("Playlist '{}' saved", self.name);
-                        context.render()?;
+                        if let Some(ref mut callback) = self.callback {
+                            (callback)(client, &self.value)?;
+                        }
                         pop_modal!(context);
                     }
                     Some(_) => {

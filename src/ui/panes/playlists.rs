@@ -22,7 +22,7 @@ use crate::{
     ui::{
         browser::{BrowserPane, MoveDirection},
         dirstack::{DirStack, DirStackItem},
-        modals::{confirm_modal::ConfirmModal, rename_playlist::RenamePlaylistModal},
+        modals::{confirm_modal::ConfirmModal, input_modal::InputModal},
         widgets::browser::Browser,
         UiEvent,
     },
@@ -326,7 +326,22 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn rename(&self, item: &DirOrSong, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
-                modal!(context, RenamePlaylistModal::new(d.clone(), context));
+                let current_name = d.clone();
+                modal!(
+                    context,
+                    InputModal::new(context)
+                        .title("Rename playlist")
+                        .confirm_label("Rename")
+                        .input_label("New name:")
+                        .initial_value(current_name.clone())
+                        .on_confirm(move |client, new_value| {
+                            if current_name != new_value {
+                                client.rename_playlist(&current_name, new_value)?;
+                                status_info!("Playlist '{}' renamed to '{}'", current_name, new_value);
+                            }
+                            Ok(())
+                        })
+                );
             }
             DirOrSong::Song(_) => {}
         };
