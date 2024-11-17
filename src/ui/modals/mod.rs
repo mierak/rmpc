@@ -13,10 +13,9 @@ use crate::{
 pub mod add_to_playlist;
 pub mod confirm_modal;
 pub mod decoders;
+pub mod input_modal;
 pub mod keybinds;
 pub mod outputs;
-pub mod rename_playlist;
-pub mod save_queue;
 pub mod song_info;
 
 pub(super) trait Modal: std::fmt::Debug {

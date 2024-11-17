@@ -24,7 +24,7 @@ use crate::{
     ui::{
         dirstack::DirState,
         modals::{
-            add_to_playlist::AddToPlaylistModal, confirm_modal::ConfirmModal, save_queue::SaveQueueModal,
+            add_to_playlist::AddToPlaylistModal, confirm_modal::ConfirmModal, input_modal::InputModal,
             song_info::SongInfoModal,
         },
         UiEvent,
@@ -355,7 +355,24 @@ impl Pane for QueuePane {
                     }
                 }
                 QueueActions::Save => {
-                    modal!(context, SaveQueueModal::new(context));
+                    modal!(
+                        context,
+                        InputModal::new(context)
+                            .title("Save queue as playlist")
+                            .confirm_label("Save")
+                            .input_label("Playlist name:")
+                            .on_confirm(move |client, value| {
+                                match client.save_queue_as_playlist(value, None) {
+                                    Ok(()) => {
+                                        status_info!("Playlist '{}' saved", value);
+                                    }
+                                    Err(err) => {
+                                        status_error!(err:?; "Failed to save playlist '{}'",value);
+                                    }
+                                };
+                                Ok(())
+                            })
+                    );
                 }
                 QueueActions::AddToPlaylist => {
                     if let Some(selected_song) = self
