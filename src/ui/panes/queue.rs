@@ -358,7 +358,7 @@ impl Pane for QueuePane {
                         context,
                         InputModal::new(context)
                             .title("Save queue as playlist")
-                            .confirm_label("Add")
+                            .confirm_label("Save")
                             .input_label("Playlist name:")
                             .on_confirm(move |client, value| {
                                 match client.save_queue_as_playlist(value, None) {
