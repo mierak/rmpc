@@ -1,5 +1,6 @@
+use std::fmt::Display;
+
 use anyhow::Result;
-use itertools::Itertools;
 use ratatui::{
     layout::Rect,
     prelude::{Constraint, Layout},
@@ -12,10 +13,10 @@ use ratatui::{
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::{client::Client, mpd_client::MpdClient},
+    mpd::client::Client,
     shared::{
         key_event::KeyEvent,
-        macros::{pop_modal, status_info},
+        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
@@ -30,30 +31,40 @@ use super::Modal;
 
 #[derive(Debug)]
 enum FocusedComponent {
-    Playlists,
+    List,
     Buttons,
 }
 
-#[derive(Debug)]
-pub struct AddToPlaylistModal<'a> {
+pub struct SelectModal<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     scrolling_state: DirState<ListState>,
-    uri: String,
-    playlists: Vec<String>,
     focused: FocusedComponent,
-    playlists_area: Rect,
+    options_area: Rect,
+    options: Vec<V>,
+    callback: Option<Callback>,
+    title: &'a str,
 }
 
-impl AddToPlaylistModal<'_> {
-    pub fn new(uri: String, playlists: Vec<String>, context: &AppContext) -> Self {
+impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> std::fmt::Debug
+    for SelectModal<'a, V, Callback>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SelectModal(title = {:?}, button_group = {:?}, button_group_state = {:?})",
+            self.title, self.button_group, self.button_group_state,
+        )
+    }
+}
+
+impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
+    pub fn new(context: &AppContext) -> Self {
         let mut scrolling_state = DirState::default();
-        if !playlists.is_empty() {
-            scrolling_state.select(Some(0), 0);
-        }
+        scrolling_state.select(Some(0), 0);
 
         let mut button_group_state = ButtonGroupState::default();
-        let buttons = vec![Button::default().label("Add"), Button::default().label("Cancel")];
+        let buttons = vec![Button::default().label("Confirm"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
 
         let button_group = ButtonGroup::default()
@@ -70,11 +81,33 @@ impl AddToPlaylistModal<'_> {
             button_group,
             button_group_state,
             scrolling_state,
-            uri,
-            playlists,
-            focused: FocusedComponent::Playlists,
-            playlists_area: Rect::default(),
+            focused: FocusedComponent::List,
+            options_area: Rect::default(),
+            options: Vec::new(),
+            callback: None,
+            title: "",
         }
+    }
+
+    pub fn options(mut self, options: Vec<V>) -> Self {
+        self.options = options;
+        self
+    }
+
+    pub fn on_confirm(mut self, callback: Callback) -> Self {
+        self.callback = Some(callback);
+        self
+    }
+
+    pub fn confirm_label(mut self, label: &'a str) -> Self {
+        let buttons = vec![Button::default().label(label), Button::default().label("Cancel")];
+        self.button_group = self.button_group.buttons(buttons);
+        self
+    }
+
+    pub fn title(mut self, title: &'a str) -> Self {
+        self.title = title;
+        self
     }
 }
 
@@ -84,7 +117,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-impl Modal for AddToPlaylistModal<'_> {
+impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> Modal for SelectModal<'a, V, Callback> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
@@ -93,38 +126,34 @@ impl Modal for AddToPlaylistModal<'_> {
         }
 
         let [list_area, buttons_area] =
-            *Layout::vertical([Constraint::Length(12), Constraint::Max(3)]).split(popup_area)
-        else {
-            return Ok(());
-        };
+            Layout::vertical([Constraint::Length(12), Constraint::Max(3)]).areas(popup_area);
 
-        let content_len = self.playlists.len();
+        let content_len = self.options.len();
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(list_area.height.into()));
 
-        let playlists = List::new(
-            self.playlists
-                .iter()
-                .enumerate()
-                .map(|(idx, v)| format!("{:>3}: {v}", idx + 1))
-                .collect_vec(),
-        )
-        .style(app.config.as_text_style())
-        .highlight_style(match self.focused {
-            FocusedComponent::Buttons => Style::default().reversed(),
-            FocusedComponent::Playlists => app.config.theme.current_item_style,
-        })
-        .block(
-            Block::default()
-                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-                .border_set(symbols::border::ROUNDED)
-                .border_style(app.config.as_border_style())
-                .title_alignment(ratatui::prelude::Alignment::Center)
-                .title("Select a playlist".bold()),
-        );
+        let options = self
+            .options
+            .iter()
+            .enumerate()
+            .map(|(idx, v)| format!("{:>3}: {v}", idx + 1));
+        let playlists = List::new(options)
+            .style(app.config.as_text_style())
+            .highlight_style(match self.focused {
+                FocusedComponent::Buttons => Style::default().reversed(),
+                FocusedComponent::List => app.config.theme.current_item_style,
+            })
+            .block(
+                Block::default()
+                    .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                    .border_set(symbols::border::ROUNDED)
+                    .border_style(app.config.as_border_style())
+                    .title_alignment(ratatui::prelude::Alignment::Center)
+                    .title(self.title.bold()),
+            );
 
         self.button_group.set_active_style(match self.focused {
-            FocusedComponent::Playlists => Style::default().reversed(),
+            FocusedComponent::List => Style::default().reversed(),
             FocusedComponent::Buttons => app.config.theme.current_item_style,
         });
 
@@ -132,7 +161,7 @@ impl Modal for AddToPlaylistModal<'_> {
             .padding(ratatui::widgets::Padding::new(0, 0, 1, 0))
             .inner(list_area);
 
-        self.playlists_area = list_area;
+        self.options_area = list_area;
 
         frame.render_stateful_widget(playlists, list_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
@@ -149,11 +178,11 @@ impl Modal for AddToPlaylistModal<'_> {
             match action {
                 CommonAction::Down => {
                     match self.focused {
-                        FocusedComponent::Playlists => {
+                        FocusedComponent::List => {
                             if self
                                 .scrolling_state
                                 .get_selected()
-                                .is_some_and(|s| s == self.playlists.len() - 1)
+                                .is_some_and(|s| s == self.options.len() - 1)
                             {
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group_state.first();
@@ -163,7 +192,7 @@ impl Modal for AddToPlaylistModal<'_> {
                         }
                         FocusedComponent::Buttons => {
                             if self.button_group_state.selected == self.button_group_state.button_count() - 1 {
-                                self.focused = FocusedComponent::Playlists;
+                                self.focused = FocusedComponent::List;
                                 self.scrolling_state.first();
                             } else {
                                 self.button_group_state.next();
@@ -175,7 +204,7 @@ impl Modal for AddToPlaylistModal<'_> {
                 }
                 CommonAction::Up => {
                     match self.focused {
-                        FocusedComponent::Playlists => {
+                        FocusedComponent::List => {
                             if self.scrolling_state.get_selected().is_some_and(|s| s == 0) {
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group_state.last();
@@ -185,7 +214,7 @@ impl Modal for AddToPlaylistModal<'_> {
                         }
                         FocusedComponent::Buttons => {
                             if self.button_group_state.selected == 0 {
-                                self.focused = FocusedComponent::Playlists;
+                                self.focused = FocusedComponent::List;
                                 self.scrolling_state.last();
                             } else {
                                 self.button_group_state.prev();
@@ -196,27 +225,31 @@ impl Modal for AddToPlaylistModal<'_> {
                     context.render()?;
                 }
                 CommonAction::Confirm => match self.focused {
-                    FocusedComponent::Playlists => {
+                    FocusedComponent::List => {
                         self.focused = FocusedComponent::Buttons;
                         self.button_group_state.first();
 
                         context.render()?;
                     }
                     FocusedComponent::Buttons if self.button_group_state.selected == 0 => {
-                        if let Some(selected) = self.scrolling_state.get_selected() {
-                            client.add_to_playlist(&self.playlists[selected], &self.uri, None)?;
-                            status_info!("Song added to playlist {}", self.playlists[selected]);
+                        if let Some(idx) = self.scrolling_state.get_selected() {
+                            if let Some(ref mut callback) = self.callback {
+                                (callback)(client, &self.options[idx], idx)?;
+                            }
                         }
                         pop_modal!(context);
+                        context.render()?;
                     }
                     FocusedComponent::Buttons => {
                         self.button_group_state = ButtonGroupState::default();
                         pop_modal!(context);
+                        context.render()?;
                     }
                 },
                 CommonAction::Close => {
                     self.button_group_state = ButtonGroupState::default();
                     pop_modal!(context);
+                    context.render()?;
                 }
                 _ => {}
             }
@@ -232,11 +265,11 @@ impl Modal for AddToPlaylistModal<'_> {
         context: &mut AppContext,
     ) -> Result<()> {
         match event.kind {
-            MouseEventKind::LeftClick if self.playlists_area.contains(event.into()) => {
-                let y: usize = event.y.saturating_sub(self.playlists_area.y).into();
+            MouseEventKind::LeftClick if self.options_area.contains(event.into()) => {
+                let y: usize = event.y.saturating_sub(self.options_area.y).into();
                 let y = y.saturating_sub(1); // Subtract one to account for the header
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
-                    self.focused = FocusedComponent::Playlists;
+                    self.focused = FocusedComponent::List;
                     self.scrolling_state.select(Some(idx), context.config.scrolloff);
                     context.render()?;
                 }
@@ -251,9 +284,10 @@ impl Modal for AddToPlaylistModal<'_> {
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        if let Some(selected) = self.scrolling_state.get_selected() {
-                            client.add_to_playlist(&self.playlists[selected], &self.uri, None)?;
-                            status_info!("Song added to playlist {}", self.playlists[selected]);
+                        if let Some(idx) = self.scrolling_state.get_selected() {
+                            if let Some(ref mut callback) = self.callback {
+                                (callback)(client, &self.options[idx], idx)?;
+                            }
                         }
                         pop_modal!(context);
                         context.render()?;
@@ -276,13 +310,13 @@ impl Modal for AddToPlaylistModal<'_> {
                 self.button_group_state.next();
                 context.render()?;
             }
-            MouseEventKind::ScrollUp if self.playlists_area.contains(event.into()) => {
-                self.focused = FocusedComponent::Playlists;
+            MouseEventKind::ScrollUp if self.options_area.contains(event.into()) => {
+                self.focused = FocusedComponent::List;
                 self.scrolling_state.prev(context.config.scrolloff, false);
                 context.render()?;
             }
-            MouseEventKind::ScrollDown if self.playlists_area.contains(event.into()) => {
-                self.focused = FocusedComponent::Playlists;
+            MouseEventKind::ScrollDown if self.options_area.contains(event.into()) => {
+                self.focused = FocusedComponent::List;
                 self.scrolling_state.next(context.config.scrolloff, false);
                 context.render()?;
             }
