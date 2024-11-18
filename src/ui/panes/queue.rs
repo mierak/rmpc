@@ -24,8 +24,7 @@ use crate::{
     ui::{
         dirstack::DirState,
         modals::{
-            add_to_playlist::AddToPlaylistModal, confirm_modal::ConfirmModal, input_modal::InputModal,
-            song_info::SongInfoModal,
+            confirm_modal::ConfirmModal, input_modal::InputModal, select_modal::SelectModal, song_info::SongInfoModal,
         },
         UiEvent,
     },
@@ -359,7 +358,7 @@ impl Pane for QueuePane {
                         context,
                         InputModal::new(context)
                             .title("Save queue as playlist")
-                            .confirm_label("Save")
+                            .confirm_label("Add")
                             .input_label("Playlist name:")
                             .on_confirm(move |client, value| {
                                 match client.save_queue_as_playlist(value, None) {
@@ -386,9 +385,18 @@ impl Pane for QueuePane {
                             .map(|v| v.name)
                             .sorted()
                             .collect_vec();
+                        let uri = selected_song.file.clone();
                         modal!(
                             context,
-                            AddToPlaylistModal::new(selected_song.file.clone(), playlists, context)
+                            SelectModal::new(context)
+                                .options(playlists)
+                                .confirm_label("Add")
+                                .title("Select a playlist")
+                                .on_confirm(move |client, selected: &String, _idx| {
+                                    client.add_to_playlist(selected, &uri, None)?;
+                                    status_info!("Song added to playlist {}", selected);
+                                    Ok(())
+                                })
                         );
                     }
                 }
