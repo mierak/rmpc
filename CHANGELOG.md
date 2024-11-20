@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - A new `Lyrics` pane used to display synchronized lyrics.
 - Missing default keybind for the Album Artists tab
 - Allow stop action to work in paused state
+- Select functionality to the queue, selected songs can be moved up and down in the queue at the same time using the MoveUp/Down actions
 
 ### Changed
 

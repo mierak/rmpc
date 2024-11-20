@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use itertools::Itertools;
@@ -34,7 +36,7 @@ use ratatui::{
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
     style::Stylize,
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Row, Table, TableState},
     Frame,
 };
@@ -125,20 +127,38 @@ impl Pane for QueuePane {
 
         let formats = &config.theme.song_table_format;
 
+        let marker_symbol_len = config.theme.symbols.marker.chars().count();
         let table_items = queue
             .iter()
-            .map(|song| {
+            .enumerate()
+            .map(|(idx, song)| {
                 let is_current = context
                     .find_current_song_in_queue()
                     .map(|(_, song)| song.id)
                     .is_some_and(|v| v == song.id);
 
+                let is_marked = self.scrolling_state.get_marked().contains(&idx);
                 let columns = (0..formats.len()).map(|i| {
-                    let max_len: usize = widths[i].width.into();
+                    let mut max_len: usize = widths[i].width.into();
+                    // We have to subtract marker symbol length from max len in order to make space
+                    // for the marker symbol in case we are in the first column of the table and the
+                    // song is marked.
+                    if is_marked && i == 0 {
+                        max_len = max_len.saturating_sub(marker_symbol_len);
+                    }
 
-                    song.as_line_ellipsized(formats[i].prop, max_len, &config.theme.symbols)
+                    let mut line = song
+                        .as_line_ellipsized(formats[i].prop, max_len, &config.theme.symbols)
                         .unwrap_or_default()
-                        .alignment(formats[i].alignment.into())
+                        .alignment(formats[i].alignment.into());
+
+                    if is_marked && i == 0 {
+                        let marker_span =
+                            Span::styled(config.theme.symbols.marker, config.theme.highlighted_item_style);
+                        line.spans.splice(..0, std::iter::once(marker_span));
+                    };
+
+                    line
                 });
 
                 let is_highlighted = is_current
@@ -430,6 +450,52 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
+                CommonAction::MoveUp if !self.scrolling_state.get_marked().is_empty() => {
+                    if context.queue.is_empty() {
+                        return Ok(());
+                    }
+                    if let Some(0) = self.scrolling_state.marked.first() {
+                        return Ok(());
+                    }
+
+                    let mut new_marked = BTreeSet::new();
+                    for idx in &self.scrolling_state.marked {
+                        let Some(song_id) = context.queue.get(*idx).map(|song| song.id) else {
+                            return Ok(());
+                        };
+                        let new_idx = idx.saturating_sub(1);
+                        new_marked.insert(new_idx);
+
+                        client.move_id(song_id, QueueMoveTarget::Absolute(new_idx))?;
+                    }
+                    std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
+
+                    return Ok(());
+                }
+                CommonAction::MoveDown if !self.scrolling_state.get_marked().is_empty() => {
+                    if context.queue.is_empty() {
+                        return Ok(());
+                    }
+                    if let Some(last_idx) = self.scrolling_state.marked.last() {
+                        if *last_idx == context.queue.len() - 1 {
+                            return Ok(());
+                        }
+                    }
+
+                    let mut new_marked = BTreeSet::new();
+                    for idx in self.scrolling_state.marked.iter().rev() {
+                        let Some(song_id) = context.queue.get(*idx).map(|song| song.id) else {
+                            return Ok(());
+                        };
+                        let new_idx = idx.saturating_add(1);
+                        new_marked.insert(new_idx);
+
+                        client.move_id(song_id, QueueMoveTarget::Absolute(new_idx))?;
+                    }
+                    std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
+
+                    return Ok(());
+                }
                 CommonAction::MoveUp => {
                     if context.queue.is_empty() {
                         return Ok(());
@@ -517,7 +583,15 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
-                CommonAction::Select => {}
+                CommonAction::Select => {
+                    if let Some(sel) = self.scrolling_state.get_selected() {
+                        self.scrolling_state.toggle_mark(sel);
+                        self.scrolling_state
+                            .next(context.config.scrolloff, context.config.wrap_navigation);
+
+                        context.render()?;
+                    };
+                }
                 CommonAction::Add => {}
                 CommonAction::AddAll => {}
                 CommonAction::Delete => {}

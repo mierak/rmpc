@@ -537,7 +537,9 @@ impl MpdClient for Client<'_> {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum QueueMoveTarget {
+    /// relative to the currently playing song; e.g. +0 moves to right after the current song
     RelativeAdd(usize),
+    /// relative to the currently playing song; e.g. -0 moves to right before the current song
     RelativeSub(usize),
     Absolute(usize),
 }
