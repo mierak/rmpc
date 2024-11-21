@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Missing default keybind for the Album Artists tab
 - Allow stop action to work in paused state
 - Select functionality to the queue, selected songs can be moved up and down in the queue at the same time using the MoveUp/Down actions
+- Selected songs in queue can now be removed all at once from the Queue with the Delete action
 - InvertSelection action
 
 ### Changed

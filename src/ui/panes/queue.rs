@@ -331,6 +331,15 @@ impl Pane for QueuePane {
             }
         } else if let Some(action) = event.as_queue_action(context) {
             match action {
+                QueueActions::Delete if !self.scrolling_state.marked.is_empty() => {
+                    for range in self.scrolling_state.marked.ranges().rev() {
+                        client.delete_from_queue(range.into())?;
+                    }
+
+                    self.scrolling_state.marked.clear();
+                    status_info!("Marked songs removed from queue");
+                    context.render()?;
+                }
                 QueueActions::Delete => {
                     if let Some(selected_song) = self
                         .scrolling_state
