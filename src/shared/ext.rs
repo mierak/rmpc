@@ -158,3 +158,119 @@ pub mod mpd_client {
         }
     }
 }
+
+pub mod btreeset_ranges {
+    use std::{
+        collections::{btree_set, BTreeSet},
+        ops::{Range, RangeInclusive},
+    };
+
+    pub trait BTreeSetRanges<'a, T: 'a> {
+        fn ranges(&'a self) -> Ranges<'a, T, std::collections::btree_set::Iter<'a, T>>;
+    }
+
+    pub struct Ranges<'a, T: 'a, I: Iterator<Item = &'a T>> {
+        iter: I,
+        current_range: Option<Range<T>>,
+    }
+
+    impl<'a, T: Default + 'a> BTreeSetRanges<'a, T> for BTreeSet<T> {
+        fn ranges(&'a self) -> Ranges<'a, T, btree_set::Iter<'a, T>> {
+            Ranges {
+                iter: self.iter(),
+                current_range: None,
+            }
+        }
+    }
+
+    impl<'a, I: DoubleEndedIterator<Item = &'a usize>> DoubleEndedIterator for Ranges<'a, usize, I> {
+        fn next_back(&mut self) -> Option<Self::Item> {
+            match (self.iter.next_back(), self.current_range.take()) {
+                (Some(current), None) => {
+                    self.current_range = Some(*current..*current);
+                    self.next_back()
+                }
+                (None, Some(current_range)) => {
+                    self.current_range = None;
+                    Some(current_range.start..=current_range.end)
+                }
+                (Some(current), Some(mut current_range)) if *current == current_range.start - 1 => {
+                    current_range.start = *current;
+                    self.current_range = Some(current_range);
+                    self.next_back()
+                }
+                (Some(current), Some(current_range)) => {
+                    self.current_range = Some(*current..*current);
+                    Some(current_range.start..=current_range.end)
+                }
+                (None, None) => None,
+            }
+        }
+    }
+
+    impl<'a, I: Iterator<Item = &'a usize>> Iterator for Ranges<'a, usize, I> {
+        type Item = RangeInclusive<usize>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match (self.iter.next(), self.current_range.take()) {
+                (Some(current), None) => {
+                    self.current_range = Some(*current..*current);
+                    self.next()
+                }
+                (None, Some(current_range)) => {
+                    self.current_range = None;
+                    Some(current_range.start..=current_range.end)
+                }
+                (Some(current), Some(mut current_range)) if *current == current_range.end + 1 => {
+                    current_range.end = *current;
+                    self.current_range = Some(current_range);
+                    self.next()
+                }
+                (Some(current), Some(current_range)) => {
+                    self.current_range = Some(*current..*current);
+                    Some(current_range.start..=current_range.end)
+                }
+                (None, None) => None,
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::collections::BTreeSet;
+
+        use itertools::Itertools;
+
+        use super::BTreeSetRanges;
+
+        #[test]
+        fn ranges() {
+            let input: BTreeSet<usize> = [1, 2, 3, 6, 7, 12, 16, 17, 18, 19].into();
+
+            let ranges = input.ranges().collect_vec();
+
+            assert_eq!(ranges[0].clone().count(), 3);
+            assert_eq!(ranges[1].clone().count(), 2);
+            assert_eq!(ranges[2].clone().count(), 1);
+            assert_eq!(ranges[3].clone().count(), 4);
+            assert_eq!(ranges, vec![1..=3, 6..=7, 12..=12, 16..=19]);
+        }
+
+        #[test]
+        fn ranges_rev() {
+            let input: BTreeSet<usize> = [1, 2, 3, 6, 7, 12, 16, 17, 18, 19].into();
+
+            let ranges = input.ranges().rev().collect_vec();
+
+            dbg!(&ranges);
+            assert_eq!(ranges[0].clone().count(), 4);
+            assert_eq!(ranges[1].clone().count(), 1);
+            assert_eq!(ranges[2].clone().count(), 2);
+            assert_eq!(ranges[3].clone().count(), 3);
+            assert_eq!(
+                ranges,
+                vec![1..=3, 6..=7, 12..=12, 16..=19].into_iter().rev().collect_vec()
+            );
+        }
+    }
+}

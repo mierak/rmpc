@@ -1,4 +1,7 @@
-use std::{collections::BTreeSet, str::FromStr};
+use std::{
+    ops::{Range, RangeInclusive},
+    str::FromStr,
+};
 
 use anyhow::Result;
 use derive_more::Deref;
@@ -100,6 +103,7 @@ pub trait MpdClient {
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     fn find(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>>;
     fn search(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>>;
+    fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()>;
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()>;
     fn find_one(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Option<Song>>;
     fn find_add(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<()>;
@@ -314,6 +318,11 @@ impl MpdClient for Client<'_> {
 
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
         self.send(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()> {
+        self.send(&format!("move {} {}", from.as_mpd_range(), to.as_mpd_str()))
             .and_then(ProtoClient::read_ok)
     }
 
@@ -560,6 +569,18 @@ pub struct SingleOrRange {
     pub end: Option<usize>,
 }
 
+impl From<RangeInclusive<usize>> for SingleOrRange {
+    fn from(value: RangeInclusive<usize>) -> Self {
+        Self::range(*value.start(), value.end() + 1)
+    }
+}
+
+impl From<Range<usize>> for SingleOrRange {
+    fn from(value: Range<usize>) -> Self {
+        Self::range(value.start, value.end)
+    }
+}
+
 #[derive(Deref)]
 pub struct Ranges(Vec<SingleOrRange>);
 
@@ -577,110 +598,6 @@ impl SingleOrRange {
         } else {
             format!("\"{}\"", self.start)
         }
-    }
-}
-
-impl std::fmt::Display for Ranges {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut iter = self.0.iter().peekable();
-        while let Some(range) = iter.next() {
-            if let Some(end) = range.end {
-                write!(f, "[{}:{}]", range.start, end)?;
-            } else {
-                write!(f, "[{}]", range.start)?;
-            }
-            if iter.peek().is_some() {
-                write!(f, ", ")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl From<&BTreeSet<usize>> for Ranges {
-    fn from(value: &BTreeSet<usize>) -> Self {
-        let res = value
-            .iter()
-            .fold(vec![Vec::default()], |mut acc: Vec<Vec<usize>>, val| {
-                let last = acc.last_mut().expect("There should always be at least one element. Using malformed range could potentionally result in loss of data se better to panic here.");
-                if last.is_empty() || last.last().is_some_and(|v| v == &(val - 1)) {
-                    last.push(*val);
-                } else {
-                    acc.push(vec![*val]);
-                }
-                acc
-            });
-        Ranges(
-            res.iter()
-                .filter_map(|range| {
-                    if range.is_empty() {
-                        None
-                    } else if range.len() == 1 {
-                        Some(SingleOrRange {
-                            start: range[0],
-                            end: None,
-                        })
-                    } else {
-                        Some(SingleOrRange {
-                            start: range[0],
-                            end: Some(range[range.len() - 1] + 1),
-                        })
-                    }
-                })
-                .collect::<Vec<_>>(),
-        )
-    }
-}
-
-#[cfg(test)]
-mod ranges_tests {
-    use std::collections::BTreeSet;
-
-    use super::{Ranges, SingleOrRange};
-
-    #[test]
-    fn simply_works() {
-        let input = &BTreeSet::from([20, 1, 2, 3, 10, 16, 21, 22, 23, 24, 15, 25]);
-
-        let result: Ranges = input.into();
-        let result = result.0;
-
-        assert_eq!(result[0], SingleOrRange { start: 1, end: Some(4) });
-        assert_eq!(result[1], SingleOrRange { start: 10, end: None });
-        assert_eq!(
-            result[2],
-            SingleOrRange {
-                start: 15,
-                end: Some(17)
-            }
-        );
-        assert_eq!(
-            result[3],
-            SingleOrRange {
-                start: 20,
-                end: Some(26)
-            }
-        );
-    }
-
-    #[test]
-    fn empty_set() {
-        let input = &BTreeSet::new();
-
-        let result: Ranges = input.into();
-        let result = result.0;
-
-        assert_eq!(result.len(), 0);
-    }
-
-    #[test]
-    fn single_value() {
-        let input = &BTreeSet::from([5]);
-
-        let result: Ranges = input.into();
-        let result = result.0;
-
-        assert_eq!(result[0], SingleOrRange { start: 5, end: None });
     }
 }
 
