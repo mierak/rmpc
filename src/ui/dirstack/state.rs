@@ -257,6 +257,15 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
+    pub fn invert_marked(&mut self) {
+        let Some(content_len) = self.content_len else {
+            log::warn!("Failed to invert marked items because content lenght is None");
+            return;
+        };
+        let all = (0..content_len).collect::<BTreeSet<usize>>();
+        self.marked = all.difference(&self.marked).copied().collect();
+    }
+
     pub fn get_marked(&self) -> &BTreeSet<usize> {
         &self.marked
     }
@@ -777,6 +786,25 @@ mod tests {
             subject.toggle_mark(10);
 
             assert_eq!(subject.marked, BTreeSet::from([10]));
+        }
+
+        #[test]
+        fn inverts_marked() {
+            let mut subject: DirState<ListState> = DirState {
+                content_len: Some(20),
+                ..DirState::default()
+            };
+            subject.mark(5);
+            subject.mark(10);
+            subject.mark(15);
+            assert_eq!(subject.marked, BTreeSet::from([5, 10, 15]));
+
+            subject.invert_marked();
+
+            assert_eq!(
+                subject.marked,
+                BTreeSet::from([0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19])
+            );
         }
     }
 

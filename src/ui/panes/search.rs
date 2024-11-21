@@ -725,6 +725,7 @@ impl Pane for SearchPane {
                         CommonAction::NextResult => {}
                         CommonAction::PreviousResult => {}
                         CommonAction::Select => {}
+                        CommonAction::InvertSelection => {}
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
@@ -886,6 +887,11 @@ impl Pane for SearchPane {
                             self.songs_dir.toggle_mark_selected();
                             self.songs_dir
                                 .next(context.config.scrolloff, context.config.wrap_navigation);
+
+                            context.render()?;
+                        }
+                        CommonAction::InvertSelection => {
+                            self.songs_dir.invert_marked();
 
                             context.render()?;
                         }

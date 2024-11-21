@@ -356,6 +356,11 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
 
                 context.render()?;
             }
+            CommonAction::InvertSelection => {
+                self.stack_mut().current_mut().invert_marked();
+
+                context.render()?;
+            }
             CommonAction::Select => {
                 self.stack_mut().current_mut().toggle_mark_selected();
                 self.stack_mut()

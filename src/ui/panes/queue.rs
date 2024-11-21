@@ -587,6 +587,11 @@ impl Pane for QueuePane {
                         context.render()?;
                     };
                 }
+                CommonAction::InvertSelection => {
+                    self.scrolling_state.invert_marked();
+
+                    context.render()?;
+                }
                 CommonAction::Add => {}
                 CommonAction::AddAll => {}
                 CommonAction::Delete => {}

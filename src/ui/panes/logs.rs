@@ -189,6 +189,7 @@ impl Pane for LogsPane {
                 CommonAction::PreviousResult => {}
                 CommonAction::Add => {}
                 CommonAction::Select => {}
+                CommonAction::InvertSelection => {}
                 CommonAction::Delete => {}
                 CommonAction::Rename => {}
                 CommonAction::MoveUp => {}
