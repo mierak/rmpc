@@ -100,6 +100,7 @@ pub trait MpdClient {
     fn add(&mut self, path: &str) -> MpdResult<()>;
     fn clear(&mut self) -> MpdResult<()>;
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
+    fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     fn find(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>>;
     fn search(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>>;
@@ -314,6 +315,11 @@ impl MpdClient for Client<'_> {
 
     fn delete_id(&mut self, id: u32) -> MpdResult<()> {
         self.send(&format!("deleteid \"{id}\"")).and_then(ProtoClient::read_ok)
+    }
+
+    fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()> {
+        self.send(&format!("delete {}", songs.as_mpd_range()))
+            .and_then(ProtoClient::read_ok)
     }
 
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
