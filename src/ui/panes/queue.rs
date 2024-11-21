@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use itertools::Itertools;
@@ -19,6 +17,7 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     shared::{
+        ext::btreeset_ranges::BTreeSetRanges,
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
@@ -454,20 +453,18 @@ impl Pane for QueuePane {
                     if context.queue.is_empty() {
                         return Ok(());
                     }
-                    if let Some(0) = self.scrolling_state.marked.first() {
+
+                    let marked = &self.scrolling_state.marked;
+                    if let Some(0) = marked.first() {
                         return Ok(());
                     }
 
-                    let mut new_marked = BTreeSet::new();
-                    for idx in &self.scrolling_state.marked {
-                        let Some(song_id) = context.queue.get(*idx).map(|song| song.id) else {
-                            return Ok(());
-                        };
-                        let new_idx = idx.saturating_sub(1);
-                        new_marked.insert(new_idx);
-
-                        client.move_id(song_id, QueueMoveTarget::Absolute(new_idx))?;
+                    for range in marked.ranges() {
+                        let new_idx = range.start().saturating_sub(1);
+                        client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
                     }
+
+                    let mut new_marked = marked.iter().map(|i| i.saturating_sub(1)).collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
                     return Ok(());
@@ -476,22 +473,20 @@ impl Pane for QueuePane {
                     if context.queue.is_empty() {
                         return Ok(());
                     }
-                    if let Some(last_idx) = self.scrolling_state.marked.last() {
+
+                    let marked = &self.scrolling_state.marked;
+                    if let Some(last_idx) = marked.last() {
                         if *last_idx == context.queue.len() - 1 {
                             return Ok(());
                         }
                     }
 
-                    let mut new_marked = BTreeSet::new();
-                    for idx in self.scrolling_state.marked.iter().rev() {
-                        let Some(song_id) = context.queue.get(*idx).map(|song| song.id) else {
-                            return Ok(());
-                        };
-                        let new_idx = idx.saturating_add(1);
-                        new_marked.insert(new_idx);
-
-                        client.move_id(song_id, QueueMoveTarget::Absolute(new_idx))?;
+                    for range in marked.ranges().rev() {
+                        let new_idx = range.start().saturating_add(1);
+                        client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
                     }
+
+                    let mut new_marked = marked.iter().map(|i| i.saturating_add(1)).collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
                     return Ok(());

@@ -515,6 +515,10 @@ impl MpdClient for TestMpdClient {
     fn decoders(&mut self) -> MpdResult<crate::mpd::commands::decoders::Decoders> {
         todo!("Not yet implemented")
     }
+
+    fn move_in_queue(&mut self, _from: SingleOrRange, _to: QueueMoveTarget) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }
 
 impl SocketClient for TestMpdClient {
