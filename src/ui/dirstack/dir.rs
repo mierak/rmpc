@@ -134,8 +134,16 @@ impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
         &self.state.marked
     }
 
+    pub fn marked_mut(&mut self) -> &mut BTreeSet<usize> {
+        &mut self.state.marked
+    }
+
     pub fn unmark_all(&mut self) {
         self.state.unmark_all();
+    }
+
+    pub fn invert_marked(&mut self) {
+        self.state.invert_marked();
     }
 
     pub fn toggle_mark_selected(&mut self) -> bool {
