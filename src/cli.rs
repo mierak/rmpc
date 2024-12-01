@@ -9,21 +9,14 @@ use crate::{
         commands::{volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{lrc::LrcIndex, macros::status_error},
-    WorkRequest,
+    shared::{lrc::LrcIndex, macros::status_error, ytdlp::YtDlp},
 };
 use anyhow::bail;
 
 impl Command {
-    pub fn execute<F, C>(
-        self,
-        client: &mut C,
-        config: &'static Config,
-        mut request_work: F,
-    ) -> Result<(), anyhow::Error>
+    pub fn execute<C>(self, client: &mut C, config: &Config) -> Result<()>
     where
         C: MpdClient,
-        F: FnMut(WorkRequest, &mut C),
     {
         match self {
             ref cmd @ Command::Update { ref path, wait } | ref cmd @ Command::Rescan { ref path, wait } => {
@@ -72,7 +65,7 @@ impl Command {
             Command::Clear => client.clear()?,
             Command::Add { file } => client.add(&file)?,
             Command::AddYt { url } => {
-                request_work(WorkRequest::DownloadYoutube { url }, client);
+                YtDlp::download_and_add(config, &url, client)?;
             }
             Command::Decoders => println!("{}", serde_json::ser::to_string(&client.decoders()?)?),
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),

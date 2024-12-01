@@ -31,7 +31,6 @@ use config::{
     tabs::{Pane, PaneType},
     ConfigFile,
 };
-use context::AppContext;
 use crossterm::event::{Event, KeyEvent};
 use itertools::Itertools;
 use log::{error, info, trace, warn};
@@ -54,10 +53,7 @@ use shared::{
     tmux,
     ytdlp::YtDlp,
 };
-use ui::{
-    panes::{browser::DirOrSong, Panes, PanesDiscriminants},
-    Level, UiAppEvent, UiEvent,
-};
+use ui::{panes::browser::DirOrSong, Level, UiAppEvent, UiEvent};
 
 use crate::{
     config::Config,
@@ -106,13 +102,11 @@ pub enum WorkRequest {
     IndexLyrics { lyrics_dir: &'static str },
     MpdQuery(MpdQuery),
     MpdCommand(MpdCommand2),
+    Command(Command),
 }
 
 #[derive(Debug)]
 pub enum WorkDone {
-    YoutubeDowloaded {
-        file_path: String,
-    },
     LyricsIndexed {
         index: LrcIndex,
     },
@@ -253,22 +247,7 @@ fn main() -> Result<()> {
                 )?,
             }));
             let mut client = Client::init(config.address, config.password, "", true)?;
-            cmd.execute(&mut client, config, |work_request, c| {
-                match handle_work_request(c, work_request, config) {
-                    Ok(WorkDone::YoutubeDowloaded { file_path }) => match c.add(&file_path) {
-                        Ok(()) => {}
-                        Err(err) => {
-                            log::error!(path = file_path.as_str(), err = err.to_string().as_str(); "Failed to add already downloaded youtube video to queue");
-                        }
-                    },
-                    Ok(WorkDone::LyricsIndexed { .. }) => {}, // lrc indexing does not make sense in cli mode
-                    Ok(WorkDone::MpdCommandFinished { .. }) => {}, // lrc indexing does not make sense in cli mode
-                    Ok(WorkDone::None) => {}, // lrc indexing does not make sense in cli mode
-                    Err(err) => {
-                        log::error!(err = err.to_string().as_str(); "Failed to handle work request");
-                    }
-                }
-            })?;
+            cmd.execute(&mut client, config)?;
         }
         None => {
             let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
@@ -372,23 +351,9 @@ fn main() -> Result<()> {
 fn handle_work_request(client: &mut Client<'_>, request: WorkRequest, config: &Config) -> Result<WorkDone> {
     match request {
         WorkRequest::DownloadYoutube { url } => {
-            let Some(cache_dir) = config.cache_dir else {
-                bail!("Youtube support requires 'cache_dir' to be configured")
-            };
+            YtDlp::download_and_add(config, &url, client)?;
 
-            if let Err(unsupported_list) = shared::dependencies::is_youtube_supported(config.address) {
-                status_warn!(
-                    "Youtube support requires the following and may thus not work properly: {}",
-                    unsupported_list.join(", ")
-                );
-            } else {
-                status_info!("Downloading '{url}'");
-            }
-
-            let ytdlp = YtDlp::new(cache_dir)?;
-            let file_path = ytdlp.download(&url)?;
-
-            Ok(WorkDone::YoutubeDowloaded { file_path })
+            Ok(WorkDone::None)
         }
         WorkRequest::IndexLyrics { lyrics_dir } => {
             let start = std::time::Instant::now();
@@ -403,6 +368,10 @@ fn handle_work_request(client: &mut Client<'_>, request: WorkRequest, config: &C
         }),
         WorkRequest::MpdCommand(command) => {
             (command.callback)(client)?;
+            Ok(WorkDone::None)
+        }
+        WorkRequest::Command(command) => {
+            command.execute(client, config)?;
             Ok(WorkDone::None)
         }
     }
@@ -491,7 +460,7 @@ fn main_task<B: Backend + std::io::Write>(
 
         if let Some(event) = event {
             match event {
-                AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context, &mut client) {
+                AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context) {
                     Ok(ui::KeyHandleResult::None) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
                         if let Err(err) = ui.on_event(UiEvent::Exit, &mut context) {
@@ -549,16 +518,6 @@ fn main_task<B: Backend + std::io::Write>(
                     full_rerender_wanted = wanted;
                 }
                 AppEvent::WorkDone(Ok(result)) => match result {
-                    WorkDone::YoutubeDowloaded { file_path } => {
-                        match client.add(&file_path) {
-                            Ok(()) => {
-                                status_info!("File '{file_path}' added to the queue");
-                            }
-                            Err(err) => {
-                                status_error!(err:?; "Failed to add '{file_path}' to the queue");
-                            }
-                        };
-                    }
                     WorkDone::LyricsIndexed { index } => {
                         context.lrc_index = index;
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context) {
@@ -567,7 +526,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => {
                         if let Err(err) = ui.on_command_finished(id, target, data, &mut context) {
-                            // error!(error:? = err, event:?; "UI failed to resize event");
+                            error!(error:? = err; "UI failed to handle command finished event");
                         }
                     }
                     WorkDone::None => {}
@@ -577,7 +536,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::Resized { columns, rows } => {
                     if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context) {
-                        error!(error:? = err, event:?; "UI failed to resize event");
+                        error!(error:? = err, event:?; "UI failed to handle resize event");
                     }
                     full_rerender_wanted = true;
                     render_wanted = true;

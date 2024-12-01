@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use crate::config::tabs::PaneType;
+use crate::{config::tabs::PaneType, WorkRequest};
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -308,12 +308,7 @@ impl<'ui> Ui<'ui> {
         Ok(())
     }
 
-    pub fn handle_key(
-        &mut self,
-        key: &mut KeyEvent,
-        context: &mut AppContext,
-        client: &mut Client<'_>,
-    ) -> Result<KeyHandleResult> {
+    pub fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<KeyHandleResult> {
         if let Some(ref mut command) = self.command {
             let action = key.as_common_action(context);
             if let Some(CommonAction::Close) = action {
@@ -327,11 +322,9 @@ impl<'ui> Ui<'ui> {
                 self.command = None;
                 match cmd {
                     Ok(Args { command: Some(cmd), .. }) => {
-                        cmd.execute(client, context.config, |request, _| {
-                            if let Err(err) = context.work_sender.send(request) {
-                                status_error!("Failed to send work request: {}", err);
-                            }
-                        })?;
+                        if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
+                            log::error!("Failed to send command");
+                        }
                     }
                     Err(err) => {
                         status_error!("Failed to parse command. {:?}", err);
@@ -373,11 +366,9 @@ impl<'ui> Ui<'ui> {
 
                     self.command = None;
                     if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                        cmd.execute(client, context.config, |request, _| {
-                            if let Err(err) = context.work_sender.send(request) {
-                                status_error!("Failed to send work request: {}", err);
-                            }
-                        })?;
+                        if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
+                            log::error!("Failed to send command");
+                        }
                     }
                 }
                 GlobalAction::CommandMode => {
