@@ -1,5 +1,6 @@
 #![deny(clippy::unwrap_used, clippy::pedantic)]
 #![allow(
+    clippy::single_match,
     clippy::module_name_repetitions,
     clippy::unused_self,
     clippy::unnested_or_patterns,
@@ -14,11 +15,11 @@
     unused_macros
 )]
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     io::{Read, Write},
     ops::Sub,
     path::PathBuf,
-    sync::mpsc::TryRecvError,
+    sync::mpsc::{Receiver, Sender, TryRecvError},
     time::Duration,
 };
 
@@ -27,16 +28,18 @@ use clap::Parser;
 use cli::run_external;
 use config::{
     cli::{Args, Command},
+    tabs::{Pane, PaneType},
     ConfigFile,
 };
+use context::AppContext;
 use crossterm::event::{Event, KeyEvent};
 use itertools::Itertools;
 use log::{error, info, trace, warn};
 use mpd::{
     client::Client,
-    commands::{idle::IdleEvent, State},
+    commands::{idle::IdleEvent, Song, State},
 };
-use ratatui::{prelude::Backend, Terminal};
+use ratatui::{prelude::Backend, widgets::ListItem, Terminal};
 use rustix::path::Arg;
 use shared::{
     dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
@@ -51,7 +54,10 @@ use shared::{
     tmux,
     ytdlp::YtDlp,
 };
-use ui::{Level, UiAppEvent, UiEvent};
+use ui::{
+    panes::{browser::DirOrSong, Panes, PanesDiscriminants},
+    Level, UiAppEvent, UiEvent,
+};
 
 use crate::{
     config::Config,
@@ -72,17 +78,64 @@ mod mpd;
 mod shared;
 mod ui;
 
+pub struct MpdQuery {
+    id: &'static str,
+    target: PaneType,
+    callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdCommandResult> + Send>,
+}
+
+pub struct MpdCommand2 {
+    callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send>,
+}
+
+impl std::fmt::Debug for MpdQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for MpdCommand2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub enum WorkRequest {
     DownloadYoutube { url: String },
     IndexLyrics { lyrics_dir: &'static str },
+    MpdQuery(MpdQuery),
+    MpdCommand(MpdCommand2),
 }
 
 #[derive(Debug)]
 pub enum WorkDone {
-    YoutubeDowloaded { file_path: String },
-    LyricsIndexed { index: LrcIndex },
+    YoutubeDowloaded {
+        file_path: String,
+    },
+    LyricsIndexed {
+        index: LrcIndex,
+    },
+    MpdCommandFinished {
+        id: &'static str,
+        target: PaneType,
+        data: MpdCommandResult,
+    },
+    None,
 }
+
+#[derive(Debug)]
+pub enum MpdCommandResult {
+    Preview(Option<Vec<ListItem<'static>>>),
+    SongsList(Vec<Song>),
+    DirOrSong(Vec<DirOrSong>),
+    LsInfo(Vec<String>),
+    AddToPlaylist { playlists: Vec<String>, song_file: String },
+    AlbumArt(Option<Vec<u8>>),
+}
+
+// #[derive(Debug)]
+// pub struct MpdCommandResult(MpdCommand);
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -201,7 +254,7 @@ fn main() -> Result<()> {
             }));
             let mut client = Client::init(config.address, config.password, "", true)?;
             cmd.execute(&mut client, config, |work_request, c| {
-                match handle_work_request(work_request, config) {
+                match handle_work_request(c, work_request, config) {
                     Ok(WorkDone::YoutubeDowloaded { file_path }) => match c.add(&file_path) {
                         Ok(()) => {}
                         Err(err) => {
@@ -209,6 +262,8 @@ fn main() -> Result<()> {
                         }
                     },
                     Ok(WorkDone::LyricsIndexed { .. }) => {}, // lrc indexing does not make sense in cli mode
+                    Ok(WorkDone::MpdCommandFinished { .. }) => {}, // lrc indexing does not make sense in cli mode
+                    Ok(WorkDone::None) => {}, // lrc indexing does not make sense in cli mode
                     Err(err) => {
                         log::error!(err = err.to_string().as_str(); "Failed to handle work request");
                     }
@@ -267,10 +322,15 @@ fn main() -> Result<()> {
                 render_loop.start()?;
             }
 
+            let wc = try_ret!(
+                Client::init(context.config.address, context.config.password, "worker", true),
+                "Failed to connect to MPD"
+            );
+
             let tx_clone = tx.clone();
             std::thread::Builder::new()
                 .name("worker task".to_owned())
-                .spawn(|| worker_task(worker_rx, tx_clone, context.config))?;
+                .spawn(|| worker_task(worker_rx, tx_clone, wc, context.config))?;
 
             let tx_clone = tx.clone();
 
@@ -309,7 +369,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone> {
+fn handle_work_request(client: &mut Client<'_>, request: WorkRequest, config: &Config) -> Result<WorkDone> {
     match request {
         WorkRequest::DownloadYoutube { url } => {
             let Some(cache_dir) = config.cache_dir else {
@@ -336,28 +396,60 @@ fn handle_work_request(request: WorkRequest, config: &Config) -> Result<WorkDone
             log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
             Ok(WorkDone::LyricsIndexed { index })
         }
+        WorkRequest::MpdQuery(query) => Ok(WorkDone::MpdCommandFinished {
+            id: query.id,
+            target: query.target,
+            data: (query.callback)(client)?,
+        }),
+        WorkRequest::MpdCommand(command) => {
+            (command.callback)(client)?;
+            Ok(WorkDone::None)
+        }
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
-fn worker_task(
-    work_request_receiver: std::sync::mpsc::Receiver<WorkRequest>,
-    work_result_sender: std::sync::mpsc::Sender<AppEvent>,
-    config: &Config,
-) {
-    while let Ok(request) = work_request_receiver.recv() {
-        match handle_work_request(request, config) {
-            Ok(result) => {
-                try_cont!(
-                    work_result_sender.send(AppEvent::WorkDone(Ok(result))),
-                    "Failed to send work done success event"
-                );
+fn worker_task(rx: Receiver<WorkRequest>, tx: Sender<AppEvent>, mut client: Client<'_>, config: &Config) {
+    let tx = tx;
+    let rx = rx;
+
+    let mut buffer = VecDeque::new();
+    loop {
+        if let Ok(request) = rx.recv() {
+            buffer.push_back(request);
+        }
+        while let Ok(request) = rx.try_recv() {
+            buffer.push_back(request);
+        }
+
+        let mut queue: VecDeque<_> = std::mem::take(&mut buffer);
+
+        while let Some(request) = queue.pop_front() {
+            if let WorkRequest::MpdQuery(MpdQuery { id, target, .. }) = request {
+                if queue.iter().any(|r| match r {
+                    WorkRequest::MpdQuery(MpdQuery {
+                        id: id2,
+                        target: target2,
+                        ..
+                    }) => id == *id2 && target == *target2,
+                    _ => false,
+                }) {
+                    continue;
+                }
             }
-            Err(err) => {
-                try_cont!(
-                    work_result_sender.send(AppEvent::WorkDone(Err(err))),
-                    "Failed to send work done error event"
-                );
+
+            match handle_work_request(&mut client, request, config) {
+                Ok(result) => {
+                    try_cont!(
+                        tx.send(AppEvent::WorkDone(Ok(result))),
+                        "Failed to send work done success event"
+                    );
+                }
+                Err(err) => {
+                    try_cont!(
+                        tx.send(AppEvent::WorkDone(Err(err))),
+                        "Failed to send work done error event"
+                    );
+                }
             }
         }
     }
@@ -378,8 +470,7 @@ fn main_task<B: Backend + std::io::Write>(
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
     let mut additional_evs = HashSet::new();
-    ui.before_show(&mut context, &mut client)
-        .expect("Initial render init to succeed");
+    ui.before_show(&mut context).expect("Initial render init to succeed");
 
     loop {
         let now = std::time::Instant::now();
@@ -403,7 +494,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context, &mut client) {
                     Ok(ui::KeyHandleResult::None) => continue,
                     Ok(ui::KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context, &mut client) {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context) {
                             error!(error:? = err, event:?; "UI failed to handle quit event");
                         }
                         break;
@@ -413,7 +504,7 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                 },
-                AppEvent::UserMouseInput(ev) => match ui.handle_mouse_event(ev, &mut client, &mut context) {
+                AppEvent::UserMouseInput(ev) => match ui.handle_mouse_event(ev, &mut context) {
                     Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
@@ -425,7 +516,7 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::Log(msg) => {
-                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut context, &mut client) {
+                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut context) {
                         error!(error:? = err; "UI failed to handle log event");
                     }
                 }
@@ -433,7 +524,7 @@ fn main_task<B: Backend + std::io::Write>(
                     match handle_idle_event(event, &mut context, &mut client, &mut render_loop, &mut additional_evs) {
                         Ok(()) => {
                             for ev in additional_evs.drain() {
-                                if let Err(err) = ui.on_event(ev, &mut context, &mut client) {
+                                if let Err(err) = ui.on_event(ev, &mut context) {
                                     status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                                 }
                             }
@@ -470,22 +561,28 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     WorkDone::LyricsIndexed { index } => {
                         context.lrc_index = index;
-                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context, &mut client) {
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context) {
                             error!(error:? = err; "UI failed to resize event");
                         }
                     }
+                    WorkDone::MpdCommandFinished { id, target, data } => {
+                        if let Err(err) = ui.on_command_finished(id, target, data, &mut context) {
+                            // error!(error:? = err, event:?; "UI failed to resize event");
+                        }
+                    }
+                    WorkDone::None => {}
                 },
                 AppEvent::WorkDone(Err(err)) => {
                     status_error!("{}", err);
                 }
                 AppEvent::Resized { columns, rows } => {
-                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context, &mut client) {
+                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context) {
                         error!(error:? = err, event:?; "UI failed to resize event");
                     }
                     full_rerender_wanted = true;
                     render_wanted = true;
                 }
-                AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut context, &mut client) {
+                AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut context) {
                     Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());

@@ -3,21 +3,21 @@ use ratatui::widgets::ListItem;
 use super::{dir::Dir, state::DirState, DirStackItem};
 
 #[derive(Debug)]
-pub struct DirStack<T: std::fmt::Debug + DirStackItem> {
+pub struct DirStack<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     current: Dir<T>,
     others: Vec<Dir<T>>,
     preview: Option<Vec<ListItem<'static>>>,
     path: Vec<String>,
 }
 
-impl<T: std::fmt::Debug + DirStackItem> Default for DirStack<T> {
+impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for DirStack<T> {
     fn default() -> Self {
         DirStack::new(Vec::default())
     }
 }
 
 #[allow(dead_code)]
-impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
+impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
     pub fn new(root: Vec<T>) -> Self {
         let mut result = Self {
             others: Vec::new(),
@@ -74,10 +74,21 @@ impl<T: std::fmt::Debug + DirStackItem> DirStack<T> {
         self.preview.as_ref()
     }
 
+    pub fn clear_preview(&mut self) {
+        if let Some(ref mut p) = self.preview {
+            p.clear();
+        }
+    }
+
     /// Returns the element at the second element from the top of the stack
     pub fn set_preview(&mut self, preview: Option<Vec<ListItem<'static>>>) -> &Self {
         self.preview = preview;
         self
+    }
+    pub fn replace(&mut self, head: Vec<T>) {
+        if self.pop().is_some() {
+            self.push(head);
+        }
     }
 
     pub fn push(&mut self, head: Vec<T>) {

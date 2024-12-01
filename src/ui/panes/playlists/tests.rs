@@ -38,7 +38,7 @@ mod on_idle_event {
             );
 
             client.playlists.remove(0);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(
                 screen.stack.current().selected(),
@@ -60,7 +60,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(2, 0);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 2);
         }
@@ -77,7 +77,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(playlist_count - 1, 0);
 
             client.playlists.pop();
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(
                 screen.stack.current().selected_with_idx().unwrap().0,
@@ -96,7 +96,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(0, 0);
 
             client.playlists.remove(0);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
         }
@@ -118,7 +118,7 @@ mod on_idle_event {
             client.playlists[2].songs_indices.remove(0);
 
             client.playlists.remove(1);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(
                 screen.stack.previous().selected(),
@@ -144,7 +144,7 @@ mod on_idle_event {
             client.playlists[2].songs_indices.remove(last_song_idx);
 
             client.playlists.remove(1);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(
                 screen.stack.previous().selected(),
@@ -170,7 +170,7 @@ mod on_idle_event {
 
             client.playlists.remove(1);
 
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(
                 screen.stack.previous().selected(),
@@ -193,7 +193,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(5, 0);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 5);
@@ -211,7 +211,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(playlist_len - 1, 0);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(
@@ -231,7 +231,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(0, 0);
 
             client.playlists.remove(2);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 2);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 0);
@@ -248,7 +248,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(5, 0);
 
             client.playlists.remove(0);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(screen.stack.previous().selected_with_idx().unwrap().0, 0);
             assert_eq!(screen.stack.current().selected_with_idx().unwrap().0, 5);
@@ -266,7 +266,7 @@ mod on_idle_event {
             screen.stack.current_mut().select_idx(5, 0);
 
             client.playlists.remove(playlist_count - 1);
-            screen.on_event(&mut event, &mut client, &app_context).unwrap();
+            screen.on_event(&mut event, &app_context).unwrap();
 
             assert_eq!(
                 screen.stack.previous().selected_with_idx().unwrap().0,
@@ -280,42 +280,36 @@ mod on_idle_event {
 #[fixture]
 fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&mut client, &app_context).unwrap();
+    screen.before_show(&app_context).unwrap();
     screen.stack.current_mut().select_idx(0, 0);
     let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
-    screen
-        .handle_common_action(&mut right.into(), &mut client, &app_context)
-        .unwrap();
+    screen.handle_common_action(&mut right.into(), &app_context).unwrap();
     screen
 }
 
 #[fixture]
 fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&mut client, &app_context).unwrap();
+    screen.before_show(&app_context).unwrap();
     screen.stack.current_mut().select_idx(2, 0);
     let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
-    screen
-        .handle_common_action(&mut right.into(), &mut client, &app_context)
-        .unwrap();
+    screen.handle_common_action(&mut right.into(), &app_context).unwrap();
     screen
 }
 
 #[fixture]
 fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&mut client, &app_context).unwrap();
+    screen.before_show(&app_context).unwrap();
     screen.stack.current_mut().select_idx(2, 0);
     let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
-    screen
-        .handle_common_action(&mut right.into(), &mut client, &app_context)
-        .unwrap();
+    screen.handle_common_action(&mut right.into(), &app_context).unwrap();
     screen
 }
 
 #[fixture]
 fn screen(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&mut client, &app_context).unwrap();
+    screen.before_show(&app_context).unwrap();
     screen
 }

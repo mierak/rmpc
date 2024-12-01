@@ -1,6 +1,5 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-#[cfg(debug_assertions)]
 use crate::config::tabs::PaneType;
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
@@ -45,6 +44,7 @@ use crate::{
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    MpdCommandResult,
 };
 use crate::{context::AppContext, mpd::version::Version};
 
@@ -156,10 +156,10 @@ impl<'ui> Ui<'ui> {
         screen_call!(self, post_render(frame, context))
     }
 
-    fn change_tab(&mut self, new_tab: TabName, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        screen_call!(self, on_hide(client, &context))?;
+    fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
+        screen_call!(self, on_hide(&context))?;
         self.active_tab = new_tab;
-        screen_call!(self, before_show(client, &context))?;
+        screen_call!(self, before_show(&context))?;
         Ok(())
     }
 
@@ -237,29 +237,30 @@ impl<'ui> Ui<'ui> {
         Ok(())
     }
 
-    pub fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    pub fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         if let Some(ref mut modal) = self.modals.last_mut() {
-            modal.handle_mouse_event(event, client, context)?;
+            modal.handle_mouse_event(event, context)?;
             return Ok(());
         }
 
         match event.kind {
             MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
-                client.pause_toggle()?;
-                context.render()?;
+                context.command(Box::new(move |client| {
+                    client.pause_toggle()?;
+                    Ok(())
+                }));
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Header].contains(event.into()) => {
-                client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
-                context.render()?;
+                context.command(Box::new(|client| {
+                    client.volume(ValueChange::Increase(context.config.volume_step.into()))?;
+                    Ok(())
+                }));
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Header].contains(event.into()) => {
-                client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
-                context.render()?;
+                context.command(Box::new(|client| {
+                    client.volume(ValueChange::Decrease(context.config.volume_step.into()))?;
+                    Ok(())
+                }));
             }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
                 if !matches!(context.status.state, State::Play | State::Pause) {
@@ -271,16 +272,19 @@ impl<'ui> Ui<'ui> {
                     .duration
                     .mul_f32(f32::from(event.x) / f32::from(self.areas[Areas::Bar].width))
                     .as_secs();
-                client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
+                context.command(Box::new(move |client| {
+                    client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
+                    Ok(())
+                }));
 
                 context.render()?;
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Tabs].contains(event.into()) => {
-                self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
+                self.change_tab(context.config.next_screen(self.active_tab), context)?;
                 context.render()?;
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Tabs].contains(event.into()) => {
-                self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
+                self.change_tab(context.config.prev_screen(self.active_tab), context)?;
                 context.render()?;
             }
             MouseEventKind::LeftClick if self.areas[Areas::Tabs].contains(event.into()) => {
@@ -290,14 +294,14 @@ impl<'ui> Ui<'ui> {
                     .and_then(|idx| context.config.tabs.names.get(idx))
                 {
                     if &self.active_tab != tab_name {
-                        self.change_tab(*tab_name, client, context)?;
+                        self.change_tab(*tab_name, context)?;
                         context.render()?;
                         return Ok(());
                     }
                 }
             }
             _ if self.areas[Areas::Content].contains(event.into()) => {
-                screen_call!(self, handle_mouse_event(event, client, context))?;
+                screen_call!(self, handle_mouse_event(event, context))?;
             }
             _ => {}
         }
@@ -355,11 +359,11 @@ impl<'ui> Ui<'ui> {
         }
 
         if let Some(ref mut modal) = self.modals.last_mut() {
-            modal.handle_key(key, client, context)?;
+            modal.handle_key(key, context)?;
             return Ok(KeyHandleResult::None);
         }
 
-        screen_call!(self, handle_action(key, client, context))?;
+        screen_call!(self, handle_action(key, context))?;
 
         if let Some(action) = key.as_global_action(context) {
             match action {
@@ -380,48 +384,103 @@ impl<'ui> Ui<'ui> {
                     self.command = Some(String::new());
                     context.render()?;
                 }
-                GlobalAction::NextTrack if context.status.state == State::Play => client.next()?,
-                GlobalAction::PreviousTrack if context.status.state == State::Play => client.prev()?,
-                GlobalAction::Stop if matches!(context.status.state, State::Play | State::Pause) => client.stop()?,
-                GlobalAction::ToggleRepeat => client.repeat(!context.status.repeat)?,
-                GlobalAction::ToggleRandom => client.random(!context.status.random)?,
-                GlobalAction::ToggleSingle if client.version() < Version::new(0, 21, 0) => {
-                    client.single(context.status.single.cycle_pre_mpd_24())?;
+                GlobalAction::NextTrack if context.status.state == State::Play => {
+                    context.command(Box::new(move |client| {
+                        client.next()?;
+                        Ok(())
+                    }));
                 }
-                GlobalAction::ToggleSingle => client.single(context.status.single.cycle())?,
-                GlobalAction::ToggleConsume if client.version() < Version::new(0, 24, 0) => {
-                    client.consume(context.status.consume.cycle_pre_mpd_24())?;
+                GlobalAction::PreviousTrack if context.status.state == State::Play => {
+                    context.command(Box::new(move |client| {
+                        client.prev()?;
+                        Ok(())
+                    }));
+                }
+                GlobalAction::Stop if matches!(context.status.state, State::Play | State::Pause) => {
+                    context.command(Box::new(move |client| {
+                        client.stop()?;
+                        Ok(())
+                    }));
+                }
+                GlobalAction::ToggleRepeat => {
+                    let repeat = !context.status.repeat;
+                    context.command(Box::new(move |client| {
+                        client.repeat(repeat)?;
+                        Ok(())
+                    }));
+                }
+                GlobalAction::ToggleRandom => {
+                    let random = !context.status.random;
+                    context.command(Box::new(move |client| {
+                        client.random(random)?;
+                        Ok(())
+                    }));
+                }
+                GlobalAction::ToggleSingle => {
+                    let single = context.status.single;
+                    context.command(Box::new(move |client| {
+                        if client.version() < Version::new(0, 21, 0) {
+                            client.single(single.cycle_pre_mpd_24())?;
+                        } else {
+                            client.single(single.cycle())?;
+                        }
+                        client.stop()?;
+                        Ok(())
+                    }));
                 }
                 GlobalAction::ToggleConsume => {
-                    client.consume(context.status.consume.cycle())?;
+                    let consume = context.status.consume;
+                    context.command(Box::new(move |client| {
+                        if client.version() < Version::new(0, 24, 0) {
+                            client.consume(consume.cycle_pre_mpd_24())?;
+                        } else {
+                            client.consume(consume.cycle())?;
+                        }
+                        client.stop()?;
+                        Ok(())
+                    }));
                 }
-                GlobalAction::TogglePause if matches!(context.status.state, State::Play | State::Pause) => {
-                    client.pause_toggle()?;
-                }
+                GlobalAction::TogglePause if matches!(context.status.state, State::Play | State::Pause) => context
+                    .command(Box::new(move |client| {
+                        client.pause_toggle()?;
+                        Ok(())
+                    })),
                 GlobalAction::TogglePause => {}
                 GlobalAction::VolumeUp => {
-                    client.set_volume(*context.status.volume.inc_by(context.config.volume_step))?;
+                    let step = context.config.volume_step;
+                    context.command(Box::new(move |client| {
+                        client.volume(ValueChange::Increase(step.into()))?;
+                        Ok(())
+                    }));
                 }
                 GlobalAction::VolumeDown => {
-                    client.set_volume(*context.status.volume.dec_by(context.config.volume_step))?;
+                    let step = context.config.volume_step;
+                    context.command(Box::new(move |client| {
+                        client.volume(ValueChange::Decrease(step.into()))?;
+                        Ok(())
+                    }));
                 }
-                GlobalAction::SeekForward if matches!(context.status.state, State::Play | State::Pause) => {
-                    client.seek_current(ValueChange::Increase(5))?;
-                }
-                GlobalAction::SeekBack if matches!(context.status.state, State::Play | State::Pause) => {
-                    client.seek_current(ValueChange::Decrease(5))?;
-                }
+                GlobalAction::SeekForward if matches!(context.status.state, State::Play | State::Pause) => context
+                    .command(Box::new(move |client| {
+                        client.seek_current(ValueChange::Increase(5))?;
+                        Ok(())
+                    })),
+                GlobalAction::SeekBack if matches!(context.status.state, State::Play | State::Pause) => context
+                    .command(Box::new(move |client| {
+                        client.seek_current(ValueChange::Decrease(5))?;
+                        Ok(())
+                    })),
                 GlobalAction::NextTab => {
-                    self.change_tab(context.config.next_screen(self.active_tab), client, context)?;
+                    self.change_tab(context.config.next_screen(self.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::PreviousTab => {
-                    self.change_tab(context.config.prev_screen(self.active_tab), client, context)?;
+                    self.change_tab(context.config.prev_screen(self.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
                     if context.config.tabs.names.contains(&name) {
-                        self.change_tab(name, client, context)?;
+                        self.change_tab(name, context)?;
                         context.render()?;
                     } else {
                         status_error!("Tab with name '{}' does not exist. Check your configuration.", name);
@@ -433,7 +492,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
                 GlobalAction::ExternalCommand { command, .. } => {
-                    run_external(command, create_env(context, std::iter::empty::<&str>(), client)?);
+                    run_external(command, create_env(context, std::iter::empty::<&str>())?);
                 }
                 GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                 GlobalAction::ShowHelp => {
@@ -441,17 +500,26 @@ impl<'ui> Ui<'ui> {
                     modal!(context, modal);
                 }
                 GlobalAction::ShowOutputs => {
-                    modal!(context, OutputsModal::new(client.outputs()?.0));
+                    // context.command(Box::new(move |client| {
+                    //     modal!(context, OutputsModal::new(client.outputs()?.0));
+                    //     Ok(())
+                    // }));
                 }
-                GlobalAction::ShowDecoders => {
-                    modal!(context, DecodersModal::new(client.decoders()?.0));
-                }
+                GlobalAction::ShowDecoders => {}
+                // GlobalAction::ShowDecoders => context.command(Box::new(move |client| {
+                //     modal!(context, DecodersModal::new(client.decoders()?.0));
+                //     Ok(())
+                // })),
                 GlobalAction::ShowCurrentSongInfo => {
-                    if let Some(current_song) = context.get_current_song(client)? {
-                        modal!(context, SongInfoModal::new(current_song));
-                    } else {
-                        status_info!("No song is currently playing");
-                    }
+                    // context.command(Box::new(move |client| {
+                    //     modal!(context, DecodersModal::new(client.decoders()?.0));
+                    //     if let Some(current_song) = context.get_current_song(client)? {
+                    //         modal!(context, SongInfoModal::new(current_song));
+                    //     } else {
+                    //         status_info!("No song is currently playing");
+                    //     }
+                    //     Ok(())
+                    // }));
                 }
             }
         };
@@ -459,8 +527,8 @@ impl<'ui> Ui<'ui> {
         Ok(KeyHandleResult::None)
     }
 
-    pub fn before_show(&mut self, context: &mut AppContext, client: &mut impl MpdClient) -> Result<()> {
-        screen_call!(self, before_show(client, &context))
+    pub fn before_show(&mut self, context: &mut AppContext) -> Result<()> {
+        screen_call!(self, before_show(&context))
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {
@@ -471,33 +539,23 @@ impl<'ui> Ui<'ui> {
         });
     }
 
-    pub fn on_ui_app_event(
-        &mut self,
-        event: UiAppEvent,
-        context: &mut AppContext,
-        client: &mut impl MpdClient,
-    ) -> Result<()> {
+    pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
                 self.modals.push(modal.0);
-                self.on_event(UiEvent::ModalOpened, context, client)?;
+                self.on_event(UiEvent::ModalOpened, context)?;
                 context.render()?;
             }
             UiAppEvent::PopModal => {
                 self.modals.pop();
-                self.on_event(UiEvent::ModalClosed, context, client)?;
+                self.on_event(UiEvent::ModalClosed, context)?;
                 context.render()?;
             }
         }
         Ok(())
     }
 
-    pub fn on_event(
-        &mut self,
-        mut event: UiEvent,
-        context: &mut AppContext,
-        client: &mut impl MpdClient,
-    ) -> Result<()> {
+    pub fn on_event(&mut self, mut event: UiEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiEvent::Player => {}
             UiEvent::Database => {
@@ -525,18 +583,42 @@ impl<'ui> Ui<'ui> {
         for name in context.config.tabs.active_panes {
             match self.panes.get_mut(*name) {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => p.on_event(&mut event, client, context),
-                Panes::Queue(p) => p.on_event(&mut event, client, context),
-                Panes::Directories(p) => p.on_event(&mut event, client, context),
-                Panes::Albums(p) => p.on_event(&mut event, client, context),
-                Panes::Artists(p) => p.on_event(&mut event, client, context),
-                Panes::Playlists(p) => p.on_event(&mut event, client, context),
-                Panes::Search(p) => p.on_event(&mut event, client, context),
-                Panes::AlbumArtists(p) => p.on_event(&mut event, client, context),
-                Panes::AlbumArt(p) => p.on_event(&mut event, client, context),
-                Panes::Lyrics(p) => p.on_event(&mut event, client, context),
+                Panes::Logs(p) => p.on_event(&mut event, context),
+                Panes::Queue(p) => p.on_event(&mut event, context),
+                Panes::Directories(p) => p.on_event(&mut event, context),
+                Panes::Albums(p) => p.on_event(&mut event, context),
+                Panes::Artists(p) => p.on_event(&mut event, context),
+                Panes::Playlists(p) => p.on_event(&mut event, context),
+                Panes::Search(p) => p.on_event(&mut event, context),
+                Panes::AlbumArtists(p) => p.on_event(&mut event, context),
+                Panes::AlbumArt(p) => p.on_event(&mut event, context),
+                Panes::Lyrics(p) => p.on_event(&mut event, context),
             }?;
         }
+
+        Ok(())
+    }
+
+    pub(crate) fn on_command_finished(
+        &mut self,
+        id: &'static str,
+        pane: PaneType,
+        command: MpdCommandResult,
+        context: &mut AppContext,
+    ) -> Result<()> {
+        match self.panes.get_mut(pane) {
+            #[cfg(debug_assertions)]
+            Panes::Logs(p) => p.on_query_finished(id, command, context),
+            Panes::Queue(p) => p.on_query_finished(id, command, context),
+            Panes::Directories(p) => p.on_query_finished(id, command, context),
+            Panes::Albums(p) => p.on_query_finished(id, command, context),
+            Panes::Artists(p) => p.on_query_finished(id, command, context),
+            Panes::Playlists(p) => p.on_query_finished(id, command, context),
+            Panes::Search(p) => p.on_query_finished(id, command, context),
+            Panes::AlbumArtists(p) => p.on_query_finished(id, command, context),
+            Panes::AlbumArt(p) => p.on_query_finished(id, command, context),
+            Panes::Lyrics(p) => p.on_query_finished(id, command, context),
+        }?;
 
         Ok(())
     }

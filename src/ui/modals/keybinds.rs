@@ -5,7 +5,6 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display};
 use crate::{
     config::keys::{CommonAction, ToDescription},
     context::AppContext,
-    mpd::client::Client,
     shared::{
         ext::iter::IntoZipLongest2,
         key_event::KeyEvent,
@@ -196,7 +195,7 @@ impl Modal for KeybindsModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, _client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
@@ -241,12 +240,7 @@ impl Modal for KeybindsModal {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        _client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }

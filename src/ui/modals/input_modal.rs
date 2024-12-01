@@ -12,7 +12,6 @@ use ratatui::{
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::client::Client,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -34,7 +33,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-pub struct InputModal<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> {
+pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     input_focused: bool,
@@ -45,7 +44,7 @@ pub struct InputModal<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<'a, Callback: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> std::fmt::Debug for InputModal<'_, Callback> {
+impl<'a, Callback: FnMut(&AppContext, &str) -> Result<()> + 'a> std::fmt::Debug for InputModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -55,7 +54,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> std::fmt::De
     }
 }
 
-impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> InputModal<'a, C> {
+impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> InputModal<'a, C> {
     pub fn new(context: &AppContext) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
@@ -110,7 +109,7 @@ impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> InputModal<'a, C> {
     }
 }
 
-impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
+impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
@@ -152,7 +151,7 @@ impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModa
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         let action = key.as_common_action(context);
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
@@ -163,7 +162,7 @@ impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModa
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group_state.selected == 0 {
                     if let Some(ref mut callback) = self.callback {
-                        (callback)(client, &self.value)?;
+                        (callback)(context, &self.value)?;
                     }
                 }
                 pop_modal!(context);
@@ -201,7 +200,7 @@ impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModa
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(client, &self.value)?;
+                            (callback)(context, &self.value)?;
                         }
                     }
                     pop_modal!(context);
@@ -218,12 +217,7 @@ impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModa
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
@@ -236,7 +230,7 @@ impl<'a, C: FnMut(&mut Client<'_>, &str) -> Result<()> + 'a> Modal for InputModa
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(client, &self.value)?;
+                            (callback)(context, &self.value)?;
                         }
                         pop_modal!(context);
                     }

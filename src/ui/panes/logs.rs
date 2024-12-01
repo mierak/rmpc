@@ -11,7 +11,6 @@ use ratatui::{
 use crate::{
     config::keys::{CommonAction, LogsActions},
     context::AppContext,
-    mpd::mpd_client::MpdClient,
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -85,12 +84,12 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut impl MpdClient, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _context: &AppContext) -> Result<()> {
         self.scrolling_state.last();
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
@@ -103,12 +102,7 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        _client: &mut impl MpdClient,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         if !self.logs_area.contains(event.into()) {
             return Ok(());
         }
@@ -130,12 +124,7 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        event: &mut KeyEvent,
-        _client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
         let config = context.config;
         if let Some(action) = event.as_logs_action(context) {
             match action {

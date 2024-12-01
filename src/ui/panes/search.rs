@@ -16,11 +16,11 @@ use ratatui::{
 use crate::cli::create_env;
 use crate::cli::run_external;
 use crate::config::keys::GlobalAction;
+use crate::config::tabs::PaneType;
 use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
-use crate::shared::ext::mpd_client::MpdClientExt;
 use crate::shared::key_event::KeyEvent;
 use crate::shared::macros::status_info;
 use crate::shared::macros::status_warn;
@@ -28,6 +28,7 @@ use crate::shared::mouse_event::MouseEvent;
 use crate::shared::mouse_event::MouseEventKind;
 use crate::ui::dirstack::Dir;
 use crate::ui::UiEvent;
+use crate::MpdCommandResult;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
     ui::widgets::{button::Button, input::Input},
@@ -78,21 +79,28 @@ impl SearchPane {
         }
     }
 
-    fn add_current(&mut self, autoplay: bool, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn add_current(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
-                let item = &self.songs_dir.items[*idx];
-                client.add(&item.file)?;
+                let item = self.songs_dir.items[*idx].file.clone();
+                context.command(Box::new(move |client| {
+                    client.add(&item)?;
+                    Ok(())
+                }));
             }
             status_info!("Added {} songs to queue", self.songs_dir.marked().len());
 
             context.render()?;
         } else if let Some(item) = self.songs_dir.selected() {
-            client.add(&item.file)?;
-            status_info!("Added '{}' to queue", item.file);
-            if autoplay {
-                client.play_last(context)?;
-            }
+            let item = item.file.clone();
+            context.command(Box::new(move |client| {
+                client.add(&item)?;
+                status_info!("Added '{item}' to queue");
+                Ok(())
+            }));
+            // if autoplay {
+            //     client.play_last(context)?;
+            // }
 
             context.render()?;
         }
@@ -150,26 +158,37 @@ impl SearchPane {
         );
     }
 
-    fn prepare_preview(
-        &mut self,
-        client: &mut impl MpdClient,
-        config: &Config,
-    ) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(&mut self, context: &AppContext) {
         match &self.phase {
-            Phase::SearchTextboxInput => Ok(None),
-            Phase::Search => Ok(Some(self.songs_dir.to_list_items(config))),
+            Phase::SearchTextboxInput => {}
+            Phase::Search => {
+                let result = Some(self.songs_dir.to_list_items(context.config));
+                context.query(
+                    "preview",
+                    PaneType::Search,
+                    Box::new(move |_| Ok(MpdCommandResult::Preview(result))),
+                );
+            }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
-                    return Ok(None);
+                    return;
                 };
+                let config = context.config;
+                let file = current.file.clone();
 
-                let preview = client
-                    .find(&[Filter::new(Tag::File, &current.file)])?
-                    .first()
-                    .context("Expected to find exactly one song")?
-                    .to_preview(&config.theme.symbols)
-                    .collect_vec();
-                Ok(Some(preview))
+                context.query(
+                    "preview",
+                    PaneType::Search,
+                    Box::new(move |client| {
+                        let preview = client
+                            .find(&[Filter::new(Tag::File, &file)])?
+                            .first()
+                            .context("Expected to find exactly one song")?
+                            .to_preview(&config.theme.symbols)
+                            .collect_vec();
+                        Ok(MpdCommandResult::Preview(Some(preview)))
+                    }),
+                );
             }
         }
     }
@@ -307,11 +326,11 @@ impl SearchPane {
             })
     }
 
-    fn search_add(&mut self, client: &mut impl MpdClient) -> Result<()> {
+    fn search_add(&mut self, context: &AppContext) {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some(Filter::new(*filter_key, value).with_type(filter_kind))
+                Some((filter_key as &'static str, value.to_owned(), filter_kind))
             }
             _ => None,
         });
@@ -319,23 +338,37 @@ impl SearchPane {
         let filter = filter.collect_vec();
 
         if filter.is_empty() {
-            return Ok(());
+            return;
         }
 
         if case_sensitive {
-            client.find_add(&filter)?;
+            context.command(Box::new(move |client| {
+                client.find_add(
+                    &filter
+                        .iter()
+                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .collect_vec(),
+                )?;
+                Ok(())
+            }));
         } else {
-            client.search_add(&filter)?;
+            context.command(Box::new(move |client| {
+                client.search_add(
+                    &filter
+                        .iter()
+                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .collect_vec(),
+                )?;
+                Ok(())
+            }));
         }
-
-        Ok(())
     }
 
-    fn search(&mut self, client: &mut impl MpdClient) -> Result<Vec<Song>> {
+    fn search(&mut self, context: &AppContext) {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some(Filter::new(*filter_key, value).with_type(filter_kind))
+                Some((filter_key as &'static str, value.to_owned(), filter_kind))
             }
             _ => None,
         });
@@ -343,14 +376,38 @@ impl SearchPane {
         let filter = filter.collect_vec();
 
         if filter.is_empty() {
-            return Ok(Vec::new());
+            return;
         }
 
-        Ok(if case_sensitive {
-            client.find(&filter)?
+        if case_sensitive {
+            context.query(
+                "search",
+                PaneType::Search,
+                Box::new(move |client| {
+                    let result = client.find(
+                        &filter
+                            .iter()
+                            .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                            .collect_vec(),
+                    )?;
+                    Ok(MpdCommandResult::SongsList(result))
+                }),
+            );
         } else {
-            client.search(&filter)?
-        })
+            context.query(
+                "search",
+                PaneType::Search,
+                Box::new(move |client| {
+                    let result = client.search(
+                        &filter
+                            .iter()
+                            .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                            .collect_vec(),
+                    )?;
+                    Ok(MpdCommandResult::SongsList(result))
+                }),
+            );
+        };
     }
 
     fn reset(&mut self, search_config: &Search) {
@@ -368,33 +425,30 @@ impl SearchPane {
         }
     }
 
-    fn activate_input(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn activate_input(&mut self, context: &AppContext) {
         match self.inputs.focused_mut() {
             FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
             FocusedInputGroup::Buttons(_) => {
                 // Reset is the only button in this group at the moment
                 self.reset(&context.config.search);
                 self.songs_dir = Dir::default();
-                self.preview = self.prepare_preview(client, context.config)?;
+                self.prepare_preview(context);
             }
             FocusedInputGroup::Filters(FilterInput {
                 variant: FilterInputVariant::SelectFilterKind { ref mut value },
                 ..
             }) => {
                 value.cycle();
-                self.songs_dir = Dir::new(self.search(client)?);
-                self.preview = self.prepare_preview(client, context.config)?;
+                self.search(context);
             }
             FocusedInputGroup::Filters(FilterInput {
                 variant: FilterInputVariant::SelectFilterCaseSensitive { ref mut value },
                 ..
             }) => {
                 *value = !*value;
-                self.songs_dir = Dir::new(self.search(client)?);
-                self.preview = self.prepare_preview(client, context.config)?;
+                self.search(context);
             }
         };
-        Ok(())
     }
 
     fn get_clicked_input(&self, event: MouseEvent) -> Option<FocusedInput> {
@@ -499,10 +553,10 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
             self.songs_dir = Dir::default();
-            self.preview = self.prepare_preview(client, context.config)?;
+            self.prepare_preview(context);
             self.phase = Phase::Search;
 
             status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
@@ -511,12 +565,23 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        mut event: MouseEvent,
-        client: &mut impl MpdClient,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
+        match data {
+            MpdCommandResult::Preview(data) => {
+                self.preview = data;
+                context.render()?;
+            }
+            MpdCommandResult::SongsList(data) => {
+                self.songs_dir = Dir::new(data);
+                self.preview = Some(self.songs_dir.to_list_items(context.config));
+                context.render()?;
+            }
+            _ => {}
+        };
+        Ok(())
+    }
+
+    fn handle_mouse_event(&mut self, mut event: MouseEvent, context: &mut AppContext) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
@@ -527,7 +592,7 @@ impl Pane for SearchPane {
                 if let Some(input) = self.get_clicked_input(event) {
                     self.inputs.focused_idx = input;
                 }
-                self.preview = self.prepare_preview(client, context.config)?;
+                self.prepare_preview(context);
 
                 context.render()?;
             }
@@ -544,21 +609,20 @@ impl Pane for SearchPane {
                             self.songs_dir.select_idx(idx_to_select, context.config.scrolloff);
                         }
 
-                        self.preview = self.prepare_preview(client, context.config)?;
+                        self.prepare_preview(context);
 
                         context.render()?;
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(false, client, context)?;
+                    self.add_current(false, context)?;
                 }
             },
             MouseEventKind::LeftClick if self.column_areas[1].contains(event.into()) => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if matches!(self.phase, Phase::SearchTextboxInput) {
                         self.phase = Phase::Search;
-                        self.songs_dir = Dir::new(self.search(client)?);
-                        self.preview = self.prepare_preview(client, context.config)?;
+                        self.search(context);
                     }
 
                     if let Some(input) = self.get_clicked_input(event) {
@@ -571,7 +635,7 @@ impl Pane for SearchPane {
                     let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
                     if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
                         self.songs_dir.select_idx(idx, context.config.scrolloff);
-                        self.preview = self.prepare_preview(client, context.config)?;
+                        self.prepare_preview(context);
 
                         context.render()?;
                     }
@@ -580,21 +644,20 @@ impl Pane for SearchPane {
             MouseEventKind::DoubleClick => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if self.get_clicked_input(event).is_some() {
-                        self.activate_input(client, context)?;
+                        self.activate_input(context);
 
                         context.render()?;
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(false, client, context)?;
+                    self.add_current(false, context)?;
                 }
             },
             MouseEventKind::ScrollDown => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if matches!(self.phase, Phase::SearchTextboxInput) {
                         self.phase = Phase::Search;
-                        self.songs_dir = Dir::new(self.search(client)?);
-                        self.preview = self.prepare_preview(client, context.config)?;
+                        self.search(context);
                     }
                     self.inputs.next_non_wrapping();
 
@@ -610,8 +673,7 @@ impl Pane for SearchPane {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if matches!(self.phase, Phase::SearchTextboxInput) {
                         self.phase = Phase::Search;
-                        self.songs_dir = Dir::new(self.search(client)?);
-                        self.preview = self.prepare_preview(client, context.config)?;
+                        self.search(context);
                     }
 
                     self.inputs.prev_non_wrapping();
@@ -630,21 +692,19 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
         let config = context.config;
         match &mut self.phase {
             Phase::SearchTextboxInput => match event.as_common_action(context) {
                 Some(CommonAction::Close) => {
                     self.phase = Phase::Search;
-                    self.songs_dir = Dir::new(self.search(client)?);
-                    self.preview = self.prepare_preview(client, config)?;
+                    self.search(context);
 
                     context.render()?;
                 }
                 Some(CommonAction::Confirm) => {
                     self.phase = Phase::Search;
-                    self.songs_dir = Dir::new(self.search(client)?);
-                    self.preview = self.prepare_preview(client, config)?;
+                    self.search(context);
 
                     context.render()?;
                 }
@@ -675,7 +735,7 @@ impl Pane for SearchPane {
                 if let Some(action) = event.as_global_action(context) {
                     if let GlobalAction::ExternalCommand { command, .. } = action {
                         let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                        run_external(command, create_env(context, songs, client)?);
+                        run_external(command, create_env(context, songs)?);
                     } else {
                         event.abandon();
                     }
@@ -705,7 +765,7 @@ impl Pane for SearchPane {
                         CommonAction::UpHalf => {}
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
                             self.phase = Phase::BrowseResults { filter_input_on: false };
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
@@ -729,7 +789,7 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.activate_input(client, context)?;
+                            self.activate_input(context);
                             context.render()?;
                         }
                         CommonAction::FocusInput
@@ -740,7 +800,7 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::AddAll => {
-                            self.search_add(client)?;
+                            self.search_add(context);
 
                             status_info!("All found songs added to queue");
 
@@ -751,8 +811,7 @@ impl Pane for SearchPane {
                         CommonAction::Delete => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
                                 textbox.value.clear();
-                                self.songs_dir = Dir::new(self.search(client)?);
-                                self.preview = self.prepare_preview(client, config)?;
+                                self.search(context);
 
                                 context.render()?;
                             }
@@ -771,7 +830,7 @@ impl Pane for SearchPane {
                 Some(CommonAction::Close) => {
                     *filter_input_on = false;
                     self.songs_dir.set_filter(None, config);
-                    self.preview = self.prepare_preview(client, config)?;
+                    self.prepare_preview(context);
 
                     context.render()?;
                 }
@@ -786,7 +845,7 @@ impl Pane for SearchPane {
                         KeyCode::Char(c) => {
                             self.songs_dir.push_filter(c, config);
                             self.songs_dir.jump_first_matching(config);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
@@ -806,11 +865,11 @@ impl Pane for SearchPane {
                     match action {
                         GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
                             let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
-                            run_external(command, create_env(context, songs, client)?);
+                            run_external(command, create_env(context, songs)?);
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                            run_external(command, create_env(context, selected, client)?);
+                            run_external(command, create_env(context, selected)?);
                         }
                         _ => {
                             event.abandon();
@@ -821,14 +880,14 @@ impl Pane for SearchPane {
                         CommonAction::Down => {
                             self.songs_dir
                                 .next(context.config.scrolloff, context.config.wrap_navigation);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
                         CommonAction::Up => {
                             self.songs_dir
                                 .prev(context.config.scrolloff, context.config.wrap_navigation);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
@@ -836,32 +895,32 @@ impl Pane for SearchPane {
                         CommonAction::MoveUp => {}
                         CommonAction::DownHalf => {
                             self.songs_dir.next_half_viewport(context.config.scrolloff);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
                         CommonAction::UpHalf => {
                             self.songs_dir.prev_half_viewport(context.config.scrolloff);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
-                        CommonAction::Right => self.add_current(false, client, context)?,
+                        CommonAction::Right => self.add_current(false, context)?,
                         CommonAction::Left => {
                             self.phase = Phase::Search;
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
                         CommonAction::Top => {
                             self.songs_dir.first();
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
                         CommonAction::Bottom => {
                             self.songs_dir.last();
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
@@ -873,13 +932,13 @@ impl Pane for SearchPane {
                         }
                         CommonAction::NextResult => {
                             self.songs_dir.jump_next_matching(config);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
                         CommonAction::PreviousResult => {
                             self.songs_dir.jump_previous_matching(config);
-                            self.preview = self.prepare_preview(client, config)?;
+                            self.prepare_preview(context);
 
                             context.render()?;
                         }
@@ -898,14 +957,14 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.add_current(true, client, context)?;
+                            self.add_current(true, context)?;
 
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => self.add_current(false, client, context)?,
+                        CommonAction::Add => self.add_current(false, context)?,
                         CommonAction::AddAll => {
-                            self.search_add(client)?;
+                            self.search_add(context);
                             status_info!("All found songs added to queue");
 
                             context.render()?;

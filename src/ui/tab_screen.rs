@@ -13,7 +13,6 @@ use crate::{
         tabs::{Pane, PaneOrSplitWithPosition, SubPaneWithPosition},
     },
     context::AppContext,
-    mpd::mpd_client::MpdClient,
     shared::{
         geometry::Point,
         id::Id,
@@ -125,7 +124,6 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: &mut KeyEvent,
-        client: &mut impl MpdClient,
         context: &AppContext,
     ) -> Result<()> {
         let Some(focused) = self.focused else {
@@ -220,7 +218,7 @@ impl TabScreen {
             Some(_) | None => {
                 event.abandon();
                 let pane = panes.get_mut(focused.pane);
-                screen_call!(pane, handle_action(event, client, context))?;
+                screen_call!(pane, handle_action(event, context))?;
             }
         };
 
@@ -231,7 +229,6 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: MouseEvent,
-        client: &mut impl MpdClient,
         context: &mut AppContext,
     ) -> Result<()> {
         if matches!(event.kind, MouseEventKind::LeftClick) {
@@ -256,7 +253,7 @@ impl TabScreen {
         };
 
         let pane = panes.get_mut(focused.pane);
-        screen_call!(pane, handle_mouse_event(event, client, context))
+        screen_call!(pane, handle_mouse_event(event, context))
     }
 
     pub fn post_render(&mut self, panes: &mut PaneContainer, frame: &mut Frame, context: &AppContext) -> Result<()> {
@@ -267,28 +264,18 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn on_hide(
-        &mut self,
-        panes: &mut PaneContainer,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()> {
+    pub fn on_hide(&mut self, panes: &mut PaneContainer, context: &AppContext) -> Result<()> {
         for pane in self.panes.panes_iter() {
             let screen = panes.get_mut(pane.pane);
-            screen_call!(screen, on_hide(client, context))?;
+            screen_call!(screen, on_hide(context))?;
         }
         Ok(())
     }
 
-    pub fn before_show(
-        &mut self,
-        panes: &mut PaneContainer,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()> {
+    pub fn before_show(&mut self, panes: &mut PaneContainer, context: &AppContext) -> Result<()> {
         for pane in self.panes.panes_iter() {
             let screen = panes.get_mut(pane.pane);
-            screen_call!(screen, before_show(client, context))?;
+            screen_call!(screen, before_show(context))?;
         }
         Ok(())
     }

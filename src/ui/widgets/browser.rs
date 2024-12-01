@@ -6,7 +6,7 @@ use crate::config::Config;
 use crate::ui::dirstack::{Dir, DirStack, DirStackItem};
 
 #[derive(Debug)]
-pub struct Browser<T: std::fmt::Debug + DirStackItem> {
+pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     state_type_marker: std::marker::PhantomData<T>,
     widths: Vec<u16>,
     config: &'static Config,
@@ -15,7 +15,7 @@ pub struct Browser<T: std::fmt::Debug + DirStackItem> {
     filter_input_active: bool,
 }
 
-impl<T: std::fmt::Debug + DirStackItem> Browser<T> {
+impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new(config: &'static Config) -> Self {
         Self {
             state_type_marker: std::marker::PhantomData,
@@ -46,7 +46,7 @@ const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
 
 impl<'a, T> StatefulWidget for &mut Browser<T>
 where
-    T: std::fmt::Debug + DirStackItem<Item = ListItem<'a>>,
+    T: std::fmt::Debug + DirStackItem<Item = ListItem<'a>> + Clone + Send,
 {
     type State = DirStack<T>;
 

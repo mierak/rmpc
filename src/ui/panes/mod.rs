@@ -30,11 +30,9 @@ use crate::{
         },
     },
     context::AppContext,
-    mpd::{
-        commands::{status::OnOffOneshot, volume::Bound, Song, Status},
-        mpd_client::MpdClient,
-    },
+    mpd::commands::{status::OnOffOneshot, volume::Bound, Song, Status},
     shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
+    MpdCommandResult,
 };
 
 use super::{widgets::volume::Volume, UiEvent};
@@ -50,7 +48,7 @@ pub mod playlists;
 pub mod queue;
 pub mod search;
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'a> {
     Queue(&'a mut QueuePane),
     #[cfg(debug_assertions)]
@@ -122,28 +120,27 @@ pub(super) trait Pane {
     }
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_hide(&mut self, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()>;
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut impl MpdClient,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+        Ok(())
+    }
+
+    fn on_query_finished(&mut self, id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
         Ok(())
     }
 }
