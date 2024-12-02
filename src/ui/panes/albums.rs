@@ -6,7 +6,7 @@ use crate::{
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
+    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -48,20 +48,17 @@ impl AlbumsPane {
         match self.stack.path() {
             [_album] => {
                 self.add(current, context)?;
-                // if autoplay {
-                //     client.play_last(context)?;
-                // }
+                let queue_len = context.queue.len();
+                if autoplay {
+                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                }
             }
             [] => {
                 let current = current.clone();
-                context.query(
-                    "next",
-                    PaneType::Albums,
-                    Box::new(move |client| {
-                        let res = list_titles(client, current.as_path())?.collect();
-                        Ok(MpdCommandResult::DirOrSong(res))
-                    }),
-                );
+                context.query("next", PaneType::Albums, move |client| {
+                    let res = list_titles(client, current.as_path())?.collect();
+                    Ok(MpdCommandResult::DirOrSong(res))
+                });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -87,14 +84,10 @@ impl Pane for AlbumsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query(
-                "init",
-                PaneType::Albums,
-                Box::new(move |client| {
-                    let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdCommandResult::LsInfo(result.0))
-                }),
-            );
+            context.query("init", PaneType::Albums, move |client| {
+                let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                Ok(MpdCommandResult::LsInfo(result.0))
+            });
             self.initialized = true;
         }
 
@@ -103,14 +96,10 @@ impl Pane for AlbumsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            context.query(
-                "init",
-                PaneType::Albums,
-                Box::new(move |client| {
-                    let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdCommandResult::LsInfo(result.0))
-                }),
-            );
+            context.query("init", PaneType::Albums, move |client| {
+                let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                Ok(MpdCommandResult::LsInfo(result.0))
+            });
         };
         Ok(())
     }
@@ -212,21 +201,21 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             [album] => {
                 let album = album.clone();
                 let name = item.dir_name_or_file_name().into_owned();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())])?;
 
                     status_info!("'{name}' added to queue");
                     Ok(())
-                }));
+                });
             }
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[Filter::new(Tag::Album, &name)])?;
 
                     status_info!("Album '{name}' added to queue");
                     Ok(())
-                }));
+                });
             }
             _ => {}
         };
@@ -238,18 +227,18 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[Filter::new(Tag::Album, album.as_str())])?;
                     status_info!("Album '{}' added to queue", album);
                     Ok(())
-                }));
+                });
             }
             [] => {
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.add("/")?; // add the whole library
                     status_info!("All albums added to queue");
                     Ok(())
-                }));
+                });
             }
             _ => {}
         };
@@ -266,38 +255,30 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
-                context.query(
-                    "preview",
-                    PaneType::Albums,
-                    Box::new(move |client| {
-                        let result = Some(
-                            find_songs(client, &album, &current)?
-                                .first()
-                                .context(anyhow!(
-                                    "Expected to find exactly one song: album: '{}', current: '{}'",
-                                    album,
-                                    current
-                                ))?
-                                .to_preview(&config.theme.symbols)
-                                .collect_vec(),
-                        );
-                        Ok(MpdCommandResult::Preview(result))
-                    }),
-                );
+                context.query("preview", PaneType::Albums, move |client| {
+                    let result = Some(
+                        find_songs(client, &album, &current)?
+                            .first()
+                            .context(anyhow!(
+                                "Expected to find exactly one song: album: '{}', current: '{}'",
+                                album,
+                                current
+                            ))?
+                            .to_preview(&config.theme.symbols)
+                            .collect_vec(),
+                    );
+                    Ok(MpdCommandResult::Preview(result))
+                });
             }
             [] => {
-                context.query(
-                    "preview",
-                    PaneType::Albums,
-                    Box::new(move |client| {
-                        let result = Some(
-                            list_titles(client, &current)?
-                                .map(|v| v.to_list_item_simple(config))
-                                .collect_vec(),
-                        );
-                        Ok(MpdCommandResult::Preview(result))
-                    }),
-                );
+                context.query("preview", PaneType::Albums, move |client| {
+                    let result = Some(
+                        list_titles(client, &current)?
+                            .map(|v| v.to_list_item_simple(config))
+                            .collect_vec(),
+                    );
+                    Ok(MpdCommandResult::Preview(result))
+                });
             }
 
             _ => {}

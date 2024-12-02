@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use crate::{config::tabs::PaneType, WorkRequest};
+use crate::{config::tabs::PaneType, shared::macros::try_skip, MpdQuery, WorkRequest};
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -245,22 +245,22 @@ impl<'ui> Ui<'ui> {
 
         match event.kind {
             MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.pause_toggle()?;
                     Ok(())
-                }));
+                });
             }
             MouseEventKind::ScrollUp if self.areas[Areas::Header].contains(event.into()) => {
-                context.command(Box::new(|client| {
+                context.command(|client| {
                     client.volume(ValueChange::Increase(context.config.volume_step.into()))?;
                     Ok(())
-                }));
+                });
             }
             MouseEventKind::ScrollDown if self.areas[Areas::Header].contains(event.into()) => {
-                context.command(Box::new(|client| {
+                context.command(|client| {
                     client.volume(ValueChange::Decrease(context.config.volume_step.into()))?;
                     Ok(())
-                }));
+                });
             }
             MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
                 if !matches!(context.status.state, State::Play | State::Pause) {
@@ -272,10 +272,10 @@ impl<'ui> Ui<'ui> {
                     .duration
                     .mul_f32(f32::from(event.x) / f32::from(self.areas[Areas::Bar].width))
                     .as_secs();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
                     Ok(())
-                }));
+                });
 
                 context.render()?;
             }
@@ -376,40 +376,40 @@ impl<'ui> Ui<'ui> {
                     context.render()?;
                 }
                 GlobalAction::NextTrack if context.status.state == State::Play => {
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.next()?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::PreviousTrack if context.status.state == State::Play => {
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.prev()?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::Stop if matches!(context.status.state, State::Play | State::Pause) => {
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.stop()?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::ToggleRepeat => {
                     let repeat = !context.status.repeat;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.repeat(repeat)?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::ToggleRandom => {
                     let random = !context.status.random;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.random(random)?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::ToggleSingle => {
                     let single = context.status.single;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         if client.version() < Version::new(0, 21, 0) {
                             client.single(single.cycle_pre_mpd_24())?;
                         } else {
@@ -417,11 +417,11 @@ impl<'ui> Ui<'ui> {
                         }
                         client.stop()?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::ToggleConsume => {
                     let consume = context.status.consume;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         if client.version() < Version::new(0, 24, 0) {
                             client.consume(consume.cycle_pre_mpd_24())?;
                         } else {
@@ -429,38 +429,38 @@ impl<'ui> Ui<'ui> {
                         }
                         client.stop()?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::TogglePause if matches!(context.status.state, State::Play | State::Pause) => context
-                    .command(Box::new(move |client| {
+                    .command(move |client| {
                         client.pause_toggle()?;
                         Ok(())
-                    })),
+                    }),
                 GlobalAction::TogglePause => {}
                 GlobalAction::VolumeUp => {
                     let step = context.config.volume_step;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.volume(ValueChange::Increase(step.into()))?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::VolumeDown => {
                     let step = context.config.volume_step;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.volume(ValueChange::Decrease(step.into()))?;
                         Ok(())
-                    }));
+                    });
                 }
                 GlobalAction::SeekForward if matches!(context.status.state, State::Play | State::Pause) => context
-                    .command(Box::new(move |client| {
+                    .command(move |client| {
                         client.seek_current(ValueChange::Increase(5))?;
                         Ok(())
-                    })),
+                    }),
                 GlobalAction::SeekBack if matches!(context.status.state, State::Play | State::Pause) => context
-                    .command(Box::new(move |client| {
+                    .command(move |client| {
                         client.seek_current(ValueChange::Decrease(5))?;
                         Ok(())
-                    })),
+                    }),
                 GlobalAction::NextTab => {
                     self.change_tab(context.config.next_screen(self.active_tab), context)?;
                     context.render()?;
@@ -483,7 +483,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
                 GlobalAction::ExternalCommand { command, .. } => {
-                    run_external(command, create_env(context, std::iter::empty::<&str>())?);
+                    run_external(command, create_env(context, std::iter::empty::<&str>()));
                 }
                 GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                 GlobalAction::ShowHelp => {
@@ -491,26 +491,31 @@ impl<'ui> Ui<'ui> {
                     modal!(context, modal);
                 }
                 GlobalAction::ShowOutputs => {
-                    // context.command(Box::new(move |client| {
-                    //     modal!(context, OutputsModal::new(client.outputs()?.0));
-                    //     Ok(())
-                    // }));
+                    try_skip!(
+                        context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                            id: "outputs",
+                            target: None,
+                            callback: Box::new(move |client| Ok(MpdCommandResult::Outputs(client.outputs()?.0))),
+                        })),
+                        "Failed to request outputs modal"
+                    );
                 }
-                GlobalAction::ShowDecoders => {}
-                // GlobalAction::ShowDecoders => context.command(Box::new(move |client| {
-                //     modal!(context, DecodersModal::new(client.decoders()?.0));
-                //     Ok(())
-                // })),
+                GlobalAction::ShowDecoders => {
+                    try_skip!(
+                        context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                            id: "decoders",
+                            target: None,
+                            callback: Box::new(move |client| Ok(MpdCommandResult::Decoders(client.decoders()?.0))),
+                        })),
+                        "Failed to request decoders modal"
+                    );
+                }
                 GlobalAction::ShowCurrentSongInfo => {
-                    // context.command(Box::new(move |client| {
-                    //     modal!(context, DecodersModal::new(client.decoders()?.0));
-                    //     if let Some(current_song) = context.get_current_song(client)? {
-                    //         modal!(context, SongInfoModal::new(current_song));
-                    //     } else {
-                    //         status_info!("No song is currently playing");
-                    //     }
-                    //     Ok(())
-                    // }));
+                    if let Some((_, current_song)) = context.find_current_song_in_queue() {
+                        modal!(context, SongInfoModal::new(current_song.clone()));
+                    } else {
+                        status_info!("No song is currently playing");
+                    }
                 }
             }
         };
@@ -593,23 +598,34 @@ impl<'ui> Ui<'ui> {
     pub(crate) fn on_command_finished(
         &mut self,
         id: &'static str,
-        pane: PaneType,
+        pane: Option<PaneType>,
         command: MpdCommandResult,
         context: &mut AppContext,
     ) -> Result<()> {
-        match self.panes.get_mut(pane) {
-            #[cfg(debug_assertions)]
-            Panes::Logs(p) => p.on_query_finished(id, command, context),
-            Panes::Queue(p) => p.on_query_finished(id, command, context),
-            Panes::Directories(p) => p.on_query_finished(id, command, context),
-            Panes::Albums(p) => p.on_query_finished(id, command, context),
-            Panes::Artists(p) => p.on_query_finished(id, command, context),
-            Panes::Playlists(p) => p.on_query_finished(id, command, context),
-            Panes::Search(p) => p.on_query_finished(id, command, context),
-            Panes::AlbumArtists(p) => p.on_query_finished(id, command, context),
-            Panes::AlbumArt(p) => p.on_query_finished(id, command, context),
-            Panes::Lyrics(p) => p.on_query_finished(id, command, context),
-        }?;
+        match pane {
+            Some(pane) => match self.panes.get_mut(pane) {
+                #[cfg(debug_assertions)]
+                Panes::Logs(p) => p.on_query_finished(id, command, context),
+                Panes::Queue(p) => p.on_query_finished(id, command, context),
+                Panes::Directories(p) => p.on_query_finished(id, command, context),
+                Panes::Albums(p) => p.on_query_finished(id, command, context),
+                Panes::Artists(p) => p.on_query_finished(id, command, context),
+                Panes::Playlists(p) => p.on_query_finished(id, command, context),
+                Panes::Search(p) => p.on_query_finished(id, command, context),
+                Panes::AlbumArtists(p) => p.on_query_finished(id, command, context),
+                Panes::AlbumArt(p) => p.on_query_finished(id, command, context),
+                Panes::Lyrics(p) => p.on_query_finished(id, command, context),
+            }?,
+            None => match command {
+                MpdCommandResult::Outputs(outputs) => {
+                    modal!(context, OutputsModal::new(outputs));
+                }
+                MpdCommandResult::Decoders(decoders) => {
+                    modal!(context, DecodersModal::new(decoders));
+                }
+                _ => {}
+            },
+        }
 
         Ok(())
     }
@@ -674,9 +690,7 @@ pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<St
 }
 
 pub enum KeyHandleResult {
-    /// Action does NOT warrant a render
     None,
-    /// Exit the application
     Quit,
 }
 

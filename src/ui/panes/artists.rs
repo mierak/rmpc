@@ -6,7 +6,7 @@ use crate::{
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
+    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -116,23 +116,20 @@ impl ArtistsPane {
         match self.stack.path() {
             [_artist, _album] => {
                 self.add(current, context)?;
-                // if autoplay {
-                //     client.play_last(context)?;
-                // }
+                let queue_len = context.queue.len();
+                if autoplay {
+                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                }
             }
             [artist] => {
                 let artist_tag = self.artist_tag();
                 let target = self.target_pane();
                 let current = current.clone();
                 let artist = artist.clone();
-                context.query(
-                    "next",
-                    target,
-                    Box::new(move |client| {
-                        let result = Self::list_titles(client, &artist, current.as_path(), artist_tag)?.collect();
-                        Ok(MpdCommandResult::DirOrSong(result))
-                    }),
-                );
+                context.query("next", target, move |client| {
+                    let result = Self::list_titles(client, &artist, current.as_path(), artist_tag)?.collect();
+                    Ok(MpdCommandResult::DirOrSong(result))
+                });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -141,14 +138,10 @@ impl ArtistsPane {
                 let artist_tag = self.artist_tag();
                 let current = current.clone();
                 let target = self.target_pane();
-                context.query(
-                    "next",
-                    target,
-                    Box::new(move |client| {
-                        let result = Self::list_albums(client, current.as_path(), artist_tag)?.collect();
-                        Ok(MpdCommandResult::DirOrSong(result))
-                    }),
-                );
+                context.query("next", target, move |client| {
+                    let result = Self::list_albums(client, current.as_path(), artist_tag)?.collect();
+                    Ok(MpdCommandResult::DirOrSong(result))
+                });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -175,14 +168,10 @@ impl Pane for ArtistsPane {
         if !self.initialized {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context.query(
-                "init",
-                target,
-                Box::new(move |client| {
-                    let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                    Ok(MpdCommandResult::LsInfo(result.0))
-                }),
-            );
+            context.query("init", target, move |client| {
+                let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                Ok(MpdCommandResult::LsInfo(result.0))
+            });
 
             self.initialized = true;
         }
@@ -194,14 +183,10 @@ impl Pane for ArtistsPane {
         if let crate::ui::UiEvent::Database = event {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context.query(
-                "init",
-                target,
-                Box::new(move |client| {
-                    let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                    Ok(MpdCommandResult::LsInfo(result.0))
-                }),
-            );
+            context.query("init", target, move |client| {
+                let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                Ok(MpdCommandResult::LsInfo(result.0))
+            });
         };
         Ok(())
     }
@@ -281,7 +266,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let album = album.clone();
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[
                         Filter::new(artist_tag, artist.as_str()),
                         Filter::new(Tag::Album, album.as_str()),
@@ -290,28 +275,28 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
 
                     status_info!("'{name}' added to queue");
                     Ok(())
-                }));
+                });
             }
             [artist] => {
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
                 let artist_tag = self.artist_tag();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[Filter::new(artist_tag, artist.as_str()), Filter::new(Tag::Album, &name)])?;
 
                     status_info!("Album '{name}' by '{artist}' added to queue");
                     Ok(())
-                }));
+                });
             }
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
                 let artist_tag = self.artist_tag();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[Filter::new(artist_tag, &name)])?;
 
                     status_info!("All songs by '{name}' added to queue");
                     Ok(())
-                }));
+                });
             }
             _ => {}
         };
@@ -325,29 +310,29 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             [artist, album] => {
                 let artist = artist.clone();
                 let album = album.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[
                         Filter::new(artist_tag, artist.as_str()),
                         Filter::new(Tag::Album, album.as_str()),
                     ])?;
                     status_info!("Album '{album}' by '{artist}' added to queue");
                     Ok(())
-                }));
+                });
             }
             [artist] => {
                 let artist = artist.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.find_add(&[Filter::new(artist_tag, artist.as_str())])?;
                     status_info!("All albums by '{artist}' added to queue");
                     Ok(())
-                }));
+                });
             }
             [] => {
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.add("/")?; // add the whole library
                     status_info!("All songs added to queue");
                     Ok(())
-                }));
+                });
             }
             _ => {}
         };
@@ -375,54 +360,42 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             [artist, album] => {
                 let artist = artist.clone();
                 let album = album.clone();
-                context.query(
-                    "preview",
-                    target,
-                    Box::new(move |client| {
-                        let result = Some(
-                            Self::find_songs(client, &artist, &album, &current, artist_tag)?
-                                .first()
-                                .context(anyhow!(
-                                    "Expected to find exactly one song: artist: '{}', album: '{}', current: '{}'",
-                                    artist,
-                                    album,
-                                    current
-                                ))?
-                                .to_preview(&config.theme.symbols)
-                                .collect_vec(),
-                        );
-                        Ok(MpdCommandResult::Preview(result))
-                    }),
-                );
-            }
-            [artist] => {
-                let artist = artist.clone();
-                context.query(
-                    "preview",
-                    target,
-                    Box::new(move |client| {
-                        let result = Some(
-                            Self::list_titles(client, &artist, &current, artist_tag)?
-                                .map(|s| s.to_list_item_simple(config))
-                                .collect_vec(),
-                        );
-
-                        Ok(MpdCommandResult::Preview(result))
-                    }),
-                );
-            }
-            [] => context.query(
-                "preview",
-                target,
-                Box::new(move |client| {
+                context.query("preview", target, move |client| {
                     let result = Some(
-                        Self::list_albums(client, &current, artist_tag)?
-                            .map(|s| s.to_list_item_simple(config))
+                        Self::find_songs(client, &artist, &album, &current, artist_tag)?
+                            .first()
+                            .context(anyhow!(
+                                "Expected to find exactly one song: artist: '{}', album: '{}', current: '{}'",
+                                artist,
+                                album,
+                                current
+                            ))?
+                            .to_preview(&config.theme.symbols)
                             .collect_vec(),
                     );
                     Ok(MpdCommandResult::Preview(result))
-                }),
-            ),
+                });
+            }
+            [artist] => {
+                let artist = artist.clone();
+                context.query("preview", target, move |client| {
+                    let result = Some(
+                        Self::list_titles(client, &artist, &current, artist_tag)?
+                            .map(|s| s.to_list_item_simple(config))
+                            .collect_vec(),
+                    );
+
+                    Ok(MpdCommandResult::Preview(result))
+                });
+            }
+            [] => context.query("preview", target, move |client| {
+                let result = Some(
+                    Self::list_albums(client, &current, artist_tag)?
+                        .map(|s| s.to_list_item_simple(config))
+                        .collect_vec(),
+                );
+                Ok(MpdCommandResult::Preview(result))
+            }),
             _ => {}
         };
     }

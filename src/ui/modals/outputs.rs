@@ -49,11 +49,11 @@ impl OutputsModal {
         };
 
         let id = output.id;
-        context.command(Box::new(move |client| {
+        context.command(move |client| {
             client.toggle_output(id)?;
             // self.outputs = client.outputs()?.0;
             Ok(())
-        }));
+        });
 
         // TODO
         // if idx >= self.outputs.len() {

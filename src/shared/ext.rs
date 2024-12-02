@@ -127,21 +127,18 @@ pub mod iter {
 }
 
 pub mod mpd_client {
-    use crate::{
-        context::AppContext,
-        mpd::{
-            errors::{ErrorCode, MpdError, MpdFailureResponse},
-            mpd_client::MpdClient,
-        },
+    use crate::mpd::{
+        errors::{ErrorCode, MpdError, MpdFailureResponse},
+        mpd_client::MpdClient,
     };
 
     pub trait MpdClientExt {
-        fn play_last(&mut self, context: &AppContext) -> Result<(), MpdError>;
+        fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError>;
     }
 
     impl<T: MpdClient> MpdClientExt for T {
-        fn play_last(&mut self, context: &AppContext) -> Result<(), MpdError> {
-            match self.play_pos(context.queue.len()) {
+        fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError> {
+            match self.play_pos(queue_len) {
                 Ok(()) => {}
                 Err(MpdError::Mpd(MpdFailureResponse {
                     code: ErrorCode::Argument,

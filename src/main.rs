@@ -1,6 +1,7 @@
 #![deny(clippy::unwrap_used, clippy::pedantic)]
 #![allow(
     clippy::single_match,
+    clippy::type_complexity,
     clippy::module_name_repetitions,
     clippy::unused_self,
     clippy::unnested_or_patterns,
@@ -23,20 +24,21 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Parser;
-use cli::run_external;
+use cli::{create_env, run_external};
 use config::{
     cli::{Args, Command},
-    tabs::{Pane, PaneType},
+    tabs::PaneType,
     ConfigFile,
 };
+use context::AppContext;
 use crossterm::event::{Event, KeyEvent};
 use itertools::Itertools;
 use log::{error, info, trace, warn};
 use mpd::{
     client::Client,
-    commands::{idle::IdleEvent, Song, State},
+    commands::{idle::IdleEvent, Decoder, Output, Song, State, Status, Volume},
 };
 use ratatui::{prelude::Backend, widgets::ListItem, Terminal};
 use rustix::path::Arg;
@@ -48,7 +50,7 @@ use shared::{
     env::ENV,
     ext::{duration::DurationExt, error::ErrorExt},
     logging,
-    macros::{status_error, status_info, try_cont, try_skip},
+    macros::{status_error, try_cont, try_skip},
     mouse_event::{MouseEvent, MouseEventTracker},
     tmux,
     ytdlp::YtDlp,
@@ -76,7 +78,7 @@ mod ui;
 
 pub struct MpdQuery {
     id: &'static str,
-    target: PaneType,
+    target: Option<PaneType>,
     callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdCommandResult> + Send>,
 }
 
@@ -112,7 +114,7 @@ pub enum WorkDone {
     },
     MpdCommandFinished {
         id: &'static str,
-        target: PaneType,
+        target: Option<PaneType>,
         data: MpdCommandResult,
     },
     None,
@@ -126,6 +128,12 @@ pub enum MpdCommandResult {
     LsInfo(Vec<String>),
     AddToPlaylist { playlists: Vec<String>, song_file: String },
     AlbumArt(Option<Vec<u8>>),
+    Status(Status),
+    Queue(Option<Vec<Song>>),
+    Volume(Volume),
+    Outputs(Vec<Output>),
+    Decoders(Vec<Decoder>),
+    ExternalCommand(&'static [&'static str], Vec<Song>),
 }
 
 // #[derive(Debug)]
@@ -138,7 +146,6 @@ pub enum AppEvent {
     Status(String, Level),
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
-    RequestStatusUpdate,
     RequestRender(bool),
     Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
@@ -292,24 +299,19 @@ fn main() -> Result<()> {
             let tx_clone = tx.clone();
 
             let context = try_ret!(
-                context::AppContext::try_new(&mut client, config, tx_clone, worker_tx),
+                context::AppContext::try_new(&mut client, config, tx_clone, worker_tx.clone()),
                 "Failed to create app context"
             );
 
-            let mut render_loop = RenderLoop::new(tx.clone(), context.config);
+            let mut render_loop = RenderLoop::new(worker_tx, context.config);
             if context.status.state == mpd::commands::status::State::Play {
                 render_loop.start()?;
             }
 
-            let wc = try_ret!(
-                Client::init(context.config.address, context.config.password, "worker", true),
-                "Failed to connect to MPD"
-            );
-
             let tx_clone = tx.clone();
             std::thread::Builder::new()
                 .name("worker task".to_owned())
-                .spawn(|| worker_task(worker_rx, tx_clone, wc, context.config))?;
+                .spawn(|| worker_task(worker_rx, tx_clone, client, context.config))?;
 
             let tx_clone = tx.clone();
 
@@ -323,7 +325,7 @@ fn main() -> Result<()> {
             );
 
             let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
-                main_task(context, rx, client, render_loop, terminal);
+                main_task(context, rx, render_loop, terminal);
             })?;
 
             idle_client.set_read_timeout(None)?;
@@ -427,7 +429,6 @@ fn worker_task(rx: Receiver<WorkRequest>, tx: Sender<AppEvent>, mut client: Clie
 fn main_task<B: Backend + std::io::Write>(
     mut context: context::AppContext,
     event_receiver: std::sync::mpsc::Receiver<AppEvent>,
-    mut client: Client<'_>,
     mut render_loop: RenderLoop,
     mut terminal: Terminal<B>,
 ) {
@@ -490,27 +491,12 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 }
                 AppEvent::IdleEvent(event) => {
-                    match handle_idle_event(event, &mut context, &mut client, &mut render_loop, &mut additional_evs) {
-                        Ok(()) => {
-                            for ev in additional_evs.drain() {
-                                if let Err(err) = ui.on_event(ev, &mut context) {
-                                    status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            status_error!(error:? = err, event:?; "Failed handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
+                    handle_idle_event(event, &context, &mut additional_evs);
+                    for ev in additional_evs.drain() {
+                        if let Err(err) = ui.on_event(ev, &mut context) {
+                            status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
-                    render_wanted = true;
-                }
-                AppEvent::RequestStatusUpdate => {
-                    match client.get_status() {
-                        Ok(status) => context.status = status,
-                        Err(err) => {
-                            error!(err:?; "Unable to update status requested by render loop");
-                        }
-                    };
                     render_wanted = true;
                 }
                 AppEvent::RequestRender(wanted) => {
@@ -524,11 +510,72 @@ fn main_task<B: Backend + std::io::Write>(
                             error!(error:? = err; "UI failed to resize event");
                         }
                     }
-                    WorkDone::MpdCommandFinished { id, target, data } => {
-                        if let Err(err) = ui.on_command_finished(id, target, data, &mut context) {
-                            error!(error:? = err; "UI failed to handle command finished event");
+                    WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
+                        ("global_status_update", None, MpdCommandResult::Status(status)) => {
+                            let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
+                            context.status = status;
+                            let mut song_changed = false;
+
+                            match context.status.state {
+                                State::Play => {
+                                    try_skip!(render_loop.start(), "Failed to start render loop");
+                                }
+                                State::Pause => {
+                                    try_skip!(render_loop.stop(), "Failed to stop render loop");
+                                }
+                                State::Stop => {
+                                    song_changed = true;
+                                    try_skip!(render_loop.stop(), "Failed to stop render loop");
+                                }
+                            }
+
+                            if let Some((_, song)) = context.find_current_song_in_queue() {
+                                if Some(song.id) != current_song_id {
+                                    if let Some(command) = context.config.on_song_change {
+                                        let env = song
+                                            .clone()
+                                            .metadata
+                                            .into_iter()
+                                            .map(|(mut k, v)| {
+                                                k.make_ascii_uppercase();
+                                                (k, v)
+                                            })
+                                            .chain(std::iter::once(("FILE".to_owned(), song.file.clone())))
+                                            .chain(std::iter::once((
+                                                "DURATION".to_owned(),
+                                                song.duration.map_or_else(String::new, |d| d.to_string()),
+                                            )))
+                                            .collect_vec();
+                                        run_external(command, env);
+                                    }
+                                    song_changed = true;
+                                }
+                            }
+                            if song_changed {
+                                if let Err(err) = ui.on_event(UiEvent::SongChanged, &mut context) {
+                                    status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
+                                }
+                            }
+                            render_wanted = true;
                         }
-                    }
+                        ("global_volume_update", None, MpdCommandResult::Volume(volume)) => {
+                            context.status.volume = volume;
+                            render_wanted = true;
+                        }
+                        ("global_queue_update", None, MpdCommandResult::Queue(queue)) => {
+                            context.queue = queue.unwrap_or_default();
+                            render_wanted = true;
+                        }
+                        ("external_command", None, MpdCommandResult::ExternalCommand(command, songs)) => {
+                            let songs = songs.iter().map(|s| s.file.as_str());
+                            run_external(command, create_env(&context, songs));
+                        }
+                        (id, target, data) => {
+                            if let Err(err) = ui.on_command_finished(id, target, data, &mut context) {
+                                error!(error:? = err; "UI failed to handle command finished event");
+                            }
+                        }
+                    },
                     WorkDone::None => {}
                 },
                 AppEvent::WorkDone(Err(err)) => {
@@ -581,79 +628,54 @@ fn main_task<B: Backend + std::io::Write>(
     ui::restore_terminal(&mut terminal, context.config.enable_mouse).expect("Terminal restore to succeed");
 }
 
-fn handle_idle_event(
-    event: IdleEvent,
-    context: &mut context::AppContext,
-    client: &mut Client<'_>,
-    render_loop: &mut RenderLoop,
-    result_ui_evs: &mut HashSet<UiEvent>,
-) -> Result<()> {
+fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut HashSet<UiEvent>) {
     match event {
         IdleEvent::Mixer => {
             if context.supported_commands.contains("getvol") {
-                context.status.volume = try_ret!(client.get_volume(), "Failed to get volume");
-            } else {
-                context.status = try_ret!(client.get_status(), "Failed to get status");
+                context.query("global_volume_update", PaneType::Queue, move |client| {
+                    Ok(MpdCommandResult::Volume(client.get_volume()?))
+                });
+                if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                    id: "global_volume_update",
+                    target: None,
+                    callback: Box::new(move |client| Ok(MpdCommandResult::Volume(client.get_volume()?))),
+                })) {
+                    error!(error:? = err; "Failed to send status update request");
+                }
+            } else if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                id: "global_status_update",
+                target: None,
+                callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+            })) {
+                error!(error:? = err; "Failed to send status update request");
             }
         }
-        IdleEvent::Options => context.status = try_ret!(client.get_status(), "Failed to get status"),
-        IdleEvent::Player => {
-            let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
-
-            context.status = try_ret!(client.get_status(), "Failed get status");
-
-            match context.status.state {
-                State::Play => {
-                    try_skip!(render_loop.start(), "Failed to start render loop");
-                }
-                State::Pause => {
-                    try_skip!(render_loop.stop(), "Failed to stop render loop");
-                }
-                State::Stop => {
-                    result_ui_evs.insert(UiEvent::SongChanged);
-                    try_skip!(render_loop.stop(), "Failed to stop render loop");
-                }
+        IdleEvent::Options => {
+            if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                id: "global_status_update",
+                target: None,
+                callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+            })) {
+                error!(error:? = err; "Failed to send status update request");
             }
-
-            if context
-                .find_current_song_in_queue()
-                .map(|(_, song)| song.id)
-                .is_some_and(|id| Some(id) != current_song_id)
-            {
-                if let Some(command) = context.config.on_song_change {
-                    let env = match context.get_current_song(client) {
-                        Ok(Some(song)) => song
-                            .metadata
-                            .into_iter()
-                            .map(|(mut k, v)| {
-                                k.make_ascii_uppercase();
-                                (k, v)
-                            })
-                            .chain(std::iter::once(("FILE".to_owned(), song.file)))
-                            .chain(std::iter::once((
-                                "DURATION".to_owned(),
-                                song.duration.map_or_else(String::new, |d| d.to_string()),
-                            )))
-                            .collect_vec(),
-                        Ok(None) => {
-                            status_error!("No song found when executing on_song_change");
-                            Vec::new()
-                        }
-                        Err(err) => {
-                            status_error!("Unexpected error when crating env for on_song_change: {:?}", err);
-                            Vec::new()
-                        }
-                    };
-
-                    run_external(command, env);
-                };
-
-                result_ui_evs.insert(UiEvent::SongChanged);
+        }
+        IdleEvent::Player => {
+            if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                id: "global_status_update",
+                target: None,
+                callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+            })) {
+                error!(error:? = err; "Failed to send status update request");
             }
         }
         IdleEvent::Playlist => {
-            let queue = client.playlist_info()?;
-            context.queue = queue.unwrap_or_default();
+            if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                id: "global_queue_update",
+                target: None,
+                callback: Box::new(move |client| Ok(MpdCommandResult::Queue(client.playlist_info()?))),
+            })) {
+                error!(error:? = err; "Failed to send status update request");
+            }
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
@@ -672,7 +694,6 @@ fn handle_idle_event(
     if let Ok(ev) = event.try_into() {
         result_ui_evs.insert(ev);
     }
-    Ok(())
 }
 
 fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEvent>) {
@@ -746,11 +767,11 @@ enum LoopEvent {
 
 #[derive(Debug)]
 struct RenderLoop {
-    event_tx: Option<std::sync::mpsc::Sender<LoopEvent>>,
+    event_tx: Option<Sender<LoopEvent>>,
 }
 
 impl RenderLoop {
-    fn new(render_sender: std::sync::mpsc::Sender<AppEvent>, config: &Config) -> Self {
+    fn new(work_tx: Sender<WorkRequest>, config: &Config) -> Self {
         let (tx, rx) = std::sync::mpsc::channel::<LoopEvent>();
 
         // send stop event at the start to not start the loop immedietally
@@ -776,7 +797,11 @@ impl RenderLoop {
                 }
 
                 std::thread::sleep(update_interval);
-                if let Err(err) = render_sender.send(AppEvent::RequestStatusUpdate) {
+                if let Err(err) = work_tx.send(WorkRequest::MpdQuery(MpdQuery {
+                    id: "global_status_update",
+                    target: None,
+                    callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+                })) {
                     error!(error:? = err; "Failed to send status update request");
                 }
             }

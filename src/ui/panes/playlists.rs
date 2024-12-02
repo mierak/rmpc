@@ -10,6 +10,7 @@ use crate::{
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
     shared::{
+        ext::mpd_client::MpdClientExt,
         key_event::KeyEvent,
         macros::{modal, status_error, status_info},
         mouse_event::MouseEvent,
@@ -58,23 +59,19 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query(
-                    "open_or_play",
-                    PaneType::Playlists,
-                    Box::new(move |client| {
-                        Ok(MpdCommandResult::SongsList(client.list_playlist_info(&playlist, None)?))
-                    }),
-                );
+                context.query("open_or_play", PaneType::Playlists, move |client| {
+                    Ok(MpdCommandResult::SongsList(client.list_playlist_info(&playlist, None)?))
+                });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
                 self.add(selected, context)?;
-                // TODO
-                // if autoplay {
-                //     c.play_last(context)?;
-                // }
+                let queue_len = context.queue.len();
+                if autoplay {
+                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                }
             }
         };
 
@@ -93,23 +90,19 @@ impl Pane for PlaylistsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query(
-                "init",
-                PaneType::Playlists,
-                Box::new(move |client| {
-                    let result: Vec<_> = client
-                        .list_playlists()
-                        .context("Cannot list playlists")?
-                        .into_iter()
-                        .map(|playlist| DirOrSong::Dir {
-                            name: playlist.name,
-                            full_path: String::new(),
-                        })
-                        .sorted()
-                        .collect();
-                    Ok(MpdCommandResult::DirOrSong(result))
-                }),
-            );
+            context.query("init", PaneType::Playlists, move |client| {
+                let result: Vec<_> = client
+                    .list_playlists()
+                    .context("Cannot list playlists")?
+                    .into_iter()
+                    .map(|playlist| DirOrSong::Dir {
+                        name: playlist.name,
+                        full_path: String::new(),
+                    })
+                    .sorted()
+                    .collect();
+                Ok(MpdCommandResult::DirOrSong(result))
+            });
 
             self.initialized = true;
         }
@@ -124,23 +117,19 @@ impl Pane for PlaylistsPane {
         };
 
         if let Some(id) = id {
-            context.query(
-                id,
-                PaneType::Playlists,
-                Box::new(move |client| {
-                    let result: Vec<_> = client
-                        .list_playlists()
-                        .context("Cannot list playlists")?
-                        .into_iter()
-                        .map(|playlist| DirOrSong::Dir {
-                            name: playlist.name,
-                            full_path: String::new(),
-                        })
-                        .sorted()
-                        .collect();
-                    Ok(MpdCommandResult::DirOrSong(result))
-                }),
-            );
+            context.query(id, PaneType::Playlists, move |client| {
+                let result: Vec<_> = client
+                    .list_playlists()
+                    .context("Cannot list playlists")?
+                    .into_iter()
+                    .map(|playlist| DirOrSong::Dir {
+                        name: playlist.name,
+                        full_path: String::new(),
+                    })
+                    .sorted()
+                    .collect();
+                Ok(MpdCommandResult::DirOrSong(result))
+            });
         }
 
         Ok(())
@@ -276,11 +265,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                         .message("Are you sure you want to delete this playlist? This action cannot be undone.")
                         .on_confirm(move |context| {
                             let d = d.clone();
-                            context.command(Box::new(move |client| {
+                            context.command(move |client| {
                                 client.delete_playlist(&d)?;
                                 status_info!("Playlist '{d}' deleted");
                                 Ok(())
-                            }));
+                            });
                             Ok(())
                         })
                         .confirm_label("Delete")
@@ -293,11 +282,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 };
                 let playlist = playlist.clone();
                 let file = s.file.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.delete_from_playlist(&playlist, &SingleOrRange::single(index))?;
                     status_info!("File '{file}' deleted from playlist '{playlist}'");
                     Ok(())
-                }));
+                });
 
                 context.render()?;
             }
@@ -309,11 +298,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         match self.stack().path() {
             [playlist] => {
                 let playlist = playlist.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.load_playlist(&playlist)?;
                     status_info!("Playlist '{playlist}' added to queue");
                     Ok(())
-                }));
+                });
             }
             [] => {
                 for playlist in &self.stack().current().items {
@@ -331,21 +320,21 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 let d = d.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.load_playlist(&d)?;
                     status_info!("Playlist '{d}' added to queue");
                     Ok(())
-                }));
+                });
             }
             DirOrSong::Song(s) => {
                 let file = s.file.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.add(&file)?;
                     if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
                         status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
                     }
                     Ok(())
-                }));
+                });
             }
         };
 
@@ -367,11 +356,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                             if current_name != new_value {
                                 let current_name = current_name.clone();
                                 let new_value = new_value.to_owned();
-                                context.command(Box::new(move |client| {
+                                context.command(move |client| {
                                     client.rename_playlist(&current_name, &new_value)?;
                                     status_info!("Playlist '{}' renamed to '{}'", current_name, new_value);
                                     Ok(())
-                                }));
+                                });
                             }
                             Ok(())
                         })
@@ -408,10 +397,10 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     MoveDirection::Down => (idx + 1).min(self.stack().current().items.len() - 1),
                 };
                 let playlist = playlist.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.move_in_playlist(&playlist, &SingleOrRange::single(idx), new_idx)?;
                     Ok(())
-                }));
+                });
             }
         };
 
@@ -421,29 +410,25 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn prepare_preview(&self, context: &AppContext) {
         let config = context.config;
         let s = self.stack().current().selected().cloned();
-        context.query(
-            "preview",
-            PaneType::Playlists,
-            Box::new(move |c| {
-                let result = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
-                    Ok(Some(match current {
-                        DirOrSong::Dir { name: d, .. } => c
-                            .list_playlist_info(d, None)?
-                            .into_iter()
-                            .map(DirOrSong::Song)
-                            .map(|s| s.to_list_item_simple(config))
-                            .collect_vec(),
-                        DirOrSong::Song(song) => c
-                            .find_one(&[Filter::new(Tag::File, &song.file)])?
-                            .context(anyhow!("File '{}' was listed but not found", song.file))?
-                            .to_preview(&config.theme.symbols)
-                            .collect_vec(),
-                    }))
-                })?;
+        context.query("preview", PaneType::Playlists, move |c| {
+            let result = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
+                Ok(Some(match current {
+                    DirOrSong::Dir { name: d, .. } => c
+                        .list_playlist_info(d, None)?
+                        .into_iter()
+                        .map(DirOrSong::Song)
+                        .map(|s| s.to_list_item_simple(config))
+                        .collect_vec(),
+                    DirOrSong::Song(song) => c
+                        .find_one(&[Filter::new(Tag::File, &song.file)])?
+                        .context(anyhow!("File '{}' was listed but not found", song.file))?
+                        .to_preview(&config.theme.symbols)
+                        .collect_vec(),
+                }))
+            })?;
 
-                Ok(MpdCommandResult::Preview(result))
-            }),
-        );
+            Ok(MpdCommandResult::Preview(result))
+        });
     }
 
     fn browser_areas(&self) -> [Rect; 3] {

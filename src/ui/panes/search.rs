@@ -21,6 +21,7 @@ use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
 use crate::mpd::commands::Song;
+use crate::shared::ext::mpd_client::MpdClientExt;
 use crate::shared::key_event::KeyEvent;
 use crate::shared::macros::status_info;
 use crate::shared::macros::status_warn;
@@ -83,24 +84,25 @@ impl SearchPane {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
                 let item = self.songs_dir.items[*idx].file.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.add(&item)?;
                     Ok(())
-                }));
+                });
             }
             status_info!("Added {} songs to queue", self.songs_dir.marked().len());
 
             context.render()?;
         } else if let Some(item) = self.songs_dir.selected() {
             let item = item.file.clone();
-            context.command(Box::new(move |client| {
+            context.command(move |client| {
                 client.add(&item)?;
                 status_info!("Added '{item}' to queue");
                 Ok(())
-            }));
-            // if autoplay {
-            //     client.play_last(context)?;
-            // }
+            });
+            let queue_len = context.queue.len();
+            if autoplay {
+                context.command(move |client| Ok(client.play_last(queue_len)?));
+            }
 
             context.render()?;
         }
@@ -163,11 +165,9 @@ impl SearchPane {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
                 let result = Some(self.songs_dir.to_list_items(context.config));
-                context.query(
-                    "preview",
-                    PaneType::Search,
-                    Box::new(move |_| Ok(MpdCommandResult::Preview(result))),
-                );
+                context.query("preview", PaneType::Search, move |_| {
+                    Ok(MpdCommandResult::Preview(result))
+                });
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
@@ -176,19 +176,15 @@ impl SearchPane {
                 let config = context.config;
                 let file = current.file.clone();
 
-                context.query(
-                    "preview",
-                    PaneType::Search,
-                    Box::new(move |client| {
-                        let preview = client
-                            .find(&[Filter::new(Tag::File, &file)])?
-                            .first()
-                            .context("Expected to find exactly one song")?
-                            .to_preview(&config.theme.symbols)
-                            .collect_vec();
-                        Ok(MpdCommandResult::Preview(Some(preview)))
-                    }),
-                );
+                context.query("preview", PaneType::Search, move |client| {
+                    let preview = client
+                        .find(&[Filter::new(Tag::File, &file)])?
+                        .first()
+                        .context("Expected to find exactly one song")?
+                        .to_preview(&config.theme.symbols)
+                        .collect_vec();
+                    Ok(MpdCommandResult::Preview(Some(preview)))
+                });
             }
         }
     }
@@ -342,7 +338,7 @@ impl SearchPane {
         }
 
         if case_sensitive {
-            context.command(Box::new(move |client| {
+            context.command(move |client| {
                 client.find_add(
                     &filter
                         .iter()
@@ -350,9 +346,9 @@ impl SearchPane {
                         .collect_vec(),
                 )?;
                 Ok(())
-            }));
+            });
         } else {
-            context.command(Box::new(move |client| {
+            context.command(move |client| {
                 client.search_add(
                     &filter
                         .iter()
@@ -360,7 +356,7 @@ impl SearchPane {
                         .collect_vec(),
                 )?;
                 Ok(())
-            }));
+            });
         }
     }
 
@@ -380,33 +376,25 @@ impl SearchPane {
         }
 
         if case_sensitive {
-            context.query(
-                "search",
-                PaneType::Search,
-                Box::new(move |client| {
-                    let result = client.find(
-                        &filter
-                            .iter()
-                            .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
-                            .collect_vec(),
-                    )?;
-                    Ok(MpdCommandResult::SongsList(result))
-                }),
-            );
+            context.query("search", PaneType::Search, move |client| {
+                let result = client.find(
+                    &filter
+                        .iter()
+                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .collect_vec(),
+                )?;
+                Ok(MpdCommandResult::SongsList(result))
+            });
         } else {
-            context.query(
-                "search",
-                PaneType::Search,
-                Box::new(move |client| {
-                    let result = client.search(
-                        &filter
-                            .iter()
-                            .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
-                            .collect_vec(),
-                    )?;
-                    Ok(MpdCommandResult::SongsList(result))
-                }),
-            );
+            context.query("search", PaneType::Search, move |client| {
+                let result = client.search(
+                    &filter
+                        .iter()
+                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .collect_vec(),
+                )?;
+                Ok(MpdCommandResult::SongsList(result))
+            });
         };
     }
 
@@ -735,7 +723,7 @@ impl Pane for SearchPane {
                 if let Some(action) = event.as_global_action(context) {
                     if let GlobalAction::ExternalCommand { command, .. } = action {
                         let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                        run_external(command, create_env(context, songs)?);
+                        run_external(command, create_env(context, songs));
                     } else {
                         event.abandon();
                     }
@@ -865,11 +853,11 @@ impl Pane for SearchPane {
                     match action {
                         GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
                             let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
-                            run_external(command, create_env(context, songs)?);
+                            run_external(command, create_env(context, songs));
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                            run_external(command, create_env(context, selected)?);
+                            run_external(command, create_env(context, selected));
                         }
                         _ => {
                             event.abandon();

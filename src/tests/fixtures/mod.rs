@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    sync::{atomic::AtomicBool, mpsc::channel},
-};
+use std::{cell::Cell, collections::HashSet, sync::mpsc::channel};
 
 use ratatui::{backend::TestBackend, Terminal};
 use rstest::fixture;
@@ -37,7 +34,7 @@ pub fn app_context() -> AppContext {
         app_event_sender: chan1.0,
         work_sender: chan2.0,
         supported_commands: HashSet::new(),
-        needs_render: AtomicBool::new(false),
+        needs_render: Cell::new(false),
         lrc_index: LrcIndex::default(),
     }
 }

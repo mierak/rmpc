@@ -9,7 +9,7 @@ use crate::{
         commands::{lsinfo::FileOrDir, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
-    shared::{key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
+    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
     ui::{
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
@@ -52,35 +52,32 @@ impl DirectoriesPane {
         match selected {
             DirOrSong::Dir { .. } => {
                 let next_path = next_path.join("/").to_string();
-                context.query(
-                    "next",
-                    PaneType::Directories,
-                    Box::new(move |client| {
-                        let new_current = client.lsinfo(Some(&next_path))?;
-                        let res = new_current
-                            .into_iter()
-                            .map(|v| match v {
-                                FileOrDir::Dir(d) => DirOrSong::Dir {
-                                    name: d.path,
-                                    full_path: d.full_path,
-                                },
-                                FileOrDir::File(s) => DirOrSong::Song(s),
-                            })
-                            .sorted()
-                            .collect();
+                context.query("next", PaneType::Directories, move |client| {
+                    let new_current = client.lsinfo(Some(&next_path))?;
+                    let res = new_current
+                        .into_iter()
+                        .map(|v| match v {
+                            FileOrDir::Dir(d) => DirOrSong::Dir {
+                                name: d.path,
+                                full_path: d.full_path,
+                            },
+                            FileOrDir::File(s) => DirOrSong::Song(s),
+                        })
+                        .sorted()
+                        .collect();
 
-                        Ok(MpdCommandResult::DirOrSong(res))
-                    }),
-                );
+                    Ok(MpdCommandResult::DirOrSong(res))
+                });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
             }
             t @ DirOrSong::Song(_) => {
                 self.add(t, context)?;
-                // if autoplay {
-                //     client.play_last(context)?;
-                // }
+                let queue_len = context.queue.len();
+                if autoplay {
+                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                }
             }
         };
 
@@ -99,19 +96,15 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query(
-                "init",
-                PaneType::Directories,
-                Box::new(move |client| {
-                    let result = client
-                        .lsinfo(None)?
-                        .into_iter()
-                        .map(Into::<DirOrSong>::into)
-                        .sorted()
-                        .collect::<Vec<_>>();
-                    Ok(MpdCommandResult::DirOrSong(result))
-                }),
-            );
+            context.query("init", PaneType::Directories, move |client| {
+                let result = client
+                    .lsinfo(None)?
+                    .into_iter()
+                    .map(Into::<DirOrSong>::into)
+                    .sorted()
+                    .collect::<Vec<_>>();
+                Ok(MpdCommandResult::DirOrSong(result))
+            });
             self.initialized = true;
         }
 
@@ -120,19 +113,15 @@ impl Pane for DirectoriesPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            context.query(
-                "init",
-                PaneType::Directories,
-                Box::new(move |client| {
-                    let result = client
-                        .lsinfo(None)?
-                        .into_iter()
-                        .map(Into::<DirOrSong>::into)
-                        .sorted()
-                        .collect::<Vec<_>>();
-                    Ok(MpdCommandResult::DirOrSong(result))
-                }),
-            );
+            context.query("init", PaneType::Directories, move |client| {
+                let result = client
+                    .lsinfo(None)?
+                    .into_iter()
+                    .map(Into::<DirOrSong>::into)
+                    .sorted()
+                    .collect::<Vec<_>>();
+                Ok(MpdCommandResult::DirOrSong(result))
+            });
         };
         Ok(())
     }
@@ -205,21 +194,21 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
 
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.add(&next_path)?;
                     status_info!("Directory '{next_path}' added to queue");
                     Ok(())
-                }));
+                });
             }
             DirOrSong::Song(song) => {
                 let file = song.file.clone();
-                context.command(Box::new(move |client| {
+                context.command(move |client| {
                     client.add(&file)?;
                     if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
                         status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
                     }
                     Ok(())
-                }));
+                });
             }
         };
 
@@ -230,11 +219,11 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
 
     fn add_all(&self, context: &AppContext) -> Result<()> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
-        context.command(Box::new(move |client| {
+        context.command(move |client| {
             client.add(&path)?;
             status_info!("Directory '{path}' added to queue");
             Ok(())
-        }));
+        });
 
         Ok(())
     }
@@ -257,48 +246,40 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let next_path = next_path.join("/").to_string();
                 let config = context.config;
 
-                context.query(
-                    "preview",
-                    PaneType::Directories,
-                    Box::new(move |client| {
-                        let res: Vec<_> = match client.lsinfo(Some(&next_path)) {
-                            Ok(val) => val,
-                            Err(err) => {
-                                log::error!(error:? = err; "Failed to get lsinfo for dir",);
-                                return Ok(MpdCommandResult::Preview(None));
-                            }
+                context.query("preview", PaneType::Directories, move |client| {
+                    let res: Vec<_> = match client.lsinfo(Some(&next_path)) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            log::error!(error:? = err; "Failed to get lsinfo for dir",);
+                            return Ok(MpdCommandResult::Preview(None));
                         }
-                        .0
-                        .into_iter()
-                        .map(|v| match v {
-                            FileOrDir::Dir(dir) => DirOrSong::Dir {
-                                name: dir.path,
-                                full_path: dir.full_path,
-                            },
-                            FileOrDir::File(song) => DirOrSong::Song(song),
-                        })
-                        .sorted()
-                        .map(|v| v.to_list_item_simple(config))
-                        .collect();
+                    }
+                    .0
+                    .into_iter()
+                    .map(|v| match v {
+                        FileOrDir::Dir(dir) => DirOrSong::Dir {
+                            name: dir.path,
+                            full_path: dir.full_path,
+                        },
+                        FileOrDir::File(song) => DirOrSong::Song(song),
+                    })
+                    .sorted()
+                    .map(|v| v.to_list_item_simple(config))
+                    .collect();
 
-                        Ok(MpdCommandResult::Preview(Some(res)))
-                    }),
-                );
+                    Ok(MpdCommandResult::Preview(Some(res)))
+                });
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
                 let config = context.config;
-                context.query(
-                    "preview",
-                    PaneType::Directories,
-                    Box::new(move |client| {
-                        Ok(MpdCommandResult::Preview(
-                            client
-                                .find_one(&[Filter::new(Tag::File, &file)])?
-                                .map(|v| v.to_preview(&config.theme.symbols).collect()),
-                        ))
-                    }),
-                );
+                context.query("preview", PaneType::Directories, move |client| {
+                    Ok(MpdCommandResult::Preview(
+                        client
+                            .find_one(&[Filter::new(Tag::File, &file)])?
+                            .map(|v| v.to_preview(&config.theme.symbols).collect()),
+                    ))
+                });
             }
             None => {}
         }

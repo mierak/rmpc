@@ -53,18 +53,14 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
-        context.query(
-            "album_art",
-            PaneType::AlbumArt,
-            Box::new(move |client| {
-                let start = std::time::Instant::now();
-                log::debug!(file = song_uri.as_str(); "Searching for album art");
-                let result = client.find_album_art(&song_uri)?;
-                log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
+        context.query("album_art", PaneType::AlbumArt, move |client| {
+            let start = std::time::Instant::now();
+            log::debug!(file = song_uri.as_str(); "Searching for album art");
+            let result = client.find_album_art(&song_uri)?;
+            log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
 
-                Ok(MpdCommandResult::AlbumArt(result))
-            }),
-        );
+            Ok(MpdCommandResult::AlbumArt(result))
+        });
 
         Some(())
     }

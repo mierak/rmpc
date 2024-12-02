@@ -261,10 +261,10 @@ impl Pane for QueuePane {
                     .and_then(|idx| context.queue.get(idx))
                 {
                     let id = song.id;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.play_id(id)?;
                         Ok(())
-                    }));
+                    });
                 }
             }
             MouseEventKind::MiddleClick => {
@@ -276,10 +276,10 @@ impl Pane for QueuePane {
                     .and_then(|idx| context.queue.get(idx))
                 {
                     let id = selected_song.id;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.delete_id(id)?;
                         Ok(())
-                    }));
+                    });
                 }
             }
             MouseEventKind::ScrollDown => {
@@ -308,11 +308,11 @@ impl Pane for QueuePane {
                         .on_confirm(move |context, selected: &String, _idx| {
                             let selected = selected.to_owned();
                             let song_file = song_file.clone();
-                            context.command(Box::new(move |client| {
+                            context.command(move |client| {
                                 client.add_to_playlist(&selected, &song_file, None)?;
                                 status_info!("Song added to playlist {}", selected);
                                 Ok(())
-                            }));
+                            });
                             Ok(())
                         })
                 );
@@ -362,10 +362,10 @@ impl Pane for QueuePane {
             match action {
                 QueueActions::Delete if !self.scrolling_state.marked.is_empty() => {
                     for range in self.scrolling_state.marked.ranges().rev() {
-                        context.command(Box::new(move |client| {
+                        context.command(move |client| {
                             client.delete_from_queue(range.into())?;
                             Ok(())
-                        }));
+                        });
                     }
                     self.scrolling_state.marked.clear();
                     status_info!("Marked songs removed from queue");
@@ -378,10 +378,10 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx))
                     {
                         let id = selected_song.id;
-                        context.command(Box::new(move |client| {
+                        context.command(move |client| {
                             client.delete_id(id)?;
                             Ok(())
-                        }));
+                        });
                     } else {
                         status_error!("No song selected");
                     }
@@ -392,7 +392,7 @@ impl Pane for QueuePane {
                         ConfirmModal::new(context)
                             .message("Are you sure you want to clear the queue? This action cannot be undone.")
                             .on_confirm(|context| {
-                                context.command(Box::new(|client| Ok(client.clear()?)));
+                                context.command(|client| Ok(client.clear()?));
                                 Ok(())
                             })
                             .confirm_label("Clear")
@@ -406,10 +406,10 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx))
                     {
                         let id = selected_song.id;
-                        context.command(Box::new(move |client| {
+                        context.command(move |client| {
                             client.play_id(id)?;
                             Ok(())
-                        }));
+                        });
                     }
                 }
                 QueueActions::JumpToCurrent => {
@@ -429,7 +429,7 @@ impl Pane for QueuePane {
                             .input_label("Playlist name:")
                             .on_confirm(move |context, value| {
                                 let value = value.to_owned();
-                                context.command(Box::new(move |client| {
+                                context.command(move |client| {
                                     match client.save_queue_as_playlist(&value, None) {
                                         Ok(()) => {
                                             status_info!("Playlist '{}' saved", value);
@@ -439,7 +439,7 @@ impl Pane for QueuePane {
                                         }
                                     };
                                     Ok(())
-                                }));
+                                });
                                 Ok(())
                             })
                     );
@@ -451,22 +451,18 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx))
                     {
                         let uri = selected_song.file.clone();
-                        context.query(
-                            "add_to_playlist",
-                            PaneType::Queue,
-                            Box::new(move |client| {
-                                let playlists = client
-                                    .list_playlists()?
-                                    .into_iter()
-                                    .map(|v| v.name)
-                                    .sorted()
-                                    .collect_vec();
-                                Ok(MpdCommandResult::AddToPlaylist {
-                                    playlists,
-                                    song_file: uri,
-                                })
-                            }),
-                        );
+                        context.query("add_to_playlist", PaneType::Queue, move |client| {
+                            let playlists = client
+                                .list_playlists()?
+                                .into_iter()
+                                .map(|v| v.name)
+                                .sorted()
+                                .collect_vec();
+                            Ok(MpdCommandResult::AddToPlaylist {
+                                playlists,
+                                song_file: uri,
+                            })
+                        });
                     }
                 }
                 QueueActions::ShowInfo => {
@@ -511,10 +507,10 @@ impl Pane for QueuePane {
 
                     for range in marked.ranges() {
                         let new_idx = range.start().saturating_sub(1);
-                        context.command(Box::new(move |client| {
+                        context.command(move |client| {
                             client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
                             Ok(())
-                        }));
+                        });
                     }
 
                     let mut new_marked = marked.iter().map(|i| i.saturating_sub(1)).collect();
@@ -536,10 +532,10 @@ impl Pane for QueuePane {
 
                     for range in marked.ranges().rev() {
                         let new_idx = range.start().saturating_add(1);
-                        context.command(Box::new(move |client| {
+                        context.command(move |client| {
                             client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
                             Ok(())
-                        }));
+                        });
                     }
 
                     let mut new_marked = marked.iter().map(|i| i.saturating_add(1)).collect();
@@ -566,10 +562,10 @@ impl Pane for QueuePane {
 
                     let new_idx = idx.saturating_sub(1);
                     let id = selected.id;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.move_id(id, QueueMoveTarget::Absolute(new_idx))?;
                         Ok(())
-                    }));
+                    });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
                 }
                 CommonAction::MoveDown => {
@@ -590,10 +586,10 @@ impl Pane for QueuePane {
 
                     let new_idx = (idx + 1).min(context.queue.len() - 1);
                     let id = selected.id;
-                    context.command(Box::new(move |client| {
+                    context.command(move |client| {
                         client.move_id(id, QueueMoveTarget::Absolute(new_idx))?;
                         Ok(())
-                    }));
+                    });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
                 }
                 CommonAction::DownHalf => {
@@ -676,7 +672,7 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
-                    run_external(command, create_env(context, song)?);
+                    run_external(command, create_env(context, song));
                 }
                 _ => {
                     event.abandon();

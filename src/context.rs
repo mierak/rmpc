@@ -1,11 +1,4 @@
-use std::{
-    collections::HashSet,
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::Sender,
-    },
-};
+use std::{cell::Cell, collections::HashSet, path::PathBuf, sync::mpsc::Sender};
 
 use crate::{
     config::{tabs::PaneType, Config, ImageMethod, Leak},
@@ -29,7 +22,7 @@ pub struct AppContext {
     pub supported_commands: HashSet<String>,
     pub app_event_sender: Sender<AppEvent>,
     pub work_sender: Sender<WorkRequest>,
-    pub needs_render: AtomicBool,
+    pub needs_render: Cell<bool>,
     pub lrc_index: LrcIndex,
 }
 
@@ -61,41 +54,42 @@ impl AppContext {
             supported_commands,
             app_event_sender,
             work_sender,
-            needs_render: AtomicBool::new(false),
+            needs_render: Cell::new(false),
         })
     }
 
     pub fn render(&self) -> Result<(), std::sync::mpsc::SendError<AppEvent>> {
-        if let Ok(_) = self
-            .needs_render
-            .compare_exchange(true, true, Ordering::Relaxed, Ordering::Relaxed)
-        {
+        if self.needs_render.get() {
             return Ok(());
         }
 
+        self.needs_render.replace(true);
         self.app_event_sender.send(AppEvent::RequestRender(false))
     }
 
     pub fn finish_frame(&self) {
-        self.needs_render.store(false, Ordering::Relaxed);
+        self.needs_render.replace(false);
     }
 
     pub fn query(
         &self,
         id: &'static str,
         target: PaneType,
-        callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdCommandResult> + Send>,
+        callback: impl FnOnce(&mut Client<'_>) -> Result<MpdCommandResult> + Send + 'static,
     ) {
-        if let Err(err) = self
-            .work_sender
-            .send(WorkRequest::MpdQuery(MpdQuery { id, target, callback }))
-        {
+        if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+            id,
+            target: Some(target),
+            callback: Box::new(callback),
+        })) {
             log::error!(error:? = err; "Failed to send query request");
         }
     }
 
-    pub fn command(&self, callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send>) {
-        if let Err(err) = self.work_sender.send(WorkRequest::MpdCommand(MpdCommand2 { callback })) {
+    pub fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
+        if let Err(err) = self.work_sender.send(WorkRequest::MpdCommand(MpdCommand2 {
+            callback: Box::new(callback),
+        })) {
             log::error!(error:? = err; "Failed to send command request");
         }
     }
@@ -108,16 +102,6 @@ impl AppContext {
         self.status
             .songid
             .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
-    }
-
-    /// Gets the owned version of current song by either cloning it from queue
-    /// or by querying MPD if not found
-    pub fn get_current_song(&self, client: &mut impl MpdClient) -> Result<Option<Song>> {
-        if let Some(song) = self.find_current_song_in_queue().map(|v| v.1).cloned() {
-            Ok(Some(song))
-        } else {
-            Ok(client.get_current_song()?)
-        }
     }
 
     pub fn find_lrc(&self) -> Result<Option<Lrc>> {

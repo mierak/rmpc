@@ -4,7 +4,6 @@ use itertools::Itertools;
 use ratatui::prelude::Rect;
 
 use crate::{
-    cli::{create_env, run_external, run_external_blocking},
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
     mpd::{commands::Song, mpd_client::MpdClient},
@@ -12,6 +11,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    MpdQuery, WorkRequest,
 };
 
 use super::{
@@ -27,7 +27,7 @@ pub enum MoveDirection {
 #[allow(unused)]
 pub(in crate::ui) trait BrowserPane<T>: Pane
 where
-    T: DirStackItem + std::fmt::Debug + Clone + Send,
+    T: DirStackItem + std::fmt::Debug + Clone + Send + 'static,
 {
     fn stack(&self) -> &DirStack<T>;
     fn stack_mut(&mut self) -> &mut DirStack<T>;
@@ -94,34 +94,30 @@ where
         match action {
             GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
                 let marked_items: Vec<_> = self.stack().current().marked_items().cloned().collect();
-                context.command(Box::new(move |client| {
-                    // let songs: Vec<_> = marked_items
-                    //     .into_iter()
-                    //     .map(|item| Self::list_songs_in_item(client, &item))
-                    //     .flatten_ok()
-                    //     .try_collect()?;
-                    // let songs = songs.iter().map(|song| song.file.as_str()).collect_vec();
-
-                    // run_external_blocking(
-                    //     command,
-                    //     create_env(context, songs)?
-                    //         .into_iter()
-                    //         .map(|(a, b)| (a.into(), b.into())),
-                    // );
-
-                    Ok(())
+                context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                    id: "external_command",
+                    target: None,
+                    callback: Box::new(move |client| {
+                        let songs: Vec<_> = marked_items
+                            .into_iter()
+                            .map(|item| Self::list_songs_in_item(client, &item))
+                            .flatten_ok()
+                            .try_collect()?;
+                        Ok(crate::MpdCommandResult::ExternalCommand(command, songs))
+                    }),
                 }));
             }
             GlobalAction::ExternalCommand { command, .. } => {
                 if let Some(selected) = self.stack().current().selected() {
                     let selected = selected.clone();
-                    // context.command(Box::new(move |client| {
-                    //     let songs = Self::list_songs_in_item(client, &selected)?;
-                    //     let songs = songs.iter().map(|s| s.file.as_str());
-                    //
-                    //     run_external(command, create_env(context, songs)?);
-                    //     Ok(())
-                    // }));
+                    context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+                        id: "external_command",
+                        target: None,
+                        callback: Box::new(move |client| {
+                            let songs = Self::list_songs_in_item(client, &selected)?;
+                            Ok(crate::MpdCommandResult::ExternalCommand(command, songs))
+                        }),
+                    }));
                 }
             }
             _ => {

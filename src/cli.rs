@@ -187,7 +187,7 @@ pub fn run_external<'a: 'static, K: Into<String>, V: Into<String>>(command: &'a 
 pub fn create_env<'a>(
     context: &AppContext,
     selected_songs_paths: impl IntoIterator<Item = &'a str>,
-) -> Result<Vec<(impl Into<String>, impl Into<String>)>> {
+) -> Vec<(impl Into<String>, impl Into<String>)> {
     let mut result = Vec::new();
 
     if let Some((_, current)) = context.find_current_song_in_queue() {
@@ -211,5 +211,5 @@ pub fn create_env<'a>(
 
     result.push(("STATE", context.status.state.to_string()));
 
-    Ok(result)
+    result
 }
