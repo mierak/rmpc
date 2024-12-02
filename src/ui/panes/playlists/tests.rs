@@ -278,7 +278,7 @@ mod on_idle_event {
 }
 
 #[fixture]
-fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+fn screen_in_playlist_0(app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&app_context).unwrap();
     screen.stack.current_mut().select_idx(0, 0);
@@ -288,7 +288,7 @@ fn screen_in_playlist_0(mut client: TestMpdClient, app_context: AppContext) -> P
 }
 
 #[fixture]
-fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+fn screen_in_playlist_2(app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&app_context).unwrap();
     screen.stack.current_mut().select_idx(2, 0);
@@ -298,7 +298,7 @@ fn screen_in_playlist_2(mut client: TestMpdClient, app_context: AppContext) -> P
 }
 
 #[fixture]
-fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+fn screen_in_playlist_4(app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&app_context).unwrap();
     screen.stack.current_mut().select_idx(2, 0);
@@ -308,7 +308,7 @@ fn screen_in_playlist_4(mut client: TestMpdClient, app_context: AppContext) -> P
 }
 
 #[fixture]
-fn screen(mut client: TestMpdClient, app_context: AppContext) -> PlaylistsPane {
+fn screen(app_context: AppContext) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&app_context).unwrap();
     screen

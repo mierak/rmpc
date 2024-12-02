@@ -229,7 +229,7 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: MouseEvent,
-        context: &mut AppContext,
+        context: &AppContext,
     ) -> Result<()> {
         if matches!(event.kind, MouseEventKind::LeftClick) {
             let Some(pane) = self

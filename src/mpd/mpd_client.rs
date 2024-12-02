@@ -732,68 +732,68 @@ mod strext_tests {
     }
 }
 
-// #[cfg(test)]
-// mod filter_tests {
-//     use crate::mpd::mpd_client::{FilterExt, FilterKind, Tag};
-//
-//     use super::Filter;
-//     use test_case::test_case;
-//
-//     #[test_case(Tag::Artist, "Artist")]
-//     #[test_case(Tag::Album, "Album")]
-//     #[test_case(Tag::AlbumArtist, "AlbumArtist")]
-//     #[test_case(Tag::Title, "Title")]
-//     #[test_case(Tag::File, "File")]
-//     #[test_case(Tag::Genre, "Genre")]
-//     #[test_case(Tag::Custom("customtag"), "customtag")]
-//     fn single_value(tag: Tag, expected: &str) {
-//         let input: &[Filter<'_, '_>] = &[Filter::new(tag, "mrs singer")];
-//
-//         assert_eq!(input.to_query_str(), format!("({expected} == 'mrs singer')"));
-//     }
-//
-//     #[test]
-//     fn starts_with() {
-//         let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
-//
-//         assert_eq!(input.to_query_str(), "(Artist =~ '^mrs singer')");
-//     }
-//
-//     #[test]
-//     fn exact() {
-//         let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
-//
-//         assert_eq!(input.to_query_str(), "(Album == 'the greatest')");
-//     }
-//
-//     #[test]
-//     fn contains() {
-//         let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
-//
-//         assert_eq!(input.to_query_str(), "(Album =~ '.*the greatest.*')");
-//     }
-//
-//     #[test]
-//     fn regex() {
-//         let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(
-//             Tag::Album,
-//             r"the greatest.*\s+[A-Za-z]+$",
-//             FilterKind::Regex,
-//         )];
-//
-//         assert_eq!(input.to_query_str(), r"(Album =~ 'the greatest.*\\\\s+[A-Za-z]+$')");
-//     }
-//
-//     #[test]
-//     fn multiple_values() {
-//         let input: &[Filter<'_, '_>] = &[
-//             Filter::new(Tag::Album, "the greatest"),
-//             Filter::new(Tag::Artist, "mrs singer"),
-//         ];
-//
-//         assert_eq!(
-//             input.to_query_str(),
-//             "(Album == 'the greatest') AND (Artist == 'mrs singer')"
-//         );
-//     }
-// }
+#[cfg(test)]
+mod filter_tests {
+    use crate::mpd::mpd_client::{FilterExt, FilterKind, Tag};
+
+    use super::Filter;
+    use test_case::test_case;
+
+    #[test_case(Tag::Artist, "Artist")]
+    #[test_case(Tag::Album, "Album")]
+    #[test_case(Tag::AlbumArtist, "AlbumArtist")]
+    #[test_case(Tag::Title, "Title")]
+    #[test_case(Tag::File, "File")]
+    #[test_case(Tag::Genre, "Genre")]
+    #[test_case(Tag::Custom("customtag"), "customtag")]
+    fn single_value(tag: Tag, expected: &str) {
+        let input: &[Filter<'_>] = &[Filter::new(tag, "mrs singer")];
+
+        assert_eq!(input.to_query_str(), format!("({expected} == 'mrs singer')"));
+    }
+
+    #[test]
+    fn starts_with() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
+
+        assert_eq!(input.to_query_str(), "(Artist =~ '^mrs singer')");
+    }
+
+    #[test]
+    fn exact() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
+
+        assert_eq!(input.to_query_str(), "(Album == 'the greatest')");
+    }
+
+    #[test]
+    fn contains() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
+
+        assert_eq!(input.to_query_str(), "(Album =~ '.*the greatest.*')");
+    }
+
+    #[test]
+    fn regex() {
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(
+            Tag::Album,
+            r"the greatest.*\s+[A-Za-z]+$",
+            FilterKind::Regex,
+        )];
+
+        assert_eq!(input.to_query_str(), r"(Album =~ 'the greatest.*\\\\s+[A-Za-z]+$')");
+    }
+
+    #[test]
+    fn multiple_values() {
+        let input: &[Filter<'_>] = &[
+            Filter::new(Tag::Album, "the greatest"),
+            Filter::new(Tag::Artist, "mrs singer"),
+        ];
+
+        assert_eq!(
+            input.to_query_str(),
+            "(Album == 'the greatest') AND (Artist == 'mrs singer')"
+        );
+    }
+}

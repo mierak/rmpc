@@ -11,7 +11,7 @@ use crate::{
         lrc::{Lrc, LrcIndex},
         macros::status_warn,
     },
-    AppEvent, MpdCommand2, MpdCommandResult, MpdQuery, WorkRequest,
+    AppEvent, MpdCommand2, MpdQuery, MpdQueryResult, WorkRequest,
 };
 use anyhow::{bail, Result};
 
@@ -75,7 +75,7 @@ impl AppContext {
         &self,
         id: &'static str,
         target: PaneType,
-        callback: impl FnOnce(&mut Client<'_>) -> Result<MpdCommandResult> + Send + 'static,
+        callback: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
     ) {
         if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
             id,

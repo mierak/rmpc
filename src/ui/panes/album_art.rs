@@ -4,7 +4,7 @@ use crate::{
     mpd::mpd_client::MpdClient,
     shared::{image::ImageProtocol, key_event::KeyEvent, macros::try_skip},
     ui::{image::facade::AlbumArtFacade, UiEvent},
-    AppEvent, MpdCommandResult,
+    AppEvent, MpdQueryResult,
 };
 use anyhow::Result;
 use ratatui::{layout::Rect, Frame};
@@ -59,7 +59,7 @@ impl AlbumArtPane {
             let result = client.find_album_art(&song_uri)?;
             log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
 
-            Ok(MpdCommandResult::AlbumArt(result))
+            Ok(MpdQueryResult::AlbumArt(result))
         });
 
         Some(())
@@ -100,9 +100,9 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, _id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, _id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match data {
-            MpdCommandResult::AlbumArt(data) => {
+            MpdQueryResult::AlbumArt(data) => {
                 self.image_data = data;
                 context.render()?;
             }

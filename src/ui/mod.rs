@@ -35,8 +35,7 @@ use crate::{
         Config,
     },
     mpd::{
-        client::Client,
-        commands::{idle::IdleEvent, volume::Bound, State},
+        commands::{idle::IdleEvent, State},
         mpd_client::{FilterKind, MpdClient, ValueChange},
     },
     shared::{
@@ -44,7 +43,7 @@ use crate::{
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    MpdCommandResult,
+    MpdQueryResult,
 };
 use crate::{context::AppContext, mpd::version::Version};
 
@@ -495,7 +494,7 @@ impl<'ui> Ui<'ui> {
                         context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                             id: "outputs",
                             target: None,
-                            callback: Box::new(move |client| Ok(MpdCommandResult::Outputs(client.outputs()?.0))),
+                            callback: Box::new(move |client| Ok(MpdQueryResult::Outputs(client.outputs()?.0))),
                         })),
                         "Failed to request outputs modal"
                     );
@@ -505,7 +504,7 @@ impl<'ui> Ui<'ui> {
                         context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                             id: "decoders",
                             target: None,
-                            callback: Box::new(move |client| Ok(MpdCommandResult::Decoders(client.decoders()?.0))),
+                            callback: Box::new(move |client| Ok(MpdQueryResult::Decoders(client.decoders()?.0))),
                         })),
                         "Failed to request decoders modal"
                     );
@@ -599,7 +598,7 @@ impl<'ui> Ui<'ui> {
         &mut self,
         id: &'static str,
         pane: Option<PaneType>,
-        command: MpdCommandResult,
+        command: MpdQueryResult,
         context: &mut AppContext,
     ) -> Result<()> {
         match pane {
@@ -617,10 +616,10 @@ impl<'ui> Ui<'ui> {
                 Panes::Lyrics(p) => p.on_query_finished(id, command, context),
             }?,
             None => match command {
-                MpdCommandResult::Outputs(outputs) => {
+                MpdQueryResult::Outputs(outputs) => {
                     modal!(context, OutputsModal::new(outputs));
                 }
-                MpdCommandResult::Decoders(decoders) => {
+                MpdQueryResult::Decoders(decoders) => {
                     modal!(context, DecodersModal::new(decoders));
                 }
                 _ => {}

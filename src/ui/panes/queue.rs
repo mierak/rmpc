@@ -30,7 +30,7 @@ use crate::{
         },
         UiEvent,
     },
-    MpdCommandResult,
+    MpdQueryResult,
 };
 use log::error;
 use ratatui::{
@@ -238,7 +238,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }
@@ -296,9 +296,9 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match data {
-            MpdCommandResult::AddToPlaylist { playlists, song_file } => {
+            MpdQueryResult::AddToPlaylist { playlists, song_file } => {
                 modal!(
                     context,
                     SelectModal::new(context)
@@ -458,7 +458,7 @@ impl Pane for QueuePane {
                                 .map(|v| v.name)
                                 .sorted()
                                 .collect_vec();
-                            Ok(MpdCommandResult::AddToPlaylist {
+                            Ok(MpdQueryResult::AddToPlaylist {
                                 playlists,
                                 song_file: uri,
                             })

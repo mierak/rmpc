@@ -6,6 +6,7 @@ use crate::{
     config::tabs::PaneType,
     context::AppContext,
     mpd::{
+        client::Client,
         commands::Song,
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
@@ -22,7 +23,7 @@ use crate::{
         widgets::browser::Browser,
         UiEvent,
     },
-    MpdCommandResult,
+    MpdQueryResult,
 };
 
 use super::{browser::DirOrSong, Pane};
@@ -60,7 +61,7 @@ impl PlaylistsPane {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
                 context.query("open_or_play", PaneType::Playlists, move |client| {
-                    Ok(MpdCommandResult::SongsList(client.list_playlist_info(&playlist, None)?))
+                    Ok(MpdQueryResult::SongsList(client.list_playlist_info(&playlist, None)?))
                 });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -101,7 +102,7 @@ impl Pane for PlaylistsPane {
                     })
                     .sorted()
                     .collect();
-                Ok(MpdCommandResult::DirOrSong(result))
+                Ok(MpdQueryResult::DirOrSong(result))
             });
 
             self.initialized = true;
@@ -128,14 +129,14 @@ impl Pane for PlaylistsPane {
                     })
                     .sorted()
                     .collect();
-                Ok(MpdCommandResult::DirOrSong(result))
+                Ok(MpdQueryResult::DirOrSong(result))
             });
         }
 
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         self.handle_mouse_action(event, context)
     }
 
@@ -146,24 +147,19 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn on_query_finished(
-        &mut self,
-        id: &'static str,
-        mpd_command: MpdCommandResult,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, mpd_command: MpdQueryResult, context: &AppContext) -> Result<()> {
         match mpd_command {
-            MpdCommandResult::Preview(vec) => {
+            MpdQueryResult::Preview(vec) => {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            MpdCommandResult::SongsList(data) => {
+            MpdQueryResult::SongsList(data) => {
                 self.stack_mut()
                     .replace(data.into_iter().map(DirOrSong::Song).collect());
                 self.prepare_preview(context);
                 context.render()?;
             }
-            MpdCommandResult::DirOrSong(data) => {
+            MpdQueryResult::DirOrSong(data) => {
                 if id == "init" {
                     self.stack = DirStack::new(data);
                 } else {
@@ -248,11 +244,13 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         self.filter_input_mode
     }
 
-    fn list_songs_in_item(client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
-        Ok(match item {
-            DirOrSong::Dir { name, .. } => client.list_playlist_info(name, None)?,
-            DirOrSong::Song(song) => vec![song.clone()],
-        })
+    fn list_songs_in_item(&self, item: DirOrSong) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+        move |client| {
+            Ok(match item {
+                DirOrSong::Dir { name, .. } => client.list_playlist_info(&name, None)?,
+                DirOrSong::Song(song) => vec![song.clone()],
+            })
+        }
     }
 
     fn delete(&self, item: &DirOrSong, index: usize, context: &AppContext) -> Result<()> {
@@ -427,7 +425,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 }))
             })?;
 
-            Ok(MpdCommandResult::Preview(result))
+            Ok(MpdQueryResult::Preview(result))
         });
     }
 

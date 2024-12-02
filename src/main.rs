@@ -76,26 +76,18 @@ mod mpd;
 mod shared;
 mod ui;
 
+#[derive(derive_more::Debug)]
 pub struct MpdQuery {
     id: &'static str,
     target: Option<PaneType>,
-    callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdCommandResult> + Send>,
+    #[debug(skip)]
+    callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send>,
 }
 
+#[derive(derive_more::Debug)]
 pub struct MpdCommand2 {
+    #[debug(skip)]
     callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send>,
-}
-
-impl std::fmt::Debug for MpdQuery {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
-impl std::fmt::Debug for MpdCommand2 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -115,13 +107,13 @@ pub enum WorkDone {
     MpdCommandFinished {
         id: &'static str,
         target: Option<PaneType>,
-        data: MpdCommandResult,
+        data: MpdQueryResult,
     },
     None,
 }
 
 #[derive(Debug)]
-pub enum MpdCommandResult {
+pub enum MpdQueryResult {
     Preview(Option<Vec<ListItem<'static>>>),
     SongsList(Vec<Song>),
     DirOrSong(Vec<DirOrSong>),
@@ -135,9 +127,6 @@ pub enum MpdCommandResult {
     Decoders(Vec<Decoder>),
     ExternalCommand(&'static [&'static str], Vec<Song>),
 }
-
-// #[derive(Debug)]
-// pub struct MpdCommandResult(MpdCommand);
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -511,7 +500,7 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
-                        ("global_status_update", None, MpdCommandResult::Status(status)) => {
+                        ("global_status_update", None, MpdQueryResult::Status(status)) => {
                             let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
                             context.status = status;
                             let mut song_changed = false;
@@ -558,15 +547,15 @@ fn main_task<B: Backend + std::io::Write>(
                             }
                             render_wanted = true;
                         }
-                        ("global_volume_update", None, MpdCommandResult::Volume(volume)) => {
+                        ("global_volume_update", None, MpdQueryResult::Volume(volume)) => {
                             context.status.volume = volume;
                             render_wanted = true;
                         }
-                        ("global_queue_update", None, MpdCommandResult::Queue(queue)) => {
+                        ("global_queue_update", None, MpdQueryResult::Queue(queue)) => {
                             context.queue = queue.unwrap_or_default();
                             render_wanted = true;
                         }
-                        ("external_command", None, MpdCommandResult::ExternalCommand(command, songs)) => {
+                        ("external_command", None, MpdQueryResult::ExternalCommand(command, songs)) => {
                             let songs = songs.iter().map(|s| s.file.as_str());
                             run_external(command, create_env(&context, songs));
                         }
@@ -633,19 +622,19 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
         IdleEvent::Mixer => {
             if context.supported_commands.contains("getvol") {
                 context.query("global_volume_update", PaneType::Queue, move |client| {
-                    Ok(MpdCommandResult::Volume(client.get_volume()?))
+                    Ok(MpdQueryResult::Volume(client.get_volume()?))
                 });
                 if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                     id: "global_volume_update",
                     target: None,
-                    callback: Box::new(move |client| Ok(MpdCommandResult::Volume(client.get_volume()?))),
+                    callback: Box::new(move |client| Ok(MpdQueryResult::Volume(client.get_volume()?))),
                 })) {
                     error!(error:? = err; "Failed to send status update request");
                 }
             } else if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                 id: "global_status_update",
                 target: None,
-                callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+                callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
             })) {
                 error!(error:? = err; "Failed to send status update request");
             }
@@ -654,7 +643,7 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
             if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                 id: "global_status_update",
                 target: None,
-                callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+                callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
             })) {
                 error!(error:? = err; "Failed to send status update request");
             }
@@ -663,7 +652,7 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
             if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                 id: "global_status_update",
                 target: None,
-                callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+                callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
             })) {
                 error!(error:? = err; "Failed to send status update request");
             }
@@ -672,7 +661,7 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
             if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                 id: "global_queue_update",
                 target: None,
-                callback: Box::new(move |client| Ok(MpdCommandResult::Queue(client.playlist_info()?))),
+                callback: Box::new(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?))),
             })) {
                 error!(error:? = err; "Failed to send status update request");
             }
@@ -800,7 +789,7 @@ impl RenderLoop {
                 if let Err(err) = work_tx.send(WorkRequest::MpdQuery(MpdQuery {
                     id: "global_status_update",
                     target: None,
-                    callback: Box::new(move |client| Ok(MpdCommandResult::Status(client.get_status()?))),
+                    callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
                 })) {
                     error!(error:? = err; "Failed to send status update request");
                 }

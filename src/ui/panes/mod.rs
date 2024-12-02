@@ -32,7 +32,7 @@ use crate::{
     context::AppContext,
     mpd::commands::{status::OnOffOneshot, volume::Bound, Song, Status},
     shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
-    MpdCommandResult,
+    MpdQueryResult,
 };
 
 use super::{widgets::volume::Volume, UiEvent};
@@ -136,11 +136,11 @@ pub(super) trait Pane {
 
     fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()>;
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         Ok(())
     }
 }

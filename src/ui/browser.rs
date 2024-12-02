@@ -6,7 +6,7 @@ use ratatui::prelude::Rect;
 use crate::{
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
-    mpd::{commands::Song, mpd_client::MpdClient},
+    mpd::{client::Client, commands::Song},
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -35,7 +35,7 @@ where
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, context: &AppContext) -> Result<()>;
-    fn list_songs_in_item(client: &mut impl MpdClient, item: &T) -> Result<Vec<Song>>;
+    fn list_songs_in_item(&self, item: T) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&self, context: &AppContext);
     fn add(&self, item: &T, context: &AppContext) -> Result<()>;
     fn add_all(&self, context: &AppContext) -> Result<()>;
@@ -93,29 +93,37 @@ where
         let config = context.config;
         match action {
             GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
-                let marked_items: Vec<_> = self.stack().current().marked_items().cloned().collect();
+                let marked_items: Vec<_> = self
+                    .stack()
+                    .current()
+                    .marked_items()
+                    .map(|item| self.list_songs_in_item(item.clone()))
+                    .collect();
+                let path = self.stack().path().to_owned();
                 context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                     id: "external_command",
                     target: None,
                     callback: Box::new(move |client| {
                         let songs: Vec<_> = marked_items
                             .into_iter()
-                            .map(|item| Self::list_songs_in_item(client, &item))
+                            .map(|item| (item)(client))
                             .flatten_ok()
                             .try_collect()?;
-                        Ok(crate::MpdCommandResult::ExternalCommand(command, songs))
+                        Ok(crate::MpdQueryResult::ExternalCommand(command, songs))
                     }),
                 }));
             }
             GlobalAction::ExternalCommand { command, .. } => {
                 if let Some(selected) = self.stack().current().selected() {
                     let selected = selected.clone();
+                    let path = self.stack().path().to_owned();
+                    let songs = self.list_songs_in_item(selected);
                     context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
                         id: "external_command",
                         target: None,
                         callback: Box::new(move |client| {
-                            let songs = Self::list_songs_in_item(client, &selected)?;
-                            Ok(crate::MpdCommandResult::ExternalCommand(command, songs))
+                            let songs = (songs)(client)?;
+                            Ok(crate::MpdQueryResult::ExternalCommand(command, songs))
                         }),
                     }));
                 }
@@ -128,7 +136,7 @@ where
         Ok(())
     }
 
-    fn handle_mouse_action(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_action(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         let [prev_area, current_area, preview_area] = self.browser_areas();
 
         let position = event.into();

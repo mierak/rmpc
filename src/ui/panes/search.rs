@@ -29,7 +29,7 @@ use crate::shared::mouse_event::MouseEvent;
 use crate::shared::mouse_event::MouseEventKind;
 use crate::ui::dirstack::Dir;
 use crate::ui::UiEvent;
-use crate::MpdCommandResult;
+use crate::MpdQueryResult;
 use crate::{
     mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
     ui::widgets::{button::Button, input::Input},
@@ -166,7 +166,7 @@ impl SearchPane {
             Phase::Search => {
                 let result = Some(self.songs_dir.to_list_items(context.config));
                 context.query("preview", PaneType::Search, move |_| {
-                    Ok(MpdCommandResult::Preview(result))
+                    Ok(MpdQueryResult::Preview(result))
                 });
             }
             Phase::BrowseResults { .. } => {
@@ -183,7 +183,7 @@ impl SearchPane {
                         .context("Expected to find exactly one song")?
                         .to_preview(&config.theme.symbols)
                         .collect_vec();
-                    Ok(MpdCommandResult::Preview(Some(preview)))
+                    Ok(MpdQueryResult::Preview(Some(preview)))
                 });
             }
         }
@@ -383,7 +383,7 @@ impl SearchPane {
                         .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
                         .collect_vec(),
                 )?;
-                Ok(MpdCommandResult::SongsList(result))
+                Ok(MpdQueryResult::SongsList(result))
             });
         } else {
             context.query("search", PaneType::Search, move |client| {
@@ -393,7 +393,7 @@ impl SearchPane {
                         .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
                         .collect_vec(),
                 )?;
-                Ok(MpdCommandResult::SongsList(result))
+                Ok(MpdQueryResult::SongsList(result))
             });
         };
     }
@@ -553,13 +553,13 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match data {
-            MpdCommandResult::Preview(data) => {
+            MpdQueryResult::Preview(data) => {
                 self.preview = data;
                 context.render()?;
             }
-            MpdCommandResult::SongsList(data) => {
+            MpdQueryResult::SongsList(data) => {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(self.songs_dir.to_list_items(context.config));
                 context.render()?;
@@ -569,7 +569,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, mut event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, mut event: MouseEvent, context: &AppContext) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;

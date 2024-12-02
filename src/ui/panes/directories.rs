@@ -6,6 +6,7 @@ use crate::{
     config::tabs::PaneType,
     context::AppContext,
     mpd::{
+        client::Client,
         commands::{lsinfo::FileOrDir, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
@@ -16,7 +17,7 @@ use crate::{
         widgets::browser::Browser,
         UiEvent,
     },
-    MpdCommandResult,
+    MpdQueryResult,
 };
 
 use super::{browser::DirOrSong, Pane};
@@ -66,7 +67,7 @@ impl DirectoriesPane {
                         .sorted()
                         .collect();
 
-                    Ok(MpdCommandResult::DirOrSong(res))
+                    Ok(MpdQueryResult::DirOrSong(res))
                 });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -103,7 +104,7 @@ impl Pane for DirectoriesPane {
                     .map(Into::<DirOrSong>::into)
                     .sorted()
                     .collect::<Vec<_>>();
-                Ok(MpdCommandResult::DirOrSong(result))
+                Ok(MpdQueryResult::DirOrSong(result))
             });
             self.initialized = true;
         }
@@ -120,13 +121,13 @@ impl Pane for DirectoriesPane {
                     .map(Into::<DirOrSong>::into)
                     .sorted()
                     .collect::<Vec<_>>();
-                Ok(MpdCommandResult::DirOrSong(result))
+                Ok(MpdQueryResult::DirOrSong(result))
             });
         };
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         self.handle_mouse_action(event, context)
     }
 
@@ -137,13 +138,13 @@ impl Pane for DirectoriesPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdCommandResult, context: &mut AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match data {
-            MpdCommandResult::Preview(vec) => {
+            MpdQueryResult::Preview(vec) => {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            MpdCommandResult::DirOrSong(data) => {
+            MpdQueryResult::DirOrSong(data) => {
                 if id == "init" {
                     self.stack = DirStack::new(data);
                 } else {
@@ -175,13 +176,15 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         self.filter_input_mode
     }
 
-    fn list_songs_in_item(client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
-        Ok(match item {
-            DirOrSong::Dir { full_path, .. } => {
-                client.find(&[Filter::new_with_kind(Tag::File, full_path, FilterKind::StartsWith)])?
-            }
-            DirOrSong::Song(song) => vec![song.clone()],
-        })
+    fn list_songs_in_item(&self, item: DirOrSong) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+        move |client| {
+            Ok(match item {
+                DirOrSong::Dir { full_path, .. } => {
+                    client.find(&[Filter::new_with_kind(Tag::File, &full_path, FilterKind::StartsWith)])?
+                }
+                DirOrSong::Song(song) => vec![song.clone()],
+            })
+        }
     }
 
     fn add(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
@@ -251,7 +254,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         Ok(val) => val,
                         Err(err) => {
                             log::error!(error:? = err; "Failed to get lsinfo for dir",);
-                            return Ok(MpdCommandResult::Preview(None));
+                            return Ok(MpdQueryResult::Preview(None));
                         }
                     }
                     .0
@@ -267,14 +270,14 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     .map(|v| v.to_list_item_simple(config))
                     .collect();
 
-                    Ok(MpdCommandResult::Preview(Some(res)))
+                    Ok(MpdQueryResult::Preview(Some(res)))
                 });
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
                 let config = context.config;
                 context.query("preview", PaneType::Directories, move |client| {
-                    Ok(MpdCommandResult::Preview(
+                    Ok(MpdQueryResult::Preview(
                         client
                             .find_one(&[Filter::new(Tag::File, &file)])?
                             .map(|v| v.to_preview(&config.theme.symbols).collect()),

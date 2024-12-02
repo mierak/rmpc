@@ -102,7 +102,7 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         if !self.logs_area.contains(event.into()) {
             return Ok(());
         }
