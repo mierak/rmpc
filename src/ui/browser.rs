@@ -11,7 +11,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    MpdQuery, WorkRequest,
+    MpdQuery, MpdQueryResult, EXTERNAL_COMMAND,
 };
 
 use super::{
@@ -100,32 +100,34 @@ where
                     .map(|item| self.list_songs_in_item(item.clone()))
                     .collect();
                 let path = self.stack().path().to_owned();
-                context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                    id: "external_command",
+                context.query_raw(MpdQuery {
+                    id: EXTERNAL_COMMAND,
                     target: None,
+                    replace_id: None,
                     callback: Box::new(move |client| {
                         let songs: Vec<_> = marked_items
                             .into_iter()
                             .map(|item| (item)(client))
                             .flatten_ok()
                             .try_collect()?;
-                        Ok(crate::MpdQueryResult::ExternalCommand(command, songs))
+                        Ok(MpdQueryResult::ExternalCommand(command, songs))
                     }),
-                }));
+                });
             }
             GlobalAction::ExternalCommand { command, .. } => {
                 if let Some(selected) = self.stack().current().selected() {
                     let selected = selected.clone();
                     let path = self.stack().path().to_owned();
                     let songs = self.list_songs_in_item(selected);
-                    context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                        id: "external_command",
+                    context.query_raw(MpdQuery {
+                        id: EXTERNAL_COMMAND,
                         target: None,
+                        replace_id: None,
                         callback: Box::new(move |client| {
                             let songs = (songs)(client)?;
-                            Ok(crate::MpdQueryResult::ExternalCommand(command, songs))
+                            Ok(MpdQueryResult::ExternalCommand(command, songs))
                         }),
-                    }));
+                    });
                 }
             }
             _ => {
@@ -307,7 +309,7 @@ where
                 context.render()?;
             }
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked().iter().rev() {
+                for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
                     self.add(item, context)?;
                 }

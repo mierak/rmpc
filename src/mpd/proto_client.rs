@@ -6,6 +6,8 @@ use std::{
 use anyhow::Result;
 use log::trace;
 
+use crate::mpd::errors::ErrorCode;
+
 use super::{
     errors::{MpdError, MpdFailureResponse},
     split_line, FromMpd,
@@ -76,7 +78,16 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 self.read_ok()
             }
             Err(e) => {
-                self.client.clear_read_buf()?;
+                if !matches!(
+                    e,
+                    MpdError::Mpd(MpdFailureResponse {
+                        code: ErrorCode::NoExist,
+                        ..
+                    })
+                ) {
+                    log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                    self.client.clear_read_buf()?;
+                }
                 Err(e)
             }
         }
@@ -86,7 +97,16 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         match v.next(val) {
             Ok(val) => Ok(val),
             Err(e) => {
-                self.client.clear_read_buf()?;
+                if !matches!(
+                    e,
+                    MpdError::Mpd(MpdFailureResponse {
+                        code: ErrorCode::NoExist,
+                        ..
+                    })
+                ) {
+                    log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                    self.client.clear_read_buf()?;
+                }
                 Err(e)
             }
         }
@@ -108,7 +128,16 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                     return self.read_response::<V>();
                 }
                 Err(e) => {
-                    self.client.clear_read_buf()?;
+                    if !matches!(
+                        e,
+                        MpdError::Mpd(MpdFailureResponse {
+                            code: ErrorCode::NoExist,
+                            ..
+                        })
+                    ) {
+                        log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                        self.client.clear_read_buf()?;
+                    }
                     return Err(e);
                 }
             };
@@ -135,7 +164,16 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                     return self.read_opt_response::<V>();
                 }
                 Err(e) => {
-                    self.client.clear_read_buf()?;
+                    if !matches!(
+                        e,
+                        MpdError::Mpd(MpdFailureResponse {
+                            code: ErrorCode::NoExist,
+                            ..
+                        })
+                    ) {
+                        log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                        self.client.clear_read_buf()?;
+                    }
                     return Err(e);
                 }
             }
@@ -144,21 +182,33 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
 
     pub(super) fn read_bin(mut self) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
+        // trim the 0 offset from the initial command because we substitute
+        // an actual value here
+        let command = self.command.trim_end_matches(" 0");
         let _ = match self.read_bin_inner(&mut buf) {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) => return Ok(None),
             Err(MpdError::ClientClosed) => {
                 self.client.reconnect()?;
-                self.execute(&format!("{} {}", self.command, buf.len()))?;
+                self.execute(&format!("{} {}", command, buf.len()))?;
                 self.read_bin_inner(&mut buf)
             }
             Err(e) => {
-                self.client.clear_read_buf()?;
+                if !matches!(
+                    e,
+                    MpdError::Mpd(MpdFailureResponse {
+                        code: ErrorCode::NoExist,
+                        ..
+                    })
+                ) {
+                    log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                    self.client.clear_read_buf()?;
+                }
                 Err(e)
             }
         };
         loop {
-            self.execute(&format!("{} {}", self.command, buf.len()))?;
+            self.execute(&format!("{} {}", command, buf.len()))?;
             match self.read_bin_inner(&mut buf) {
                 Ok(Some(response)) => {
                     if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
@@ -168,7 +218,16 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 }
                 Ok(None) => return Ok(None),
                 Err(e) => {
-                    self.client.clear_read_buf()?;
+                    if !matches!(
+                        e,
+                        MpdError::Mpd(MpdFailureResponse {
+                            code: ErrorCode::NoExist,
+                            ..
+                        })
+                    ) {
+                        log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                        self.client.clear_read_buf()?;
+                    }
                     return Err(e);
                 }
             }

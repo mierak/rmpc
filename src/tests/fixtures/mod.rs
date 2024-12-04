@@ -1,5 +1,6 @@
-use std::{cell::Cell, collections::HashSet, sync::mpsc::channel};
+use std::{cell::Cell, collections::HashSet};
 
+use crossbeam::channel::unbounded;
 use ratatui::{backend::TestBackend, Terminal};
 use rstest::fixture;
 
@@ -19,8 +20,8 @@ pub fn status() -> Status {
 
 #[fixture]
 pub fn app_context() -> AppContext {
-    let chan1 = channel();
-    let chan2 = channel();
+    let chan1 = unbounded();
+    let chan2 = unbounded();
     chan1.1.leak();
     chan2.1.leak();
     let config = ConfigFile::default()

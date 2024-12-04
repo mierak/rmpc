@@ -87,7 +87,9 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
     }
     pub fn replace(&mut self, head: Vec<T>) {
         if self.pop().is_some() {
+            let len = head.len();
             self.push(head);
+            self.current_mut().state.set_content_len(Some(len));
         }
     }
 

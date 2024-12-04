@@ -495,12 +495,12 @@ impl MpdClient for Client<'_> {
     }
 
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("readpicture \"{path}\""))
+        self.send(&format!("readpicture \"{path}\" 0"))
             .and_then(ProtoClient::read_bin)
     }
 
     fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("albumart \"{path}\""))
+        self.send(&format!("albumart \"{path}\" 0"))
             .and_then(ProtoClient::read_bin)
     }
 

@@ -78,11 +78,31 @@ impl AppContext {
         target: PaneType,
         callback: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
     ) {
-        if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
+        self.query_raw(MpdQuery {
             id,
             target: Some(target),
+            replace_id: None,
             callback: Box::new(callback),
-        })) {
+        });
+    }
+
+    pub fn query_replaceable(
+        &self,
+        id: &'static str,
+        replace_id: &'static str,
+        target: PaneType,
+        callback: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
+    ) {
+        self.query_raw(MpdQuery {
+            id,
+            target: Some(target),
+            replace_id: Some(replace_id),
+            callback: Box::new(callback),
+        });
+    }
+
+    pub fn query_raw(&self, query: MpdQuery) {
+        if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(query)) {
             log::error!(error:? = err; "Failed to send query request");
         }
     }

@@ -17,6 +17,8 @@ pub struct AlbumArtPane {
     image_data: Option<Vec<u8>>,
 }
 
+const ALBUM_ART: &str = "album_art";
+
 impl AlbumArtPane {
     pub fn new(context: &AppContext) -> Self {
         let sender = context.app_event_sender.clone();
@@ -53,7 +55,7 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
-        context.query("album_art", PaneType::AlbumArt, move |client| {
+        context.query(ALBUM_ART, PaneType::AlbumArt, move |client| {
             let start = std::time::Instant::now();
             log::debug!(file = song_uri.as_str(); "Searching for album art");
             let result = client.find_album_art(&song_uri)?;
@@ -100,9 +102,9 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, _id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match data {
-            MpdQueryResult::AlbumArt(data) => {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+        match (id, data) {
+            (ALBUM_ART, MpdQueryResult::AlbumArt(data)) => {
                 self.image_data = data;
                 context.render()?;
             }
@@ -143,91 +145,89 @@ impl Pane for AlbumArtPane {
     }
 }
 
-// #[cfg(test)]
-// #[allow(clippy::unwrap_used)]
-// mod tests {
-//     use rstest::rstest;
-//
-//     use crate::config::Config;
-//     use crate::config::Leak;
-//     use crate::mpd::commands::Song;
-//     use crate::mpd::commands::State;
-//     use crate::tests::fixtures::app_context;
-//     use crate::tests::fixtures::mpd_client::client;
-//     use crate::tests::fixtures::mpd_client::TestMpdClient;
-//     use crate::ui::panes::Pane;
-//     use crate::ui::UiEvent;
-//     use crate::{config::ImageMethod, context::AppContext};
-//
-//     use super::AlbumArtPane;
-//
-//     #[rstest]
-//     #[case(ImageMethod::Kitty, true)]
-//     #[case(ImageMethod::UeberzugWayland, true)]
-//     #[case(ImageMethod::UeberzugX11, true)]
-//     #[case(ImageMethod::Iterm2, true)]
-//     #[case(ImageMethod::Sixel, true)]
-//     #[case(ImageMethod::Unsupported, false)]
-//     #[case(ImageMethod::None, false)]
-//     fn searches_for_album_art_before_show(
-//         #[case] method: ImageMethod,
-//         #[case] should_search: bool,
-//         mut app_context: AppContext,
-//         mut client: TestMpdClient,
-//     ) {
-//         let selected_song_id = 333;
-//         let mut config = Config::default();
-//         config.album_art.method = method;
-//         app_context.config = config.leak();
-//         app_context.queue.push(Song {
-//             id: selected_song_id,
-//             ..Default::default()
-//         });
-//         app_context.status.songid = Some(selected_song_id);
-//         app_context.status.state = State::Play;
-//         let mut screen = AlbumArtPane::new(&app_context);
-//
-//         screen.before_show(&mut client, &app_context).unwrap();
-//
-//         assert_eq!(
-//             client.calls.get("find_album_art").map_or(0, |v| *v),
-//             u32::from(should_search)
-//         );
-//     }
-//
-//     #[rstest]
-//     #[case(ImageMethod::Kitty, true)]
-//     #[case(ImageMethod::UeberzugWayland, true)]
-//     #[case(ImageMethod::UeberzugX11, true)]
-//     #[case(ImageMethod::Iterm2, true)]
-//     #[case(ImageMethod::Sixel, true)]
-//     #[case(ImageMethod::Unsupported, false)]
-//     #[case(ImageMethod::None, false)]
-//     fn searches_for_album_art_on_event(
-//         #[case] method: ImageMethod,
-//         #[case] should_search: bool,
-//         mut app_context: AppContext,
-//         mut client: TestMpdClient,
-//     ) {
-//         let selected_song_id = 333;
-//         let mut config = Config::default();
-//         config.album_art.method = method;
-//         app_context.config = config.leak();
-//         app_context.queue.push(Song {
-//             id: selected_song_id,
-//             ..Default::default()
-//         });
-//         app_context.status.songid = Some(selected_song_id);
-//         app_context.status.state = State::Play;
-//         let mut screen = AlbumArtPane::new(&app_context);
-//
-//         screen
-//             .on_event(&mut UiEvent::SongChanged, &mut client, &app_context)
-//             .unwrap();
-//
-//         assert_eq!(
-//             client.calls.get("find_album_art").map_or(0, |v| *v),
-//             u32::from(should_search)
-//         );
-//     }
-// }
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use rstest::rstest;
+
+    use crate::config::Config;
+    use crate::config::Leak;
+    use crate::mpd::commands::Song;
+    use crate::mpd::commands::State;
+    use crate::tests::fixtures::app_context;
+    use crate::tests::fixtures::mpd_client::client;
+    use crate::tests::fixtures::mpd_client::TestMpdClient;
+    use crate::ui::panes::Pane;
+    use crate::ui::UiEvent;
+    use crate::{config::ImageMethod, context::AppContext};
+
+    use super::AlbumArtPane;
+
+    #[rstest]
+    #[case(ImageMethod::Kitty, true)]
+    #[case(ImageMethod::UeberzugWayland, true)]
+    #[case(ImageMethod::UeberzugX11, true)]
+    #[case(ImageMethod::Iterm2, true)]
+    #[case(ImageMethod::Sixel, true)]
+    #[case(ImageMethod::Unsupported, false)]
+    #[case(ImageMethod::None, false)]
+    fn searches_for_album_art_before_show(
+        #[case] method: ImageMethod,
+        #[case] should_search: bool,
+        mut app_context: AppContext,
+        client: TestMpdClient,
+    ) {
+        let selected_song_id = 333;
+        let mut config = Config::default();
+        config.album_art.method = method;
+        app_context.config = config.leak();
+        app_context.queue.push(Song {
+            id: selected_song_id,
+            ..Default::default()
+        });
+        app_context.status.songid = Some(selected_song_id);
+        app_context.status.state = State::Play;
+        let mut screen = AlbumArtPane::new(&app_context);
+
+        screen.before_show(&app_context).unwrap();
+
+        assert_eq!(
+            client.calls.get("find_album_art").map_or(0, |v| *v),
+            u32::from(should_search)
+        );
+    }
+
+    #[rstest]
+    #[case(ImageMethod::Kitty, true)]
+    #[case(ImageMethod::UeberzugWayland, true)]
+    #[case(ImageMethod::UeberzugX11, true)]
+    #[case(ImageMethod::Iterm2, true)]
+    #[case(ImageMethod::Sixel, true)]
+    #[case(ImageMethod::Unsupported, false)]
+    #[case(ImageMethod::None, false)]
+    fn searches_for_album_art_on_event(
+        #[case] method: ImageMethod,
+        #[case] should_search: bool,
+        mut app_context: AppContext,
+        client: TestMpdClient,
+    ) {
+        let selected_song_id = 333;
+        let mut config = Config::default();
+        config.album_art.method = method;
+        app_context.config = config.leak();
+        app_context.queue.push(Song {
+            id: selected_song_id,
+            ..Default::default()
+        });
+        app_context.status.songid = Some(selected_song_id);
+        app_context.status.state = State::Play;
+        let mut screen = AlbumArtPane::new(&app_context);
+
+        screen.on_event(&mut UiEvent::SongChanged, &app_context).unwrap();
+
+        assert_eq!(
+            client.calls.get("find_album_art").map_or(0, |v| *v),
+            u32::from(should_search)
+        );
+    }
+}

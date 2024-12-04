@@ -47,6 +47,9 @@ pub struct SearchPane {
     column_areas: [Rect; 3],
 }
 
+const PREVIEW: &str = "preview";
+const SEARCH: &str = "search";
+
 impl SearchPane {
     pub fn new(context: &AppContext) -> Self {
         let config = context.config;
@@ -165,9 +168,7 @@ impl SearchPane {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
                 let result = Some(self.songs_dir.to_list_items(context.config));
-                context.query("preview", PaneType::Search, move |_| {
-                    Ok(MpdQueryResult::Preview(result))
-                });
+                context.query(PREVIEW, PaneType::Search, move |_| Ok(MpdQueryResult::Preview(result)));
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
@@ -176,7 +177,7 @@ impl SearchPane {
                 let config = context.config;
                 let file = current.file.clone();
 
-                context.query("preview", PaneType::Search, move |client| {
+                context.query(PREVIEW, PaneType::Search, move |client| {
                     let preview = client
                         .find(&[Filter::new(Tag::File, &file)])?
                         .first()
@@ -372,11 +373,13 @@ impl SearchPane {
         let filter = filter.collect_vec();
 
         if filter.is_empty() {
+            let _ = std::mem::take(&mut self.songs_dir);
+            self.preview.take();
             return;
         }
 
         if case_sensitive {
-            context.query("search", PaneType::Search, move |client| {
+            context.query(SEARCH, PaneType::Search, move |client| {
                 let result = client.find(
                     &filter
                         .iter()
@@ -386,7 +389,7 @@ impl SearchPane {
                 Ok(MpdQueryResult::SongsList(result))
             });
         } else {
-            context.query("search", PaneType::Search, move |client| {
+            context.query(SEARCH, PaneType::Search, move |client| {
                 let result = client.search(
                     &filter
                         .iter()
@@ -554,12 +557,12 @@ impl Pane for SearchPane {
     }
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match data {
-            MpdQueryResult::Preview(data) => {
+        match (id, data) {
+            (PREVIEW, MpdQueryResult::Preview(data)) => {
                 self.preview = data;
                 context.render()?;
             }
-            MpdQueryResult::SongsList(data) => {
+            (SEARCH, MpdQueryResult::SongsList(data)) => {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(self.songs_dir.to_list_items(context.config));
                 context.render()?;

@@ -37,7 +37,13 @@ pub struct PlaylistsPane {
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
     initialized: bool,
+    selected_song: Option<(usize, String)>,
 }
+
+const INIT: &str = "init";
+const REINIT: &str = "reinit";
+const OPEN_OR_PLAY: &str = "open_or_play";
+const PREVIEW: &str = "preview";
 
 impl PlaylistsPane {
     pub fn new(context: &AppContext) -> Self {
@@ -46,10 +52,11 @@ impl PlaylistsPane {
             filter_input_mode: false,
             browser: Browser::new(context.config),
             initialized: false,
+            selected_song: None,
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &AppContext, action_id: &'static str) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
 
@@ -60,7 +67,7 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query("open_or_play", PaneType::Playlists, move |client| {
+                context.query(action_id, PaneType::Playlists, move |client| {
                     Ok(MpdQueryResult::SongsList(client.list_playlist_info(&playlist, None)?))
                 });
                 self.stack_mut().push(Vec::new());
@@ -91,7 +98,7 @@ impl Pane for PlaylistsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query("init", PaneType::Playlists, move |client| {
+            context.query(INIT, PaneType::Playlists, move |client| {
                 let result: Vec<_> = client
                     .list_playlists()
                     .context("Cannot list playlists")?
@@ -112,8 +119,8 @@ impl Pane for PlaylistsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         let id = match event {
-            UiEvent::Database => Some("init"),
-            UiEvent::StoredPlaylist => Some("list_playlists"),
+            UiEvent::Database => Some(INIT),
+            UiEvent::StoredPlaylist => Some(REINIT),
             _ => None,
         };
 
@@ -140,7 +147,7 @@ impl Pane for PlaylistsPane {
         self.handle_mouse_action(event, context)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         self.handle_filter_input(event, context)?;
         self.handle_common_action(event, context)?;
         self.handle_global_action(event, context)?;
@@ -148,78 +155,107 @@ impl Pane for PlaylistsPane {
     }
 
     fn on_query_finished(&mut self, id: &'static str, mpd_command: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match mpd_command {
-            MpdQueryResult::Preview(vec) => {
+        match (id, mpd_command) {
+            (PREVIEW, MpdQueryResult::Preview(vec)) => {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            MpdQueryResult::SongsList(data) => {
+            (INIT | OPEN_OR_PLAY, MpdQueryResult::SongsList(songs)) => {
+                // TODO: check that we are on the correct path still
                 self.stack_mut()
-                    .replace(data.into_iter().map(DirOrSong::Song).collect());
+                    .replace(songs.into_iter().map(DirOrSong::Song).collect());
                 self.prepare_preview(context);
                 context.render()?;
             }
-            MpdQueryResult::DirOrSong(data) => {
-                if id == "init" {
-                    self.stack = DirStack::new(data);
-                } else {
-                    let mut new_stack = DirStack::new(data);
-                    let old_viewport_len = self.stack.current().state.viewport_len();
+            (INIT, MpdQueryResult::DirOrSong(new_playlists)) => {
+                self.stack = DirStack::new(new_playlists);
+                self.prepare_preview(context);
+            }
+            (REINIT, MpdQueryResult::SongsList(songs)) => {
+                // Select the same song by filename or index as before
+                let old_viewport_len = self.stack.current().state.viewport_len();
 
-                    match self.stack.current_mut().selected_mut() {
-                        Some(DirOrSong::Dir { name: playlist, .. }) => {
-                            let mut items = new_stack.current().items.iter();
-                            // Select the same playlist by name or index as before
-                            let idx_to_select = items
-                                .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
-                                .or_else(|| self.stack().current().selected_with_idx())
-                                .map(|(idx, _)| idx);
-
-                            new_stack.current_mut().state.set_viewport_len(old_viewport_len);
-                            new_stack
-                                .current_mut()
-                                .state
-                                .select(idx_to_select, context.config.scrolloff);
-
-                            self.stack = new_stack;
-                        }
-                        Some(DirOrSong::Song(ref mut song)) => {
-                            let song = std::mem::take(song);
-                            let playlist = &self.stack.path()[0];
-                            let mut items = new_stack.current().items.iter();
-                            // Select the same playlist by name or index as before
-                            let playlist_idx_to_select = items
-                                .find_position(|p| matches!(p, DirOrSong::Dir { name: d, .. } if d == playlist))
-                                .or_else(|| self.stack().previous().selected_with_idx())
-                                .map(|(idx, _)| idx);
-
-                            new_stack.current_mut().state.set_viewport_len(old_viewport_len);
-                            new_stack
-                                .current_mut()
-                                .state
-                                .select(playlist_idx_to_select, context.config.scrolloff);
-
-                            let previous_song_index = self.stack.current().selected_with_idx().map(|(idx, _)| idx);
-                            self.stack = new_stack;
-                            self.next(context)?;
-
-                            // Select the same song by filename or index as before
-                            let mut items = self.stack.current().items.iter();
-                            let idx_to_select = items
-                                .find_position(|p| matches!(p, DirOrSong::Song(s) if s.file == song.file))
-                                .map(|(idx, _)| idx)
-                                .or(previous_song_index);
-                            self.stack.current_mut().state.set_viewport_len(old_viewport_len);
-                            self.stack
-                                .current_mut()
-                                .state
-                                .select(idx_to_select, context.config.scrolloff);
-                        }
-                        None => {}
-                    }
-                }
+                self.stack_mut()
+                    .replace(songs.into_iter().map(DirOrSong::Song).collect());
+                self.prepare_preview(context);
+                if let Some((idx, song)) = &self.selected_song {
+                    let idx_to_select = self
+                        .stack
+                        .current()
+                        .items
+                        .iter()
+                        .find_position(|item| item.as_path() == song)
+                        .map_or(*idx, |(idx, _)| idx);
+                    self.stack.current_mut().state.set_viewport_len(old_viewport_len);
+                    self.stack
+                        .current_mut()
+                        .state
+                        .select(Some(idx_to_select), context.config.scrolloff);
+                };
                 self.prepare_preview(context);
                 context.render()?;
+            }
+            (REINIT, MpdQueryResult::DirOrSong(new_playlists)) => {
+                let mut new_stack = DirStack::new(new_playlists);
+                let old_viewport_len = self.stack.current().state.viewport_len();
+                let old_content_len = self.stack.current().state.content_len();
+                match self.stack.path() {
+                    [playlist_name] => {
+                        let (selected_idx, selected_playlist) = self
+                            .stack()
+                            .previous()
+                            .selected_with_idx()
+                            .map_or((0, playlist_name.as_str()), |(idx, playlist)| (idx, playlist.as_path()));
+                        let idx_to_select = new_stack
+                            .current()
+                            .items
+                            .iter()
+                            .find_position(|item| item.as_path() == selected_playlist)
+                            .map_or(selected_idx, |(idx, _)| idx);
+                        new_stack.current_mut().state.set_viewport_len(old_viewport_len);
+
+                        new_stack
+                            .current_mut()
+                            .state
+                            .select(Some(idx_to_select), context.config.scrolloff);
+
+                        if let Some((idx, DirOrSong::Song(song))) = self.stack().current().selected_with_idx() {
+                            self.selected_song = Some((idx, song.as_path().to_owned()));
+                        }
+                        self.stack = new_stack;
+                        self.open_or_play(false, context, "reinit")?;
+                        self.stack_mut().current_mut().state.set_content_len(old_content_len);
+                        self.stack_mut().current_mut().state.set_viewport_len(old_viewport_len);
+                    }
+                    [] => {
+                        let Some((selected_idx, selected_playlist)) = self
+                            .stack()
+                            .current()
+                            .selected_with_idx()
+                            .map(|(idx, playlist)| (idx, playlist.as_path()))
+                        else {
+                            log::warn!(stack:? = self.stack(); "Expected playlist to be selected");
+                            return Ok(());
+                        };
+                        let idx_to_select = new_stack
+                            .current()
+                            .items
+                            .iter()
+                            .find_position(|item| item.as_path() == selected_playlist)
+                            .map_or(selected_idx, |(idx, _)| idx);
+                        new_stack.current_mut().state.set_viewport_len(old_viewport_len);
+                        // new_stack.current_mut().state.set_content_len(old_content_len);
+                        new_stack
+                            .current_mut()
+                            .state
+                            .select(Some(idx_to_select), context.config.scrolloff);
+
+                        self.stack = new_stack;
+                    }
+                    _ => {
+                        log::error!(stack:? = self.stack; "Invalid playlist stack state");
+                    }
+                }
             }
             _ => {}
         };
@@ -371,11 +407,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context)
+        self.open_or_play(true, context, OPEN_OR_PLAY)
     }
 
     fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context)
+        self.open_or_play(false, context, OPEN_OR_PLAY)
     }
 
     fn move_selected(&mut self, direction: MoveDirection, context: &AppContext) -> Result<()> {
@@ -399,8 +435,13 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     client.move_in_playlist(&playlist, &SingleOrRange::single(idx), new_idx)?;
                     Ok(())
                 });
+                self.stack_mut().current_mut().items.swap(idx, new_idx);
+                self.stack_mut()
+                    .current_mut()
+                    .select_idx(new_idx, context.config.scrolloff);
             }
         };
+        context.render()?;
 
         Ok(())
     }
@@ -408,7 +449,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn prepare_preview(&self, context: &AppContext) {
         let config = context.config;
         let s = self.stack().current().selected().cloned();
-        context.query("preview", PaneType::Playlists, move |c| {
+        context.query_replaceable(PREVIEW, "playlists_preview", PaneType::Playlists, move |c| {
             let result = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
                 Ok(Some(match current {
                     DirOrSong::Dir { name: d, .. } => c

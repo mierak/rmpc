@@ -7,6 +7,7 @@ use ratatui::{
 use crate::{
     context::AppContext,
     shared::{key_event::KeyEvent, mouse_event::MouseEvent},
+    MpdQueryResult,
 };
 
 pub mod confirm_modal;
@@ -17,12 +18,17 @@ pub mod outputs;
 pub mod select_modal;
 pub mod song_info;
 
+#[allow(unused)]
 pub(super) trait Modal: std::fmt::Debug {
-    fn render(&mut self, frame: &mut Frame, _app: &mut crate::context::AppContext) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()>;
 
-    fn handle_key(&mut self, key: &mut KeyEvent, _app: &mut AppContext) -> Result<()>;
+    fn handle_key(&mut self, key: &mut KeyEvent, app: &mut AppContext) -> Result<()>;
 
     fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()>;
+
+    fn on_query_finished(&mut self, id: &'static str, data: &mut MpdQueryResult, context: &AppContext) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[allow(dead_code)]

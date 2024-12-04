@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use crate::{config::tabs::PaneType, shared::macros::try_skip, MpdQuery, WorkRequest};
+use crate::{config::tabs::PaneType, MpdQuery, WorkRequest};
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -86,6 +86,9 @@ pub struct Ui<'ui> {
     areas: EnumMap<Areas, Rect>,
     tab_bar: AppTabs<'ui>,
 }
+
+const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
+const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
 
 macro_rules! screen_call {
     ($self:ident, $fn:ident($($param:expr),+)) => {
@@ -490,24 +493,20 @@ impl<'ui> Ui<'ui> {
                     modal!(context, modal);
                 }
                 GlobalAction::ShowOutputs => {
-                    try_skip!(
-                        context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                            id: "outputs",
-                            target: None,
-                            callback: Box::new(move |client| Ok(MpdQueryResult::Outputs(client.outputs()?.0))),
-                        })),
-                        "Failed to request outputs modal"
-                    );
+                    context.query_raw(MpdQuery {
+                        id: OPEN_OUTPUTS_MODAL,
+                        target: None,
+                        replace_id: None,
+                        callback: Box::new(move |client| Ok(MpdQueryResult::Outputs(client.outputs()?.0))),
+                    });
                 }
                 GlobalAction::ShowDecoders => {
-                    try_skip!(
-                        context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                            id: "decoders",
-                            target: None,
-                            callback: Box::new(move |client| Ok(MpdQueryResult::Decoders(client.decoders()?.0))),
-                        })),
-                        "Failed to request decoders modal"
-                    );
+                    context.query_raw(MpdQuery {
+                        id: OPEN_DECODERS_MODAL,
+                        target: None,
+                        replace_id: None,
+                        callback: Box::new(move |client| Ok(MpdQueryResult::Decoders(client.decoders()?.0))),
+                    });
                 }
                 GlobalAction::ShowCurrentSongInfo => {
                     if let Some((_, current_song)) = context.find_current_song_in_queue() {
@@ -598,31 +597,36 @@ impl<'ui> Ui<'ui> {
         &mut self,
         id: &'static str,
         pane: Option<PaneType>,
-        command: MpdQueryResult,
+        data: MpdQueryResult,
         context: &mut AppContext,
     ) -> Result<()> {
         match pane {
             Some(pane) => match self.panes.get_mut(pane) {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => p.on_query_finished(id, command, context),
-                Panes::Queue(p) => p.on_query_finished(id, command, context),
-                Panes::Directories(p) => p.on_query_finished(id, command, context),
-                Panes::Albums(p) => p.on_query_finished(id, command, context),
-                Panes::Artists(p) => p.on_query_finished(id, command, context),
-                Panes::Playlists(p) => p.on_query_finished(id, command, context),
-                Panes::Search(p) => p.on_query_finished(id, command, context),
-                Panes::AlbumArtists(p) => p.on_query_finished(id, command, context),
-                Panes::AlbumArt(p) => p.on_query_finished(id, command, context),
-                Panes::Lyrics(p) => p.on_query_finished(id, command, context),
+                Panes::Logs(p) => p.on_query_finished(id, data, context),
+                Panes::Queue(p) => p.on_query_finished(id, data, context),
+                Panes::Directories(p) => p.on_query_finished(id, data, context),
+                Panes::Albums(p) => p.on_query_finished(id, data, context),
+                Panes::Artists(p) => p.on_query_finished(id, data, context),
+                Panes::Playlists(p) => p.on_query_finished(id, data, context),
+                Panes::Search(p) => p.on_query_finished(id, data, context),
+                Panes::AlbumArtists(p) => p.on_query_finished(id, data, context),
+                Panes::AlbumArt(p) => p.on_query_finished(id, data, context),
+                Panes::Lyrics(p) => p.on_query_finished(id, data, context),
             }?,
-            None => match command {
-                MpdQueryResult::Outputs(outputs) => {
+            None => match (id, data) {
+                (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {
                     modal!(context, OutputsModal::new(outputs));
                 }
-                MpdQueryResult::Decoders(decoders) => {
+                (OPEN_DECODERS_MODAL, MpdQueryResult::Decoders(decoders)) => {
                     modal!(context, DecodersModal::new(decoders));
                 }
-                _ => {}
+                (id, mut data) => {
+                    // TODO a proper modal target
+                    for modal in &mut self.modals {
+                        modal.on_query_finished(id, &mut data, context)?;
+                    }
+                }
             },
         }
 

@@ -81,10 +81,29 @@ mod ui;
 #[derive(derive_more::Debug)]
 pub struct MpdQuery {
     id: &'static str,
+    replace_id: Option<&'static str>,
     target: Option<PaneType>,
     #[debug(skip)]
     callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send>,
 }
+
+impl MpdQuery {
+    fn should_be_skipped(&self, other: &Self) -> bool {
+        let Some(self_replace_id) = self.replace_id else {
+            return false;
+        };
+        let Some(other_replace_id) = other.replace_id else {
+            return false;
+        };
+
+        return self.id == other.id && self_replace_id == other_replace_id && self.target == other.target;
+    }
+}
+
+const EXTERNAL_COMMAND: &str = "external_command";
+const GLOBAL_STATUS_UPDATE: &str = "global_status_update";
+const GLOBAL_VOLUME_UPDATE: &str = "global_volume_update";
+const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
 
 #[derive(derive_more::Debug)]
 pub struct MpdCommand2 {
@@ -382,13 +401,15 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
             .spawn_scoped(s, move || loop {
                 match idle_rx.recv() {
                     Ok(()) => {
+                        log::trace!("Trying to acquire client lock for idle");
                         let mut client = try_cont!(client1.lock(), "Failed to acquire client lock");
                         let idle_client = try_cont!(client.enter_idle(), "Failed to enter idle state");
                         try_cont!(idle_confirm_tx.send(()), "Failed to send idle confirmation");
-                        let evs: Vec<IdleEvent> = try_cont!(idle_client.read_response(), "Failed to read idle events");
+                        let events: Vec<IdleEvent> =
+                            try_cont!(idle_client.read_response(), "Failed to read idle events");
 
-                        log::trace!(evs:?; "Got idle events");
-                        for ev in evs {
+                        log::trace!(events:?; "Got idle events");
+                        for ev in events {
                             try_cont!(app_event_tx2.send(AppEvent::IdleEvent(ev)), "Failed to send idle event");
                         }
                     }
@@ -397,7 +418,7 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
                         break;
                     }
                 };
-                log::debug!("stopping idle");
+                log::trace!("Stopping idle");
             })
             .expect("failed to spawn thread");
 
@@ -410,27 +431,25 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
                     if let Ok(request) = rx.recv() {
                         buffer.push_back(request);
                     };
-                    while let Ok(request) = rx.try_recv() {
-                        buffer.push_back(request);
-                    }
 
-                    let mut queue: VecDeque<_> = std::mem::take(&mut buffer);
-
+                    log::trace!(buffer:?; "Trying to acquire client lock");
                     try_cont!(client_write.write_all(b"noidle\n"), "Failed to write noidle");
                     let mut client = try_cont!(client2.lock(), "Failed to acquire client lock");
 
-                    while let Some(request) = queue.pop_front() {
-                        if let WorkRequest::MpdQuery(MpdQuery { id, target, .. }) = request {
-                            if queue.iter().any(|r| match r {
-                                WorkRequest::MpdQuery(MpdQuery {
-                                    id: id2,
-                                    target: target2,
-                                    ..
-                                }) => id == *id2 && target == *target2,
-                                _ => false,
-                            }) {
-                                // continue;
+                    while let Some(request) = buffer.pop_front() {
+                        while let Ok(request) = rx.try_recv() {
+                            log::trace!(count = buffer.len(), buffer:?; "Got more requests");
+                            buffer.push_back(request);
+                        }
+                        if buffer.iter().any(|request2| {
+                            if let (WorkRequest::MpdQuery(q1), WorkRequest::MpdQuery(q2)) = (&request, &request2) {
+                                q1.should_be_skipped(q2)
+                            } else {
+                                false
                             }
+                        }) {
+                            log::trace!(request:?; "Skipping duplicated request");
+                            continue;
                         }
 
                         match handle_work_request(&mut client, request, config) {
@@ -448,8 +467,9 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
                             }
                         }
                     }
-                    drop(client);
 
+                    drop(client);
+                    log::trace!("Releasing client lock to idle");
                     try_cont!(idle_tx.send(()), "Failed to request for client idle");
                     try_cont!(idle_confirm_rx.recv(), "Idle confirmation failed");
                 }
@@ -546,7 +566,7 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
-                        ("global_status_update", None, MpdQueryResult::Status(status)) => {
+                        (GLOBAL_STATUS_UPDATE, None, MpdQueryResult::Status(status)) => {
                             let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
                             context.status = status;
                             let mut song_changed = false;
@@ -601,7 +621,7 @@ fn main_task<B: Backend + std::io::Write>(
                             context.queue = queue.unwrap_or_default();
                             render_wanted = true;
                         }
-                        ("external_command", None, MpdQueryResult::ExternalCommand(command, songs)) => {
+                        (EXTERNAL_COMMAND, None, MpdQueryResult::ExternalCommand(command, songs)) => {
                             let songs = songs.iter().map(|s| s.file.as_str());
                             run_external(command, create_env(&context, songs));
                         }
@@ -665,52 +685,45 @@ fn main_task<B: Backend + std::io::Write>(
 
 fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut HashSet<UiEvent>) {
     match event {
-        IdleEvent::Mixer => {
-            if context.supported_commands.contains("getvol") {
-                context.query("global_volume_update", PaneType::Queue, move |client| {
-                    Ok(MpdQueryResult::Volume(client.get_volume()?))
-                });
-                if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                    id: "global_volume_update",
-                    target: None,
-                    callback: Box::new(move |client| Ok(MpdQueryResult::Volume(client.get_volume()?))),
-                })) {
-                    error!(error:? = err; "Failed to send status update request");
-                }
-            } else if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                id: "global_status_update",
+        IdleEvent::Mixer if context.supported_commands.contains("getvol") => {
+            context.query_raw(MpdQuery {
+                id: GLOBAL_VOLUME_UPDATE,
                 target: None,
+                replace_id: None,
+                callback: Box::new(move |client| Ok(MpdQueryResult::Volume(client.get_volume()?))),
+            });
+        }
+        IdleEvent::Mixer => {
+            context.query_raw(MpdQuery {
+                id: GLOBAL_STATUS_UPDATE,
+                target: None,
+                replace_id: None,
                 callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-            })) {
-                error!(error:? = err; "Failed to send status update request");
-            }
+            });
         }
         IdleEvent::Options => {
-            if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                id: "global_status_update",
+            context.query_raw(MpdQuery {
+                id: GLOBAL_STATUS_UPDATE,
                 target: None,
+                replace_id: None,
                 callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-            })) {
-                error!(error:? = err; "Failed to send status update request");
-            }
+            });
         }
         IdleEvent::Player => {
-            if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                id: "global_status_update",
+            context.query_raw(MpdQuery {
+                id: GLOBAL_STATUS_UPDATE,
                 target: None,
+                replace_id: None,
                 callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-            })) {
-                error!(error:? = err; "Failed to send status update request");
-            }
+            });
         }
         IdleEvent::Playlist => {
-            if let Err(err) = context.work_sender.send(WorkRequest::MpdQuery(MpdQuery {
-                id: "global_queue_update",
+            context.query_raw(MpdQuery {
+                id: GLOBAL_QUEUE_UPDATE,
                 target: None,
+                replace_id: None,
                 callback: Box::new(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?))),
-            })) {
-                error!(error:? = err; "Failed to send status update request");
-            }
+            });
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
@@ -808,6 +821,7 @@ impl RenderLoop {
                 if let Err(err) = work_tx.send(WorkRequest::MpdQuery(MpdQuery {
                     id: "global_status_update",
                     target: None,
+                    replace_id: None,
                     callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
                 })) {
                     error!(error:? = err; "Failed to send status update request");

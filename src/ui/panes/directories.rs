@@ -30,6 +30,10 @@ pub struct DirectoriesPane {
     initialized: bool,
 }
 
+const INIT: &str = "init";
+const OPEN_OR_PLAY: &str = "open_or_play";
+const PREVIEW: &str = "preview";
+
 impl DirectoriesPane {
     pub fn new(context: &AppContext) -> Self {
         Self {
@@ -53,7 +57,7 @@ impl DirectoriesPane {
         match selected {
             DirOrSong::Dir { .. } => {
                 let next_path = next_path.join("/").to_string();
-                context.query("next", PaneType::Directories, move |client| {
+                context.query(OPEN_OR_PLAY, PaneType::Directories, move |client| {
                     let new_current = client.lsinfo(Some(&next_path))?;
                     let res = new_current
                         .into_iter()
@@ -97,7 +101,7 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query("init", PaneType::Directories, move |client| {
+            context.query(INIT, PaneType::Directories, move |client| {
                 let result = client
                     .lsinfo(None)?
                     .into_iter()
@@ -114,7 +118,7 @@ impl Pane for DirectoriesPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            context.query("init", PaneType::Directories, move |client| {
+            context.query(INIT, PaneType::Directories, move |client| {
                 let result = client
                     .lsinfo(None)?
                     .into_iter()
@@ -139,17 +143,18 @@ impl Pane for DirectoriesPane {
     }
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match data {
-            MpdQueryResult::Preview(vec) => {
+        match (id, data) {
+            (PREVIEW, MpdQueryResult::Preview(vec)) => {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            MpdQueryResult::DirOrSong(data) => {
-                if id == "init" {
-                    self.stack = DirStack::new(data);
-                } else {
-                    self.stack_mut().replace(data);
-                }
+            (INIT, MpdQueryResult::DirOrSong(data)) => {
+                self.stack = DirStack::new(data);
+                self.prepare_preview(context);
+                context.render()?;
+            }
+            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong(data)) => {
+                self.stack_mut().replace(data);
                 self.prepare_preview(context);
                 context.render()?;
             }
@@ -249,7 +254,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let next_path = next_path.join("/").to_string();
                 let config = context.config;
 
-                context.query("preview", PaneType::Directories, move |client| {
+                context.query_replaceable(PREVIEW, "directories_preview", PaneType::Directories, move |client| {
                     let res: Vec<_> = match client.lsinfo(Some(&next_path)) {
                         Ok(val) => val,
                         Err(err) => {
@@ -276,7 +281,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
                 let config = context.config;
-                context.query("preview", PaneType::Directories, move |client| {
+                context.query(PREVIEW, PaneType::Directories, move |client| {
                     Ok(MpdQueryResult::Preview(
                         client
                             .find_one(&[Filter::new(Tag::File, &file)])?

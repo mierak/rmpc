@@ -30,6 +30,10 @@ pub struct AlbumsPane {
     initialized: bool,
 }
 
+const INIT: &str = "init";
+const OPEN_OR_PLAY: &str = "open_or_play";
+const PREVIEW: &str = "preview";
+
 impl AlbumsPane {
     pub fn new(context: &AppContext) -> Self {
         Self {
@@ -56,7 +60,7 @@ impl AlbumsPane {
             }
             [] => {
                 let current = current.clone();
-                context.query("next", PaneType::Albums, move |client| {
+                context.query(OPEN_OR_PLAY, PaneType::Albums, move |client| {
                     let res = list_titles(client, current.as_path())?.collect();
                     Ok(MpdQueryResult::DirOrSong(res))
                 });
@@ -85,7 +89,7 @@ impl Pane for AlbumsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query("init", PaneType::Albums, move |client| {
+            context.query(INIT, PaneType::Albums, move |client| {
                 let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
                 Ok(MpdQueryResult::LsInfo(result.0))
             });
@@ -97,7 +101,7 @@ impl Pane for AlbumsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            context.query("init", PaneType::Albums, move |client| {
+            context.query(INIT, PaneType::Albums, move |client| {
                 let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
                 Ok(MpdQueryResult::LsInfo(result.0))
             });
@@ -117,12 +121,12 @@ impl Pane for AlbumsPane {
     }
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match data {
-            MpdQueryResult::Preview(vec) => {
+        match (id, data) {
+            (PREVIEW, MpdQueryResult::Preview(vec)) => {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            MpdQueryResult::LsInfo(data) => {
+            (INIT, MpdQueryResult::LsInfo(data)) => {
                 self.stack = DirStack::new(
                     data.into_iter()
                         .map(|v| DirOrSong::Dir {
@@ -133,7 +137,7 @@ impl Pane for AlbumsPane {
                 );
                 self.prepare_preview(context);
             }
-            MpdQueryResult::DirOrSong(data) => {
+            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong(data)) => {
                 self.stack_mut().replace(data);
                 self.prepare_preview(context);
                 context.render()?;
@@ -252,7 +256,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
-                context.query("preview", PaneType::Albums, move |client| {
+                context.query_replaceable(PREVIEW, "albums_preview", PaneType::Albums, move |client| {
                     let result = Some(
                         find_songs(client, &album, &current)?
                             .first()
@@ -268,7 +272,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                 });
             }
             [] => {
-                context.query("preview", PaneType::Albums, move |client| {
+                context.query_replaceable(PREVIEW, "albums_preview", PaneType::Albums, move |client| {
                     let result = Some(
                         list_titles(client, &current)?
                             .map(|v| v.to_list_item_simple(config))

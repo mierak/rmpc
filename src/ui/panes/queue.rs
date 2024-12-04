@@ -55,6 +55,8 @@ pub struct QueuePane {
     table_area: Rect,
 }
 
+const ADD_TO_PLAYLIST: &str = "add_to_playlist";
+
 impl QueuePane {
     pub fn new(context: &AppContext) -> Self {
         let config = context.config;
@@ -297,8 +299,8 @@ impl Pane for QueuePane {
     }
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match data {
-            MpdQueryResult::AddToPlaylist { playlists, song_file } => {
+        match (id, data) {
+            (ADD_TO_PLAYLIST, MpdQueryResult::AddToPlaylist { playlists, song_file }) => {
                 modal!(
                     context,
                     SelectModal::new(context)
@@ -451,7 +453,7 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx))
                     {
                         let uri = selected_song.file.clone();
-                        context.query("add_to_playlist", PaneType::Queue, move |client| {
+                        context.query(ADD_TO_PLAYLIST, PaneType::Queue, move |client| {
                             let playlists = client
                                 .list_playlists()?
                                 .into_iter()

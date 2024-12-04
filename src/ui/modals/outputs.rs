@@ -16,6 +16,7 @@ use crate::{
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::dirstack::DirState,
+    MpdQuery, MpdQueryResult,
 };
 
 use super::{Modal, RectExt};
@@ -49,16 +50,15 @@ impl OutputsModal {
         };
 
         let id = output.id;
-        context.command(move |client| {
-            client.toggle_output(id)?;
-            // self.outputs = client.outputs()?.0;
-            Ok(())
+        context.query_raw(MpdQuery {
+            id: "refresh_outputs",
+            replace_id: None,
+            target: None,
+            callback: Box::new(move |client| {
+                client.toggle_output(id)?;
+                Ok(MpdQueryResult::Outputs(client.outputs()?.0))
+            }),
         });
-
-        // TODO
-        // if idx >= self.outputs.len() {
-        //     self.scrolling_state.last();
-        // }
     }
 }
 
@@ -122,6 +122,17 @@ impl Modal for OutputsModal {
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 
+        Ok(())
+    }
+
+    fn on_query_finished(&mut self, id: &'static str, data: &mut MpdQueryResult, context: &AppContext) -> Result<()> {
+        match (id, data) {
+            ("refresh_outputs", MpdQueryResult::Outputs(outputs)) => {
+                self.outputs = std::mem::take(outputs);
+                context.render()?;
+            }
+            _ => {}
+        };
         Ok(())
     }
 

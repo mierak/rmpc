@@ -36,6 +36,10 @@ pub struct ArtistsPane {
     initialized: bool,
 }
 
+const INIT: &str = "init";
+const OPEN_OR_PLAY: &str = "open_or_play";
+const PREVIEW: &str = "preview";
+
 impl ArtistsPane {
     pub fn new(mode: ArtistsPaneMode, context: &AppContext) -> Self {
         Self {
@@ -127,7 +131,7 @@ impl ArtistsPane {
                 let target = self.target_pane();
                 let current = current.clone();
                 let artist = artist.clone();
-                context.query("next", target, move |client| {
+                context.query(OPEN_OR_PLAY, target, move |client| {
                     let result = Self::list_titles(client, &artist, current.as_path(), artist_tag)?.collect();
                     Ok(MpdQueryResult::DirOrSong(result))
                 });
@@ -139,7 +143,7 @@ impl ArtistsPane {
                 let artist_tag = self.artist_tag();
                 let current = current.clone();
                 let target = self.target_pane();
-                context.query("next", target, move |client| {
+                context.query(OPEN_OR_PLAY, target, move |client| {
                     let result = Self::list_albums(client, current.as_path(), artist_tag)?.collect();
                     Ok(MpdQueryResult::DirOrSong(result))
                 });
@@ -169,7 +173,7 @@ impl Pane for ArtistsPane {
         if !self.initialized {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context.query("init", target, move |client| {
+            context.query(INIT, target, move |client| {
                 let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
                 Ok(MpdQueryResult::LsInfo(result.0))
             });
@@ -184,7 +188,7 @@ impl Pane for ArtistsPane {
         if let crate::ui::UiEvent::Database = event {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context.query("init", target, move |client| {
+            context.query(INIT, target, move |client| {
                 let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
                 Ok(MpdQueryResult::LsInfo(result.0))
             });
@@ -204,17 +208,17 @@ impl Pane for ArtistsPane {
     }
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
-        match data {
-            MpdQueryResult::Preview(vec) => {
+        match (id, data) {
+            (PREVIEW, MpdQueryResult::Preview(vec)) => {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            MpdQueryResult::DirOrSong(data) => {
+            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong(data)) => {
                 self.stack_mut().replace(data);
                 self.prepare_preview(context);
                 context.render()?;
             }
-            MpdQueryResult::LsInfo(data) => {
+            (INIT, MpdQueryResult::LsInfo(data)) => {
                 self.stack = DirStack::new(
                     data.into_iter()
                         .map(|v| DirOrSong::Dir {
@@ -364,7 +368,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             [artist, album] => {
                 let artist = artist.clone();
                 let album = album.clone();
-                context.query("preview", target, move |client| {
+                context.query_replaceable(PREVIEW, "artists_preview", target, move |client| {
                     let result = Some(
                         Self::find_songs(client, &artist, &album, &current, artist_tag)?
                             .first()
@@ -382,7 +386,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             }
             [artist] => {
                 let artist = artist.clone();
-                context.query("preview", target, move |client| {
+                context.query(PREVIEW, target, move |client| {
                     let result = Some(
                         Self::list_titles(client, &artist, &current, artist_tag)?
                             .map(|s| s.to_list_item_simple(config))
@@ -392,7 +396,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     Ok(MpdQueryResult::Preview(result))
                 });
             }
-            [] => context.query("preview", target, move |client| {
+            [] => context.query(PREVIEW, target, move |client| {
                 let result = Some(
                     Self::list_albums(client, &current, artist_tag)?
                         .map(|s| s.to_list_item_simple(config))
