@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet, path::PathBuf, sync::mpsc::Sender};
+use std::{cell::Cell, collections::HashSet, path::PathBuf};
 
 use crate::{
     config::{tabs::PaneType, Config, ImageMethod, Leak},
@@ -14,6 +14,7 @@ use crate::{
     AppEvent, MpdCommand2, MpdQuery, MpdQueryResult, WorkRequest,
 };
 use anyhow::{bail, Result};
+use crossbeam::channel::{SendError, Sender};
 
 pub struct AppContext {
     pub config: &'static Config,
@@ -58,7 +59,7 @@ impl AppContext {
         })
     }
 
-    pub fn render(&self) -> Result<(), std::sync::mpsc::SendError<AppEvent>> {
+    pub fn render(&self) -> Result<(), SendError<AppEvent>> {
         if self.needs_render.get() {
             return Ok(());
         }

@@ -110,24 +110,27 @@ impl KittyImageState {
         let image_data_to_transfer_channel = channel::<Data>();
         let data_sender = image_data_to_transfer_channel.0;
 
-        std::thread::spawn(move || {
-            while let Ok((vec, width, height)) = rx.recv_last() {
-                let data = match create_data_to_transfer(&vec, width, height, Compression::new(6), max_size) {
-                    Ok(data) => data,
-                    Err(err) => {
-                        status_error!(err:?; "Failed to compress image data");
+        std::thread::Builder::new()
+            .name("kitty".to_string())
+            .spawn(move || {
+                while let Ok((vec, width, height)) = rx.recv_last() {
+                    let data = match create_data_to_transfer(&vec, width, height, Compression::new(6), max_size) {
+                        Ok(data) => data,
+                        Err(err) => {
+                            status_error!(err:?; "Failed to compress image data");
+                            continue;
+                        }
+                    };
+
+                    if let Err(err) = data_sender.send(data) {
+                        status_error!(err:?; "Failed to send compressed image data");
                         continue;
                     }
-                };
 
-                if let Err(err) = data_sender.send(data) {
-                    status_error!(err:?; "Failed to send compressed image data");
-                    continue;
+                    request_render(false);
                 }
-
-                request_render(false);
-            }
-        });
+            })
+            .expect("Kitty thread to be spawned");
 
         let default_art = Arc::new(default_art.to_vec());
         Self {

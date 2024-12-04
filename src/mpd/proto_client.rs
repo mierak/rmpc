@@ -92,7 +92,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(super) fn read_response<V>(mut self) -> Result<V, MpdError>
+    pub(crate) fn read_response<V>(mut self) -> Result<V, MpdError>
     where
         V: FromMpd + Default,
     {
@@ -144,13 +144,13 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
 
     pub(super) fn read_bin(mut self) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
-        let _ = match self._read_bin(&mut buf) {
+        let _ = match self.read_bin_inner(&mut buf) {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) => return Ok(None),
             Err(MpdError::ClientClosed) => {
                 self.client.reconnect()?;
                 self.execute(&format!("{} {}", self.command, buf.len()))?;
-                self._read_bin(&mut buf)
+                self.read_bin_inner(&mut buf)
             }
             Err(e) => {
                 self.client.clear_read_buf()?;
@@ -159,7 +159,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         };
         loop {
             self.execute(&format!("{} {}", self.command, buf.len()))?;
-            match self._read_bin(&mut buf) {
+            match self.read_bin_inner(&mut buf) {
                 Ok(Some(response)) => {
                     if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
                         trace!( len = buf.len();"Finshed reading binary response");
@@ -176,7 +176,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(Some(buf))
     }
 
-    fn _read_bin(&mut self, binary_buf: &mut Vec<u8>) -> Result<Option<BinaryMpdResponse>, MpdError> {
+    fn read_bin_inner(&mut self, binary_buf: &mut Vec<u8>) -> Result<Option<BinaryMpdResponse>, MpdError> {
         let mut result = BinaryMpdResponse::default();
         {
             loop {
@@ -545,7 +545,7 @@ mod tests {
 
             let result = ProtoClient::new("", &mut TestClient::new(buf))
                 .unwrap()
-                ._read_bin(&mut Vec::new());
+                .read_bin_inner(&mut Vec::new());
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -556,7 +556,7 @@ mod tests {
 
             let result = ProtoClient::new("", &mut TestClient::new(buf))
                 .unwrap()
-                ._read_bin(&mut Vec::new());
+                .read_bin_inner(&mut Vec::new());
 
             assert_eq!(
                 result,
@@ -572,7 +572,7 @@ mod tests {
 
             let result = ProtoClient::new("", &mut TestClient::new(buf))
                 .unwrap()
-                ._read_bin(&mut Vec::new());
+                .read_bin_inner(&mut Vec::new());
 
             assert_eq!(result, Ok(None));
         }
@@ -587,7 +587,7 @@ mod tests {
             let mut command = ProtoClient::new("", &mut client).unwrap();
 
             let mut buf = Vec::new();
-            let result = command._read_bin(&mut buf);
+            let result = command.read_bin_inner(&mut buf);
 
             assert_eq!(buf, bytes);
             assert_eq!(

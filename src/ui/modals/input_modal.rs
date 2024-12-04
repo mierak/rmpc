@@ -44,7 +44,7 @@ pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<'a, Callback: FnMut(&AppContext, &str) -> Result<()> + 'a> std::fmt::Debug for InputModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

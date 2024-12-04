@@ -134,7 +134,7 @@ pub(super) trait Pane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()>;
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()>;
 
     fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         Ok(())

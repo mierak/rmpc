@@ -135,7 +135,7 @@ impl<'a> Styled for Tabs<'a> {
     }
 }
 
-impl<'a> Widget for &mut Tabs<'a> {
+impl Widget for &mut Tabs<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         buf.set_style(area, self.style);
         let tabs_area = match &self.block {

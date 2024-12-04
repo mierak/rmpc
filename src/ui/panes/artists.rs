@@ -196,7 +196,7 @@ impl Pane for ArtistsPane {
         self.handle_mouse_action(event, context)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         self.handle_filter_input(event, context)?;
         self.handle_common_action(event, context)?;
         self.handle_global_action(event, context)?;

@@ -124,7 +124,7 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: &mut KeyEvent,
-        context: &AppContext,
+        context: &mut AppContext,
     ) -> Result<()> {
         let Some(focused) = self.focused else {
             return Ok(());

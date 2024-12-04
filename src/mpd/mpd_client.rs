@@ -16,7 +16,7 @@ use super::{
         volume::Bound, IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
-    proto_client::ProtoClient,
+    proto_client::{ProtoClient, SocketClient},
     version::Version,
 };
 
@@ -62,7 +62,7 @@ impl ValueChange {
 }
 
 #[allow(dead_code)]
-pub trait MpdClient {
+pub trait MpdClient: Sized {
     fn version(&mut self) -> Version;
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()>;
     fn password(&mut self, password: &str) -> MpdResult<()>;
@@ -70,6 +70,9 @@ pub trait MpdClient {
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>>;
+    fn enter_idle(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient;
     fn noidle(&mut self) -> MpdResult<()>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
@@ -186,6 +189,13 @@ impl MpdClient for Client<'_> {
         } else {
             self.send("idle").and_then(ProtoClient::read_response)
         }
+    }
+
+    fn enter_idle(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient,
+    {
+        self.send("idle")
     }
 
     fn noidle(&mut self) -> MpdResult<()> {

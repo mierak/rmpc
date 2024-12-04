@@ -20,7 +20,8 @@ use std::{
     io::{Read, Write},
     ops::Sub,
     path::PathBuf,
-    sync::mpsc::{Receiver, Sender, TryRecvError},
+    sync::{Arc, Mutex},
+    thread::Builder,
     time::Duration,
 };
 
@@ -33,9 +34,10 @@ use config::{
     ConfigFile,
 };
 use context::AppContext;
+use crossbeam::channel::{bounded, unbounded, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use crossterm::event::{Event, KeyEvent};
 use itertools::Itertools;
-use log::{error, info, trace, warn};
+use log::{error, info, warn};
 use mpd::{
     client::Client,
     commands::{idle::IdleEvent, Decoder, Output, Song, State, Status, Volume},
@@ -100,6 +102,7 @@ pub enum WorkRequest {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub enum WorkDone {
     LyricsIndexed {
         index: LrcIndex,
@@ -246,12 +249,14 @@ fn main() -> Result<()> {
             cmd.execute(&mut client, config)?;
         }
         None => {
-            let (tx, rx) = std::sync::mpsc::channel::<AppEvent>();
+            let (tx, rx) = unbounded::<AppEvent>();
             logging::init(tx.clone()).expect("Logger to initialize");
             log::debug!(rev = env!("VERGEN_GIT_DESCRIBE"); "rmpc started");
-            std::thread::spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()));
+            std::thread::Builder::new()
+                .name("dependency_check".to_string())
+                .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
-            let (worker_tx, worker_rx) = std::sync::mpsc::channel::<WorkRequest>();
+            let (worker_tx, worker_rx) = unbounded::<WorkRequest>();
 
             let config = match ConfigFile::read(&args.config) {
                 Ok(val) => val.into_config(
@@ -280,9 +285,10 @@ fn main() -> Result<()> {
             try_ret!(tx.send(AppEvent::RequestRender(false)), "Failed to render first frame");
 
             let mut client = try_ret!(
-                Client::init(config.address, config.password, "command", true),
+                Client::init(config.address, config.password, "command", false),
                 "Failed to connect to MPD"
             );
+            client.set_read_timeout(None)?;
 
             let terminal = try_ret!(ui::setup_terminal(config.enable_mouse), "Failed to setup terminal");
             let tx_clone = tx.clone();
@@ -305,22 +311,12 @@ fn main() -> Result<()> {
             let tx_clone = tx.clone();
 
             std::thread::Builder::new()
-                .name("input poll".to_owned())
+                .name("input".to_owned())
                 .spawn(|| input_poll_task(tx_clone))?;
 
-            let mut idle_client = try_ret!(
-                Client::init(context.config.address, context.config.password, "idle", true),
-                "Failed to connect to MPD with idle client"
-            );
-
-            let main_task = std::thread::Builder::new().name("main task".to_owned()).spawn(|| {
+            let main_task = std::thread::Builder::new().name("main".to_owned()).spawn(|| {
                 main_task(context, rx, render_loop, terminal);
             })?;
-
-            idle_client.set_read_timeout(None)?;
-            std::thread::Builder::new()
-                .name("idle task".to_owned())
-                .spawn(|| idle_task(idle_client, tx))?;
 
             let original_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {
@@ -339,6 +335,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// first element in return tuple determines whether the result is to be sent into sync work channel
 fn handle_work_request(client: &mut Client<'_>, request: WorkRequest, config: &Config) -> Result<WorkDone> {
     match request {
         WorkRequest::DownloadYoutube { url } => {
@@ -368,56 +365,105 @@ fn handle_work_request(client: &mut Client<'_>, request: WorkRequest, config: &C
     }
 }
 
-fn worker_task(rx: Receiver<WorkRequest>, tx: Sender<AppEvent>, mut client: Client<'_>, config: &Config) {
-    let tx = tx;
-    let rx = rx;
+fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client: Client<'_>, config: &Config) {
+    std::thread::scope(move |s| {
+        let mut client_write = client.stream.try_clone().expect("Client write clone to succeed");
+        let client1 = Arc::new(Mutex::new(client));
+        let client2 = client1.clone();
+        let app_event_tx2 = app_event_tx.clone();
 
-    let mut buffer = VecDeque::new();
-    loop {
-        if let Ok(request) = rx.recv() {
-            buffer.push_back(request);
-        }
-        while let Ok(request) = rx.try_recv() {
-            buffer.push_back(request);
-        }
+        let (idle_tx, idle_rx) = bounded::<()>(0);
+        let (idle_confirm_tx, idle_confirm_rx) = bounded::<()>(0);
 
-        let mut queue: VecDeque<_> = std::mem::take(&mut buffer);
+        // TODO any error here should probably end the program right as there is no real way to recover
+        // maybe we should display a modal with info which exits the program on confirm
+        let idle = Builder::new()
+            .name("idle".to_string())
+            .spawn_scoped(s, move || loop {
+                match idle_rx.recv() {
+                    Ok(()) => {
+                        let mut client = try_cont!(client1.lock(), "Failed to acquire client lock");
+                        let idle_client = try_cont!(client.enter_idle(), "Failed to enter idle state");
+                        try_cont!(idle_confirm_tx.send(()), "Failed to send idle confirmation");
+                        let evs: Vec<IdleEvent> = try_cont!(idle_client.read_response(), "Failed to read idle events");
 
-        while let Some(request) = queue.pop_front() {
-            if let WorkRequest::MpdQuery(MpdQuery { id, target, .. }) = request {
-                if queue.iter().any(|r| match r {
-                    WorkRequest::MpdQuery(MpdQuery {
-                        id: id2,
-                        target: target2,
-                        ..
-                    }) => id == *id2 && target == *target2,
-                    _ => false,
-                }) {
-                    continue;
+                        log::trace!(evs:?; "Got idle events");
+                        for ev in evs {
+                            try_cont!(app_event_tx2.send(AppEvent::IdleEvent(ev)), "Failed to send idle event");
+                        }
+                    }
+                    Err(err) => {
+                        log::error!(err:?; "idle error");
+                        break;
+                    }
+                };
+                log::debug!("stopping idle");
+            })
+            .expect("failed to spawn thread");
+
+        let work = Builder::new()
+            .name("work".to_string())
+            .spawn_scoped(s, move || {
+                let mut buffer = VecDeque::new();
+
+                loop {
+                    if let Ok(request) = rx.recv() {
+                        buffer.push_back(request);
+                    };
+                    while let Ok(request) = rx.try_recv() {
+                        buffer.push_back(request);
+                    }
+
+                    let mut queue: VecDeque<_> = std::mem::take(&mut buffer);
+
+                    try_cont!(client_write.write_all(b"noidle\n"), "Failed to write noidle");
+                    let mut client = try_cont!(client2.lock(), "Failed to acquire client lock");
+
+                    while let Some(request) = queue.pop_front() {
+                        if let WorkRequest::MpdQuery(MpdQuery { id, target, .. }) = request {
+                            if queue.iter().any(|r| match r {
+                                WorkRequest::MpdQuery(MpdQuery {
+                                    id: id2,
+                                    target: target2,
+                                    ..
+                                }) => id == *id2 && target == *target2,
+                                _ => false,
+                            }) {
+                                // continue;
+                            }
+                        }
+
+                        match handle_work_request(&mut client, request, config) {
+                            Ok(result) => {
+                                try_cont!(
+                                    app_event_tx.send(AppEvent::WorkDone(Ok(result))),
+                                    "Failed to send work done success event"
+                                );
+                            }
+                            Err(err) => {
+                                try_cont!(
+                                    app_event_tx.send(AppEvent::WorkDone(Err(err))),
+                                    "Failed to send work done error event"
+                                );
+                            }
+                        }
+                    }
+                    drop(client);
+
+                    try_cont!(idle_tx.send(()), "Failed to request for client idle");
+                    try_cont!(idle_confirm_rx.recv(), "Idle confirmation failed");
                 }
-            }
+            })
+            .expect("failed to spawn thread");
 
-            match handle_work_request(&mut client, request, config) {
-                Ok(result) => {
-                    try_cont!(
-                        tx.send(AppEvent::WorkDone(Ok(result))),
-                        "Failed to send work done success event"
-                    );
-                }
-                Err(err) => {
-                    try_cont!(
-                        tx.send(AppEvent::WorkDone(Err(err))),
-                        "Failed to send work done error event"
-                    );
-                }
-            }
-        }
-    }
+        idle.join().expect("idle thread not to panic");
+        work.join().expect("work thread not to panic");
+    });
 }
 
 fn main_task<B: Backend + std::io::Write>(
     mut context: context::AppContext,
-    event_receiver: std::sync::mpsc::Receiver<AppEvent>,
+    event_receiver: Receiver<AppEvent>,
     mut render_loop: RenderLoop,
     mut terminal: Terminal<B>,
 ) {
@@ -441,8 +487,8 @@ fn main_task<B: Backend + std::io::Write>(
                     .unwrap_or(Duration::ZERO),
             ) {
                 Ok(v) => Some(v),
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => None,
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => None,
+                Err(RecvTimeoutError::Timeout) => None,
+                Err(RecvTimeoutError::Disconnected) => None,
             }
         } else {
             event_receiver.recv().ok()
@@ -685,34 +731,7 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
     }
 }
 
-fn idle_task(mut idle_client: Client<'_>, sender: std::sync::mpsc::Sender<AppEvent>) {
-    let mut error_count = 0;
-    let sender = sender;
-    loop {
-        let events = match idle_client.idle(None) {
-            Ok(val) => val,
-            Err(err) => {
-                if error_count > 5 {
-                    error!(err:?; "Unexpected error when receiving idle events");
-                    break;
-                }
-                warn!(err:?; "Unexpected error when receiving idle events");
-                error_count += 1;
-                std::thread::sleep(Duration::from_secs(error_count));
-                continue;
-            }
-        };
-
-        for event in events {
-            trace!(idle_event:? = event; "Received idle event");
-            if let Err(err) = sender.send(AppEvent::IdleEvent(event)) {
-                error!(error:? = err; "Failed to send app event");
-            }
-        }
-    }
-}
-
-fn input_poll_task(user_input_tx: std::sync::mpsc::Sender<AppEvent>) {
+fn input_poll_task(user_input_tx: Sender<AppEvent>) {
     let user_input_tx = user_input_tx;
     let mut mouse_event_tracker = MouseEventTracker::default();
     loop {
@@ -761,7 +780,7 @@ struct RenderLoop {
 
 impl RenderLoop {
     fn new(work_tx: Sender<WorkRequest>, config: &Config) -> Self {
-        let (tx, rx) = std::sync::mpsc::channel::<LoopEvent>();
+        let (tx, rx) = unbounded::<LoopEvent>();
 
         // send stop event at the start to not start the loop immedietally
         if let Err(err) = tx.send(LoopEvent::Stop) {

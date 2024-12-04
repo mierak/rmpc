@@ -29,7 +29,7 @@ const MIN_SUPPORTED_VERSION: Version = Version {
 pub struct Client<'name> {
     name: &'name str,
     rx: BufReader<TcpOrUnixStream>,
-    stream: TcpOrUnixStream,
+    pub stream: TcpOrUnixStream,
     reconnect: bool,
     addr: MpdAddress<'name>,
     password: Option<MpdPassword<'name>>,
@@ -46,7 +46,7 @@ impl std::fmt::Debug for Client<'_> {
     }
 }
 
-enum TcpOrUnixStream {
+pub enum TcpOrUnixStream {
     Unix(UnixStream),
     Tcp(TcpStream),
 }
@@ -76,7 +76,7 @@ impl TcpOrUnixStream {
         Ok(())
     }
 
-    fn try_clone(&self) -> std::io::Result<Self> {
+    pub fn try_clone(&self) -> std::io::Result<Self> {
         Ok(match self {
             TcpOrUnixStream::Unix(s) => TcpOrUnixStream::Unix(s.try_clone()?),
             TcpOrUnixStream::Tcp(s) => TcpOrUnixStream::Tcp(s.try_clone()?),

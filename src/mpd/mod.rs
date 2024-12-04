@@ -7,7 +7,7 @@ pub mod mpd_client;
 pub mod proto_client;
 pub mod version;
 
-trait FromMpd
+pub(crate) trait FromMpd
 where
     Self: std::marker::Sized,
 {
@@ -36,7 +36,7 @@ pub fn split_line(mut line: String) -> Result<(String, String), MpdError> {
     Ok((line, value))
 }
 
-enum LineHandled {
+pub(crate) enum LineHandled {
     Yes,
     No { value: String },
 }

@@ -16,7 +16,7 @@ pub struct Volume<'a> {
     style: Style,
 }
 
-impl<'a> Default for Volume<'a> {
+impl Default for Volume<'_> {
     fn default() -> Self {
         Self {
             value: 0,

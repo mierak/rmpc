@@ -28,7 +28,7 @@ impl From<String> for MpdPassword<'static> {
     }
 }
 
-impl<'a> Default for MpdAddress<'a> {
+impl Default for MpdAddress<'_> {
     fn default() -> Self {
         Self::IpAndPort("127.0.0.1:6600")
     }

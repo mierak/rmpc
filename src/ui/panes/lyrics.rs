@@ -112,7 +112,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
         Ok(())
     }
 }

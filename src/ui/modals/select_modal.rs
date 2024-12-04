@@ -45,8 +45,8 @@ pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -
     title: &'a str,
 }
 
-impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> std::fmt::Debug
-    for SelectModal<'a, V, Callback>
+impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> std::fmt::Debug
+    for SelectModal<'_, V, Callback>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -116,7 +116,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal for SelectModal<'a, V, Callback> {
+impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal for SelectModal<'_, V, Callback> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);

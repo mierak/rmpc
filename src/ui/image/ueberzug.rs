@@ -135,48 +135,51 @@ impl Ueberzug {
             layer,
         };
 
-        let handle = std::thread::spawn(move || {
-            while let Ok(action) = rx.recv() {
-                daemon.pid = Some(try_cont!(
-                    daemon.spawn_daemon_if_needed(),
-                    "Failed to spawn ueberzugpp daemon"
-                ));
-                match action {
-                    Action::Add(path, x, y, width, height) => {
-                        try_cont!(
-                            daemon.show_image(path, x, y, width, height),
-                            "Failed to send image to ueberzugpp"
-                        );
-                    }
-                    Action::Remove => {
-                        try_cont!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
-                    }
-                    Action::Destroy => {
-                        try_skip!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
-
-                        if let Some(ref mut proc) = daemon.ueberzug_process {
-                            try_skip!(proc.kill(), "Failed to kill ueberzugpp process");
-                            try_skip!(proc.wait(), "Ueberzugpp process failed to die");
+        let handle = std::thread::Builder::new()
+            .name("ueberzugpp".to_string())
+            .spawn(move || {
+                while let Ok(action) = rx.recv() {
+                    daemon.pid = Some(try_cont!(
+                        daemon.spawn_daemon_if_needed(),
+                        "Failed to spawn ueberzugpp daemon"
+                    ));
+                    match action {
+                        Action::Add(path, x, y, width, height) => {
+                            try_cont!(
+                                daemon.show_image(path, x, y, width, height),
+                                "Failed to send image to ueberzugpp"
+                            );
                         }
+                        Action::Remove => {
+                            try_cont!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
+                        }
+                        Action::Destroy => {
+                            try_skip!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
 
-                        if let Some(pid) = daemon.pid {
-                            if let Some(pid) = rustix::process::Pid::from_raw(pid.0) {
-                                try_skip!(
-                                    rustix::process::kill_process(pid, rustix::process::Signal::Term),
-                                    "Failed to send SIGTERM to ueberzugpp pid file"
-                                );
+                            if let Some(ref mut proc) = daemon.ueberzug_process {
+                                try_skip!(proc.kill(), "Failed to kill ueberzugpp process");
+                                try_skip!(proc.wait(), "Ueberzugpp process failed to die");
                             }
-                        };
 
-                        try_skip!(
-                            std::fs::remove_file(&daemon.pid_file),
-                            "Failed to remove ueberzugpp's pid file"
-                        );
-                        break;
+                            if let Some(pid) = daemon.pid {
+                                if let Some(pid) = rustix::process::Pid::from_raw(pid.0) {
+                                    try_skip!(
+                                        rustix::process::kill_process(pid, rustix::process::Signal::Term),
+                                        "Failed to send SIGTERM to ueberzugpp pid file"
+                                    );
+                                }
+                            };
+
+                            try_skip!(
+                                std::fs::remove_file(&daemon.pid_file),
+                                "Failed to remove ueberzugpp's pid file"
+                            );
+                            break;
+                        }
                     }
                 }
-            }
-        });
+            })
+            .expect("ueberzugpp thread to be spawned");
 
         Self {
             sender: tx,

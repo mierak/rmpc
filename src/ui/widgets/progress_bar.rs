@@ -65,7 +65,7 @@ impl<'a> ProgressBar<'a> {
     }
 }
 
-impl<'a> Widget for ProgressBar<'a> {
+impl Widget for ProgressBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let left = area.left();
         let right = area.right();
@@ -95,7 +95,7 @@ impl<'a> Widget for ProgressBar<'a> {
     }
 }
 
-impl<'a> Default for ProgressBar<'a> {
+impl Default for ProgressBar<'_> {
     fn default() -> Self {
         Self {
             value: 0.0,

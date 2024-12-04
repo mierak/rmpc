@@ -36,7 +36,7 @@ pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
     size: (u16, u16),
 }
 
-impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> std::fmt::Debug for ConfirmModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -94,7 +94,7 @@ impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callb
     }
 }
 
-impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> Modal for ConfirmModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(self.size.0, self.size.1);
         frame.render_widget(Clear, popup_area);

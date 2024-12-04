@@ -680,7 +680,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         let config = context.config;
         match &mut self.phase {
             Phase::SearchTextboxInput => match event.as_common_action(context) {

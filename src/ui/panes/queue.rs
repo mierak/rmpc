@@ -322,7 +322,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if self.filter_input_mode {
             match event.as_common_action(context) {
                 Some(CommonAction::Confirm) => {
@@ -500,22 +500,37 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    let marked = &self.scrolling_state.marked;
-                    if let Some(0) = marked.first() {
+                    if let Some(0) = self.scrolling_state.marked.first() {
                         return Ok(());
                     }
 
-                    for range in marked.ranges() {
-                        let new_idx = range.start().saturating_sub(1);
+                    for range in self.scrolling_state.marked.ranges() {
+                        for idx in range.clone() {
+                            let new_idx = idx.saturating_sub(1);
+                            context.queue.swap(idx, new_idx);
+                        }
+
+                        let new_start_idx = range.start().saturating_sub(1);
                         context.command(move |client| {
-                            client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
+                            client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_start_idx))?;
                             Ok(())
                         });
                     }
 
-                    let mut new_marked = marked.iter().map(|i| i.saturating_sub(1)).collect();
+                    if let Some(start) = self.scrolling_state.marked.first() {
+                        let new_idx = start.saturating_sub(1);
+                        self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    }
+
+                    let mut new_marked = self
+                        .scrolling_state
+                        .marked
+                        .iter()
+                        .map(|i| i.saturating_sub(1))
+                        .collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
+                    context.render()?;
                     return Ok(());
                 }
                 CommonAction::MoveDown if !self.scrolling_state.get_marked().is_empty() => {
@@ -523,24 +538,39 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    let marked = &self.scrolling_state.marked;
-                    if let Some(last_idx) = marked.last() {
+                    if let Some(last_idx) = self.scrolling_state.marked.last() {
                         if *last_idx == context.queue.len() - 1 {
                             return Ok(());
                         }
                     }
 
-                    for range in marked.ranges().rev() {
-                        let new_idx = range.start().saturating_add(1);
+                    for range in self.scrolling_state.marked.ranges().rev() {
+                        for idx in range.clone().rev() {
+                            let new_idx = idx.saturating_add(1);
+                            context.queue.swap(idx, new_idx);
+                        }
+
+                        let new_start_idx = range.start().saturating_add(1);
                         context.command(move |client| {
-                            client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
+                            client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_start_idx))?;
                             Ok(())
                         });
                     }
 
-                    let mut new_marked = marked.iter().map(|i| i.saturating_add(1)).collect();
+                    if let Some(start) = self.scrolling_state.marked.last() {
+                        let new_idx = start.saturating_add(1);
+                        self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    }
+
+                    let mut new_marked = self
+                        .scrolling_state
+                        .marked
+                        .iter()
+                        .map(|i| i.saturating_add(1))
+                        .collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
+                    context.render()?;
                     return Ok(());
                 }
                 CommonAction::MoveUp => {
@@ -567,6 +597,8 @@ impl Pane for QueuePane {
                         Ok(())
                     });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    context.queue.swap(idx, new_idx);
+                    context.render()?;
                 }
                 CommonAction::MoveDown => {
                     if context.queue.is_empty() {
@@ -591,6 +623,8 @@ impl Pane for QueuePane {
                         Ok(())
                     });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    context.queue.swap(idx, new_idx);
+                    context.render()?;
                 }
                 CommonAction::DownHalf => {
                     if !context.queue.is_empty() {
