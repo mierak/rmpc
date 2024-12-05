@@ -197,6 +197,7 @@ fn main() -> Result<()> {
                 .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
             let (worker_tx, worker_rx) = unbounded::<WorkRequest>();
+            let work_tx_clone = worker_tx.clone();
 
             let config = match ConfigFile::read(&args.config) {
                 Ok(val) => val.into_config(
@@ -246,7 +247,7 @@ fn main() -> Result<()> {
             let tx_clone = tx.clone();
             std::thread::Builder::new()
                 .name("worker task".to_owned())
-                .spawn(|| worker_task(worker_rx, tx_clone, client, context.config))?;
+                .spawn(|| worker_task(worker_rx, work_tx_clone, tx_clone, client, context.config))?;
 
             let tx_clone = tx.clone();
 
@@ -302,10 +303,17 @@ fn handle_work_request(client: &mut Client<'_>, request: WorkRequest, config: &C
             command.execute(client, config)?;
             Ok(WorkDone::None)
         }
+        WorkRequest::CheckQueue => Ok(WorkDone::None),
     }
 }
 
-fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client: Client<'_>, config: &Config) {
+fn worker_task(
+    rx: Receiver<WorkRequest>,
+    tx: Sender<WorkRequest>,
+    app_event_tx: Sender<AppEvent>,
+    client: Client<'_>,
+    config: &Config,
+) {
     std::thread::scope(move |s| {
         let mut client_write = client.stream.try_clone().expect("Client write clone to succeed");
         let client1 = Arc::new(Mutex::new(client));
@@ -333,6 +341,7 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
                         for ev in events {
                             try_cont!(app_event_tx2.send(AppEvent::IdleEvent(ev)), "Failed to send idle event");
                         }
+                        try_cont!(tx.send(WorkRequest::CheckQueue), "Failed to send idle event");
                     }
                     Err(err) => {
                         log::error!(err:?; "idle error");
@@ -342,6 +351,9 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
                 log::trace!("Stopping idle");
             })
             .expect("failed to spawn thread");
+
+        try_skip!(idle_tx.send(()), "Failed to request for client idle");
+        try_skip!(idle_confirm_rx.recv(), "Idle confirmation failed");
 
         let work = Builder::new()
             .name("work".to_string())
@@ -353,44 +365,46 @@ fn worker_task(rx: Receiver<WorkRequest>, app_event_tx: Sender<AppEvent>, client
                         buffer.push_back(request);
                     };
 
-                    log::trace!(buffer:?; "Trying to acquire client lock");
-                    try_cont!(client_write.write_all(b"noidle\n"), "Failed to write noidle");
-                    let mut client = try_cont!(client2.lock(), "Failed to acquire client lock");
+                    if !buffer.is_empty() {
+                        log::trace!(buffer:?; "Trying to acquire client lock");
+                        try_cont!(client_write.write_all(b"noidle\n"), "Failed to write noidle");
+                        let mut client = try_cont!(client2.lock(), "Failed to acquire client lock");
 
-                    while let Some(request) = buffer.pop_front() {
-                        while let Ok(request) = rx.try_recv() {
-                            log::trace!(count = buffer.len(), buffer:?; "Got more requests");
-                            buffer.push_back(request);
-                        }
-                        if buffer.iter().any(|request2| {
-                            if let (WorkRequest::MpdQuery(q1), WorkRequest::MpdQuery(q2)) = (&request, &request2) {
-                                q1.should_be_skipped(q2)
-                            } else {
-                                false
+                        while let Some(request) = buffer.pop_front() {
+                            while let Ok(request) = rx.try_recv() {
+                                log::trace!(count = buffer.len(), buffer:?; "Got more requests");
+                                buffer.push_back(request);
                             }
-                        }) {
-                            log::trace!(request:?; "Skipping duplicated request");
-                            continue;
+                            if buffer.iter().any(|request2| {
+                                if let (WorkRequest::MpdQuery(q1), WorkRequest::MpdQuery(q2)) = (&request, &request2) {
+                                    q1.should_be_skipped(q2)
+                                } else {
+                                    false
+                                }
+                            }) {
+                                log::trace!(request:?; "Skipping duplicated request");
+                                continue;
+                            }
+
+                            match handle_work_request(&mut client, request, config) {
+                                Ok(result) => {
+                                    try_cont!(
+                                        app_event_tx.send(AppEvent::WorkDone(Ok(result))),
+                                        "Failed to send work done success event"
+                                    );
+                                }
+                                Err(err) => {
+                                    try_cont!(
+                                        app_event_tx.send(AppEvent::WorkDone(Err(err))),
+                                        "Failed to send work done error event"
+                                    );
+                                }
+                            }
                         }
 
-                        match handle_work_request(&mut client, request, config) {
-                            Ok(result) => {
-                                try_cont!(
-                                    app_event_tx.send(AppEvent::WorkDone(Ok(result))),
-                                    "Failed to send work done success event"
-                                );
-                            }
-                            Err(err) => {
-                                try_cont!(
-                                    app_event_tx.send(AppEvent::WorkDone(Err(err))),
-                                    "Failed to send work done error event"
-                                );
-                            }
-                        }
+                        drop(client);
+                        log::trace!("Releasing client lock to idle");
                     }
-
-                    drop(client);
-                    log::trace!("Releasing client lock to idle");
                     try_cont!(idle_tx.send(()), "Failed to request for client idle");
                     try_cont!(idle_confirm_rx.recv(), "Idle confirmation failed");
                 }

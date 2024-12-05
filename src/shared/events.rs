@@ -20,6 +20,7 @@ pub(crate) enum WorkRequest {
     MpdQuery(MpdQuery),
     MpdCommand(MpdCommand),
     Command(Command),
+    CheckQueue,
 }
 
 #[derive(Debug)]
