@@ -1,0 +1,50 @@
+use crate::{
+    config::{cli::Command, tabs::PaneType},
+    mpd::commands::IdleEvent,
+    ui::{Level, UiAppEvent},
+};
+use anyhow::Result;
+use crossterm::event::KeyEvent;
+
+use super::{
+    lrc::LrcIndex,
+    mouse_event::MouseEvent,
+    mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
+};
+
+#[derive(Debug)]
+#[allow(unused)]
+pub(crate) enum WorkRequest {
+    DownloadYoutube { url: String },
+    IndexLyrics { lyrics_dir: &'static str },
+    MpdQuery(MpdQuery),
+    MpdCommand(MpdCommand),
+    Command(Command),
+}
+
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
+pub(crate) enum WorkDone {
+    LyricsIndexed {
+        index: LrcIndex,
+    },
+    MpdCommandFinished {
+        id: &'static str,
+        target: Option<PaneType>,
+        data: MpdQueryResult,
+    },
+    None,
+}
+
+#[derive(Debug)]
+pub(crate) enum AppEvent {
+    UserKeyInput(KeyEvent),
+    UserMouseInput(MouseEvent),
+    Status(String, Level),
+    Log(Vec<u8>),
+    IdleEvent(IdleEvent),
+    RequestRender(bool),
+    Resized { columns: u16, rows: u16 },
+    WorkDone(Result<WorkDone>),
+    UiEvent(UiAppEvent),
+}

@@ -60,10 +60,15 @@ impl AlbumsPane {
             }
             [] => {
                 let current = current.clone();
-                context.query(OPEN_OR_PLAY, PaneType::Albums, move |client| {
-                    let res = list_titles(client, current.as_path())?.collect();
-                    Ok(MpdQueryResult::DirOrSong(res))
-                });
+                context
+                    .query()
+                    .id(OPEN_OR_PLAY)
+                    .replace_id(OPEN_OR_PLAY)
+                    .target(PaneType::Albums)
+                    .query(move |client| {
+                        let res = list_titles(client, current.as_path())?.collect();
+                        Ok(MpdQueryResult::DirOrSong(res))
+                    });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -89,10 +94,15 @@ impl Pane for AlbumsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query(INIT, PaneType::Albums, move |client| {
-                let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                Ok(MpdQueryResult::LsInfo(result.0))
-            });
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneType::Albums)
+                .query(move |client| {
+                    let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                    Ok(MpdQueryResult::LsInfo(result.0))
+                });
             self.initialized = true;
         }
 
@@ -101,10 +111,15 @@ impl Pane for AlbumsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            context.query(INIT, PaneType::Albums, move |client| {
-                let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                Ok(MpdQueryResult::LsInfo(result.0))
-            });
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneType::Albums)
+                .query(move |client| {
+                    let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                    Ok(MpdQueryResult::LsInfo(result.0))
+                });
         };
         Ok(())
     }
@@ -246,40 +261,51 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         Ok(())
     }
 
-    fn prepare_preview(&self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) {
         let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
             return;
         };
         let current = current.to_owned();
         let config = context.config;
 
+        self.stack_mut().clear_preview();
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
-                context.query_replaceable(PREVIEW, "albums_preview", PaneType::Albums, move |client| {
-                    let result = Some(
-                        find_songs(client, &album, &current)?
-                            .first()
-                            .context(anyhow!(
-                                "Expected to find exactly one song: album: '{}', current: '{}'",
-                                album,
-                                current
-                            ))?
-                            .to_preview(&config.theme.symbols)
-                            .collect_vec(),
-                    );
-                    Ok(MpdQueryResult::Preview(result))
-                });
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("albums_preview")
+                    .target(PaneType::Albums)
+                    .query(move |client| {
+                        let result = Some(
+                            find_songs(client, &album, &current)?
+                                .first()
+                                .context(anyhow!(
+                                    "Expected to find exactly one song: album: '{}', current: '{}'",
+                                    album,
+                                    current
+                                ))?
+                                .to_preview(&config.theme.symbols)
+                                .collect_vec(),
+                        );
+                        Ok(MpdQueryResult::Preview(result))
+                    });
             }
             [] => {
-                context.query_replaceable(PREVIEW, "albums_preview", PaneType::Albums, move |client| {
-                    let result = Some(
-                        list_titles(client, &current)?
-                            .map(|v| v.to_list_item_simple(config))
-                            .collect_vec(),
-                    );
-                    Ok(MpdQueryResult::Preview(result))
-                });
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("albums_preview")
+                    .target(PaneType::Albums)
+                    .query(move |client| {
+                        let result = Some(
+                            list_titles(client, &current)?
+                                .map(|v| v.to_list_item_simple(config))
+                                .collect_vec(),
+                        );
+                        Ok(MpdQueryResult::Preview(result))
+                    });
             }
 
             _ => {}

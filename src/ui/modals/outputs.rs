@@ -16,7 +16,7 @@ use crate::{
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::dirstack::DirState,
-    MpdQuery, MpdQueryResult,
+    MpdQueryResult,
 };
 
 use super::{Modal, RectExt};
@@ -50,14 +50,9 @@ impl OutputsModal {
         };
 
         let id = output.id;
-        context.query_raw(MpdQuery {
-            id: "refresh_outputs",
-            replace_id: None,
-            target: None,
-            callback: Box::new(move |client| {
-                client.toggle_output(id)?;
-                Ok(MpdQueryResult::Outputs(client.outputs()?.0))
-            }),
+        context.query().id("refresh_outputs").query(move |client| {
+            client.toggle_output(id)?;
+            Ok(MpdQueryResult::Outputs(client.outputs()?.0))
         });
     }
 }

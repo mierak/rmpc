@@ -11,9 +11,10 @@ use crate::{
         lrc::{Lrc, LrcIndex},
         macros::status_warn,
     },
-    AppEvent, MpdCommand2, MpdQuery, MpdQueryResult, WorkRequest,
+    AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest,
 };
 use anyhow::{bail, Result};
+use bon::bon;
 use crossbeam::channel::{SendError, Sender};
 
 pub struct AppContext {
@@ -27,6 +28,7 @@ pub struct AppContext {
     pub lrc_index: LrcIndex,
 }
 
+#[bon]
 impl AppContext {
     pub fn try_new(
         client: &mut Client<'_>,
@@ -72,43 +74,27 @@ impl AppContext {
         self.needs_render.replace(false);
     }
 
+    #[builder(finish_fn(name = query))]
     pub fn query(
         &self,
+        #[builder(finish_fn)] on_done: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
         id: &'static str,
-        target: PaneType,
-        callback: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
+        target: Option<PaneType>,
+        replace_id: Option<&'static str>,
     ) {
-        self.query_raw(MpdQuery {
+        let query = MpdQuery {
             id,
-            target: Some(target),
-            replace_id: None,
-            callback: Box::new(callback),
-        });
-    }
-
-    pub fn query_replaceable(
-        &self,
-        id: &'static str,
-        replace_id: &'static str,
-        target: PaneType,
-        callback: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
-    ) {
-        self.query_raw(MpdQuery {
-            id,
-            target: Some(target),
-            replace_id: Some(replace_id),
-            callback: Box::new(callback),
-        });
-    }
-
-    pub fn query_raw(&self, query: MpdQuery) {
+            target,
+            replace_id,
+            callback: Box::new(on_done),
+        };
         if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(query)) {
             log::error!(error:? = err; "Failed to send query request");
         }
     }
 
     pub fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
-        if let Err(err) = self.work_sender.send(WorkRequest::MpdCommand(MpdCommand2 {
+        if let Err(err) = self.work_sender.send(WorkRequest::MpdCommand(MpdCommand {
             callback: Box::new(callback),
         })) {
             log::error!(error:? = err; "Failed to send command request");

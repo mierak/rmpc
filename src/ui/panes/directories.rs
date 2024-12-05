@@ -57,22 +57,27 @@ impl DirectoriesPane {
         match selected {
             DirOrSong::Dir { .. } => {
                 let next_path = next_path.join("/").to_string();
-                context.query(OPEN_OR_PLAY, PaneType::Directories, move |client| {
-                    let new_current = client.lsinfo(Some(&next_path))?;
-                    let res = new_current
-                        .into_iter()
-                        .map(|v| match v {
-                            FileOrDir::Dir(d) => DirOrSong::Dir {
-                                name: d.path,
-                                full_path: d.full_path,
-                            },
-                            FileOrDir::File(s) => DirOrSong::Song(s),
-                        })
-                        .sorted()
-                        .collect();
+                context
+                    .query()
+                    .id(OPEN_OR_PLAY)
+                    .replace_id(OPEN_OR_PLAY)
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        let new_current = client.lsinfo(Some(&next_path))?;
+                        let res = new_current
+                            .into_iter()
+                            .map(|v| match v {
+                                FileOrDir::Dir(d) => DirOrSong::Dir {
+                                    name: d.path,
+                                    full_path: d.full_path,
+                                },
+                                FileOrDir::File(s) => DirOrSong::Song(s),
+                            })
+                            .sorted()
+                            .collect();
 
-                    Ok(MpdQueryResult::DirOrSong(res))
-                });
+                        Ok(MpdQueryResult::DirOrSong(res))
+                    });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -101,15 +106,20 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query(INIT, PaneType::Directories, move |client| {
-                let result = client
-                    .lsinfo(None)?
-                    .into_iter()
-                    .map(Into::<DirOrSong>::into)
-                    .sorted()
-                    .collect::<Vec<_>>();
-                Ok(MpdQueryResult::DirOrSong(result))
-            });
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneType::Directories)
+                .query(move |client| {
+                    let result = client
+                        .lsinfo(None)?
+                        .into_iter()
+                        .map(Into::<DirOrSong>::into)
+                        .sorted()
+                        .collect::<Vec<_>>();
+                    Ok(MpdQueryResult::DirOrSong(result))
+                });
             self.initialized = true;
         }
 
@@ -118,15 +128,20 @@ impl Pane for DirectoriesPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            context.query(INIT, PaneType::Directories, move |client| {
-                let result = client
-                    .lsinfo(None)?
-                    .into_iter()
-                    .map(Into::<DirOrSong>::into)
-                    .sorted()
-                    .collect::<Vec<_>>();
-                Ok(MpdQueryResult::DirOrSong(result))
-            });
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneType::Directories)
+                .query(move |client| {
+                    let result = client
+                        .lsinfo(None)?
+                        .into_iter()
+                        .map(Into::<DirOrSong>::into)
+                        .sorted()
+                        .collect::<Vec<_>>();
+                    Ok(MpdQueryResult::DirOrSong(result))
+                });
         };
         Ok(())
     }
@@ -244,7 +259,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         self.open_or_play(false, context)
     }
 
-    fn prepare_preview(&self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) {
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir { .. }) => {
                 let Some(next_path) = self.stack.next_path() else {
@@ -254,40 +269,51 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let next_path = next_path.join("/").to_string();
                 let config = context.config;
 
-                context.query_replaceable(PREVIEW, "directories_preview", PaneType::Directories, move |client| {
-                    let res: Vec<_> = match client.lsinfo(Some(&next_path)) {
-                        Ok(val) => val,
-                        Err(err) => {
-                            log::error!(error:? = err; "Failed to get lsinfo for dir",);
-                            return Ok(MpdQueryResult::Preview(None));
+                self.stack_mut().clear_preview();
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("directories_preview")
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        let res: Vec<_> = match client.lsinfo(Some(&next_path)) {
+                            Ok(val) => val,
+                            Err(err) => {
+                                log::error!(error:? = err; "Failed to get lsinfo for dir",);
+                                return Ok(MpdQueryResult::Preview(None));
+                            }
                         }
-                    }
-                    .0
-                    .into_iter()
-                    .map(|v| match v {
-                        FileOrDir::Dir(dir) => DirOrSong::Dir {
-                            name: dir.path,
-                            full_path: dir.full_path,
-                        },
-                        FileOrDir::File(song) => DirOrSong::Song(song),
-                    })
-                    .sorted()
-                    .map(|v| v.to_list_item_simple(config))
-                    .collect();
+                        .0
+                        .into_iter()
+                        .map(|v| match v {
+                            FileOrDir::Dir(dir) => DirOrSong::Dir {
+                                name: dir.path,
+                                full_path: dir.full_path,
+                            },
+                            FileOrDir::File(song) => DirOrSong::Song(song),
+                        })
+                        .sorted()
+                        .map(|v| v.to_list_item_simple(config))
+                        .collect();
 
-                    Ok(MpdQueryResult::Preview(Some(res)))
-                });
+                        Ok(MpdQueryResult::Preview(Some(res)))
+                    });
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
                 let config = context.config;
-                context.query(PREVIEW, PaneType::Directories, move |client| {
-                    Ok(MpdQueryResult::Preview(
-                        client
-                            .find_one(&[Filter::new(Tag::File, &file)])?
-                            .map(|v| v.to_preview(&config.theme.symbols).collect()),
-                    ))
-                });
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("directories_preview")
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        Ok(MpdQueryResult::Preview(
+                            client
+                                .find_one(&[Filter::new(Tag::File, &file)])?
+                                .map(|v| v.to_preview(&config.theme.symbols).collect()),
+                        ))
+                    });
             }
             None => {}
         }

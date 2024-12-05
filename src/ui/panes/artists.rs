@@ -131,10 +131,15 @@ impl ArtistsPane {
                 let target = self.target_pane();
                 let current = current.clone();
                 let artist = artist.clone();
-                context.query(OPEN_OR_PLAY, target, move |client| {
-                    let result = Self::list_titles(client, &artist, current.as_path(), artist_tag)?.collect();
-                    Ok(MpdQueryResult::DirOrSong(result))
-                });
+                context
+                    .query()
+                    .id(OPEN_OR_PLAY)
+                    .replace_id(OPEN_OR_PLAY)
+                    .target(target)
+                    .query(move |client| {
+                        let result = Self::list_titles(client, &artist, current.as_path(), artist_tag)?.collect();
+                        Ok(MpdQueryResult::DirOrSong(result))
+                    });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -143,10 +148,15 @@ impl ArtistsPane {
                 let artist_tag = self.artist_tag();
                 let current = current.clone();
                 let target = self.target_pane();
-                context.query(OPEN_OR_PLAY, target, move |client| {
-                    let result = Self::list_albums(client, current.as_path(), artist_tag)?.collect();
-                    Ok(MpdQueryResult::DirOrSong(result))
-                });
+                context
+                    .query()
+                    .id(OPEN_OR_PLAY)
+                    .replace_id(OPEN_OR_PLAY)
+                    .target(target)
+                    .query(move |client| {
+                        let result = Self::list_albums(client, current.as_path(), artist_tag)?.collect();
+                        Ok(MpdQueryResult::DirOrSong(result))
+                    });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -173,10 +183,15 @@ impl Pane for ArtistsPane {
         if !self.initialized {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context.query(INIT, target, move |client| {
-                let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                Ok(MpdQueryResult::LsInfo(result.0))
-            });
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(target)
+                .query(move |client| {
+                    let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                    Ok(MpdQueryResult::LsInfo(result.0))
+                });
 
             self.initialized = true;
         }
@@ -188,10 +203,15 @@ impl Pane for ArtistsPane {
         if let crate::ui::UiEvent::Database = event {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context.query(INIT, target, move |client| {
-                let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                Ok(MpdQueryResult::LsInfo(result.0))
-            });
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(target)
+                .query(move |client| {
+                    let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                    Ok(MpdQueryResult::LsInfo(result.0))
+                });
         };
         Ok(())
     }
@@ -355,7 +375,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         self.open_or_play(false, context)
     }
 
-    fn prepare_preview(&self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) {
         let Some(current) = self.stack.current().selected().map(DirStackItem::as_path) else {
             return;
         };
@@ -364,46 +384,64 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         let artist_tag = self.artist_tag();
         let target = self.target_pane();
 
+        self.stack_mut().clear_preview();
         match self.stack.path() {
             [artist, album] => {
                 let artist = artist.clone();
                 let album = album.clone();
-                context.query_replaceable(PREVIEW, "artists_preview", target, move |client| {
-                    let result = Some(
-                        Self::find_songs(client, &artist, &album, &current, artist_tag)?
-                            .first()
-                            .context(anyhow!(
-                                "Expected to find exactly one song: artist: '{}', album: '{}', current: '{}'",
-                                artist,
-                                album,
-                                current
-                            ))?
-                            .to_preview(&config.theme.symbols)
-                            .collect_vec(),
-                    );
-                    Ok(MpdQueryResult::Preview(result))
-                });
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("artists_preview")
+                    .target(target)
+                    .query(move |client| {
+                        let result = Some(
+                            Self::find_songs(client, &artist, &album, &current, artist_tag)?
+                                .first()
+                                .context(anyhow!(
+                                    "Expected to find exactly one song: artist: '{}', album: '{}', current: '{}'",
+                                    artist,
+                                    album,
+                                    current
+                                ))?
+                                .to_preview(&config.theme.symbols)
+                                .collect_vec(),
+                        );
+                        Ok(MpdQueryResult::Preview(result))
+                    });
             }
             [artist] => {
                 let artist = artist.clone();
-                context.query(PREVIEW, target, move |client| {
-                    let result = Some(
-                        Self::list_titles(client, &artist, &current, artist_tag)?
-                            .map(|s| s.to_list_item_simple(config))
-                            .collect_vec(),
-                    );
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id(PREVIEW)
+                    .target(target)
+                    .query(move |client| {
+                        let result = Some(
+                            Self::list_titles(client, &artist, &current, artist_tag)?
+                                .map(|s| s.to_list_item_simple(config))
+                                .collect_vec(),
+                        );
 
-                    Ok(MpdQueryResult::Preview(result))
-                });
+                        Ok(MpdQueryResult::Preview(result))
+                    });
             }
-            [] => context.query(PREVIEW, target, move |client| {
-                let result = Some(
-                    Self::list_albums(client, &current, artist_tag)?
-                        .map(|s| s.to_list_item_simple(config))
-                        .collect_vec(),
-                );
-                Ok(MpdQueryResult::Preview(result))
-            }),
+            [] => {
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id(PREVIEW)
+                    .target(target)
+                    .query(move |client| {
+                        let result = Some(
+                            Self::list_albums(client, &current, artist_tag)?
+                                .map(|s| s.to_list_item_simple(config))
+                                .collect_vec(),
+                        );
+                        Ok(MpdQueryResult::Preview(result))
+                    });
+            }
             _ => {}
         };
     }

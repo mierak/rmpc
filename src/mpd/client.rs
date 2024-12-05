@@ -159,7 +159,8 @@ impl<'name> Client<'name> {
             client.password(password)?;
         }
 
-        client.binary_limit(1024 * 1024 * 5)?;
+        // 2^18 seems to be max limit supported by MPD and higher values dont have any effect
+        client.binary_limit(2u64.pow(18))?;
 
         Ok(client)
     }

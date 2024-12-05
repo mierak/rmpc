@@ -453,18 +453,23 @@ impl Pane for QueuePane {
                         .and_then(|idx| context.queue.get(idx))
                     {
                         let uri = selected_song.file.clone();
-                        context.query(ADD_TO_PLAYLIST, PaneType::Queue, move |client| {
-                            let playlists = client
-                                .list_playlists()?
-                                .into_iter()
-                                .map(|v| v.name)
-                                .sorted()
-                                .collect_vec();
-                            Ok(MpdQueryResult::AddToPlaylist {
-                                playlists,
-                                song_file: uri,
-                            })
-                        });
+                        context
+                            .query()
+                            .id(ADD_TO_PLAYLIST)
+                            .replace_id(ADD_TO_PLAYLIST)
+                            .target(PaneType::Queue)
+                            .query(move |client| {
+                                let playlists = client
+                                    .list_playlists()?
+                                    .into_iter()
+                                    .map(|v| v.name)
+                                    .sorted()
+                                    .collect_vec();
+                                Ok(MpdQueryResult::AddToPlaylist {
+                                    playlists,
+                                    song_file: uri,
+                                })
+                            });
                     }
                 }
                 QueueActions::ShowInfo => {

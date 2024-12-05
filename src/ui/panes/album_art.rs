@@ -55,14 +55,19 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
-        context.query(ALBUM_ART, PaneType::AlbumArt, move |client| {
-            let start = std::time::Instant::now();
-            log::debug!(file = song_uri.as_str(); "Searching for album art");
-            let result = client.find_album_art(&song_uri)?;
-            log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
+        context
+            .query()
+            .id(ALBUM_ART)
+            .replace_id(ALBUM_ART)
+            .target(PaneType::AlbumArt)
+            .query(move |client| {
+                let start = std::time::Instant::now();
+                log::debug!(file = song_uri.as_str(); "Searching for album art");
+                let result = client.find_album_art(&song_uri)?;
+                log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
 
-            Ok(MpdQueryResult::AlbumArt(result))
-        });
+                Ok(MpdQueryResult::AlbumArt(result))
+            });
 
         Some(())
     }
@@ -148,20 +153,25 @@ impl Pane for AlbumArtPane {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use crossbeam::channel::RecvTimeoutError;
+    use crossbeam::channel::{Receiver, Sender};
     use rstest::rstest;
+    use std::time::Duration;
+
+    use super::AlbumArtPane;
 
     use crate::config::Config;
+    use crate::config::ImageMethod;
     use crate::config::Leak;
     use crate::mpd::commands::Song;
     use crate::mpd::commands::State;
+    use crate::shared::events::WorkRequest;
+    use crate::shared::mpd_query::MpdQuery;
     use crate::tests::fixtures::app_context;
-    use crate::tests::fixtures::mpd_client::client;
-    use crate::tests::fixtures::mpd_client::TestMpdClient;
+    use crate::tests::fixtures::work_request_channel;
     use crate::ui::panes::Pane;
     use crate::ui::UiEvent;
-    use crate::{config::ImageMethod, context::AppContext};
-
-    use super::AlbumArtPane;
+    use crate::{config::tabs::PaneType, ui::panes::album_art::ALBUM_ART};
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
@@ -174,9 +184,10 @@ mod tests {
     fn searches_for_album_art_before_show(
         #[case] method: ImageMethod,
         #[case] should_search: bool,
-        mut app_context: AppContext,
-        client: TestMpdClient,
+        work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
     ) {
+        let rx = work_request_channel.1.clone();
+        let mut app_context = app_context(work_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
@@ -191,10 +202,21 @@ mod tests {
 
         screen.before_show(&app_context).unwrap();
 
-        assert_eq!(
-            client.calls.get("find_album_art").map_or(0, |v| *v),
-            u32::from(should_search)
-        );
+        if should_search {
+            assert!(matches!(
+                rx.recv_timeout(Duration::from_millis(100)).unwrap(),
+                WorkRequest::MpdQuery(MpdQuery {
+                    id: ALBUM_ART,
+                    replace_id: Some(ALBUM_ART),
+                    target: Some(PaneType::AlbumArt),
+                    ..
+                })
+            ));
+        } else {
+            assert!(rx
+                .recv_timeout(Duration::from_millis(100))
+                .is_err_and(|err| RecvTimeoutError::Timeout == err));
+        }
     }
 
     #[rstest]
@@ -208,9 +230,10 @@ mod tests {
     fn searches_for_album_art_on_event(
         #[case] method: ImageMethod,
         #[case] should_search: bool,
-        mut app_context: AppContext,
-        client: TestMpdClient,
+        work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
     ) {
+        let rx = work_request_channel.1.clone();
+        let mut app_context = app_context(work_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
@@ -225,9 +248,19 @@ mod tests {
 
         screen.on_event(&mut UiEvent::SongChanged, &app_context).unwrap();
 
-        assert_eq!(
-            client.calls.get("find_album_art").map_or(0, |v| *v),
-            u32::from(should_search)
-        );
+        if should_search {
+            assert!(matches!(
+                rx.recv_timeout(Duration::from_millis(100)).unwrap(),
+                WorkRequest::MpdQuery(MpdQuery {
+                    id: ALBUM_ART,
+                    replace_id: Some(ALBUM_ART),
+                    target: Some(PaneType::AlbumArt),
+                    ..
+                })
+            ));
+        } else {
+            let result = rx.recv_timeout(Duration::from_millis(100));
+            assert!(result.is_err_and(|err| RecvTimeoutError::Timeout == err));
+        }
     }
 }

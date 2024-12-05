@@ -1,6 +1,6 @@
 use std::{cell::Cell, collections::HashSet};
 
-use crossbeam::channel::unbounded;
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use ratatui::{backend::TestBackend, Terminal};
 use rstest::fixture;
 
@@ -8,7 +8,7 @@ use crate::{
     config::{Config, ConfigFile, Leak},
     context::AppContext,
     mpd::commands::Status,
-    shared::lrc::LrcIndex,
+    shared::{events::WorkRequest, lrc::LrcIndex},
 };
 
 pub mod mpd_client;
@@ -19,21 +19,25 @@ pub fn status() -> Status {
 }
 
 #[fixture]
-pub fn app_context() -> AppContext {
+pub fn work_request_channel() -> (Sender<WorkRequest>, Receiver<WorkRequest>) {
+    unbounded()
+}
+
+#[fixture]
+pub fn app_context(work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>)) -> AppContext {
     let chan1 = unbounded();
-    let chan2 = unbounded();
     chan1.1.leak();
-    chan2.1.leak();
     let config = ConfigFile::default()
         .into_config(None, None, None, true)
         .expect("Test default config to convert correctly")
         .leak();
+
     AppContext {
         status: Status::default(),
         config,
         queue: Vec::default(),
         app_event_sender: chan1.0,
-        work_sender: chan2.0,
+        work_sender: work_request_channel.0.clone(),
         supported_commands: HashSet::new(),
         needs_render: Cell::new(false),
         lrc_index: LrcIndex::default(),

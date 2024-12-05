@@ -208,7 +208,9 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
             }
         };
         loop {
-            self.execute(&format!("{} {}", command, buf.len()))?;
+            let command = format!("{} {}", command, buf.len());
+            log::trace!(len = buf.len(), command = command.as_str(); "Requesting more binary data");
+            self.execute(&command)?;
             match self.read_bin_inner(&mut buf) {
                 Ok(Some(response)) => {
                     if buf.len() >= response.size_total as usize || response.bytes_read == 0 {

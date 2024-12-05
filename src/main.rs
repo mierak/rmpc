@@ -30,34 +30,35 @@ use clap::Parser;
 use cli::{create_env, run_external};
 use config::{
     cli::{Args, Command},
-    tabs::PaneType,
     ConfigFile,
 };
 use context::AppContext;
 use crossbeam::channel::{bounded, unbounded, Receiver, RecvTimeoutError, Sender, TryRecvError};
-use crossterm::event::{Event, KeyEvent};
+use crossterm::event::Event;
 use itertools::Itertools;
 use log::{error, info, warn};
 use mpd::{
     client::Client,
-    commands::{idle::IdleEvent, Decoder, Output, Song, State, Status, Volume},
+    commands::{idle::IdleEvent, State},
 };
-use ratatui::{prelude::Backend, widgets::ListItem, Terminal};
+use ratatui::{prelude::Backend, Terminal};
 use rustix::path::Arg;
 use shared::{
     dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
+    events::{AppEvent, WorkDone, WorkRequest},
     lrc::LrcIndex,
+    mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
 };
 use shared::{
     env::ENV,
     ext::{duration::DurationExt, error::ErrorExt},
     logging,
     macros::{status_error, try_cont, try_skip},
-    mouse_event::{MouseEvent, MouseEventTracker},
+    mouse_event::MouseEventTracker,
     tmux,
     ytdlp::YtDlp,
 };
-use ui::{panes::browser::DirOrSong, Level, UiAppEvent, UiEvent};
+use ui::UiEvent;
 
 use crate::{
     config::Config,
@@ -78,90 +79,10 @@ mod mpd;
 mod shared;
 mod ui;
 
-#[derive(derive_more::Debug)]
-pub struct MpdQuery {
-    id: &'static str,
-    replace_id: Option<&'static str>,
-    target: Option<PaneType>,
-    #[debug(skip)]
-    callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send>,
-}
-
-impl MpdQuery {
-    fn should_be_skipped(&self, other: &Self) -> bool {
-        let Some(self_replace_id) = self.replace_id else {
-            return false;
-        };
-        let Some(other_replace_id) = other.replace_id else {
-            return false;
-        };
-
-        return self.id == other.id && self_replace_id == other_replace_id && self.target == other.target;
-    }
-}
-
 const EXTERNAL_COMMAND: &str = "external_command";
 const GLOBAL_STATUS_UPDATE: &str = "global_status_update";
 const GLOBAL_VOLUME_UPDATE: &str = "global_volume_update";
 const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
-
-#[derive(derive_more::Debug)]
-pub struct MpdCommand2 {
-    #[debug(skip)]
-    callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send>,
-}
-
-#[derive(Debug)]
-pub enum WorkRequest {
-    DownloadYoutube { url: String },
-    IndexLyrics { lyrics_dir: &'static str },
-    MpdQuery(MpdQuery),
-    MpdCommand(MpdCommand2),
-    Command(Command),
-}
-
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
-pub enum WorkDone {
-    LyricsIndexed {
-        index: LrcIndex,
-    },
-    MpdCommandFinished {
-        id: &'static str,
-        target: Option<PaneType>,
-        data: MpdQueryResult,
-    },
-    None,
-}
-
-#[derive(Debug)]
-pub enum MpdQueryResult {
-    Preview(Option<Vec<ListItem<'static>>>),
-    SongsList(Vec<Song>),
-    DirOrSong(Vec<DirOrSong>),
-    LsInfo(Vec<String>),
-    AddToPlaylist { playlists: Vec<String>, song_file: String },
-    AlbumArt(Option<Vec<u8>>),
-    Status(Status),
-    Queue(Option<Vec<Song>>),
-    Volume(Volume),
-    Outputs(Vec<Output>),
-    Decoders(Vec<Decoder>),
-    ExternalCommand(&'static [&'static str], Vec<Song>),
-}
-
-#[derive(Debug)]
-pub enum AppEvent {
-    UserKeyInput(KeyEvent),
-    UserMouseInput(MouseEvent),
-    Status(String, Level),
-    Log(Vec<u8>),
-    IdleEvent(IdleEvent),
-    RequestRender(bool),
-    Resized { columns: u16, rows: u16 },
-    WorkDone(Result<WorkDone>),
-    UiAppEvent(UiAppEvent),
-}
 
 fn main() -> Result<()> {
     let mut args = Args::parse();
@@ -643,7 +564,7 @@ fn main_task<B: Backend + std::io::Write>(
                     full_rerender_wanted = true;
                     render_wanted = true;
                 }
-                AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut context) {
+                AppEvent::UiEvent(event) => match ui.on_ui_app_event(event, &mut context) {
                     Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());
@@ -686,44 +607,39 @@ fn main_task<B: Backend + std::io::Write>(
 fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut HashSet<UiEvent>) {
     match event {
         IdleEvent::Mixer if context.supported_commands.contains("getvol") => {
-            context.query_raw(MpdQuery {
-                id: GLOBAL_VOLUME_UPDATE,
-                target: None,
-                replace_id: None,
-                callback: Box::new(move |client| Ok(MpdQueryResult::Volume(client.get_volume()?))),
-            });
+            context
+                .query()
+                .id(GLOBAL_VOLUME_UPDATE)
+                .replace_id("volume")
+                .query(move |client| Ok(MpdQueryResult::Volume(client.get_volume()?)));
         }
         IdleEvent::Mixer => {
-            context.query_raw(MpdQuery {
-                id: GLOBAL_STATUS_UPDATE,
-                target: None,
-                replace_id: None,
-                callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-            });
+            context
+                .query()
+                .id(GLOBAL_STATUS_UPDATE)
+                .replace_id("status")
+                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
         }
         IdleEvent::Options => {
-            context.query_raw(MpdQuery {
-                id: GLOBAL_STATUS_UPDATE,
-                target: None,
-                replace_id: None,
-                callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-            });
+            context
+                .query()
+                .id(GLOBAL_STATUS_UPDATE)
+                .replace_id("status")
+                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
         }
         IdleEvent::Player => {
-            context.query_raw(MpdQuery {
-                id: GLOBAL_STATUS_UPDATE,
-                target: None,
-                replace_id: None,
-                callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-            });
+            context
+                .query()
+                .id(GLOBAL_STATUS_UPDATE)
+                .replace_id("status")
+                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
         }
         IdleEvent::Playlist => {
-            context.query_raw(MpdQuery {
-                id: GLOBAL_QUEUE_UPDATE,
-                target: None,
-                replace_id: None,
-                callback: Box::new(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?))),
-            });
+            context
+                .query()
+                .id(GLOBAL_QUEUE_UPDATE)
+                .replace_id("status")
+                .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?)));
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}

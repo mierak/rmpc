@@ -11,7 +11,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    MpdQuery, MpdQueryResult, EXTERNAL_COMMAND,
+    MpdQueryResult, EXTERNAL_COMMAND,
 };
 
 use super::{
@@ -36,7 +36,7 @@ where
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, context: &AppContext) -> Result<()>;
     fn list_songs_in_item(&self, item: T) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
-    fn prepare_preview(&self, context: &AppContext);
+    fn prepare_preview(&mut self, context: &AppContext);
     fn add(&self, item: &T, context: &AppContext) -> Result<()>;
     fn add_all(&self, context: &AppContext) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
@@ -100,18 +100,13 @@ where
                     .map(|item| self.list_songs_in_item(item.clone()))
                     .collect();
                 let path = self.stack().path().to_owned();
-                context.query_raw(MpdQuery {
-                    id: EXTERNAL_COMMAND,
-                    target: None,
-                    replace_id: None,
-                    callback: Box::new(move |client| {
-                        let songs: Vec<_> = marked_items
-                            .into_iter()
-                            .map(|item| (item)(client))
-                            .flatten_ok()
-                            .try_collect()?;
-                        Ok(MpdQueryResult::ExternalCommand(command, songs))
-                    }),
+                context.query().id(EXTERNAL_COMMAND).query(move |client| {
+                    let songs: Vec<_> = marked_items
+                        .into_iter()
+                        .map(|item| (item)(client))
+                        .flatten_ok()
+                        .try_collect()?;
+                    Ok(MpdQueryResult::ExternalCommand(command, songs))
                 });
             }
             GlobalAction::ExternalCommand { command, .. } => {
@@ -119,14 +114,9 @@ where
                     let selected = selected.clone();
                     let path = self.stack().path().to_owned();
                     let songs = self.list_songs_in_item(selected);
-                    context.query_raw(MpdQuery {
-                        id: EXTERNAL_COMMAND,
-                        target: None,
-                        replace_id: None,
-                        callback: Box::new(move |client| {
-                            let songs = (songs)(client)?;
-                            Ok(MpdQueryResult::ExternalCommand(command, songs))
-                        }),
+                    context.query().id(EXTERNAL_COMMAND).query(move |client| {
+                        let songs = (songs)(client)?;
+                        Ok(MpdQueryResult::ExternalCommand(command, songs))
                     });
                 }
             }

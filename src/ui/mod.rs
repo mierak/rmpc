@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use crate::{config::tabs::PaneType, MpdQuery, WorkRequest};
+use crate::{config::tabs::PaneType, WorkRequest};
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -493,20 +493,18 @@ impl<'ui> Ui<'ui> {
                     modal!(context, modal);
                 }
                 GlobalAction::ShowOutputs => {
-                    context.query_raw(MpdQuery {
-                        id: OPEN_OUTPUTS_MODAL,
-                        target: None,
-                        replace_id: None,
-                        callback: Box::new(move |client| Ok(MpdQueryResult::Outputs(client.outputs()?.0))),
-                    });
+                    context
+                        .query()
+                        .id(OPEN_OUTPUTS_MODAL)
+                        .replace_id(OPEN_OUTPUTS_MODAL)
+                        .query(|client| Ok(MpdQueryResult::Outputs(client.outputs()?.0)));
                 }
                 GlobalAction::ShowDecoders => {
-                    context.query_raw(MpdQuery {
-                        id: OPEN_DECODERS_MODAL,
-                        target: None,
-                        replace_id: None,
-                        callback: Box::new(move |client| Ok(MpdQueryResult::Decoders(client.decoders()?.0))),
-                    });
+                    context
+                        .query()
+                        .id(OPEN_DECODERS_MODAL)
+                        .replace_id(OPEN_DECODERS_MODAL)
+                        .query(|client| Ok(MpdQueryResult::Decoders(client.decoders()?.0)));
                 }
                 GlobalAction::ShowCurrentSongInfo => {
                     if let Some((_, current_song)) = context.find_current_song_in_queue() {

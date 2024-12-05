@@ -67,9 +67,11 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query(action_id, PaneType::Playlists, move |client| {
-                    Ok(MpdQueryResult::SongsList(client.list_playlist_info(&playlist, None)?))
-                });
+                context
+                    .query()
+                    .id(action_id)
+                    .target(PaneType::Playlists)
+                    .query(move |client| Ok(MpdQueryResult::SongsList(client.list_playlist_info(&playlist, None)?)));
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -98,19 +100,24 @@ impl Pane for PlaylistsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query(INIT, PaneType::Playlists, move |client| {
-                let result: Vec<_> = client
-                    .list_playlists()
-                    .context("Cannot list playlists")?
-                    .into_iter()
-                    .map(|playlist| DirOrSong::Dir {
-                        name: playlist.name,
-                        full_path: String::new(),
-                    })
-                    .sorted()
-                    .collect();
-                Ok(MpdQueryResult::DirOrSong(result))
-            });
+            context
+                .query()
+                .id(INIT)
+                .target(PaneType::Playlists)
+                .replace_id(INIT)
+                .query(move |client| {
+                    let result: Vec<_> = client
+                        .list_playlists()
+                        .context("Cannot list playlists")?
+                        .into_iter()
+                        .map(|playlist| DirOrSong::Dir {
+                            name: playlist.name,
+                            full_path: String::new(),
+                        })
+                        .sorted()
+                        .collect();
+                    Ok(MpdQueryResult::DirOrSong(result))
+                });
 
             self.initialized = true;
         }
@@ -125,19 +132,24 @@ impl Pane for PlaylistsPane {
         };
 
         if let Some(id) = id {
-            context.query(id, PaneType::Playlists, move |client| {
-                let result: Vec<_> = client
-                    .list_playlists()
-                    .context("Cannot list playlists")?
-                    .into_iter()
-                    .map(|playlist| DirOrSong::Dir {
-                        name: playlist.name,
-                        full_path: String::new(),
-                    })
-                    .sorted()
-                    .collect();
-                Ok(MpdQueryResult::DirOrSong(result))
-            });
+            context
+                .query()
+                .id(id)
+                .replace_id(id)
+                .target(PaneType::Playlists)
+                .query(move |client| {
+                    let result: Vec<_> = client
+                        .list_playlists()
+                        .context("Cannot list playlists")?
+                        .into_iter()
+                        .map(|playlist| DirOrSong::Dir {
+                            name: playlist.name,
+                            full_path: String::new(),
+                        })
+                        .sorted()
+                        .collect();
+                    Ok(MpdQueryResult::DirOrSong(result))
+                });
         }
 
         Ok(())
@@ -160,7 +172,7 @@ impl Pane for PlaylistsPane {
                 self.stack_mut().set_preview(vec);
                 context.render()?;
             }
-            (INIT | OPEN_OR_PLAY, MpdQueryResult::SongsList(songs)) => {
+            (OPEN_OR_PLAY, MpdQueryResult::SongsList(songs)) => {
                 // TODO: check that we are on the correct path still
                 self.stack_mut()
                     .replace(songs.into_iter().map(DirOrSong::Song).collect());
@@ -223,7 +235,7 @@ impl Pane for PlaylistsPane {
                             self.selected_song = Some((idx, song.as_path().to_owned()));
                         }
                         self.stack = new_stack;
-                        self.open_or_play(false, context, "reinit")?;
+                        self.open_or_play(false, context, REINIT)?;
                         self.stack_mut().current_mut().state.set_content_len(old_content_len);
                         self.stack_mut().current_mut().state.set_viewport_len(old_viewport_len);
                     }
@@ -446,28 +458,34 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn prepare_preview(&self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) {
         let config = context.config;
         let s = self.stack().current().selected().cloned();
-        context.query_replaceable(PREVIEW, "playlists_preview", PaneType::Playlists, move |c| {
-            let result = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
-                Ok(Some(match current {
-                    DirOrSong::Dir { name: d, .. } => c
-                        .list_playlist_info(d, None)?
-                        .into_iter()
-                        .map(DirOrSong::Song)
-                        .map(|s| s.to_list_item_simple(config))
-                        .collect_vec(),
-                    DirOrSong::Song(song) => c
-                        .find_one(&[Filter::new(Tag::File, &song.file)])?
-                        .context(anyhow!("File '{}' was listed but not found", song.file))?
-                        .to_preview(&config.theme.symbols)
-                        .collect_vec(),
-                }))
-            })?;
+        self.stack_mut().clear_preview();
+        context
+            .query()
+            .id(PREVIEW)
+            .replace_id("playlists_preview")
+            .target(PaneType::Playlists)
+            .query(move |c| {
+                let result = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
+                    Ok(Some(match current {
+                        DirOrSong::Dir { name: d, .. } => c
+                            .list_playlist_info(d, None)?
+                            .into_iter()
+                            .map(DirOrSong::Song)
+                            .map(|s| s.to_list_item_simple(config))
+                            .collect_vec(),
+                        DirOrSong::Song(song) => c
+                            .find_one(&[Filter::new(Tag::File, &song.file)])?
+                            .context(anyhow!("File '{}' was listed but not found", song.file))?
+                            .to_preview(&config.theme.symbols)
+                            .collect_vec(),
+                    }))
+                })?;
 
-            Ok(MpdQueryResult::Preview(result))
-        });
+                Ok(MpdQueryResult::Preview(result))
+            });
     }
 
     fn browser_areas(&self) -> [Rect; 3] {

@@ -168,7 +168,12 @@ impl SearchPane {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
                 let result = Some(self.songs_dir.to_list_items(context.config));
-                context.query(PREVIEW, PaneType::Search, move |_| Ok(MpdQueryResult::Preview(result)));
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("preview")
+                    .target(PaneType::Search)
+                    .query(|_| Ok(MpdQueryResult::Preview(result)));
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
@@ -177,15 +182,20 @@ impl SearchPane {
                 let config = context.config;
                 let file = current.file.clone();
 
-                context.query(PREVIEW, PaneType::Search, move |client| {
-                    let preview = client
-                        .find(&[Filter::new(Tag::File, &file)])?
-                        .first()
-                        .context("Expected to find exactly one song")?
-                        .to_preview(&config.theme.symbols)
-                        .collect_vec();
-                    Ok(MpdQueryResult::Preview(Some(preview)))
-                });
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("preview")
+                    .target(PaneType::Search)
+                    .query(move |client| {
+                        let preview = client
+                            .find(&[Filter::new(Tag::File, &file)])?
+                            .first()
+                            .context("Expected to find exactly one song")?
+                            .to_preview(&config.theme.symbols)
+                            .collect_vec();
+                        Ok(MpdQueryResult::Preview(Some(preview)))
+                    });
             }
         }
     }
@@ -378,27 +388,24 @@ impl SearchPane {
             return;
         }
 
-        if case_sensitive {
-            context.query(SEARCH, PaneType::Search, move |client| {
-                let result = client.find(
-                    &filter
-                        .iter()
-                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
-                        .collect_vec(),
-                )?;
+        context
+            .query()
+            .id(SEARCH)
+            .replace_id(SEARCH)
+            .target(PaneType::Search)
+            .query(move |client| {
+                let filter = &filter
+                    .iter()
+                    .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                    .collect_vec();
+                let result = if case_sensitive {
+                    client.find(filter)
+                } else {
+                    client.search(filter)
+                }?;
+
                 Ok(MpdQueryResult::SongsList(result))
             });
-        } else {
-            context.query(SEARCH, PaneType::Search, move |client| {
-                let result = client.search(
-                    &filter
-                        .iter()
-                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
-                        .collect_vec(),
-                )?;
-                Ok(MpdQueryResult::SongsList(result))
-            });
-        };
     }
 
     fn reset(&mut self, search_config: &Search) {

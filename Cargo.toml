@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 clap = { workspace = true }
 anyhow = "1.0.91"
+bon = "3.2.0"
 base64 = "0.22.1"
 crossterm = { version = "0.28.1", features = ["serde"] }
 image = "0.25.4"
