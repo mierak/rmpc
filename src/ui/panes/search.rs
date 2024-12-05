@@ -663,6 +663,7 @@ impl Pane for SearchPane {
                 }
                 Phase::BrowseResults { .. } => {
                     self.songs_dir.next(context.config.scrolloff, false);
+                    self.prepare_preview(context);
 
                     context.render()?;
                 }
@@ -680,6 +681,7 @@ impl Pane for SearchPane {
                 }
                 Phase::BrowseResults { .. } => {
                     self.songs_dir.prev(context.config.scrolloff, false);
+                    self.prepare_preview(context);
 
                     context.render()?;
                 }
