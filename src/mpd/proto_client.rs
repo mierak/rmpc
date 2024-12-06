@@ -56,6 +56,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         trace!(command = self.command; "Executing command");
         if let Err(e) = self.client.write([command, "\n"].concat().as_bytes()) {
             if e.kind() == std::io::ErrorKind::BrokenPipe {
+                log::error!(err:? = e; "Got broken pipe from mpd");
                 self.client.reconnect()?;
                 self.client.write([command, "\n"].concat().as_bytes())?;
                 Ok(self)
@@ -279,14 +280,22 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     fn read_line(&mut self) -> Result<MpdLine, MpdError> {
         let read = self.client.read();
         let mut line = String::new();
+        std::thread::sleep(std::time::Duration::from_millis(1));
 
         let bytes_read = match read.read_line(&mut line) {
             Ok(v) => Ok(v),
-            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => Err(MpdError::ClientClosed),
-            _ => Err(MpdError::ClientClosed),
+            Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => {
+                log::error!(err:? = e; "Got broken pipe from mpd");
+                Err(MpdError::ClientClosed)
+            }
+            Err(e) => {
+                log::error!(err:? = e; "Encountered unexpected error whe reading a response  line from MPD");
+                Err(e.into())
+            }
         }?;
 
         if bytes_read == 0 {
+            log::error!("Got an empty line in MPD's response");
             return Err(MpdError::ClientClosed);
         }
 
