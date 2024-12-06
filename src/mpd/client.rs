@@ -166,6 +166,11 @@ impl<'name> Client<'name> {
     }
 
     fn reconnect(&mut self) -> MpdResult<&Client> {
+        if !self.reconnect {
+            return Err(MpdError::Generic(
+                "Not reconnecting. Client is not configured to reconnect.".to_string(),
+            ));
+        }
         let mut stream = match self.addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),

@@ -46,6 +46,7 @@ All notable changes to this project will be documented in this file.
 - Rows not wrapping in the keybinds modal when the screen is too small
 - Unchecked panic inside the volume widget when volume exceeds certain value
 - Several things that should have happened on song change were happening on every `Player` event, ie. seeking
+- Improved handling of errors while reading MPD's response
 
 ### Deprecated
 
