@@ -28,6 +28,7 @@ use crate::shared::macros::status_warn;
 use crate::shared::mouse_event::MouseEvent;
 use crate::shared::mouse_event::MouseEventKind;
 use crate::ui::dirstack::Dir;
+use crate::ui::dirstack::DirStackItem;
 use crate::ui::UiEvent;
 use crate::MpdQueryResult;
 use crate::{
@@ -164,16 +165,24 @@ impl SearchPane {
     }
 
     fn prepare_preview(&mut self, context: &AppContext) {
+        let Some(origin_path) = self.songs_dir.selected().map(|s| vec![s.as_path().to_owned()]) else {
+            return;
+        };
         match &self.phase {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
-                let result = Some(self.songs_dir.to_list_items(context.config));
+                let data = Some(self.songs_dir.to_list_items(context.config));
                 context
                     .query()
                     .id(PREVIEW)
                     .replace_id("preview")
                     .target(PaneType::Search)
-                    .query(|_| Ok(MpdQueryResult::Preview(result)));
+                    .query(|_| {
+                        Ok(MpdQueryResult::Preview {
+                            data,
+                            origin_path: Some(origin_path),
+                        })
+                    });
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
@@ -188,13 +197,18 @@ impl SearchPane {
                     .replace_id("preview")
                     .target(PaneType::Search)
                     .query(move |client| {
-                        let preview = client
-                            .find(&[Filter::new(Tag::File, &file)])?
-                            .first()
-                            .context("Expected to find exactly one song")?
-                            .to_preview(&config.theme.symbols)
-                            .collect_vec();
-                        Ok(MpdQueryResult::Preview(Some(preview)))
+                        let data = Some(
+                            client
+                                .find(&[Filter::new(Tag::File, &file)])?
+                                .first()
+                                .context("Expected to find exactly one song")?
+                                .to_preview(&config.theme.symbols)
+                                .collect_vec(),
+                        );
+                        Ok(MpdQueryResult::Preview {
+                            data,
+                            origin_path: Some(origin_path),
+                        })
                     });
             }
         }
@@ -404,7 +418,10 @@ impl SearchPane {
                     client.search(filter)
                 }?;
 
-                Ok(MpdQueryResult::SongsList(result))
+                Ok(MpdQueryResult::SongsList {
+                    data: result,
+                    origin_path: None,
+                })
             });
     }
 
@@ -565,11 +582,21 @@ impl Pane for SearchPane {
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::Preview(data)) => {
+            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+                let Some(selected) = self.songs_dir.selected().map(|s| [s.as_path()]) else {
+                    log::trace!("Dropping preview because no item was selected");
+                    return Ok(());
+                };
+                if let Some(origin_path) = origin_path {
+                    if origin_path != selected {
+                        log::trace!(origin_path:?, current_path:? = selected; "Dropping preview because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
                 self.preview = data;
                 context.render()?;
             }
-            (SEARCH, MpdQueryResult::SongsList(data)) => {
+            (SEARCH, MpdQueryResult::SongsList { data, origin_path: _ }) => {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(self.songs_dir.to_list_items(context.config));
                 context.render()?;
@@ -765,6 +792,7 @@ impl Pane for SearchPane {
                         CommonAction::UpHalf => {}
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
                             self.phase = Phase::BrowseResults { filter_input_on: false };
+                            self.preview = None;
                             self.prepare_preview(context);
 
                             context.render()?;

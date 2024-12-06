@@ -29,7 +29,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -40,7 +43,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl2"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl2"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -56,7 +62,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -65,7 +74,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -81,7 +93,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -90,7 +105,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -106,7 +124,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -114,7 +135,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -144,7 +168,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -153,7 +180,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList(initial_songs.clone()),
+                    MpdQueryResult::SongsList {
+                        data: initial_songs.clone(),
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -170,7 +200,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -187,7 +220,14 @@ mod on_idle_event {
             ));
             let new_songs = vec![song("s2"), song("s3"), song("s4")];
             screen
-                .on_query_finished(REINIT, MpdQueryResult::SongsList(new_songs.clone()), &app_context)
+                .on_query_finished(
+                    REINIT,
+                    MpdQueryResult::SongsList {
+                        data: new_songs.clone(),
+                        origin_path: None,
+                    },
+                    &app_context,
+                )
                 .unwrap();
 
             assert_eq!(
@@ -207,7 +247,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -216,7 +259,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList(initial_songs.clone()),
+                    MpdQueryResult::SongsList {
+                        data: initial_songs.clone(),
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -233,7 +279,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -250,7 +299,14 @@ mod on_idle_event {
             ));
             let new_songs = vec![song("s1"), song("s2")];
             screen
-                .on_query_finished(REINIT, MpdQueryResult::SongsList(new_songs.clone()), &app_context)
+                .on_query_finished(
+                    REINIT,
+                    MpdQueryResult::SongsList {
+                        data: new_songs.clone(),
+                        origin_path: None,
+                    },
+                    &app_context,
+                )
                 .unwrap();
 
             assert_eq!(
@@ -270,7 +326,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -279,7 +338,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList(initial_songs.clone()),
+                    MpdQueryResult::SongsList {
+                        data: initial_songs.clone(),
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -296,7 +358,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -313,7 +378,14 @@ mod on_idle_event {
             ));
             let new_songs = vec![song("s3"), song("s4")];
             screen
-                .on_query_finished(REINIT, MpdQueryResult::SongsList(new_songs.clone()), &app_context)
+                .on_query_finished(
+                    REINIT,
+                    MpdQueryResult::SongsList {
+                        data: new_songs.clone(),
+                        origin_path: None,
+                    },
+                    &app_context,
+                )
                 .unwrap();
 
             assert_eq!(
@@ -333,7 +405,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -342,7 +417,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList(initial_songs.clone()),
+                    MpdQueryResult::SongsList {
+                        data: initial_songs.clone(),
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -359,7 +437,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -376,7 +457,14 @@ mod on_idle_event {
             ));
             let new_songs = vec![song("s1"), song("s3"), song("s4")];
             screen
-                .on_query_finished(REINIT, MpdQueryResult::SongsList(new_songs.clone()), &app_context)
+                .on_query_finished(
+                    REINIT,
+                    MpdQueryResult::SongsList {
+                        data: new_songs.clone(),
+                        origin_path: None,
+                    },
+                    &app_context,
+                )
                 .unwrap();
 
             assert_eq!(
@@ -395,14 +483,24 @@ mod on_idle_event {
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             let initial_playlists = vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")];
             screen
-                .on_query_finished(INIT, MpdQueryResult::DirOrSong(initial_playlists), &app_context)
+                .on_query_finished(
+                    INIT,
+                    MpdQueryResult::DirOrSong {
+                        data: initial_playlists,
+                        origin_path: None,
+                    },
+                    &app_context,
+                )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
             screen.stack_mut().push(Vec::new());
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList(initial_songs.clone()),
+                    MpdQueryResult::SongsList {
+                        data: initial_songs.clone(),
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -419,7 +517,10 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong(vec![dir("pl1"), dir("pl2"), dir("pl4")]),
+                    MpdQueryResult::DirOrSong {
+                        data: vec![dir("pl1"), dir("pl2"), dir("pl4")],
+                        origin_path: None,
+                    },
                     &app_context,
                 )
                 .unwrap();
@@ -436,7 +537,14 @@ mod on_idle_event {
             ));
             let new_songs = vec![song("s1"), song("s3"), song("s4")];
             screen
-                .on_query_finished(REINIT, MpdQueryResult::SongsList(new_songs.clone()), &app_context)
+                .on_query_finished(
+                    REINIT,
+                    MpdQueryResult::SongsList {
+                        data: new_songs.clone(),
+                        origin_path: None,
+                    },
+                    &app_context,
+                )
                 .unwrap();
 
             assert_eq!(

@@ -63,6 +63,10 @@ impl PlaylistsPane {
             context.render()?;
             return Ok(());
         };
+        let Some(next_path) = self.stack.next_path() else {
+            log::error!("Failed to move deeper inside dir. Next path is None");
+            return Ok(());
+        };
 
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
@@ -71,7 +75,12 @@ impl PlaylistsPane {
                     .query()
                     .id(action_id)
                     .target(PaneType::Playlists)
-                    .query(move |client| Ok(MpdQueryResult::SongsList(client.list_playlist_info(&playlist, None)?)));
+                    .query(move |client| {
+                        Ok(MpdQueryResult::SongsList {
+                            data: client.list_playlist_info(&playlist, None)?,
+                            origin_path: Some(next_path),
+                        })
+                    });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -116,7 +125,10 @@ impl Pane for PlaylistsPane {
                         })
                         .sorted()
                         .collect();
-                    Ok(MpdQueryResult::DirOrSong(result))
+                    Ok(MpdQueryResult::DirOrSong {
+                        data: result,
+                        origin_path: None,
+                    })
                 });
 
             self.initialized = true;
@@ -148,7 +160,10 @@ impl Pane for PlaylistsPane {
                         })
                         .sorted()
                         .collect();
-                    Ok(MpdQueryResult::DirOrSong(result))
+                    Ok(MpdQueryResult::DirOrSong {
+                        data: result,
+                        origin_path: None,
+                    })
                 });
         }
 
@@ -168,22 +183,33 @@ impl Pane for PlaylistsPane {
 
     fn on_query_finished(&mut self, id: &'static str, mpd_command: MpdQueryResult, context: &AppContext) -> Result<()> {
         match (id, mpd_command) {
-            (PREVIEW, MpdQueryResult::Preview(vec)) => {
-                self.stack_mut().set_preview(vec);
+            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
+                self.stack_mut().set_preview(data);
                 context.render()?;
             }
-            (OPEN_OR_PLAY, MpdQueryResult::SongsList(songs)) => {
-                // TODO: check that we are on the correct path still
+            (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
                 self.stack_mut()
-                    .replace(songs.into_iter().map(DirOrSong::Song).collect());
+                    .replace(data.into_iter().map(DirOrSong::Song).collect());
                 self.prepare_preview(context);
                 context.render()?;
             }
-            (INIT, MpdQueryResult::DirOrSong(new_playlists)) => {
-                self.stack = DirStack::new(new_playlists);
+            (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
+                self.stack = DirStack::new(data);
                 self.prepare_preview(context);
             }
-            (REINIT, MpdQueryResult::SongsList(songs)) => {
+            (REINIT, MpdQueryResult::SongsList { data: songs, .. }) => {
                 // Select the same song by filename or index as before
                 let old_viewport_len = self.stack.current().state.viewport_len();
 
@@ -207,8 +233,8 @@ impl Pane for PlaylistsPane {
                 self.prepare_preview(context);
                 context.render()?;
             }
-            (REINIT, MpdQueryResult::DirOrSong(new_playlists)) => {
-                let mut new_stack = DirStack::new(new_playlists);
+            (REINIT, MpdQueryResult::DirOrSong { data, .. }) => {
+                let mut new_stack = DirStack::new(data);
                 let old_viewport_len = self.stack.current().state.viewport_len();
                 let old_content_len = self.stack.current().state.content_len();
                 match self.stack.path() {
@@ -256,7 +282,6 @@ impl Pane for PlaylistsPane {
                             .find_position(|item| item.as_path() == selected_playlist)
                             .map_or(selected_idx, |(idx, _)| idx);
                         new_stack.current_mut().state.set_viewport_len(old_viewport_len);
-                        // new_stack.current_mut().state.set_content_len(old_content_len);
                         new_stack
                             .current_mut()
                             .state
@@ -462,13 +487,14 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         let config = context.config;
         let s = self.stack().current().selected().cloned();
         self.stack_mut().clear_preview();
+        let origin_path = Some(self.stack().path().to_vec());
         context
             .query()
             .id(PREVIEW)
             .replace_id("playlists_preview")
             .target(PaneType::Playlists)
             .query(move |c| {
-                let result = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
+                let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
                     Ok(Some(match current {
                         DirOrSong::Dir { name: d, .. } => c
                             .list_playlist_info(d, None)?
@@ -484,7 +510,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     }))
                 })?;
 
-                Ok(MpdQueryResult::Preview(result))
+                Ok(MpdQueryResult::Preview { data, origin_path })
             });
     }
 

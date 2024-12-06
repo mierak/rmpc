@@ -117,6 +117,10 @@ impl ArtistsPane {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
         };
+        let Some(next_path) = self.stack.next_path() else {
+            log::error!("Failed to move deeper inside dir. Next path is None");
+            return Ok(());
+        };
 
         match self.stack.path() {
             [_artist, _album] => {
@@ -138,7 +142,10 @@ impl ArtistsPane {
                     .target(target)
                     .query(move |client| {
                         let result = Self::list_titles(client, &artist, current.as_path(), artist_tag)?.collect();
-                        Ok(MpdQueryResult::DirOrSong(result))
+                        Ok(MpdQueryResult::DirOrSong {
+                            data: result,
+                            origin_path: Some(next_path),
+                        })
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -155,7 +162,10 @@ impl ArtistsPane {
                     .target(target)
                     .query(move |client| {
                         let result = Self::list_albums(client, current.as_path(), artist_tag)?.collect();
-                        Ok(MpdQueryResult::DirOrSong(result))
+                        Ok(MpdQueryResult::DirOrSong {
+                            data: result,
+                            origin_path: Some(next_path),
+                        })
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -190,7 +200,10 @@ impl Pane for ArtistsPane {
                 .target(target)
                 .query(move |client| {
                     let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                    Ok(MpdQueryResult::LsInfo(result.0))
+                    Ok(MpdQueryResult::LsInfo {
+                        data: result.0,
+                        origin_path: None,
+                    })
                 });
 
             self.initialized = true;
@@ -210,7 +223,10 @@ impl Pane for ArtistsPane {
                 .target(target)
                 .query(move |client| {
                     let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                    Ok(MpdQueryResult::LsInfo(result.0))
+                    Ok(MpdQueryResult::LsInfo {
+                        data: result.0,
+                        origin_path: None,
+                    })
                 });
         };
         Ok(())
@@ -229,16 +245,28 @@ impl Pane for ArtistsPane {
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::Preview(vec)) => {
-                self.stack_mut().set_preview(vec);
+            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
+                self.stack_mut().set_preview(data);
                 context.render()?;
             }
-            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong(data)) => {
+            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
                 self.stack_mut().replace(data);
                 self.prepare_preview(context);
                 context.render()?;
             }
-            (INIT, MpdQueryResult::LsInfo(data)) => {
+            (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
                 self.stack = DirStack::new(
                     data.into_iter()
                         .map(|v| DirOrSong::Dir {
@@ -383,6 +411,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         let config = context.config;
         let artist_tag = self.artist_tag();
         let target = self.target_pane();
+        let origin_path = Some(self.stack().path().to_vec());
 
         self.stack_mut().clear_preview();
         match self.stack.path() {
@@ -395,7 +424,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     .replace_id("artists_preview")
                     .target(target)
                     .query(move |client| {
-                        let result = Some(
+                        let data = Some(
                             Self::find_songs(client, &artist, &album, &current, artist_tag)?
                                 .first()
                                 .context(anyhow!(
@@ -407,7 +436,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                                 .to_preview(&config.theme.symbols)
                                 .collect_vec(),
                         );
-                        Ok(MpdQueryResult::Preview(result))
+                        Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
             [artist] => {
@@ -418,13 +447,13 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     .replace_id(PREVIEW)
                     .target(target)
                     .query(move |client| {
-                        let result = Some(
+                        let data = Some(
                             Self::list_titles(client, &artist, &current, artist_tag)?
                                 .map(|s| s.to_list_item_simple(config))
                                 .collect_vec(),
                         );
 
-                        Ok(MpdQueryResult::Preview(result))
+                        Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
             [] => {
@@ -434,12 +463,12 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     .replace_id(PREVIEW)
                     .target(target)
                     .query(move |client| {
-                        let result = Some(
+                        let data = Some(
                             Self::list_albums(client, &current, artist_tag)?
                                 .map(|s| s.to_list_item_simple(config))
                                 .collect_vec(),
                         );
-                        Ok(MpdQueryResult::Preview(result))
+                        Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
             _ => {}

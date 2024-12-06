@@ -49,6 +49,10 @@ impl AlbumsPane {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
         };
+        let Some(next_path) = self.stack.next_path() else {
+            log::error!("Failed to move deeper inside dir. Next path is None");
+            return Ok(());
+        };
 
         match self.stack.path() {
             [_album] => {
@@ -66,8 +70,11 @@ impl AlbumsPane {
                     .replace_id(OPEN_OR_PLAY)
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let res = list_titles(client, current.as_path())?.collect();
-                        Ok(MpdQueryResult::DirOrSong(res))
+                        let data = list_titles(client, current.as_path())?.collect();
+                        Ok(MpdQueryResult::DirOrSong {
+                            data,
+                            origin_path: Some(next_path),
+                        })
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -101,7 +108,10 @@ impl Pane for AlbumsPane {
                 .target(PaneType::Albums)
                 .query(move |client| {
                     let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdQueryResult::LsInfo(result.0))
+                    Ok(MpdQueryResult::LsInfo {
+                        data: result.0,
+                        origin_path: None,
+                    })
                 });
             self.initialized = true;
         }
@@ -118,7 +128,10 @@ impl Pane for AlbumsPane {
                 .target(PaneType::Albums)
                 .query(move |client| {
                     let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdQueryResult::LsInfo(result.0))
+                    Ok(MpdQueryResult::LsInfo {
+                        data: result.0,
+                        origin_path: None,
+                    })
                 });
         };
         Ok(())
@@ -137,11 +150,17 @@ impl Pane for AlbumsPane {
 
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::Preview(vec)) => {
-                self.stack_mut().set_preview(vec);
+            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
+                self.stack_mut().set_preview(data);
                 context.render()?;
             }
-            (INIT, MpdQueryResult::LsInfo(data)) => {
+            (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
                 self.stack = DirStack::new(
                     data.into_iter()
                         .map(|v| DirOrSong::Dir {
@@ -152,7 +171,13 @@ impl Pane for AlbumsPane {
                 );
                 self.prepare_preview(context);
             }
-            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong(data)) => {
+            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
                 self.stack_mut().replace(data);
                 self.prepare_preview(context);
                 context.render()?;
@@ -267,6 +292,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         };
         let current = current.to_owned();
         let config = context.config;
+        let origin_path = Some(self.stack().path().to_vec());
 
         self.stack_mut().clear_preview();
         match self.stack.path() {
@@ -278,7 +304,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let result = Some(
+                        let data = Some(
                             find_songs(client, &album, &current)?
                                 .first()
                                 .context(anyhow!(
@@ -289,7 +315,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                                 .to_preview(&config.theme.symbols)
                                 .collect_vec(),
                         );
-                        Ok(MpdQueryResult::Preview(result))
+                        Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
             [] => {
@@ -299,12 +325,12 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let result = Some(
+                        let data = Some(
                             list_titles(client, &current)?
                                 .map(|v| v.to_list_item_simple(config))
                                 .collect_vec(),
                         );
-                        Ok(MpdQueryResult::Preview(result))
+                        Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
 

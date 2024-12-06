@@ -39,12 +39,28 @@ impl MpdQuery {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub(crate) enum MpdQueryResult {
-    Preview(Option<Vec<ListItem<'static>>>),
-    SongsList(Vec<Song>),
-    DirOrSong(Vec<DirOrSong>),
-    LsInfo(Vec<String>),
-    AddToPlaylist { playlists: Vec<String>, song_file: String },
+    Preview {
+        data: Option<Vec<ListItem<'static>>>,
+        origin_path: Option<Vec<String>>,
+    },
+    SongsList {
+        data: Vec<Song>,
+        origin_path: Option<Vec<String>>,
+    },
+    LsInfo {
+        data: Vec<String>,
+        origin_path: Option<Vec<String>>,
+    },
+    DirOrSong {
+        data: Vec<DirOrSong>,
+        origin_path: Option<Vec<String>>,
+    },
+    AddToPlaylist {
+        playlists: Vec<String>,
+        song_file: String,
+    },
     AlbumArt(Option<Vec<u8>>),
     Status(Status),
     Queue(Option<Vec<Song>>),
