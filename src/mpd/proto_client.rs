@@ -280,7 +280,6 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     fn read_line(&mut self) -> Result<MpdLine, MpdError> {
         let read = self.client.read();
         let mut line = String::new();
-        std::thread::sleep(std::time::Duration::from_millis(1));
 
         let bytes_read = match read.read_line(&mut line) {
             Ok(v) => Ok(v),
@@ -296,7 +295,9 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
 
         if bytes_read == 0 {
             log::error!("Got an empty line in MPD's response");
-            return Err(MpdError::ClientClosed);
+            return Err(MpdError::ValueExpected(
+                "Expected value when reading MPD's response but the stream reached EOF".to_string(),
+            ));
         }
 
         if line.starts_with("OK") || line.starts_with("list_OK") {
