@@ -29,7 +29,7 @@ const MIN_SUPPORTED_VERSION: Version = Version {
 pub struct Client<'name> {
     name: &'name str,
     rx: BufReader<TcpOrUnixStream>,
-    stream: TcpOrUnixStream,
+    pub stream: TcpOrUnixStream,
     reconnect: bool,
     addr: MpdAddress<'name>,
     password: Option<MpdPassword<'name>>,
@@ -46,7 +46,7 @@ impl std::fmt::Debug for Client<'_> {
     }
 }
 
-enum TcpOrUnixStream {
+pub enum TcpOrUnixStream {
     Unix(UnixStream),
     Tcp(TcpStream),
 }
@@ -76,7 +76,7 @@ impl TcpOrUnixStream {
         Ok(())
     }
 
-    fn try_clone(&self) -> std::io::Result<Self> {
+    pub fn try_clone(&self) -> std::io::Result<Self> {
         Ok(match self {
             TcpOrUnixStream::Unix(s) => TcpOrUnixStream::Unix(s.try_clone()?),
             TcpOrUnixStream::Tcp(s) => TcpOrUnixStream::Tcp(s.try_clone()?),
@@ -159,7 +159,8 @@ impl<'name> Client<'name> {
             client.password(password)?;
         }
 
-        client.binary_limit(1024 * 1024 * 5)?;
+        // 2^18 seems to be max limit supported by MPD and higher values dont have any effect
+        client.binary_limit(2u64.pow(18))?;
 
         Ok(client)
     }

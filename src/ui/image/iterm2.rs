@@ -185,24 +185,27 @@ impl Iterm2 {
         let (sender, receiver) = channel::<DataToEncode>();
         let (encoded_tx, encoded_rx) = channel::<EncodedData>();
 
-        std::thread::spawn(move || loop {
-            if let Ok(DataToEncode {
-                width,
-                height,
-                wants_full_render,
-                data,
-                request_id,
-            }) = receiver.recv_last()
-            {
-                let encoded = try_cont!(
-                    Iterm2::encode(width, height, &data, max_size, request_id),
-                    "Failed to encode data"
-                );
-                try_cont!(encoded_tx.send(encoded), "Failed to send encoded data");
+        std::thread::Builder::new()
+            .name("iterm2".to_string())
+            .spawn(move || loop {
+                if let Ok(DataToEncode {
+                    width,
+                    height,
+                    wants_full_render,
+                    data,
+                    request_id,
+                }) = receiver.recv_last()
+                {
+                    let encoded = try_cont!(
+                        Iterm2::encode(width, height, &data, max_size, request_id),
+                        "Failed to encode data"
+                    );
+                    try_cont!(encoded_tx.send(encoded), "Failed to send encoded data");
 
-                request_render(wants_full_render);
-            }
-        });
+                    request_render(wants_full_render);
+                }
+            })
+            .expect("iterm2 thread to be spawned");
         let default_art = Arc::new(default_art.to_vec());
 
         Self {

@@ -3,6 +3,14 @@ use itertools::Itertools;
 use rustix::path::Arg;
 use std::{os::unix::ffi::OsStrExt, path::PathBuf, process::Command, str::FromStr};
 
+use crate::{
+    config::Config,
+    mpd::mpd_client::MpdClient,
+    shared::macros::{status_error, status_info, status_warn},
+};
+
+use super::dependencies;
+
 #[derive(Debug)]
 pub struct YtDlp {
     pub cache_dir: String,
@@ -18,6 +26,35 @@ impl YtDlp {
 
         std::fs::create_dir_all(&cache_dir)?;
         Ok(Self { cache_dir })
+    }
+
+    pub fn download_and_add(config: &Config, url: &str, client: &mut impl MpdClient) -> Result<String> {
+        let Some(cache_dir) = config.cache_dir else {
+            bail!("Youtube support requires 'cache_dir' to be configured")
+        };
+
+        if let Err(unsupported_list) = dependencies::is_youtube_supported(config.address) {
+            status_warn!(
+                "Youtube support requires the following and may thus not work properly: {}",
+                unsupported_list.join(", ")
+            );
+        } else {
+            status_info!("Downloading '{url}'");
+        }
+
+        let ytdlp = YtDlp::new(cache_dir)?;
+        let file_path = ytdlp.download(url)?;
+
+        match client.add(&file_path) {
+            Ok(()) => {
+                status_info!("File '{file_path}' added to the queue");
+            }
+            Err(err) => {
+                status_error!(err:?; "Failed to add '{file_path}' to the queue");
+            }
+        };
+
+        Ok(file_path)
     }
 
     pub fn download(&self, url: &str) -> Result<String> {

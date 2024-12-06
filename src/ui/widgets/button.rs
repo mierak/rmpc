@@ -15,7 +15,7 @@ pub struct Button<'a> {
     label_alignment: Alignment,
 }
 
-impl<'a> Default for Button<'a> {
+impl Default for Button<'_> {
     fn default() -> Self {
         Self {
             label_alignment: Alignment::Center,
@@ -53,13 +53,13 @@ impl<'a> Button<'a> {
     }
 }
 
-impl<'a> Widget for Button<'a> {
+impl Widget for Button<'_> {
     fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         (&mut self).render(area, buf);
     }
 }
 
-impl<'a> Widget for &mut Button<'a> {
+impl Widget for &mut Button<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         buf.set_style(area, self.style);
         let area = match &self.block {
@@ -96,7 +96,7 @@ pub struct ButtonGroup<'a> {
     pub areas: Vec<Rect>,
 }
 
-impl<'a> Default for ButtonGroup<'a> {
+impl Default for ButtonGroup<'_> {
     fn default() -> Self {
         Self {
             buttons: Vec::new(),
@@ -109,7 +109,7 @@ impl<'a> Default for ButtonGroup<'a> {
     }
 }
 
-impl<'a> StatefulWidget for &mut ButtonGroup<'a> {
+impl StatefulWidget for &mut ButtonGroup<'_> {
     type State = ButtonGroupState;
 
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {

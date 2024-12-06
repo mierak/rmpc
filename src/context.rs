@@ -1,7 +1,7 @@
-use std::{cell::Cell, collections::HashSet, path::PathBuf, sync::mpsc::Sender};
+use std::{cell::Cell, collections::HashSet, path::PathBuf};
 
 use crate::{
-    config::{Config, ImageMethod, Leak},
+    config::{tabs::PaneType, Config, ImageMethod, Leak},
     mpd::{
         client::Client,
         commands::{Song, State, Status},
@@ -11,9 +11,11 @@ use crate::{
         lrc::{Lrc, LrcIndex},
         macros::status_warn,
     },
-    AppEvent, WorkRequest,
+    AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest,
 };
 use anyhow::{bail, Result};
+use bon::bon;
+use crossbeam::channel::{SendError, Sender};
 
 pub struct AppContext {
     pub config: &'static Config,
@@ -26,6 +28,7 @@ pub struct AppContext {
     pub lrc_index: LrcIndex,
 }
 
+#[bon]
 impl AppContext {
     pub fn try_new(
         client: &mut Client<'_>,
@@ -58,7 +61,7 @@ impl AppContext {
         })
     }
 
-    pub fn render(&self) -> Result<(), std::sync::mpsc::SendError<AppEvent>> {
+    pub fn render(&self) -> Result<(), SendError<AppEvent>> {
         if self.needs_render.get() {
             return Ok(());
         }
@@ -71,6 +74,33 @@ impl AppContext {
         self.needs_render.replace(false);
     }
 
+    #[builder(finish_fn(name = query))]
+    pub fn query(
+        &self,
+        #[builder(finish_fn)] on_done: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
+        id: &'static str,
+        target: Option<PaneType>,
+        replace_id: Option<&'static str>,
+    ) {
+        let query = MpdQuery {
+            id,
+            target,
+            replace_id,
+            callback: Box::new(on_done),
+        };
+        if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(query)) {
+            log::error!(error:? = err; "Failed to send query request");
+        }
+    }
+
+    pub fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
+        if let Err(err) = self.work_sender.send(WorkRequest::MpdCommand(MpdCommand {
+            callback: Box::new(callback),
+        })) {
+            log::error!(error:? = err; "Failed to send command request");
+        }
+    }
+
     pub fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
         if self.status.state == State::Stop {
             return None;
@@ -79,16 +109,6 @@ impl AppContext {
         self.status
             .songid
             .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
-    }
-
-    /// Gets the owned version of current song by either cloning it from queue
-    /// or by querying MPD if not found
-    pub fn get_current_song(&self, client: &mut impl MpdClient) -> Result<Option<Song>> {
-        if let Some(song) = self.find_current_song_in_queue().map(|v| v.1).cloned() {
-            Ok(Some(song))
-        } else {
-            Ok(client.get_current_song()?)
-        }
     }
 
     pub fn find_lrc(&self) -> Result<Option<Lrc>> {

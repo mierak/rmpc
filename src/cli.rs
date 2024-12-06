@@ -9,21 +9,14 @@ use crate::{
         commands::{volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{lrc::LrcIndex, macros::status_error},
-    WorkRequest,
+    shared::{lrc::LrcIndex, macros::status_error, ytdlp::YtDlp},
 };
 use anyhow::bail;
 
 impl Command {
-    pub fn execute<F, C>(
-        self,
-        client: &mut C,
-        config: &'static Config,
-        mut request_work: F,
-    ) -> Result<(), anyhow::Error>
+    pub fn execute<C>(self, client: &mut C, config: &Config) -> Result<()>
     where
         C: MpdClient,
-        F: FnMut(WorkRequest, &mut C),
     {
         match self {
             ref cmd @ Command::Update { ref path, wait } | ref cmd @ Command::Rescan { ref path, wait } => {
@@ -72,7 +65,7 @@ impl Command {
             Command::Clear => client.clear()?,
             Command::Add { file } => client.add(&file)?,
             Command::AddYt { url } => {
-                request_work(WorkRequest::DownloadYoutube { url }, client);
+                YtDlp::download_and_add(config, &url, client)?;
             }
             Command::Decoders => println!("{}", serde_json::ser::to_string(&client.decoders()?)?),
             Command::Outputs => println!("{}", serde_json::ser::to_string(&client.outputs()?)?),
@@ -194,11 +187,10 @@ pub fn run_external<'a: 'static, K: Into<String>, V: Into<String>>(command: &'a 
 pub fn create_env<'a>(
     context: &AppContext,
     selected_songs_paths: impl IntoIterator<Item = &'a str>,
-    client: &mut impl MpdClient,
-) -> Result<Vec<(impl Into<String>, impl Into<String>)>> {
+) -> Vec<(impl Into<String>, impl Into<String>)> {
     let mut result = Vec::new();
 
-    if let Some(current) = context.get_current_song(client)? {
+    if let Some((_, current)) = context.find_current_song_in_queue() {
         result.push(("CURRENT_SONG", current.file.clone()));
     }
 
@@ -219,5 +211,5 @@ pub fn create_env<'a>(
 
     result.push(("STATE", context.status.state.to_string()));
 
-    Ok(result)
+    result
 }

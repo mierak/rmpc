@@ -10,7 +10,6 @@ use ratatui::{
 use crate::{
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
-    mpd::client::Client,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -29,7 +28,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-pub struct ConfirmModal<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> {
+pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
     message: &'a str,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
@@ -37,7 +36,7 @@ pub struct ConfirmModal<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a>
     size: (u16, u16),
 }
 
-impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> std::fmt::Debug for ConfirmModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -48,7 +47,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> std::fmt::Debug fo
 }
 
 #[allow(dead_code)]
-impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
+impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
     pub fn new(context: &AppContext) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Confirm"), Button::default().label("Cancel")];
@@ -95,7 +94,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> ConfirmModal<'a, C
     }
 }
 
-impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> Modal for ConfirmModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(self.size.0, self.size.1);
         frame.render_widget(Clear, popup_area);
@@ -127,7 +126,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> Modal for ConfirmM
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Right => {
@@ -145,7 +144,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> Modal for ConfirmM
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(client)?;
+                            (callback)(context)?;
                         }
                     }
                     self.button_group_state = ButtonGroupState::default();
@@ -170,12 +169,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> Modal for ConfirmM
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
@@ -187,7 +181,7 @@ impl<'a, Callback: FnMut(&mut Client<'_>) -> Result<()> + 'a> Modal for ConfirmM
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(client)?;
+                            (callback)(context)?;
                         }
                         pop_modal!(context);
                     }

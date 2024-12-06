@@ -104,11 +104,38 @@ impl TestMpdClient {
 type MpdResult<T> = Result<T, MpdError>;
 #[allow(clippy::cast_possible_truncation)]
 impl MpdClient for TestMpdClient {
+    fn version(&mut self) -> crate::mpd::version::Version {
+        todo!("Not yet implemented")
+    }
+
+    fn binary_limit(&mut self, _limit: u64) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn password(&mut self, _password: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
     fn commands(&mut self) -> MpdResult<MpdList> {
         todo!("Not yet implemented")
     }
 
+    fn update(&mut self, _path: Option<&str>) -> MpdResult<Update> {
+        todo!("Not yet implemented")
+    }
+
+    fn rescan(&mut self, _path: Option<&str>) -> MpdResult<Update> {
+        todo!("Not yet implemented")
+    }
+
     fn idle(&mut self, _subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>> {
+        todo!("Not yet implemented")
+    }
+
+    fn enter_idle(&mut self) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient,
+    {
         todo!("Not yet implemented")
     }
 
@@ -231,6 +258,18 @@ impl MpdClient for TestMpdClient {
         Ok(())
     }
 
+    fn mount(&mut self, _name: &str, _path: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn unmount(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_mounts(&mut self) -> MpdResult<crate::mpd::commands::Mounts> {
+        todo!("Not yet implemented")
+    }
+
     fn add(&mut self, _path: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
@@ -246,6 +285,10 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn delete_from_queue(&mut self, _songs: SingleOrRange) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         Ok(Some(
             self.queue.iter().map(|idx| self.songs[*idx].clone()).collect_vec(),
@@ -253,7 +296,7 @@ impl MpdClient for TestMpdClient {
     }
 
     /// `FilterKind` not implemented, everything is treated as Contains
-    fn find(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>> {
+    fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         Ok(self
             .songs
             .iter()
@@ -290,7 +333,7 @@ impl MpdClient for TestMpdClient {
             .collect())
     }
 
-    fn search(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>> {
+    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         Ok(self
             .songs
             .iter()
@@ -339,11 +382,15 @@ impl MpdClient for TestMpdClient {
             .collect())
     }
 
+    fn move_in_queue(&mut self, _from: SingleOrRange, _to: QueueMoveTarget) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
     fn move_id(&mut self, _id: u32, _to: QueueMoveTarget) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
-    fn find_one(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Option<Song>> {
+    fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
         let mut res = self.find(filter)?;
         if res.len() > 1 {
             Err(MpdError::Generic("More than one song found".to_string()))
@@ -352,11 +399,15 @@ impl MpdClient for TestMpdClient {
         }
     }
 
-    fn find_add(&mut self, _filter: &[Filter<'_, '_>]) -> MpdResult<()> {
+    fn find_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
-    fn list_tag(&mut self, _tag: Tag, _filter: Option<&[Filter<'_, '_>]>) -> MpdResult<MpdList> {
+    fn search_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_tag(&mut self, _tag: Tag, _filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         todo!("Not yet implemented")
     }
 
@@ -476,51 +527,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn mount(&mut self, _name: &str, _path: &str) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn unmount(&mut self, _name: &str) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn list_mounts(&mut self) -> MpdResult<crate::mpd::commands::Mounts> {
-        todo!("Not yet implemented")
-    }
-
-    fn version(&mut self) -> crate::mpd::version::Version {
-        todo!("Not yet implemented")
-    }
-
-    fn search_add(&mut self, _filter: &[Filter<'_, '_>]) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn update(&mut self, _path: Option<&str>) -> MpdResult<Update> {
-        todo!("Not yet implemented")
-    }
-
-    fn rescan(&mut self, _path: Option<&str>) -> MpdResult<Update> {
-        todo!("Not yet implemented")
-    }
-
-    fn password(&mut self, _password: &str) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn binary_limit(&mut self, _limit: u64) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
     fn decoders(&mut self) -> MpdResult<crate::mpd::commands::decoders::Decoders> {
-        todo!("Not yet implemented")
-    }
-
-    fn move_in_queue(&mut self, _from: SingleOrRange, _to: QueueMoveTarget) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn delete_from_queue(&mut self, _songs: SingleOrRange) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 }

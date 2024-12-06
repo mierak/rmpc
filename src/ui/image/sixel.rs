@@ -163,22 +163,25 @@ impl Sixel {
         let (sender, receiver) = channel::<DataToEncode>();
         let (encoded_tx, encoded_rx) = channel::<EncodedData>();
 
-        std::thread::spawn(move || loop {
-            if let Ok(DataToEncode {
-                width,
-                height,
-                wants_full_render,
-                data,
-                request_id,
-            }) = receiver.recv_last()
-            {
-                let buf = try_cont!(encode(width, height, &data, max_size, request_id), "Failed to encode");
+        std::thread::Builder::new()
+            .name("sixel".to_string())
+            .spawn(move || loop {
+                if let Ok(DataToEncode {
+                    width,
+                    height,
+                    wants_full_render,
+                    data,
+                    request_id,
+                }) = receiver.recv_last()
+                {
+                    let buf = try_cont!(encode(width, height, &data, max_size, request_id), "Failed to encode");
 
-                try_skip!(encoded_tx.send(buf), "Failed to send encoded data");
+                    try_skip!(encoded_tx.send(buf), "Failed to send encoded data");
 
-                request_render(wants_full_render);
-            }
-        });
+                    request_render(wants_full_render);
+                }
+            })
+            .expect("sixel thread to be spawned");
         let default_art = Arc::new(default_art.to_vec());
 
         Self {

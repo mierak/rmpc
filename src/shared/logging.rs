@@ -1,8 +1,9 @@
+use crossbeam::channel::Sender;
 use flexi_logger::{FileSpec, FlexiLoggerError, LoggerHandle};
 
 use crate::AppEvent;
 
-pub fn init(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+pub fn init(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
     #[cfg(debug_assertions)]
     return init_debug(tx);
     #[cfg(not(debug_assertions))]
@@ -20,7 +21,7 @@ pub fn init_console() -> Result<LoggerHandle, FlexiLoggerError> {
 }
 
 #[allow(dead_code)]
-fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+fn init_release(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
     flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file(
             FileSpec::default()
@@ -35,7 +36,7 @@ fn init_release(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, F
 }
 
 #[allow(dead_code)]
-fn init_debug(tx: std::sync::mpsc::Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+fn init_debug(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
     flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file_and_writer(
             FileSpec::default()
@@ -63,17 +64,17 @@ impl flexi_logger::writers::LogWriter for NullWriter {
 }
 
 pub struct StatusBarWriter {
-    tx: std::sync::mpsc::Sender<AppEvent>,
+    tx: Sender<AppEvent>,
 }
 
 impl StatusBarWriter {
-    pub fn new(tx: std::sync::mpsc::Sender<AppEvent>) -> Self {
+    pub fn new(tx: Sender<AppEvent>) -> Self {
         Self { tx }
     }
 }
 
 pub struct AppEventChannelWriter {
-    tx: std::sync::mpsc::Sender<AppEvent>,
+    tx: Sender<AppEvent>,
     format_fn: Option<flexi_logger::FormatFunction>,
 }
 
@@ -94,7 +95,7 @@ impl flexi_logger::writers::LogWriter for StatusBarWriter {
 }
 
 impl AppEventChannelWriter {
-    pub fn new(tx: std::sync::mpsc::Sender<AppEvent>) -> Self {
+    pub fn new(tx: Sender<AppEvent>) -> Self {
         Self { tx, format_fn: None }
     }
 }
@@ -168,9 +169,10 @@ pub fn structured_detailed_format(
     }
     write!(
         w,
-        r#"{} {:<5} {}:{} message="{}" {}"#,
+        r#"{} {:<5} thread={} {}:{} message="{}" {}"#,
         now.now_utc_owned().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
         record.level().to_string(),
+        std::thread::current().name().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
         &record.args().to_string(),

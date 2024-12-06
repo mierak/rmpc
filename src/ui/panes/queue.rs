@@ -6,6 +6,7 @@ use crate::{
     cli::{create_env, run_external},
     config::{
         keys::{GlobalAction, QueueActions},
+        tabs::PaneType,
         theme::{
             properties::{Property, SongProperty},
             PercentOrLength,
@@ -29,6 +30,7 @@ use crate::{
         },
         UiEvent,
     },
+    MpdQueryResult,
 };
 use log::error;
 use ratatui::{
@@ -52,6 +54,8 @@ pub struct QueuePane {
     column_formats: Vec<&'static Property<'static, SongProperty>>,
     table_area: Rect,
 }
+
+const ADD_TO_PLAYLIST: &str = "add_to_playlist";
 
 impl QueuePane {
     pub fn new(context: &AppContext) -> Self {
@@ -208,7 +212,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &AppContext) -> Result<()> {
         self.scrolling_state.set_content_len(Some(context.queue.len()));
         let scrolloff = if self.table_area == Rect::default() {
             0
@@ -223,7 +227,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let UiEvent::SongChanged = event {
             if let Some((idx, _)) = context.find_current_song_in_queue() {
                 if context.config.select_current_song_on_change {
@@ -236,12 +240,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut impl MpdClient,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }
@@ -263,8 +262,11 @@ impl Pane for QueuePane {
                     .get_at_rendered_row(clicked_row)
                     .and_then(|idx| context.queue.get(idx))
                 {
-                    client.play_id(song.id)?;
-                    context.render()?;
+                    let id = song.id;
+                    context.command(move |client| {
+                        client.play_id(id)?;
+                        Ok(())
+                    });
                 }
             }
             MouseEventKind::MiddleClick => {
@@ -275,8 +277,11 @@ impl Pane for QueuePane {
                     .get_at_rendered_row(clicked_row)
                     .and_then(|idx| context.queue.get(idx))
                 {
-                    client.delete_id(selected_song.id)?;
-                    context.render()?;
+                    let id = selected_song.id;
+                    context.command(move |client| {
+                        client.delete_id(id)?;
+                        Ok(())
+                    });
                 }
             }
             MouseEventKind::ScrollDown => {
@@ -293,7 +298,33 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+        match (id, data) {
+            (ADD_TO_PLAYLIST, MpdQueryResult::AddToPlaylist { playlists, song_file }) => {
+                modal!(
+                    context,
+                    SelectModal::new(context)
+                        .options(playlists)
+                        .confirm_label("Add")
+                        .title("Select a playlist")
+                        .on_confirm(move |context, selected: &String, _idx| {
+                            let selected = selected.to_owned();
+                            let song_file = song_file.clone();
+                            context.command(move |client| {
+                                client.add_to_playlist(&selected, &song_file, None)?;
+                                status_info!("Song added to playlist {}", selected);
+                                Ok(())
+                            });
+                            Ok(())
+                        })
+                );
+            }
+            _ => {}
+        };
+        Ok(())
+    }
+
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if self.filter_input_mode {
             match event.as_common_action(context) {
                 Some(CommonAction::Confirm) => {
@@ -333,9 +364,11 @@ impl Pane for QueuePane {
             match action {
                 QueueActions::Delete if !self.scrolling_state.marked.is_empty() => {
                     for range in self.scrolling_state.marked.ranges().rev() {
-                        client.delete_from_queue(range.into())?;
+                        context.command(move |client| {
+                            client.delete_from_queue(range.into())?;
+                            Ok(())
+                        });
                     }
-
                     self.scrolling_state.marked.clear();
                     status_info!("Marked songs removed from queue");
                     context.render()?;
@@ -346,10 +379,11 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     {
-                        match client.delete_id(selected_song.id) {
-                            Ok(()) => {}
-                            Err(e) => error!("{:?}", e),
-                        }
+                        let id = selected_song.id;
+                        context.command(move |client| {
+                            client.delete_id(id)?;
+                            Ok(())
+                        });
                     } else {
                         status_error!("No song selected");
                     }
@@ -359,7 +393,10 @@ impl Pane for QueuePane {
                         context,
                         ConfirmModal::new(context)
                             .message("Are you sure you want to clear the queue? This action cannot be undone.")
-                            .on_confirm(|client| Ok(client.clear()?))
+                            .on_confirm(|context| {
+                                context.command(|client| Ok(client.clear()?));
+                                Ok(())
+                            })
                             .confirm_label("Clear")
                             .size(45, 6)
                     );
@@ -370,7 +407,11 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     {
-                        client.play_id(selected_song.id)?;
+                        let id = selected_song.id;
+                        context.command(move |client| {
+                            client.play_id(id)?;
+                            Ok(())
+                        });
                     }
                 }
                 QueueActions::JumpToCurrent => {
@@ -388,15 +429,19 @@ impl Pane for QueuePane {
                             .title("Save queue as playlist")
                             .confirm_label("Save")
                             .input_label("Playlist name:")
-                            .on_confirm(move |client, value| {
-                                match client.save_queue_as_playlist(value, None) {
-                                    Ok(()) => {
-                                        status_info!("Playlist '{}' saved", value);
-                                    }
-                                    Err(err) => {
-                                        status_error!(err:?; "Failed to save playlist '{}'",value);
-                                    }
-                                };
+                            .on_confirm(move |context, value| {
+                                let value = value.to_owned();
+                                context.command(move |client| {
+                                    match client.save_queue_as_playlist(&value, None) {
+                                        Ok(()) => {
+                                            status_info!("Playlist '{}' saved", value);
+                                        }
+                                        Err(err) => {
+                                            status_error!(err:?; "Failed to save playlist '{}'",value);
+                                        }
+                                    };
+                                    Ok(())
+                                });
                                 Ok(())
                             })
                     );
@@ -407,25 +452,24 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx))
                     {
-                        let playlists = client
-                            .list_playlists()?
-                            .into_iter()
-                            .map(|v| v.name)
-                            .sorted()
-                            .collect_vec();
                         let uri = selected_song.file.clone();
-                        modal!(
-                            context,
-                            SelectModal::new(context)
-                                .options(playlists)
-                                .confirm_label("Add")
-                                .title("Select a playlist")
-                                .on_confirm(move |client, selected: &String, _idx| {
-                                    client.add_to_playlist(selected, &uri, None)?;
-                                    status_info!("Song added to playlist {}", selected);
-                                    Ok(())
+                        context
+                            .query()
+                            .id(ADD_TO_PLAYLIST)
+                            .replace_id(ADD_TO_PLAYLIST)
+                            .target(PaneType::Queue)
+                            .query(move |client| {
+                                let playlists = client
+                                    .list_playlists()?
+                                    .into_iter()
+                                    .map(|v| v.name)
+                                    .sorted()
+                                    .collect_vec();
+                                Ok(MpdQueryResult::AddToPlaylist {
+                                    playlists,
+                                    song_file: uri,
                                 })
-                        );
+                            });
                     }
                 }
                 QueueActions::ShowInfo => {
@@ -463,19 +507,37 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    let marked = &self.scrolling_state.marked;
-                    if let Some(0) = marked.first() {
+                    if let Some(0) = self.scrolling_state.marked.first() {
                         return Ok(());
                     }
 
-                    for range in marked.ranges() {
-                        let new_idx = range.start().saturating_sub(1);
-                        client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
+                    for range in self.scrolling_state.marked.ranges() {
+                        for idx in range.clone() {
+                            let new_idx = idx.saturating_sub(1);
+                            context.queue.swap(idx, new_idx);
+                        }
+
+                        let new_start_idx = range.start().saturating_sub(1);
+                        context.command(move |client| {
+                            client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_start_idx))?;
+                            Ok(())
+                        });
                     }
 
-                    let mut new_marked = marked.iter().map(|i| i.saturating_sub(1)).collect();
+                    if let Some(start) = self.scrolling_state.marked.first() {
+                        let new_idx = start.saturating_sub(1);
+                        self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    }
+
+                    let mut new_marked = self
+                        .scrolling_state
+                        .marked
+                        .iter()
+                        .map(|i| i.saturating_sub(1))
+                        .collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
+                    context.render()?;
                     return Ok(());
                 }
                 CommonAction::MoveDown if !self.scrolling_state.get_marked().is_empty() => {
@@ -483,21 +545,39 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    let marked = &self.scrolling_state.marked;
-                    if let Some(last_idx) = marked.last() {
+                    if let Some(last_idx) = self.scrolling_state.marked.last() {
                         if *last_idx == context.queue.len() - 1 {
                             return Ok(());
                         }
                     }
 
-                    for range in marked.ranges().rev() {
-                        let new_idx = range.start().saturating_add(1);
-                        client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_idx))?;
+                    for range in self.scrolling_state.marked.ranges().rev() {
+                        for idx in range.clone().rev() {
+                            let new_idx = idx.saturating_add(1);
+                            context.queue.swap(idx, new_idx);
+                        }
+
+                        let new_start_idx = range.start().saturating_add(1);
+                        context.command(move |client| {
+                            client.move_in_queue(range.into(), QueueMoveTarget::Absolute(new_start_idx))?;
+                            Ok(())
+                        });
                     }
 
-                    let mut new_marked = marked.iter().map(|i| i.saturating_add(1)).collect();
+                    if let Some(start) = self.scrolling_state.marked.last() {
+                        let new_idx = start.saturating_add(1);
+                        self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    }
+
+                    let mut new_marked = self
+                        .scrolling_state
+                        .marked
+                        .iter()
+                        .map(|i| i.saturating_add(1))
+                        .collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
+                    context.render()?;
                     return Ok(());
                 }
                 CommonAction::MoveUp => {
@@ -518,8 +598,14 @@ impl Pane for QueuePane {
                     };
 
                     let new_idx = idx.saturating_sub(1);
-                    client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
+                    let id = selected.id;
+                    context.command(move |client| {
+                        client.move_id(id, QueueMoveTarget::Absolute(new_idx))?;
+                        Ok(())
+                    });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    context.queue.swap(idx, new_idx);
+                    context.render()?;
                 }
                 CommonAction::MoveDown => {
                     if context.queue.is_empty() {
@@ -538,8 +624,14 @@ impl Pane for QueuePane {
                     };
 
                     let new_idx = (idx + 1).min(context.queue.len() - 1);
-                    client.move_id(selected.id, QueueMoveTarget::Absolute(new_idx))?;
+                    let id = selected.id;
+                    context.command(move |client| {
+                        client.move_id(id, QueueMoveTarget::Absolute(new_idx))?;
+                        Ok(())
+                    });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                    context.queue.swap(idx, new_idx);
+                    context.render()?;
                 }
                 CommonAction::DownHalf => {
                     if !context.queue.is_empty() {
@@ -621,7 +713,7 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
-                    run_external(command, create_env(context, song, client)?);
+                    run_external(command, create_env(context, song));
                 }
                 _ => {
                     event.abandon();

@@ -309,7 +309,7 @@ pub struct PaneIter<'a> {
     queue: Vec<&'a PaneOrSplitWithPosition>,
 }
 
-impl<'a> Iterator for PaneIter<'a> {
+impl Iterator for PaneIter<'_> {
     type Item = Pane;
 
     fn next(&mut self) -> Option<Self::Item> {

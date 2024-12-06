@@ -13,7 +13,6 @@ use ratatui::{
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::client::Client,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -35,7 +34,7 @@ enum FocusedComponent {
     Buttons,
 }
 
-pub struct SelectModal<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> {
+pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     scrolling_state: DirState<ListState>,
@@ -46,8 +45,8 @@ pub struct SelectModal<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usiz
     title: &'a str,
 }
 
-impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> std::fmt::Debug
-    for SelectModal<'a, V, Callback>
+impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> std::fmt::Debug
+    for SelectModal<'_, V, Callback>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -58,7 +57,7 @@ impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> 
     }
 }
 
-impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
+impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
     pub fn new(context: &AppContext) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
@@ -117,7 +116,7 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> Modal for SelectModal<'a, V, Callback> {
+impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal for SelectModal<'_, V, Callback> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
@@ -173,7 +172,7 @@ impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> 
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Down => {
@@ -234,7 +233,7 @@ impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> 
                     FocusedComponent::Buttons if self.button_group_state.selected == 0 => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
                             if let Some(ref mut callback) = self.callback {
-                                (callback)(client, &self.options[idx], idx)?;
+                                (callback)(context, &self.options[idx], idx)?;
                             }
                         }
                         pop_modal!(context);
@@ -258,12 +257,7 @@ impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> 
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.options_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.options_area.y).into();
@@ -286,7 +280,7 @@ impl<'a, V: Display, Callback: FnMut(&mut Client<'_>, &V, usize) -> Result<()>> 
                     Some(0) => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
                             if let Some(ref mut callback) = self.callback {
-                                (callback)(client, &self.options[idx], idx)?;
+                                (callback)(context, &self.options[idx], idx)?;
                             }
                         }
                         pop_modal!(context);

@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file.
 - Refactored confirm modal into a generic one
 - Refactored rename playlist and save queue modal into a generic modal with single input
 - Refactored add to playlist modal into generic select modal
+- Refactored MPD client out of a UI thread. Rmpc now also requires only single connection to MPD.
 
 ### Fixed
 

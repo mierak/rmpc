@@ -1,15 +1,12 @@
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{
-    prelude::Rect,
-    widgets::{ListItem, StatefulWidget},
-    Frame,
-};
+use ratatui::{prelude::Rect, widgets::StatefulWidget, Frame};
 
 use crate::{
-    config::Config,
+    config::tabs::PaneType,
     context::AppContext,
     mpd::{
+        client::Client,
         commands::{lsinfo::FileOrDir, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
@@ -20,6 +17,7 @@ use crate::{
         widgets::browser::Browser,
         UiEvent,
     },
+    MpdQueryResult,
 };
 
 use super::{browser::DirOrSong, Pane};
@@ -32,6 +30,10 @@ pub struct DirectoriesPane {
     initialized: bool,
 }
 
+const INIT: &str = "init";
+const OPEN_OR_PLAY: &str = "open_or_play";
+const PREVIEW: &str = "preview";
+
 impl DirectoriesPane {
     pub fn new(context: &AppContext) -> Self {
         Self {
@@ -42,7 +44,7 @@ impl DirectoriesPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
         let Some(selected) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -54,26 +56,39 @@ impl DirectoriesPane {
 
         match selected {
             DirOrSong::Dir { .. } => {
-                let new_current = client.lsinfo(Some(next_path.join("/").to_string().as_str()))?;
-                let res = new_current
-                    .into_iter()
-                    .map(|v| match v {
-                        FileOrDir::Dir(d) => DirOrSong::Dir {
-                            name: d.path,
-                            full_path: d.full_path,
-                        },
-                        FileOrDir::File(s) => DirOrSong::Song(s),
-                    })
-                    .sorted()
-                    .collect();
-                self.stack.push(res);
+                context
+                    .query()
+                    .id(OPEN_OR_PLAY)
+                    .replace_id(OPEN_OR_PLAY)
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        let new_current = client.lsinfo(Some(&next_path.join("/").to_string()))?;
+                        let res = new_current
+                            .into_iter()
+                            .map(|v| match v {
+                                FileOrDir::Dir(d) => DirOrSong::Dir {
+                                    name: d.path,
+                                    full_path: d.full_path,
+                                },
+                                FileOrDir::File(s) => DirOrSong::Song(s),
+                            })
+                            .sorted()
+                            .collect();
 
+                        Ok(MpdQueryResult::DirOrSong {
+                            data: res,
+                            origin_path: Some(next_path),
+                        })
+                    });
+                self.stack_mut().push(Vec::new());
+                self.stack_mut().clear_preview();
                 context.render()?;
             }
             t @ DirOrSong::Song(_) => {
-                self.add(t, client, context)?;
+                self.add(t, context)?;
+                let queue_len = context.queue.len();
                 if autoplay {
-                    client.play_last(context)?;
+                    context.command(move |client| Ok(client.play_last(queue_len)?));
                 }
             }
         };
@@ -91,54 +106,95 @@ impl Pane for DirectoriesPane {
         Ok(())
     }
 
-    fn before_show(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            self.stack = DirStack::new(
-                client
-                    .lsinfo(None)?
-                    .into_iter()
-                    .map(Into::<DirOrSong>::into)
-                    .sorted()
-                    .collect::<Vec<_>>(),
-            );
-            let preview = self.prepare_preview(client, context.config)?;
-            self.stack.set_preview(preview);
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneType::Directories)
+                .query(move |client| {
+                    let result = client
+                        .lsinfo(None)?
+                        .into_iter()
+                        .map(Into::<DirOrSong>::into)
+                        .sorted()
+                        .collect::<Vec<_>>();
+                    Ok(MpdQueryResult::DirOrSong {
+                        data: result,
+                        origin_path: None,
+                    })
+                });
             self.initialized = true;
         }
 
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         if let crate::ui::UiEvent::Database = event {
-            self.stack = DirStack::new(
-                client
-                    .lsinfo(None)?
-                    .into_iter()
-                    .map(Into::<DirOrSong>::into)
-                    .collect::<Vec<_>>(),
-            );
-            let preview = self.prepare_preview(client, context.config)?;
-            self.stack.set_preview(preview);
-
-            context.render()?;
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneType::Directories)
+                .query(move |client| {
+                    let result = client
+                        .lsinfo(None)?
+                        .into_iter()
+                        .map(Into::<DirOrSong>::into)
+                        .sorted()
+                        .collect::<Vec<_>>();
+                    Ok(MpdQueryResult::DirOrSong {
+                        data: result,
+                        origin_path: None,
+                    })
+                });
         };
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut impl MpdClient,
-        context: &mut AppContext,
-    ) -> Result<()> {
-        self.handle_mouse_action(event, client, context)
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+        self.handle_mouse_action(event, context)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        self.handle_filter_input(event, client, context)?;
-        self.handle_common_action(event, client, context)?;
-        self.handle_global_action(event, client, context)?;
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+        self.handle_filter_input(event, context)?;
+        self.handle_common_action(event, context)?;
+        self.handle_global_action(event, context)?;
+        Ok(())
+    }
+
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+        match (id, data) {
+            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
+                self.stack_mut().set_preview(data);
+                context.render()?;
+            }
+            (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
+                self.stack = DirStack::new(data);
+                self.prepare_preview(context);
+                context.render()?;
+            }
+            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
+                if let Some(origin_path) = origin_path {
+                    if origin_path != self.stack().path() {
+                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
+                        return Ok(());
+                    }
+                }
+                self.stack_mut().replace(data);
+                self.prepare_preview(context);
+                context.render()?;
+            }
+            _ => {}
+        };
         Ok(())
     }
 }
@@ -160,16 +216,18 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         self.filter_input_mode
     }
 
-    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &DirOrSong) -> Result<Vec<Song>> {
-        Ok(match item {
-            DirOrSong::Dir { full_path, .. } => {
-                client.find(&[Filter::new_with_kind(Tag::File, full_path, FilterKind::StartsWith)])?
-            }
-            DirOrSong::Song(song) => vec![song.clone()],
-        })
+    fn list_songs_in_item(&self, item: DirOrSong) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+        move |client| {
+            Ok(match item {
+                DirOrSong::Dir { full_path, .. } => {
+                    client.find(&[Filter::new_with_kind(Tag::File, &full_path, FilterKind::StartsWith)])?
+                }
+                DirOrSong::Song(song) => vec![song.clone()],
+            })
+        }
     }
 
-    fn add(&self, item: &DirOrSong, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn add(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
         match item {
             DirOrSong::Dir {
                 name: dirname,
@@ -179,14 +237,21 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
 
-                client.add(&next_path)?;
-                status_info!("Directory '{next_path}' added to queue");
+                context.command(move |client| {
+                    client.add(&next_path)?;
+                    status_info!("Directory '{next_path}' added to queue");
+                    Ok(())
+                });
             }
             DirOrSong::Song(song) => {
-                client.add(&song.file)?;
-                if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &song.file)]) {
-                    status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
-                }
+                let file = song.file.clone();
+                context.command(move |client| {
+                    client.add(&file)?;
+                    if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
+                        status_info!("'{}' by '{}' added to queue", song.title_str(), song.artist_str());
+                    }
+                    Ok(())
+                });
             }
         };
 
@@ -195,62 +260,93 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         Ok(())
     }
 
-    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn add_all(&self, context: &AppContext) -> Result<()> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
-        client.add(&path)?;
-        status_info!("Directory '{path}' added to queue");
-
-        context.render()?;
+        context.command(move |client| {
+            client.add(&path)?;
+            status_info!("Directory '{path}' added to queue");
+            Ok(())
+        });
 
         Ok(())
     }
 
-    fn open(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, client, context)
+    fn open(&mut self, context: &AppContext) -> Result<()> {
+        self.open_or_play(true, context)
     }
 
-    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, client, context)
+    fn next(&mut self, context: &AppContext) -> Result<()> {
+        self.open_or_play(false, context)
     }
 
-    fn prepare_preview(
-        &mut self,
-        client: &mut impl MpdClient,
-        config: &Config,
-    ) -> Result<Option<Vec<ListItem<'static>>>> {
+    fn prepare_preview(&mut self, context: &AppContext) {
+        let origin_path = Some(self.stack().path().to_vec());
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir { .. }) => {
                 let Some(next_path) = self.stack.next_path() else {
                     log::error!("Failed to move deeper inside dir. Next path is None");
-                    return Ok(None);
+                    return;
                 };
-                let res: Vec<_> = match client.lsinfo(Some(&next_path.join("/").to_string())) {
-                    Ok(val) => val,
-                    Err(err) => {
-                        log::error!(error:? = err; "Failed to get lsinfo for dir",);
-                        return Ok(None);
-                    }
-                }
-                .0
-                .into_iter()
-                .map(|v| match v {
-                    FileOrDir::Dir(dir) => DirOrSong::Dir {
-                        name: dir.path,
-                        full_path: dir.full_path,
-                    },
-                    FileOrDir::File(song) => DirOrSong::Song(song),
-                })
-                .sorted()
-                .map(|v| v.to_list_item_simple(config))
-                .collect();
-                Ok(Some(res))
+                let next_path = next_path.join("/").to_string();
+                let config = context.config;
+
+                self.stack_mut().clear_preview();
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("directories_preview")
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        let data: Vec<_> = match client.lsinfo(Some(&next_path)) {
+                            Ok(val) => val,
+                            Err(err) => {
+                                log::error!(error:? = err; "Failed to get lsinfo for dir",);
+                                return Ok(MpdQueryResult::Preview {
+                                    data: None,
+                                    origin_path: None,
+                                });
+                            }
+                        }
+                        .0
+                        .into_iter()
+                        .map(|v| match v {
+                            FileOrDir::Dir(dir) => DirOrSong::Dir {
+                                name: dir.path,
+                                full_path: dir.full_path,
+                            },
+                            FileOrDir::File(song) => DirOrSong::Song(song),
+                        })
+                        .sorted()
+                        .map(|v| v.to_list_item_simple(config))
+                        .collect();
+
+                        Ok(MpdQueryResult::Preview {
+                            data: Some(data),
+                            origin_path,
+                        })
+                    });
             }
-            Some(DirOrSong::Song(song)) => Ok(client
-                .find_one(&[Filter::new(Tag::File, &song.file)])?
-                .map(|v| v.to_preview(&config.theme.symbols).collect())),
-            None => Ok(None),
+            Some(DirOrSong::Song(song)) => {
+                let file = song.file.clone();
+                let config = context.config;
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("directories_preview")
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        Ok(MpdQueryResult::Preview {
+                            data: client
+                                .find_one(&[Filter::new(Tag::File, &file)])?
+                                .map(|v| v.to_preview(&config.theme.symbols).collect()),
+                            origin_path,
+                        })
+                    });
+            }
+            None => {}
         }
     }
+
     fn browser_areas(&self) -> [Rect; 3] {
         self.browser.areas
     }

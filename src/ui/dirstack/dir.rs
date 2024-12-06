@@ -8,14 +8,14 @@ use crate::{config::Config, shared::macros::status_warn};
 use super::{state::DirState, DirStackItem};
 
 #[derive(Debug)]
-pub struct Dir<T: std::fmt::Debug + DirStackItem> {
+pub struct Dir<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     pub items: Vec<T>,
     pub state: DirState<ListState>,
     filter: Option<String>,
     matched_item_count: usize,
 }
 
-impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
+impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for Dir<T> {
     fn default() -> Self {
         Self {
             items: Vec::default(),
@@ -27,7 +27,7 @@ impl<T: std::fmt::Debug + DirStackItem> Default for Dir<T> {
 }
 
 #[allow(dead_code)]
-impl<T: std::fmt::Debug + DirStackItem> Dir<T> {
+impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
     pub fn new(root: Vec<T>) -> Self {
         let mut result = Self {
             items: Vec::new(),

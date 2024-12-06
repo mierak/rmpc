@@ -1,20 +1,17 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use crossterm::event::KeyCode;
 use itertools::Itertools;
-use ratatui::{prelude::Rect, widgets::ListItem};
+use ratatui::prelude::Rect;
 
 use crate::{
-    cli::{create_env, run_external},
-    config::{
-        keys::{CommonAction, GlobalAction},
-        Config,
-    },
+    config::keys::{CommonAction, GlobalAction},
     context::AppContext,
-    mpd::{commands::Song, mpd_client::MpdClient},
+    mpd::{client::Client, commands::Song},
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    MpdQueryResult, EXTERNAL_COMMAND,
 };
 
 use super::{
@@ -28,37 +25,31 @@ pub enum MoveDirection {
 }
 
 #[allow(unused)]
-pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
+pub(in crate::ui) trait BrowserPane<T>: Pane
+where
+    T: DirStackItem + std::fmt::Debug + Clone + Send + 'static,
+{
     fn stack(&self) -> &DirStack<T>;
     fn stack_mut(&mut self) -> &mut DirStack<T>;
     fn browser_areas(&self) -> [Rect; 3];
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
-    fn list_songs_in_item(&self, client: &mut impl MpdClient, item: &T) -> Result<Vec<Song>>;
-    fn move_selected(&mut self, direction: MoveDirection, client: &mut impl MpdClient) -> Result<()> {
+    fn next(&mut self, context: &AppContext) -> Result<()>;
+    fn list_songs_in_item(&self, item: T) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
+    fn prepare_preview(&mut self, context: &AppContext);
+    fn add(&self, item: &T, context: &AppContext) -> Result<()>;
+    fn add_all(&self, context: &AppContext) -> Result<()>;
+    fn open(&mut self, context: &AppContext) -> Result<()>;
+    fn delete(&self, item: &T, index: usize, context: &AppContext) -> Result<()> {
         Ok(())
     }
-    fn prepare_preview(
-        &mut self,
-        client: &mut impl MpdClient,
-        config: &Config,
-    ) -> Result<Option<Vec<ListItem<'static>>>>;
-    fn add(&self, item: &T, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
-    fn add_all(&self, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
-    fn open(&mut self, client: &mut impl MpdClient, context: &AppContext) -> Result<()>;
-    fn delete(&self, item: &T, index: usize, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn rename(&self, item: &T, context: &AppContext) -> Result<()> {
         Ok(())
     }
-    fn rename(&self, item: &T, client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn move_selected(&mut self, direction: MoveDirection, context: &AppContext) -> Result<()> {
         Ok(())
     }
-    fn handle_filter_input(
-        &mut self,
-        event: &mut KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn handle_filter_input(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
         if !self.is_filter_input_mode_active() {
             return Ok(());
         }
@@ -68,9 +59,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().set_filter(None, config);
-                let preview = self.prepare_preview(client, config)?;
-                self.stack_mut().set_preview(preview);
-                context.render()?;
+                self.prepare_preview(context);
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
@@ -82,9 +71,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     KeyCode::Char(c) => {
                         self.stack_mut().current_mut().push_filter(c, config);
                         self.stack_mut().current_mut().jump_first_matching(config);
-                        let preview = self.prepare_preview(client, config)?;
-                        self.stack_mut().set_preview(preview);
-                        context.render()?;
+                        self.prepare_preview(context);
                     }
                     KeyCode::Backspace => {
                         self.stack_mut().current_mut().pop_filter(config);
@@ -98,12 +85,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         Ok(())
     }
 
-    fn handle_global_action(
-        &mut self,
-        event: &mut KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn handle_global_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
         let Some(action) = event.as_global_action(context) else {
             return Ok(());
         };
@@ -111,23 +93,31 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         let config = context.config;
         match action {
             GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
-                let songs: Vec<_> = self
+                let marked_items: Vec<_> = self
                     .stack()
                     .current()
                     .marked_items()
-                    .map(|item| self.list_songs_in_item(client, item))
-                    .flatten_ok()
-                    .try_collect()?;
-                let songs = songs.iter().map(|song| song.file.as_str()).collect_vec();
-
-                run_external(command, create_env(context, songs, client)?);
+                    .map(|item| self.list_songs_in_item(item.clone()))
+                    .collect();
+                let path = self.stack().path().to_owned();
+                context.query().id(EXTERNAL_COMMAND).query(move |client| {
+                    let songs: Vec<_> = marked_items
+                        .into_iter()
+                        .map(|item| (item)(client))
+                        .flatten_ok()
+                        .try_collect()?;
+                    Ok(MpdQueryResult::ExternalCommand(command, songs))
+                });
             }
             GlobalAction::ExternalCommand { command, .. } => {
                 if let Some(selected) = self.stack().current().selected() {
-                    let songs = self.list_songs_in_item(client, selected)?;
-                    let songs = songs.iter().map(|s| s.file.as_str());
-
-                    run_external(command, create_env(context, songs, client)?);
+                    let selected = selected.clone();
+                    let path = self.stack().path().to_owned();
+                    let songs = self.list_songs_in_item(selected);
+                    context.query().id(EXTERNAL_COMMAND).query(move |client| {
+                        let songs = (songs)(client)?;
+                        Ok(MpdQueryResult::ExternalCommand(command, songs))
+                    });
                 }
             }
             _ => {
@@ -138,12 +128,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         Ok(())
     }
 
-    fn handle_mouse_action(
-        &mut self,
-        event: MouseEvent,
-        client: &mut impl MpdClient,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_action(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
         let [prev_area, current_area, preview_area] = self.browser_areas();
 
         let position = event.into();
@@ -155,24 +140,14 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     prev_stack.select_idx(idx_to_select, context.config.scrolloff);
                 }
                 self.stack_mut().pop();
-                let preview = self
-                    .prepare_preview(client, context.config)
-                    .context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
-                context.render()?;
+                self.prepare_preview(context);
             }
             MouseEventKind::DoubleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
                 if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
-                    self.next(client, context)?;
-                    let preview = self
-                        .prepare_preview(client, context.config)
-                        .context("Cannot prepare preview")?;
-                    self.stack_mut().set_preview(preview);
-
-                    context.render()?;
+                    self.next(context)?;
+                    self.prepare_preview(context);
                 }
             }
             MouseEventKind::MiddleClick if current_area.contains(position) => {
@@ -183,15 +158,10 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        self.add(item, client, context)?;
+                        self.add(item, context)?;
                     }
 
-                    let preview = self
-                        .prepare_preview(client, context.config)
-                        .context("Cannot prepare preview")?;
-                    self.stack_mut().set_preview(preview);
-
-                    context.render()?;
+                    self.prepare_preview(context);
                 }
             }
             MouseEventKind::LeftClick if current_area.contains(position) => {
@@ -201,11 +171,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     self.stack_mut()
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
-                    let preview = self
-                        .prepare_preview(client, context.config)
-                        .context("Cannot prepare preview")?;
-                    self.stack_mut().set_preview(preview);
-                    context.render()?;
+                    self.prepare_preview(context);
                 }
             }
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick if preview_area.contains(position) => {
@@ -220,35 +186,20 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                     }
                 });
 
-                self.next(client, context)?;
+                self.next(context)?;
                 self.stack_mut()
                     .current_mut()
                     .select_idx(idx_to_select.unwrap_or_default(), 0);
 
-                let preview = self
-                    .prepare_preview(client, context.config)
-                    .context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
-                context.render()?;
+                self.prepare_preview(context);
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
                 self.stack_mut().current_mut().prev(context.config.scrolloff, false);
-                let preview = self
-                    .prepare_preview(client, context.config)
-                    .context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
-                context.render()?;
+                self.prepare_preview(context);
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
                 self.stack_mut().current_mut().next(context.config.scrolloff, false);
-                let preview = self
-                    .prepare_preview(client, context.config)
-                    .context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
-                context.render()?;
+                self.prepare_preview(context);
             }
             _ => {}
         };
@@ -256,12 +207,7 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
         Ok(())
     }
 
-    fn handle_common_action(
-        &mut self,
-        event: &mut KeyEvent,
-        client: &mut impl MpdClient,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn handle_common_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
         let Some(action) = event.as_common_action(context) else {
             return Ok(());
         };
@@ -272,68 +218,55 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.stack_mut()
                     .current_mut()
                     .prev(config.scrolloff, config.wrap_navigation);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::Down => {
                 self.stack_mut()
                     .current_mut()
                     .next(config.scrolloff, config.wrap_navigation);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::MoveUp => {
-                self.move_selected(MoveDirection::Up, client);
+                self.move_selected(MoveDirection::Up, context);
             }
             CommonAction::MoveDown => {
-                self.move_selected(MoveDirection::Down, client);
+                self.move_selected(MoveDirection::Down, context);
             }
             CommonAction::DownHalf => {
                 self.stack_mut()
                     .current_mut()
                     .next_half_viewport(context.config.scrolloff);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::UpHalf => {
                 self.stack_mut()
                     .current_mut()
                     .prev_half_viewport(context.config.scrolloff);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::Bottom => {
                 self.stack_mut().current_mut().last();
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::Top => {
                 self.stack_mut().current_mut().first();
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::Right => {
-                self.next(client, context)?;
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
+                self.next(context)?;
+                self.prepare_preview(context);
+                context.render()?;
             }
             CommonAction::Left => {
                 self.stack_mut().pop();
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.stack_mut().clear_preview();
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::EnterSearch => {
@@ -344,16 +277,12 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
             }
             CommonAction::NextResult => {
                 self.stack_mut().current_mut().jump_next_matching(config);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::PreviousResult => {
                 self.stack_mut().current_mut().jump_previous_matching(config);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::InvertSelection => {
@@ -366,54 +295,51 @@ pub(in crate::ui) trait BrowserPane<T: DirStackItem + std::fmt::Debug>: Pane {
                 self.stack_mut()
                     .current_mut()
                     .next(context.config.scrolloff, context.config.wrap_navigation);
-                let preview = self.prepare_preview(client, config).context("Cannot prepare preview")?;
-                self.stack_mut().set_preview(preview);
-
+                self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked().iter().rev() {
+                for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, client, context)?;
+                    self.add(item, context)?;
                 }
 
                 context.render()?;
             }
             CommonAction::Add => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, client, context);
+                    self.add(item, context);
                 }
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
                 log::debug!("add all");
-                self.add_all(client, context)?;
-
-                context.render()?;
+                self.add_all(context)?;
             }
             CommonAction::AddAll => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.delete(item, *idx, client, context)?;
+                    self.delete(item, *idx, context)?;
                 }
 
                 context.render()?;
             }
             CommonAction::Delete => {
                 if let Some((index, item)) = self.stack().current().selected_with_idx() {
-                    self.delete(item, index, client, context)?;
+                    self.delete(item, index, context)?;
                     context.render()?;
                 }
             }
             CommonAction::Rename => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.rename(item, client, context);
+                    self.rename(item, context);
                 }
             }
             CommonAction::FocusInput => {}
             CommonAction::Close => {}
             CommonAction::Confirm if self.stack().current().marked().is_empty() => {
-                self.open(client, context)?;
+                self.open(context)?;
+                context.render()?;
             }
             CommonAction::Confirm => {}
             CommonAction::PaneDown => {}

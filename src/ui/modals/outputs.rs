@@ -9,13 +9,14 @@ use ratatui::{
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::{client::Client, commands::Output, mpd_client::MpdClient},
+    mpd::{commands::Output, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::dirstack::DirState,
+    MpdQueryResult,
 };
 
 use super::{Modal, RectExt};
@@ -40,22 +41,19 @@ impl OutputsModal {
         result
     }
 
-    pub fn toggle_selected_output(&mut self, client: &mut Client<'_>) -> Result<()> {
+    pub fn toggle_selected_output(&mut self, context: &AppContext) {
         let Some(idx) = self.scrolling_state.get_selected() else {
-            return Ok(());
+            return;
         };
         let Some(output) = self.outputs.get(idx) else {
-            return Ok(());
+            return;
         };
 
-        client.toggle_output(output.id)?;
-        self.outputs = client.outputs()?.0;
-
-        if idx >= self.outputs.len() {
-            self.scrolling_state.last();
-        }
-
-        Ok(())
+        let id = output.id;
+        context.query().id("refresh_outputs").query(move |client| {
+            client.toggle_output(id)?;
+            Ok(MpdQueryResult::Outputs(client.outputs()?.0))
+        });
     }
 }
 
@@ -122,7 +120,18 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: &mut MpdQueryResult, context: &AppContext) -> Result<()> {
+        match (id, data) {
+            ("refresh_outputs", MpdQueryResult::Outputs(outputs)) => {
+                self.outputs = std::mem::take(outputs);
+                context.render()?;
+            }
+            _ => {}
+        };
+        Ok(())
+    }
+
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
@@ -158,7 +167,7 @@ impl Modal for OutputsModal {
                     context.render()?;
                 }
                 CommonAction::Confirm => {
-                    self.toggle_selected_output(client)?;
+                    self.toggle_selected_output(context);
                 }
                 CommonAction::Close => {
                     pop_modal!(context);
@@ -169,12 +178,7 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.outputs_table_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.outputs_table_area.y).into();
@@ -185,7 +189,7 @@ impl Modal for OutputsModal {
                 }
             }
             MouseEventKind::DoubleClick if self.outputs_table_area.contains(event.into()) => {
-                self.toggle_selected_output(client)?;
+                self.toggle_selected_output(context);
                 context.render()?;
             }
             MouseEventKind::MiddleClick => {}

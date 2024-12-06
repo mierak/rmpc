@@ -16,7 +16,7 @@ use super::{
         volume::Bound, IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
-    proto_client::ProtoClient,
+    proto_client::{ProtoClient, SocketClient},
     version::Version,
 };
 
@@ -62,7 +62,7 @@ impl ValueChange {
 }
 
 #[allow(dead_code)]
-pub trait MpdClient {
+pub trait MpdClient: Sized {
     fn version(&mut self) -> Version;
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()>;
     fn password(&mut self, password: &str) -> MpdResult<()>;
@@ -70,6 +70,9 @@ pub trait MpdClient {
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>>;
+    fn enter_idle(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient;
     fn noidle(&mut self) -> MpdResult<()>;
     fn get_volume(&mut self) -> MpdResult<Volume>;
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
@@ -102,14 +105,14 @@ pub trait MpdClient {
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
-    fn find(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>>;
-    fn search(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>>;
+    fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
+    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
     fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()>;
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()>;
-    fn find_one(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Option<Song>>;
-    fn find_add(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<()>;
-    fn search_add(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<()>;
-    fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_, '_>]>) -> MpdResult<MpdList>;
+    fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>>;
+    fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
+    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
+    fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
@@ -186,6 +189,13 @@ impl MpdClient for Client<'_> {
         } else {
             self.send("idle").and_then(ProtoClient::read_response)
         }
+    }
+
+    fn enter_idle(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient,
+    {
+        self.send("idle")
     }
 
     fn noidle(&mut self) -> MpdResult<()> {
@@ -337,14 +347,14 @@ impl MpdClient for Client<'_> {
     }
 
     /// Search the database for songs matching FILTER
-    fn find(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>> {
+    fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         self.send(&format!("find \"({})\"", filter.to_query_str()))
             .and_then(ProtoClient::read_response)
     }
 
     /// Search the database for songs matching FILTER (see Filters).
     /// Parameters have the same meaning as for find, except that search is not case sensitive.
-    fn search(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Vec<Song>> {
+    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         let query = filter.to_query_str();
         let query = query.as_str();
         log::debug!(query; "Searching for songs");
@@ -354,7 +364,7 @@ impl MpdClient for Client<'_> {
 
     /// Search the database for songs matching FILTER (see Filters) AND add them to queue.
     /// Parameters have the same meaning as for find, except that search is not case sensitive.
-    fn search_add(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<()> {
+    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
         let query = filter.to_query_str();
         let query = query.as_str();
         log::debug!(query; "Searching for songs and adding them");
@@ -362,19 +372,19 @@ impl MpdClient for Client<'_> {
             .and_then(ProtoClient::read_ok)
     }
 
-    fn find_one(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<Option<Song>> {
+    fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
         Ok(self
             .send(&format!("find \"({})\"", filter.to_query_str()))
             .and_then(ProtoClient::read_response::<Vec<Song>>)?
             .pop())
     }
 
-    fn find_add(&mut self, filter: &[Filter<'_, '_>]) -> MpdResult<()> {
+    fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
         self.send(&format!("findadd \"({})\"", filter.to_query_str()))
             .and_then(ProtoClient::read_ok)
     }
 
-    fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_, '_>]>) -> MpdResult<MpdList> {
+    fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         self.send(&if let Some(filter) = filter {
             format!("list {} \"({})\"", tag.as_str(), filter.to_query_str())
         } else {
@@ -485,12 +495,12 @@ impl MpdClient for Client<'_> {
     }
 
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("readpicture \"{path}\""))
+        self.send(&format!("readpicture \"{path}\" 0"))
             .and_then(ProtoClient::read_bin)
     }
 
     fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("albumart \"{path}\""))
+        self.send(&format!("albumart \"{path}\" 0"))
             .and_then(ProtoClient::read_bin)
     }
 
@@ -620,9 +630,9 @@ impl StrExt for &str {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[allow(unused)]
-pub enum Tag<'custom> {
+pub enum Tag {
     Any,
     Artist,
     AlbumArtist,
@@ -630,10 +640,10 @@ pub enum Tag<'custom> {
     Title,
     File,
     Genre,
-    Custom(&'custom str),
+    Custom(&'static str),
 }
 
-impl Tag<'_> {
+impl Tag {
     fn as_str(&self) -> &str {
         match self {
             Tag::Any => "Any",
@@ -659,21 +669,21 @@ pub enum FilterKind {
 }
 
 #[derive(Debug)]
-pub struct Filter<'tag, 'value> {
-    pub tag: Tag<'tag>,
+pub struct Filter<'value> {
+    pub tag: Tag,
     pub value: &'value str,
     pub kind: FilterKind,
 }
 
-impl<'tag> From<&'tag str> for Tag<'tag> {
-    fn from(value: &'tag str) -> Self {
+impl From<&'static str> for Tag {
+    fn from(value: &'static str) -> Self {
         Self::Custom(value)
     }
 }
 
 #[allow(dead_code)]
-impl<'tag, 'value> Filter<'tag, 'value> {
-    pub fn new<T: Into<Tag<'tag>>>(tag: T, value: &'value str) -> Self {
+impl<'value> Filter<'value> {
+    pub fn new<T: Into<Tag>>(tag: T, value: &'value str) -> Self {
         Self {
             tag: tag.into(),
             value,
@@ -681,7 +691,7 @@ impl<'tag, 'value> Filter<'tag, 'value> {
         }
     }
 
-    pub fn new_with_kind<T: Into<Tag<'tag>>>(tag: T, value: &'value str, kind: FilterKind) -> Self {
+    pub fn new_with_kind<T: Into<Tag>>(tag: T, value: &'value str, kind: FilterKind) -> Self {
         Self {
             tag: tag.into(),
             value,
@@ -707,7 +717,7 @@ impl<'tag, 'value> Filter<'tag, 'value> {
 trait FilterExt {
     fn to_query_str(&self) -> String;
 }
-impl FilterExt for &[Filter<'_, '_>] {
+impl FilterExt for &[Filter<'_>] {
     fn to_query_str(&self) -> String {
         self.iter().enumerate().fold(String::new(), |mut acc, (idx, filter)| {
             if idx > 0 {
@@ -747,35 +757,35 @@ mod filter_tests {
     #[test_case(Tag::Genre, "Genre")]
     #[test_case(Tag::Custom("customtag"), "customtag")]
     fn single_value(tag: Tag, expected: &str) {
-        let input: &[Filter<'_, '_>] = &[Filter::new(tag, "mrs singer")];
+        let input: &[Filter<'_>] = &[Filter::new(tag, "mrs singer")];
 
         assert_eq!(input.to_query_str(), format!("({expected} == 'mrs singer')"));
     }
 
     #[test]
     fn starts_with() {
-        let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
 
         assert_eq!(input.to_query_str(), "(Artist =~ '^mrs singer')");
     }
 
     #[test]
     fn exact() {
-        let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
 
         assert_eq!(input.to_query_str(), "(Album == 'the greatest')");
     }
 
     #[test]
     fn contains() {
-        let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
 
         assert_eq!(input.to_query_str(), "(Album =~ '.*the greatest.*')");
     }
 
     #[test]
     fn regex() {
-        let input: &[Filter<'_, '_>] = &[Filter::new_with_kind(
+        let input: &[Filter<'_>] = &[Filter::new_with_kind(
             Tag::Album,
             r"the greatest.*\s+[A-Za-z]+$",
             FilterKind::Regex,
@@ -786,7 +796,7 @@ mod filter_tests {
 
     #[test]
     fn multiple_values() {
-        let input: &[Filter<'_, '_>] = &[
+        let input: &[Filter<'_>] = &[
             Filter::new(Tag::Album, "the greatest"),
             Filter::new(Tag::Artist, "mrs singer"),
         ];

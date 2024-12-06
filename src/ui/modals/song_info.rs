@@ -1,7 +1,7 @@
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
-    mpd::{client::Client, commands::Song},
+    mpd::commands::Song,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -179,7 +179,7 @@ impl Modal for SongInfoModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, _client: &mut Client<'_>, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
@@ -224,12 +224,7 @@ impl Modal for SongInfoModal {
         Ok(())
     }
 
-    fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        _client: &mut Client<'_>,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }

@@ -8,7 +8,6 @@ use ratatui::{
 
 use crate::{
     context::AppContext,
-    mpd::mpd_client::MpdClient,
     shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
     ui::UiEvent,
 };
@@ -72,7 +71,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn before_show(&mut self, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
             match context.find_lrc() {
                 Ok(lrc) => {
@@ -88,7 +87,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _client: &mut impl MpdClient, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::SongChanged => match context.find_lrc() {
                 Ok(lrc) => {
@@ -113,12 +112,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        _event: &mut KeyEvent,
-        _client: &mut impl MpdClient,
-        _context: &AppContext,
-    ) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
         Ok(())
     }
 }

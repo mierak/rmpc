@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 clap = { workspace = true }
 anyhow = "1.0.91"
+bon = "3.2.0"
 base64 = "0.22.1"
 crossterm = { version = "0.28.1", features = ["serde"] }
 image = "0.25.4"
@@ -23,7 +24,7 @@ time = { version = "0.3.36", features = ["macros", "local-offset"] }
 flate2 = { version = "1.0.34" }
 itertools = "0.13.0"
 ron = "0.8.1"
-derive_more = { version = "1.0.0", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref"] }
+derive_more = { version = "1.0.0", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref", "debug"] }
 rustix = { version = "0.38.38", features = ["termios", "stdio", "process"] }
 bitflags = { version = "2.6.0", features = ["serde"] }
 log = { version = "0.4.22", features = ["kv"] }
@@ -39,6 +40,7 @@ sysinfo = "0.32.0"
 color_quant = "1.1.0"
 enum-map = "2.7.3"
 textwrap = "0.16.1"
+crossbeam = "0.8.4"
 
 [build-dependencies]
 clap = { workspace = true }
