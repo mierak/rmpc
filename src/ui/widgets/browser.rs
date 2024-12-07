@@ -52,11 +52,17 @@ where
 
     #[allow(clippy::unwrap_used)]
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
-        let scrollbar_track = self.config.theme.scrollbar.symbols[0];
-
-        let scrollbar_margin = Margin {
-            vertical: 0,
-            horizontal: scrollbar_track.is_empty().into(),
+        let scrollbar_margin = if self.config.theme.draw_borders {
+            let scrollbar_track = self.config.theme.scrollbar.symbols[0];
+            Margin {
+                vertical: 0,
+                horizontal: scrollbar_track.is_empty().into(),
+            }
+        } else {
+            Margin {
+                vertical: 0,
+                horizontal: 0,
+            }
         };
         let previous = state.previous().to_list_items(self.config);
         let current = state.current().to_list_items(self.config);
