@@ -49,7 +49,14 @@ const PREVIEW: &str = "preview";
 struct ArtistsCache(HashMap<String, CachedArtist>);
 
 #[derive(Debug, Default)]
-struct CachedArtist(Vec<(String, Vec<Song>)>);
+struct CachedArtist(Vec<CachedAlbum>);
+
+#[derive(Debug, Default)]
+struct CachedAlbum {
+    name: String,
+    original_name: String,
+    songs: Vec<Song>,
+}
 
 impl ArtistsPane {
     pub fn new(mode: ArtistsPaneMode, context: &AppContext) -> Self {
@@ -99,7 +106,8 @@ impl ArtistsPane {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some((_, songs)) = albums.0.iter().find(|(name, _)| name == current.as_path()) else {
+                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|album| album.name == current.as_path())
+                else {
                     return Ok(());
                 };
                 let songs = songs
@@ -116,7 +124,7 @@ impl ArtistsPane {
                     let albums = albums
                         .0
                         .iter()
-                        .map(|(album, _)| DirOrSong::name_only(album.to_owned()))
+                        .map(|CachedAlbum { name, .. }| DirOrSong::name_only(name.to_owned()))
                         .collect();
                     self.stack_mut().push(albums);
                 } else {
@@ -168,29 +176,27 @@ impl ArtistsPane {
                 },
                 AlbumSortMode::Date => date_a.cmp(date_b),
             })
-            .map(|((album, date), songs)| {
-                (
-                    match display_mode {
-                        AlbumDisplayMode::SplitByDate => {
-                            format!("({date}) {album}")
-                        }
-                        AlbumDisplayMode::NameOnly => album.to_string(),
-                    },
-                    std::mem::take(songs),
-                )
+            .map(|((album, date), songs)| CachedAlbum {
+                name: match display_mode {
+                    AlbumDisplayMode::SplitByDate => {
+                        format!("({date}) {album}")
+                    }
+                    AlbumDisplayMode::NameOnly => album.to_string(),
+                },
+                original_name: album.to_string(),
+                songs: std::mem::take(songs),
             })
-            .fold(Vec::new(), |mut acc, (processed_name, songs)| {
+            .fold(Vec::new(), |mut acc, album| {
                 match display_mode {
                     AlbumDisplayMode::SplitByDate => {
-                        acc.push((processed_name, songs));
+                        acc.push(album);
                     }
                     AlbumDisplayMode::NameOnly => {
-                        if let Some((_, last_songs)) =
-                            acc.iter_mut().find(|(last_name, _)| last_name == &processed_name)
+                        if let Some(cached_album) = acc.iter_mut().find(|cached_album| cached_album.name == album.name)
                         {
-                            last_songs.extend(songs);
+                            cached_album.songs.extend(album.songs);
                         } else {
-                            acc.push((processed_name, songs));
+                            acc.push(album);
                         }
                     }
                 };
@@ -293,7 +299,7 @@ impl Pane for ArtistsPane {
                 let preview = cached_artist
                     .0
                     .iter()
-                    .map(|album| DirOrSong::name_only(album.0.clone()).to_list_item_simple(context.config))
+                    .map(|album| DirOrSong::name_only(album.name.clone()).to_list_item_simple(context.config))
                     .collect();
                 self.stack.set_preview(Some(preview));
                 context.render()?;
@@ -321,7 +327,7 @@ impl Pane for ArtistsPane {
                 let albums = cached_artist
                     .0
                     .iter()
-                    .map(|(album, _)| DirOrSong::name_only(album.to_owned()))
+                    .map(|CachedAlbum { name, .. }| DirOrSong::name_only(name.to_owned()))
                     .collect();
                 self.stack.replace(albums);
                 self.prepare_preview(context)?;
@@ -358,10 +364,26 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
     fn list_songs_in_item(&self, item: DirOrSong) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
         let tag = self.artist_tag();
         let path = self.stack().path().to_owned();
+        let album_name = match (self.stack().path(), &item) {
+            ([artist], DirOrSong::Dir { name, .. }) => self
+                .cache
+                .0
+                .get(artist)
+                .and_then(|albums| {
+                    albums
+                        .0
+                        .iter()
+                        .find(|a| &a.name == name)
+                        .map(|a| a.original_name.clone())
+                })
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+
         move |client| {
             Ok(match item {
                 DirOrSong::Dir { name, full_path: _ } => match path.as_slice() {
-                    [artist] => client.find(&[Filter::new(Tag::Album, &name), Filter::new(tag, artist)])?,
+                    [artist] => client.find(&[Filter::new(Tag::Album, &album_name), Filter::new(tag, artist)])?,
                     [] => client.find(&[Filter::new(tag, &name)])?,
                     _ => Vec::new(),
                 },
@@ -374,13 +396,26 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         match self.stack.path() {
             [artist, album] => {
                 let artist_tag = self.artist_tag();
-                let album = album.clone();
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
+
+                let Some(albums) = self.cache.0.get(&artist) else {
+                    return Ok(());
+                };
+
+                let Some(original_name) = albums
+                    .0
+                    .iter()
+                    .find(|a| &a.name == album)
+                    .map(|a| a.original_name.clone())
+                else {
+                    return Ok(());
+                };
+
                 context.command(move |client| {
                     client.find_add(&[
                         Filter::new(artist_tag, artist.as_str()),
-                        Filter::new(Tag::Album, album.as_str()),
+                        Filter::new(Tag::Album, original_name.as_str()),
                         Filter::new(Tag::File, &name),
                     ])?;
 
@@ -392,8 +427,25 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
                 let artist_tag = self.artist_tag();
+
+                let Some(albums) = self.cache.0.get(&artist) else {
+                    return Ok(());
+                };
+
+                let Some(original_name) = albums
+                    .0
+                    .iter()
+                    .find(|a| a.name == name)
+                    .map(|a| a.original_name.clone())
+                else {
+                    return Ok(());
+                };
+
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(artist_tag, artist.as_str()), Filter::new(Tag::Album, &name)])?;
+                    client.find_add(&[
+                        Filter::new(artist_tag, artist.as_str()),
+                        Filter::new(Tag::Album, &original_name),
+                    ])?;
 
                     status_info!("Album '{name}' by '{artist}' added to queue");
                     Ok(())
@@ -420,13 +472,25 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         match self.stack.path() {
             [artist, album] => {
                 let artist = artist.clone();
-                let album = album.clone();
+                let Some(albums) = self.cache.0.get(&artist) else {
+                    return Ok(());
+                };
+
+                let Some(original_name) = albums
+                    .0
+                    .iter()
+                    .find(|a| &a.name == album)
+                    .map(|a| a.original_name.clone())
+                else {
+                    return Ok(());
+                };
+
                 context.command(move |client| {
                     client.find_add(&[
                         Filter::new(artist_tag, artist.as_str()),
-                        Filter::new(Tag::Album, album.as_str()),
+                        Filter::new(Tag::Album, original_name.as_str()),
                     ])?;
-                    status_info!("Album '{album}' by '{artist}' added to queue");
+                    status_info!("Album '{original_name}' by '{artist}' added to queue");
                     Ok(())
                 });
             }
@@ -470,7 +534,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some((_, songs)) = albums.0.iter().find(|(name, _)| name == &current) else {
+                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|album| album.name == current) else {
                     return Ok(());
                 };
                 let song = songs
@@ -484,7 +548,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some((_, songs)) = albums.0.iter().find(|(name, _)| name == &current) else {
+                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|album| album.name == current) else {
                     return Ok(());
                 };
                 let songs = songs
@@ -500,8 +564,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                         albums
                             .0
                             .iter()
-                            .map(|(album, _)| {
-                                DirOrSong::name_only(album.to_owned()).to_list_item_simple(context.config)
+                            .map(|CachedAlbum { name, .. }| {
+                                DirOrSong::name_only(name.to_owned()).to_list_item_simple(context.config)
                             })
                             .collect(),
                     ));
@@ -568,8 +632,8 @@ mod tests {
         let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
 
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0].0, "album_a");
-        assert_eq!(result[1].0, "album_b");
+        assert_eq!(result[0].name, "album_a");
+        assert_eq!(result[1].name, "album_b");
     }
 
     #[rstest]
@@ -589,9 +653,9 @@ mod tests {
         let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
 
         assert_eq!(result.len(), 3);
-        assert_eq!(result[0].0, "(2020) album_a");
-        assert_eq!(result[1].0, "(2021) album_a");
-        assert_eq!(result[2].0, "(2022) album_b");
+        assert_eq!(result[0].name, "(2020) album_a");
+        assert_eq!(result[1].name, "(2021) album_a");
+        assert_eq!(result[2].name, "(2022) album_b");
     }
 
     #[rstest]
@@ -611,9 +675,9 @@ mod tests {
         let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
 
         assert_eq!(result.len(), 3);
-        assert_eq!(result[0].0, "(2019) album_b");
-        assert_eq!(result[1].0, "(2020) album_a");
-        assert_eq!(result[2].0, "(2021) album_a");
+        assert_eq!(result[0].name, "(2019) album_b");
+        assert_eq!(result[1].name, "(2020) album_a");
+        assert_eq!(result[2].name, "(2021) album_a");
     }
 
     #[rstest]
@@ -634,7 +698,7 @@ mod tests {
         dbg!(&result);
 
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0].0, "album_b");
-        assert_eq!(result[1].0, "album_a");
+        assert_eq!(result[0].name, "album_b");
+        assert_eq!(result[1].name, "album_a");
     }
 }
