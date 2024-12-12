@@ -36,7 +36,7 @@ where
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, context: &AppContext) -> Result<()>;
     fn list_songs_in_item(&self, item: T) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
-    fn prepare_preview(&mut self, context: &AppContext);
+    fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
     fn add(&self, item: &T, context: &AppContext) -> Result<()>;
     fn add_all(&self, context: &AppContext) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;

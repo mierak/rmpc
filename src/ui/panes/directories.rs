@@ -179,7 +179,7 @@ impl Pane for DirectoriesPane {
             }
             (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
                 self.stack = DirStack::new(data);
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
                 context.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
@@ -190,7 +190,7 @@ impl Pane for DirectoriesPane {
                     }
                 }
                 self.stack_mut().replace(data);
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
                 context.render()?;
             }
             _ => {}
@@ -279,13 +279,13 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         self.open_or_play(false, context)
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
         let origin_path = Some(self.stack().path().to_vec());
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir { .. }) => {
                 let Some(next_path) = self.stack.next_path() else {
                     log::error!("Failed to move deeper inside dir. Next path is None");
-                    return;
+                    return Ok(());
                 };
                 let next_path = next_path.join("/").to_string();
                 let config = context.config;
@@ -344,7 +344,8 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     });
             }
             None => {}
-        }
+        };
+        Ok(())
     }
 
     fn browser_areas(&self) -> [Rect; 3] {

@@ -4,6 +4,7 @@ use std::str::FromStr;
 use address::MpdPassword;
 use anyhow::Context;
 use anyhow::Result;
+use artists::{Artists, ArtistsFile};
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
@@ -15,6 +16,7 @@ use tabs::{Tabs, TabsFile};
 use utils::tilde_expand;
 
 pub mod address;
+pub mod artists;
 pub mod cli;
 mod defaults;
 pub mod keys;
@@ -91,6 +93,7 @@ pub struct Config {
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<&'static [&'static str]>,
     pub search: Search,
+    pub artists: Artists,
     pub tabs: Tabs,
 }
 
@@ -130,6 +133,8 @@ pub struct ConfigFile {
     on_song_change: Option<Vec<String>>,
     #[serde(default)]
     search: SearchFile,
+    #[serde(default)]
+    artists: ArtistsFile,
     #[serde(default)]
     tabs: TabsFile,
 }
@@ -175,6 +180,7 @@ impl Default for ConfigFile {
             enable_mouse: true,
             wrap_navigation: false,
             password: None,
+            artists: ArtistsFile::default(),
         }
     }
 }
@@ -248,6 +254,7 @@ impl ConfigFile {
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
             search: self.search.into(),
+            artists: self.artists.into(),
             tabs: self.tabs.try_into()?,
             album_art: AlbumArtConfig {
                 method: ImageMethod::default(),

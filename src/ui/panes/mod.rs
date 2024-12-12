@@ -243,6 +243,13 @@ pub(crate) mod browser {
     }
 
     impl DirOrSong {
+        pub fn name_only(name: String) -> Self {
+            DirOrSong::Dir {
+                name,
+                full_path: String::new(),
+            }
+        }
+
         pub fn dir_name_or_file_name(&self) -> Cow<str> {
             match self {
                 DirOrSong::Dir { name, full_path: _ } => Cow::Borrowed(name),

@@ -143,3 +143,40 @@ arguments passed to the command. Nothing will be executed if left empty. Can be 
 Configures what tags are searchable on the Search pane. Also sets whether the search should be case insensitive by
 default and what kind of search mode to perform. More detail in the [Search](/rmpc/configuration/search) section.
 If not specified, the [default values](/rmpc/reference/config) are used.
+
+### artists
+
+<ConfigValue name="artists" type="other" customText="<artists>" />
+
+Configures how albums are displayed and sorted in the `Artists` and `AlbumArtists` panes. Albums can display either
+only its name or include an album's date as well. Additionally, albums can be sorted by their name or date.
+
+Default:
+
+```rust
+artists: (
+    album_display_mode: SplitByDate,
+    album_sort_by: Date,
+),
+```
+
+#### album_display_mode
+
+Can be one of the following:
+
+-   `SplitByDate` - songs in the album will be split into separate album entries, one for each date and the
+    album date will be displayed in front of the album name in the following format: `(<date value>) <album name>`
+-   `NameOnly` - only one entry for an album will be created and the album date will not be displayed
+
+#### album_sort_by
+
+Can be one of the following:
+
+-   `Name` - albums are sorted by their name first and date second if their names are identical
+-   `Date` - albums will be simply sorted by date.
+
+:::caution
+
+Rmpc does not do any processing on the `date` metadata tag on the song. It gets sorted lexicographically.
+
+:::

@@ -202,12 +202,12 @@ impl Pane for PlaylistsPane {
                 }
                 self.stack_mut()
                     .replace(data.into_iter().map(DirOrSong::Song).collect());
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
                 context.render()?;
             }
             (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
                 self.stack = DirStack::new(data);
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
             }
             (REINIT, MpdQueryResult::SongsList { data: songs, .. }) => {
                 // Select the same song by filename or index as before
@@ -215,7 +215,7 @@ impl Pane for PlaylistsPane {
 
                 self.stack_mut()
                     .replace(songs.into_iter().map(DirOrSong::Song).collect());
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
                 if let Some((idx, song)) = &self.selected_song {
                     let idx_to_select = self
                         .stack
@@ -230,7 +230,7 @@ impl Pane for PlaylistsPane {
                         .state
                         .select(Some(idx_to_select), context.config.scrolloff);
                 };
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
                 context.render()?;
             }
             (REINIT, MpdQueryResult::DirOrSong { data, .. }) => {
@@ -483,7 +483,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
         let config = context.config;
         let s = self.stack().current().selected().cloned();
         self.stack_mut().clear_preview();
@@ -512,6 +512,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
 
                 Ok(MpdQueryResult::Preview { data, origin_path })
             });
+        Ok(())
     }
 
     fn browser_areas(&self) -> [Rect; 3] {

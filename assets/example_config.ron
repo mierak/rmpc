@@ -104,6 +104,10 @@
             (value: "genre",       label: "Genre"),
         ],
     ),
+    artists: (
+        album_display_mode: SplitByDate,
+        album_sort_by: Date,
+    ),
     tabs: [
         (
             name: "Queue",

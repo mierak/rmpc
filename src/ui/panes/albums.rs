@@ -169,7 +169,7 @@ impl Pane for AlbumsPane {
                         })
                         .collect::<Vec<_>>(),
                 );
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {
@@ -179,7 +179,7 @@ impl Pane for AlbumsPane {
                     }
                 }
                 self.stack_mut().replace(data);
-                self.prepare_preview(context);
+                self.prepare_preview(context)?;
                 context.render()?;
             }
             _ => {}
@@ -286,9 +286,9 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         Ok(())
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
         let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
-            return;
+            return Ok(());
         };
         let current = current.to_owned();
         let config = context.config;
@@ -335,7 +335,9 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             }
 
             _ => {}
-        }
+        };
+
+        Ok(())
     }
 
     fn browser_areas(&self) -> [Rect; 3] {
