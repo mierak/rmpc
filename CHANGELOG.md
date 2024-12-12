@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 - Select functionality to the queue, selected songs can be moved up and down in the queue at the same time using the MoveUp/Down actions
 - Selected songs in queue can now be removed all at once from the Queue with the Delete action
 - InvertSelection action
+- Show album date in the `Artists` and `AlbumArtists` panes
+- Config options to sort albums by date or name and to hide or show album date in in the `Artists` and `AlbumArtists` panes
 
 ### Changed
 
