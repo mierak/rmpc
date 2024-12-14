@@ -9,7 +9,7 @@ use ratatui::{
 use crate::{
     context::AppContext,
     shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
-    ui::UiEvent,
+    ui::{status_info, UiEvent},
 };
 
 use super::Pane;
@@ -34,14 +34,14 @@ impl Pane for LyricsPane {
         let Some(lrc) = &self.current_lyrics else { return Ok(()) };
 
         let elapsed = context.status.elapsed;
-        let Some((current_line_idx, _)) = lrc
+        let current_line_idx = lrc
             .lines
             .iter()
             .enumerate()
+            .filter(|line| elapsed >= line.1.time)
             .min_by(|a, b| a.1.time.abs_diff(elapsed).cmp(&b.1.time.abs_diff(elapsed)))
-        else {
-            return Ok(());
-        };
+            .map(|result| result.0)
+            .unwrap_or_default();
 
         let rows = area.height;
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
