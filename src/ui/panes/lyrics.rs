@@ -38,7 +38,6 @@ impl Pane for LyricsPane {
             .lines
             .iter()
             .enumerate()
-            .filter(|line| line.1.time > elapsed)
             .min_by(|a, b| a.1.time.abs_diff(elapsed).cmp(&b.1.time.abs_diff(elapsed)))
         else {
             return Ok(());
