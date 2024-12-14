@@ -9,7 +9,7 @@ use ratatui::{
 use crate::{
     context::AppContext,
     shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
-    ui::{status_info, UiEvent},
+    ui::UiEvent,
 };
 
 use super::Pane;
