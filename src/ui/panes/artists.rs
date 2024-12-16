@@ -242,23 +242,30 @@ impl Pane for ArtistsPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
-        if let crate::ui::UiEvent::Database = event {
-            let target = self.target_pane();
-            let artist_tag = self.artist_tag();
-            self.cache = ArtistsCache::default();
-            context
-                .query()
-                .id(INIT)
-                .replace_id(INIT)
-                .target(target)
-                .query(move |client| {
-                    let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                    Ok(MpdQueryResult::LsInfo {
-                        data: result.0,
-                        origin_path: None,
-                    })
-                });
-        };
+        match event {
+            UiEvent::Database => {
+                let target = self.target_pane();
+                let artist_tag = self.artist_tag();
+                self.cache = ArtistsCache::default();
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(target)
+                    .query(move |client| {
+                        let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                        Ok(MpdQueryResult::LsInfo {
+                            data: result.0,
+                            origin_path: None,
+                        })
+                    });
+            }
+            UiEvent::Reconnected => {
+                self.initialized = false;
+                self.before_show(context)?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -530,11 +537,11 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
 
         self.stack_mut().clear_preview();
         match self.stack.path() {
-            [artist, _album] => {
+            [artist, album] => {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|album| album.name == current) else {
+                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|a| &a.name == album) else {
                     return Ok(());
                 };
                 let song = songs

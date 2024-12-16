@@ -120,20 +120,27 @@ impl Pane for AlbumsPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
-        if let crate::ui::UiEvent::Database = event {
-            context
-                .query()
-                .id(INIT)
-                .replace_id(INIT)
-                .target(PaneType::Albums)
-                .query(move |client| {
-                    let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdQueryResult::LsInfo {
-                        data: result.0,
-                        origin_path: None,
-                    })
-                });
-        };
+        match event {
+            UiEvent::Database => {
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(PaneType::Albums)
+                    .query(move |client| {
+                        let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                        Ok(MpdQueryResult::LsInfo {
+                            data: result.0,
+                            origin_path: None,
+                        })
+                    });
+            }
+            UiEvent::Reconnected => {
+                self.initialized = false;
+                self.before_show(context)?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 

@@ -30,7 +30,6 @@ pub struct Client<'name> {
     name: &'name str,
     rx: BufReader<TcpOrUnixStream>,
     pub stream: TcpOrUnixStream,
-    reconnect: bool,
     addr: MpdAddress<'name>,
     password: Option<MpdPassword<'name>>,
     pub version: Version,
@@ -38,11 +37,7 @@ pub struct Client<'name> {
 
 impl std::fmt::Debug for Client<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Client {{ name: {:?}, recconect: {}, addr: {:?} }}",
-            self.name, self.reconnect, self.addr
-        )
+        write!(f, "Client {{ name: {:?}, addr: {:?} }}", self.name, self.addr)
     }
 }
 
@@ -115,7 +110,6 @@ impl<'name> Client<'name> {
         addr: MpdAddress<'name>,
         password: Option<MpdPassword<'name>>,
         name: &'name str,
-        reconnect: bool,
     ) -> MpdResult<Client<'name>> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
@@ -148,7 +142,6 @@ impl<'name> Client<'name> {
             name,
             rx,
             stream,
-            reconnect,
             addr,
             password,
             version,
@@ -165,12 +158,8 @@ impl<'name> Client<'name> {
         Ok(client)
     }
 
-    fn reconnect(&mut self) -> MpdResult<&Client> {
-        if !self.reconnect {
-            return Err(MpdError::Generic(
-                "Not reconnecting. Client is not configured to reconnect.".to_string(),
-            ));
-        }
+    pub fn reconnect(&mut self) -> MpdResult<&Client> {
+        debug!(name = self.name, addr:? = self.addr; "trying to reconnect");
         let mut stream = match self.addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
@@ -227,10 +216,6 @@ impl<'name> Client<'name> {
 }
 
 impl<'name> SocketClient for Client<'name> {
-    fn reconnect(&mut self) -> MpdResult<&impl SocketClient> {
-        self.reconnect()
-    }
-
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {
         Write::write_all(&mut self.stream, bytes)
     }

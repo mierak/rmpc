@@ -13,13 +13,13 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
 };
 
-use crate::cli::create_env;
-use crate::cli::run_external;
 use crate::config::keys::GlobalAction;
 use crate::config::tabs::PaneType;
 use crate::config::Config;
 use crate::config::Search;
 use crate::context::AppContext;
+use crate::core::command::create_env;
+use crate::core::command::run_external;
 use crate::mpd::commands::Song;
 use crate::shared::ext::mpd_client::MpdClientExt;
 use crate::shared::key_event::KeyEvent;
@@ -569,14 +569,21 @@ impl Pane for SearchPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
-        if let crate::ui::UiEvent::Database = event {
-            self.songs_dir = Dir::default();
-            self.prepare_preview(context);
-            self.phase = Phase::Search;
+        match event {
+            UiEvent::Database => {
+                self.songs_dir = Dir::default();
+                self.prepare_preview(context);
+                self.phase = Phase::Search;
 
-            status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+            }
+            UiEvent::Reconnected => {
+                self.phase = Phase::Search;
+                self.preview = None;
+                self.songs_dir = Dir::default();
+            }
+            _ => {}
         }
-
         Ok(())
     }
 

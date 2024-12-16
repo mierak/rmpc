@@ -5,8 +5,7 @@ use std::{os::unix::ffi::OsStrExt, path::PathBuf, process::Command, str::FromStr
 
 use crate::{
     config::Config,
-    mpd::mpd_client::MpdClient,
-    shared::macros::{status_error, status_info, status_warn},
+    shared::macros::{status_info, status_warn},
 };
 
 use super::dependencies;
@@ -28,7 +27,7 @@ impl YtDlp {
         Ok(Self { cache_dir })
     }
 
-    pub fn download_and_add(config: &Config, url: &str, client: &mut impl MpdClient) -> Result<String> {
+    pub fn init_and_download(config: &Config, url: &str) -> Result<String> {
         let Some(cache_dir) = config.cache_dir else {
             bail!("Youtube support requires 'cache_dir' to be configured")
         };
@@ -44,15 +43,6 @@ impl YtDlp {
 
         let ytdlp = YtDlp::new(cache_dir)?;
         let file_path = ytdlp.download(url)?;
-
-        match client.add(&file_path) {
-            Ok(()) => {
-                status_info!("File '{file_path}' added to the queue");
-            }
-            Err(err) => {
-                status_error!(err:?; "Failed to add '{file_path}' to the queue");
-            }
-        };
 
         Ok(file_path)
     }

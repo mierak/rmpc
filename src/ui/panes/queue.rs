@@ -3,7 +3,6 @@ use crossterm::event::KeyCode;
 use itertools::Itertools;
 
 use crate::{
-    cli::{create_env, run_external},
     config::{
         keys::{GlobalAction, QueueActions},
         tabs::PaneType,
@@ -13,6 +12,7 @@ use crate::{
         },
     },
     context::AppContext,
+    core::command::{create_env, run_external},
     mpd::{
         commands::Song,
         mpd_client::{MpdClient, QueueMoveTarget},
@@ -228,14 +228,20 @@ impl Pane for QueuePane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
-        if let UiEvent::SongChanged = event {
-            if let Some((idx, _)) = context.find_current_song_in_queue() {
-                if context.config.select_current_song_on_change {
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    context.render()?;
+        match event {
+            UiEvent::SongChanged => {
+                if let Some((idx, _)) = context.find_current_song_in_queue() {
+                    if context.config.select_current_song_on_change {
+                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                        context.render()?;
+                    }
                 }
             }
-        };
+            UiEvent::Reconnected => {
+                self.before_show(context)?;
+            }
+            _ => {}
+        }
 
         Ok(())
     }

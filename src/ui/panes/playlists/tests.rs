@@ -150,8 +150,11 @@ mod on_idle_event {
     mod browsing_songs {
         use crate::{
             config::tabs::PaneType,
-            shared::{events::WorkRequest, mpd_query::MpdQuery},
-            tests::fixtures::work_request_channel,
+            shared::{
+                events::{ClientRequest, WorkRequest},
+                mpd_query::MpdQuery,
+            },
+            tests::fixtures::{client_request_channel, work_request_channel},
         };
         use crossbeam::channel::{Receiver, Sender};
 
@@ -161,9 +164,10 @@ mod on_idle_event {
         fn selects_the_same_playlist_and_song(
             mut screen: PlaylistsPane,
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+            client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
-            let rx = work_request_channel.1.clone();
-            let app_context = app_context(work_request_channel);
+            let rx = client_request_channel.1.clone();
+            let app_context = app_context(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -211,7 +215,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -240,9 +244,10 @@ mod on_idle_event {
         fn selects_the_same_playlist_and_last_song(
             mut screen: PlaylistsPane,
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+            client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
-            let rx = work_request_channel.1.clone();
-            let app_context = app_context(work_request_channel);
+            let rx = client_request_channel.1.clone();
+            let app_context = app_context(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -290,7 +295,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -319,9 +324,10 @@ mod on_idle_event {
         fn selects_the_same_playlist_and_first_song(
             mut screen: PlaylistsPane,
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+            client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
-            let rx = work_request_channel.1.clone();
-            let app_context = app_context(work_request_channel);
+            let rx = client_request_channel.1.clone();
+            let app_context = app_context(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -369,7 +375,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -398,9 +404,10 @@ mod on_idle_event {
         fn selects_the_same_playlist_and_song_idx(
             mut screen: PlaylistsPane,
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+            client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
-            let rx = work_request_channel.1.clone();
-            let app_context = app_context(work_request_channel);
+            let rx = client_request_channel.1.clone();
+            let app_context = app_context(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -448,7 +455,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -477,9 +484,10 @@ mod on_idle_event {
         fn selects_the_same_playlist_idx_and_last_song(
             mut screen: PlaylistsPane,
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+            client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
-            let rx = work_request_channel.1.clone();
-            let app_context = app_context(work_request_channel);
+            let rx = client_request_channel.1.clone();
+            let app_context = app_context(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             let initial_playlists = vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")];
             screen
@@ -528,7 +536,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),

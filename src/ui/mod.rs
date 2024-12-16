@@ -1,6 +1,10 @@
 use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
 
-use crate::{config::tabs::PaneType, WorkRequest};
+use crate::{
+    config::tabs::PaneType,
+    core::command::{create_env, run_external},
+    shared::events::WorkRequest,
+};
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -27,7 +31,6 @@ use tab_screen::TabScreen;
 use widgets::app_tabs::AppTabs;
 
 use crate::{
-    cli::{create_env, run_external},
     config::{
         cli::Args,
         keys::{CommonAction, GlobalAction},
@@ -570,6 +573,7 @@ impl<'ui> Ui<'ui> {
             UiEvent::Exit => {}
             UiEvent::LyricsIndexed => {}
             UiEvent::SongChanged => {}
+            UiEvent::Reconnected => {}
         }
 
         for name in context.config.tabs.active_panes {
@@ -654,6 +658,7 @@ pub enum UiEvent {
     Exit,
     LyricsIndexed,
     SongChanged,
+    Reconnected,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {

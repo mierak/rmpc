@@ -120,7 +120,7 @@ impl Pane for AlbumArtPane {
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::SongChanged => {
+            UiEvent::SongChanged | UiEvent::Reconnected => {
                 if AlbumArtPane::fetch_album_art(context).is_none() {
                     self.album_art.set_image(None)?;
                 }
@@ -165,10 +165,10 @@ mod tests {
     use crate::config::Leak;
     use crate::mpd::commands::Song;
     use crate::mpd::commands::State;
-    use crate::shared::events::WorkRequest;
+    use crate::shared::events::{ClientRequest, WorkRequest};
     use crate::shared::mpd_query::MpdQuery;
-    use crate::tests::fixtures::app_context;
     use crate::tests::fixtures::work_request_channel;
+    use crate::tests::fixtures::{app_context, client_request_channel};
     use crate::ui::panes::Pane;
     use crate::ui::UiEvent;
     use crate::{config::tabs::PaneType, ui::panes::album_art::ALBUM_ART};
@@ -185,9 +185,10 @@ mod tests {
         #[case] method: ImageMethod,
         #[case] should_search: bool,
         work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+        client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
-        let rx = work_request_channel.1.clone();
-        let mut app_context = app_context(work_request_channel);
+        let rx = client_request_channel.1.clone();
+        let mut app_context = app_context(work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
@@ -205,7 +206,7 @@ mod tests {
         if should_search {
             assert!(matches!(
                 rx.recv_timeout(Duration::from_millis(100)).unwrap(),
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: ALBUM_ART,
                     replace_id: Some(ALBUM_ART),
                     target: Some(PaneType::AlbumArt),
@@ -231,9 +232,10 @@ mod tests {
         #[case] method: ImageMethod,
         #[case] should_search: bool,
         work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+        client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
-        let rx = work_request_channel.1.clone();
-        let mut app_context = app_context(work_request_channel);
+        let rx = client_request_channel.1.clone();
+        let mut app_context = app_context(work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
@@ -251,7 +253,7 @@ mod tests {
         if should_search {
             assert!(matches!(
                 rx.recv_timeout(Duration::from_millis(100)).unwrap(),
-                WorkRequest::MpdQuery(MpdQuery {
+                ClientRequest::MpdQuery(MpdQuery {
                     id: ALBUM_ART,
                     replace_id: Some(ALBUM_ART),
                     target: Some(PaneType::AlbumArt),

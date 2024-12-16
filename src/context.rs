@@ -8,6 +8,7 @@ use crate::{
         mpd_client::MpdClient,
     },
     shared::{
+        events::ClientRequest,
         lrc::{Lrc, LrcIndex},
         macros::status_warn,
     },
@@ -24,6 +25,7 @@ pub struct AppContext {
     pub supported_commands: HashSet<String>,
     pub app_event_sender: Sender<AppEvent>,
     pub work_sender: Sender<WorkRequest>,
+    pub client_request_sender: Sender<ClientRequest>,
     pub needs_render: Cell<bool>,
     pub lrc_index: LrcIndex,
 }
@@ -35,6 +37,7 @@ impl AppContext {
         mut config: Config,
         app_event_sender: Sender<AppEvent>,
         work_sender: Sender<WorkRequest>,
+        client_request_sender: Sender<ClientRequest>,
     ) -> Result<Self> {
         let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
@@ -57,6 +60,7 @@ impl AppContext {
             supported_commands,
             app_event_sender,
             work_sender,
+            client_request_sender,
             needs_render: Cell::new(false),
         })
     }
@@ -88,13 +92,13 @@ impl AppContext {
             replace_id,
             callback: Box::new(on_done),
         };
-        if let Err(err) = self.work_sender.send(WorkRequest::MpdQuery(query)) {
+        if let Err(err) = self.client_request_sender.send(ClientRequest::MpdQuery(query)) {
             log::error!(error:? = err; "Failed to send query request");
         }
     }
 
     pub fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
-        if let Err(err) = self.work_sender.send(WorkRequest::MpdCommand(MpdCommand {
+        if let Err(err) = self.client_request_sender.send(ClientRequest::MpdCommand(MpdCommand {
             callback: Box::new(callback),
         })) {
             log::error!(error:? = err; "Failed to send command request");
