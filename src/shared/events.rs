@@ -14,13 +14,17 @@ use super::{
 
 #[derive(Debug)]
 #[allow(unused)]
-pub(crate) enum WorkRequest {
-    DownloadYoutube { url: String },
-    IndexLyrics { lyrics_dir: &'static str },
+pub(crate) enum ClientRequest {
     MpdQuery(MpdQuery),
     MpdCommand(MpdCommand),
-    Command(Command),
     CheckQueue,
+}
+
+#[derive(Debug)]
+#[allow(unused)]
+pub(crate) enum WorkRequest {
+    IndexLyrics { lyrics_dir: &'static str },
+    Command(Command),
 }
 
 #[derive(Debug)]
@@ -48,4 +52,6 @@ pub(crate) enum AppEvent {
     Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
     UiEvent(UiAppEvent),
+    Reconnected,
+    LostConnection,
 }

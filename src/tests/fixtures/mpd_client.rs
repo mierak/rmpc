@@ -533,10 +533,6 @@ impl MpdClient for TestMpdClient {
 }
 
 impl SocketClient for TestMpdClient {
-    fn reconnect(&mut self) -> MpdResult<&impl SocketClient> {
-        Ok(self)
-    }
-
     fn write(&mut self, _bytes: &[u8]) -> std::io::Result<()> {
         Ok(())
     }

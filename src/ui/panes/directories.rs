@@ -132,25 +132,32 @@ impl Pane for DirectoriesPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
-        if let crate::ui::UiEvent::Database = event {
-            context
-                .query()
-                .id(INIT)
-                .replace_id(INIT)
-                .target(PaneType::Directories)
-                .query(move |client| {
-                    let result = client
-                        .lsinfo(None)?
-                        .into_iter()
-                        .map(Into::<DirOrSong>::into)
-                        .sorted()
-                        .collect::<Vec<_>>();
-                    Ok(MpdQueryResult::DirOrSong {
-                        data: result,
-                        origin_path: None,
-                    })
-                });
-        };
+        match event {
+            UiEvent::Database => {
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(PaneType::Directories)
+                    .query(move |client| {
+                        let result = client
+                            .lsinfo(None)?
+                            .into_iter()
+                            .map(Into::<DirOrSong>::into)
+                            .sorted()
+                            .collect::<Vec<_>>();
+                        Ok(MpdQueryResult::DirOrSong {
+                            data: result,
+                            origin_path: None,
+                        })
+                    });
+            }
+            UiEvent::Reconnected => {
+                self.initialized = false;
+                self.before_show(context)?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 

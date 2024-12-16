@@ -142,29 +142,37 @@ impl Pane for PlaylistsPane {
             UiEvent::StoredPlaylist => Some(REINIT),
             _ => None,
         };
-
-        if let Some(id) = id {
-            context
-                .query()
-                .id(id)
-                .replace_id(id)
-                .target(PaneType::Playlists)
-                .query(move |client| {
-                    let result: Vec<_> = client
-                        .list_playlists()
-                        .context("Cannot list playlists")?
-                        .into_iter()
-                        .map(|playlist| DirOrSong::Dir {
-                            name: playlist.name,
-                            full_path: String::new(),
-                        })
-                        .sorted()
-                        .collect();
-                    Ok(MpdQueryResult::DirOrSong {
-                        data: result,
-                        origin_path: None,
-                    })
-                });
+        match event {
+            UiEvent::Database | UiEvent::StoredPlaylist => {
+                if let Some(id) = id {
+                    context
+                        .query()
+                        .id(id)
+                        .replace_id(id)
+                        .target(PaneType::Playlists)
+                        .query(move |client| {
+                            let result: Vec<_> = client
+                                .list_playlists()
+                                .context("Cannot list playlists")?
+                                .into_iter()
+                                .map(|playlist| DirOrSong::Dir {
+                                    name: playlist.name,
+                                    full_path: String::new(),
+                                })
+                                .sorted()
+                                .collect();
+                            Ok(MpdQueryResult::DirOrSong {
+                                data: result,
+                                origin_path: None,
+                            })
+                        });
+                }
+            }
+            UiEvent::Reconnected => {
+                self.initialized = false;
+                self.before_show(context)?;
+            }
+            _ => {}
         }
 
         Ok(())

@@ -6,12 +6,13 @@ use ratatui::prelude::Rect;
 use crate::{
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
+    core::event_loop::EXTERNAL_COMMAND,
     mpd::{client::Client, commands::Song},
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    MpdQueryResult, EXTERNAL_COMMAND,
+    MpdQueryResult,
 };
 
 use super::{

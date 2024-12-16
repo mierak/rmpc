@@ -8,7 +8,10 @@ use crate::{
     config::{Config, ConfigFile, Leak},
     context::AppContext,
     mpd::commands::Status,
-    shared::{events::WorkRequest, lrc::LrcIndex},
+    shared::{
+        events::{ClientRequest, WorkRequest},
+        lrc::LrcIndex,
+    },
 };
 
 pub mod mpd_client;
@@ -24,7 +27,15 @@ pub fn work_request_channel() -> (Sender<WorkRequest>, Receiver<WorkRequest>) {
 }
 
 #[fixture]
-pub fn app_context(work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>)) -> AppContext {
+pub fn client_request_channel() -> (Sender<ClientRequest>, Receiver<ClientRequest>) {
+    unbounded()
+}
+
+#[fixture]
+pub fn app_context(
+    work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
+    client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
+) -> AppContext {
     let chan1 = unbounded();
     chan1.1.leak();
     let config = ConfigFile::default()
@@ -38,6 +49,7 @@ pub fn app_context(work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequ
         queue: Vec::default(),
         app_event_sender: chan1.0,
         work_sender: work_request_channel.0.clone(),
+        client_request_sender: client_request_channel.0.clone(),
         supported_commands: HashSet::new(),
         needs_render: Cell::new(false),
         lrc_index: LrcIndex::default(),

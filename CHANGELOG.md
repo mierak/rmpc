@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - InvertSelection action
 - Show album date in the `Artists` and `AlbumArtists` panes
 - Config options to sort albums by date or name and to hide or show album date in in the `Artists` and `AlbumArtists` panes
+- Rmpc will now try to reconnect and reinitialize on losing connection to mpd
 
 ### Changed
 
