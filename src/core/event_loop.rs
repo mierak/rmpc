@@ -3,6 +3,7 @@ use std::{collections::HashSet, io::Stdout, ops::Sub, time::Duration};
 use crossbeam::channel::{Receiver, RecvTimeoutError};
 use itertools::Itertools;
 use ratatui::{
+    layout::Rect,
     prelude::{Backend, CrosstermBackend},
     Terminal,
 };
@@ -49,6 +50,8 @@ fn main_task<B: Backend + std::io::Write>(
     mut render_loop: UpdateLoop,
     mut terminal: Terminal<B>,
 ) -> Terminal<B> {
+    let size = terminal.size().expect("To be able to get terminal size");
+    let area = Rect::new(0, 0, size.width, size.height);
     let mut ui = Ui::new(&context).expect("UI to be created correctly");
     let event_receiver = event_rx;
     let mut render_wanted = false;
@@ -58,7 +61,8 @@ fn main_task<B: Backend + std::io::Write>(
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
     let mut additional_evs = HashSet::new();
     let mut connected = true;
-    ui.before_show(&mut context).expect("Initial render init to succeed");
+    ui.before_show(area, &mut context)
+        .expect("Initial render init to succeed");
 
     loop {
         let now = std::time::Instant::now();

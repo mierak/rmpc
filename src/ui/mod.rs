@@ -141,15 +141,14 @@ impl<'ui> Ui<'ui> {
             (false, _) => 0,
         };
 
-        let [header_area, tabs_area, content_area, bar_area] = *Layout::vertical([
+        let [header_area, tabs_area, content_area, bar_area] = Layout::vertical([
             Constraint::Length(u16::try_from(context.config.theme.header.rows.len())?),
             Constraint::Length(tab_area_height), // Tab bar
             Constraint::Percentage(100),
             Constraint::Min(1),
         ])
-        .split(area) else {
-            return Ok(());
-        };
+        .areas(area);
+
         self.areas[Areas::Header] = header_area;
         self.areas[Areas::Tabs] = tabs_area;
         self.areas[Areas::Content] = content_area;
@@ -164,7 +163,7 @@ impl<'ui> Ui<'ui> {
     fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
         screen_call!(self, on_hide(&context))?;
         self.active_tab = new_tab;
-        screen_call!(self, before_show(&context))?;
+        screen_call!(self, before_show(self.areas[Areas::Content], context))?;
         Ok(())
     }
 
@@ -522,8 +521,9 @@ impl<'ui> Ui<'ui> {
         Ok(KeyHandleResult::None)
     }
 
-    pub fn before_show(&mut self, context: &mut AppContext) -> Result<()> {
-        screen_call!(self, before_show(&context))
+    pub fn before_show(&mut self, area: Rect, context: &mut AppContext) -> Result<()> {
+        self.calc_areas(area, context)?;
+        screen_call!(self, before_show(self.areas[Areas::Content], context))
     }
 
     pub fn display_message(&mut self, message: String, level: Level) {

@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use crossterm::event::{KeyEvent, KeyModifiers};
 use rstest::{fixture, rstest};
 
 use crate::context::AppContext;
@@ -582,36 +581,6 @@ fn song(name: &str) -> Song {
         duration: Some(Duration::from_secs(1)),
         metadata: HashMap::new(),
     }
-}
-
-#[fixture]
-fn screen_in_playlist_0(app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&app_context).unwrap();
-    screen.stack.current_mut().select_idx(0, 0);
-    let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
-    screen.handle_common_action(&mut right.into(), &app_context).unwrap();
-    screen
-}
-
-#[fixture]
-fn screen_in_playlist_2(app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&app_context).unwrap();
-    screen.stack.current_mut().select_idx(2, 0);
-    let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
-    screen.handle_common_action(&mut right.into(), &app_context).unwrap();
-    screen
-}
-
-#[fixture]
-fn screen_in_playlist_4(app_context: AppContext) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&app_context).unwrap();
-    screen.stack.current_mut().select_idx(2, 0);
-    let right = KeyEvent::new(crossterm::event::KeyCode::Char('l'), KeyModifiers::NONE);
-    screen.handle_common_action(&mut right.into(), &app_context).unwrap();
-    screen
 }
 
 #[fixture]
