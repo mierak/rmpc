@@ -51,6 +51,7 @@ All notable changes to this project will be documented in this file.
 - Several things that should have happened on song change were happening on every `Player` event, ie. seeking
 - Improved handling of errors while reading MPD's response
 - Adjust scrollbar position in browser panes when `track` symbol is empty
+- Scrolloff not applying on the very first render
 
 ### Deprecated
 

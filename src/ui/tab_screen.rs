@@ -75,17 +75,21 @@ impl TabScreen {
         area: Rect,
         context: &AppContext,
     ) -> Result<()> {
-        self.render_recursive(panes, self.panes, frame, area, context)?;
+        self.for_each_pane(panes, self.panes, area, context, &mut |pane, area, block| {
+            screen_call!(pane, render(frame, area, context))?;
+            frame.render_widget(block, area);
+            Ok(())
+        })?;
         Ok(())
     }
 
-    pub fn render_recursive(
+    pub fn for_each_pane(
         &mut self,
         panes: &mut PaneContainer,
         configured_panes: &PaneOrSplitWithPosition,
-        frame: &mut Frame,
         area: Rect,
         context: &AppContext,
+        callback: &mut impl FnMut(&mut Panes<'_>, Rect, Block) -> Result<()>,
     ) -> Result<()> {
         match configured_panes {
             PaneOrSplitWithPosition::Pane(Pane { pane, border, id, .. }) => {
@@ -96,11 +100,10 @@ impl TabScreen {
                         context.config.as_border_style()
                     })
                     .borders(*border);
-                let pane = panes.get_mut(*pane);
+                let mut pane = panes.get_mut(*pane);
                 let pane_area = block.inner(area);
                 self.pane_areas.insert(*id, pane_area);
-                screen_call!(pane, render(frame, pane_area, context))?;
-                frame.render_widget(block, area);
+                callback(&mut pane, pane_area, block)?;
             }
             PaneOrSplitWithPosition::Split {
                 direction,
@@ -112,7 +115,7 @@ impl TabScreen {
                 let areas = Layout::new(*direction, constraints).split(area);
 
                 for (idx, area) in areas.iter().enumerate() {
-                    self.render_recursive(panes, &sub_panes[idx].pane, frame, *area, context)?;
+                    self.for_each_pane(panes, &sub_panes[idx].pane, *area, context, callback)?;
                 }
             }
         };
@@ -272,11 +275,11 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn before_show(&mut self, panes: &mut PaneContainer, context: &AppContext) -> Result<()> {
-        for pane in self.panes.panes_iter() {
-            let screen = panes.get_mut(pane.pane);
-            screen_call!(screen, before_show(context))?;
-        }
-        Ok(())
+    pub fn before_show(&mut self, panes: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
+        self.for_each_pane(panes, self.panes, area, context, &mut |pane, rect, _block| {
+            screen_call!(pane, calculate_areas(rect, context));
+            screen_call!(pane, before_show(context))?;
+            Ok(())
+        })
     }
 }

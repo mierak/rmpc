@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
+use enum_map::{enum_map, Enum, EnumMap};
 use itertools::Itertools;
 
 use crate::{
@@ -18,7 +19,7 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     shared::{
-        ext::btreeset_ranges::BTreeSetRanges,
+        ext::{btreeset_ranges::BTreeSetRanges, rect::ShrinkExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
@@ -52,7 +53,15 @@ pub struct QueuePane {
     header: Vec<&'static str>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<&'static Property<'static, SongProperty>>,
-    table_area: Rect,
+    areas: EnumMap<Areas, Rect>,
+}
+
+#[derive(Debug, Enum)]
+enum Areas {
+    Table,
+    TableHeader,
+    Scrollbar,
+    TableBlock,
 }
 
 const ADD_TO_PLAYLIST: &str = "add_to_playlist";
@@ -75,7 +84,9 @@ impl QueuePane {
                 })
                 .collect_vec(),
             column_formats: config.theme.song_table_format.iter().map(|v| v.prop).collect_vec(),
-            table_area: Rect::default(),
+            areas: enum_map! {
+                _ => Rect::default(),
+            },
         }
     }
 }
@@ -84,6 +95,7 @@ impl Pane for QueuePane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
         let AppContext { queue, config, .. } = context;
         let queue_len = queue.len();
+        self.calculate_areas(area, context);
 
         let title = self
             .filter
@@ -101,32 +113,12 @@ impl Pane for QueuePane {
             b
         };
 
-        let header_height = u16::from(config.theme.show_song_table_header);
-
-        let [data_area, scrollbar_area] =
-            Layout::horizontal([Constraint::Percentage(100), Constraint::Length(1)]).areas(area);
-
-        let [table_header_section, mut queue_section] =
-            Layout::vertical([Constraint::Length(header_height), Constraint::Min(0)])
-                .horizontal_margin(1)
-                .areas(data_area);
-
-        let constraints: &[Constraint] = if config.theme.show_song_table_header {
-            &[Constraint::Length(header_height + 1), Constraint::Min(0)]
-        } else {
-            &[Constraint::Min(0)]
-        };
-        let scrollbar_index = usize::from(config.theme.show_song_table_header);
-        let scrollbar_area = Layout::vertical(constraints).split(scrollbar_area)[scrollbar_index];
-
-        let table_area = table_block.inner(queue_section);
-
         self.scrolling_state.set_content_len(Some(queue_len));
 
         let widths = Layout::horizontal(self.column_widths.clone())
             .flex(Flex::Start)
             .spacing(1)
-            .split(table_area);
+            .split(self.areas[Areas::Table]);
 
         let formats = &config.theme.song_table_format;
 
@@ -187,42 +179,73 @@ impl Pane for QueuePane {
                 .style(config.as_text_style())
                 .widths(self.column_widths.clone())
                 .block(config.as_header_table_block());
-            frame.render_widget(header_table, table_header_section);
+
+            frame.render_widget(header_table, self.areas[Areas::TableHeader]);
         }
 
         let table = Table::new(table_items, self.column_widths.clone())
             .style(config.as_text_style())
             .row_highlight_style(config.theme.current_item_style);
 
-        self.table_area = table_area;
-        frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        frame.render_widget(table_block, queue_section);
+        frame.render_stateful_widget(
+            table,
+            self.areas[Areas::Table],
+            self.scrolling_state.as_render_state_ref(),
+        );
+        frame.render_widget(table_block, self.areas[Areas::TableBlock]);
 
-        if config.theme.show_song_table_header {
-            queue_section.y = queue_section.y.saturating_add(1);
-            queue_section.height = queue_section.height.saturating_sub(1);
-        }
-        self.scrolling_state.set_viewport_len(Some(queue_section.height.into()));
+        self.scrolling_state
+            .set_viewport_len(Some(self.areas[Areas::Table].height.into()));
         frame.render_stateful_widget(
             config.as_styled_scrollbar(),
-            scrollbar_area,
+            self.areas[Areas::Scrollbar],
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 
         Ok(())
     }
 
+    fn calculate_areas(&mut self, area: Rect, context: &AppContext) {
+        let AppContext { config, .. } = context;
+
+        let header_height = u16::from(config.theme.show_song_table_header);
+        let scrollbar_index = usize::from(config.theme.show_song_table_header);
+
+        let [data_area, scrollbar_area] =
+            Layout::horizontal([Constraint::Percentage(100), Constraint::Length(1)]).areas(area);
+        let [table_header_section, queue_section] =
+            Layout::vertical([Constraint::Length(header_height), Constraint::Min(0)])
+                .horizontal_margin(1)
+                .areas(data_area);
+
+        let constraints: &[Constraint] = if config.theme.show_song_table_header {
+            &[Constraint::Length(header_height + 1), Constraint::Min(0)]
+        } else {
+            &[Constraint::Min(0)]
+        };
+        let scrollbar_area = Layout::vertical(constraints).split(scrollbar_area)[scrollbar_index];
+
+        let table_area = if config.theme.show_song_table_header {
+            queue_section.shrink_from_top(1)
+        } else {
+            queue_section
+        };
+
+        self.areas[Areas::Table] = table_area;
+        self.areas[Areas::TableHeader] = table_header_section;
+        self.areas[Areas::TableBlock] = queue_section;
+        self.areas[Areas::Scrollbar] = scrollbar_area;
+    }
+
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         self.scrolling_state.set_content_len(Some(context.queue.len()));
-        let scrolloff = if self.table_area == Rect::default() {
-            0
-        } else {
-            context.config.scrolloff
-        };
-        if self.scrolling_state.get_selected().is_none() {
-            self.scrolling_state
-                .select(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)), scrolloff);
-        }
+        self.scrolling_state
+            .set_viewport_len(Some(self.areas[Areas::Table].height as usize));
+        let to_select = self
+            .scrolling_state
+            .get_selected()
+            .or(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
+        self.scrolling_state.select(to_select, context.config.scrolloff);
 
         Ok(())
     }
@@ -247,13 +270,13 @@ impl Pane for QueuePane {
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
-        if !self.table_area.contains(event.into()) {
+        if !self.areas[Areas::Table].contains(event.into()) {
             return Ok(());
         }
 
         match event.kind {
             MouseEventKind::LeftClick => {
-                let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
+                let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(clicked_row) {
                     self.scrolling_state.select(Some(idx), context.config.scrolloff);
 
@@ -261,7 +284,7 @@ impl Pane for QueuePane {
                 }
             }
             MouseEventKind::DoubleClick => {
-                let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
+                let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
 
                 if let Some(song) = self
                     .scrolling_state
@@ -276,7 +299,7 @@ impl Pane for QueuePane {
                 }
             }
             MouseEventKind::MiddleClick => {
-                let clicked_row: usize = event.y.saturating_sub(self.table_area.y).into();
+                let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
 
                 if let Some(selected_song) = self
                     .scrolling_state

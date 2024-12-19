@@ -143,6 +143,8 @@ pub(super) trait Pane {
     fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
         Ok(())
     }
+
+    fn calculate_areas(&mut self, area: Rect, context: &AppContext) {}
 }
 
 pub mod dirstack {}

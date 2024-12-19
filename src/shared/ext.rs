@@ -271,3 +271,19 @@ pub mod btreeset_ranges {
         }
     }
 }
+
+pub mod rect {
+    use ratatui::layout::Rect;
+
+    pub trait ShrinkExt {
+        fn shrink_from_top(self, amount: u16) -> Rect;
+    }
+
+    impl ShrinkExt for Rect {
+        fn shrink_from_top(mut self, amount: u16) -> Rect {
+            self.height = self.height.saturating_sub(amount);
+            self.y = self.y.saturating_add(amount);
+            self
+        }
+    }
+}
