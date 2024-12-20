@@ -1,0 +1,72 @@
+---
+title: Execute on song change
+description: Execute a script when the song changes.
+sidebar:
+    order: 5
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { path } from "../data.ts";
+
+Rmpc provides <a href={path("configuration#on_song_change")}>on_song_change</a> property in the config file
+which can be used to run a command whenever the song changes. This can be used for various purposes
+like showing a desktop notification.
+
+## Desktop notification on song change
+
+Assuming you have a notification daemon with support for images like [dunst](https://dunst-project.org/) running.
+All song metadata are available to the script as environment variables. For example `$TITLE`, `$FILE`, `$DURATION`, etc.
+
+<Steps>
+1. Create a script and place it somewhere. For example `~/.config/rmpc/notify`. Below is an example of such script.
+Edit it to your needs or create a new one.
+
+    ```bash title=~/.config/rmpc/notify
+    #!/usr/bin/env sh
+
+    # Directory where to store temporary data
+    TMP_DIR="/tmp/rmpc"
+
+    # Ensure the directory is created
+    mkdir -p "$TMP_DIR"
+
+    # Where to temporarily store the album art received from rmpc
+    ALBUM_ART_PATH="$TMP_DIR/notification_cover"
+
+    # Path to fallback album art if no album art is found by rmpc/mpd
+    # Change this to your needs
+    DEFAULT_ALBUM_ART_PATH="$TMP_DIR/default_album_art.jpg"
+
+    # Save album art of the currently playing song to a file
+    if ! rmpc albumart --output "$ALBUM_ART_PATH"; then
+        # Use default album art if rmpc returns non-zero exit code
+        ALBUM_ART_PATH="${DEFAULT_ALBUM_ART_PATH}"
+    fi
+
+    # Send the notification
+    notify-send -i "${ALBUM_ART_PATH}" "Now Playing" "$ARTIST - $TITLE"
+    ```
+
+2.  Make the script executable
+
+    ```bash
+    chmod +x ~/.config/rmpc/notify
+    ```
+
+3.  In your rmpc's `config.ron` specify <a href={path("configuration#on_song_change")}>on_song_change</a> property
+    and point it at location of the script from step 1.
+
+        ```rust title=config.ron
+        #![enable(implicit_some)]
+        #![enable(unwrap_newtypes)]
+        #![enable(unwrap_variant_newtypes)]
+        (
+            address: "/tmp/mpd_socket",
+            on_song_change: ["~/.config/rmpc/notify"],
+        ...
+
+        ```
+
+4.  Restart rmpc
+
+</Steps>
