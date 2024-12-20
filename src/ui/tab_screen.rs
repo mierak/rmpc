@@ -75,11 +75,17 @@ impl TabScreen {
         area: Rect,
         context: &AppContext,
     ) -> Result<()> {
-        self.for_each_pane(panes, self.panes, area, context, &mut |pane, area, block| {
-            screen_call!(pane, render(frame, area, context))?;
-            frame.render_widget(block, area);
-            Ok(())
-        })?;
+        self.for_each_pane(
+            panes,
+            self.panes,
+            area,
+            context,
+            &mut |pane, area, block, block_area| {
+                screen_call!(pane, render(frame, area, context))?;
+                frame.render_widget(block, block_area);
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -89,7 +95,7 @@ impl TabScreen {
         configured_panes: &PaneOrSplitWithPosition,
         area: Rect,
         context: &AppContext,
-        callback: &mut impl FnMut(&mut Panes<'_>, Rect, Block) -> Result<()>,
+        callback: &mut impl FnMut(&mut Panes<'_>, Rect, Block, Rect) -> Result<()>,
     ) -> Result<()> {
         match configured_panes {
             PaneOrSplitWithPosition::Pane(Pane { pane, border, id, .. }) => {
@@ -103,7 +109,7 @@ impl TabScreen {
                 let mut pane = panes.get_mut(*pane);
                 let pane_area = block.inner(area);
                 self.pane_areas.insert(*id, pane_area);
-                callback(&mut pane, pane_area, block)?;
+                callback(&mut pane, pane_area, block, area)?;
             }
             PaneOrSplitWithPosition::Split {
                 direction,
@@ -276,7 +282,7 @@ impl TabScreen {
     }
 
     pub fn before_show(&mut self, panes: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
-        self.for_each_pane(panes, self.panes, area, context, &mut |pane, rect, _block| {
+        self.for_each_pane(panes, self.panes, area, context, &mut |pane, rect, _, _| {
             screen_call!(pane, calculate_areas(rect, context));
             screen_call!(pane, before_show(context))?;
             Ok(())
