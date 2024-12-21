@@ -17,7 +17,6 @@ use super::{
 pub(crate) enum ClientRequest {
     MpdQuery(MpdQuery),
     MpdCommand(MpdCommand),
-    CheckQueue,
 }
 
 #[derive(Debug)]

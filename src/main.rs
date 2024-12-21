@@ -218,7 +218,7 @@ fn main() -> Result<()> {
                 render_loop.start()?;
             }
 
-            core::client::init(client_rx.clone(), client_tx.clone(), event_tx.clone(), client)?;
+            core::client::init(client_rx.clone(), event_tx.clone(), client)?;
             core::work::init(worker_rx.clone(), client_tx.clone(), event_tx.clone(), context.config)?;
             core::input::init(event_tx.clone())?;
             let event_loop_handle = core::event_loop::init(context, event_rx, render_loop, terminal)?;
