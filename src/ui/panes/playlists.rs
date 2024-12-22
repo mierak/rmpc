@@ -217,30 +217,6 @@ impl Pane for PlaylistsPane {
                 self.stack = DirStack::new(data);
                 self.prepare_preview(context)?;
             }
-            (REINIT, MpdQueryResult::SongsList { data: songs, .. }) => {
-                // Select the same song by filename or index as before
-                let old_viewport_len = self.stack.current().state.viewport_len();
-
-                self.stack_mut()
-                    .replace(songs.into_iter().map(DirOrSong::Song).collect());
-                self.prepare_preview(context)?;
-                if let Some((idx, song)) = &self.selected_song {
-                    let idx_to_select = self
-                        .stack
-                        .current()
-                        .items
-                        .iter()
-                        .find_position(|item| item.as_path() == song)
-                        .map_or(*idx, |(idx, _)| idx);
-                    self.stack.current_mut().state.set_viewport_len(old_viewport_len);
-                    self.stack
-                        .current_mut()
-                        .state
-                        .select(Some(idx_to_select), context.config.scrolloff);
-                };
-                self.prepare_preview(context)?;
-                context.render()?;
-            }
             (REINIT, MpdQueryResult::DirOrSong { data, .. }) => {
                 let mut new_stack = DirStack::new(data);
                 let old_viewport_len = self.stack.current().state.viewport_len();
@@ -268,10 +244,33 @@ impl Pane for PlaylistsPane {
                         if let Some((idx, DirOrSong::Song(song))) = self.stack().current().selected_with_idx() {
                             self.selected_song = Some((idx, song.as_path().to_owned()));
                         }
+                        let playlist = playlist_name.to_owned();
                         self.stack = new_stack;
-                        self.open_or_play(false, context, REINIT)?;
                         self.stack_mut().current_mut().state.set_content_len(old_content_len);
                         self.stack_mut().current_mut().state.set_viewport_len(old_viewport_len);
+
+                        let songs =
+                            context.query_sync(move |client| Ok(client.list_playlist_info(&playlist, None)?))?;
+
+                        self.stack_mut().push(songs.into_iter().map(DirOrSong::Song).collect());
+                        self.prepare_preview(context)?;
+                        if let Some((idx, song)) = &self.selected_song {
+                            let idx_to_select = self
+                                .stack
+                                .current()
+                                .items
+                                .iter()
+                                .find_position(|item| item.as_path() == song)
+                                .map_or(*idx, |(idx, _)| idx);
+                            self.stack.current_mut().state.set_viewport_len(old_viewport_len);
+                            self.stack
+                                .current_mut()
+                                .state
+                                .select(Some(idx_to_select), context.config.scrolloff);
+                        };
+                        self.stack_mut().clear_preview();
+                        self.prepare_preview(context)?;
+                        context.render()?;
                     }
                     [] => {
                         let Some((selected_idx, selected_playlist)) = self

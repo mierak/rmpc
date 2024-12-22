@@ -214,7 +214,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -294,7 +294,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -374,7 +374,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -454,7 +454,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),
@@ -535,7 +535,7 @@ mod on_idle_event {
             let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
             assert!(matches!(
                 qry,
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: REINIT,
                     replace_id: None,
                     target: Some(PaneType::Playlists),

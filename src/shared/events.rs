@@ -9,14 +9,15 @@ use crossterm::event::KeyEvent;
 use super::{
     lrc::LrcIndex,
     mouse_event::MouseEvent,
-    mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
+    mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
 
 #[derive(Debug)]
 #[allow(unused)]
 pub(crate) enum ClientRequest {
-    MpdQuery(MpdQuery),
-    MpdCommand(MpdCommand),
+    Query(MpdQuery),
+    QuerySync(MpdQuerySync),
+    Command(MpdCommand),
 }
 
 #[derive(Debug)]

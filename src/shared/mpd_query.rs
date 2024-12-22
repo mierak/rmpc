@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::{
     config::tabs::PaneType,
     mpd::{
@@ -8,6 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use bon::Builder;
+use crossbeam::channel::Sender;
 use ratatui::widgets::ListItem;
 
 #[derive(derive_more::Debug, Builder)]
@@ -17,6 +20,13 @@ pub(crate) struct MpdQuery {
     pub target: Option<PaneType>,
     #[debug(skip)]
     pub callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send>,
+}
+
+#[derive(derive_more::Debug, Builder)]
+pub(crate) struct MpdQuerySync {
+    #[debug(skip)]
+    pub callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send>,
+    pub tx: Sender<MpdQueryResult>,
 }
 
 #[derive(derive_more::Debug)]
@@ -68,4 +78,5 @@ pub(crate) enum MpdQueryResult {
     Outputs(Vec<Output>),
     Decoders(Vec<Decoder>),
     ExternalCommand(&'static [&'static str], Vec<Song>),
+    Any(Box<dyn Any + Send + Sync>),
 }

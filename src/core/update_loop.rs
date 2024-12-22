@@ -48,7 +48,7 @@ impl UpdateLoop {
                 }
 
                 std::thread::sleep(update_interval);
-                if let Err(err) = work_tx.send(ClientRequest::MpdQuery(MpdQuery {
+                if let Err(err) = work_tx.send(ClientRequest::Query(MpdQuery {
                     id: "global_status_update",
                     target: None,
                     replace_id: None,
