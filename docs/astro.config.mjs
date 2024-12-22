@@ -64,44 +64,44 @@ export default defineConfig({
                     },
                     {
                         label: "Release (v0.7.0)",
-                        link: "latest/overview",
+                        link: "release/overview",
                         badge: { text: "Stable", variant: "default" },
                         icon: "seti:todo",
                         items: [
                             {
                                 label: "Overview",
-                                link: "latest/overview",
+                                link: "release/overview",
                             },
                             {
                                 label: "Installation",
-                                link: "latest/installation",
+                                link: "release/installation",
                             },
                             {
                                 label: "Try without installing",
-                                link: "latest/try-without-install",
+                                link: "release/try-without-install",
                             },
                             {
                                 label: "Configuration",
                                 autogenerate: {
-                                    directory: "latest/configuration",
+                                    directory: "release/configuration",
                                 },
                             },
                             {
                                 label: "Guides",
                                 autogenerate: {
-                                    directory: "latest/guides",
+                                    directory: "release/guides",
                                 },
                             },
                             {
                                 label: "Reference",
                                 autogenerate: {
-                                    directory: "latest/reference",
+                                    directory: "release/reference",
                                 },
                             },
                             {
                                 label: "Theme gallery",
                                 autogenerate: {
-                                    directory: "latest/themes",
+                                    directory: "release/themes",
                                 },
                             },
                         ],
