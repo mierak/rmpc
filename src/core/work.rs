@@ -39,7 +39,7 @@ fn handle_work_request(
         WorkRequest::Command(command) => {
             let callback = command.execute(config)?; // TODO log
             try_skip!(
-                client_tx.send(ClientRequest::MpdCommand(MpdCommand { callback })),
+                client_tx.send(ClientRequest::Command(MpdCommand { callback })),
                 "Failed to send client request to complete command"
             );
             Ok(WorkDone::None)

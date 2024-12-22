@@ -148,11 +148,7 @@ mod on_idle_event {
 
     mod browsing_songs {
         use crate::{
-            config::tabs::PaneType,
-            shared::{
-                events::{ClientRequest, WorkRequest},
-                mpd_query::MpdQuery,
-            },
+            shared::events::{ClientRequest, WorkRequest},
             tests::fixtures::{client_request_channel, work_request_channel},
         };
         use crossbeam::channel::{Receiver, Sender};
@@ -200,6 +196,15 @@ mod on_idle_event {
             }
 
             // then
+            let rx2 = rx.clone();
+            let new_songs = vec![song("s2"), song("s3"), song("s4")];
+            let new_songs2 = new_songs.clone();
+            std::thread::spawn(move || {
+                let req = rx2.recv().unwrap();
+                if let ClientRequest::QuerySync(qry) = req {
+                    qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
+                };
+            });
             screen
                 .on_query_finished(
                     REINIT,
@@ -211,28 +216,6 @@ mod on_idle_event {
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
-            let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
-            assert!(matches!(
-                qry,
-                ClientRequest::MpdQuery(MpdQuery {
-                    id: REINIT,
-                    replace_id: None,
-                    target: Some(PaneType::Playlists),
-                    ..
-                })
-            ));
-            let new_songs = vec![song("s2"), song("s3"), song("s4")];
-            screen
-                .on_query_finished(
-                    REINIT,
-                    MpdQueryResult::SongsList {
-                        data: new_songs.clone(),
-                        origin_path: None,
-                    },
-                    &app_context,
-                )
-                .unwrap();
-
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[1].clone()))
@@ -280,6 +263,15 @@ mod on_idle_event {
             }
 
             // then
+            let rx2 = rx.clone();
+            let new_songs = vec![song("s1"), song("s2")];
+            let new_songs2 = new_songs.clone();
+            std::thread::spawn(move || {
+                let req = rx2.recv().unwrap();
+                if let ClientRequest::QuerySync(qry) = req {
+                    qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
+                };
+            });
             screen
                 .on_query_finished(
                     REINIT,
@@ -291,27 +283,6 @@ mod on_idle_event {
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
-            let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
-            assert!(matches!(
-                qry,
-                ClientRequest::MpdQuery(MpdQuery {
-                    id: REINIT,
-                    replace_id: None,
-                    target: Some(PaneType::Playlists),
-                    ..
-                })
-            ));
-            let new_songs = vec![song("s1"), song("s2")];
-            screen
-                .on_query_finished(
-                    REINIT,
-                    MpdQueryResult::SongsList {
-                        data: new_songs.clone(),
-                        origin_path: None,
-                    },
-                    &app_context,
-                )
-                .unwrap();
 
             assert_eq!(
                 screen.stack.current().selected(),
@@ -360,6 +331,15 @@ mod on_idle_event {
             }
 
             // then
+            let rx2 = rx.clone();
+            let new_songs = vec![song("s3"), song("s4")];
+            let new_songs2 = new_songs.clone();
+            std::thread::spawn(move || {
+                let req = rx2.recv().unwrap();
+                if let ClientRequest::QuerySync(qry) = req {
+                    qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
+                };
+            });
             screen
                 .on_query_finished(
                     REINIT,
@@ -371,28 +351,6 @@ mod on_idle_event {
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
-            let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
-            assert!(matches!(
-                qry,
-                ClientRequest::MpdQuery(MpdQuery {
-                    id: REINIT,
-                    replace_id: None,
-                    target: Some(PaneType::Playlists),
-                    ..
-                })
-            ));
-            let new_songs = vec![song("s3"), song("s4")];
-            screen
-                .on_query_finished(
-                    REINIT,
-                    MpdQueryResult::SongsList {
-                        data: new_songs.clone(),
-                        origin_path: None,
-                    },
-                    &app_context,
-                )
-                .unwrap();
-
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[0].clone()))
@@ -440,6 +398,15 @@ mod on_idle_event {
             }
 
             // then
+            let rx2 = rx.clone();
+            let new_songs = vec![song("s1"), song("s3"), song("s4")];
+            let new_songs2 = new_songs.clone();
+            std::thread::spawn(move || {
+                let req = rx2.recv().unwrap();
+                if let ClientRequest::QuerySync(qry) = req {
+                    qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
+                };
+            });
             screen
                 .on_query_finished(
                     REINIT,
@@ -451,28 +418,6 @@ mod on_idle_event {
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
-            let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
-            assert!(matches!(
-                qry,
-                ClientRequest::MpdQuery(MpdQuery {
-                    id: REINIT,
-                    replace_id: None,
-                    target: Some(PaneType::Playlists),
-                    ..
-                })
-            ));
-            let new_songs = vec![song("s1"), song("s3"), song("s4")];
-            screen
-                .on_query_finished(
-                    REINIT,
-                    MpdQueryResult::SongsList {
-                        data: new_songs.clone(),
-                        origin_path: None,
-                    },
-                    &app_context,
-                )
-                .unwrap();
-
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[1].clone()))
@@ -521,6 +466,15 @@ mod on_idle_event {
             }
 
             // then
+            let rx2 = rx.clone();
+            let new_songs = vec![song("s1"), song("s3"), song("s4")];
+            let new_songs2 = new_songs.clone();
+            std::thread::spawn(move || {
+                let req = rx2.recv().unwrap();
+                if let ClientRequest::QuerySync(qry) = req {
+                    qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
+                };
+            });
             screen
                 .on_query_finished(
                     REINIT,
@@ -532,28 +486,6 @@ mod on_idle_event {
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl4")));
-            let qry = rx.recv_timeout(Duration::from_millis(100)).unwrap();
-            assert!(matches!(
-                qry,
-                ClientRequest::MpdQuery(MpdQuery {
-                    id: REINIT,
-                    replace_id: None,
-                    target: Some(PaneType::Playlists),
-                    ..
-                })
-            ));
-            let new_songs = vec![song("s1"), song("s3"), song("s4")];
-            screen
-                .on_query_finished(
-                    REINIT,
-                    MpdQueryResult::SongsList {
-                        data: new_songs.clone(),
-                        origin_path: None,
-                    },
-                    &app_context,
-                )
-                .unwrap();
-
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[1].clone()))

@@ -206,7 +206,7 @@ mod tests {
         if should_search {
             assert!(matches!(
                 rx.recv_timeout(Duration::from_millis(100)).unwrap(),
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: ALBUM_ART,
                     replace_id: Some(ALBUM_ART),
                     target: Some(PaneType::AlbumArt),
@@ -253,7 +253,7 @@ mod tests {
         if should_search {
             assert!(matches!(
                 rx.recv_timeout(Duration::from_millis(100)).unwrap(),
-                ClientRequest::MpdQuery(MpdQuery {
+                ClientRequest::Query(MpdQuery {
                     id: ALBUM_ART,
                     replace_id: Some(ALBUM_ART),
                     target: Some(PaneType::AlbumArt),

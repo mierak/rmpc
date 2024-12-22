@@ -11,12 +11,13 @@ use crate::{
         events::ClientRequest,
         lrc::{Lrc, LrcIndex},
         macros::status_warn,
+        mpd_query::MpdQuerySync,
     },
     AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest,
 };
 use anyhow::{bail, Result};
 use bon::bon;
-use crossbeam::channel::{SendError, Sender};
+use crossbeam::channel::{bounded, SendError, Sender};
 
 pub struct AppContext {
     pub config: &'static Config,
@@ -78,6 +79,31 @@ impl AppContext {
         self.needs_render.replace(false);
     }
 
+    pub fn query_sync<T: Send + Sync + 'static>(
+        &self,
+        on_done: impl FnOnce(&mut Client<'_>) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        let (tx, rx) = bounded(1);
+        let query = MpdQuerySync {
+            callback: Box::new(|client| Ok(MpdQueryResult::Any(Box::new((on_done)(client)?)))),
+            tx,
+        };
+
+        if let Err(err) = self.client_request_sender.send(ClientRequest::QuerySync(query)) {
+            log::error!(error:? = err; "Failed to send query request");
+            bail!("Failed to send sync query request");
+        }
+
+        if let MpdQueryResult::Any(any) = rx.recv()? {
+            if let Ok(val) = any.downcast::<T>() {
+                return Ok(*val);
+            }
+            bail!("Received unknown type answer for sync query request",);
+        }
+
+        bail!("Received unknown MpdQueryResult for sync query request");
+    }
+
     #[builder(finish_fn(name = query))]
     pub fn query(
         &self,
@@ -92,13 +118,13 @@ impl AppContext {
             replace_id,
             callback: Box::new(on_done),
         };
-        if let Err(err) = self.client_request_sender.send(ClientRequest::MpdQuery(query)) {
+        if let Err(err) = self.client_request_sender.send(ClientRequest::Query(query)) {
             log::error!(error:? = err; "Failed to send query request");
         }
     }
 
     pub fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
-        if let Err(err) = self.client_request_sender.send(ClientRequest::MpdCommand(MpdCommand {
+        if let Err(err) = self.client_request_sender.send(ClientRequest::Command(MpdCommand {
             callback: Box::new(callback),
         })) {
             log::error!(error:? = err; "Failed to send command request");

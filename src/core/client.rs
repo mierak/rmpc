@@ -141,7 +141,7 @@ fn client_task(client_rx: &Receiver<ClientRequest>, event_tx: &Sender<AppEvent>,
                                             buffer.push_back(request);
                                         }
                                         if buffer.iter().any(|request2| {
-                                            if let (ClientRequest::MpdQuery(q1), ClientRequest::MpdQuery(q2)) =
+                                            if let (ClientRequest::Query(q1), ClientRequest::Query(q2)) =
                                                 (&request, &request2)
                                             {
                                                 q1.should_be_skipped(q2)
@@ -283,13 +283,18 @@ fn check_connection(
 
 fn handle_client_request(client: &mut Client<'_>, request: ClientRequest) -> Result<WorkDone> {
     match request {
-        ClientRequest::MpdQuery(query) => Ok(WorkDone::MpdCommandFinished {
+        ClientRequest::Query(query) => Ok(WorkDone::MpdCommandFinished {
             id: query.id,
             target: query.target,
             data: (query.callback)(client)?,
         }),
-        ClientRequest::MpdCommand(command) => {
+        ClientRequest::Command(command) => {
             (command.callback)(client)?;
+            Ok(WorkDone::None)
+        }
+        ClientRequest::QuerySync(query) => {
+            let result = (query.callback)(client)?;
+            query.tx.send(result)?;
             Ok(WorkDone::None)
         }
     }
