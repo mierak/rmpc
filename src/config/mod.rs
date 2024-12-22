@@ -442,7 +442,7 @@ mod tests {
     fn example_config_equals_default() {
         let config = ConfigFile::default();
         let path = format!(
-            "{}/docs/src/content/docs/latest/assets/example_config.ron",
+            "{}/docs/src/content/docs/next/assets/example_config.ron",
             std::env::var("CARGO_MANIFEST_DIR").unwrap()
         );
 
@@ -457,7 +457,7 @@ mod tests {
     fn example_config_equals_default() {
         let config = ConfigFile::default();
         let path = format!(
-            "{}/docs/src/content/docs/latest/assets/example_config.ron",
+            "{}/docs/src/content/docs/next/assets/example_config.ron",
             std::env::var("CARGO_MANIFEST_DIR").unwrap()
         );
 
@@ -470,7 +470,7 @@ mod tests {
     fn example_theme_equals_default() {
         let theme = UiConfigFile::default();
         let path = format!(
-            "{}/docs/src/content/docs/latest/assets/example_theme.ron",
+            "{}/docs/src/content/docs/next/assets/example_theme.ron",
             std::env::var("CARGO_MANIFEST_DIR").unwrap()
         );
 
@@ -482,7 +482,7 @@ mod tests {
     #[test]
     fn gallery_themes_are_valid() {
         let path = format!(
-            "{}/docs/src/content/docs/latest/assets/themes",
+            "{}/docs/src/content/docs/next/assets/themes",
             std::env::var("CARGO_MANIFEST_DIR").unwrap()
         );
 
