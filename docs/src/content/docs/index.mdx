@@ -5,42 +5,41 @@ template: splash
 hero:
     tagline: A beautiful and configurable TUI client for MPD
     image:
-        file: ../../assets/preview.png
+        file: ./assets/preview.png
     actions:
         - text: Get Started
-          link: /rmpc/overview/
+          link: /rmpc/next/overview/
           icon: right-arrow
           variant: primary
         - text: Try without installing
-          link: /rmpc/try-without-install
+          link: /rmpc/next/try-without-install
           icon: right-arrow
           variant: secondary
 ---
 
 import { Card, CardGrid } from "@astrojs/starlight/components";
-import * as utils from "../../utils.ts";
 import Hero from "../../components/Hero.astro";
 
 ## Next steps
 
 <CardGrid stagger>
     <Card title="Install" icon="approve-check">
-        <a href="/rmpc/installation/" style={{ textDecoration: "none" }}>
+        <a href="/rmpc/next/installation/" style={{ textDecoration: "none" }}>
             Installation instructions
         </a>
     </Card>
     <Card title="Configure" icon="setting">
-        <a href="/rmpc/configuration/" style={{ textDecoration: "none" }}>
+        <a href="/rmpc/next/configuration/" style={{ textDecoration: "none" }}>
             Configure rmpc just how you like it
         </a>
     </Card>
     <Card title="Reference" icon="document">
-        <a href="/rmpc/reference/config/" style={{ textDecoration: "none" }}>
+        <a href="/rmpc/next/reference/config/" style={{ textDecoration: "none" }}>
             Looking for a specific configuration option?
         </a>
     </Card>
     <Card title="Themes" icon="open-book">
-        <a href="/rmpc/configuration/theme/" style={{ textDecoration: "none" }}>
+        <a href="/rmpc/next/configuration/theme/" style={{ textDecoration: "none" }}>
             Browse predefined and user submitted themes
         </a>
     </Card>
