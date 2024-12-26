@@ -419,7 +419,6 @@ impl<'ui> Ui<'ui> {
                         } else {
                             client.single(single.cycle())?;
                         }
-                        client.stop()?;
                         Ok(())
                     });
                 }
@@ -431,7 +430,6 @@ impl<'ui> Ui<'ui> {
                         } else {
                             client.consume(consume.cycle())?;
                         }
-                        client.stop()?;
                         Ok(())
                     });
                 }
