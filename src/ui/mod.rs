@@ -156,9 +156,6 @@ impl<'ui> Ui<'ui> {
 
         Ok(())
     }
-    pub fn post_render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
-        screen_call!(self, post_render(frame, context))
-    }
 
     fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
         screen_call!(self, on_hide(&context))?;
@@ -548,6 +545,12 @@ impl<'ui> Ui<'ui> {
         Ok(())
     }
 
+    pub fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+        log::trace!(area:?; "Terminal was resized");
+        self.calc_areas(area, context)?;
+        screen_call!(self, resize(self.areas[Areas::Content], context))
+    }
+
     pub fn on_event(&mut self, mut event: UiEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiEvent::Player => {}
@@ -565,7 +568,6 @@ impl<'ui> Ui<'ui> {
                     context.render()?;
                 }
             }
-            UiEvent::Resized { .. } => {}
             UiEvent::ModalOpened => {}
             UiEvent::ModalClosed => {}
             UiEvent::Exit => {}
@@ -650,7 +652,6 @@ pub enum UiEvent {
     Database,
     StoredPlaylist,
     LogAdded(Vec<u8>),
-    Resized { columns: u16, rows: u16 },
     ModalOpened,
     ModalClosed,
     Exit,

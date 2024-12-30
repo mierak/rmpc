@@ -48,7 +48,7 @@ pub(crate) enum AppEvent {
     Status(String, Level),
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
-    RequestRender(bool),
+    RequestRender,
     Resized { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
     UiEvent(UiAppEvent),

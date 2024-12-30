@@ -265,14 +265,6 @@ impl TabScreen {
         screen_call!(pane, handle_mouse_event(event, context))
     }
 
-    pub fn post_render(&mut self, panes: &mut PaneContainer, frame: &mut Frame, context: &AppContext) -> Result<()> {
-        for pane in self.panes.panes_iter() {
-            let screen = panes.get_mut(pane.pane);
-            screen_call!(screen, post_render(frame, context))?;
-        }
-        Ok(())
-    }
-
     pub fn on_hide(&mut self, panes: &mut PaneContainer, context: &AppContext) -> Result<()> {
         for pane in self.panes.panes_iter() {
             let screen = panes.get_mut(pane.pane);
@@ -285,6 +277,14 @@ impl TabScreen {
         self.for_each_pane(panes, self.panes, area, context, &mut |pane, rect, _, _| {
             screen_call!(pane, calculate_areas(rect, context));
             screen_call!(pane, before_show(context))?;
+            Ok(())
+        })
+    }
+
+    pub fn resize(&mut self, panes: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
+        self.for_each_pane(panes, self.panes, area, context, &mut |pane, rect, _, _| {
+            screen_call!(pane, calculate_areas(rect, context));
+            screen_call!(pane, resize(rect, context))?;
             Ok(())
         })
     }

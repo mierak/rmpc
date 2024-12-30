@@ -114,9 +114,6 @@ impl PaneContainer {
 #[allow(unused_variables)]
 pub(super) trait Pane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
-    fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
-        Ok(())
-    }
 
     /// For any cleanup operations, ran when the screen hides
     fn on_hide(&mut self, context: &AppContext) -> Result<()> {
@@ -144,6 +141,10 @@ pub(super) trait Pane {
     }
 
     fn calculate_areas(&mut self, area: Rect, context: &AppContext) {}
+
+    fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub mod dirstack {}

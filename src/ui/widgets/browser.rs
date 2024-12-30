@@ -50,7 +50,6 @@ where
 {
     type State = DirStack<T>;
 
-    #[allow(clippy::unwrap_used)]
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
         let scrollbar_margin = if self.config.theme.draw_borders {
             let scrollbar_track = self.config.theme.scrollbar.symbols[0];

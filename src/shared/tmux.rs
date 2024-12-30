@@ -13,21 +13,22 @@ pub fn is_inside_tmux() -> bool {
     *IS_TMUX
 }
 
-pub fn wrap_print_if_needed(input: &str) {
-    if *IS_TMUX {
-        print!("\x1bPtmux;");
-        print!("{}", input.replace('\x1b', "\x1b\x1b"));
-        print!("\x1b\\");
-    } else {
-        print!("{input}");
-    }
+/// [write!] except it wraps the given sequence in TMUX's pass through if tmux
+/// is detected
+macro_rules! tmux_write {
+    ( $w:ident, $($t:tt)* ) => {{
+        if *crate::tmux::IS_TMUX {
+            write!($w, "\x1bPtmux;")
+                .and_then(|()| {
+                    write!($w, "{}", format!($($t)*).replace('\x1b', "\x1b\x1b"))
+                        .and_then(|()| write!($w, "\x1b\\"))
+            })
+        } else {
+            write!($w, $($t)*)
+        }
+    }}
 }
-
-pub fn wrap_print(input: &str) {
-    print!("\x1bPtmux;");
-    print!("{}", input.replace('\x1b', "\x1b\x1b"));
-    print!("\x1b\\");
-}
+pub(crate) use tmux_write;
 
 pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
     let mut cmd = std::process::Command::new("tmux");

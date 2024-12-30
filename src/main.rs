@@ -195,10 +195,7 @@ fn main() -> Result<()> {
                     "Failed to request lyrics indexing"
                 );
             }
-            try_ret!(
-                event_tx.send(AppEvent::RequestRender(false)),
-                "Failed to render first frame"
-            );
+            try_ret!(event_tx.send(AppEvent::RequestRender), "Failed to render first frame");
 
             let mut client = try_ret!(
                 Client::init(config.address, config.password, "command"),
