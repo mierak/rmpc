@@ -129,9 +129,14 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
     let mut buf = Vec::new();
 
     if tmux {
-        write!(buf, "\x1bPtmux;\x1b\x1bP0;7q\"1;1;{};{}", image.width(), image.height())?;
+        write!(
+            buf,
+            "\x1bPtmux;\x1b\x1bP0;1;7q\"1;1;{};{}",
+            image.width(),
+            image.height()
+        )?;
     } else {
-        write!(buf, "\x1bP0;7q\"1;1;{};{}", image.width(), image.height())?;
+        write!(buf, "\x1bP0;1;7q\"1;1;{};{}", image.width(), image.height())?;
     }
 
     let image = image.to_rgba8();
