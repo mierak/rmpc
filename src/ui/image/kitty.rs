@@ -1,17 +1,20 @@
 use anyhow::{Context, Result};
+use crossbeam::channel::{unbounded, Sender};
+use crossterm::{
+    execute,
+    style::{Colors, SetColors},
+};
 use itertools::Itertools;
 use std::{
     io::Write,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc,
-    },
+    sync::{atomic::Ordering, Arc},
     time::Instant,
 };
 
+use crate::shared::tmux::tmux_write;
 use base64::Engine;
 use flate2::Compression;
-use ratatui::prelude::{Buffer, Rect};
+use ratatui::prelude::{Color, Rect};
 
 use crate::{
     config::Size,
@@ -20,127 +23,94 @@ use crate::{
         image::{get_gif_frames, get_image_area_size_px, resize_image},
         macros::status_error,
     },
-    tmux,
 };
 
-use super::ImageProto;
+use super::{csi_move, facade::IS_SHOWING, Backend};
 
 #[derive(Debug)]
-pub struct KittyImageState {
-    idx: u32,
-    image: Arc<Vec<u8>>,
-    default_art: Arc<Vec<u8>>,
-    needs_transfer: bool,
-    transfer_request_channel: Sender<(Arc<Vec<u8>>, u16, u16)>,
-    compression_finished_receiver: Receiver<Data>,
+pub struct Kitty {
+    sender: Sender<(Arc<Vec<u8>>, Rect)>,
+    colors: Colors,
 }
 
-impl ImageProto for KittyImageState {
-    fn render(&mut self, buf: &mut Buffer, rect: Rect) -> Result<()> {
-        let state = self;
-        let height = rect.height;
-        let width = rect.width;
-
-        if state.needs_transfer {
-            state.needs_transfer = false;
-
-            let delete_all_images = "\x1b_Ga=D\x1b\\";
-            if tmux::is_inside_tmux() {
-                tmux::wrap_print(delete_all_images);
-            } else {
-                print!("{delete_all_images}");
-            }
-
-            if let Err(err) = state
-                .transfer_request_channel
-                .send((Arc::clone(&state.image), width, height))
-            {
-                status_error!(err:?; "Failed to compress image data");
-            }
-        }
-
-        if let Ok(data) = state.compression_finished_receiver.try_recv() {
-            state.idx = state.idx.wrapping_add(1);
-            match data {
-                Data::ImageData(data) => {
-                    transfer_image_data(&data.content, width, height, data.img_width, data.img_height, state);
-                }
-                Data::AnimationData(data) => transfer_animation_data(data, width, height, state),
-            }
-        }
-
-        create_unicode_placeholder_grid(state, buf, rect);
-        Ok(())
+impl Backend for Kitty {
+    fn hide(&mut self, area: Rect) -> Result<()> {
+        clear_area(&mut std::io::stdout().lock(), self.colors, area)
     }
 
-    fn post_render(&mut self, _: &mut Buffer, _: Option<ratatui::prelude::Color>, _: Rect) -> Result<()> {
-        Ok(())
+    fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
+        Ok(self.sender.send((data, area))?)
     }
 
-    fn hide(&mut self, _: Option<ratatui::prelude::Color>, _: Rect) -> Result<()> {
-        Ok(())
-    }
-
-    fn show(&mut self) {
-        self.needs_transfer = true;
-    }
-
-    fn resize(&mut self) {
-        self.needs_transfer = true;
-    }
-
-    fn set_data(&mut self, data: Option<Vec<u8>>) -> Result<()> {
-        if let Some(data) = data {
-            self.image = Arc::new(data);
-        } else {
-            self.image = Arc::clone(&self.default_art);
-        }
-        log::debug!(bytes = self.image.len(); "New image received",);
-        self.needs_transfer = true;
-
-        Ok(())
+    fn cleanup(self: Box<Self>, area: Rect) -> Result<()> {
+        clear_area(&mut std::io::stdout().lock(), self.colors, area)
     }
 }
 
-impl KittyImageState {
-    pub fn new(default_art: &'static [u8], max_size: Size, request_render: impl Fn(bool) + Send + 'static) -> Self {
-        let compression_request_channel = channel::<(Arc<Vec<_>>, u16, u16)>();
-        let rx = compression_request_channel.1;
-
-        let image_data_to_transfer_channel = channel::<Data>();
-        let data_sender = image_data_to_transfer_channel.0;
+impl Kitty {
+    pub fn new(max_size: Size, bg_color: Option<Color>) -> Self {
+        let (sender, receiver) = unbounded::<(Arc<Vec<_>>, Rect)>();
+        let colors = Colors {
+            background: bg_color.map(Into::into),
+            foreground: None,
+        };
 
         std::thread::Builder::new()
             .name("kitty".to_string())
             .spawn(move || {
-                while let Ok((vec, width, height)) = rx.recv_last() {
-                    let data = match create_data_to_transfer(&vec, width, height, Compression::new(6), max_size) {
-                        Ok(data) => data,
-                        Err(err) => {
-                            status_error!(err:?; "Failed to compress image data");
-                            continue;
-                        }
+                let mut pending_req: Option<(Arc<Vec<_>>, Rect)> = None;
+                loop {
+                    let Ok((vec, rect)) = pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) else {
+                        continue;
                     };
 
-                    if let Err(err) = data_sender.send(data) {
-                        status_error!(err:?; "Failed to send compressed image data");
+                    let data =
+                        match create_data_to_transfer(&vec, rect.width, rect.height, Compression::new(6), max_size) {
+                            Ok(data) => data,
+                            Err(err) => {
+                                status_error!(err:?; "Failed to compress image data");
+                                continue;
+                            }
+                        };
+
+                    let mut stdout = std::io::stdout().lock();
+                    if !IS_SHOWING.load(Ordering::Relaxed) {
+                        log::trace!("Not showing image because its not supposed to be displayed anymore");
                         continue;
                     }
 
-                    request_render(false);
+                    if let Ok(msg) = receiver.try_recv_last() {
+                        pending_req = Some(msg);
+                        log::trace!("Skipping image because another one is waiting in the queue");
+                        continue;
+                    };
+
+                    if let Err(err) = match data {
+                        Data::ImageData(data) => transfer_image_data(
+                            &mut stdout,
+                            &data.content,
+                            rect.width,
+                            rect.height,
+                            data.img_width,
+                            data.img_height,
+                        ),
+                        Data::AnimationData(data) => {
+                            transfer_animation_data(&mut stdout, data, rect.width, rect.height)
+                        }
+                    } {
+                        status_error!(err:?; "Failed to transfer image data");
+                        continue;
+                    }
+
+                    if let Err(err) = create_unicode_placeholder_grid(&mut stdout, colors, rect) {
+                        status_error!(err:?; "Failed to create unicode placeholders");
+                        continue;
+                    }
                 }
             })
             .expect("Kitty thread to be spawned");
 
-        let default_art = Arc::new(default_art.to_vec());
-        Self {
-            idx: 0,
-            needs_transfer: true,
-            image: Arc::clone(&default_art),
-            transfer_request_channel: compression_request_channel.0,
-            compression_finished_receiver: image_data_to_transfer_channel.1,
-            default_art,
-        }
+        Self { sender, colors }
     }
 }
 
@@ -196,30 +166,32 @@ fn create_data_to_transfer(
     }
 }
 
-fn create_unicode_placeholder_grid(state: &KittyImageState, buf: &mut Buffer, area: Rect) {
-    (0..area.height).for_each(|y| {
-        let mut res = format!("\x1b[38;5;{}m", state.idx);
-
-        (0..area.width).for_each(|x| {
-            res.push_str(&format!(
-                "{DELIM}{row}{col}",
-                row = GRID[y as usize],
-                col = GRID[x as usize],
-            ));
-
-            if x > 0 {
-                buf.cell_mut((area.left() + x, area.top() + y))
-                    .map(|cell| cell.set_skip(true));
-            }
-        });
-
-        res.push_str("\x1b[39m\n");
-        buf.cell_mut((area.left(), area.top() + y))
-            .map(|cell| cell.set_symbol(&res));
-    });
+fn clear_area(w: &mut impl Write, colors: Colors, area: Rect) -> Result<()> {
+    super::clear_area(w, colors, area)?;
+    tmux_write!(w, "\x1b_Ga=d,d=A,q=2\x1b\\")?;
+    Ok(())
 }
 
-fn transfer_animation_data(data: AnimationData, cols: u16, rows: u16, state: &mut KittyImageState) {
+fn create_unicode_placeholder_grid(w: &mut impl Write, colors: Colors, area: Rect) -> Result<()> {
+    let mut buf = Vec::with_capacity(area.width as usize * area.height as usize * 2);
+    execute!(buf, SetColors(colors))?;
+    for y in 0..area.height {
+        csi_move!(buf, area.left(), area.top() + y)?;
+        write!(buf, "\x1b[38;5;1m")?;
+
+        for x in 0..area.width {
+            write!(buf, "{DELIM}{row}{col}", row = GRID[y as usize], col = GRID[x as usize])?;
+        }
+
+        write!(buf, "\x1b[39m")?;
+    }
+    w.write_all(&buf)?;
+    w.flush()?;
+
+    Ok(())
+}
+
+fn transfer_animation_data(w: &mut impl Write, data: AnimationData, cols: u16, rows: u16) -> Result<()> {
     let start_time = Instant::now();
     let AnimationData {
         frames,
@@ -232,7 +204,7 @@ fn transfer_animation_data(data: AnimationData, cols: u16, rows: u16, state: &mu
 
     if frames.len() < 2 {
         log::warn!("Less than two frames, invalid animation data");
-        return;
+        return Ok(());
     }
 
     let mut first_frame_iter = frames[0].content.chars().peekable();
@@ -242,17 +214,16 @@ fn transfer_animation_data(data: AnimationData, cols: u16, rows: u16, state: &mu
     let delay = frames[0].delay;
 
     // Create image and transfer first frame
-    let create_img = &format!(
-        "\x1b_Gi={},f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
-        state.idx, compression = if is_compressed { ",o=z" } else { ""} 
-    );
-    tmux::wrap_print_if_needed(create_img);
+    tmux_write!(w,
+        "\x1b_Gi=1,f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
+         compression = if is_compressed { ",o=z" } else { ""} 
+    )?;
 
     // Transfer the rest of the first frame if any
     while first_frame_iter.peek().is_some() {
         let chunk: String = first_frame_iter.by_ref().take(4096).collect();
         let m = i32::from(first_frame_iter.peek().is_some());
-        tmux::wrap_print_if_needed(&format!("\x1b_Gi={},m={m};{chunk}\x1b\\", state.idx));
+        tmux_write!(w, "\x1b_Gi=1,m={m};{chunk}\x1b\\")?;
     }
 
     // Transfer rest of the frames, skip first because it was already transferred
@@ -260,53 +231,52 @@ fn transfer_animation_data(data: AnimationData, cols: u16, rows: u16, state: &mu
         let mut frame_iter = content.chars().peekable();
         let chunk: String = frame_iter.by_ref().take(4096).collect();
 
-        let next_frame = &format!(
-            "\x1b_Gi={},a=f,t=d,m={m},z={delay},q=2,s={img_width},v={img_height}{compression};{chunk}\x1b\\",
-            state.idx,
+        tmux_write!(
+            w,
+            "\x1b_Gi=1,a=f,t=d,m={m},z={delay},q=2,s={img_width},v={img_height}{compression};{chunk}\x1b\\",
             compression = if is_compressed { ",o=z" } else { "" }
-        );
+        )?;
 
-        tmux::wrap_print_if_needed(next_frame);
         while frame_iter.peek().is_some() {
             let chunk: String = frame_iter.by_ref().take(4096).collect();
             let m = i32::from(frame_iter.peek().is_some());
-            tmux::wrap_print_if_needed(&format!("\x1b_Ga=f,i={},m={m};{chunk}\x1b\\", state.idx));
+            tmux_write!(w, "\x1b_Ga=f,i=1,m={m};{chunk}\x1b\\")?;
         }
     }
 
     // Run the animation
-    tmux::wrap_print_if_needed(&format!("\x1b_Ga=a,i={},s=3\x1b\\", state.idx));
+    tmux_write!(w, "\x1b_Ga=a,i=1,s=3\x1b\\")?;
     log::debug!(duration:? = start_time.elapsed(); "Transfer finished");
+
+    Ok(())
 }
 
 fn transfer_image_data(
+    w: &mut impl Write,
     content: &str,
     cols: u16,
     rows: u16,
     img_width: u32,
     img_height: u32,
-    state: &mut KittyImageState,
-) {
+) -> Result<()> {
     let start_time = Instant::now();
     log::debug!(bytes = content.len(), img_width, img_height, rows, cols; "Transferring compressed image data");
     let mut iter = content.chars().peekable();
 
     let first: String = iter.by_ref().take(4096).collect();
-    let delete_all_images = "\x1b_Ga=D\x1b\\";
-    let virtual_image_placement = &format!(
-        "\x1b_Gi={},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={},v={},c={},r={};{}\x1b\\",
-        state.idx, img_width, img_height, cols, rows, first
-    );
-
-    tmux::wrap_print_if_needed(delete_all_images);
-    tmux::wrap_print_if_needed(virtual_image_placement);
+    tmux_write!(
+        w,
+        "\x1b_Gi=1,f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={img_width},v={img_height};{first}\x1b\\"
+    )?;
 
     while iter.peek().is_some() {
         let chunk: String = iter.by_ref().take(4096).collect();
         let m = i32::from(iter.peek().is_some());
-        tmux::wrap_print_if_needed(&format!("\x1b_Gm={m};{chunk}\x1b\\"));
+        tmux_write!(w, "\x1b_Gm={m};{chunk}\x1b\\")?;
     }
     log::debug!(duration:? = start_time.elapsed(); "Transfer finished");
+
+    Ok(())
 }
 
 enum Data {

@@ -41,15 +41,18 @@ pub mod duration {
     }
 }
 
+#[allow(unused)]
 pub mod mpsc {
+    use crossbeam::channel::{Receiver, RecvError, TryRecvError};
+
     pub trait RecvLast<T> {
-        fn recv_last(&self) -> Result<T, std::sync::mpsc::RecvError>;
-        fn try_recv_last(&self) -> Result<T, std::sync::mpsc::TryRecvError>;
+        fn recv_last(&self) -> Result<T, RecvError>;
+        fn try_recv_last(&self) -> Result<T, TryRecvError>;
     }
 
-    impl<T> RecvLast<T> for std::sync::mpsc::Receiver<T> {
+    impl<T> RecvLast<T> for Receiver<T> {
         /// recv the last message in the channel and drop all the other ones
-        fn recv_last(&self) -> Result<T, std::sync::mpsc::RecvError> {
+        fn recv_last(&self) -> Result<T, RecvError> {
             self.recv().map(|data| {
                 let mut result = data;
                 while let Ok(newer_data) = self.try_recv() {
@@ -60,7 +63,7 @@ pub mod mpsc {
         }
 
         /// recv the last message in the channel in a non-blocking manner and drop all the other ones
-        fn try_recv_last(&self) -> Result<T, std::sync::mpsc::TryRecvError> {
+        fn try_recv_last(&self) -> Result<T, TryRecvError> {
             self.try_recv().map(|data| {
                 let mut result = data;
                 while let Ok(newer_data) = self.try_recv() {

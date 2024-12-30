@@ -2,9 +2,9 @@ use crate::{
     config::tabs::PaneType,
     context::AppContext,
     mpd::mpd_client::MpdClient,
-    shared::{image::ImageProtocol, key_event::KeyEvent, macros::try_skip},
+    shared::{image::ImageProtocol, key_event::KeyEvent},
     ui::{image::facade::AlbumArtFacade, UiEvent},
-    AppEvent, MpdQueryResult,
+    MpdQueryResult,
 };
 use anyhow::Result;
 use ratatui::{layout::Rect, Frame};
@@ -14,28 +14,14 @@ use super::Pane;
 #[derive(Debug)]
 pub struct AlbumArtPane {
     album_art: AlbumArtFacade,
-    image_data: Option<Vec<u8>>,
 }
 
 const ALBUM_ART: &str = "album_art";
 
 impl AlbumArtPane {
     pub fn new(context: &AppContext) -> Self {
-        let sender = context.app_event_sender.clone();
-        let config = context.config;
         Self {
-            image_data: None,
-            album_art: AlbumArtFacade::new(
-                config.album_art.method.into(),
-                config.theme.default_album_art,
-                config.album_art.max_size_px,
-                move |full_render: bool| {
-                    try_skip!(
-                        sender.send(AppEvent::RequestRender(full_render)),
-                        "Failed to request render"
-                    );
-                },
-            ),
+            album_art: AlbumArtFacade::new(context.config),
         }
     }
 
@@ -74,70 +60,61 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    fn render(&mut self, _frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
         self.album_art.set_size(area);
-        if let Some(data) = self.image_data.take() {
-            self.album_art.set_image(Some(data))?;
-            self.album_art.show();
-            self.album_art.render(frame, context.config)?;
-        } else {
-            self.album_art.render(frame, context.config)?;
-        }
         Ok(())
     }
 
-    fn post_render(&mut self, frame: &mut ratatui::Frame, context: &AppContext) -> Result<()> {
-        self.album_art.post_render(frame, context.config)?;
-        Ok(())
+    fn calculate_areas(&mut self, area: Rect, _context: &AppContext) {
+        self.album_art.set_size(area);
     }
 
     fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
         Ok(())
     }
 
-    fn on_hide(&mut self, context: &AppContext) -> Result<()> {
-        self.album_art.hide(context.config.theme.background_color)?;
-        Ok(())
+    fn on_hide(&mut self, _context: &AppContext) -> Result<()> {
+        self.album_art.hide()
+    }
+
+    fn resize(&mut self, area: Rect, _context: &AppContext) -> Result<()> {
+        self.album_art.set_size(area);
+        self.album_art.show_current()
     }
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if AlbumArtPane::fetch_album_art(context).is_none() {
-            self.album_art.set_image(None)?;
+            self.album_art.show_default()?;
         }
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, _context: &AppContext) -> Result<()> {
         match (id, data) {
-            (ALBUM_ART, MpdQueryResult::AlbumArt(data)) => {
-                self.image_data = data;
-                context.render()?;
+            (ALBUM_ART, MpdQueryResult::AlbumArt(Some(data))) => {
+                self.album_art.show(data)?;
+            }
+            (ALBUM_ART, MpdQueryResult::AlbumArt(None)) => {
+                self.album_art.show_default()?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::SongChanged | UiEvent::Reconnected => {
+            UiEvent::SongChanged | UiEvent::Reconnected if is_visible => {
                 if AlbumArtPane::fetch_album_art(context).is_none() {
-                    self.album_art.set_image(None)?;
+                    self.album_art.show_default()?;
                 }
             }
-            UiEvent::Resized { columns, rows } => {
-                self.album_art.resize(*columns, *rows);
-
-                context.render()?;
-            }
             UiEvent::ModalOpened => {
-                self.album_art.hide(context.config.theme.background_color)?;
-
+                self.album_art.hide()?;
                 context.render()?;
             }
             UiEvent::ModalClosed => {
-                self.album_art.show();
-
+                self.album_art.show_current()?;
                 context.render()?;
             }
             UiEvent::Exit => {
@@ -248,7 +225,7 @@ mod tests {
         app_context.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&app_context);
 
-        screen.on_event(&mut UiEvent::SongChanged, &app_context).unwrap();
+        screen.on_event(&mut UiEvent::SongChanged, true, &app_context).unwrap();
 
         if should_search {
             assert!(matches!(

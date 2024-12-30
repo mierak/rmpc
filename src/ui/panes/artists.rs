@@ -241,7 +241,7 @@ impl Pane for ArtistsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::Database => {
                 let target = self.target_pane();

@@ -1,149 +1,130 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use anyhow::Result;
-use ratatui::{layout::Rect, style::Color, Frame};
+use ratatui::layout::Rect;
 
-use crate::config::{Config, ImageMethod, Size};
+use crate::config::{Config, ImageMethod};
 use crate::shared::image::ImageProtocol;
 
-use super::{iterm2::Iterm2, kitty::KittyImageState, ImageProto};
+use super::{iterm2::Iterm2, kitty::Kitty, Backend};
 use super::{
     sixel::Sixel,
     ueberzug::{Layer, Ueberzug},
 };
 
+pub static IS_SHOWING: AtomicBool = AtomicBool::new(false);
+
 #[derive(Debug)]
 pub struct AlbumArtFacade {
     image_state: ImageState,
-    image_data: Option<Vec<u8>>,
-    image_data_hash: u64,
+    current_album_art: Option<Arc<Vec<u8>>>,
+    default_album_art: Arc<Vec<u8>>,
     last_size: Rect,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 enum ImageState {
-    Kitty(KittyImageState),
+    Kitty(Kitty),
     Ueberzug(Ueberzug),
     Iterm2(Iterm2),
     Sixel(Sixel),
+    #[default]
     None,
 }
 
 impl AlbumArtFacade {
-    pub fn new(
-        protocol: ImageProtocol,
-        default_album_art: &'static [u8],
-        max_size: Size,
-        request_render: impl Fn(bool) + Send + 'static,
-    ) -> Self {
-        let proto = match protocol {
-            ImageProtocol::Kitty => {
-                ImageState::Kitty(KittyImageState::new(default_album_art, max_size, request_render))
-            }
-            ImageProtocol::UeberzugWayland => {
-                ImageState::Ueberzug(Ueberzug::new(default_album_art, Layer::Wayland, max_size))
-            }
-            ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(default_album_art, Layer::X11, max_size)),
-            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(default_album_art, max_size, request_render)),
-            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(default_album_art, max_size, request_render)),
+    pub fn new(config: &Config) -> Self {
+        let max_size = config.album_art.max_size_px;
+        let bg_color = config.theme.background_color;
+        let proto = match config.album_art.method.into() {
+            ImageProtocol::Kitty => ImageState::Kitty(Kitty::new(max_size, bg_color)),
+            ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new(Layer::Wayland, max_size)),
+            ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11, max_size)),
+            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(max_size, bg_color)),
+            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(max_size, bg_color)),
             ImageProtocol::None => ImageState::None,
         };
         Self {
             image_state: proto,
-            image_data: None,
-            image_data_hash: 0,
+            current_album_art: None,
             last_size: Rect::default(),
+            default_album_art: Arc::new(config.theme.default_album_art.to_vec()),
         }
     }
 
-    pub fn set_image(&mut self, mut data: Option<Vec<u8>>) -> Result<()> {
-        let mut hasher = DefaultHasher::new();
-        data.hash(&mut hasher);
-        self.last_size.hash(&mut hasher);
-        let hash = hasher.finish();
+    pub fn show_default(&mut self) -> Result<()> {
+        self.current_album_art = None;
+        IS_SHOWING.store(true, Ordering::Relaxed);
 
-        if hash == self.image_data_hash {
-            return Ok(());
-        }
+        let data = Arc::clone(&self.default_album_art);
+        log::debug!(bytes = data.len(), area:? = self.last_size; "Displaying default image");
 
         match &mut self.image_state {
-            ImageState::Kitty(state) => state.set_data(data.take())?,
-            ImageState::Ueberzug(ueberzug) => ueberzug.set_data(data.take())?,
-            ImageState::Iterm2(iterm2) => iterm2.set_data(data.take())?,
-            ImageState::Sixel(s) => s.set_data(data.take())?,
-            ImageState::None => {}
-        }
-
-        self.image_data = data;
-        self.image_data_hash = hash;
-        Ok(())
-    }
-
-    pub fn show(&mut self) {
-        match &mut self.image_state {
-            ImageState::Kitty(kitty) => kitty.show(),
-            ImageState::Ueberzug(ueberzug) => ueberzug.show(),
-            ImageState::Iterm2(iterm2) => iterm2.show(),
-            ImageState::Sixel(s) => s.show(),
-            ImageState::None => {}
-        }
-    }
-
-    pub fn hide(&mut self, bg_color: Option<Color>) -> Result<()> {
-        match &mut self.image_state {
-            ImageState::Kitty(kitty) => kitty.hide(bg_color, self.last_size)?,
-            ImageState::Ueberzug(ueberzug) => ueberzug.hide(bg_color, self.last_size)?,
-            ImageState::Iterm2(iterm2) => iterm2.hide(bg_color, self.last_size)?,
-            ImageState::Sixel(s) => s.hide(bg_color, self.last_size)?,
-            ImageState::None => {}
-        }
-        Ok(())
-    }
-
-    pub fn render(&mut self, frame: &mut Frame, _config: &Config) -> anyhow::Result<()> {
-        match &mut self.image_state {
-            ImageState::Kitty(state) => state.render(frame.buffer_mut(), self.last_size)?,
-            ImageState::Ueberzug(state) => state.render(frame.buffer_mut(), self.last_size)?,
-            ImageState::Iterm2(iterm2) => iterm2.render(frame.buffer_mut(), self.last_size)?,
-            ImageState::Sixel(s) => s.render(frame.buffer_mut(), self.last_size)?,
-            ImageState::None => {}
-        };
-        Ok(())
-    }
-
-    pub fn resize(&mut self, _columns: u16, _rows: u16) {
-        match &mut self.image_state {
-            ImageState::Kitty(state) => state.resize(),
-            ImageState::Ueberzug(ueberzug) => ueberzug.resize(),
-            ImageState::Iterm2(iterm2) => iterm2.resize(),
-            ImageState::Sixel(s) => s.resize(),
-            ImageState::None => {}
-        }
-    }
-
-    pub fn cleanup(&mut self) -> Result<()> {
-        let state = std::mem::replace(&mut self.image_state, ImageState::None);
-        match state {
-            ImageState::Kitty(kitty) => Box::new(kitty).cleanup(),
-            ImageState::Ueberzug(ueberzug) => Box::new(ueberzug).cleanup(),
-            ImageState::Iterm2(iterm2) => Box::new(iterm2).cleanup(),
-            ImageState::Sixel(s) => Box::new(s).cleanup(),
+            ImageState::Kitty(kitty) => kitty.show(data, self.last_size),
+            ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
+            ImageState::Iterm2(iterm2) => iterm2.show(data, self.last_size),
+            ImageState::Sixel(s) => s.show(data, self.last_size),
             ImageState::None => Ok(()),
         }
     }
 
-    pub fn post_render(&mut self, frame: &mut Frame, config: &Config) -> std::result::Result<(), anyhow::Error> {
+    pub fn show_current(&mut self) -> Result<()> {
+        let Some(ref current_album_art) = self.current_album_art else {
+            log::warn!("Tried to display current album art but none was present");
+            return Ok(());
+        };
+
+        IS_SHOWING.store(true, Ordering::Relaxed);
+
+        let data = Arc::clone(current_album_art);
+        log::debug!(bytes = data.len(), area:? = self.last_size; "Displaying current image again",);
+
         match &mut self.image_state {
-            ImageState::Kitty(kitty) => {
-                kitty.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size)
-            }
-            ImageState::Ueberzug(ueberzug) => {
-                ueberzug.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size)
-            }
-            ImageState::Iterm2(iterm2) => {
-                iterm2.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size)
-            }
-            ImageState::Sixel(s) => s.post_render(frame.buffer_mut(), config.theme.background_color, self.last_size),
+            ImageState::Kitty(kitty) => kitty.show(data, self.last_size),
+            ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
+            ImageState::Iterm2(iterm2) => iterm2.show(data, self.last_size),
+            ImageState::Sixel(s) => s.show(data, self.last_size),
+            ImageState::None => Ok(()),
+        }
+    }
+
+    pub fn show(&mut self, data: Vec<u8>) -> Result<()> {
+        IS_SHOWING.store(true, Ordering::Relaxed);
+
+        log::debug!(bytes = data.len(), area:? = self.last_size; "New image received",);
+        let data = Arc::new(data);
+        self.current_album_art = Some(Arc::clone(&data));
+
+        match &mut self.image_state {
+            ImageState::Kitty(kitty) => kitty.show(data, self.last_size),
+            ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
+            ImageState::Iterm2(iterm2) => iterm2.show(data, self.last_size),
+            ImageState::Sixel(s) => s.show(data, self.last_size),
+            ImageState::None => Ok(()),
+        }
+    }
+
+    pub fn hide(&mut self) -> Result<()> {
+        IS_SHOWING.store(false, Ordering::Relaxed);
+        match &mut self.image_state {
+            ImageState::Kitty(kitty) => kitty.hide(self.last_size)?,
+            ImageState::Ueberzug(ueberzug) => ueberzug.hide(self.last_size)?,
+            ImageState::Iterm2(iterm2) => iterm2.hide(self.last_size)?,
+            ImageState::Sixel(s) => s.hide(self.last_size)?,
+            ImageState::None => {}
+        }
+        Ok(())
+    }
+
+    pub fn cleanup(&mut self) -> Result<()> {
+        let state = std::mem::take(&mut self.image_state);
+        IS_SHOWING.store(false, Ordering::Relaxed);
+        match state {
+            ImageState::Kitty(kitty) => Box::new(kitty).cleanup(self.last_size),
+            ImageState::Ueberzug(ueberzug) => Box::new(ueberzug).cleanup(self.last_size),
+            ImageState::Iterm2(iterm2) => Box::new(iterm2).cleanup(self.last_size),
+            ImageState::Sixel(s) => Box::new(s).cleanup(self.last_size),
             ImageState::None => Ok(()),
         }
     }
@@ -161,8 +142,7 @@ impl From<ImageMethod> for ImageProtocol {
             ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
             ImageMethod::Iterm2 => ImageProtocol::Iterm2,
             ImageMethod::Sixel => ImageProtocol::Sixel,
-            ImageMethod::None => ImageProtocol::None,
-            ImageMethod::Unsupported => ImageProtocol::None,
+            ImageMethod::None | ImageMethod::Unsupported => ImageProtocol::None,
         }
     }
 }

@@ -72,7 +72,7 @@ impl AppContext {
         }
 
         self.needs_render.replace(true);
-        self.app_event_sender.send(AppEvent::RequestRender(false))
+        self.app_event_sender.send(AppEvent::RequestRender)
     }
 
     pub fn finish_frame(&self) {

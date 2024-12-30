@@ -114,9 +114,6 @@ impl PaneContainer {
 #[allow(unused_variables)]
 pub(super) trait Pane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
-    fn post_render(&mut self, frame: &mut Frame, context: &AppContext) -> Result<()> {
-        Ok(())
-    }
 
     /// For any cleanup operations, ran when the screen hides
     fn on_hide(&mut self, context: &AppContext) -> Result<()> {
@@ -129,7 +126,7 @@ pub(super) trait Pane {
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
         Ok(())
     }
 
@@ -144,6 +141,10 @@ pub(super) trait Pane {
     }
 
     fn calculate_areas(&mut self, area: Rect, context: &AppContext) {}
+
+    fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub mod dirstack {}

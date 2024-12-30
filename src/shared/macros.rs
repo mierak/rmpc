@@ -82,8 +82,16 @@ macro_rules! pop_modal {
     }};
 }
 
+macro_rules! csi_move {
+    ( $buf:ident, $x:expr, $y:expr ) => {
+        write!($buf, "\x1b[{};{}H", $y + 1, $x + 1)
+    };
+}
+
 pub(crate) use modal;
 pub(crate) use pop_modal;
+
+pub(crate) use csi_move;
 
 pub(crate) use status_error;
 pub(crate) use status_info;

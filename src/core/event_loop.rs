@@ -55,7 +55,6 @@ fn main_task<B: Backend + std::io::Write>(
     let mut ui = Ui::new(&context).expect("UI to be created correctly");
     let event_receiver = event_rx;
     let mut render_wanted = false;
-    let mut full_rerender_wanted = false;
     let max_fps = 30f64;
     let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
@@ -82,6 +81,7 @@ fn main_task<B: Backend + std::io::Write>(
         };
 
         if let Some(event) = event {
+            let _lock = std::io::stdout().lock();
             match event {
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context) {
                     Ok(KeyHandleResult::None) => continue,
@@ -121,15 +121,14 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     render_wanted = true;
                 }
-                AppEvent::RequestRender(wanted) => {
+                AppEvent::RequestRender => {
                     render_wanted = true;
-                    full_rerender_wanted = wanted;
                 }
                 AppEvent::WorkDone(Ok(result)) => match result {
                     WorkDone::LyricsIndexed { index } => {
                         context.lrc_index = index;
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context) {
-                            log::error!(error:? = err; "UI failed to resize event");
+                            log::error!(error:? = err; "UI failed to lyrics indexed event");
                         }
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
@@ -211,10 +210,9 @@ fn main_task<B: Backend + std::io::Write>(
                     status_error!("{}", err);
                 }
                 AppEvent::Resized { columns, rows } => {
-                    if let Err(err) = ui.on_event(UiEvent::Resized { columns, rows }, &mut context) {
+                    if let Err(err) = ui.resize(Rect::new(0, 0, columns, rows), &context) {
                         log::error!(error:? = err, event:?; "UI failed to handle resize event");
                     }
-                    full_rerender_wanted = true;
                     render_wanted = true;
                 }
                 AppEvent::UiEvent(event) => match ui.on_ui_app_event(event, &mut context) {
@@ -251,12 +249,6 @@ fn main_task<B: Backend + std::io::Write>(
             if till_next_frame != Duration::ZERO {
                 continue;
             }
-            if full_rerender_wanted {
-                terminal.swap_buffers();
-                terminal.swap_buffers();
-                terminal.clear().expect("Terminal clear after full rerender to succeed");
-                full_rerender_wanted = false;
-            }
             terminal
                 .draw(|frame| {
                     if let Err(err) = ui.render(frame, &mut context) {
@@ -264,9 +256,6 @@ fn main_task<B: Backend + std::io::Write>(
                     };
                 })
                 .expect("Expected render to succeed");
-            if let Err(err) = ui.post_render(&mut terminal.get_frame(), &mut context) {
-                log::error!(error:? = err; "Failed handle post render phase");
-            };
 
             context.finish_frame();
             last_render = now;
