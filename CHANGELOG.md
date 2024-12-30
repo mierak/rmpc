@@ -8,10 +8,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Album art with kitty image protocol is no longer centered and is in line with the other image backends
+
 ### Fixed
 
 - `ToggleConsume` and `ToggleSingle` causing playback to stop
 - Styling not being applied to Bitrate and Crossfade props
+- Refactored and greatly simplified image backends
 
 ## [0.7.0] - 2024-12-24
 
