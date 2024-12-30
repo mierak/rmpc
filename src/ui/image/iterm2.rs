@@ -121,18 +121,27 @@ fn display(w: &mut impl Write, data: EncodedData, area: Rect) -> Result<()> {
 
 fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
     let start = std::time::Instant::now();
-    let (iwidth, iheight) = match get_image_area_size_px(width, height, max_size_px) {
+    let (area_width, area_height) = match get_image_area_size_px(width, height, max_size_px) {
         Ok(v) => v,
         Err(err) => {
             bail!("Failed to get image size, err: {}", err);
         }
     };
 
-    let (len, data) = if get_gif_frames(data)?.is_some() {
+    let (len, width_px, height_px, data) = if get_gif_frames(data)?.is_some() {
         log::debug!("encoding animated gif");
-        (data.len(), base64::engine::general_purpose::STANDARD.encode(data))
+
+        // Take smaller of the two dimensions to make the gif stretch over available area and not overflow
+        let size = area_width.min(area_height).into();
+
+        (
+            data.len(),
+            size,
+            size,
+            base64::engine::general_purpose::STANDARD.encode(data),
+        )
     } else {
-        let image = match resize_image(data, iwidth, iheight) {
+        let image = match resize_image(data, area_width, area_height) {
             Ok(v) => v,
             Err(err) => {
                 bail!("Failed to resize image, err: {}", err);
@@ -141,14 +150,19 @@ fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<Enc
         let Ok(jpg) = jpg_encode(&image) else {
             bail!("Failed to encode image as jpg")
         };
-        (jpg.len(), base64::engine::general_purpose::STANDARD.encode(&jpg))
+        (
+            jpg.len(),
+            image.width(),
+            image.height(),
+            base64::engine::general_purpose::STANDARD.encode(&jpg),
+        )
     };
 
-    log::debug!(compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(); "encoded data");
+    log::debug!(compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(), area_width, area_height ; "encoded data");
     Ok(EncodedData {
         content: data,
         size: len,
-        width: u32::from(iwidth),
-        height: u32::from(iheight),
+        width: width_px,
+        height: height_px,
     })
 }

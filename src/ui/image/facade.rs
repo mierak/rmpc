@@ -55,11 +55,11 @@ impl AlbumArtFacade {
 
     pub fn show_default(&mut self) -> Result<()> {
         self.current_album_art = None;
-
-        let data = Arc::clone(&self.default_album_art);
         IS_SHOWING.store(true, Ordering::Relaxed);
 
+        let data = Arc::clone(&self.default_album_art);
         log::debug!(bytes = data.len(), area:? = self.last_size; "Displaying default image");
+
         match &mut self.image_state {
             ImageState::Kitty(kitty) => kitty.show(data, self.last_size),
             ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
@@ -75,10 +75,11 @@ impl AlbumArtFacade {
             return Ok(());
         };
 
-        let data = Arc::clone(current_album_art);
         IS_SHOWING.store(true, Ordering::Relaxed);
 
+        let data = Arc::clone(current_album_art);
         log::debug!(bytes = data.len(), area:? = self.last_size; "Displaying current image again",);
+
         match &mut self.image_state {
             ImageState::Kitty(kitty) => kitty.show(data, self.last_size),
             ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
@@ -89,9 +90,7 @@ impl AlbumArtFacade {
     }
 
     pub fn show(&mut self, data: Vec<u8>) -> Result<()> {
-        if IS_SHOWING.swap(true, Ordering::Relaxed) {
-            return Ok(());
-        }
+        IS_SHOWING.store(true, Ordering::Relaxed);
 
         log::debug!(bytes = data.len(), area:? = self.last_size; "New image received",);
         let data = Arc::new(data);
