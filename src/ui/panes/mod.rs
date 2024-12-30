@@ -126,7 +126,7 @@ pub(super) trait Pane {
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
         Ok(())
     }
 

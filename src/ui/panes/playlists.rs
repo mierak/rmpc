@@ -136,7 +136,7 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
         let id = match event {
             UiEvent::Database => Some(INIT),
             UiEvent::StoredPlaylist => Some(REINIT),

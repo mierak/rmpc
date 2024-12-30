@@ -552,19 +552,22 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn on_event(&mut self, mut event: UiEvent, context: &mut AppContext) -> Result<()> {
+        let contains_pane = |p| {
+            self.tabs
+                .get(&self.active_tab)
+                .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == p))
+        };
+
         match event {
             UiEvent::Player => {}
             UiEvent::Database => {
                 status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
             }
             UiEvent::StoredPlaylist => {}
-            UiEvent::LogAdded(_) => {
+            UiEvent::LogAdded(_) =>
+            {
                 #[cfg(debug_assertions)]
-                if self
-                    .tabs
-                    .get(&self.active_tab)
-                    .is_some_and(|tab| tab.panes.panes_iter().any(|pane| matches!(pane.pane, PaneType::Logs)))
-                {
+                if contains_pane(PaneType::Logs) {
                     context.render()?;
                 }
             }
@@ -579,16 +582,16 @@ impl<'ui> Ui<'ui> {
         for name in context.config.tabs.active_panes {
             match self.panes.get_mut(*name) {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => p.on_event(&mut event, context),
-                Panes::Queue(p) => p.on_event(&mut event, context),
-                Panes::Directories(p) => p.on_event(&mut event, context),
-                Panes::Albums(p) => p.on_event(&mut event, context),
-                Panes::Artists(p) => p.on_event(&mut event, context),
-                Panes::Playlists(p) => p.on_event(&mut event, context),
-                Panes::Search(p) => p.on_event(&mut event, context),
-                Panes::AlbumArtists(p) => p.on_event(&mut event, context),
-                Panes::AlbumArt(p) => p.on_event(&mut event, context),
-                Panes::Lyrics(p) => p.on_event(&mut event, context),
+                Panes::Logs(p) => p.on_event(&mut event, contains_pane(PaneType::Logs), context),
+                Panes::Queue(p) => p.on_event(&mut event, contains_pane(PaneType::Queue), context),
+                Panes::Directories(p) => p.on_event(&mut event, contains_pane(PaneType::Directories), context),
+                Panes::Albums(p) => p.on_event(&mut event, contains_pane(PaneType::Albums), context),
+                Panes::Artists(p) => p.on_event(&mut event, contains_pane(PaneType::Artists), context),
+                Panes::Playlists(p) => p.on_event(&mut event, contains_pane(PaneType::Playlists), context),
+                Panes::Search(p) => p.on_event(&mut event, contains_pane(PaneType::Search), context),
+                Panes::AlbumArtists(p) => p.on_event(&mut event, contains_pane(PaneType::AlbumArtists), context),
+                Panes::AlbumArt(p) => p.on_event(&mut event, contains_pane(PaneType::AlbumArt), context),
+                Panes::Lyrics(p) => p.on_event(&mut event, contains_pane(PaneType::Lyrics), context),
             }?;
         }
 

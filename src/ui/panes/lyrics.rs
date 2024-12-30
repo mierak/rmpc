@@ -86,7 +86,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected => match context.find_lrc() {
                 Ok(lrc) => {

@@ -250,7 +250,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
         match event {
             UiEvent::SongChanged => {
                 if let Some((idx, _)) = context.find_current_song_in_queue() {

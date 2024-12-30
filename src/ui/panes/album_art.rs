@@ -102,21 +102,19 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, context: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
         match event {
-            UiEvent::SongChanged | UiEvent::Reconnected => {
+            UiEvent::SongChanged | UiEvent::Reconnected if is_visible => {
                 if AlbumArtPane::fetch_album_art(context).is_none() {
                     self.album_art.show_default()?;
                 }
             }
             UiEvent::ModalOpened => {
                 self.album_art.hide()?;
-
                 context.render()?;
             }
             UiEvent::ModalClosed => {
                 self.album_art.show_current()?;
-
                 context.render()?;
             }
             UiEvent::Exit => {
@@ -227,7 +225,7 @@ mod tests {
         app_context.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&app_context);
 
-        screen.on_event(&mut UiEvent::SongChanged, &app_context).unwrap();
+        screen.on_event(&mut UiEvent::SongChanged, true, &app_context).unwrap();
 
         if should_search {
             assert!(matches!(
