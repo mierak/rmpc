@@ -42,8 +42,6 @@ impl Backend for Kitty {
         Ok(self.sender.send((data, area))?)
     }
 
-    fn resize(&mut self) {}
-
     fn cleanup(self: Box<Self>, area: Rect) -> Result<()> {
         clear_area(&mut std::io::stdout().lock(), self.colors, area)
     }

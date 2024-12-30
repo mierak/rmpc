@@ -49,8 +49,6 @@ impl Backend for Sixel {
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
         Ok(self.sender.send(DataToEncode { area, data })?)
     }
-
-    fn resize(&mut self) {}
 }
 
 impl Sixel {

@@ -20,7 +20,6 @@ pub mod ueberzug;
 pub trait Backend {
     fn hide(&mut self, size: Rect) -> Result<()>;
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()>;
-    fn resize(&mut self);
     fn cleanup(self: Box<Self>, rect: Rect) -> Result<()> {
         Ok(())
     }

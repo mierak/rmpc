@@ -91,8 +91,6 @@ impl Backend for Ueberzug {
         Ok(self.sender.send(Action::Remove)?)
     }
 
-    fn resize(&mut self) {}
-
     fn cleanup(self: Box<Self>, _: Rect) -> Result<()> {
         self.sender.send(Action::Destroy)?;
         self.handle.join().expect("Ueberzug thread to end gracefully");

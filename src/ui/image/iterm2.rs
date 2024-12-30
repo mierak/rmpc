@@ -54,8 +54,6 @@ impl Backend for Iterm2 {
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
         Ok(self.sender.send(DataToEncode { area, data })?)
     }
-
-    fn resize(&mut self) {}
 }
 
 impl Iterm2 {

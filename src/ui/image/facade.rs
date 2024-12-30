@@ -118,16 +118,6 @@ impl AlbumArtFacade {
         Ok(())
     }
 
-    pub fn resize(&mut self) {
-        match &mut self.image_state {
-            ImageState::Kitty(state) => state.resize(),
-            ImageState::Ueberzug(ueberzug) => ueberzug.resize(),
-            ImageState::Iterm2(iterm2) => iterm2.resize(),
-            ImageState::Sixel(s) => s.resize(),
-            ImageState::None => {}
-        }
-    }
-
     pub fn cleanup(&mut self) -> Result<()> {
         let state = std::mem::take(&mut self.image_state);
         IS_SHOWING.store(false, Ordering::Relaxed);
@@ -141,12 +131,7 @@ impl AlbumArtFacade {
     }
 
     pub fn set_size(&mut self, area: Rect) {
-        if self.last_size == area {
-            self.last_size = area;
-        } else {
-            self.last_size = area;
-            self.resize();
-        }
+        self.last_size = area;
     }
 }
 
