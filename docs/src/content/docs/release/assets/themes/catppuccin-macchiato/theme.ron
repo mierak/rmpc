@@ -2,8 +2,6 @@
 #![enable(unwrap_newtypes)]
 #![enable(unwrap_variant_newtypes)]
 (
-    album_art_position: Right,
-    album_art_width_percent: 40,
     default_album_art_path: None,
     draw_borders: false,
     show_song_table_header: false,

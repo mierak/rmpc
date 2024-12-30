@@ -13,7 +13,6 @@ use playlists::PlaylistsPane;
 use queue::QueuePane;
 use ratatui::{
     prelude::Rect,
-    style::Style,
     text::{Line, Span},
     Frame,
 };
@@ -645,11 +644,11 @@ impl Property<'static, PropertyKind> {
                 StatusProperty::Single => Some(Either::Left(Span::styled(status.single.to_string(), style))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
                     || self.default_as_span(song, status),
-                    |v| Some(Either::Left(Span::styled(v.to_string(), Style::default()))),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
                     || self.default_as_span(song, status),
-                    |v| Some(Either::Left(Span::styled(v.to_string(), Style::default()))),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
