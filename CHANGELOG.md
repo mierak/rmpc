@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - `ToggleConsume` and `ToggleSingle` causing playback to stop
+- Styling not being applied to Bitrate and Crossfade props
 
 ## [0.7.0] - 2024-12-24
 
