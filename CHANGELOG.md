@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Styling not being applied to Bitrate and Crossfade props
 - Refactored and greatly simplified image backends
 - Potential infinite loop in lyrics indexing
+- `lsinfo` parsing playlist entries incorrectly
 
 ## [0.7.0] - 2024-12-24
 
