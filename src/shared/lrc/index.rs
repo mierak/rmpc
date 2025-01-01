@@ -30,6 +30,7 @@ impl LrcIndex {
 
             let file = try_cont!(std::fs::File::open(entry.path()), "failed to open entry file");
 
+            log::debug!(file:?, entry:? = entry.path(); "trying to index entry");
             let index_entry = try_cont!(
                 LrcIndexEntry::read(BufReader::new(file), entry.path().to_path_buf()),
                 "failed to index an entry"
@@ -40,6 +41,7 @@ impl LrcIndex {
                 continue;
             };
 
+            log::debug!(entry:?; "successfully indexed");
             index.push(index_entry);
         }
 
@@ -87,14 +89,14 @@ pub struct LrcIndexEntry {
 }
 
 impl LrcIndexEntry {
-    fn read(mut read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
+    fn read(read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
         let mut title = None;
         let mut artist = None;
         let mut album = None;
         let mut length = None;
 
-        let mut buf = String::new();
-        while read.read_line(&mut buf).is_ok() {
+        for buf in read.lines() {
+            let buf = buf?;
             if buf.trim().is_empty() || buf.starts_with('#') {
                 continue;
             }
@@ -128,7 +130,6 @@ impl LrcIndexEntry {
                     bail!("Invalid lrc metadata/timestamp: '{metadata}'");
                 }
             }
-            buf.clear();
         }
 
         let Some(artist) = artist else {
