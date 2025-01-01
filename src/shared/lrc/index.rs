@@ -5,7 +5,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::mpd::commands::Song;
+use crate::{mpd::commands::Song, shared::macros::try_cont};
 
 use super::{parse_length, Lrc};
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
@@ -14,21 +14,35 @@ pub struct LrcIndex {
 }
 
 impl LrcIndex {
-    pub fn index(lyrics_dir: &PathBuf) -> anyhow::Result<Self> {
-        Ok(Self {
-            index: WalkDir::new(lyrics_dir)
-                .into_iter()
-                .filter_ok(|entry| entry.file_name().to_string_lossy().ends_with(".lrc"))
-                .map_ok(|entry| {
-                    LrcIndexEntry::read(
-                        BufReader::new(std::fs::File::open(entry.path())?),
-                        entry.path().to_path_buf(),
-                    )
-                })
-                .flatten()
-                .filter_map(|entry| entry.transpose())
-                .try_collect()?,
-        })
+    pub fn index(lyrics_dir: &PathBuf) -> Self {
+        let dir = WalkDir::new(lyrics_dir);
+        log::debug!(dir:?; "walkdir");
+
+        let mut index = Vec::new();
+        for entry in dir {
+            let entry = try_cont!(entry, "skipping entry");
+
+            if !entry.file_name().to_string_lossy().ends_with(".lrc") {
+                log::debug!(entry:?; "skipping non lrc file");
+                continue;
+            }
+
+            let file = try_cont!(std::fs::File::open(entry.path()), "failed to open entry file");
+
+            let index_entry = try_cont!(
+                LrcIndexEntry::read(BufReader::new(file), entry.path().to_path_buf()),
+                "failed to index an entry"
+            );
+
+            let Some(index_entry) = index_entry else {
+                log::debug!(entry:?; "entry did not have enough metadata to index, skipping");
+                continue;
+            };
+
+            index.push(index_entry);
+        }
+
+        Self { index }
     }
 
     pub fn len(&self) -> usize {

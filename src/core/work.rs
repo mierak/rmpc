@@ -46,7 +46,7 @@ fn handle_work_request(
         }
         WorkRequest::IndexLyrics { lyrics_dir } => {
             let start = std::time::Instant::now();
-            let index = LrcIndex::index(&PathBuf::from(lyrics_dir))?;
+            let index = LrcIndex::index(&PathBuf::from(lyrics_dir));
             log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
             Ok(WorkDone::LyricsIndexed { index })
         }
