@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use address::MpdPassword;
+use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethod, ImageMethodFile};
 use anyhow::Context;
 use anyhow::Result;
 use artists::{Artists, ArtistsFile};
@@ -11,11 +12,11 @@ use itertools::Itertools;
 use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
-use strum::Display;
 use tabs::{Tabs, TabsFile};
 use utils::tilde_expand;
 
 pub mod address;
+pub mod album_art;
 pub mod artists;
 pub mod cli;
 mod defaults;
@@ -36,45 +37,6 @@ use self::{
 };
 
 pub use search::Search;
-
-#[derive(Default, Display, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
-pub enum ImageMethodFile {
-    Kitty,
-    UeberzugWayland,
-    UeberzugX11,
-    Iterm2,
-    Sixel,
-    None,
-    #[default]
-    Auto,
-}
-
-#[derive(Default, Display, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageMethod {
-    Kitty,
-    UeberzugWayland,
-    UeberzugX11,
-    Iterm2,
-    Sixel,
-    None,
-    #[default]
-    Unsupported,
-}
-
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
-pub struct Size {
-    pub width: u16,
-    pub height: u16,
-}
-
-impl Default for Size {
-    fn default() -> Self {
-        Self {
-            width: 600,
-            height: 600,
-        }
-    }
-}
 
 #[derive(Debug, Default, Clone)]
 pub struct Config {
@@ -139,21 +101,19 @@ pub struct ConfigFile {
     tabs: TabsFile,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct AlbumArtConfigFile {
-    #[serde(default)]
-    pub method: ImageMethodFile,
-    #[serde(default)]
-    pub max_size_px: Size,
-    #[serde(default = "defaults::disabled_album_art_protos")]
-    pub disabled_protocols: Vec<String>,
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+pub struct Size {
+    pub width: u16,
+    pub height: u16,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct AlbumArtConfig {
-    pub method: ImageMethod,
-    pub max_size_px: Size,
-    pub disabled_protocols: Vec<&'static str>,
+impl Default for Size {
+    fn default() -> Self {
+        Self {
+            width: 600,
+            height: 600,
+        }
+    }
 }
 
 impl Default for ConfigFile {
@@ -228,8 +188,8 @@ impl ConfigFile {
             .unwrap_or_default()
             .try_into()?;
 
-        let size = self.album_art.max_size_px;
         let (address, password) = MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
+        let album_art_method = self.album_art.method;
         let mut config = Config {
             theme,
             cache_dir: self
@@ -256,19 +216,7 @@ impl ConfigFile {
             search: self.search.into(),
             artists: self.artists.into(),
             tabs: self.tabs.try_into()?,
-            album_art: AlbumArtConfig {
-                method: ImageMethod::default(),
-                max_size_px: Size {
-                    width: if size.width == 0 { u16::MAX } else { size.width },
-                    height: if size.height == 0 { u16::MAX } else { size.height },
-                },
-                disabled_protocols: self
-                    .album_art
-                    .disabled_protocols
-                    .into_iter()
-                    .map(|proto| proto.leak() as &'static _)
-                    .collect(),
-            },
+            album_art: self.album_art.into(),
             on_song_change: self.on_song_change.map(|arr| {
                 arr.into_iter()
                     .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
@@ -286,7 +234,7 @@ impl ConfigFile {
             tmux::enable_passthrough()?;
         };
 
-        config.album_art.method = match self.image_method.unwrap_or(self.album_art.method) {
+        config.album_art.method = match self.image_method.unwrap_or(album_art_method) {
             ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
             ImageMethodFile::Kitty => ImageMethod::Kitty,
             ImageMethodFile::UeberzugWayland if image::is_ueberzug_wayland_supported() => ImageMethod::UeberzugWayland,
@@ -317,7 +265,7 @@ impl ConfigFile {
             | ImageMethod::UeberzugX11
             | ImageMethod::Iterm2
             | ImageMethod::Sixel => {
-                log::debug!(resolved:? = config.album_art.method, requested:? = self.album_art.method, is_tmux; "Image method resolved");
+                log::debug!(resolved:? = config.album_art.method, requested:? = album_art_method, is_tmux; "Image method resolved");
             }
         }
 

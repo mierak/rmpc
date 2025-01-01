@@ -11,7 +11,10 @@ use std::{
     time::Instant,
 };
 
-use crate::shared::{image::create_aligned_area, macros::try_cont, tmux::tmux_write};
+use crate::{
+    config::album_art::{HorizontalAlign, VerticalAlign},
+    shared::{image::create_aligned_area, macros::try_cont, tmux::tmux_write},
+};
 use base64::Engine;
 use flate2::Compression;
 use ratatui::prelude::{Color, Rect};
@@ -48,7 +51,7 @@ impl Backend for Kitty {
 }
 
 impl Kitty {
-    pub fn new(max_size: Size, bg_color: Option<Color>) -> Self {
+    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
         let (sender, receiver) = unbounded::<(Arc<Vec<_>>, Rect)>();
         let colors = Colors {
             background: bg_color.map(Into::into),
@@ -64,7 +67,8 @@ impl Kitty {
                         continue;
                     };
 
-                    let data = match create_data_to_transfer(&vec, area, Compression::new(6), max_size) {
+                    let data = match create_data_to_transfer(&vec, area, Compression::new(6), max_size, halign, valign)
+                    {
                         Ok(data) => data,
                         Err(err) => {
                             status_error!(err:?; "Failed to compress image data");
@@ -117,7 +121,14 @@ impl Kitty {
     }
 }
 
-fn create_data_to_transfer(image_data: &[u8], area: Rect, compression: Compression, max_size: Size) -> Result<Data> {
+fn create_data_to_transfer(
+    image_data: &[u8],
+    area: Rect,
+    compression: Compression,
+    max_size: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> Result<Data> {
     let start_time = Instant::now();
     log::debug!(bytes = image_data.len(); "Compressing image data");
 
@@ -135,7 +146,7 @@ fn create_data_to_transfer(image_data: &[u8], area: Rect, compression: Compressi
                 }
             })
             .try_collect()?;
-        let aligned_area = create_aligned_area(area, (width, height), max_size).area;
+        let aligned_area = create_aligned_area(area, (width, height), max_size, halign, valign).area;
 
         Ok(Data::AnimationData(AnimationData {
             frames,
@@ -145,7 +156,7 @@ fn create_data_to_transfer(image_data: &[u8], area: Rect, compression: Compressi
             aligned_area,
         }))
     } else {
-        let (image, aligned_area) = resize_image(image_data, area, max_size)?;
+        let (image, aligned_area) = resize_image(image_data, area, max_size, halign, valign)?;
 
         let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
         e.write_all(image.to_rgba8().as_raw())

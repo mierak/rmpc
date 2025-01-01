@@ -14,7 +14,10 @@ use std::{
 use ratatui::{layout::Rect, style::Color};
 
 use crate::{
-    config::Size,
+    config::{
+        album_art::{HorizontalAlign, VerticalAlign},
+        Size,
+    },
     shared::{
         ext::mpsc::RecvLast,
         image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
@@ -58,7 +61,7 @@ impl Backend for Iterm2 {
 }
 
 impl Iterm2 {
-    pub fn new(max_size: Size, bg_color: Option<Color>) -> Self {
+    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
         let (sender, receiver) = unbounded::<DataToEncode>();
         let colors = Colors {
             background: bg_color.map(Into::into),
@@ -76,7 +79,7 @@ impl Iterm2 {
                         continue;
                     };
 
-                    let encoded = try_cont!(encode(area, &data, max_size), "Failed to encode data");
+                    let encoded = try_cont!(encode(area, &data, max_size, halign, valign), "Failed to encode data");
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
@@ -129,7 +132,13 @@ fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
     Ok(())
 }
 
-fn encode(area: Rect, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
+fn encode(
+    area: Rect,
+    data: &[u8],
+    max_size_px: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> Result<EncodedData> {
     let start = std::time::Instant::now();
 
     let (len, width_px, height_px, data, aligned_area) = if let Some(gif_data) = get_gif_frames(data)? {
@@ -137,7 +146,7 @@ fn encode(area: Rect, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
 
         // Take smaller of the two dimensions to make the gif stretch over available area and not overflow
         let (width, height) = gif_data.dimensions;
-        let aligned_area = create_aligned_area(area, (width, height), max_size_px);
+        let aligned_area = create_aligned_area(area, (width, height), max_size_px, halign, valign);
         log::debug!(aligned_area:?, dims:? = gif_data.dimensions; "encoded");
 
         let size = aligned_area.size_px.width.min(aligned_area.size_px.height).into();
@@ -150,7 +159,7 @@ fn encode(area: Rect, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
             aligned_area,
         )
     } else {
-        let (image, aligned_area) = match resize_image(data, area, max_size_px) {
+        let (image, aligned_area) = match resize_image(data, area, max_size_px, halign, valign) {
             Ok(v) => v,
             Err(err) => {
                 bail!("Failed to resize image, err: {}", err);

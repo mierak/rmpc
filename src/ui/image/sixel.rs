@@ -17,7 +17,10 @@ use image::Rgba;
 use ratatui::{layout::Rect, style::Color};
 
 use crate::{
-    config::Size,
+    config::{
+        album_art::{HorizontalAlign, VerticalAlign},
+        Size,
+    },
     shared::{
         ext::mpsc::RecvLast,
         image::resize_image,
@@ -52,7 +55,7 @@ impl Backend for Sixel {
 }
 
 impl Sixel {
-    pub fn new(max_size: Size, bg_color: Option<Color>) -> Self {
+    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
         let (sender, receiver) = unbounded::<DataToEncode>();
         let colors = Colors {
             background: bg_color.map(Into::into),
@@ -70,7 +73,8 @@ impl Sixel {
                         continue;
                     };
 
-                    let (buf, resized_area) = try_cont!(encode(&data, area, max_size), "Failed to encode");
+                    let (buf, resized_area) =
+                        try_cont!(encode(&data, area, max_size, halign, valign), "Failed to encode");
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
@@ -105,10 +109,16 @@ fn display(w: &mut impl Write, data: &[u8], area: Rect) -> Result<()> {
     Ok(())
 }
 
-fn encode(data: &[u8], area: Rect, max_size: Size) -> Result<(Vec<u8>, Rect)> {
+fn encode(
+    data: &[u8],
+    area: Rect,
+    max_size: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> Result<(Vec<u8>, Rect)> {
     let start = Instant::now();
 
-    let (image, resized_area) = match resize_image(data, area, max_size) {
+    let (image, resized_area) = match resize_image(data, area, max_size, halign, valign) {
         Ok(v) => v,
         Err(err) => {
             bail!("Failed to resize image, err: {}", err);
