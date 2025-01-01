@@ -17,7 +17,7 @@ use crate::{
     config::Size,
     shared::{
         ext::mpsc::RecvLast,
-        image::{get_gif_frames, get_image_area_size_px, jpg_encode, resize_image},
+        image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
         macros::try_cont,
         tmux::tmux_write,
     },
@@ -29,9 +29,10 @@ use super::Backend;
 #[derive(Debug)]
 struct EncodedData {
     content: String,
+    aligned_area: Rect,
     size: usize,
-    width: u32,
-    height: u32,
+    img_width_px: u32,
+    img_height_px: u32,
 }
 
 #[derive(Debug)]
@@ -75,10 +76,7 @@ impl Iterm2 {
                         continue;
                     };
 
-                    let encoded = try_cont!(
-                        encode(area.width, area.height, &data, max_size),
-                        "Failed to encode data"
-                    );
+                    let encoded = try_cont!(encode(area, &data, max_size), "Failed to encode data");
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
@@ -93,7 +91,7 @@ impl Iterm2 {
                     };
 
                     try_cont!(clear_area(&mut w, colors, area), "Failed to clear iterm2 image area");
-                    try_cont!(display(&mut w, encoded, area), "Failed to display iterm2 image");
+                    try_cont!(display(&mut w, encoded), "Failed to display iterm2 image");
                 }
             })
             .expect("iterm2 thread to be spawned");
@@ -102,46 +100,57 @@ impl Iterm2 {
     }
 }
 
-fn display(w: &mut impl Write, data: EncodedData, area: Rect) -> Result<()> {
+fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
     let EncodedData {
         content,
         size,
-        width,
-        height,
+        aligned_area,
+        img_width_px,
+        img_height_px,
     } = data;
 
     queue!(w, SavePosition)?;
-    queue!(w, MoveTo(area.x, area.y))?;
+    queue!(w, MoveTo(aligned_area.x, aligned_area.y))?;
 
-    tmux_write!(w, "\x1b]1337;File=inline=1;size={size};width={width}px;height={height}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x07")?;
+    // TODO: https://iterm2.com/documentation-images.html
+    // A new way of sending files was introduced in iTerm2 version 3.5 which works in tmux integration mode
+    // by splitting the giant control sequence into a number of smaller ones:
+    // First, send:
+    // ESC ] 1337 ; MultipartFile = [optional arguments] ^G
+    // Then, send one or more of:
+    // ESC ] 1337 ; FilePart = base64 encoded file contents ^G
+    // What size chunks should you use? Older versions of tmux have a limit of 256 bytes for the entire sequence.
+    // In newer versions of tmux, the limit is 1,048,576 bytes. iTerm2 also imposes a limit of 1,048,576 bytes.
+    // Finally, send:
+    // ESC ] 1337 ; FileEnd ^G
+    tmux_write!(w, "\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n")?;
     queue!(w, RestorePosition)?;
 
     Ok(())
 }
 
-fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
+fn encode(area: Rect, data: &[u8], max_size_px: Size) -> Result<EncodedData> {
     let start = std::time::Instant::now();
-    let (area_width, area_height) = match get_image_area_size_px(width, height, max_size_px) {
-        Ok(v) => v,
-        Err(err) => {
-            bail!("Failed to get image size, err: {}", err);
-        }
-    };
 
-    let (len, width_px, height_px, data) = if get_gif_frames(data)?.is_some() {
+    let (len, width_px, height_px, data, aligned_area) = if let Some(gif_data) = get_gif_frames(data)? {
         log::debug!("encoding animated gif");
 
         // Take smaller of the two dimensions to make the gif stretch over available area and not overflow
-        let size = area_width.min(area_height).into();
+        let (width, height) = gif_data.dimensions;
+        let aligned_area = create_aligned_area(area, (width, height), max_size_px);
+        log::debug!(aligned_area:?, dims:? = gif_data.dimensions; "encoded");
+
+        let size = aligned_area.size_px.width.min(aligned_area.size_px.height).into();
 
         (
             data.len(),
             size,
             size,
             base64::engine::general_purpose::STANDARD.encode(data),
+            aligned_area,
         )
     } else {
-        let image = match resize_image(data, area_width, area_height) {
+        let (image, aligned_area) = match resize_image(data, area, max_size_px) {
             Ok(v) => v,
             Err(err) => {
                 bail!("Failed to resize image, err: {}", err);
@@ -155,14 +164,16 @@ fn encode(width: u16, height: u16, data: &[u8], max_size_px: Size) -> Result<Enc
             image.width(),
             image.height(),
             base64::engine::general_purpose::STANDARD.encode(&jpg),
+            aligned_area,
         )
     };
 
-    log::debug!(compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(), area_width, area_height ; "encoded data");
+    log::debug!(compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(); "encoded data");
     Ok(EncodedData {
         content: data,
         size: len,
-        width: width_px,
-        height: height_px,
+        img_width_px: width_px,
+        img_height_px: height_px,
+        aligned_area: aligned_area.area,
     })
 }

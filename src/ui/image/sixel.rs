@@ -20,7 +20,7 @@ use crate::{
     config::Size,
     shared::{
         ext::mpsc::RecvLast,
-        image::{get_image_area_size_px, resize_image},
+        image::resize_image,
         macros::{status_error, try_cont},
     },
     tmux,
@@ -70,7 +70,7 @@ impl Sixel {
                         continue;
                     };
 
-                    let buf = try_cont!(encode(area.width, area.height, &data, max_size), "Failed to encode");
+                    let (buf, resized_area) = try_cont!(encode(&data, area, max_size), "Failed to encode");
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
@@ -85,7 +85,7 @@ impl Sixel {
                     };
 
                     try_cont!(clear_area(&mut w, colors, area), "Failed to clear sixel image area");
-                    try_cont!(display(&mut w, &buf, area), "Failed to display sixel image");
+                    try_cont!(display(&mut w, &buf, resized_area), "Failed to display sixel image");
                 }
             })
             .expect("sixel thread to be spawned");
@@ -105,17 +105,10 @@ fn display(w: &mut impl Write, data: &[u8], area: Rect) -> Result<()> {
     Ok(())
 }
 
-fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8>> {
+fn encode(data: &[u8], area: Rect, max_size: Size) -> Result<(Vec<u8>, Rect)> {
     let start = Instant::now();
 
-    let (iwidth, iheight) = match get_image_area_size_px(width, height, max_size) {
-        Ok(v) => v,
-        Err(err) => {
-            bail!("Failed to get image size, err: {}", err);
-        }
-    };
-
-    let image = match resize_image(data, iwidth, iheight) {
+    let (image, resized_area) = match resize_image(data, area, max_size) {
         Ok(v) => v,
         Err(err) => {
             bail!("Failed to resize image, err: {}", err);
@@ -185,7 +178,7 @@ fn encode(width: u16, height: u16, data: &[u8], max_size: Size) -> Result<Vec<u8
     }
 
     log::debug!(bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
-    Ok(buf)
+    Ok((buf, resized_area.area))
 }
 
 fn put_color<W: Write>(buf: &mut W, byte: u8, color: usize, repeat: u16) -> Result<(), std::io::Error> {
