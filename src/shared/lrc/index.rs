@@ -1,11 +1,10 @@
 use std::{io::BufRead, io::BufReader, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use itertools::Itertools;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::mpd::commands::Song;
+use crate::{mpd::commands::Song, shared::macros::try_cont};
 
 use super::{parse_length, Lrc};
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
@@ -14,25 +13,39 @@ pub struct LrcIndex {
 }
 
 impl LrcIndex {
-    pub fn index(lyrics_dir: &PathBuf) -> anyhow::Result<Self> {
-        Ok(Self {
-            index: WalkDir::new(lyrics_dir)
-                .into_iter()
-                .filter_ok(|entry| entry.file_name().to_string_lossy().ends_with(".lrc"))
-                .map_ok(|entry| {
-                    LrcIndexEntry::read(
-                        BufReader::new(std::fs::File::open(entry.path())?),
-                        entry.path().to_path_buf(),
-                    )
-                })
-                .flatten()
-                .filter_map(|entry| entry.transpose())
-                .try_collect()?,
-        })
-    }
+    pub fn index(lyrics_dir: &PathBuf) -> Self {
+        let start = std::time::Instant::now();
+        let dir = WalkDir::new(lyrics_dir);
+        log::info!(dir:?; "Starting lyrics index lyrics");
 
-    pub fn len(&self) -> usize {
-        self.index.len()
+        let mut index = Vec::new();
+        for entry in dir {
+            let entry = try_cont!(entry, "skipping entry");
+
+            if !entry.file_name().to_string_lossy().ends_with(".lrc") {
+                log::trace!(entry:?; "skipping non lrc file");
+                continue;
+            }
+
+            let file = try_cont!(std::fs::File::open(entry.path()), "failed to open entry file");
+
+            log::trace!(file:?, entry:? = entry.path(); "Trying to index lyrics entry");
+            let index_entry = try_cont!(
+                LrcIndexEntry::read(BufReader::new(file), entry.path().to_path_buf()),
+                "Failed to index an entry"
+            );
+
+            let Some(index_entry) = index_entry else {
+                log::trace!(entry:?; "Entry did not have enough metadata to index, skipping");
+                continue;
+            };
+
+            log::trace!(entry:?; "Successfully indexed entry");
+            index.push(index_entry);
+        }
+
+        log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
+        Self { index }
     }
 
     pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {
@@ -71,14 +84,14 @@ pub struct LrcIndexEntry {
 }
 
 impl LrcIndexEntry {
-    fn read(mut read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
+    fn read(read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
         let mut title = None;
         let mut artist = None;
         let mut album = None;
         let mut length = None;
 
-        let mut buf = String::new();
-        while read.read_line(&mut buf).is_ok() {
+        for buf in read.lines() {
+            let buf = buf?;
             if buf.trim().is_empty() || buf.starts_with('#') {
                 continue;
             }
@@ -112,7 +125,6 @@ impl LrcIndexEntry {
                     bail!("Invalid lrc metadata/timestamp: '{metadata}'");
                 }
             }
-            buf.clear();
         }
 
         let Some(artist) = artist else {
