@@ -137,8 +137,8 @@ mod tests {
 
     use super::AlbumArtPane;
 
+    use crate::config::album_art::ImageMethod;
     use crate::config::Config;
-    use crate::config::ImageMethod;
     use crate::config::Leak;
     use crate::mpd::commands::Song;
     use crate::mpd::commands::State;

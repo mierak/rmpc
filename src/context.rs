@@ -1,7 +1,7 @@
 use std::{cell::Cell, collections::HashSet, path::PathBuf};
 
 use crate::{
-    config::{tabs::PaneType, Config, ImageMethod, Leak},
+    config::{album_art::ImageMethod, tabs::PaneType, Config, Leak},
     mpd::{
         client::Client,
         commands::{Song, State, Status},

@@ -11,7 +11,10 @@ use image::ImageDecoder;
 use ratatui::layout::Rect;
 use rustix::path::Arg;
 
+use crate::config::album_art::HorizontalAlign;
+use crate::config::album_art::VerticalAlign;
 use crate::config::Size;
+use crate::shared::macros::status_info;
 
 use super::dependencies::UEBERZUGPP;
 
@@ -194,7 +197,13 @@ pub struct AlignedArea {
 /// Returns the input [`available_area`] and [`max_size_px`] if terminal's size cannot be determined properly.
 /// Also returns resulting area size in pixels.
 #[allow(clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-pub fn create_aligned_area(available_area: Rect, image_size: (u32, u32), max_size_px: Size) -> AlignedArea {
+pub fn create_aligned_area(
+    available_area: Rect,
+    image_size: (u32, u32),
+    max_size_px: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> AlignedArea {
     let Ok(window_size) = crossterm::terminal::window_size() else {
         log::warn!(available_area:?, max_size_px:?; "Failed to query terminal size");
         return AlignedArea {
@@ -239,32 +248,50 @@ pub fn create_aligned_area(available_area: Rect, image_size: (u32, u32), max_siz
         new_height = available_area.height;
     }
 
+    let new_x = match halign {
+        HorizontalAlign::Left => available_area.x,
+        HorizontalAlign::Center => available_area.x + (available_area.width.saturating_sub(new_width)) / 2,
+        HorizontalAlign::Right => available_area.right().saturating_sub(new_width),
+    };
+    let new_y = match valign {
+        VerticalAlign::Top => available_area.y,
+        VerticalAlign::Center => available_area.y + (available_area.height.saturating_sub(new_height)) / 2,
+        VerticalAlign::Bottom => available_area.bottom().saturating_sub(new_height),
+    };
+
     let result = AlignedArea {
-        area: Rect::new(
-            available_area.x + (available_area.width.saturating_sub(new_width)) / 2,
-            available_area.y + (available_area.height.saturating_sub(new_height)) / 2,
-            new_width,
-            new_height,
-        ),
+        area: Rect::new(new_x, new_y, new_width, new_height),
         size_px: Size {
             width: ((new_width as f64 * cell_width) as u16).min(max_size_px.width),
             height: ((new_height as f64 * cell_height) as u16).min(max_size_px.height),
         },
     };
 
-    log::debug!(result:?, available_area:?, cell_width, cell_height, image_size:?, max_size_px:?; "Aligned area");
+    log::debug!(result:?, available_area:?, cell_width, cell_height, image_size:?, max_size_px:?, window_size:?; "Aligned area");
 
     result
 }
 
-pub fn resize_image(image_data: &[u8], availabe_area: Rect, max_size_px: Size) -> Result<(DynamicImage, AlignedArea)> {
+pub fn resize_image(
+    image_data: &[u8],
+    availabe_area: Rect,
+    max_size_px: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> Result<(DynamicImage, AlignedArea)> {
     let image = image::ImageReader::new(Cursor::new(image_data))
         .with_guessed_format()
         .context("Unable to guess image format")?
         .decode()
         .context("Unable to decode image")?;
 
-    let result_area = create_aligned_area(availabe_area, (image.width(), image.height()), max_size_px);
+    let result_area = create_aligned_area(
+        availabe_area,
+        (image.width(), image.height()),
+        max_size_px,
+        halign,
+        valign,
+    );
 
     let result = image.resize(
         result_area.size_px.width.into(),

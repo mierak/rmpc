@@ -4,7 +4,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ratatui::layout::Rect;
 
-use crate::config::{Config, ImageMethod};
+use crate::config::album_art::ImageMethod;
+use crate::config::Config;
 use crate::shared::image::ImageProtocol;
 
 use super::{iterm2::Iterm2, kitty::Kitty, Backend};
@@ -37,12 +38,14 @@ impl AlbumArtFacade {
     pub fn new(config: &Config) -> Self {
         let max_size = config.album_art.max_size_px;
         let bg_color = config.theme.background_color;
+        let valign = config.album_art.vertical_align;
+        let halign = config.album_art.horizontal_align;
         let proto = match config.album_art.method.into() {
-            ImageProtocol::Kitty => ImageState::Kitty(Kitty::new(max_size, bg_color)),
+            ImageProtocol::Kitty => ImageState::Kitty(Kitty::new(max_size, bg_color, halign, valign)),
             ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new(Layer::Wayland, max_size)),
             ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11, max_size)),
-            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(max_size, bg_color)),
-            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(max_size, bg_color)),
+            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(max_size, bg_color, halign, valign)),
+            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(max_size, bg_color, halign, valign)),
             ImageProtocol::None => ImageState::None,
         };
         Self {
