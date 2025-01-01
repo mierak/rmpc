@@ -1,7 +1,6 @@
 use std::{io::BufRead, io::BufReader, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use itertools::Itertools;
 use serde::Serialize;
 use walkdir::WalkDir;
 
@@ -24,33 +23,29 @@ impl LrcIndex {
             let entry = try_cont!(entry, "skipping entry");
 
             if !entry.file_name().to_string_lossy().ends_with(".lrc") {
-                log::debug!(entry:?; "skipping non lrc file");
+                log::trace!(entry:?; "skipping non lrc file");
                 continue;
             }
 
             let file = try_cont!(std::fs::File::open(entry.path()), "failed to open entry file");
 
-            log::debug!(file:?, entry:? = entry.path(); "trying to index entry");
+            log::trace!(file:?, entry:? = entry.path(); "Trying to index lyrics entry");
             let index_entry = try_cont!(
                 LrcIndexEntry::read(BufReader::new(file), entry.path().to_path_buf()),
-                "failed to index an entry"
+                "Failed to index an entry"
             );
 
             let Some(index_entry) = index_entry else {
-                log::debug!(entry:?; "entry did not have enough metadata to index, skipping");
+                log::trace!(entry:?; "Entry did not have enough metadata to index, skipping");
                 continue;
             };
 
-            log::debug!(entry:?; "successfully indexed");
+            log::trace!(entry:?; "Successfully indexed entry");
             index.push(index_entry);
         }
 
         log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
         Self { index }
-    }
-
-    pub fn len(&self) -> usize {
-        self.index.len()
     }
 
     pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {

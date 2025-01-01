@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - `ToggleConsume` and `ToggleSingle` causing playback to stop
 - Styling not being applied to Bitrate and Crossfade props
 - Refactored and greatly simplified image backends
+- Potential infinite loop in lyrics indexing
 
 ## [0.7.0] - 2024-12-24
 
