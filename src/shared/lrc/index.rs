@@ -15,8 +15,9 @@ pub struct LrcIndex {
 
 impl LrcIndex {
     pub fn index(lyrics_dir: &PathBuf) -> Self {
+        let start = std::time::Instant::now();
         let dir = WalkDir::new(lyrics_dir);
-        log::debug!(dir:?; "walkdir");
+        log::info!(dir:?; "Starting lyrics index lyrics");
 
         let mut index = Vec::new();
         for entry in dir {
@@ -42,6 +43,7 @@ impl LrcIndex {
             index.push(index_entry);
         }
 
+        log::info!(found_count = index.len(), elapsed:? = start.elapsed(); "Indexed lrc files");
         Self { index }
     }
 
