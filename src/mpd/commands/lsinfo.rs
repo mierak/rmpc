@@ -41,7 +41,6 @@ impl FromMpd for Dir {
                 self.full_path = value;
             }
             "last-modified" => self.last_modified = value,
-            "playlist" => {} // ignore, deprecated
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
@@ -90,7 +89,7 @@ mod tests {
     use super::{FromMpd, LsInfo};
 
     #[test]
-    fn lsinfoplaylist() {
+    fn can_parse_playlist_entry() {
         let input = r"playlist: autechre.m3u
 Last-Modified: 2024-10-30T00:04:26Z
 directory: .cue
