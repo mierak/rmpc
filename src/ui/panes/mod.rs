@@ -160,7 +160,7 @@ pub(crate) mod browser {
 
     use crate::{
         config::theme::SymbolsConfig,
-        mpd::commands::{lsinfo::FileOrDir, Song},
+        mpd::commands::{lsinfo::LsInfoEntry, Song},
     };
 
     impl Song {
@@ -296,13 +296,14 @@ pub(crate) mod browser {
         }
     }
 
-    impl From<FileOrDir> for DirOrSong {
-        fn from(value: FileOrDir) -> Self {
+    impl From<LsInfoEntry> for Option<DirOrSong> {
+        fn from(value: LsInfoEntry) -> Self {
             match value {
-                FileOrDir::Dir(crate::mpd::commands::lsinfo::Dir { path, full_path, .. }) => {
-                    DirOrSong::Dir { name: path, full_path }
+                LsInfoEntry::Dir(crate::mpd::commands::lsinfo::Dir { path, full_path, .. }) => {
+                    Some(DirOrSong::Dir { name: path, full_path })
                 }
-                FileOrDir::File(song) => DirOrSong::Song(song),
+                LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
+                LsInfoEntry::Playlist(_) => None,
             }
         }
     }

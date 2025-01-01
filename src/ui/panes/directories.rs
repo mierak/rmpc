@@ -7,7 +7,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::{lsinfo::FileOrDir, Song},
+        commands::{lsinfo::LsInfoEntry, Song},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
@@ -65,12 +65,13 @@ impl DirectoriesPane {
                         let new_current = client.lsinfo(Some(&next_path.join("/").to_string()))?;
                         let res = new_current
                             .into_iter()
-                            .map(|v| match v {
-                                FileOrDir::Dir(d) => DirOrSong::Dir {
+                            .filter_map(|v| match v {
+                                LsInfoEntry::Dir(d) => Some(DirOrSong::Dir {
                                     name: d.path,
                                     full_path: d.full_path,
-                                },
-                                FileOrDir::File(s) => DirOrSong::Song(s),
+                                }),
+                                LsInfoEntry::File(s) => Some(DirOrSong::Song(s)),
+                                LsInfoEntry::Playlist(_) => None,
                             })
                             .sorted()
                             .collect();
@@ -117,7 +118,7 @@ impl Pane for DirectoriesPane {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
-                        .map(Into::<DirOrSong>::into)
+                        .filter_map(Into::<Option<DirOrSong>>::into)
                         .sorted()
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong {
@@ -143,7 +144,7 @@ impl Pane for DirectoriesPane {
                         let result = client
                             .lsinfo(None)?
                             .into_iter()
-                            .map(Into::<DirOrSong>::into)
+                            .filter_map(Into::<Option<DirOrSong>>::into)
                             .sorted()
                             .collect::<Vec<_>>();
                         Ok(MpdQueryResult::DirOrSong {
@@ -316,12 +317,13 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         }
                         .0
                         .into_iter()
-                        .map(|v| match v {
-                            FileOrDir::Dir(dir) => DirOrSong::Dir {
+                        .filter_map(|v| match v {
+                            LsInfoEntry::Dir(dir) => Some(DirOrSong::Dir {
                                 name: dir.path,
                                 full_path: dir.full_path,
-                            },
-                            FileOrDir::File(song) => DirOrSong::Song(song),
+                            }),
+                            LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
+                            LsInfoEntry::Playlist(_) => None,
                         })
                         .sorted()
                         .map(|v| v.to_list_item_simple(config))
