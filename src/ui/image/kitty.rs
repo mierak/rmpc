@@ -11,7 +11,10 @@ use std::{
     time::Instant,
 };
 
-use crate::shared::tmux::tmux_write;
+use crate::{
+    config::album_art::{HorizontalAlign, VerticalAlign},
+    shared::{image::create_aligned_area, macros::try_cont, tmux::tmux_write},
+};
 use base64::Engine;
 use flate2::Compression;
 use ratatui::prelude::{Color, Rect};
@@ -20,7 +23,7 @@ use crate::{
     config::Size,
     shared::{
         ext::mpsc::RecvLast,
-        image::{get_gif_frames, get_image_area_size_px, resize_image},
+        image::{get_gif_frames, resize_image},
         macros::status_error,
     },
 };
@@ -48,7 +51,7 @@ impl Backend for Kitty {
 }
 
 impl Kitty {
-    pub fn new(max_size: Size, bg_color: Option<Color>) -> Self {
+    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
         let (sender, receiver) = unbounded::<(Arc<Vec<_>>, Rect)>();
         let colors = Colors {
             background: bg_color.map(Into::into),
@@ -60,20 +63,20 @@ impl Kitty {
             .spawn(move || {
                 let mut pending_req: Option<(Arc<Vec<_>>, Rect)> = None;
                 loop {
-                    let Ok((vec, rect)) = pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) else {
+                    let Ok((vec, area)) = pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) else {
                         continue;
                     };
 
-                    let data =
-                        match create_data_to_transfer(&vec, rect.width, rect.height, Compression::new(6), max_size) {
-                            Ok(data) => data,
-                            Err(err) => {
-                                status_error!(err:?; "Failed to compress image data");
-                                continue;
-                            }
-                        };
+                    let data = match create_data_to_transfer(&vec, area, Compression::new(6), max_size, halign, valign)
+                    {
+                        Ok(data) => data,
+                        Err(err) => {
+                            status_error!(err:?; "Failed to compress image data");
+                            continue;
+                        }
+                    };
 
-                    let mut stdout = std::io::stdout().lock();
+                    let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
                         log::trace!("Not showing image because its not supposed to be displayed anymore");
                         continue;
@@ -85,26 +88,30 @@ impl Kitty {
                         continue;
                     };
 
-                    if let Err(err) = match data {
-                        Data::ImageData(data) => transfer_image_data(
-                            &mut stdout,
-                            &data.content,
-                            rect.width,
-                            rect.height,
-                            data.img_width,
-                            data.img_height,
-                        ),
-                        Data::AnimationData(data) => {
-                            transfer_animation_data(&mut stdout, data, rect.width, rect.height)
-                        }
-                    } {
-                        status_error!(err:?; "Failed to transfer image data");
-                        continue;
-                    }
+                    try_cont!(clear_area(&mut w, colors, area), "Failed to clear kitty image area");
+                    match data {
+                        Data::ImageData(data) => {
+                            try_cont!(
+                                transfer_image_data(&mut w, &data.content, data.img_width, data.img_height),
+                                "Failed to transfer image data"
+                            );
 
-                    if let Err(err) = create_unicode_placeholder_grid(&mut stdout, colors, rect) {
-                        status_error!(err:?; "Failed to create unicode placeholders");
-                        continue;
+                            try_cont!(
+                                create_unicode_placeholder_grid(&mut w, colors, data.aligned_area),
+                                "Failed to create unicode placeholders"
+                            );
+                        }
+                        Data::AnimationData(data) => {
+                            let aligned_area = data.aligned_area;
+                            try_cont!(
+                                transfer_animation_data(&mut w, data),
+                                "Failed to transfer animation data"
+                            );
+                            try_cont!(
+                                create_unicode_placeholder_grid(&mut w, colors, aligned_area),
+                                "Failed to create unicode placeholders"
+                            );
+                        }
                     }
                 }
             })
@@ -116,18 +123,19 @@ impl Kitty {
 
 fn create_data_to_transfer(
     image_data: &[u8],
-    width: u16,
-    height: u16,
+    area: Rect,
     compression: Compression,
     max_size: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
 ) -> Result<Data> {
     let start_time = Instant::now();
     log::debug!(bytes = image_data.len(); "Compressing image data");
-    let (w, h) = get_image_area_size_px(width, height, max_size)?;
 
     if let Some(data) = get_gif_frames(image_data)? {
         let frames = data.frames;
         let (width, height) = data.dimensions;
+
         let frames: Vec<AnimationFrame> = frames
             .map_ok(|frame| {
                 let delay = frame.delay().numer_denom_ms();
@@ -138,15 +146,17 @@ fn create_data_to_transfer(
                 }
             })
             .try_collect()?;
+        let aligned_area = create_aligned_area(area, (width, height), max_size, halign, valign).area;
 
         Ok(Data::AnimationData(AnimationData {
             frames,
             is_compressed: false,
             img_width: width,
             img_height: height,
+            aligned_area,
         }))
     } else {
-        let image = resize_image(image_data, w, h)?;
+        let (image, aligned_area) = resize_image(image_data, area, max_size, halign, valign)?;
 
         let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
         e.write_all(image.to_rgba8().as_raw())
@@ -160,6 +170,7 @@ fn create_data_to_transfer(
         log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
         Ok(Data::ImageData(ImageData {
             content,
+            aligned_area: aligned_area.area,
             img_width: image.width(),
             img_height: image.height(),
         }))
@@ -191,16 +202,17 @@ fn create_unicode_placeholder_grid(w: &mut impl Write, colors: Colors, area: Rec
     Ok(())
 }
 
-fn transfer_animation_data(w: &mut impl Write, data: AnimationData, cols: u16, rows: u16) -> Result<()> {
+fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()> {
     let start_time = Instant::now();
     let AnimationData {
         frames,
         is_compressed,
         img_width,
         img_height,
+        aligned_area,
     } = data;
 
-    log::debug!(frames = frames.len(), img_width, img_height, rows, cols; "Transferring animation data");
+    log::debug!(frames = frames.len(), img_width, img_height, aligned_area:?; "Transferring animation data");
 
     if frames.len() < 2 {
         log::warn!("Less than two frames, invalid animation data");
@@ -216,7 +228,9 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData, cols: u16, r
     // Create image and transfer first frame
     tmux_write!(w,
         "\x1b_Gi=1,f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
-         compression = if is_compressed { ",o=z" } else { ""} 
+         compression = if is_compressed { ",o=z" } else { ""},
+         cols = aligned_area.width,
+         rows = aligned_area.height
     )?;
 
     // Transfer the rest of the first frame if any
@@ -251,16 +265,9 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData, cols: u16, r
     Ok(())
 }
 
-fn transfer_image_data(
-    w: &mut impl Write,
-    content: &str,
-    cols: u16,
-    rows: u16,
-    img_width: u32,
-    img_height: u32,
-) -> Result<()> {
+fn transfer_image_data(w: &mut impl Write, content: &str, img_width: u32, img_height: u32) -> Result<()> {
     let start_time = Instant::now();
-    log::debug!(bytes = content.len(), img_width, img_height, rows, cols; "Transferring compressed image data");
+    log::debug!(bytes = content.len(), img_width, img_height; "Transferring compressed image data");
     let mut iter = content.chars().peekable();
 
     let first: String = iter.by_ref().take(4096).collect();
@@ -288,6 +295,7 @@ struct ImageData {
     content: String,
     img_width: u32,
     img_height: u32,
+    aligned_area: Rect,
 }
 
 struct AnimationFrame {
@@ -300,6 +308,7 @@ struct AnimationData {
     is_compressed: bool,
     img_width: u32,
     img_height: u32,
+    aligned_area: Rect,
 }
 
 const DELIM: &str = "\u{10EEEE}";
