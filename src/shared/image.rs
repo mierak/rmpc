@@ -14,7 +14,6 @@ use rustix::path::Arg;
 use crate::config::album_art::HorizontalAlign;
 use crate::config::album_art::VerticalAlign;
 use crate::config::Size;
-use crate::shared::macros::status_info;
 
 use super::dependencies::UEBERZUGPP;
 

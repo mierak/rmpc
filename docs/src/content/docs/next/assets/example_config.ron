@@ -17,6 +17,8 @@
         method: Auto,
         max_size_px: (width: 600, height: 600),
         disabled_protocols: ["http://", "https://"],
+        vertical_align: Center,
+        horizontal_align: Center,
     ),
     keybinds: (
         global: {
