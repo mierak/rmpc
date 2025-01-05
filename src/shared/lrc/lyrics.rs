@@ -47,34 +47,36 @@ impl FromStr for Lrc {
             let (meta_or_time, line) = s
                 .trim()
                 .strip_prefix('[')
-                .and_then(|s| s.split_once(']'))
+                .and_then(|s| s.rsplit_once(']'))
                 .with_context(|| format!("Invalid lrc line format: '{s}'"))?;
 
             match meta_or_time.chars().next() {
                 Some(c) if c.is_numeric() => {
-                    let (minutes, time_rest) = meta_or_time
-                        .split_once(':')
-                        .with_context(|| format!("Invalid lrc minutes format: '{meta_or_time}'"))?;
-                    let (seconds, hundreths) = time_rest
-                        .split_once('.')
-                        .or_else(|| time_rest.split_once(':'))
-                        .with_context(|| format!("Invalid lrc seconds and hundreths format: '{time_rest}'"))?;
+                    for meta_or_time in meta_or_time.split("][") {
+                        let (minutes, time_rest) = meta_or_time
+                            .split_once(':')
+                            .with_context(|| format!("Invalid lrc minutes format: '{meta_or_time}'"))?;
+                        let (seconds, hundreths) = time_rest
+                            .split_once('.')
+                            .or_else(|| time_rest.split_once(':'))
+                            .with_context(|| format!("Invalid lrc seconds and hundreths format: '{time_rest}'"))?;
 
-                    let mut milis = 0;
-                    milis += minutes.parse::<u64>()? * 60 * 1000;
-                    milis += seconds.parse::<u64>()? * 1000;
-                    milis += hundreths.parse::<u64>()? * 10;
+                        let mut milis = 0;
+                        milis += minutes.parse::<u64>()? * 60 * 1000;
+                        milis += seconds.parse::<u64>()? * 1000;
+                        milis += hundreths.parse::<u64>()? * 10;
 
-                    milis = match offset {
-                        Some(offset) if offset > 0 => milis.saturating_sub(offset.unsigned_abs()),
-                        Some(offset) if offset < 0 => milis.saturating_add(offset.unsigned_abs()),
-                        _ => milis,
-                    };
+                        milis = match offset {
+                            Some(offset) if offset > 0 => milis.saturating_sub(offset.unsigned_abs()),
+                            Some(offset) if offset < 0 => milis.saturating_add(offset.unsigned_abs()),
+                            _ => milis,
+                        };
 
-                    result.lines.push(LrcLine {
-                        time: Duration::from_millis(milis),
-                        content: line.to_owned(),
-                    });
+                        result.lines.push(LrcLine {
+                            time: Duration::from_millis(milis),
+                            content: line.to_owned(),
+                        });
+                    }
                 }
                 Some(_) => {
                     let (key, value) = meta_or_time
@@ -213,6 +215,50 @@ mod tests {
                     LrcLine {
                         time: Duration::from_millis(5730),
                         content: "line2".to_string()
+                    },
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn repeating_lyrics() {
+        let input = r"
+[00:01.86]line1
+[00:04.73][00:05.73][00:06.73]line2
+[00:07.86]line3
+";
+
+        let result: Lrc = input.parse().unwrap();
+
+        assert_eq!(
+            result,
+            Lrc {
+                title: None,
+                artist: None,
+                album: None,
+                author: None,
+                length: None,
+                lines: vec![
+                    LrcLine {
+                        time: Duration::from_millis(1860),
+                        content: "line1".to_string()
+                    },
+                    LrcLine {
+                        time: Duration::from_millis(4730),
+                        content: "line2".to_string()
+                    },
+                    LrcLine {
+                        time: Duration::from_millis(5730),
+                        content: "line2".to_string()
+                    },
+                    LrcLine {
+                        time: Duration::from_millis(6730),
+                        content: "line2".to_string()
+                    },
+                    LrcLine {
+                        time: Duration::from_millis(7860),
+                        content: "line3".to_string()
                     },
                 ],
             }
