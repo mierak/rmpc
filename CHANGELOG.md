@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Support for repeating lyrics in lrc
+
 ### Changed
 
 - Album art with kitty image protocol is no longer centered and is in line with the other image backends
