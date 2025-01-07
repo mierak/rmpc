@@ -15,8 +15,10 @@
     select_current_song_on_change: false,
     album_art: (
         method: Auto,
-        max_size_px: (width: 600, height: 600),
+        max_size_px: (width: 1200, height: 1200),
         disabled_protocols: ["http://", "https://"],
+        vertical_align: Center,
+        horizontal_align: Center,
     ),
     keybinds: (
         global: {

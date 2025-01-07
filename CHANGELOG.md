@@ -7,10 +7,11 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Support for repeating lyrics in lrc
+- `vertical_align` and `horizontal_align` to album art config, supports kitty, sixel and iterm2
 
 ### Changed
 
-- Album art with kitty image protocol is no longer centered and is in line with the other image backends
+- Increased default album art `max_size_px` to `(1200, 1200)`.
 
 ### Fixed
 

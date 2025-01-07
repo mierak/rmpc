@@ -3,14 +3,16 @@ use std::io::Cursor;
 
 use anyhow::Context;
 use anyhow::Result;
-use crossterm::terminal::WindowSize;
 use image::codecs::gif::GifDecoder;
 use image::codecs::jpeg::JpegEncoder;
 use image::AnimationDecoder;
 use image::DynamicImage;
 use image::ImageDecoder;
+use ratatui::layout::Rect;
 use rustix::path::Arg;
 
+use crate::config::album_art::HorizontalAlign;
+use crate::config::album_art::VerticalAlign;
 use crate::config::Size;
 
 use super::dependencies::UEBERZUGPP;
@@ -183,57 +185,126 @@ pub fn read_size_csi() -> Result<Option<(u16, u16)>> {
     Ok(None)
 }
 
-pub fn get_image_area_size_px(area_width_col: u16, area_height_col: u16, max_size_px: Size) -> Result<(u16, u16)> {
-    let size = crossterm::terminal::window_size().context("Unable to query terminal size")?;
-
-    // TODO: Figure out how to execute and read CSI sequences without it messing up crossterm
-
-    // if size.width == 0 || size.height == 0 {
-    //     if let Ok(Some((width, height))) = read_size_csi() {
-    //         size.width = width;
-    //         size.height = height;
-    //     }
-    // }
-
-    // TODO calc correct max size
-
-    let (w, h) = clamp_image_size(&size, area_width_col, area_height_col, max_size_px);
-
-    log::debug!(w, h, size:?; "Resolved terminal size");
-    Ok((w, h))
+#[derive(Debug, Clone, Copy)]
+pub struct AlignedArea {
+    pub area: Rect,
+    pub size_px: Size,
 }
 
-pub fn resize_image(image_data: &[u8], width_px: u16, hegiht_px: u16) -> Result<DynamicImage> {
-    Ok(image::ImageReader::new(Cursor::new(image_data))
+/// Returns a new aligned area contained by [`available_area`] with aspect ratio provided by [`image_size`].
+/// Constrains area by [`max_size_px`].
+/// Returns the input [`available_area`] and [`max_size_px`] if terminal's size cannot be determined properly.
+/// Also returns resulting area size in pixels.
+#[allow(clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub fn create_aligned_area(
+    available_area: Rect,
+    image_size: (u32, u32),
+    max_size_px: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> AlignedArea {
+    let Ok(window_size) = crossterm::terminal::window_size() else {
+        log::warn!(available_area:?, max_size_px:?; "Failed to query terminal size");
+        return AlignedArea {
+            area: available_area,
+            size_px: max_size_px,
+        };
+    };
+
+    if window_size.width == 0 || window_size.height == 0 {
+        log::warn!(available_area:?, max_size_px:?; "Terminal returned invalid size");
+        return AlignedArea {
+            area: available_area,
+            size_px: max_size_px,
+        };
+    };
+
+    let available_width = available_area.width as f64;
+    let available_height = available_area.height as f64;
+    let cell_width = window_size.width as f64 / window_size.columns as f64;
+    let cell_height = window_size.height as f64 / window_size.rows as f64;
+
+    let image_aspect_ratio = image_size.0 as f64 / image_size.1 as f64;
+    let cell_aspect_ratio = cell_width / cell_height;
+    let available_area_aspect_ratio = available_width / available_height * cell_aspect_ratio;
+
+    let (mut new_width, mut new_height) = if available_area_aspect_ratio < image_aspect_ratio {
+        let new_width = available_area.width;
+        let new_height = (available_width / image_aspect_ratio * cell_aspect_ratio).ceil() as u16;
+
+        (new_width, new_height)
+    } else {
+        let new_width = (available_height * image_aspect_ratio / cell_aspect_ratio).ceil() as u16;
+        let new_height = available_area.height;
+
+        (new_width, new_height)
+    };
+
+    if new_width > available_area.width {
+        new_width = available_area.width;
+    }
+    if new_height > available_area.height {
+        new_height = available_area.height;
+    }
+
+    let new_x = match halign {
+        HorizontalAlign::Left => available_area.x,
+        HorizontalAlign::Center => available_area.x + (available_area.width.saturating_sub(new_width)) / 2,
+        HorizontalAlign::Right => available_area.right().saturating_sub(new_width),
+    };
+    let new_y = match valign {
+        VerticalAlign::Top => available_area.y,
+        VerticalAlign::Center => available_area.y + (available_area.height.saturating_sub(new_height)) / 2,
+        VerticalAlign::Bottom => available_area.bottom().saturating_sub(new_height),
+    };
+
+    let result = AlignedArea {
+        area: Rect::new(new_x, new_y, new_width, new_height),
+        size_px: Size {
+            width: ((new_width as f64 * cell_width) as u16).min(max_size_px.width),
+            height: ((new_height as f64 * cell_height) as u16).min(max_size_px.height),
+        },
+    };
+
+    log::debug!(result:?, available_area:?, cell_width, cell_height, image_size:?, max_size_px:?, window_size:?; "Aligned area");
+
+    result
+}
+
+pub fn resize_image(
+    image_data: &[u8],
+    availabe_area: Rect,
+    max_size_px: Size,
+    halign: HorizontalAlign,
+    valign: VerticalAlign,
+) -> Result<(DynamicImage, AlignedArea)> {
+    let image = image::ImageReader::new(Cursor::new(image_data))
         .with_guessed_format()
         .context("Unable to guess image format")?
         .decode()
-        .context("Unable to decode image")?
-        .resize(
-            u32::from(width_px),
-            u32::from(hegiht_px),
-            image::imageops::FilterType::Lanczos3,
-        ))
+        .context("Unable to decode image")?;
+
+    let result_area = create_aligned_area(
+        availabe_area,
+        (image.width(), image.height()),
+        max_size_px,
+        halign,
+        valign,
+    );
+
+    let result = image.resize(
+        result_area.size_px.width.into(),
+        result_area.size_px.height.into(),
+        image::imageops::FilterType::Lanczos3,
+    );
+
+    Ok((result, result_area))
 }
 
 pub fn jpg_encode(img: &DynamicImage) -> Result<Vec<u8>> {
     let mut jpg = Vec::new();
     JpegEncoder::new(&mut jpg).encode_image(img)?;
     Ok(jpg)
-}
-
-fn clamp_image_size(size: &WindowSize, area_width_col: u16, area_height_col: u16, max_size_px: Size) -> (u16, u16) {
-    if size.width == 0 || size.height == 0 {
-        return (max_size_px.width, max_size_px.height);
-    }
-
-    let cell_width = size.width / size.columns;
-    let cell_height = size.height / size.rows;
-
-    let w = cell_width * area_width_col;
-    let h = cell_height * area_height_col;
-
-    (w.min(max_size_px.width), h.min(max_size_px.height))
 }
 
 pub struct GifData<'frames> {
@@ -255,32 +326,5 @@ pub fn get_gif_frames(data: &[u8]) -> Result<Option<GifData<'_>>> {
         }))
     } else {
         Ok(None)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crossterm::terminal::WindowSize;
-    use test_case::test_case;
-
-    use crate::config::Size;
-
-    use super::clamp_image_size;
-
-    #[test_case(&WindowSize { width: 0, height: 0, columns: 10, rows: 10 }, 10, 10, Size { width: 500, height: 500 }, Size { width: 500, height: 500 }; "size not reported")]
-    #[test_case(&WindowSize { width: 500, height: 500, columns: 10, rows: 10 }, 50, 10, Size { width: 500, height: 500 }, Size { width: 500, height: 500 }; "wider area")]
-    #[test_case(&WindowSize { width: 500, height: 500, columns: 10, rows: 10 }, 10, 50, Size { width: 500, height: 500 }, Size { width: 500, height: 500 }; "taller area")]
-    #[test_case(&WindowSize { width: 500, height: 500, columns: 10, rows: 10 }, 10, 10, Size { width: 5000, height: 500 }, Size { width: 500, height: 500 }; "square area")]
-    fn uses_max_size_if_size_not_reported(
-        window: &WindowSize,
-        area_width: u16,
-        area_height: u16,
-        max_size: Size,
-        expected: Size,
-    ) {
-        let (w, h) = clamp_image_size(window, area_width, area_height, max_size);
-
-        assert_eq!(w, expected.width, "width not correct");
-        assert_eq!(h, expected.height, "height not correct");
     }
 }
