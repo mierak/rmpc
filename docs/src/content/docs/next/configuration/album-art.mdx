@@ -46,9 +46,10 @@ Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is 
 <ConfigValue name="max_size_px" type="other" customText="(<width>, <height>)" />
 
 Sets limit for the album art size. If the album art is larger than this, it will be resized to fit the limit.
-You should not set this option unless needed because preferred image methods will figure out the correct size
-themselves. This is needed only for terminals that do not report their size correctly. Default is `(600, 600)`.
-`(0, 0)` means no practical limit. Ueberzug method is not influenced by this setting.
+
+You can set this to `(0, 0)` (no limit) if you use terminal emulator which properly reports its size and rmpc will figure
+out the maximum size itself. This is needed only for terminals which do not report their size correctly.
+Default is `(1200, 1200)`. Ueberzug backend is not influenced by this setting.
 
 ### disabled_protocols
 
@@ -61,13 +62,13 @@ to enable all protocols. Defaults to `["http://", "https://]`
 
 <ConfigValue name="vertical_align" type={["Top", "Center", "Bottom"]} />
 
-Where to align album art vertically.
+Where to align album art vertically. Not supported by ueberzugpp backend.
 
 ### horizontal_align
 
 <ConfigValue name="horizontal_align" type={["Left", "Center", "Right"]} />
 
-Where to align album art horizontally.
+Where to align album art horizontally. Not supported by ueberzugpp backend.
 
 ## Backends
 
@@ -82,7 +83,7 @@ Cons:
 
 ### Ueberzugpp
 
-Requires [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Art is aligned to the top of the window and not centered.
+Requires [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Art is aligned to the top of and its position cannot be changed.
 
 Pros:
 

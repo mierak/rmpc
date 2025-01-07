@@ -110,8 +110,8 @@ pub struct Size {
 impl Default for Size {
     fn default() -> Self {
         Self {
-            width: 600,
-            height: 600,
+            width: 1200,
+            height: 1200,
         }
     }
 }

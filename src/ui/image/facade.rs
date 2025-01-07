@@ -57,19 +57,8 @@ impl AlbumArtFacade {
     }
 
     pub fn show_default(&mut self) -> Result<()> {
-        self.current_album_art = None;
-        IS_SHOWING.store(true, Ordering::Relaxed);
-
-        let data = Arc::clone(&self.default_album_art);
-        log::debug!(bytes = data.len(), area:? = self.last_size; "Displaying default image");
-
-        match &mut self.image_state {
-            ImageState::Kitty(kitty) => kitty.show(data, self.last_size),
-            ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
-            ImageState::Iterm2(iterm2) => iterm2.show(data, self.last_size),
-            ImageState::Sixel(s) => s.show(data, self.last_size),
-            ImageState::None => Ok(()),
-        }
+        self.current_album_art = Some(Arc::clone(&self.default_album_art));
+        self.show_current()
     }
 
     pub fn show_current(&mut self) -> Result<()> {
