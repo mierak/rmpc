@@ -9,8 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-
-  build:
+  build-linux:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -25,6 +24,55 @@ jobs:
             target: aarch64-unknown-linux-musl
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
+    steps:
+    - name: Install prerequisites
+      run: |
+        cargo install cross --git https://github.com/cross-rs/cross
+
+    - name: Read release tag
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]; then
+            echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}"  >> "$GITHUB_ENV"
+        fi
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Fetch tags
+      run: |
+        git fetch --tags -f
+
+    - name: Build release
+      run: |
+        cross build --release --target ${{ matrix.target }}
+
+    - name: Copy artifacts
+      working-directory: ./target
+      run: |
+        mkdir -p "/tmp/artifacts"
+        tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: rmpc-${{ matrix.target }}
+        path: /tmp/artifacts/
+
+    # - name: Release
+    #   uses: ncipollo/release-action@v1
+    #   with:
+    #     allowUpdates: true
+    #     draft: true
+    #     artifacts: /tmp/artifacts/*
+
+  build-macos:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
           - os: macos-latest
             target: x86_64-apple-darwin
           - os: macos-latest
@@ -44,8 +92,6 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v4
-      # with:
-      #    fetch-tags: true
 
     - name: Fetch tags
       run: |
@@ -53,7 +99,7 @@ jobs:
 
     - name: Build release
       run: |
-        cross build --release --target ${{ matrix.target }}
+        cargo build --release --target ${{ matrix.target }}
 
     - name: Copy artifacts
       working-directory: ./target
