@@ -99,6 +99,7 @@ jobs:
 
     - name: Build release
       run: |
+        rustup target add ${{ matrix.target }}
         cargo build --release --target ${{ matrix.target }}
 
     - name: Copy artifacts
