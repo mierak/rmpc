@@ -2,6 +2,8 @@ name: Release
 
 on: 
   push:
+    branches:
+      - "ci/macos-binary"
     tags:
     - 'v*.*.*'
   workflow_dispatch:
@@ -14,13 +16,19 @@ jobs:
       contents: write
     strategy:
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
         include:
           - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
     steps:
     - name: Install prerequisites
       run: |
@@ -53,14 +61,14 @@ jobs:
         mkdir -p "/tmp/artifacts"
         tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
 
-    # - uses: actions/upload-artifact@v4
-    #   with:
-    #     name: rmpc-${{ matrix.target }}
-    #     path: /tmp/artifacts/
-
-    - name: Release
-      uses: ncipollo/release-action@v1
+    - uses: actions/upload-artifact@v4
       with:
-        allowUpdates: true
-        draft: true
-        artifacts: /tmp/artifacts/*
+        name: rmpc-${{ matrix.target }}
+        path: /tmp/artifacts/
+
+    # - name: Release
+    #   uses: ncipollo/release-action@v1
+    #   with:
+    #     allowUpdates: true
+    #     draft: true
+    #     artifacts: /tmp/artifacts/*
