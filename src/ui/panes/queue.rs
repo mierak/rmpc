@@ -7,10 +7,7 @@ use crate::{
     config::{
         keys::{GlobalAction, QueueActions},
         tabs::PaneType,
-        theme::{
-            properties::{Property, SongProperty},
-            PercentOrLength,
-        },
+        theme::properties::{Property, SongProperty},
     },
     context::AppContext,
     core::command::{create_env, run_external},
@@ -78,10 +75,7 @@ impl QueuePane {
                 .theme
                 .song_table_format
                 .iter()
-                .map(|v| match v.width {
-                    PercentOrLength::Percent(p) => Constraint::Percentage(p),
-                    PercentOrLength::Length(l) => Constraint::Length(l),
-                })
+                .map(|v| Into::<Constraint>::into(v.width))
                 .collect_vec(),
             column_formats: config.theme.song_table_format.iter().map(|v| v.prop).collect_vec(),
             areas: enum_map! {

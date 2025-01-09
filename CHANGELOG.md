@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Support for repeating lyrics in lrc
 - `vertical_align` and `horizontal_align` to album art config, supports kitty, sixel and iterm2
+- Support for fixed Pane size in Tabs
 
 ### Changed
 

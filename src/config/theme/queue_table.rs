@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use itertools::Itertools;
+use ratatui::layout::Constraint;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -11,10 +12,19 @@ use super::properties::{
 use super::style::ToConfigOr;
 use super::StyleFile;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PercentOrLength {
     Percent(u16),
     Length(u16),
+}
+
+impl From<PercentOrLength> for Constraint {
+    fn from(value: PercentOrLength) -> Self {
+        match value {
+            PercentOrLength::Percent(val) => Constraint::Percentage(val),
+            PercentOrLength::Length(val) => Constraint::Length(val),
+        }
+    }
 }
 
 impl std::str::FromStr for PercentOrLength {

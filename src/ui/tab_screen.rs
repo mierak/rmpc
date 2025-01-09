@@ -10,11 +10,10 @@ use ratatui::{
 use crate::{
     config::{
         keys::CommonAction,
-        tabs::{Pane, PaneOrSplitWithPosition, SubPaneWithPosition},
+        tabs::{Pane, SizedPaneOrSplit, SizedSubPane},
     },
     context::AppContext,
     shared::{
-        geometry::Point,
         id::Id,
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -26,25 +25,18 @@ use super::{Pane as _, PaneContainer, Panes};
 #[derive(Debug)]
 pub struct TabScreen {
     focused: Option<Pane>, // can focused ever be none?
-    pub panes: &'static crate::config::tabs::PaneOrSplitWithPosition,
-    pane_areas: HashMap<Id, Rect>,
+    pub panes: &'static crate::config::tabs::SizedPaneOrSplit,
+    pane_areas: HashMap<Id, (Rect, bool)>,
+    initialized: bool,
 }
 
 impl TabScreen {
-    pub fn new(panes: &'static crate::config::tabs::PaneOrSplitWithPosition) -> Self {
-        let focused = panes
-            .panes_iter()
-            .filter(|Pane { focusable, .. }| *focusable)
-            .min_by(|a, b| {
-                Point::default()
-                    .distance(a.geometry.top_left())
-                    .cmp(&Point::default().distance(b.geometry.top_left()))
-            });
-
+    pub fn new(panes: &'static crate::config::tabs::SizedPaneOrSplit) -> Self {
         Self {
-            focused,
             panes,
+            initialized: false,
             pane_areas: HashMap::default(),
+            focused: panes.panes_iter().next(),
         }
     }
 }
@@ -92,13 +84,19 @@ impl TabScreen {
     pub fn for_each_pane(
         &mut self,
         panes: &mut PaneContainer,
-        configured_panes: &PaneOrSplitWithPosition,
+        configured_panes: &SizedPaneOrSplit,
         area: Rect,
         context: &AppContext,
         callback: &mut impl FnMut(&mut Panes<'_>, Rect, Block, Rect) -> Result<()>,
     ) -> Result<()> {
         match configured_panes {
-            PaneOrSplitWithPosition::Pane(Pane { pane, border, id, .. }) => {
+            SizedPaneOrSplit::Pane(Pane {
+                pane,
+                border,
+                id,
+                focusable,
+                ..
+            }) => {
                 let block = Block::default()
                     .border_style(if self.focused.is_some_and(|p| p.id == *id) {
                         context.config.as_focused_border_style()
@@ -108,16 +106,16 @@ impl TabScreen {
                     .borders(*border);
                 let mut pane = panes.get_mut(*pane);
                 let pane_area = block.inner(area);
-                self.pane_areas.insert(*id, pane_area);
+                self.pane_areas.insert(*id, (pane_area, *focusable));
                 callback(&mut pane, pane_area, block, area)?;
             }
-            PaneOrSplitWithPosition::Split {
+            SizedPaneOrSplit::Split {
                 direction,
                 panes: sub_panes,
             } => {
                 let constraints = sub_panes
                     .iter()
-                    .map(|SubPaneWithPosition { size, .. }| Constraint::Percentage((*size).into()));
+                    .map(|SizedSubPane { size, .. }| Into::<Constraint>::into(*size));
                 let areas = Layout::new(*direction, constraints).split(area);
 
                 for (idx, area) in areas.iter().enumerate() {
@@ -141,87 +139,60 @@ impl TabScreen {
 
         match event.as_common_action(context) {
             Some(CommonAction::PaneUp) => {
-                self.focused = Some(
-                    self.panes
-                        .panes_iter()
-                        .filter(|p| p.id != focused.id && p.focusable)
-                        .fold((focused, u16::MAX), |acc, pane| {
-                            if !pane.geometry.is_directly_above(focused.geometry) {
-                                return acc;
-                            }
-
-                            let dist = pane.geometry.top_left_dist(focused.geometry);
-                            if dist > acc.1 {
-                                return acc;
-                            }
-
-                            (pane, dist)
-                        })
-                        .0,
-                );
+                let Some((focused_area, _)) = self.pane_areas.get(&focused.id) else {
+                    log::warn!(focused:?, pane_areas:? = self.pane_areas; "Tried to find focused pane area but it does not exist");
+                    return Ok(());
+                };
+                self.focused = self
+                    .pane_areas
+                    .iter()
+                    .filter(|(_, (area, focusable))| *focusable && area.bottom() < focused_area.top())
+                    .max_by(|(_, (area_a, _)), (_, (area_b, _))| area_a.top().cmp(&area_b.top()))
+                    .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
+                    .or(Some(focused));
                 context.render()?;
             }
             Some(CommonAction::PaneDown) => {
-                self.focused = Some(
-                    self.panes
-                        .panes_iter()
-                        .filter(|p| p.id != focused.id && p.focusable)
-                        .fold((focused, u16::MAX), |acc, pane| {
-                            if !pane.geometry.is_directly_below(focused.geometry) {
-                                return acc;
-                            }
-
-                            let dist = pane.geometry.top_left_dist(focused.geometry);
-                            if dist > acc.1 {
-                                return acc;
-                            }
-
-                            (pane, dist)
-                        })
-                        .0,
-                );
+                let Some((focused_area, _)) = self.pane_areas.get(&focused.id) else {
+                    log::warn!(focused:?, pane_areas:? = self.pane_areas; "Tried to find focused pane area but it does not exist");
+                    return Ok(());
+                };
+                self.focused = self
+                    .pane_areas
+                    .iter()
+                    .filter(|(_, (area, focusable))| *focusable && focused_area.bottom() < area.top())
+                    .min_by(|(_, (area_a, _)), (_, (area_b, _))| area_a.top().cmp(&area_b.top()))
+                    .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
+                    .or(Some(focused));
                 context.render()?;
             }
             Some(CommonAction::PaneRight) => {
-                self.focused = Some(
-                    self.panes
-                        .panes_iter()
-                        .filter(|p| p.id != focused.id && p.focusable)
-                        .fold((focused, u16::MAX), |acc, pane| {
-                            if !pane.geometry.is_directly_right(focused.geometry) {
-                                return acc;
-                            }
-
-                            let dist = pane.geometry.top_left_dist(focused.geometry);
-                            if dist > acc.1 {
-                                return acc;
-                            }
-
-                            (pane, dist)
-                        })
-                        .0,
-                );
+                let Some((focused_area, _)) = self.pane_areas.get(&focused.id) else {
+                    log::warn!(focused:?, pane_areas:? = self.pane_areas; "Tried to find focused pane area but it does not exist");
+                    return Ok(());
+                };
+                self.focused = self
+                    .pane_areas
+                    .iter()
+                    .filter(|(_, (area, focusable))| *focusable && area.left() > focused_area.right())
+                    .min_by(|(_, (area_a, _)), (_, (area_b, _))| area_a.left().cmp(&area_b.left()))
+                    .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
+                    .or(Some(focused));
                 context.render()?;
             }
             Some(CommonAction::PaneLeft) => {
-                self.focused = Some(
-                    self.panes
-                        .panes_iter()
-                        .filter(|p| p.id != focused.id && p.focusable)
-                        .fold((focused, u16::MAX), |acc, pane| {
-                            if !pane.geometry.is_directly_left(focused.geometry) {
-                                return acc;
-                            }
-
-                            let dist = pane.geometry.top_left_dist(focused.geometry);
-                            if dist > acc.1 {
-                                return acc;
-                            }
-
-                            (pane, dist)
-                        })
-                        .0,
-                );
+                let (focused_area, _) = self.pane_areas.get(&focused.id).unwrap();
+                let Some((focused_area, _)) = self.pane_areas.get(&focused.id) else {
+                    log::warn!(focused:?, pane_areas:? = self.pane_areas; "Tried to find focused pane area but it does not exist");
+                    return Ok(());
+                };
+                self.focused = self
+                    .pane_areas
+                    .iter()
+                    .filter(|(_, (area, focusable))| *focusable && area.right() < focused_area.left())
+                    .max_by(|(_, (area_a, _)), (_, (area_b, _))| area_a.left().cmp(&area_b.left()))
+                    .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
+                    .or(Some(focused));
                 context.render()?;
             }
             Some(_) | None => {
@@ -244,7 +215,7 @@ impl TabScreen {
             let Some(pane) = self
                 .pane_areas
                 .iter()
-                .find(|(_, area)| area.contains(event.into()))
+                .find(|(_, (area, _))| area.contains(event.into()))
                 .and_then(|(pane_id, _)| {
                     self.panes
                         .panes_iter()
@@ -278,7 +249,19 @@ impl TabScreen {
             screen_call!(pane, calculate_areas(rect, context));
             screen_call!(pane, before_show(context))?;
             Ok(())
-        })
+        })?;
+        if !self.initialized {
+            self.focused = self
+                .pane_areas
+                .iter()
+                .filter(|(_, (_, focusable))| *focusable)
+                .min_by(|(_, (a, _)), (_, (b, _))| a.left().cmp(&b.left()).then(a.top().cmp(&b.top())))
+                .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
+                .or(self.focused);
+            self.initialized = true;
+        };
+
+        Ok(())
     }
 
     pub fn resize(&mut self, panes: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
