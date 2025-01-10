@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -6,11 +6,7 @@ use std::collections::HashMap;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use crate::shared::{
-    geometry::Geometry,
-    id::{self, Id},
-    percent::Percent,
-};
+use crate::shared::id::{self, Id};
 
 use super::{theme::PercentOrLength, Leak};
 
@@ -210,7 +206,6 @@ struct SubPaneFile {
 #[derive(Debug, Copy, Clone)]
 pub struct Pane {
     pub pane: PaneType,
-    // pub geometry: Geometry,
     pub border: Borders,
     pub focusable: bool,
     pub id: Id,
@@ -233,15 +228,10 @@ pub struct SizedSubPane {
 
 impl PaneOrSplitFile {
     fn convert(&self, border_type: BorderTypeFile) -> Result<SizedPaneOrSplit> {
-        self.convert_recursive(/* Geometry::new(0, 0, 100, 100) ,*/ border_type, Borders::NONE)
+        self.convert_recursive(border_type, Borders::NONE)
     }
 
-    fn convert_recursive(
-        &self,
-        // mut available_geometry: Geometry,
-        border_type: BorderTypeFile,
-        borders: Borders,
-    ) -> Result<SizedPaneOrSplit> {
+    fn convert_recursive(&self, border_type: BorderTypeFile, borders: Borders) -> Result<SizedPaneOrSplit> {
         match self {
             PaneOrSplitFile::Pane(pane) => Ok(SizedPaneOrSplit::Pane(Pane {
                 pane: pane.into(),
@@ -252,54 +242,31 @@ impl PaneOrSplitFile {
             PaneOrSplitFile::Split {
                 direction,
                 panes: sub_panes,
-            } => {
-                // if sub_panes
-                //     .iter()
-                //     .map(|pane| -> Result<_> { Ok(*pane.size.parse::<Percent>()?) })
-                //     .try_fold(0u16, |acc, val| -> Result<_> {
-                //         let val = val?;
-                //         if val == 0 {
-                //             bail!("Pane size cannot be {}%", val);
-                //         }
-                //         Ok(acc + val)
-                //     })?
-                //     != 100
-                // {
-                //     bail!("Pane sizes in single split must add up to exactly 100%");
-                // }
+            } => Ok(SizedPaneOrSplit::Split {
+                direction: direction.into(),
+                panes: sub_panes
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, sub_pane)| -> Result<_> {
+                        let borders = match border_type {
+                            BorderTypeFile::Full => Borders::ALL,
+                            BorderTypeFile::Single => match direction {
+                                DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT,
+                                DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM,
+                                _ => Borders::NONE,
+                            },
+                            BorderTypeFile::None => Borders::NONE,
+                        };
 
-                Ok(SizedPaneOrSplit::Split {
-                    direction: direction.into(),
-                    panes: sub_panes
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, sub_pane)| -> Result<_> {
-                            let borders = match border_type {
-                                BorderTypeFile::Full => Borders::ALL,
-                                BorderTypeFile::Single => match direction {
-                                    DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT,
-                                    DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM,
-                                    _ => Borders::NONE,
-                                },
-                                BorderTypeFile::None => Borders::NONE,
-                            };
+                        let size: PercentOrLength = sub_pane.size.parse()?;
 
-                            let size: PercentOrLength = sub_pane.size.parse()?;
-
-                            // let geo = if idx == sub_panes.len() - 1 {
-                            //     available_geometry.take_remainder()
-                            // } else {
-                            //     available_geometry.take_chunk(direction.into(), size)
-                            // };
-
-                            Ok(SizedSubPane {
-                                size,
-                                pane: sub_pane.pane.convert_recursive(border_type, borders)?,
-                            })
+                        Ok(SizedSubPane {
+                            size,
+                            pane: sub_pane.pane.convert_recursive(border_type, borders)?,
                         })
-                        .try_collect()?,
-                })
-            }
+                    })
+                    .try_collect()?,
+            }),
         }
     }
 }

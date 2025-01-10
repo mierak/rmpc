@@ -278,15 +278,67 @@ pub mod btreeset_ranges {
 pub mod rect {
     use ratatui::layout::Rect;
 
-    pub trait ShrinkExt {
+    pub trait RectExt {
         fn shrink_from_top(self, amount: u16) -> Rect;
+        fn overlaps_in_y(&self, other: &Self) -> bool;
+        fn overlaps_in_x(&self, other: &Self) -> bool;
     }
 
-    impl ShrinkExt for Rect {
+    impl RectExt for Rect {
         fn shrink_from_top(mut self, amount: u16) -> Rect {
             self.height = self.height.saturating_sub(amount);
             self.y = self.y.saturating_add(amount);
             self
+        }
+
+        fn overlaps_in_y(&self, other: &Self) -> bool {
+            !(self.bottom() <= other.top() || self.top() >= other.bottom())
+        }
+
+        fn overlaps_in_x(&self, other: &Self) -> bool {
+            !(self.right() <= other.left() || self.left() >= other.right())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use ratatui::layout::Rect;
+        use test_case::test_case;
+
+        use crate::shared::ext::rect::RectExt;
+
+        #[test_case(Rect::new(0, 0, 5, 1), Rect::new(5, 0, 5, 1), false; "self on the left, no overlap")]
+        #[test_case(Rect::new(0, 0, 6, 1), Rect::new(5, 0, 5, 1), true; "self on the left, overlap")]
+        #[test_case(Rect::new(10, 0, 5, 1), Rect::new(5, 0, 5, 1), false; "self on the right, no overlap")]
+        #[test_case(Rect::new(10, 0, 6, 1), Rect::new(5, 0, 6, 1), true; "self on the right, overlap")]
+        #[test_case(Rect::new(0, 0, 5, 5), Rect::new(0, 0, 5, 5), true; "perfect overlap")]
+        fn overlap_x(a: Rect, b: Rect, expected_overlap: bool) {
+            assert_eq!(a.overlaps_in_x(&b), expected_overlap);
+        }
+
+        #[test_case(Rect::new(0, 0, 5, 5), Rect::new(0, 5, 5, 5), false; "self above, no overlap")]
+        #[test_case(Rect::new(0, 0, 5, 6), Rect::new(0, 5, 5, 5), true; "self above, overlap")]
+        #[test_case(Rect::new(0, 10, 5, 5), Rect::new(0, 5, 5, 5), false; "self below, no overlap")]
+        #[test_case(Rect::new(0, 10, 5, 5), Rect::new(0, 5, 5, 6), true; "self below, overlap")]
+        #[test_case(Rect::new(0, 0, 5, 5), Rect::new(0, 0, 5, 5), true; "perfect overlap")]
+        fn overlap_y(a: Rect, b: Rect, expected_overlap: bool) {
+            assert_eq!(a.overlaps_in_y(&b), expected_overlap);
+        }
+    }
+}
+
+pub mod vec {
+    pub trait VecExt<T> {
+        fn or_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T>;
+    }
+
+    impl<T> VecExt<T> for Vec<T> {
+        fn or_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T> {
+            if self.is_empty() {
+                cb()
+            } else {
+                self
+            }
         }
     }
 }

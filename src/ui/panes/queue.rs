@@ -16,7 +16,7 @@ use crate::{
         mpd_client::{MpdClient, QueueMoveTarget},
     },
     shared::{
-        ext::{btreeset_ranges::BTreeSetRanges, rect::ShrinkExt},
+        ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
