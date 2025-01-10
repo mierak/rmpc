@@ -251,9 +251,9 @@ impl PaneOrSplitFile {
                         let borders = match border_type {
                             BorderTypeFile::Full => Borders::ALL,
                             BorderTypeFile::Single => match direction {
-                                DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT,
-                                DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM,
-                                _ => Borders::NONE,
+                                DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT | borders,
+                                DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM | borders,
+                                _ => Borders::NONE | borders,
                             },
                             BorderTypeFile::None => Borders::NONE,
                         };
