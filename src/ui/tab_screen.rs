@@ -167,7 +167,7 @@ impl TabScreen {
                 let pane_to_focus = self
                     .panes_directly_above(focused_area)
                     .collect_vec()
-                    .or_if_empty(|| self.all_panes_above(focused_area))
+                    .or_else_if_empty(|| self.closest_panes_above(focused_area))
                     .into_iter()
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
@@ -179,7 +179,7 @@ impl TabScreen {
                 let pane_to_focus = self
                     .panes_directly_below(focused_area)
                     .collect_vec()
-                    .or_if_empty(|| self.all_panes_below(focused_area))
+                    .or_else_if_empty(|| self.closest_panes_below(focused_area))
                     .into_iter()
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
@@ -191,7 +191,7 @@ impl TabScreen {
                 let pane_to_focus = self
                     .panes_directly_right(focused_area)
                     .collect_vec()
-                    .or_if_empty(|| self.all_panes_right(focused_area))
+                    .or_else_if_empty(|| self.closest_panes_right(focused_area))
                     .into_iter()
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
@@ -203,7 +203,7 @@ impl TabScreen {
                 let pane_to_focus = self
                     .panes_directly_left(focused_area)
                     .collect_vec()
-                    .or_if_empty(|| self.all_panes_left(focused_area))
+                    .or_else_if_empty(|| self.closest_panes_left(focused_area))
                     .into_iter()
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
@@ -298,7 +298,7 @@ impl TabScreen {
         })
     }
 
-    fn all_panes_above(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
+    fn closest_panes_above(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
         self.pane_data
             .iter()
             .filter(|data| {
@@ -317,7 +317,7 @@ impl TabScreen {
         })
     }
 
-    fn all_panes_below(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
+    fn closest_panes_below(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
         self.pane_data
             .iter()
             .filter(|data| {
@@ -336,7 +336,7 @@ impl TabScreen {
         })
     }
 
-    fn all_panes_left(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
+    fn closest_panes_left(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
         self.pane_data
             .iter()
             .filter(|data| {
@@ -355,7 +355,7 @@ impl TabScreen {
         })
     }
 
-    fn all_panes_right(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
+    fn closest_panes_right(&self, focused_area: Rect) -> Vec<(&Id, &PaneData)> {
         self.pane_data
             .iter()
             .filter(|data| {

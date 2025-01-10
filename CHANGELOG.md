@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Increased default album art `max_size_px` to `(1200, 1200)`.
+- Improved navigation between Pane splits by including recency bias
 
 ### Fixed
 

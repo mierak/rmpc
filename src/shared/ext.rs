@@ -329,11 +329,11 @@ pub mod rect {
 
 pub mod vec {
     pub trait VecExt<T> {
-        fn or_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T>;
+        fn or_else_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T>;
     }
 
     impl<T> VecExt<T> for Vec<T> {
-        fn or_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T> {
+        fn or_else_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T> {
             if self.is_empty() {
                 cb()
             } else {
