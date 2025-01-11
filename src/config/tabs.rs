@@ -248,17 +248,38 @@ impl PaneOrSplitFile {
                     .iter()
                     .enumerate()
                     .map(|(idx, sub_pane)| -> Result<_> {
+                        let mut size: PercentOrLength = sub_pane.size.parse()?;
+
                         let borders = match border_type {
-                            BorderTypeFile::Full => Borders::ALL,
-                            BorderTypeFile::Single => match direction {
-                                DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT | borders,
-                                DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM | borders,
-                                _ => Borders::NONE | borders,
-                            },
+                            BorderTypeFile::Full => {
+                                if let PercentOrLength::Length(ref mut len) = size {
+                                    *len += 2;
+                                };
+                                Borders::ALL
+                            }
+                            BorderTypeFile::Single => {
+                                let result = match direction {
+                                    DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT | borders,
+                                    DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM | borders,
+                                    _ => Borders::NONE | borders,
+                                };
+                                if let PercentOrLength::Length(ref mut len) = size {
+                                    match direction {
+                                        DirectionFile::Horizontal => {
+                                            *len += u16::from(result.contains(Borders::LEFT))
+                                                + u16::from(result.contains(Borders::RIGHT));
+                                        }
+                                        DirectionFile::Vertical => {
+                                            *len += u16::from(result.contains(Borders::TOP))
+                                                + u16::from(result.contains(Borders::BOTTOM));
+                                        }
+                                    }
+                                };
+
+                                result
+                            }
                             BorderTypeFile::None => Borders::NONE,
                         };
-
-                        let size: PercentOrLength = sub_pane.size.parse()?;
 
                         Ok(SizedSubPane {
                             size,
