@@ -186,7 +186,7 @@ impl From<AlbumsActionsFile> for AlbumsActions {
 }
 
 impl ToDescription for AlbumsActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> &'static str {
         ""
     }
 }
@@ -200,7 +200,7 @@ pub enum ArtistsActionsFile {}
 pub enum ArtistsActions {}
 
 impl ToDescription for ArtistsActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> &'static str {
         ""
     }
 }
@@ -220,7 +220,7 @@ pub enum DirectoriesActionsFile {}
 pub enum DirectoriesActions {}
 
 impl ToDescription for DirectoriesActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> &'static str {
         ""
     }
 }
@@ -456,7 +456,7 @@ pub enum PlaylistsActionsFile {}
 pub enum PlaylistsActions {}
 
 impl ToDescription for PlaylistsActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> &'static str {
         ""
     }
 }
@@ -474,7 +474,7 @@ pub enum SearchActionsFile {}
 pub enum SearchActions {}
 
 impl ToDescription for SearchActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> &'static str {
         ""
     }
 }

@@ -215,7 +215,7 @@ impl<'name> Client<'name> {
     }
 }
 
-impl<'name> SocketClient for Client<'name> {
+impl SocketClient for Client<'_> {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<()> {
         Write::write_all(&mut self.stream, bytes)
     }
