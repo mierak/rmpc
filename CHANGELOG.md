@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Refactored and greatly simplified image backends
 - Potential infinite loop in lyrics indexing
 - `lsinfo` parsing playlist entries incorrectly
+- Missing border in tabs with `border_type: Single`
 
 ## [0.7.0] - 2024-12-24
 

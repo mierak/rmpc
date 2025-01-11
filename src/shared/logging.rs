@@ -148,7 +148,7 @@ pub fn console_format(
 
     write!(
         w,
-        r#"{:<5}: {} {}"#,
+        r"{:<5}: {} {}",
         flexi_logger::style(level).paint(level.to_string()),
         &record.args().to_string(),
         visitor
