@@ -280,7 +280,13 @@ impl Pane for ArtistsPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: MpdQueryResult,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::SongsList { data, origin_path }) => {
                 let Some(artist) = origin_path.and_then(|mut v| v.first_mut().map(std::mem::take)) else {

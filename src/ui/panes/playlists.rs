@@ -189,7 +189,13 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, mpd_command: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        mpd_command: MpdQueryResult,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match (id, mpd_command) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {

@@ -321,7 +321,13 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: MpdQueryResult,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match (id, data) {
             (ADD_TO_PLAYLIST, MpdQueryResult::AddToPlaylist { playlists, song_file }) => {
                 modal!(

@@ -605,19 +605,24 @@ impl<'ui> Ui<'ui> {
         data: MpdQueryResult,
         context: &mut AppContext,
     ) -> Result<()> {
+        let contains_pane = |p| {
+            self.tabs
+                .get(&self.active_tab)
+                .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == p))
+        };
         match pane {
             Some(pane) => match self.panes.get_mut(pane) {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => p.on_query_finished(id, data, context),
-                Panes::Queue(p) => p.on_query_finished(id, data, context),
-                Panes::Directories(p) => p.on_query_finished(id, data, context),
-                Panes::Albums(p) => p.on_query_finished(id, data, context),
-                Panes::Artists(p) => p.on_query_finished(id, data, context),
-                Panes::Playlists(p) => p.on_query_finished(id, data, context),
-                Panes::Search(p) => p.on_query_finished(id, data, context),
-                Panes::AlbumArtists(p) => p.on_query_finished(id, data, context),
-                Panes::AlbumArt(p) => p.on_query_finished(id, data, context),
-                Panes::Lyrics(p) => p.on_query_finished(id, data, context),
+                Panes::Logs(p) => p.on_query_finished(id, data, contains_pane(PaneType::Logs), context),
+                Panes::Queue(p) => p.on_query_finished(id, data, contains_pane(PaneType::Queue), context),
+                Panes::Directories(p) => p.on_query_finished(id, data, contains_pane(PaneType::Directories), context),
+                Panes::Albums(p) => p.on_query_finished(id, data, contains_pane(PaneType::Albums), context),
+                Panes::Artists(p) => p.on_query_finished(id, data, contains_pane(PaneType::Artists), context),
+                Panes::Playlists(p) => p.on_query_finished(id, data, contains_pane(PaneType::Playlists), context),
+                Panes::Search(p) => p.on_query_finished(id, data, contains_pane(PaneType::Search), context),
+                Panes::AlbumArtists(p) => p.on_query_finished(id, data, contains_pane(PaneType::AlbumArtists), context),
+                Panes::AlbumArt(p) => p.on_query_finished(id, data, contains_pane(PaneType::AlbumArt), context),
+                Panes::Lyrics(p) => p.on_query_finished(id, data, contains_pane(PaneType::Lyrics), context),
             }?,
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {

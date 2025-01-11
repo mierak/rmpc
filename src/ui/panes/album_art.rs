@@ -89,7 +89,16 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, _context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: MpdQueryResult,
+        is_visible: bool,
+        _context: &AppContext,
+    ) -> Result<()> {
+        if !is_visible {
+            return Ok(());
+        }
         match (id, data) {
             (ALBUM_ART, MpdQueryResult::AlbumArt(Some(data))) => {
                 self.album_art.show(data)?;
@@ -109,11 +118,11 @@ impl Pane for AlbumArtPane {
                     self.album_art.show_default()?;
                 }
             }
-            UiEvent::ModalOpened => {
+            UiEvent::ModalOpened if is_visible => {
                 self.album_art.hide()?;
                 context.render()?;
             }
-            UiEvent::ModalClosed => {
+            UiEvent::ModalClosed if is_visible => {
                 self.album_art.show_current()?;
                 context.render()?;
             }

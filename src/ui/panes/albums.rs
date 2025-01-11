@@ -155,7 +155,13 @@ impl Pane for AlbumsPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: MpdQueryResult,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {

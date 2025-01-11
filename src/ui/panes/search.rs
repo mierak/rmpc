@@ -587,7 +587,13 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: MpdQueryResult,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
                 let Some(selected) = self.songs_dir.selected().map(|s| [s.as_path()]) else {
