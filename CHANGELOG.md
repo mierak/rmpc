@@ -8,10 +8,12 @@ All notable changes to this project will be documented in this file.
 
 - Support for repeating lyrics in lrc
 - `vertical_align` and `horizontal_align` to album art config, supports kitty, sixel and iterm2
+- Support for fixed Pane size in Tabs
 
 ### Changed
 
 - Increased default album art `max_size_px` to `(1200, 1200)`.
+- Improved navigation between Pane splits by including recency bias
 
 ### Fixed
 

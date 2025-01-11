@@ -126,7 +126,7 @@ impl<'ui> Ui<'ui> {
                 .tabs
                 .tabs
                 .iter()
-                .map(|(name, screen)| -> Result<_> { Ok((*name, TabScreen::new(&screen.panes))) })
+                .map(|(name, screen)| -> Result<_> { Ok((*name, TabScreen::new(screen.panes.clone()))) })
                 .try_collect()?,
             areas: enum_map! {
                 _ => Rect::default()

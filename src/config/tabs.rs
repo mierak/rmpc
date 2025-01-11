@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -6,13 +6,9 @@ use std::collections::HashMap;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use crate::shared::{
-    geometry::Geometry,
-    id::{self, Id},
-    percent::Percent,
-};
+use crate::shared::id::{self, Id};
 
-use super::Leak;
+use super::{theme::PercentOrLength, Leak};
 
 #[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]
 pub struct TabName(pub &'static str);
@@ -165,7 +161,7 @@ struct TabFile {
 #[derive(Debug, Clone)]
 pub struct Tab {
     pub name: TabName,
-    pub panes: PaneOrSplitWithPosition,
+    pub panes: SizedPaneOrSplit,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -210,42 +206,35 @@ struct SubPaneFile {
 #[derive(Debug, Copy, Clone)]
 pub struct Pane {
     pub pane: PaneType,
-    pub geometry: Geometry,
     pub border: Borders,
     pub focusable: bool,
     pub id: Id,
 }
 
 #[derive(Debug, Clone)]
-pub enum PaneOrSplitWithPosition {
+pub enum SizedPaneOrSplit {
     Pane(Pane),
     Split {
         direction: Direction,
-        panes: Vec<SubPaneWithPosition>,
+        panes: Vec<SizedSubPane>,
     },
 }
 
 #[derive(Debug, Clone)]
-pub struct SubPaneWithPosition {
-    pub size: Percent,
-    pub pane: PaneOrSplitWithPosition,
+pub struct SizedSubPane {
+    pub size: PercentOrLength,
+    pub pane: SizedPaneOrSplit,
 }
 
 impl PaneOrSplitFile {
-    fn convert(&self, border_type: BorderTypeFile) -> Result<PaneOrSplitWithPosition> {
-        self.convert_recursive(Geometry::new(0, 0, 100, 100), border_type, Borders::NONE)
+    fn convert(&self, border_type: BorderTypeFile) -> Result<SizedPaneOrSplit> {
+        self.convert_recursive(border_type, Borders::NONE)
     }
 
-    fn convert_recursive(
-        &self,
-        mut available_geometry: Geometry,
-        border_type: BorderTypeFile,
-        borders: Borders,
-    ) -> Result<PaneOrSplitWithPosition> {
+    fn convert_recursive(&self, border_type: BorderTypeFile, borders: Borders) -> Result<SizedPaneOrSplit> {
         match self {
-            PaneOrSplitFile::Pane(pane) => Ok(PaneOrSplitWithPosition::Pane(Pane {
+            PaneOrSplitFile::Pane(pane) => Ok(SizedPaneOrSplit::Pane(Pane {
                 pane: pane.into(),
-                geometry: available_geometry,
                 focusable: pane.is_focusable(),
                 border: borders,
                 id: id::new(),
@@ -253,60 +242,37 @@ impl PaneOrSplitFile {
             PaneOrSplitFile::Split {
                 direction,
                 panes: sub_panes,
-            } => {
-                if sub_panes
+            } => Ok(SizedPaneOrSplit::Split {
+                direction: direction.into(),
+                panes: sub_panes
                     .iter()
-                    .map(|pane| -> Result<_> { Ok(*pane.size.parse::<Percent>()?) })
-                    .try_fold(0u16, |acc, val| -> Result<_> {
-                        let val = val?;
-                        if val == 0 {
-                            bail!("Pane size cannot be {}%", val);
-                        }
-                        Ok(acc + val)
-                    })?
-                    != 100
-                {
-                    bail!("Pane sizes in single split must add up to exactly 100%");
-                }
+                    .enumerate()
+                    .map(|(idx, sub_pane)| -> Result<_> {
+                        let borders = match border_type {
+                            BorderTypeFile::Full => Borders::ALL,
+                            BorderTypeFile::Single => match direction {
+                                DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT | borders,
+                                DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM | borders,
+                                _ => Borders::NONE | borders,
+                            },
+                            BorderTypeFile::None => Borders::NONE,
+                        };
 
-                Ok(PaneOrSplitWithPosition::Split {
-                    direction: direction.into(),
-                    panes: sub_panes
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, sub_pane)| -> Result<_> {
-                            let borders = match border_type {
-                                BorderTypeFile::Full => Borders::ALL,
-                                BorderTypeFile::Single => match direction {
-                                    DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT,
-                                    DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM,
-                                    _ => Borders::NONE,
-                                },
-                                BorderTypeFile::None => Borders::NONE,
-                            };
+                        let size: PercentOrLength = sub_pane.size.parse()?;
 
-                            let size: Percent = sub_pane.size.parse()?;
-
-                            let geo = if idx == sub_panes.len() - 1 {
-                                available_geometry.take_remainder()
-                            } else {
-                                available_geometry.take_chunk(direction.into(), size)
-                            };
-
-                            Ok(SubPaneWithPosition {
-                                size,
-                                pane: sub_pane.pane.convert_recursive(geo, border_type, borders)?,
-                            })
+                        Ok(SizedSubPane {
+                            size,
+                            pane: sub_pane.pane.convert_recursive(border_type, borders)?,
                         })
-                        .try_collect()?,
-                })
-            }
+                    })
+                    .try_collect()?,
+            }),
         }
     }
 }
 
 pub struct PaneIter<'a> {
-    queue: Vec<&'a PaneOrSplitWithPosition>,
+    queue: Vec<&'a SizedPaneOrSplit>,
 }
 
 impl Iterator for PaneIter<'_> {
@@ -314,8 +280,8 @@ impl Iterator for PaneIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.queue.pop() {
-            Some(PaneOrSplitWithPosition::Pane(pane)) => Some(*pane),
-            Some(PaneOrSplitWithPosition::Split { panes: sub_panes, .. }) => {
+            Some(SizedPaneOrSplit::Pane(pane)) => Some(*pane),
+            Some(SizedPaneOrSplit::Split { panes: sub_panes, .. }) => {
                 self.queue.extend(sub_panes.iter().map(|v| &v.pane));
                 self.next()
             }
@@ -324,12 +290,12 @@ impl Iterator for PaneIter<'_> {
     }
 }
 
-impl PaneOrSplitWithPosition {
+impl SizedPaneOrSplit {
     pub fn panes_iter(&self) -> PaneIter {
         PaneIter {
             queue: match self {
-                p @ PaneOrSplitWithPosition::Pane { .. } => vec![p],
-                PaneOrSplitWithPosition::Split { panes: sub_panes, .. } => sub_panes.iter().map(|v| &v.pane).collect(),
+                p @ SizedPaneOrSplit::Pane { .. } => vec![p],
+                SizedPaneOrSplit::Split { panes: sub_panes, .. } => sub_panes.iter().map(|v| &v.pane).collect(),
             },
         }
     }

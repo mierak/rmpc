@@ -1,3 +1,5 @@
+#![allow(unused)]
+// TODO cleanup eventually if not needed
 use ratatui::layout::Direction;
 
 use super::percent::Percent;
