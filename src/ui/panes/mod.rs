@@ -136,7 +136,13 @@ pub(super) trait Pane {
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: MpdQueryResult,
+        is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         Ok(())
     }
 

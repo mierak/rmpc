@@ -32,6 +32,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -46,6 +47,7 @@ mod on_idle_event {
                         data: vec![dir("pl2"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -65,6 +67,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -77,6 +80,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -96,6 +100,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -108,6 +113,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -127,6 +133,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -138,6 +145,7 @@ mod on_idle_event {
                         data: vec![dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -171,6 +179,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -183,6 +192,7 @@ mod on_idle_event {
                         data: initial_songs.clone(),
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -212,6 +222,7 @@ mod on_idle_event {
                         data: vec![dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -238,6 +249,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -250,6 +262,7 @@ mod on_idle_event {
                         data: initial_songs.clone(),
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -279,6 +292,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -306,6 +320,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -318,6 +333,7 @@ mod on_idle_event {
                         data: initial_songs.clone(),
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -347,6 +363,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -373,6 +390,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -385,6 +403,7 @@ mod on_idle_event {
                         data: initial_songs.clone(),
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -414,6 +433,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -441,6 +461,7 @@ mod on_idle_event {
                         data: initial_playlists,
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -453,6 +474,7 @@ mod on_idle_event {
                         data: initial_songs.clone(),
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
@@ -482,6 +504,7 @@ mod on_idle_event {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl4")],
                         origin_path: None,
                     },
+                    true,
                     &app_context,
                 )
                 .unwrap();
