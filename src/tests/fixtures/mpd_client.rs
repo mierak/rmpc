@@ -530,6 +530,34 @@ impl MpdClient for TestMpdClient {
     fn decoders(&mut self) -> MpdResult<crate::mpd::commands::decoders::Decoders> {
         todo!("Not yet implemented")
     }
+
+    fn sticker(&mut self, _uri: &str, _name: &str) -> MpdResult<crate::mpd::commands::stickers::Sticker> {
+        todo!("Not yet implemented")
+    }
+
+    fn set_sticker(&mut self, _uri: &str, _name: &str, _value: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn delete_sticker(&mut self, _uri: &str, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn delete_all_stickers(&mut self, _uri: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_stickers(&mut self, _uri: &str) -> MpdResult<crate::mpd::commands::stickers::Stickers> {
+        todo!("Not yet implemented")
+    }
+
+    fn find_stickers(
+        &mut self,
+        _uri: &str,
+        _name: &str,
+    ) -> MpdResult<crate::mpd::commands::stickers::StickersWithFile> {
+        todo!("Not yet implemented")
+    }
 }
 
 impl SocketClient for TestMpdClient {

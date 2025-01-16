@@ -12,8 +12,14 @@ use crate::shared::{ext::error::ErrorExt, macros::status_error};
 use super::{
     client::Client,
     commands::{
-        decoders::Decoders, list::MpdList, list_playlist::FileList, outputs::Outputs, status::OnOffOneshot,
-        volume::Bound, IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
+        decoders::Decoders,
+        list::MpdList,
+        list_playlist::FileList,
+        outputs::Outputs,
+        status::OnOffOneshot,
+        stickers::{Sticker, Stickers, StickersWithFile},
+        volume::Bound,
+        IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     proto_client::{ProtoClient, SocketClient},
@@ -141,6 +147,25 @@ pub trait MpdClient: Sized {
     fn disable_output(&mut self, id: u32) -> MpdResult<()>;
     // Decoders
     fn decoders(&mut self) -> MpdResult<Decoders>;
+    // Stickers
+
+    /// Reads a sticker value for the specified object.
+    fn sticker(&mut self, uri: &str, name: &str) -> MpdResult<Sticker>;
+
+    /// Adds a sticker value to the specified object. If a sticker item with that name already exists, it is replaced.
+    fn set_sticker(&mut self, uri: &str, name: &str, value: &str) -> MpdResult<()>;
+
+    /// Deletes a sticker value from the specified object.
+    fn delete_sticker(&mut self, uri: &str, name: &str) -> MpdResult<()>;
+
+    /// Deletes all stickers from the specified object.
+    fn delete_all_stickers(&mut self, uri: &str) -> MpdResult<()>;
+
+    /// Lists the stickers for the specified object.
+    fn list_stickers(&mut self, uri: &str) -> MpdResult<Stickers>;
+
+    // Searches the sticker database for stickers with the specified name, below the specified directory (URI).
+    fn find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<StickersWithFile>;
 }
 
 impl MpdClient for Client<'_> {
@@ -156,6 +181,11 @@ impl MpdClient for Client<'_> {
     fn password(&mut self, password: &str) -> MpdResult<()> {
         self.send(&format!("password {password}"))
             .and_then(ProtoClient::read_ok)
+    }
+
+    // Lists commands supported by the MPD server
+    fn commands(&mut self) -> MpdResult<MpdList> {
+        self.send("commands").and_then(ProtoClient::read_response)
     }
 
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update> {
@@ -174,11 +204,6 @@ impl MpdClient for Client<'_> {
         } else {
             self.send("rescan").and_then(ProtoClient::read_response)
         }
-    }
-
-    // Lists commands supported by the MPD server
-    fn commands(&mut self) -> MpdResult<MpdList> {
-        self.send("commands").and_then(ProtoClient::read_response)
     }
 
     // Queries
@@ -332,16 +357,6 @@ impl MpdClient for Client<'_> {
             .and_then(ProtoClient::read_ok)
     }
 
-    fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
-        self.send(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
-            .and_then(ProtoClient::read_ok)
-    }
-
-    fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()> {
-        self.send(&format!("move {} {}", from.as_mpd_range(), to.as_mpd_str()))
-            .and_then(ProtoClient::read_ok)
-    }
-
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         self.send("playlistinfo").and_then(ProtoClient::read_opt_response)
     }
@@ -362,13 +377,13 @@ impl MpdClient for Client<'_> {
             .and_then(ProtoClient::read_response)
     }
 
-    /// Search the database for songs matching FILTER (see Filters) AND add them to queue.
-    /// Parameters have the same meaning as for find, except that search is not case sensitive.
-    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
-        let query = filter.to_query_str();
-        let query = query.as_str();
-        log::debug!(query; "Searching for songs and adding them");
-        self.send(&format!("searchadd \"({query})\""))
+    fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()> {
+        self.send(&format!("move {} {}", from.as_mpd_range(), to.as_mpd_str()))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
+        self.send(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
             .and_then(ProtoClient::read_ok)
     }
 
@@ -381,6 +396,16 @@ impl MpdClient for Client<'_> {
 
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
         self.send(&format!("findadd \"({})\"", filter.to_query_str()))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    /// Search the database for songs matching FILTER (see Filters) AND add them to queue.
+    /// Parameters have the same meaning as for find, except that search is not case sensitive.
+    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
+        let query = filter.to_query_str();
+        let query = query.as_str();
+        log::debug!(query; "Searching for songs and adding them");
+        self.send(&format!("searchadd \"({query})\""))
             .and_then(ProtoClient::read_ok)
     }
 
@@ -419,6 +444,14 @@ impl MpdClient for Client<'_> {
         })
     }
 
+    fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+        self.send(&format!("readpicture \"{path}\" 0"))
+            .and_then(ProtoClient::read_bin)
+    }
+    fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+        self.send(&format!("albumart \"{path}\" 0"))
+            .and_then(ProtoClient::read_bin)
+    }
     // Stored playlists
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.send("listplaylists").and_then(ProtoClient::read_response)
@@ -444,13 +477,20 @@ impl MpdClient for Client<'_> {
     fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send(&format!("load \"{name}\"")).and_then(ProtoClient::read_ok)
     }
+    fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
+        self.send(&format!("rename \"{name}\" \"{new_name}\""))
+            .and_then(ProtoClient::read_ok)
+    }
+
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send(&format!("rm \"{name}\"")).and_then(ProtoClient::read_ok)
     }
+
     fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
         self.send(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
             .and_then(ProtoClient::read_ok)
     }
+
     fn move_in_playlist(
         &mut self,
         playlist_name: &str,
@@ -475,11 +515,6 @@ impl MpdClient for Client<'_> {
         }
     }
 
-    fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
-        self.send(&format!("rename \"{name}\" \"{new_name}\""))
-            .and_then(ProtoClient::read_ok)
-    }
-
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()> {
         if let Some(mode) = mode {
             if self.version < Version::new(0, 24, 0) {
@@ -492,16 +527,6 @@ impl MpdClient for Client<'_> {
         } else {
             self.send(&format!("save \"{name}\"")).and_then(ProtoClient::read_ok)
         }
-    }
-
-    fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("readpicture \"{path}\" 0"))
-            .and_then(ProtoClient::read_bin)
-    }
-
-    fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("albumart \"{path}\" 0"))
-            .and_then(ProtoClient::read_bin)
     }
 
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
@@ -556,6 +581,37 @@ impl MpdClient for Client<'_> {
     // Decoders
     fn decoders(&mut self) -> MpdResult<Decoders> {
         self.send("decoders").and_then(ProtoClient::read_response)
+    }
+
+    // Stickers
+    fn sticker(&mut self, uri: &str, key: &str) -> MpdResult<Sticker> {
+        self.send(&format!("sticker get song \"{uri}\" \"{key}\""))
+            .and_then(ProtoClient::read_response)
+    }
+
+    fn set_sticker(&mut self, uri: &str, key: &str, value: &str) -> MpdResult<()> {
+        self.send(&format!("sticker set song \"{uri}\" \"{key}\" \"{value}\""))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    fn delete_sticker(&mut self, uri: &str, key: &str) -> MpdResult<()> {
+        self.send(&format!("sticker delete song \"{uri}\" \"{key}\""))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    fn delete_all_stickers(&mut self, uri: &str) -> MpdResult<()> {
+        self.send(&format!("sticker delete song \"{uri}\""))
+            .and_then(ProtoClient::read_ok)
+    }
+
+    fn list_stickers(&mut self, uri: &str) -> MpdResult<Stickers> {
+        self.send(&format!("sticker list song \"{uri}\""))
+            .and_then(ProtoClient::read_response)
+    }
+
+    fn find_stickers(&mut self, uri: &str, key: &str) -> MpdResult<StickersWithFile> {
+        self.send(&format!("sticker find song \"{uri}\" \"{key}\""))
+            .and_then(ProtoClient::read_response)
     }
 }
 

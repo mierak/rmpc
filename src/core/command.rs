@@ -3,7 +3,10 @@ use itertools::Itertools;
 use std::{io::Write, path::PathBuf};
 
 use crate::{
-    config::{cli::Command, Config},
+    config::{
+        cli::{Command, StickerCmd},
+        Config,
+    },
     context::AppContext,
     mpd::{
         client::Client,
@@ -174,6 +177,45 @@ impl Command {
                         .write_all(&album_art)?;
                     Ok(())
                 }
+            })),
+            Command::Sticker {
+                cmd: StickerCmd::Set { uri, key, value },
+            } => Ok(Box::new(move |client| {
+                client.set_sticker(&uri, &key, &value)?;
+                Ok(())
+            })),
+            Command::Sticker {
+                cmd: StickerCmd::Get { uri, key },
+            } => Ok(Box::new(move |client| {
+                let sticker = client.sticker(&uri, &key)?;
+                println!("{}", serde_json::ser::to_string(&sticker)?);
+                Ok(())
+            })),
+            Command::Sticker {
+                cmd: StickerCmd::Delete { uri, key },
+            } => Ok(Box::new(move |client| {
+                client.delete_sticker(&uri, &key)?;
+                Ok(())
+            })),
+            Command::Sticker {
+                cmd: StickerCmd::DeleteAll { uri },
+            } => Ok(Box::new(move |client| {
+                client.delete_all_stickers(&uri)?;
+                Ok(())
+            })),
+            Command::Sticker {
+                cmd: StickerCmd::List { uri },
+            } => Ok(Box::new(move |client| {
+                let stickers = client.list_stickers(&uri)?;
+                println!("{}", serde_json::ser::to_string(&stickers)?);
+                Ok(())
+            })),
+            Command::Sticker {
+                cmd: StickerCmd::Find { uri, key },
+            } => Ok(Box::new(move |client| {
+                let stickers = client.find_stickers(&uri, &key)?;
+                println!("{}", serde_json::ser::to_string(&stickers)?);
+                Ok(())
             })),
         }
     }
