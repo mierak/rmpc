@@ -2,11 +2,7 @@ use std::{collections::HashMap, time::Instant};
 
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{
-    layout::{Constraint, Layout, Rect},
-    widgets::Block,
-    Frame,
-};
+use ratatui::{layout::Rect, Frame};
 
 use crate::{
     config::{
@@ -22,7 +18,7 @@ use crate::{
     },
 };
 
-use super::{Pane as _, PaneContainer, Panes};
+use super::{panes::pane_call, Pane as _, PaneContainer, Panes};
 
 #[derive(Debug)]
 pub struct PaneData {
@@ -70,79 +66,27 @@ impl TabScreen {
     }
 }
 
-macro_rules! screen_call {
-    ($screen:ident, $fn:ident($($param:expr),+)) => {
-        match $screen {
-            Panes::Queue(s) => s.$fn($($param),+),
-            #[cfg(debug_assertions)]
-            Panes::Logs(s) => s.$fn($($param),+),
-            Panes::Directories(s) => s.$fn($($param),+),
-            Panes::Artists(s) => s.$fn($($param),+),
-            Panes::AlbumArtists(s) => s.$fn($($param),+),
-            Panes::Albums(s) => s.$fn($($param),+),
-            Panes::Playlists(s) => s.$fn($($param),+),
-            Panes::Search(s) => s.$fn($($param),+),
-            Panes::AlbumArt(s) => s.$fn($($param),+),
-            Panes::Lyrics(s) => s.$fn($($param),+),
-        }
-    }
-}
-
 impl TabScreen {
     pub fn render(
         &mut self,
-        panes: &mut PaneContainer,
+        pane_container: &mut PaneContainer,
         frame: &mut Frame,
         area: Rect,
         context: &AppContext,
     ) -> Result<()> {
-        self.for_each_pane(panes, area, context, &mut |pane, area, block, block_area| {
-            screen_call!(pane, render(frame, area, context))?;
-            frame.render_widget(block, block_area);
-            Ok(())
-        })?;
-        Ok(())
-    }
-
-    pub fn for_each_pane(
-        &mut self,
-        panes: &mut PaneContainer,
-        area: Rect,
-        context: &AppContext,
-        callback: &mut impl FnMut(&mut Panes<'_>, Rect, Block, Rect) -> Result<()>,
-    ) -> Result<()> {
-        let mut stack = vec![(&self.panes, area)];
-
-        while let Some((configured_panes, area)) = stack.pop() {
-            match configured_panes {
-                SizedPaneOrSplit::Pane(pane) => {
-                    let block = Block::default()
-                        .border_style(if self.focused.is_some_and(|p| p.id == pane.id) {
-                            context.config.as_focused_border_style()
-                        } else {
-                            context.config.as_border_style()
-                        })
-                        .borders(pane.border);
-                    let pane_area = block.inner(area);
-
-                    let pane_data = self
-                        .pane_data
-                        .entry(pane.id)
-                        .or_insert_with(|| PaneData::new(pane.focusable));
-                    pane_data.area = pane_area;
-                    pane_data.block_area = area;
-
-                    let mut pane = panes.get_mut(pane.pane);
-                    callback(&mut pane, pane_area, block, area)?;
-                }
-                SizedPaneOrSplit::Split { direction, panes } => {
-                    let constraints = panes.iter().map(|pane| Into::<Constraint>::into(pane.size));
-                    let areas = Layout::new(*direction, constraints).split(area);
-                    stack.extend(areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)));
-                }
-            }
-        }
-
+        self.panes
+            .for_each_pane(self.focused, area, context, &mut |pane, area, block, block_area| {
+                let pane_data = self
+                    .pane_data
+                    .entry(pane.id)
+                    .or_insert_with(|| PaneData::new(pane.is_focusable()));
+                pane_data.area = area;
+                pane_data.block_area = block_area;
+                let pane_instance = &mut pane_container.get_mut(pane.pane);
+                pane_call!(pane_instance, render(frame, area, context))?;
+                frame.render_widget(block, block_area);
+                Ok(())
+            })?;
         Ok(())
     }
 
@@ -213,8 +157,8 @@ impl TabScreen {
             }
             Some(_) | None => {
                 event.abandon();
-                let pane = panes.get_mut(focused.pane);
-                screen_call!(pane, handle_action(event, context))?;
+                let mut pane = panes.get_mut(focused.pane);
+                pane_call!(pane, handle_action(event, context))?;
             }
         };
 
@@ -235,7 +179,7 @@ impl TabScreen {
                 .and_then(|(pane_id, _)| {
                     self.panes
                         .panes_iter()
-                        .find(|pane| &pane.id == pane_id && pane.focusable)
+                        .find(|pane| &pane.id == pane_id && pane.is_focusable())
                 })
             else {
                 return Ok(());
@@ -248,24 +192,33 @@ impl TabScreen {
             return Ok(());
         };
 
-        let pane = panes.get_mut(focused.pane);
-        screen_call!(pane, handle_mouse_event(event, context))
+        let mut pane = panes.get_mut(focused.pane);
+        pane_call!(pane, handle_mouse_event(event, context))?;
+        Ok(())
     }
 
     pub fn on_hide(&mut self, panes: &mut PaneContainer, context: &AppContext) -> Result<()> {
         for pane in self.panes.panes_iter() {
-            let screen = panes.get_mut(pane.pane);
-            screen_call!(screen, on_hide(context))?;
+            let mut pane = panes.get_mut(pane.pane);
+            pane_call!(pane, on_hide(context))?;
         }
         Ok(())
     }
 
-    pub fn before_show(&mut self, panes: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
-        self.for_each_pane(panes, area, context, &mut |pane, rect, _, _| {
-            screen_call!(pane, calculate_areas(rect, context));
-            screen_call!(pane, before_show(context))?;
-            Ok(())
-        })?;
+    pub fn before_show(&mut self, pane_container: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
+        self.panes
+            .for_each_pane(self.focused, area, context, &mut |pane, pane_area, _, block_area| {
+                let pane_data = self
+                    .pane_data
+                    .entry(pane.id)
+                    .or_insert_with(|| PaneData::new(pane.is_focusable()));
+                pane_data.area = area;
+                pane_data.block_area = block_area;
+                let pane_instance = &mut pane_container.get_mut(pane.pane);
+                pane_call!(pane_instance, calculate_areas(pane_area, context))?;
+                pane_call!(pane_instance, before_show(context))?;
+                Ok(())
+            })?;
         if !self.initialized {
             self.set_focused(
                 self.pane_data
@@ -282,12 +235,20 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn resize(&mut self, panes: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
-        self.for_each_pane(panes, area, context, &mut |pane, rect, _, _| {
-            screen_call!(pane, calculate_areas(rect, context));
-            screen_call!(pane, resize(rect, context))?;
-            Ok(())
-        })
+    pub fn resize(&mut self, pane_container: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
+        self.panes
+            .for_each_pane(self.focused, area, context, &mut |pane, pane_area, _, block_area| {
+                let pane_data = self
+                    .pane_data
+                    .entry(pane.id)
+                    .or_insert_with(|| PaneData::new(pane.is_focusable()));
+                pane_data.area = area;
+                pane_data.block_area = block_area;
+                let pane_instance = &mut pane_container.get_mut(pane.pane);
+                pane_call!(pane_instance, calculate_areas(pane_area, context))?;
+                pane_call!(pane_instance, resize(pane_area, context))?;
+                Ok(())
+            })
     }
 
     fn panes_directly_above(&self, focused_area: Rect) -> impl Iterator<Item = (&Id, &PaneData)> {

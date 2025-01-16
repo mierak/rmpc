@@ -1,42 +1,35 @@
-use std::{collections::HashMap, io::Stdout, ops::AddAssign, time::Duration};
+use std::{collections::HashMap, io::Stdout};
 
 use crate::{
-    config::tabs::PaneType,
+    config::tabs::{PaneType, SizedPaneOrSplit},
     core::command::{create_env, run_external},
     shared::events::WorkRequest,
 };
 use anyhow::{anyhow, Context, Result};
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use enum_map::{enum_map, Enum, EnumMap};
 use itertools::Itertools;
-use modals::{decoders::DecodersModal, keybinds::KeybindsModal, outputs::OutputsModal, song_info::SongInfoModal};
-use panes::{PaneContainer, Panes};
-#[cfg(debug_assertions)]
-use ratatui::style::Stylize;
+use modals::{
+    decoders::DecodersModal, input_modal::InputModal, keybinds::KeybindsModal, outputs::OutputsModal,
+    song_info::SongInfoModal,
+};
+use panes::{pane_call, PaneContainer, Panes};
 
 use ratatui::{
     layout::Rect,
-    prelude::{Backend, Constraint, CrosstermBackend, Layout},
+    prelude::{Backend, CrosstermBackend},
     style::{Color, Style},
     symbols::border,
-    text::Text,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
     Frame, Terminal,
 };
 use tab_screen::TabScreen;
-use widgets::app_tabs::AppTabs;
 
 use crate::{
-    config::{
-        cli::Args,
-        keys::{CommonAction, GlobalAction},
-        tabs::TabName,
-        Config,
-    },
+    config::{cli::Args, keys::GlobalAction, tabs::TabName, Config},
     mpd::{
         commands::{idle::IdleEvent, State},
         mpd_client::{FilterKind, MpdClient, ValueChange},
@@ -44,13 +37,13 @@ use crate::{
     shared::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
-        mouse_event::{MouseEvent, MouseEventKind},
+        mouse_event::MouseEvent,
     },
     MpdQueryResult,
 };
 use crate::{context::AppContext, mpd::version::Version};
 
-use self::{modals::Modal, panes::Pane, widgets::header::Header};
+use self::{modals::Modal, panes::Pane};
 
 pub mod browser;
 pub mod dirstack;
@@ -60,7 +53,7 @@ pub mod panes;
 pub mod tab_screen;
 pub mod widgets;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(dead_code)]
 pub enum Level {
     Trace,
@@ -79,21 +72,18 @@ pub struct StatusMessage {
 
 #[derive(Debug)]
 pub struct Ui<'ui> {
-    panes: PaneContainer,
+    panes: PaneContainer<'ui>,
     modals: Vec<Box<dyn Modal>>,
-    status_message: Option<StatusMessage>,
-    rendered_frames_count: u32,
-    command: Option<String>,
     active_tab: TabName,
     tabs: HashMap<TabName, TabScreen>,
-    areas: EnumMap<Areas, Rect>,
-    tab_bar: AppTabs<'ui>,
+    layout: SizedPaneOrSplit,
+    area: Rect,
 }
 
 const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
 const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
 
-macro_rules! screen_call {
+macro_rules! active_tab_call {
     ($self:ident, $fn:ident($($param:expr),+)) => {
         $self.tabs
             .get_mut(&$self.active_tab)
@@ -102,25 +92,14 @@ macro_rules! screen_call {
     }
 }
 
-#[derive(Debug, Enum)]
-enum Areas {
-    Header,
-    Tabs,
-    Content,
-    Bar,
-}
-
 impl<'ui> Ui<'ui> {
     pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
         let active_tab = *context.config.tabs.names.first().context("Expected at least one tab")?;
         Ok(Self {
-            panes: PaneContainer::new(context),
-            tab_bar: AppTabs::new(active_tab, context.config),
-            status_message: None,
-            rendered_frames_count: 0,
-            modals: Vec::default(),
-            command: None,
             active_tab,
+            panes: PaneContainer::new(context)?,
+            layout: context.config.theme.layout.clone(),
+            modals: Vec::default(),
             tabs: context
                 .config
                 .tabs
@@ -128,108 +107,60 @@ impl<'ui> Ui<'ui> {
                 .iter()
                 .map(|(name, screen)| -> Result<_> { Ok((*name, TabScreen::new(screen.panes.clone()))) })
                 .try_collect()?,
-            areas: enum_map! {
-                _ => Rect::default()
-            },
+            area: Rect::default(),
         })
     }
 
-    fn calc_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
-        let tab_area_height = match (context.config.theme.tab_bar.enabled, context.config.theme.draw_borders) {
-            (true, true) => 3,
-            (true, false) => 1,
-            (false, _) => 0,
-        };
-
-        let [header_area, tabs_area, content_area, bar_area] = Layout::vertical([
-            Constraint::Length(u16::try_from(context.config.theme.header.rows.len())?),
-            Constraint::Length(tab_area_height), // Tab bar
-            Constraint::Percentage(100),
-            Constraint::Min(1),
-        ])
-        .areas(area);
-
-        self.areas[Areas::Header] = header_area;
-        self.areas[Areas::Tabs] = tabs_area;
-        self.areas[Areas::Content] = content_area;
-        self.areas[Areas::Bar] = bar_area;
-
-        Ok(())
+    fn calc_areas(&mut self, area: Rect, _context: &AppContext) {
+        self.area = area;
     }
 
     fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
-        screen_call!(self, on_hide(&context))?;
+        self.layout
+            .for_each_pane(None, self.area, context, &mut |pane, _, _, _| {
+                match self.panes.get_mut(pane.pane) {
+                    Panes::TabContent => {
+                        active_tab_call!(self, on_hide(context))?;
+                    }
+                    _ => {}
+                };
+                Ok(())
+            })?;
+
         self.active_tab = new_tab;
-        screen_call!(self, before_show(self.areas[Areas::Content], context))?;
-        Ok(())
+        self.on_event(UiEvent::TabChanged(new_tab), context)?;
+
+        self.layout
+            .for_each_pane(None, self.area, context, &mut |pane, pane_area, _, _| {
+                match self.panes.get_mut(pane.pane) {
+                    Panes::TabContent => {
+                        active_tab_call!(self, before_show(pane_area, context))?;
+                    }
+                    _ => {}
+                };
+                Ok(())
+            })
     }
 
     pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
-        self.calc_areas(frame.area(), context)?;
-
+        self.area = frame.area();
         if let Some(bg_color) = context.config.theme.background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), frame.area());
         }
-        self.rendered_frames_count.add_assign(1);
-        if self
-            .status_message
-            .as_ref()
-            .is_some_and(|m| m.created.elapsed() > std::time::Duration::from_secs(5))
-        {
-            self.status_message = None;
-        }
 
-        let header = Header::new(context);
-        frame.render_widget(header, self.areas[Areas::Header]);
-
-        if self.areas[Areas::Tabs].height > 0 {
-            self.tab_bar.set_selected(self.active_tab);
-            self.tab_bar.render(self.areas[Areas::Tabs], frame.buffer_mut());
-        }
-
-        if let Some(command) = &self.command {
-            let [leader_area, command_area] =
-                *Layout::horizontal([Constraint::Length(1), Constraint::Percentage(100)]).split(self.areas[Areas::Bar])
-            else {
-                return Ok(());
-            };
-
-            let status_bar = Paragraph::new(command.as_str())
-                .alignment(ratatui::prelude::Alignment::Left)
-                .style(context.config.as_text_style());
-
-            frame.render_widget(Text::from(":"), leader_area);
-            frame.render_widget(status_bar, command_area);
-        } else if let Some(StatusMessage { message, level, .. }) = &self.status_message {
-            let status_bar = Paragraph::new(message.to_owned())
-                .alignment(ratatui::prelude::Alignment::Center)
-                .style(Style::default().fg(level.into()).bg(Color::Black));
-            frame.render_widget(status_bar, self.areas[Areas::Bar]);
-        } else if context.config.status_update_interval_ms.is_some() {
-            let elapsed_bar = context.config.as_styled_progress_bar();
-            let elapsed_bar = if context.status.duration == Duration::ZERO {
-                elapsed_bar.value(0.0)
-            } else {
-                elapsed_bar.value(context.status.elapsed.as_secs_f32() / context.status.duration.as_secs_f32())
-            };
-            frame.render_widget(elapsed_bar, self.areas[Areas::Bar]);
-        }
-
-        #[cfg(debug_assertions)]
-        #[allow(clippy::cast_possible_truncation)]
-        {
-            let text = format!("{} frames", self.rendered_frames_count);
-            let mut area = self.areas[Areas::Bar];
-            area.width = text.chars().count() as u16;
-            frame.render_widget(
-                Text::from(text)
-                    .fg(context.config.theme.text_color.unwrap_or_default())
-                    .bg(context.config.theme.background_color.unwrap_or_default()),
-                area,
-            );
-        }
-
-        screen_call!(self, render(frame, self.areas[Areas::Content], context))?;
+        self.layout
+            .for_each_pane(None, self.area, context, &mut |pane, pane_area, block, block_area| {
+                match self.panes.get_mut(pane.pane) {
+                    Panes::TabContent => {
+                        active_tab_call!(self, render(frame, pane_area, context))?;
+                    }
+                    mut pane_instance => {
+                        pane_call!(pane_instance, render(frame, pane_area, context))?;
+                    }
+                };
+                frame.render_widget(block, block_area);
+                Ok(())
+            })?;
 
         for modal in &mut self.modals {
             modal.render(frame, context)?;
@@ -244,120 +175,27 @@ impl<'ui> Ui<'ui> {
             return Ok(());
         }
 
-        match event.kind {
-            MouseEventKind::LeftClick if self.areas[Areas::Header].contains(event.into()) => {
-                context.command(move |client| {
-                    client.pause_toggle()?;
-                    Ok(())
-                });
-            }
-            MouseEventKind::ScrollUp if self.areas[Areas::Header].contains(event.into()) => {
-                context.command(|client| {
-                    client.volume(ValueChange::Increase(context.config.volume_step.into()))?;
-                    Ok(())
-                });
-            }
-            MouseEventKind::ScrollDown if self.areas[Areas::Header].contains(event.into()) => {
-                context.command(|client| {
-                    client.volume(ValueChange::Decrease(context.config.volume_step.into()))?;
-                    Ok(())
-                });
-            }
-            MouseEventKind::LeftClick if self.areas[Areas::Bar].contains(event.into()) => {
-                if !matches!(context.status.state, State::Play | State::Pause) {
-                    return Ok(());
-                }
-
-                let second_to_seek_to = context
-                    .status
-                    .duration
-                    .mul_f32(f32::from(event.x) / f32::from(self.areas[Areas::Bar].width))
-                    .as_secs();
-                context.command(move |client| {
-                    client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
-                    Ok(())
-                });
-
-                context.render()?;
-            }
-            MouseEventKind::ScrollDown if self.areas[Areas::Tabs].contains(event.into()) => {
-                self.change_tab(context.config.next_screen(self.active_tab), context)?;
-                context.render()?;
-            }
-            MouseEventKind::ScrollUp if self.areas[Areas::Tabs].contains(event.into()) => {
-                self.change_tab(context.config.prev_screen(self.active_tab), context)?;
-                context.render()?;
-            }
-            MouseEventKind::LeftClick if self.areas[Areas::Tabs].contains(event.into()) => {
-                if let Some(tab_name) = self
-                    .tab_bar
-                    .get_tab_idx_at(event.into())
-                    .and_then(|idx| context.config.tabs.names.get(idx))
-                {
-                    if &self.active_tab != tab_name {
-                        self.change_tab(*tab_name, context)?;
-                        context.render()?;
-                        return Ok(());
+        self.layout
+            .for_each_pane(None, self.area, context, &mut |pane, _, _, _| {
+                match self.panes.get_mut(pane.pane) {
+                    Panes::TabContent => {
+                        active_tab_call!(self, handle_mouse_event(event, context))?;
                     }
-                }
-            }
-            _ if self.areas[Areas::Content].contains(event.into()) => {
-                screen_call!(self, handle_mouse_event(event, context))?;
-            }
-            _ => {}
-        }
-        Ok(())
+                    mut pane_instance => {
+                        pane_call!(pane_instance, handle_mouse_event(event, context))?;
+                    }
+                };
+                Ok(())
+            })
     }
 
     pub fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<KeyHandleResult> {
-        if let Some(ref mut command) = self.command {
-            let action = key.as_common_action(context);
-            if let Some(CommonAction::Close) = action {
-                self.command = None;
-                context.render()?;
-                return Ok(KeyHandleResult::None);
-            } else if let Some(CommonAction::Confirm) = action {
-                let cmd = command.parse();
-                log::debug!("Executing command: {:?}", cmd);
-
-                self.command = None;
-                match cmd {
-                    Ok(Args { command: Some(cmd), .. }) => {
-                        if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
-                            log::error!("Failed to send command");
-                        }
-                    }
-                    Err(err) => {
-                        status_error!("Failed to parse command. {:?}", err);
-                    }
-                    _ => {}
-                }
-
-                context.render()?;
-                return Ok(KeyHandleResult::None);
-            }
-
-            match key.code() {
-                KeyCode::Char(c) => {
-                    command.push(c);
-                    context.render()?;
-                }
-                KeyCode::Backspace => {
-                    command.pop();
-                    context.render()?;
-                }
-                _ => {}
-            }
-
-            return Ok(KeyHandleResult::None);
-        }
-
         if let Some(ref mut modal) = self.modals.last_mut() {
             modal.handle_key(key, context)?;
             return Ok(KeyHandleResult::None);
         }
 
-        screen_call!(self, handle_action(key, context))?;
+        active_tab_call!(self, handle_action(key, context))?;
 
         if let Some(action) = key.as_global_action(context) {
             match action {
@@ -365,7 +203,6 @@ impl<'ui> Ui<'ui> {
                     let cmd = command.parse();
                     log::debug!("executing {:?}", cmd);
 
-                    self.command = None;
                     if let Ok(Args { command: Some(cmd), .. }) = cmd {
                         if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
                             log::error!("Failed to send command");
@@ -373,8 +210,23 @@ impl<'ui> Ui<'ui> {
                     }
                 }
                 GlobalAction::CommandMode => {
-                    self.command = Some(String::new());
-                    context.render()?;
+                    modal!(
+                        context,
+                        InputModal::new(context)
+                            .title("Execute a command")
+                            .confirm_label("Execute")
+                            .on_confirm(|context, value| {
+                                let cmd = value.parse();
+                                log::debug!("executing {:?}", cmd);
+
+                                if let Ok(Args { command: Some(cmd), .. }) = cmd {
+                                    if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
+                                        log::error!("Failed to send command");
+                                    }
+                                };
+                                Ok(())
+                            })
+                    );
                 }
                 GlobalAction::NextTrack if context.status.state == State::Play => {
                     context.command(move |client| {
@@ -517,16 +369,21 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn before_show(&mut self, area: Rect, context: &mut AppContext) -> Result<()> {
-        self.calc_areas(area, context)?;
-        screen_call!(self, before_show(self.areas[Areas::Content], context))
-    }
+        self.calc_areas(area, context);
 
-    pub fn display_message(&mut self, message: String, level: Level) {
-        self.status_message = Some(StatusMessage {
-            message,
-            level,
-            created: std::time::Instant::now(),
-        });
+        self.layout
+            .for_each_pane(None, self.area, context, &mut |pane, pane_area, _, _| {
+                match self.panes.get_mut(pane.pane) {
+                    Panes::TabContent => {
+                        active_tab_call!(self, before_show(pane_area, context))?;
+                    }
+                    mut pane_instance => {
+                        pane_call!(pane_instance, calculate_areas(pane_area, context))?;
+                        pane_call!(pane_instance, before_show(context))?;
+                    }
+                };
+                Ok(())
+            })
     }
 
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut AppContext) -> Result<()> {
@@ -541,45 +398,50 @@ impl<'ui> Ui<'ui> {
                 self.on_event(UiEvent::ModalClosed, context)?;
                 context.render()?;
             }
+            UiAppEvent::ChangeTab(tab_name) => self.change_tab(tab_name, context)?,
         }
         Ok(())
     }
 
     pub fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
         log::trace!(area:?; "Terminal was resized");
-        self.calc_areas(area, context)?;
-        screen_call!(self, resize(self.areas[Areas::Content], context))
+        self.calc_areas(area, context);
+
+        self.layout
+            .for_each_pane(None, self.area, context, &mut |pane, pane_area, _, _| {
+                match self.panes.get_mut(pane.pane) {
+                    Panes::TabContent => {
+                        active_tab_call!(self, resize(pane_area, context))?;
+                    }
+                    mut pane_instance => {
+                        pane_call!(pane_instance, calculate_areas(pane_area, context))?;
+                        pane_call!(pane_instance, resize(pane_area, context))?;
+                    }
+                };
+                Ok(())
+            })
     }
 
-    pub fn on_event(&mut self, mut event: UiEvent, context: &mut AppContext) -> Result<()> {
+    pub fn on_event(&mut self, mut event: UiEvent, context: &AppContext) -> Result<()> {
+        match event {
+            UiEvent::Database => {
+                status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
+            }
+            UiEvent::LogAdded(_) => {
+                #[cfg(debug_assertions)]
+                context.render()?;
+            }
+            _ => {}
+        }
+
         let contains_pane = |p| {
             self.tabs
                 .get(&self.active_tab)
                 .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == p))
+                || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
 
-        match event {
-            UiEvent::Player => {}
-            UiEvent::Database => {
-                status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
-            }
-            UiEvent::StoredPlaylist => {}
-            UiEvent::LogAdded(_) =>
-            {
-                #[cfg(debug_assertions)]
-                if contains_pane(PaneType::Logs) {
-                    context.render()?;
-                }
-            }
-            UiEvent::ModalOpened => {}
-            UiEvent::ModalClosed => {}
-            UiEvent::Exit => {}
-            UiEvent::LyricsIndexed => {}
-            UiEvent::SongChanged => {}
-            UiEvent::Reconnected => {}
-        }
-
-        for name in context.config.tabs.active_panes {
+        for name in context.config.active_panes {
             match self.panes.get_mut(*name) {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => p.on_event(&mut event, contains_pane(PaneType::Logs), context),
@@ -592,6 +454,12 @@ impl<'ui> Ui<'ui> {
                 Panes::AlbumArtists(p) => p.on_event(&mut event, contains_pane(PaneType::AlbumArtists), context),
                 Panes::AlbumArt(p) => p.on_event(&mut event, contains_pane(PaneType::AlbumArt), context),
                 Panes::Lyrics(p) => p.on_event(&mut event, contains_pane(PaneType::Lyrics), context),
+                Panes::ProgressBar(p) => p.on_event(&mut event, contains_pane(PaneType::ProgressBar), context),
+                Panes::Header(p) => p.on_event(&mut event, contains_pane(PaneType::Header), context),
+                Panes::Tabs(p) => p.on_event(&mut event, contains_pane(PaneType::Tabs), context),
+                Panes::TabContent => Ok(()),
+                #[cfg(debug_assertions)]
+                Panes::FrameCount(p) => p.on_event(&mut event, contains_pane(PaneType::Tabs), context),
             }?;
         }
 
@@ -609,6 +477,7 @@ impl<'ui> Ui<'ui> {
             self.tabs
                 .get(&self.active_tab)
                 .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == p))
+                || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
         match pane {
             Some(pane) => match self.panes.get_mut(pane) {
@@ -623,6 +492,12 @@ impl<'ui> Ui<'ui> {
                 Panes::AlbumArtists(p) => p.on_query_finished(id, data, contains_pane(PaneType::AlbumArtists), context),
                 Panes::AlbumArt(p) => p.on_query_finished(id, data, contains_pane(PaneType::AlbumArt), context),
                 Panes::Lyrics(p) => p.on_query_finished(id, data, contains_pane(PaneType::Lyrics), context),
+                Panes::ProgressBar(p) => p.on_query_finished(id, data, contains_pane(PaneType::ProgressBar), context),
+                Panes::Header(p) => p.on_query_finished(id, data, contains_pane(PaneType::Header), context),
+                Panes::Tabs(p) => p.on_query_finished(id, data, contains_pane(PaneType::Tabs), context),
+                Panes::TabContent => Ok(()),
+                #[cfg(debug_assertions)]
+                Panes::FrameCount(p) => p.on_query_finished(id, data, contains_pane(PaneType::FrameCount), context),
             }?,
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {
@@ -651,9 +526,10 @@ pub struct ModalWrapper(Box<dyn Modal + Send + Sync>);
 pub enum UiAppEvent {
     Modal(ModalWrapper),
     PopModal,
+    ChangeTab(TabName),
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 #[allow(dead_code)]
 pub enum UiEvent {
     Player,
@@ -666,6 +542,8 @@ pub enum UiEvent {
     LyricsIndexed,
     SongChanged,
     Reconnected,
+    Status(String, Level),
+    TabChanged(TabName),
 }
 
 impl TryFrom<IdleEvent> for UiEvent {

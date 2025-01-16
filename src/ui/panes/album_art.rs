@@ -65,8 +65,9 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, _context: &AppContext) {
+    fn calculate_areas(&mut self, area: Rect, _context: &AppContext) -> Result<()> {
         self.album_art.set_size(area);
+        Ok(())
     }
 
     fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {

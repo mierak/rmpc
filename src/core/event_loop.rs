@@ -86,7 +86,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context) {
                     Ok(KeyHandleResult::None) => continue,
                     Ok(KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context) {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &context) {
                             log::error!(error:? = err, event:?; "UI failed to handle quit event");
                         }
                         break;
@@ -104,18 +104,19 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 },
                 AppEvent::Status(message, level) => {
-                    ui.display_message(message, level);
-                    render_wanted = true;
+                    if let Err(err) = ui.on_event(UiEvent::Status(message, level), &context) {
+                        log::error!(error:? = err; "UI failed to handle status message event");
+                    }
                 }
                 AppEvent::Log(msg) => {
-                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut context) {
+                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &context) {
                         log::error!(error:? = err; "UI failed to handle log event");
                     }
                 }
                 AppEvent::IdleEvent(event) => {
                     handle_idle_event(event, &context, &mut additional_evs);
                     for ev in additional_evs.drain() {
-                        if let Err(err) = ui.on_event(ev, &mut context) {
+                        if let Err(err) = ui.on_event(ev, &context) {
                             status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
@@ -127,7 +128,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::WorkDone(Ok(result)) => match result {
                     WorkDone::LyricsIndexed { index } => {
                         context.lrc_index = index;
-                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context) {
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &context) {
                             log::error!(error:? = err; "UI failed to lyrics indexed event");
                         }
                     }
@@ -180,7 +181,7 @@ fn main_task<B: Backend + std::io::Write>(
                                 }
                             }
                             if song_changed {
-                                if let Err(err) = ui.on_event(UiEvent::SongChanged, &mut context) {
+                                if let Err(err) = ui.on_event(UiEvent::SongChanged, &context) {
                                     status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
                                 }
                             }
@@ -226,7 +227,7 @@ fn main_task<B: Backend + std::io::Write>(
                     for ev in [IdleEvent::Player, IdleEvent::Playlist, IdleEvent::Options] {
                         handle_idle_event(ev, &context, &mut additional_evs);
                     }
-                    if let Err(err) = ui.on_event(UiEvent::Reconnected, &mut context) {
+                    if let Err(err) = ui.on_event(UiEvent::Reconnected, &context) {
                         log::error!(error:? = err, event:?; "UI failed to handle resize event");
                     }
                     status_warn!("rmpc reconnected to MPD and will reinitialize");

@@ -1,28 +1,33 @@
 use std::borrow::Cow;
 
+#[cfg(debug_assertions)]
+use self::{frame_count::FrameCountPane, logs::LogsPane};
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
 use anyhow::Result;
 use artists::{ArtistsPane, ArtistsPaneMode};
 use directories::DirectoriesPane;
 use either::Either;
-#[cfg(debug_assertions)]
-use logs::LogsPane;
+use header::HeaderPane;
 use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
+use progress_bar::ProgressBarPane;
 use queue::QueuePane;
 use ratatui::{
+    layout::{Constraint, Layout},
     prelude::Rect,
     text::{Line, Span},
+    widgets::Block,
     Frame,
 };
 use search::SearchPane;
 use strum::Display;
+use tabs::TabsPane;
 
 use crate::{
     config::{
         keys::CommonAction,
-        tabs::PaneType,
+        tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
         theme::{
             properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
             SymbolsConfig,
@@ -41,29 +46,40 @@ pub mod albums;
 pub mod artists;
 pub mod directories;
 #[cfg(debug_assertions)]
+pub mod frame_count;
+pub mod header;
+#[cfg(debug_assertions)]
 pub mod logs;
 pub mod lyrics;
 pub mod playlists;
+pub mod progress_bar;
 pub mod queue;
 pub mod search;
+pub mod tabs;
 
 #[derive(Debug, Display, strum::EnumDiscriminants)]
-pub enum Panes<'a> {
-    Queue(&'a mut QueuePane),
+pub enum Panes<'pane_ref, 'pane> {
+    Queue(&'pane_ref mut QueuePane),
     #[cfg(debug_assertions)]
-    Logs(&'a mut LogsPane),
-    Directories(&'a mut DirectoriesPane),
-    Artists(&'a mut ArtistsPane),
-    AlbumArtists(&'a mut ArtistsPane),
-    Albums(&'a mut AlbumsPane),
-    Playlists(&'a mut PlaylistsPane),
-    Search(&'a mut SearchPane),
-    AlbumArt(&'a mut AlbumArtPane),
-    Lyrics(&'a mut LyricsPane),
+    Logs(&'pane_ref mut LogsPane),
+    Directories(&'pane_ref mut DirectoriesPane),
+    Artists(&'pane_ref mut ArtistsPane),
+    AlbumArtists(&'pane_ref mut ArtistsPane),
+    Albums(&'pane_ref mut AlbumsPane),
+    Playlists(&'pane_ref mut PlaylistsPane),
+    Search(&'pane_ref mut SearchPane),
+    AlbumArt(&'pane_ref mut AlbumArtPane),
+    Lyrics(&'pane_ref mut LyricsPane),
+    ProgressBar(&'pane_ref mut ProgressBarPane),
+    Header(&'pane_ref mut HeaderPane),
+    Tabs(&'pane_ref mut TabsPane<'pane>),
+    #[cfg(debug_assertions)]
+    FrameCount(&'pane_ref mut FrameCountPane),
+    TabContent,
 }
 
 #[derive(Debug)]
-pub struct PaneContainer {
+pub struct PaneContainer<'panes> {
     pub queue: QueuePane,
     #[cfg(debug_assertions)]
     pub logs: LogsPane,
@@ -75,11 +91,16 @@ pub struct PaneContainer {
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
     pub lyrics: LyricsPane,
+    pub progress_bar: ProgressBarPane,
+    pub header: HeaderPane,
+    pub tabs: TabsPane<'panes>,
+    #[cfg(debug_assertions)]
+    pub frame_count: FrameCountPane,
 }
 
-impl PaneContainer {
-    pub fn new(context: &AppContext) -> Self {
-        Self {
+impl<'panes> PaneContainer<'panes> {
+    pub fn new(context: &AppContext) -> Result<Self> {
+        Ok(Self {
             queue: QueuePane::new(context),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
@@ -91,10 +112,15 @@ impl PaneContainer {
             search: SearchPane::new(context),
             album_art: AlbumArtPane::new(context),
             lyrics: LyricsPane::new(context),
-        }
+            progress_bar: ProgressBarPane::new(),
+            header: HeaderPane::new(),
+            tabs: TabsPane::new(context)?,
+            #[cfg(debug_assertions)]
+            frame_count: FrameCountPane::new(),
+        })
     }
 
-    pub fn get_mut(&mut self, screen: PaneType) -> Panes {
+    pub fn get_mut<'pane_ref>(&'pane_ref mut self, screen: PaneType) -> Panes<'pane_ref, 'panes> {
         match screen {
             PaneType::Queue => Panes::Queue(&mut self.queue),
             #[cfg(debug_assertions)]
@@ -107,9 +133,40 @@ impl PaneContainer {
             PaneType::Search => Panes::Search(&mut self.search),
             PaneType::AlbumArt => Panes::AlbumArt(&mut self.album_art),
             PaneType::Lyrics => Panes::Lyrics(&mut self.lyrics),
+            PaneType::ProgressBar => Panes::ProgressBar(&mut self.progress_bar),
+            PaneType::Header => Panes::Header(&mut self.header),
+            PaneType::Tabs => Panes::Tabs(&mut self.tabs),
+            PaneType::TabContent => Panes::TabContent,
+            #[cfg(debug_assertions)]
+            PaneType::FrameCount => Panes::FrameCount(&mut self.frame_count),
         }
     }
 }
+
+macro_rules! pane_call {
+    ($screen:ident, $fn:ident($($param:expr),+)) => {
+        match $screen {
+            Panes::Queue(ref mut s) => s.$fn($($param),+),
+            #[cfg(debug_assertions)]
+            Panes::Logs(ref mut s) => s.$fn($($param),+),
+            Panes::Directories(ref mut s) => s.$fn($($param),+),
+            Panes::Artists(ref mut s) => s.$fn($($param),+),
+            Panes::AlbumArtists(ref mut s) => s.$fn($($param),+),
+            Panes::Albums(ref mut s) => s.$fn($($param),+),
+            Panes::Playlists(ref mut s) => s.$fn($($param),+),
+            Panes::Search(ref mut s) => s.$fn($($param),+),
+            Panes::AlbumArt(ref mut s) => s.$fn($($param),+),
+            Panes::Lyrics(ref mut s) => s.$fn($($param),+),
+            Panes::ProgressBar(ref mut s) => s.$fn($($param),+),
+            Panes::Header(ref mut s) => s.$fn($($param),+),
+            Panes::Tabs(ref mut s) => s.$fn($($param),+),
+            Panes::TabContent => Ok(()),
+            #[cfg(debug_assertions)]
+            Panes::FrameCount(ref mut s) => s.$fn($($param),+),
+        }
+    }
+}
+pub(crate) use pane_call;
 
 #[allow(unused_variables)]
 pub(super) trait Pane {
@@ -146,7 +203,9 @@ pub(super) trait Pane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &AppContext) {}
+    fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+        Ok(())
+    }
 
     fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
         Ok(())
@@ -733,6 +792,42 @@ impl Property<'static, PropertyKind> {
                 return Some(Either::Right(buf));
             }
         }
+    }
+}
+
+impl SizedPaneOrSplit {
+    pub fn for_each_pane(
+        &self,
+        focused: Option<ConfigPane>,
+        area: Rect,
+        context: &AppContext,
+        callback: &mut impl FnMut(ConfigPane, Rect, Block, Rect) -> Result<()>,
+    ) -> Result<()> {
+        let mut stack = vec![(self, area)];
+
+        while let Some((configured_panes, area)) = stack.pop() {
+            match configured_panes {
+                SizedPaneOrSplit::Pane(pane) => {
+                    let block = Block::default()
+                        .border_style(if focused.is_some_and(|p| p.id == pane.id) {
+                            context.config.as_focused_border_style()
+                        } else {
+                            context.config.as_border_style()
+                        })
+                        .borders(pane.border);
+                    let pane_area = block.inner(area);
+
+                    callback(*pane, pane_area, block, area)?;
+                }
+                SizedPaneOrSplit::Split { direction, panes } => {
+                    let constraints = panes.iter().map(|pane| Into::<Constraint>::into(pane.size));
+                    let areas = Layout::new(*direction, constraints).split(area);
+                    stack.extend(areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)));
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
