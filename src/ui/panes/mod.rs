@@ -517,11 +517,15 @@ impl Song {
         for format in formats {
             let match_found = match &format.kind {
                 PropertyKindOrText::Text(value) => Some(value.to_lowercase().contains(&filter.to_lowercase())),
-                PropertyKindOrText::Sticker(key) => Some(self.stickers.as_ref().is_some_and(|stickers| {
-                    stickers
-                        .get(*key)
-                        .is_some_and(|value| value.to_lowercase().contains(&filter.to_lowercase()))
-                })),
+                PropertyKindOrText::Sticker(key) => self
+                    .stickers
+                    .as_ref()
+                    .and_then(|stickers| {
+                        stickers
+                            .get(*key)
+                            .map(|value| value.to_lowercase().contains(&filter.to_lowercase()))
+                    })
+                    .or_else(|| format.default.map(|f| self.matches(&[f], filter))),
                 PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                     || format.default.map(|f| self.matches(&[f], filter)),
                     |p| Some(p.to_lowercase().contains(filter)),
@@ -563,7 +567,12 @@ impl Song {
                 .stickers
                 .as_ref()
                 .and_then(|stickers| stickers.get(*key))
-                .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style)),
+                .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style))
+                .or_else(|| {
+                    format
+                        .default
+                        .and_then(|format| self.as_line_ellipsized(format, max_len, symbols))
+                }),
             PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                 || self.default_as_line_ellipsized(format, max_len, symbols),
                 |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
