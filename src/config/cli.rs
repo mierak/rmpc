@@ -138,6 +138,56 @@ pub enum Command {
     Unmount { name: String },
     /// List currently mounted storages
     ListMounts,
+    /// Manipulate and query song stickers
+    Sticker {
+        #[command(subcommand)]
+        cmd: StickerCmd,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+pub enum StickerCmd {
+    /// Set sticker value for a song
+    Set {
+        /// Path to a song, relative to music directory root
+        uri: String,
+        /// Sticker key to set
+        key: String,
+        /// Sticker value that will be written
+        value: String,
+    },
+    /// Get sticker value for a song
+    Get {
+        /// Path to a song, relative to music directory root
+        uri: String,
+        /// Sticker key to get
+        key: String,
+    },
+    /// List all stickers of a song
+    List {
+        /// Path to a song, relative to music directory root
+        uri: String,
+    },
+    /// Find all stickers of given name in  the specified directory
+    Find {
+        /// Path to a directory, relative to music directory root
+        uri: String,
+        /// Sticker key to search for
+        key: String,
+    },
+    /// Delete a sticker from a song
+    Delete {
+        /// Path to a song, relative to music directory root
+        uri: String,
+        /// Sticker key to search delete
+        key: String,
+    },
+    /// Delete all stickers in a song
+    DeleteAll {
+        /// Path to a song, relative to music directory root
+        uri: String,
+    },
 }
 
 #[derive(Parser, ValueEnum, Copy, Clone, Debug, PartialEq)]

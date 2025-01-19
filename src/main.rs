@@ -203,8 +203,6 @@ fn main() -> Result<()> {
             );
             client.set_read_timeout(None)?;
 
-            let enable_mouse = config.enable_mouse;
-            let terminal = try_ret!(ui::setup_terminal(enable_mouse), "Failed to setup terminal");
             let tx_clone = event_tx.clone();
 
             let context = try_ret!(
@@ -216,6 +214,9 @@ fn main() -> Result<()> {
             if context.status.state == State::Play {
                 render_loop.start()?;
             }
+
+            let enable_mouse = context.config.enable_mouse;
+            let terminal = try_ret!(ui::setup_terminal(enable_mouse), "Failed to setup terminal");
 
             core::client::init(client_rx.clone(), event_tx.clone(), client)?;
             core::work::init(worker_rx.clone(), client_tx.clone(), event_tx.clone(), context.config)?;

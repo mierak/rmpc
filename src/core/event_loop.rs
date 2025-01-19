@@ -296,19 +296,19 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
                 .replace_id("status")
                 .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
         }
-        IdleEvent::Playlist => {
+        IdleEvent::Playlist | IdleEvent::Sticker => {
+            let fetch_stickers = context.should_fetch_stickers;
             context
                 .query()
                 .id(GLOBAL_QUEUE_UPDATE)
                 .replace_id("playlist")
-                .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?)));
+                .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?)));
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}
         IdleEvent::Update => {}
         IdleEvent::Output
         | IdleEvent::Partition
-        | IdleEvent::Sticker
         | IdleEvent::Subscription
         | IdleEvent::Message
         | IdleEvent::Neighbor

@@ -7,6 +7,7 @@ sidebar:
 
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
 import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
 
 <ConfigValue name="song_table_format" type="other" customText="<song_table_column[]>" link="#song_table_column" />
 An array of `Property` objects which serve as a template for table of songs thathat are currently in the queue. Each
@@ -72,9 +73,10 @@ Will display static text in the table. Mostly useful for default values. For exa
 
 ### Group
 
-<ConfigValue name="kind" type="other" customText="Group(<property>)" link="#property" />A special kind of property that
-groups multiple properties together. If any of the properties in the group results in a `None` value, the whole group is
-considered `None` and the default value is used.
+<ConfigValue name="kind" type="other" customText="Group(<property>)" link="#property" />
+
+A special kind of property that groups multiple properties together. If any of the properties in the group results
+in a `None` value, the whole group is considered `None` and the default value is used.
 
 Consider the following example:
 
@@ -109,7 +111,15 @@ property and the song's `filename` will be displayed instead. A group can also c
 />
 Will display value of the respective tag from the song. Since tags are not guaranteed to be present, a fallback value
 can be specified with the `default` field. Since song files can have arbitrary tags the `Other` variant can be used to
-display any tag, even those not explicitly supported by rmpc.
+display any tag supported by MPD, even those not explicitly supported by rmpc.
+
+### Sticker
+
+<ConfigValue name="kind" type="other" customText='Sticker("<sticker_key>")' />
+
+Will display value of the respective MPD sticker on a song. Requires your MPD to have [sticker_file](https://mpd.readthedocs.io/en/latest/mpd.conf.5.html#optional-parameters)
+set in its `mpd.conf`. You can use this to for example display play count of the song with the following <a href={path("guides/on_song_change/#track-song-play-count")}>on_song_change</a>.
+Please note that fetching the stickers is somewhat inefficient as they have to be fetched separately for each song so your mileage may vary if your current queue is too large.
 
 ## Example
 

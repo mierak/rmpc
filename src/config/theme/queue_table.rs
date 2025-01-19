@@ -156,6 +156,7 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                     let prop: Property<SongProperty> = v.prop.try_into()?;
                     let label = v.label.unwrap_or_else(|| match &prop.kind {
                         PropertyKindOrText::Text { .. } => String::new(),
+                        PropertyKindOrText::Sticker { .. } => String::new(),
                         PropertyKindOrText::Property(prop) => prop.to_string(),
                         PropertyKindOrText::Group(_) => String::new(),
                     });
@@ -196,6 +197,7 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<'static, SongProperty>
         Ok(Self {
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
+                PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value.leak()),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.try_into()?),
                 PropertyKindFileOrText::Group(group) => {
                     let res: Vec<_> = group

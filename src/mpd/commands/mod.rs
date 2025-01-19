@@ -10,6 +10,7 @@ pub mod lsinfo;
 pub mod outputs;
 pub mod playlist_info;
 pub mod status;
+pub mod stickers;
 pub mod update;
 pub mod volume;
 

@@ -53,6 +53,7 @@ pub fn app_context(
         supported_commands: HashSet::new(),
         needs_render: Cell::new(false),
         lrc_index: LrcIndex::default(),
+        should_fetch_stickers: false,
     }
 }
 

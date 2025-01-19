@@ -517,6 +517,15 @@ impl Song {
         for format in formats {
             let match_found = match &format.kind {
                 PropertyKindOrText::Text(value) => Some(value.to_lowercase().contains(&filter.to_lowercase())),
+                PropertyKindOrText::Sticker(key) => self
+                    .stickers
+                    .as_ref()
+                    .and_then(|stickers| {
+                        stickers
+                            .get(*key)
+                            .map(|value| value.to_lowercase().contains(&filter.to_lowercase()))
+                    })
+                    .or_else(|| format.default.map(|f| self.matches(&[f], filter))),
                 PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                     || format.default.map(|f| self.matches(&[f], filter)),
                     |p| Some(p.to_lowercase().contains(filter)),
@@ -554,6 +563,16 @@ impl Song {
             PropertyKindOrText::Text(value) => {
                 Some(Line::styled((*value).ellipsize(max_len, symbols).to_string(), style))
             }
+            PropertyKindOrText::Sticker(key) => self
+                .stickers
+                .as_ref()
+                .and_then(|stickers| stickers.get(*key))
+                .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style))
+                .or_else(|| {
+                    format
+                        .default
+                        .and_then(|format| self.as_line_ellipsized(format, max_len, symbols))
+                }),
             PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                 || self.default_as_line_ellipsized(format, max_len, symbols),
                 |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
@@ -585,6 +604,13 @@ impl Property<'static, SongProperty> {
     pub fn as_string(&self, song: Option<&Song>) -> Option<String> {
         match &self.kind {
             PropertyKindOrText::Text(value) => Some((*value).to_string()),
+            PropertyKindOrText::Sticker(key) => {
+                if let Some(sticker) = song.map(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key))) {
+                    sticker.cloned()
+                } else {
+                    self.default(song)
+                }
+            }
             PropertyKindOrText::Property(property) => {
                 if let Some(song) = song {
                     song.format(property)
@@ -625,6 +651,13 @@ impl Property<'static, PropertyKind> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(*value, style))),
+            PropertyKindOrText::Sticker(key) => {
+                if let Some(sticker) = song.and_then(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key))) {
+                    Some(Either::Left(Span::styled(sticker, style)))
+                } else {
+                    self.default_as_span(song, status)
+                }
+            }
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
                     song.format(property).map_or_else(
@@ -801,6 +834,7 @@ mod format_tests {
                     ("track".to_string(), "123".to_string()),
                     ("artist".to_string(), "artist".to_string()),
                 ]),
+                stickers: None,
             };
 
             let result = format.as_string(Some(&song));
@@ -834,6 +868,7 @@ mod format_tests {
                     ("title".to_string(), "title".to_owned()),
                     ("track".to_string(), "123".to_string()),
                 ]),
+                stickers: None,
             };
             let status = Status {
                 volume: Volume::new(123),

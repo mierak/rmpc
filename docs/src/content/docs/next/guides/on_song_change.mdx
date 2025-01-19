@@ -70,3 +70,63 @@ Edit it to your needs or create a new one.
 4.  Restart rmpc
 
 </Steps>
+
+## Track song play count
+
+This allows you to track and display song's play count in the queue table (or header). Please note that rmpc has to be running
+for the script to execute and increment the play count.
+
+<Steps>
+    1. Configure [sticker_file](https://mpd.readthedocs.io/en/latest/mpd.conf.5.html#optional-parameters) in your `mpd.conf`
+
+    2. Create a script and place it somewhere. For example `~/.config/rmpc/playcount` and make the script executable. Or append it to an existing `on_song_change` script.
+
+    3. Increment playCount sticker on the song inside the script. (requires jq)
+        ```bash
+        #!/usr/bin/env sh
+
+        sticker=$(rmpc sticker get "$FILE" "playCount" | jq -r '.value')
+        if [ -z "$sticker" ]; then
+            rmpc sticker set "$FILE" "playCount" "1"
+        else
+            rmpc sticker set "$FILE" "playCount" "$((sticker + 1))"
+        fi
+        ```
+
+    4. Change your `config.ron` to execute the script you created on song change
+        ```rust title=config.ron
+        #![enable(implicit_some)]
+        #![enable(unwrap_newtypes)]
+        #![enable(unwrap_variant_newtypes)]
+        (
+            address: "/tmp/mpd_socket",
+            on_song_change: ["~/.config/rmpc/playcount"],
+        ...
+
+        ```
+    5. Change your theme to include play count sticker, for example in the queue table
+
+        ```rust title=theme.ron
+        #![enable(implicit_some)]
+        #![enable(unwrap_newtypes)]
+        #![enable(unwrap_variant_newtypes)]
+        (
+            song_table_format: [
+                (
+                    ...
+                ),
+                (
+                    prop: (kind: Sticker("playCount"), default: (kind: Text("0"))),
+                    width: "9",
+                    alignment: Right,
+                    label: "Playcount"
+                ),
+                (
+                    ...
+                ),
+            ],
+        ...
+
+        ```
+
+</Steps>

@@ -71,6 +71,7 @@ pub enum PropertyKindFile {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PropertyKindFileOrText<T> {
     Text(String),
+    Sticker(String),
     Property(T),
     Group(Vec<PropertyFile<T>>),
 }
@@ -86,8 +87,20 @@ pub struct PropertyFile<T> {
 #[derive(Debug, Clone, Copy)]
 pub enum PropertyKindOrText<'a, T> {
     Text(&'a str),
+    Sticker(&'a str),
     Property(T),
     Group(&'a [&'a Property<'a, T>]),
+}
+
+impl<T> PropertyKindOrText<'_, T> {
+    pub fn contains_stickers(&self) -> bool {
+        match self {
+            PropertyKindOrText::Text(_) => false,
+            PropertyKindOrText::Sticker(_) => true,
+            PropertyKindOrText::Property(_) => false,
+            PropertyKindOrText::Group(group) => group.iter().any(|prop| prop.kind.contains_stickers()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -190,6 +203,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
         Ok(Self {
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
+                PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value.leak()),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(match prop {
                     PropertyKindFile::Song(s) => PropertyKind::Song(s.try_into()?),
                     PropertyKindFile::Status(s) => PropertyKind::Status(s.try_into()?),

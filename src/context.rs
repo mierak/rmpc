@@ -29,6 +29,7 @@ pub struct AppContext {
     pub client_request_sender: Sender<ClientRequest>,
     pub needs_render: Cell<bool>,
     pub lrc_index: LrcIndex,
+    pub should_fetch_stickers: bool,
 }
 
 #[bon]
@@ -40,11 +41,16 @@ impl AppContext {
         work_sender: Sender<WorkRequest>,
         client_request_sender: Sender<ClientRequest>,
     ) -> Result<Self> {
-        let status = client.get_status()?;
-        let queue = client.playlist_info()?.unwrap_or_default();
         let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
+        let sticker_support_needed = config.sticker_support_needed();
+        log::info!(supported_commands:? = supported_commands, sticker_support_needed; "Supported commands by server");
 
-        log::info!(supported_commands:? = supported_commands; "Supported commands by server");
+        if sticker_support_needed && !supported_commands.contains("sticker") {
+            bail!("Rmpc was configured to display stickers but MPD did not report sticker support.\nCheck if you have 'sticker_file' configured your in mpd.conf.");
+        }
+
+        let status = client.get_status()?;
+        let queue = client.playlist_info(true)?.unwrap_or_default();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
             config.album_art.method = ImageMethod::None;
@@ -63,6 +69,7 @@ impl AppContext {
             work_sender,
             client_request_sender,
             needs_render: Cell::new(false),
+            should_fetch_stickers: sticker_support_needed,
         })
     }
 
@@ -174,5 +181,25 @@ impl AppContext {
         };
 
         Ok(None)
+    }
+}
+
+impl Config {
+    fn sticker_support_needed(&self) -> bool {
+        self.theme
+            .song_table_format
+            .iter()
+            .any(|column| column.prop.kind.contains_stickers())
+            || self
+                .theme
+                .browser_song_format
+                .0
+                .iter()
+                .any(|prop| prop.kind.contains_stickers())
+            || self.theme.header.rows.iter().any(|row| {
+                row.left.iter().any(|left| left.kind.contains_stickers())
+                    || row.center.iter().any(|center| center.kind.contains_stickers())
+                    || row.right.iter().any(|right| right.kind.contains_stickers())
+            })
     }
 }

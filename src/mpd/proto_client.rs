@@ -56,7 +56,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(self.client.write([command, "\n"].concat().as_bytes()).map(|()| self)?)
     }
 
-    pub(super) fn read_ok(self) -> Result<(), MpdError> {
+    pub(super) fn read_ok(&mut self) -> Result<(), MpdError> {
         trace!(command = self.command; "Reading command");
         let read = self.client.read();
 
@@ -79,7 +79,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(crate) fn read_response<V>(self) -> Result<V, MpdError>
+    pub(crate) fn read_response<V>(&mut self) -> Result<V, MpdError>
     where
         V: FromMpd + Default,
     {
@@ -122,7 +122,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(super) fn read_opt_response<V>(self) -> Result<Option<V>, MpdError>
+    pub(super) fn read_opt_response<V>(&mut self) -> Result<Option<V>, MpdError>
     where
         V: FromMpd + Default,
     {
@@ -166,7 +166,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(super) fn read_bin(mut self) -> MpdResult<Option<Vec<u8>>> {
+    pub(super) fn read_bin(&mut self) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
         // trim the 0 offset from the initial command because we substitute
         // an actual value here
