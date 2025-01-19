@@ -625,6 +625,7 @@ mod tests {
             file: format!("{date:?} {album:?}"),
             duration: None,
             metadata: HashMap::from([("album".to_string(), album.into()), ("date".to_string(), date.into())]),
+            stickers: None,
         }
     }
 

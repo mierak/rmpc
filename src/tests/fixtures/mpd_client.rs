@@ -10,8 +10,8 @@ use rstest::fixture;
 
 use crate::mpd::{
     commands::{
-        list::MpdList, list_playlist::FileList, status::OnOffOneshot, volume::Bound, IdleEvent, ListFiles, LsInfo,
-        Playlist, Song, Status, Update, Volume,
+        list::MpdList, list_playlist::FileList, status::OnOffOneshot, stickers::Sticker, volume::Bound, IdleEvent,
+        ListFiles, LsInfo, Playlist, Song, Status, Update, Volume,
     },
     errors::MpdError,
     mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
@@ -40,6 +40,7 @@ pub fn client() -> TestMpdClient {
                     ("title".to_owned(), format!("{}_{}_file_{i}", *artist, *album)),
                 ]),
                 duration: Some(Duration::from_secs(i.into())),
+                stickers: None,
             })
         })
         .collect();
@@ -289,7 +290,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
+    fn playlist_info(&mut self, _: bool) -> MpdResult<Option<Vec<Song>>> {
         Ok(Some(
             self.queue.iter().map(|idx| self.songs[*idx].clone()).collect_vec(),
         ))
@@ -464,6 +465,7 @@ impl MpdClient for TestMpdClient {
                         id: *idx as u32,
                         duration: None,
                         metadata: HashMap::default(),
+                        stickers: None,
                     })
                     .collect())
             },
@@ -531,7 +533,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn sticker(&mut self, _uri: &str, _name: &str) -> MpdResult<crate::mpd::commands::stickers::Sticker> {
+    fn sticker(&mut self, _uri: &str, _name: &str) -> MpdResult<Option<Sticker>> {
         todo!("Not yet implemented")
     }
 
@@ -556,6 +558,21 @@ impl MpdClient for TestMpdClient {
         _uri: &str,
         _name: &str,
     ) -> MpdResult<crate::mpd::commands::stickers::StickersWithFile> {
+        todo!("Not yet implemented")
+    }
+
+    fn start_cmd_list(&mut self) -> anyhow::Result<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn execute_cmd_list(&mut self) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient,
+    {
+        todo!("Not yet implemented")
+    }
+
+    fn list_stickers_multiple(&mut self, _uris: &[&str]) -> MpdResult<Vec<crate::mpd::commands::stickers::Stickers>> {
         todo!("Not yet implemented")
     }
 }

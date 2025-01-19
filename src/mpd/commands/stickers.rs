@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, Context};
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 use serde::Serialize;
@@ -5,28 +7,22 @@ use serde::Serialize;
 use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
 
 #[derive(Debug, Default, Serialize, IntoIterator, AsRef, AsMut, Into)]
-pub struct Stickers(pub Vec<Sticker>);
+pub struct Stickers(pub HashMap<String, String>);
 
 #[derive(Debug, Default, Serialize, IntoIterator, AsRef, AsMut, Into)]
 pub struct StickersWithFile(pub Vec<StickerWithFile>);
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize, Default, PartialEq, Eq, Clone)]
 pub struct Sticker {
-    key: String,
-    value: String,
+    pub key: String,
+    pub value: String,
 }
 
 #[derive(Debug, Serialize, Default)]
 pub struct StickerWithFile {
-    file: String,
-    key: String,
-    value: String,
-}
-
-impl From<Vec<Sticker>> for Stickers {
-    fn from(value: Vec<Sticker>) -> Self {
-        Stickers(value)
-    }
+    pub file: String,
+    pub key: String,
+    pub value: String,
 }
 
 impl From<Vec<StickerWithFile>> for StickersWithFile {
@@ -37,10 +33,14 @@ impl From<Vec<StickerWithFile>> for StickersWithFile {
 
 impl FromMpd for Stickers {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
-        let mut sticker = Sticker::default();
-        Sticker::next_internal(&mut sticker, key, value)?;
+        if key != "sticker" {
+            return Ok(LineHandled::No { value });
+        };
 
-        self.0.push(sticker);
+        let Some((key, value)) = value.split_once('=') else {
+            return Err(MpdError::Parse(format!("Invalid sticker value: {value}")));
+        };
+        self.0.insert(key.to_string(), value.to_string());
         Ok(LineHandled::Yes)
     }
 }

@@ -84,7 +84,7 @@ fn client_task(client_rx: &Receiver<ClientRequest>, event_tx: &Sender<AppEvent>,
 
                                     log::trace!("Trying to acquire client lock for idle");
 
-                                    let idle_client = try_break!(client.enter_idle(), "Failed to enter idle state");
+                                    let mut idle_client = try_break!(client.enter_idle(), "Failed to enter idle state");
                                     try_break!(idle_entered_tx.send(()), "Failed to send idle confirmation");
                                     let events: Vec<IdleEvent> = try_break!(idle_client.read_response(), "Failed to read idle events");
 

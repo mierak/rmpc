@@ -187,8 +187,14 @@ impl Command {
             Command::Sticker {
                 cmd: StickerCmd::Get { uri, key },
             } => Ok(Box::new(move |client| {
-                let sticker = client.sticker(&uri, &key)?;
-                println!("{}", serde_json::ser::to_string(&sticker)?);
+                match client.sticker(&uri, &key)? {
+                    Some(sticker) => {
+                        println!("{}", serde_json::ser::to_string(&sticker)?);
+                    }
+                    None => {
+                        std::process::exit(1);
+                    }
+                }
                 Ok(())
             })),
             Command::Sticker {

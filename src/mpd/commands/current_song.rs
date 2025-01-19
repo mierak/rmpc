@@ -10,6 +10,7 @@ pub struct Song {
     pub file: String,
     pub duration: Option<Duration>,
     pub metadata: HashMap<String, String>,
+    pub stickers: Option<HashMap<String, String>>,
 }
 
 impl std::fmt::Debug for Song {
