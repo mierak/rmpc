@@ -7,7 +7,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::Song,
+        commands::{lsinfo::LsInfoEntry, Song},
         mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
     },
     shared::{
@@ -506,21 +506,31 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             .id(PREVIEW)
             .replace_id("playlists_preview")
             .target(PaneType::Playlists)
-            .query(move |c| {
+            .query(move |client| {
                 let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
-                    Ok(Some(match current {
-                        DirOrSong::Dir { name: d, .. } => c
-                            .list_playlist_info(d, None)?
-                            .into_iter()
-                            .map(DirOrSong::Song)
-                            .map(|s| s.to_list_item_simple(config))
-                            .collect_vec(),
-                        DirOrSong::Song(song) => c
-                            .find_one(&[Filter::new(Tag::File, &song.file)])?
-                            .context(anyhow!("File '{}' was listed but not found", song.file))?
-                            .to_preview(&config.theme.symbols)
-                            .collect_vec(),
-                    }))
+                    let response = match current {
+                        DirOrSong::Dir { name: d, .. } => Some(
+                            client
+                                .list_playlist_info(d, None)?
+                                .into_iter()
+                                .map(DirOrSong::Song)
+                                .map(|s| s.to_list_item_simple(config))
+                                .collect_vec(),
+                        ),
+                        DirOrSong::Song(song) => {
+                            match client
+                                .lsinfo(Some(&song.file))
+                                .context(anyhow!("File '{}' was listed but not found", song.file))?
+                                .0
+                                .first()
+                                .context("Expected to find exactly one song for preview")?
+                            {
+                                LsInfoEntry::File(song) => Some(song.to_preview(&config.theme.symbols).collect_vec()),
+                                _ => None,
+                            }
+                        }
+                    };
+                    Ok(response)
                 })?;
 
                 Ok(MpdQueryResult::Preview { data, origin_path })
