@@ -198,7 +198,8 @@ impl MpdClient for Client<'_> {
     }
 
     fn password(&mut self, password: &str) -> MpdResult<()> {
-        self.send(&format!("password {password}")).and_then(read_ok)
+        self.send(&format!("password {}", password.quote_and_escape()))
+            .and_then(read_ok)
     }
 
     // Lists commands supported by the MPD server
@@ -208,7 +209,8 @@ impl MpdClient for Client<'_> {
 
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update> {
         if let Some(path) = path {
-            self.send(&format!("update {path}")).and_then(read_response)
+            self.send(&format!("update {}", path.quote_and_escape()))
+                .and_then(read_response)
         } else {
             self.send("update").and_then(read_response)
         }
@@ -216,7 +218,8 @@ impl MpdClient for Client<'_> {
 
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update> {
         if let Some(path) = path {
-            self.send(&format!("rescan {path}")).and_then(read_response)
+            self.send(&format!("rescan {}", path.quote_and_escape()))
+                .and_then(read_response)
         } else {
             self.send("rescan").and_then(read_response)
         }
@@ -338,11 +341,17 @@ impl MpdClient for Client<'_> {
 
     // Mounts
     fn mount(&mut self, name: &str, path: &str) -> MpdResult<()> {
-        self.send(&format!("mount \"{name}\" \"{path}\"")).and_then(read_ok)
+        self.send(&format!(
+            "mount {} {}",
+            name.quote_and_escape(),
+            path.quote_and_escape()
+        ))
+        .and_then(read_ok)
     }
 
     fn unmount(&mut self, name: &str) -> MpdResult<()> {
-        self.send(&format!("unmount \"{name}\"")).and_then(read_ok)
+        self.send(&format!("unmount {}", name.quote_and_escape()))
+            .and_then(read_ok)
     }
 
     fn list_mounts(&mut self) -> MpdResult<Mounts> {
@@ -350,8 +359,8 @@ impl MpdClient for Client<'_> {
     }
 
     // Current queue
-    fn add(&mut self, path: &str) -> MpdResult<()> {
-        self.send(&format!("add \"{path}\"")).and_then(read_ok)
+    fn add(&mut self, uri: &str) -> MpdResult<()> {
+        self.send(&format!("add {}", uri.quote_and_escape())).and_then(read_ok)
     }
 
     fn clear(&mut self) -> MpdResult<()> {
@@ -359,7 +368,7 @@ impl MpdClient for Client<'_> {
     }
 
     fn delete_id(&mut self, id: u32) -> MpdResult<()> {
-        self.send(&format!("deleteid \"{id}\"")).and_then(read_ok)
+        self.send(&format!("deleteid {id}")).and_then(read_ok)
     }
 
     fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()> {
@@ -411,7 +420,7 @@ impl MpdClient for Client<'_> {
     }
 
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
-        self.send(&format!("moveid \"{id}\" \"{}\"", to.as_mpd_str()))
+        self.send(&format!("moveid {id} \"{}\"", to.as_mpd_str()))
             .and_then(read_ok)
     }
 
@@ -449,7 +458,7 @@ impl MpdClient for Client<'_> {
     // Database
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
         Ok(if let Some(path) = path {
-            self.send(&format!("lsinfo \"{path}\""))
+            self.send(&format!("lsinfo {}", path.quote_and_escape()))
                 .and_then(read_opt_response)?
                 .unwrap_or_default()
         } else {
@@ -459,7 +468,7 @@ impl MpdClient for Client<'_> {
 
     fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles> {
         Ok(if let Some(path) = path {
-            self.send(&format!("listfiles \"{path}\""))
+            self.send(&format!("listfiles {}", path.quote_and_escape()))
                 .and_then(read_opt_response)?
                 .unwrap_or_default()
         } else {
@@ -468,17 +477,20 @@ impl MpdClient for Client<'_> {
     }
 
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("readpicture \"{path}\" 0")).and_then(read_bin)
+        self.send(&format!("readpicture {} 0", path.quote_and_escape()))
+            .and_then(read_bin)
     }
     fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("albumart \"{path}\" 0")).and_then(read_bin)
+        self.send(&format!("albumart {} 0", path.quote_and_escape()))
+            .and_then(read_bin)
     }
     // Stored playlists
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.send("listplaylists").and_then(read_response)
     }
     fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
-        self.send(&format!("listplaylist \"{name}\"")).and_then(read_response)
+        self.send(&format!("listplaylist {}", name.quote_and_escape()))
+            .and_then(read_response)
     }
     fn list_playlist_info(&mut self, playlist: &str, range: Option<SingleOrRange>) -> MpdResult<Vec<Song>> {
         if let Some(range) = range {
@@ -487,28 +499,41 @@ impl MpdClient for Client<'_> {
                     "listplaylistinfo with range can only be used since MPD 0.24.0",
                 ));
             }
-            self.send(&format!("listplaylistinfo \"{playlist}\" {}", range.as_mpd_range()))
-                .and_then(read_response)
+            self.send(&format!(
+                "listplaylistinfo {} {}",
+                playlist.quote_and_escape(),
+                range.as_mpd_range()
+            ))
+            .and_then(read_response)
         } else {
-            self.send(&format!("listplaylistinfo \"{playlist}\""))
+            self.send(&format!("listplaylistinfo {}", playlist.quote_and_escape()))
                 .and_then(read_response)
         }
     }
     fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.send(&format!("load \"{name}\"")).and_then(read_ok)
+        self.send(&format!("load {}", name.quote_and_escape()))
+            .and_then(read_ok)
     }
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
-        self.send(&format!("rename \"{name}\" \"{new_name}\""))
-            .and_then(read_ok)
+        self.send(&format!(
+            "rename {} {}",
+            name.quote_and_escape(),
+            new_name.quote_and_escape()
+        ))
+        .and_then(read_ok)
     }
 
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.send(&format!("rm \"{name}\"")).and_then(read_ok)
+        self.send(&format!("rm {}", name.quote_and_escape())).and_then(read_ok)
     }
 
     fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
-        self.send(&format!("playlistdelete \"{playlist_name}\" {}", range.as_mpd_range()))
-            .and_then(read_ok)
+        self.send(&format!(
+            "playlistdelete {} {}",
+            playlist_name.quote_and_escape(),
+            range.as_mpd_range()
+        ))
+        .and_then(read_ok)
     }
 
     fn move_in_playlist(
@@ -518,7 +543,8 @@ impl MpdClient for Client<'_> {
         target_position: usize,
     ) -> MpdResult<()> {
         self.send(&format!(
-            "playlistmove \"{playlist_name}\" {} {target_position}",
+            "playlistmove {} {} {target_position}",
+            playlist_name.quote_and_escape(),
             range.as_mpd_range()
         ))
         .and_then(read_ok)
@@ -527,10 +553,18 @@ impl MpdClient for Client<'_> {
     fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()> {
         match target_position {
             Some(target_position) => self
-                .send(&format!(r#"playlistadd "{playlist_name}" "{uri}" {target_position}"#))
+                .send(&format!(
+                    "playlistadd {} {} {target_position}",
+                    playlist_name.quote_and_escape(),
+                    uri.quote_and_escape()
+                ))
                 .and_then(read_ok),
             None => self
-                .send(&format!(r#"playlistadd "{playlist_name}" "{uri}""#))
+                .send(&format!(
+                    "playlistadd {} {}",
+                    playlist_name.quote_and_escape(),
+                    uri.quote_and_escape()
+                ))
                 .and_then(read_ok),
         }
     }
@@ -542,14 +576,16 @@ impl MpdClient for Client<'_> {
                     "save mode can be used since MPD 0.24.0",
                 ));
             }
-            self.send(&format!("save \"{name}\" \"{}\"", mode.as_ref()))
+            self.send(&format!("save {} \"{}\"", name.quote_and_escape(), mode.as_ref()))
                 .and_then(read_ok)
         } else {
-            self.send(&format!("save \"{name}\"")).and_then(read_ok)
+            self.send(&format!("save {}", name.quote_and_escape()))
+                .and_then(read_ok)
         }
     }
 
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+        // path is already escaped in albumart() and read_picture()
         match self.albumart(path) {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None)
@@ -606,7 +642,11 @@ impl MpdClient for Client<'_> {
     // Stickers
     fn sticker(&mut self, uri: &str, key: &str) -> MpdResult<Option<Sticker>> {
         let result: MpdResult<Sticker> = self
-            .send(&format!("sticker get song \"{uri}\" \"{key}\""))
+            .send(&format!(
+                "sticker get song {} {}",
+                uri.quote_and_escape(),
+                key.quote_and_escape()
+            ))
             .and_then(read_response);
 
         if let Err(MpdError::Mpd(MpdFailureResponse {
@@ -621,21 +661,31 @@ impl MpdClient for Client<'_> {
     }
 
     fn set_sticker(&mut self, uri: &str, key: &str, value: &str) -> MpdResult<()> {
-        self.send(&format!("sticker set song \"{uri}\" \"{key}\" \"{value}\""))
-            .and_then(read_ok)
+        self.send(&format!(
+            "sticker set song {} {} {}",
+            uri.quote_and_escape(),
+            key.quote_and_escape(),
+            value.quote_and_escape()
+        ))
+        .and_then(read_ok)
     }
 
     fn delete_sticker(&mut self, uri: &str, key: &str) -> MpdResult<()> {
-        self.send(&format!("sticker delete song \"{uri}\" \"{key}\""))
-            .and_then(read_ok)
+        self.send(&format!(
+            "sticker delete song {} {}",
+            uri.quote_and_escape(),
+            key.quote_and_escape()
+        ))
+        .and_then(read_ok)
     }
 
     fn delete_all_stickers(&mut self, uri: &str) -> MpdResult<()> {
-        self.send(&format!("sticker delete song \"{uri}\"")).and_then(read_ok)
+        self.send(&format!("sticker delete song {}", uri.quote_and_escape()))
+            .and_then(read_ok)
     }
 
     fn list_stickers(&mut self, uri: &str) -> MpdResult<Stickers> {
-        self.send(&format!("sticker list song \"{uri}\""))
+        self.send(&format!("sticker list song {}", uri.quote_and_escape()))
             .and_then(read_response)
     }
 
@@ -643,7 +693,7 @@ impl MpdClient for Client<'_> {
         self.start_cmd_list()?;
 
         for uri in uris {
-            self.send(&format!("sticker list song \"{uri}\""))?;
+            self.send(&format!("sticker list song {}", uri.quote_and_escape()))?;
         }
         let mut proto = self.execute_cmd_list()?;
 
@@ -672,8 +722,12 @@ impl MpdClient for Client<'_> {
     }
 
     fn find_stickers(&mut self, uri: &str, key: &str) -> MpdResult<StickersWithFile> {
-        self.send(&format!("sticker find song \"{uri}\" \"{key}\""))
-            .and_then(read_response)
+        self.send(&format!(
+            "sticker find song {} {}",
+            uri.quote_and_escape(),
+            key.quote_and_escape()
+        ))
+        .and_then(read_response)
     }
 
     fn start_cmd_list(&mut self) -> Result<()> {
@@ -732,28 +786,17 @@ impl SingleOrRange {
     pub fn single(idx: usize) -> Self {
         Self { start: idx, end: None }
     }
+
     pub fn range(start: usize, end: usize) -> Self {
         Self { start, end: Some(end) }
     }
+
     pub fn as_mpd_range(&self) -> String {
         if let Some(end) = self.end {
             format!("\"{}:{}\"", self.start, end)
         } else {
             format!("\"{}\"", self.start)
         }
-    }
-}
-
-trait StrExt {
-    fn escape(self) -> String;
-}
-impl StrExt for &str {
-    fn escape(self) -> String {
-        self.replace('\\', r"\\\\")
-            .replace('(', "\\(")
-            .replace(')', "\\)")
-            .replace('\'', "\\\\'")
-            .replace('\"', "\\\"")
     }
 }
 
@@ -831,13 +874,58 @@ impl<'value> Filter<'value> {
         self
     }
 
-    fn to_query_str(&self) -> String {
+    pub fn to_query_str(&self) -> String {
         match self.kind {
-            FilterKind::Exact => format!("{} == '{}'", self.tag.as_str(), self.value.escape()),
-            FilterKind::StartsWith => format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape()),
-            FilterKind::Contains => format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape()),
-            FilterKind::Regex => format!("{} =~ '{}'", self.tag.as_str(), self.value.escape()),
+            FilterKind::Exact => format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter()),
+            FilterKind::StartsWith => format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter()),
+            FilterKind::Contains => format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter()),
+            FilterKind::Regex => format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter()),
         }
+    }
+}
+
+trait StrExt {
+    fn escape_filter(self) -> String;
+    fn quote_and_escape(self) -> String;
+}
+
+impl StrExt for &str {
+    fn escape_filter(self) -> String {
+        self.replace('\\', r"\\\\")
+            .replace('(', "\\(")
+            .replace(')', "\\)")
+            .replace('\'', "\\\\'")
+            .replace('\"', "\\\"")
+    }
+
+    fn quote_and_escape(self) -> String {
+        // reserve at least the input len + 2 for surrounding double quotes
+        let mut result = String::with_capacity(self.len() + 2);
+
+        result.push('"');
+        for c in self.chars() {
+            if c == '"' || c == '\\' {
+                result.push('\\');
+            }
+            result.push(c);
+        }
+
+        result.push('"');
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StrExt;
+
+    #[test]
+    fn strext_test() {
+        let input = String::from("test\\test\",h,");
+
+        let result = input.quote_and_escape();
+
+        assert_eq!(result, "\"test\\\\test\\\",h,\"");
     }
 }
 
@@ -865,7 +953,7 @@ mod strext_tests {
     fn escapes_correctly() {
         let input: &'static str = r#"(Artist == "foo'bar")"#;
 
-        assert_eq!(input.escape(), r#"\(Artist == \"foo\\'bar\"\)"#);
+        assert_eq!(input.escape_filter(), r#"\(Artist == \"foo\\'bar\"\)"#);
     }
 }
 
