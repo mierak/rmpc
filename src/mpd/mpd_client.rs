@@ -650,7 +650,14 @@ impl MpdClient for Client<'_> {
         let mut result = Vec::new();
 
         for _ in uris {
-            result.push(proto.read_response()?);
+            result.push(match proto.read_response() {
+                Ok(v) => v,
+                Err(MpdError::Mpd(MpdFailureResponse {
+                    code: ErrorCode::NoExist,
+                    ..
+                })) => Stickers::default(),
+                Err(e) => return Err(e),
+            });
         }
 
         // OK for end of the whole command list
