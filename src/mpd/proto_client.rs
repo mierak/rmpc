@@ -51,6 +51,13 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(res)
     }
 
+    pub fn new_read_only(client: &'client mut C) -> Self {
+        Self {
+            command: "<read_only>",
+            client,
+        }
+    }
+
     fn execute(&mut self, command: &str) -> Result<&mut Self, MpdError> {
         trace!(command = self.command; "Executing command");
         Ok(self.client.write([command, "\n"].concat().as_bytes()).map(|()| self)?)
@@ -62,7 +69,11 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
 
         match Self::read_line(read) {
             Ok(MpdLine::Ok) => Ok(()),
-            Ok(MpdLine::Value(val)) => Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'"))),
+            Ok(MpdLine::Value(val)) => {
+                log::error!(val = val.as_str(); "read buffer was reinitialized because we got a value when receiving ok");
+                self.client.clear_read_buf()?;
+                Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'")))
+            }
             Err(e) => {
                 if !matches!(
                     e,
@@ -71,7 +82,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                         ..
                     })
                 ) {
-                    log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                    log::error!(e:?; "read buffer was reinitialized");
                     self.client.clear_read_buf()?;
                 }
                 Err(e)
@@ -99,7 +110,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                                 ..
                             })
                         ) {
-                            log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                            log::error!(e:?; "read buffer was reinitialized");
                             self.client.clear_read_buf()?;
                         }
                         return Err(e);
@@ -113,7 +124,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                             ..
                         })
                     ) {
-                        log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                        log::error!(e:?; "read buffer was reinitialized");
                         self.client.clear_read_buf()?;
                     }
                     return Err(e);
@@ -143,7 +154,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                                 ..
                             })
                         ) {
-                            log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                            log::error!(e:?; "read buffer was reinitialized");
                             self.client.clear_read_buf()?;
                         }
                         return Err(e);
@@ -157,7 +168,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                             ..
                         })
                     ) {
-                        log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                        log::error!(e:?; "read buffer was reinitialized");
                         self.client.clear_read_buf()?;
                     }
                     return Err(e);
@@ -182,7 +193,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                         ..
                     })
                 ) {
-                    log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                    log::error!(e:?; "read buffer was reinitialized");
                     self.client.clear_read_buf()?;
                 }
                 Err(e)
@@ -208,7 +219,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                             ..
                         })
                     ) {
-                        log::error!(e:?; "read buffer was reinitialized buffer was reinitialized");
+                        log::error!(e:?; "read buffer was reinitialized");
                         self.client.clear_read_buf()?;
                     }
                     return Err(e);

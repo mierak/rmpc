@@ -381,19 +381,27 @@ impl MpdClient for Client<'_> {
         if !fetch_stickers {
             return Ok(songs);
         }
+
         let Some(mut songs) = songs else {
             return Ok(songs);
         };
 
-        let stickers = self.list_stickers_multiple(&songs.iter().map(|song| song.file.as_str()).collect_vec())?;
-        let stickers_len = stickers.len();
-
-        for (idx, song_stickers) in stickers.into_iter().enumerate() {
-            if let Some(song) = songs.get_mut(idx) {
-                song.stickers = Some(song_stickers.0);
-            } else {
-                log::warn!(songs_len = songs.len(), stickers_len; "Received different number of sticker responses than requested songs");
+        let mut stickers = match self.list_stickers_multiple(&songs.iter().map(|song| song.file.as_str()).collect_vec())
+        {
+            Ok(stickers) => stickers,
+            Err(err) => {
+                log::error!(err:?; "Failed to fetch stickers for playlist_info");
+                return Ok(Some(songs));
             }
+        };
+
+        if songs.len() != stickers.len() {
+            log::error!(songs_len = songs.len(), stickers_len = stickers.len(); "Received different number of sticker responses than requested songs");
+            return Ok(Some(songs));
+        };
+
+        for (stickers, song) in stickers.iter_mut().zip(songs.iter_mut()) {
+            song.stickers = Some(std::mem::take(&mut stickers.0));
         }
 
         Ok(Some(songs))
@@ -689,34 +697,45 @@ impl MpdClient for Client<'_> {
             .and_then(read_response)
     }
 
+    /// Resulting `Vec` is of the same length as input `uri`s.
+    /// Default value (empty `HashMap`) is supplied if sticker
+    /// for a specific URI cannot be found or an error is encountered
     fn list_stickers_multiple(&mut self, uris: &[&str]) -> MpdResult<Vec<Stickers>> {
-        self.start_cmd_list()?;
+        let mut result = Vec::with_capacity(uris.len());
+        let mut list_ended_with_err = false;
+        let mut i = 0;
 
-        for uri in uris {
-            self.send(&format!("sticker list song {}", uri.quote_and_escape()))?;
-        }
-        let mut proto = self.execute_cmd_list()?;
+        'outer: while i < uris.len() {
+            self.start_cmd_list()?;
 
-        let mut result = Vec::new();
+            for uri in &uris[i..] {
+                self.send(&format!("sticker list song {}", uri.quote_and_escape()))?;
+            }
+            let mut proto = self.execute_cmd_list()?;
 
-        for _ in uris {
-            result.push(match proto.read_response() {
-                Ok(v) => v,
-                Err(
-                    error @ MpdError::Mpd(MpdFailureResponse {
-                        code: ErrorCode::NoExist,
-                        ..
-                    }),
-                ) => {
-                    log::warn!(error:?; "Tried to find stickers but the song did not exist");
-                    Stickers::default()
+            for uri in &uris[i..] {
+                let res: MpdResult<Stickers> = proto.read_response();
+                i += 1;
+                match res {
+                    Ok(v) => {
+                        list_ended_with_err = false;
+                        result.push(v);
+                    }
+                    Err(error) => {
+                        log::warn!(error:?, uri; "Tried to find stickers but unexpected error occured");
+                        result.push(Stickers::default());
+                        list_ended_with_err = true;
+                        continue 'outer;
+                    }
                 }
-                Err(e) => return Err(e),
-            });
+            }
         }
 
-        // OK for end of the whole command list
-        proto.read_ok()?;
+        // In case the last sticker was fetched successfully we have to read an OK
+        // as an ack for the whole command list
+        if !list_ended_with_err {
+            ProtoClient::new_read_only(self).read_ok()?;
+        }
 
         Ok(result)
     }
