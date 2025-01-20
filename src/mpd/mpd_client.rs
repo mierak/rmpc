@@ -652,10 +652,15 @@ impl MpdClient for Client<'_> {
         for _ in uris {
             result.push(match proto.read_response() {
                 Ok(v) => v,
-                Err(MpdError::Mpd(MpdFailureResponse {
-                    code: ErrorCode::NoExist,
-                    ..
-                })) => Stickers::default(),
+                Err(
+                    error @ MpdError::Mpd(MpdFailureResponse {
+                        code: ErrorCode::NoExist,
+                        ..
+                    }),
+                ) => {
+                    log::warn!(error:?; "Tried to find stickers but the song did not exist");
+                    Stickers::default()
+                }
                 Err(e) => return Err(e),
             });
         }
