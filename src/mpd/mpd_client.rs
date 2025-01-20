@@ -705,7 +705,7 @@ impl MpdClient for Client<'_> {
         let mut list_ended_with_err = false;
         let mut i = 0;
 
-        'outer: while i < uris.len() {
+        while i < uris.len() {
             self.start_cmd_list()?;
 
             for uri in &uris[i..] {
@@ -725,7 +725,7 @@ impl MpdClient for Client<'_> {
                         log::warn!(error:?, uri; "Tried to find stickers but unexpected error occured");
                         result.push(Stickers::default());
                         list_ended_with_err = true;
-                        continue 'outer;
+                        break;
                     }
                 }
             }
