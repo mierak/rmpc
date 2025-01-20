@@ -427,10 +427,6 @@ impl<'ui> Ui<'ui> {
             UiEvent::Database => {
                 status_warn!("The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours.");
             }
-            UiEvent::LogAdded(_) => {
-                #[cfg(debug_assertions)]
-                context.render()?;
-            }
             _ => {}
         }
 
