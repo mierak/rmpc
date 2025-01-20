@@ -50,7 +50,7 @@ impl AppContext {
         }
 
         let status = client.get_status()?;
-        let queue = client.playlist_info(true)?.unwrap_or_default();
+        let queue = client.playlist_info(sticker_support_needed)?.unwrap_or_default();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
             config.album_art.method = ImageMethod::None;
