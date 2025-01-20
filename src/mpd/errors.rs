@@ -72,7 +72,7 @@ impl Display for ErrorCode {
                 ErrorCode::Argument => "bad argument",
                 ErrorCode::Password => "invalid password",
                 ErrorCode::Permission => "no permission",
-                ErrorCode::UnknownCmd => "unknown commad",
+                ErrorCode::UnknownCmd => "unknown command",
                 ErrorCode::NoExist => "resource does not exist",
                 ErrorCode::PlaylistMax => "maximum playlist size",
                 ErrorCode::System => "system error",
