@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Potential infinite loop in lyrics indexing
 - `lsinfo` parsing playlist entries incorrectly
 - Missing border in tabs with `border_type: Single`
+- Properly escape strings in mpd protocol
 
 ## [0.7.0] - 2024-12-24
 
