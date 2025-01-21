@@ -89,11 +89,15 @@ impl Command {
                 };
 
                 let dir = music_directory.clone();
-                for file in files.iter().map(|file| file.trim_end_matches('/')) {
-                    if file.starts_with('/') {
-                        client.add(file.trim_start_matches(&dir).trim_start_matches('/'))?;
+                for file in files {
+                    if file.starts_with(&dir) {
+                        client.add(
+                            file.trim_start_matches(&dir)
+                                .trim_start_matches('/')
+                                .trim_end_matches('/'),
+                        )?;
                     } else {
-                        client.add(file)?;
+                        client.add(&file)?;
                     }
                 }
 
