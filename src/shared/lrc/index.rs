@@ -58,7 +58,7 @@ impl LrcIndex {
 
     fn find_lrc(&self, artist: &str, title: &str, album: &str, length: Option<Duration>) -> Option<&LrcIndexEntry> {
         self.index.iter().find(|entry| {
-            log::debug!(entry:?; "searching entry");
+            log::trace!(entry:?; "searching entry");
 
             let length_matches = match (entry.length, length) {
                 (Some(entry_length), Some(length)) => entry_length.abs_diff(length) < Duration::from_secs(3),

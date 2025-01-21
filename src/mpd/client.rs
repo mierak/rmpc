@@ -11,6 +11,7 @@ use crate::{
 };
 
 use super::{
+    commands::mpd_config::MpdConfig,
     errors::MpdError,
     proto_client::{ProtoClient, SocketClient},
     version::Version,
@@ -33,6 +34,7 @@ pub struct Client<'name> {
     addr: MpdAddress<'name>,
     password: Option<MpdPassword<'name>>,
     pub version: Version,
+    pub config: Option<MpdConfig>,
 }
 
 impl std::fmt::Debug for Client<'_> {
@@ -145,6 +147,7 @@ impl<'name> Client<'name> {
             addr,
             password,
             version,
+            config: None,
         };
 
         if let Some(MpdPassword(password)) = password {
@@ -183,6 +186,7 @@ impl<'name> Client<'name> {
         self.rx = rx;
         self.stream = stream;
         self.version = version;
+        self.config = None;
 
         debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initialized");
 

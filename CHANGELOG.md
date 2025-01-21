@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Support for fixed Pane size in Tabs
 - Support for displaying MPD stickers in the header and queue table
 - Support for manipulation of MPD stickers via CLI
+- Support for globs/multiple files and songs outside music database (with socket connection) in the `add` cli command
 
 ### Changed
 

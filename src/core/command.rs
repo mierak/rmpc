@@ -10,7 +10,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::{volume::Bound, IdleEvent},
+        commands::{mpd_config::MpdConfig, volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
     shared::{
@@ -81,7 +81,58 @@ impl Command {
             Command::Consume { value } => Ok(Box::new(move |client| Ok(client.consume((value).into())?))),
             Command::Seek { value } => Ok(Box::new(move |client| Ok(client.seek_current(value.parse()?)?))),
             Command::Clear => Ok(Box::new(|client| Ok(client.clear()?))),
-            Command::Add { file } => Ok(Box::new(move |client| Ok(client.add(&file)?))),
+            Command::Add { files, skip_ext_check } if files.iter().any(|path| path.is_absolute()) => {
+                Ok(Box::new(move |client| {
+                    let Some(MpdConfig { music_directory, .. }) = client.config() else {
+                        status_error!("Cannot add absolute path without socket connection to MPD");
+                        return Ok(());
+                    };
+
+                    let dir = music_directory.clone();
+
+                    let mut files = files;
+
+                    if !skip_ext_check {
+                        let supported_extensions = client
+                            .decoders()?
+                            .into_iter()
+                            .flat_map(|decoder| decoder.suffixes)
+                            .collect_vec();
+
+                        files = files
+                            .into_iter()
+                            .filter(|path| {
+                                path.to_string_lossy() == "/"
+                                    || path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
+                                        supported_extensions.iter().any(|supported_ext| supported_ext == ext)
+                                    })
+                            })
+                            .collect_vec();
+                    }
+
+                    for file in files {
+                        if file.starts_with(&dir) {
+                            client.add(
+                                file.to_string_lossy()
+                                    .trim_start_matches(&dir)
+                                    .trim_start_matches('/')
+                                    .trim_end_matches('/'),
+                            )?;
+                        } else {
+                            client.add(&file.to_string_lossy())?;
+                        }
+                    }
+
+                    Ok(())
+                }))
+            }
+            Command::Add { files, .. } => Ok(Box::new(move |client| {
+                for file in &files {
+                    client.add(&file.to_string_lossy())?;
+                }
+
+                Ok(())
+            })),
             Command::AddYt { url } => {
                 let file_path = YtDlp::init_and_download(config, &url)?;
                 status_info!("file path {file_path}");

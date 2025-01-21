@@ -10,8 +10,8 @@ use rstest::fixture;
 
 use crate::mpd::{
     commands::{
-        list::MpdList, list_playlist::FileList, status::OnOffOneshot, stickers::Sticker, volume::Bound, IdleEvent,
-        ListFiles, LsInfo, Playlist, Song, Status, Update, Volume,
+        list::MpdList, list_playlist::FileList, mpd_config::MpdConfig, status::OnOffOneshot, stickers::Sticker,
+        volume::Bound, IdleEvent, ListFiles, LsInfo, Playlist, Song, Status, Update, Volume,
     },
     errors::MpdError,
     mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
@@ -573,6 +573,10 @@ impl MpdClient for TestMpdClient {
     }
 
     fn list_stickers_multiple(&mut self, _uris: &[&str]) -> MpdResult<Vec<crate::mpd::commands::stickers::Stickers>> {
+        todo!("Not yet implemented")
+    }
+
+    fn config(&mut self) -> Option<&MpdConfig> {
         todo!("Not yet implemented")
     }
 }

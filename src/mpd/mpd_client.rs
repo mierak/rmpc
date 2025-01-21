@@ -16,6 +16,7 @@ use super::{
         decoders::Decoders,
         list::MpdList,
         list_playlist::FileList,
+        mpd_config::MpdConfig,
         outputs::Outputs,
         status::OnOffOneshot,
         stickers::{Sticker, Stickers, StickersWithFile},
@@ -72,6 +73,7 @@ impl ValueChange {
 #[allow(dead_code)]
 pub trait MpdClient: Sized {
     fn version(&mut self) -> Version;
+    fn config(&mut self) -> Option<&MpdConfig>;
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()>;
     fn password(&mut self, password: &str) -> MpdResult<()>;
     fn commands(&mut self) -> MpdResult<MpdList>;
@@ -191,6 +193,21 @@ fn read_ok<S: SocketClient>(mut c: ProtoClient<'_, '_, S>) -> MpdResult<()> {
 impl MpdClient for Client<'_> {
     fn version(&mut self) -> Version {
         self.version
+    }
+
+    fn config(&mut self) -> Option<&MpdConfig> {
+        if self.config.is_none() {
+            match self.send("config").and_then(read_response) {
+                Ok(config) => {
+                    self.config = Some(config);
+                }
+                Err(error) => {
+                    log::debug!(error:?; "Cannot get MPD config, most likely not using socket connection");
+                }
+            };
+        }
+
+        self.config.as_ref()
     }
 
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()> {
