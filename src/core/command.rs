@@ -10,7 +10,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::{volume::Bound, IdleEvent},
+        commands::{mpd_config::MpdConfig, volume::Bound, IdleEvent},
         mpd_client::{Filter, MpdClient, Tag},
     },
     shared::{
@@ -81,7 +81,31 @@ impl Command {
             Command::Consume { value } => Ok(Box::new(move |client| Ok(client.consume((value).into())?))),
             Command::Seek { value } => Ok(Box::new(move |client| Ok(client.seek_current(value.parse()?)?))),
             Command::Clear => Ok(Box::new(|client| Ok(client.clear()?))),
-            Command::Add { file } => Ok(Box::new(move |client| Ok(client.add(&file)?))),
+            Command::Add { files } if files.iter().any(|path| path.starts_with('/')) => Ok(Box::new(move |client| {
+                client.fetch_config_if_needed();
+                let Some(MpdConfig { music_directory, .. }) = &client.config else {
+                    status_error!("Cannot add absolute path without socket connection to MPD");
+                    return Ok(());
+                };
+
+                let dir = music_directory.clone();
+                for file in files.iter().map(|file| file.trim_end_matches('/')) {
+                    if file.starts_with('/') {
+                        client.add(file.trim_start_matches(&dir).trim_start_matches('/'))?;
+                    } else {
+                        client.add(file)?;
+                    }
+                }
+
+                Ok(())
+            })),
+            Command::Add { files } => Ok(Box::new(move |client| {
+                for file in &files {
+                    client.add(file)?;
+                }
+
+                Ok(())
+            })),
             Command::AddYt { url } => {
                 let file_path = YtDlp::init_and_download(config, &url)?;
                 status_info!("file path {file_path}");

@@ -11,6 +11,7 @@ use crate::{
 };
 
 use super::{
+    commands::mpd_config::MpdConfig,
     errors::MpdError,
     proto_client::{ProtoClient, SocketClient},
     version::Version,
@@ -33,6 +34,7 @@ pub struct Client<'name> {
     addr: MpdAddress<'name>,
     password: Option<MpdPassword<'name>>,
     pub version: Version,
+    pub config: Option<MpdConfig>,
 }
 
 impl std::fmt::Debug for Client<'_> {
@@ -145,6 +147,7 @@ impl<'name> Client<'name> {
             addr,
             password,
             version,
+            config: None,
         };
 
         if let Some(MpdPassword(password)) = password {
@@ -194,6 +197,19 @@ impl<'name> Client<'name> {
         self.binary_limit(1024 * 1024 * 5)?;
 
         Ok(self)
+    }
+
+    pub fn fetch_config_if_needed(&mut self) {
+        if self.config.is_none() {
+            match self.config() {
+                Ok(config) => {
+                    self.config = Some(config);
+                }
+                Err(error) => {
+                    log::debug!(error:?; "Cannot get MPD config, most likely not using socket connection");
+                }
+            };
+        }
     }
 
     pub fn set_read_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {

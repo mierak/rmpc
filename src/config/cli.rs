@@ -101,7 +101,7 @@ pub enum Command {
     /// Clear the current queue
     Clear,
     /// Add a song to the current queue. Relative to music database root. '/' to add all files to the queue
-    Add { file: String },
+    Add { files: Vec<String> },
     /// Add a song from youtube to the current queue.
     AddYt { url: String },
     /// List MPD outputs
