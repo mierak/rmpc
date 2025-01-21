@@ -102,9 +102,10 @@ impl Command {
                         files = files
                             .into_iter()
                             .filter(|path| {
-                                path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
-                                    supported_extensions.iter().any(|supported_ext| supported_ext == ext)
-                                })
+                                path.to_string_lossy() == "/"
+                                    || path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
+                                        supported_extensions.iter().any(|supported_ext| supported_ext == ext)
+                                    })
                             })
                             .collect_vec();
                     }
