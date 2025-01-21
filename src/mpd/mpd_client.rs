@@ -73,7 +73,7 @@ impl ValueChange {
 #[allow(dead_code)]
 pub trait MpdClient: Sized {
     fn version(&mut self) -> Version;
-    fn config(&mut self) -> MpdResult<MpdConfig>;
+    fn config(&mut self) -> Option<&MpdConfig>;
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()>;
     fn password(&mut self, password: &str) -> MpdResult<()>;
     fn commands(&mut self) -> MpdResult<MpdList>;
@@ -195,8 +195,19 @@ impl MpdClient for Client<'_> {
         self.version
     }
 
-    fn config(&mut self) -> MpdResult<MpdConfig> {
-        self.send("config").and_then(read_response)
+    fn config(&mut self) -> Option<&MpdConfig> {
+        if self.config.is_none() {
+            match self.send("config").and_then(read_response) {
+                Ok(config) => {
+                    self.config = Some(config);
+                }
+                Err(error) => {
+                    log::debug!(error:?; "Cannot get MPD config, most likely not using socket connection");
+                }
+            };
+        }
+
+        self.config.as_ref()
     }
 
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()> {

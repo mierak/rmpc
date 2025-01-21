@@ -186,6 +186,7 @@ impl<'name> Client<'name> {
         self.rx = rx;
         self.stream = stream;
         self.version = version;
+        self.config = None;
 
         debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initialized");
 
@@ -197,19 +198,6 @@ impl<'name> Client<'name> {
         self.binary_limit(1024 * 1024 * 5)?;
 
         Ok(self)
-    }
-
-    pub fn fetch_config_if_needed(&mut self) {
-        if self.config.is_none() {
-            match self.config() {
-                Ok(config) => {
-                    self.config = Some(config);
-                }
-                Err(error) => {
-                    log::debug!(error:?; "Cannot get MPD config, most likely not using socket connection");
-                }
-            };
-        }
     }
 
     pub fn set_read_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
