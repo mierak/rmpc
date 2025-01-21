@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Missing border in tabs with `border_type: Single`
 - Properly escape strings in mpd protocol
 - Preview for songs outside of the music database not working in playlists
+- AddToPlaylist not working for local songs
 
 ## [0.7.0] - 2024-12-24
 
