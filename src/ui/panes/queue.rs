@@ -340,7 +340,11 @@ impl Pane for QueuePane {
                             let selected = selected.to_owned();
                             let song_file = song_file.clone();
                             context.command(move |client| {
-                                client.add_to_playlist(&selected, &song_file, None)?;
+                                if song_file.starts_with('/') {
+                                    client.add_to_playlist(&selected, &format!("file://{song_file}"), None)?;
+                                } else {
+                                    client.add_to_playlist(&selected, &song_file, None)?;
+                                }
                                 status_info!("Song added to playlist {}", selected);
                                 Ok(())
                             });
