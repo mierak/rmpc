@@ -29,7 +29,8 @@ jobs:
       uses: actions/checkout@v4
     - name: Format check
       run: |
-        cargo fmt --check
+        rustup component add rustfmt --toolchain nightly
+        cargo +nightly fmt --check
   clippy:
     name: Clippy Debug Mode
     runs-on: ubuntu-latest
