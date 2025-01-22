@@ -1,14 +1,16 @@
 use anyhow::Result;
-use ratatui::Frame;
-use ratatui::prelude::Rect;
+use ratatui::{Frame, prelude::Rect};
 
 use super::Pane;
-use crate::context::AppContext;
-use crate::mpd::mpd_client::{MpdClient, ValueChange};
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::UiEvent;
-use crate::ui::widgets::header::Header;
+use crate::{
+    context::AppContext,
+    mpd::mpd_client::{MpdClient, ValueChange},
+    shared::{
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{UiEvent, widgets::header::Header},
+};
 
 #[derive(Debug)]
 pub struct HeaderPane {

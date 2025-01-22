@@ -1,37 +1,40 @@
-use std::ops::{Range, RangeInclusive};
-use std::str::FromStr;
+use std::{
+    ops::{Range, RangeInclusive},
+    str::FromStr,
+};
 
 use anyhow::Result;
 use derive_more::Deref;
 use itertools::Itertools;
 use strum::AsRefStr;
 
-use super::FromMpd;
-use super::client::Client;
-use super::commands::decoders::Decoders;
-use super::commands::list::MpdList;
-use super::commands::list_playlist::FileList;
-use super::commands::mpd_config::MpdConfig;
-use super::commands::outputs::Outputs;
-use super::commands::status::OnOffOneshot;
-use super::commands::stickers::{Sticker, Stickers, StickersWithFile};
-use super::commands::volume::Bound;
-use super::commands::{
-    IdleEvent,
-    ListFiles,
-    LsInfo,
-    Mounts,
-    Playlist,
-    Song,
-    Status,
-    Update,
-    Volume,
+use super::{
+    FromMpd,
+    client::Client,
+    commands::{
+        IdleEvent,
+        ListFiles,
+        LsInfo,
+        Mounts,
+        Playlist,
+        Song,
+        Status,
+        Update,
+        Volume,
+        decoders::Decoders,
+        list::MpdList,
+        list_playlist::FileList,
+        mpd_config::MpdConfig,
+        outputs::Outputs,
+        status::OnOffOneshot,
+        stickers::{Sticker, Stickers, StickersWithFile},
+        volume::Bound,
+    },
+    errors::{ErrorCode, MpdError, MpdFailureResponse},
+    proto_client::{ProtoClient, SocketClient},
+    version::Version,
 };
-use super::errors::{ErrorCode, MpdError, MpdFailureResponse};
-use super::proto_client::{ProtoClient, SocketClient};
-use super::version::Version;
-use crate::shared::ext::error::ErrorExt;
-use crate::shared::macros::status_error;
+use crate::shared::{ext::error::ErrorExt, macros::status_error};
 
 type MpdResult<T> = Result<T, MpdError>;
 

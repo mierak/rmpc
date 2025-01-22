@@ -1,29 +1,35 @@
-use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use ratatui::Frame;
-use ratatui::prelude::Rect;
-use ratatui::widgets::StatefulWidget;
+use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
 
-use super::Pane;
-use super::browser::DirOrSong;
-use crate::MpdQueryResult;
-use crate::config::artists::{AlbumDisplayMode, AlbumSortMode};
-use crate::config::tabs::PaneType;
-use crate::context::AppContext;
-use crate::mpd::client::Client;
-use crate::mpd::commands::Song;
-use crate::mpd::mpd_client::{Filter, MpdClient, Tag};
-use crate::shared::ext::mpd_client::MpdClientExt;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::status_info;
-use crate::shared::mouse_event::MouseEvent;
-use crate::ui::UiEvent;
-use crate::ui::browser::BrowserPane;
-use crate::ui::dirstack::{DirStack, DirStackItem};
-use crate::ui::widgets::browser::Browser;
+use super::{Pane, browser::DirOrSong};
+use crate::{
+    MpdQueryResult,
+    config::{
+        artists::{AlbumDisplayMode, AlbumSortMode},
+        tabs::PaneType,
+    },
+    context::AppContext,
+    mpd::{
+        client::Client,
+        commands::Song,
+        mpd_client::{Filter, MpdClient, Tag},
+    },
+    shared::{
+        ext::mpd_client::MpdClientExt,
+        key_event::KeyEvent,
+        macros::status_info,
+        mouse_event::MouseEvent,
+    },
+    ui::{
+        UiEvent,
+        browser::BrowserPane,
+        dirstack::{DirStack, DirStackItem},
+        widgets::browser::Browser,
+    },
+};
 
 #[derive(Debug)]
 pub enum ArtistsPaneMode {
@@ -607,8 +613,10 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::config::{Config, Leak};
-    use crate::tests::fixtures::{app_context, config};
+    use crate::{
+        config::{Config, Leak},
+        tests::fixtures::{app_context, config},
+    };
 
     fn song(
         album: impl Into<String> + std::fmt::Debug,

@@ -15,14 +15,16 @@ pub mod stickers;
 pub mod update;
 pub mod volume;
 
-pub use self::current_song::Song;
-pub use self::decoders::Decoder;
-pub use self::idle::IdleEvent;
-pub use self::list_files::ListFiles;
-pub use self::list_mounts::Mounts;
-pub use self::list_playlists::Playlist;
-pub use self::lsinfo::LsInfo;
-pub use self::outputs::Output;
-pub use self::status::{State, Status};
-pub use self::update::Update;
-pub use self::volume::Volume;
+pub use self::{
+    current_song::Song,
+    decoders::Decoder,
+    idle::IdleEvent,
+    list_files::ListFiles,
+    list_mounts::Mounts,
+    list_playlists::Playlist,
+    lsinfo::LsInfo,
+    outputs::Output,
+    status::{State, Status},
+    update::Update,
+    volume::Volume,
+};

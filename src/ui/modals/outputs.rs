@@ -1,19 +1,24 @@
 use anyhow::Result;
-use ratatui::layout::{Constraint, Margin, Rect};
-use ratatui::style::Style;
-use ratatui::symbols::border;
-use ratatui::widgets::{Block, Borders, Cell, Clear, Row, Table, TableState};
+use ratatui::{
+    layout::{Constraint, Margin, Rect},
+    style::Style,
+    symbols::border,
+    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
+};
 
 use super::{Modal, RectExt};
-use crate::MpdQueryResult;
-use crate::config::keys::CommonAction;
-use crate::context::AppContext;
-use crate::mpd::commands::Output;
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::pop_modal;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::dirstack::DirState;
+use crate::{
+    MpdQueryResult,
+    config::keys::CommonAction,
+    context::AppContext,
+    mpd::{commands::Output, mpd_client::MpdClient},
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::dirstack::DirState,
+};
 
 #[derive(Debug)]
 pub struct OutputsModal {

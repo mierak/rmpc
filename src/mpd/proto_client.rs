@@ -1,11 +1,16 @@
-use std::io::{BufRead, Read};
-use std::str::FromStr;
+use std::{
+    io::{BufRead, Read},
+    str::FromStr,
+};
 
 use anyhow::Result;
 use log::trace;
 
-use super::errors::{MpdError, MpdFailureResponse};
-use super::{FromMpd, split_line};
+use super::{
+    FromMpd,
+    errors::{MpdError, MpdFailureResponse},
+    split_line,
+};
 use crate::mpd::errors::ErrorCode;
 type MpdResult<T> = Result<T, MpdError>;
 
@@ -279,8 +284,7 @@ mod tests {
     use std::io::{BufReader, Cursor};
 
     use super::SocketClient;
-    use crate::mpd::errors::MpdError;
-    use crate::mpd::{FromMpd, LineHandled};
+    use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
     #[derive(Default, Debug, PartialEq, Eq)]
     struct TestMpdObject {
@@ -331,9 +335,13 @@ mod tests {
 
         use rstest::rstest;
 
-        use crate::mpd::errors::{ErrorCode, MpdError, MpdFailureResponse};
-        use crate::mpd::proto_client::{MpdLine, ProtoClient, SocketClient};
-        use crate::tests::fixtures::mpd_client::{TestMpdClient, client};
+        use crate::{
+            mpd::{
+                errors::{ErrorCode, MpdError, MpdFailureResponse},
+                proto_client::{MpdLine, ProtoClient, SocketClient},
+            },
+            tests::fixtures::mpd_client::{TestMpdClient, client},
+        };
 
         #[rstest]
         fn returns_ok(mut client: TestMpdClient) {
@@ -394,8 +402,10 @@ mod tests {
     mod response {
 
         use super::*;
-        use crate::mpd::errors::{ErrorCode, MpdError, MpdFailureResponse};
-        use crate::mpd::proto_client::ProtoClient;
+        use crate::mpd::{
+            errors::{ErrorCode, MpdError, MpdFailureResponse},
+            proto_client::ProtoClient,
+        };
 
         #[test]
         fn parses_correct_response() {
@@ -438,8 +448,10 @@ mod tests {
     }
     mod response_opt {
         use super::*;
-        use crate::mpd::errors::{ErrorCode, MpdError, MpdFailureResponse};
-        use crate::mpd::proto_client::ProtoClient;
+        use crate::mpd::{
+            errors::{ErrorCode, MpdError, MpdFailureResponse},
+            proto_client::ProtoClient,
+        };
 
         #[test]
         fn parses_correct_response() {
@@ -497,8 +509,10 @@ mod tests {
 
     mod ok {
         use super::*;
-        use crate::mpd::errors::{ErrorCode, MpdFailureResponse};
-        use crate::mpd::proto_client::ProtoClient;
+        use crate::mpd::{
+            errors::{ErrorCode, MpdFailureResponse},
+            proto_client::ProtoClient,
+        };
 
         #[test]
         fn parses_correct_response() {
@@ -535,9 +549,10 @@ mod tests {
     }
 
     mod binary {
-        use crate::mpd::errors::{ErrorCode, MpdError, MpdFailureResponse};
-        use crate::mpd::proto_client::tests::TestClient;
-        use crate::mpd::proto_client::{BinaryMpdResponse, ProtoClient};
+        use crate::mpd::{
+            errors::{ErrorCode, MpdError, MpdFailureResponse},
+            proto_client::{BinaryMpdResponse, ProtoClient, tests::TestClient},
+        };
 
         #[test]
         fn returns_mpd_error() {

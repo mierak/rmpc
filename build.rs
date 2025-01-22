@@ -1,11 +1,12 @@
 include!("src/config/cli.rs");
 
-use std::error::Error;
-use std::fs;
+use std::{error::Error, fs};
 
 use clap::{Command as ClapCommand, CommandFactory};
-use clap_complete::Shell::{Bash, Fish, Zsh};
-use clap_complete::generate_to;
+use clap_complete::{
+    Shell::{Bash, Fish, Zsh},
+    generate_to,
+};
 use clap_mangen::Man;
 use vergen_gitcl::{Emitter, GitclBuilder};
 

@@ -1,5 +1,4 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use anyhow::{Context, Result, bail};
 
@@ -115,8 +114,7 @@ impl FromStr for Lrc {
 mod tests {
     use std::time::Duration;
 
-    use crate::shared::lrc::Lrc;
-    use crate::shared::lrc::lyrics::LrcLine;
+    use crate::shared::lrc::{Lrc, lyrics::LrcLine};
 
     #[test]
     fn lrc() {

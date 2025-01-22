@@ -1,26 +1,30 @@
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::Frame;
-use ratatui::prelude::Rect;
-use ratatui::widgets::StatefulWidget;
+use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
 
-use super::Pane;
-use super::browser::DirOrSong;
-use crate::MpdQueryResult;
-use crate::config::tabs::PaneType;
-use crate::context::AppContext;
-use crate::mpd::client::Client;
-use crate::mpd::commands::Song;
-use crate::mpd::commands::lsinfo::LsInfoEntry;
-use crate::mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag};
-use crate::shared::ext::mpd_client::MpdClientExt;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::status_info;
-use crate::shared::mouse_event::MouseEvent;
-use crate::ui::UiEvent;
-use crate::ui::browser::BrowserPane;
-use crate::ui::dirstack::{DirStack, DirStackItem};
-use crate::ui::widgets::browser::Browser;
+use super::{Pane, browser::DirOrSong};
+use crate::{
+    MpdQueryResult,
+    config::tabs::PaneType,
+    context::AppContext,
+    mpd::{
+        client::Client,
+        commands::{Song, lsinfo::LsInfoEntry},
+        mpd_client::{Filter, FilterKind, MpdClient, Tag},
+    },
+    shared::{
+        ext::mpd_client::MpdClientExt,
+        key_event::KeyEvent,
+        macros::status_info,
+        mouse_event::MouseEvent,
+    },
+    ui::{
+        UiEvent,
+        browser::BrowserPane,
+        dirstack::{DirStack, DirStackItem},
+        widgets::browser::Browser,
+    },
+};
 
 #[derive(Debug)]
 pub struct DirectoriesPane {

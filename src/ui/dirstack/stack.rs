@@ -1,8 +1,6 @@
 use ratatui::widgets::ListItem;
 
-use super::DirStackItem;
-use super::dir::Dir;
-use super::state::DirState;
+use super::{DirStackItem, dir::Dir, state::DirState};
 
 #[derive(Debug)]
 pub struct DirStack<T: std::fmt::Debug + DirStackItem + Clone + Send> {

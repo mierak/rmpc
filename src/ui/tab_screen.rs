@@ -1,21 +1,23 @@
-use std::collections::HashMap;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::Frame;
-use ratatui::layout::Rect;
+use ratatui::{Frame, layout::Rect};
 
-use super::panes::pane_call;
-use super::{Pane as _, PaneContainer, Panes};
-use crate::config::keys::CommonAction;
-use crate::config::tabs::{Pane, SizedPaneOrSplit};
-use crate::context::AppContext;
-use crate::shared::ext::rect::RectExt;
-use crate::shared::ext::vec::VecExt;
-use crate::shared::id::Id;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use super::{Pane as _, PaneContainer, Panes, panes::pane_call};
+use crate::{
+    config::{
+        keys::CommonAction,
+        tabs::{Pane, SizedPaneOrSplit},
+    },
+    context::AppContext,
+    shared::{
+        ext::{rect::RectExt, vec::VecExt},
+        id::Id,
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+};
 
 #[derive(Debug)]
 pub struct PaneData {

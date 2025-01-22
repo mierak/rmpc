@@ -1,11 +1,14 @@
 use anyhow::Result;
-use ratatui::Frame;
-use ratatui::prelude::{Constraint, Layout, Rect};
+use ratatui::{
+    Frame,
+    prelude::{Constraint, Layout, Rect},
+};
 
-use crate::MpdQueryResult;
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::MouseEvent;
+use crate::{
+    MpdQueryResult,
+    context::AppContext,
+    shared::{key_event::KeyEvent, mouse_event::MouseEvent},
+};
 
 pub mod confirm_modal;
 pub mod decoders;

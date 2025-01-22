@@ -1,13 +1,16 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 
-use super::lrc::LrcIndex;
-use super::mouse_event::MouseEvent;
-use super::mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync};
-use crate::config::cli::Command;
-use crate::config::tabs::PaneType;
-use crate::mpd::commands::IdleEvent;
-use crate::ui::{Level, UiAppEvent};
+use super::{
+    lrc::LrcIndex,
+    mouse_event::MouseEvent,
+    mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
+};
+use crate::{
+    config::{cli::Command, tabs::PaneType},
+    mpd::commands::IdleEvent,
+    ui::{Level, UiAppEvent},
+};
 
 #[derive(Debug)]
 #[allow(unused)]

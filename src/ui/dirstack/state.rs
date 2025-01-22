@@ -1,5 +1,4 @@
-use std::collections::BTreeSet;
-use std::ops::SubAssign;
+use std::{collections::BTreeSet, ops::SubAssign};
 
 use ratatui::widgets::ScrollbarState;
 

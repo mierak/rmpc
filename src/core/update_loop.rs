@@ -3,9 +3,13 @@ use std::time::Duration;
 use anyhow::Result;
 use crossbeam::channel::{Sender, TryRecvError, unbounded};
 
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::events::ClientRequest;
-use crate::shared::mpd_query::{MpdQuery, MpdQueryResult};
+use crate::{
+    mpd::mpd_client::MpdClient,
+    shared::{
+        events::ClientRequest,
+        mpd_query::{MpdQuery, MpdQueryResult},
+    },
+};
 
 enum LoopEvent {
     Start,

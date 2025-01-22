@@ -1,9 +1,10 @@
-use ratatui::layout::{Position, Rect};
-use ratatui::widgets::Widget;
+use ratatui::{
+    layout::{Position, Rect},
+    widgets::Widget,
+};
 
 use super::tabs::Tabs;
-use crate::config::Config;
-use crate::config::tabs::TabName;
+use crate::config::{Config, tabs::TabName};
 
 #[derive(Debug)]
 pub struct AppTabs<'a> {

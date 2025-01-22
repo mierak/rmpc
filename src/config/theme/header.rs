@@ -2,17 +2,19 @@ use anyhow::Result;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use super::properties::{
-    Property,
-    PropertyFile,
-    PropertyKind,
-    PropertyKindFile,
-    PropertyKindFileOrText,
-    SongPropertyFile,
-    StatusPropertyFile,
-    WidgetPropertyFile,
+use super::{
+    properties::{
+        Property,
+        PropertyFile,
+        PropertyKind,
+        PropertyKindFile,
+        PropertyKindFileOrText,
+        SongPropertyFile,
+        StatusPropertyFile,
+        WidgetPropertyFile,
+    },
+    style::{Modifiers, StyleFile},
 };
-use super::style::{Modifiers, StyleFile};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HeaderConfigRow {

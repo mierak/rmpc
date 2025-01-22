@@ -3,10 +3,8 @@ use std::collections::BTreeSet;
 use log::error;
 use ratatui::widgets::ListState;
 
-use super::DirStackItem;
-use super::state::DirState;
-use crate::config::Config;
-use crate::shared::macros::status_warn;
+use super::{DirStackItem, state::DirState};
+use crate::{config::Config, shared::macros::status_warn};
 
 #[derive(Debug)]
 pub struct Dir<T: std::fmt::Debug + DirStackItem + Clone + Send> {
@@ -416,8 +414,7 @@ mod tests {
     }
 
     mod jump_next_matching {
-        use crate::config::Config;
-        use crate::ui::dirstack::Dir;
+        use crate::{config::Config, ui::dirstack::Dir};
 
         #[test]
         fn jumps_by_half_viewport() {
@@ -440,8 +437,7 @@ mod tests {
     }
 
     mod jump_previous_matching {
-        use crate::config::Config;
-        use crate::ui::dirstack::Dir;
+        use crate::{config::Config, ui::dirstack::Dir};
 
         #[test]
         fn jumps_by_half_viewport() {
@@ -467,8 +463,7 @@ mod tests {
     }
 
     mod matched_item_count {
-        use crate::config::Config;
-        use crate::ui::dirstack::Dir;
+        use crate::{config::Config, ui::dirstack::Dir};
 
         #[test]
         fn filter_changes_recounts_matched_items() {

@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 
-use ratatui::prelude::{Constraint, Layout, Margin};
-use ratatui::style::Style;
-use ratatui::widgets::{Block, Borders, Paragraph, Widget, Wrap};
+use ratatui::{
+    prelude::{Constraint, Layout, Margin},
+    style::Style,
+    widgets::{Block, Borders, Paragraph, Widget, Wrap},
+};
 
 #[derive(Debug, Default)]
 pub struct Input<'a> {

@@ -1,29 +1,34 @@
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Cursor};
-use std::ops::AddAssign;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader, Cursor},
+    ops::AddAssign,
+    time::Duration,
+};
 
 use itertools::Itertools;
 use rstest::fixture;
 
-use crate::mpd::commands::list::MpdList;
-use crate::mpd::commands::list_playlist::FileList;
-use crate::mpd::commands::mpd_config::MpdConfig;
-use crate::mpd::commands::status::OnOffOneshot;
-use crate::mpd::commands::stickers::Sticker;
-use crate::mpd::commands::volume::Bound;
-use crate::mpd::commands::{IdleEvent, ListFiles, LsInfo, Playlist, Song, Status, Update, Volume};
-use crate::mpd::errors::MpdError;
-use crate::mpd::mpd_client::{
-    Filter,
-    MpdClient,
-    QueueMoveTarget,
-    SaveMode,
-    SingleOrRange,
-    Tag,
-    ValueChange,
+use crate::mpd::{
+    commands::{
+        IdleEvent,
+        ListFiles,
+        LsInfo,
+        Playlist,
+        Song,
+        Status,
+        Update,
+        Volume,
+        list::MpdList,
+        list_playlist::FileList,
+        mpd_config::MpdConfig,
+        status::OnOffOneshot,
+        stickers::Sticker,
+        volume::Bound,
+    },
+    errors::MpdError,
+    mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
+    proto_client::SocketClient,
 };
-use crate::mpd::proto_client::SocketClient;
 
 #[fixture]
 pub fn client() -> TestMpdClient {

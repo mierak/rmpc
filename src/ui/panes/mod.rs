@@ -11,38 +11,41 @@ use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use queue::QueuePane;
-use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout};
-use ratatui::prelude::Rect;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::Block;
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout},
+    prelude::Rect,
+    text::{Line, Span},
+    widgets::Block,
+};
 use search::SearchPane;
 use strum::Display;
 use tabs::TabsPane;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
-use super::UiEvent;
-use super::widgets::volume::Volume;
-use crate::MpdQueryResult;
-use crate::config::keys::CommonAction;
-use crate::config::tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit};
-use crate::config::theme::SymbolsConfig;
-use crate::config::theme::properties::{
-    Property,
-    PropertyKind,
-    PropertyKindOrText,
-    SongProperty,
-    StatusProperty,
-    WidgetProperty,
+use super::{UiEvent, widgets::volume::Volume};
+use crate::{
+    MpdQueryResult,
+    config::{
+        keys::CommonAction,
+        tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
+        theme::{
+            SymbolsConfig,
+            properties::{
+                Property,
+                PropertyKind,
+                PropertyKindOrText,
+                SongProperty,
+                StatusProperty,
+                WidgetProperty,
+            },
+        },
+    },
+    context::AppContext,
+    mpd::commands::{Song, Status, status::OnOffOneshot, volume::Bound},
+    shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
 };
-use crate::context::AppContext;
-use crate::mpd::commands::status::OnOffOneshot;
-use crate::mpd::commands::volume::Bound;
-use crate::mpd::commands::{Song, Status};
-use crate::shared::ext::duration::DurationExt;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::MouseEvent;
 
 pub mod album_art;
 pub mod albums;
@@ -223,16 +226,18 @@ pub(super) trait Pane {
 pub mod dirstack {}
 
 pub(crate) mod browser {
-    use std::borrow::Cow;
-    use std::cmp::Ordering;
+    use std::{borrow::Cow, cmp::Ordering};
 
-    use ratatui::style::{Color, Style};
-    use ratatui::text::{Line, Span};
-    use ratatui::widgets::ListItem;
+    use ratatui::{
+        style::{Color, Style},
+        text::{Line, Span},
+        widgets::ListItem,
+    };
 
-    use crate::config::theme::SymbolsConfig;
-    use crate::mpd::commands::Song;
-    use crate::mpd::commands::lsinfo::LsInfoEntry;
+    use crate::{
+        config::theme::SymbolsConfig,
+        mpd::commands::{Song, lsinfo::LsInfoEntry},
+    };
 
     impl Song {
         pub(crate) fn to_preview(
@@ -841,21 +846,25 @@ impl StringExt for String {
 
 #[cfg(test)]
 mod format_tests {
-    use crate::config::Leak;
-    use crate::config::theme::properties::{Property, PropertyKindOrText, SongProperty};
-    use crate::mpd::commands::Song;
+    use crate::{
+        config::{
+            Leak,
+            theme::properties::{Property, PropertyKindOrText, SongProperty},
+        },
+        mpd::commands::Song,
+    };
 
     mod correct_values {
-        use std::collections::HashMap;
-        use std::time::Duration;
+        use std::{collections::HashMap, time::Duration};
 
         use ratatui::text::Span;
         use test_case::test_case;
 
         use super::*;
-        use crate::config::theme::properties::{PropertyKind, StatusProperty};
-        use crate::mpd::commands::status::OnOffOneshot;
-        use crate::mpd::commands::{State, Status, Volume};
+        use crate::{
+            config::theme::properties::{PropertyKind, StatusProperty},
+            mpd::commands::{State, Status, Volume, status::OnOffOneshot},
+        };
 
         #[test_case(SongProperty::Title, "title")]
         #[test_case(SongProperty::Artist, "artist")]

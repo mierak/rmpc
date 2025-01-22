@@ -3,12 +3,10 @@ use std::collections::HashMap;
 use anyhow::{Result, ensure};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
-use ratatui::layout::Direction;
-use ratatui::widgets::Borders;
+use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use super::Leak;
-use super::theme::PercentOrLength;
+use super::{Leak, theme::PercentOrLength};
 use crate::shared::id::{self, Id};
 
 #[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]

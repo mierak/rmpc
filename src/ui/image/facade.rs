@@ -1,17 +1,22 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use anyhow::Result;
 use ratatui::layout::Rect;
 
-use super::Backend;
-use super::iterm2::Iterm2;
-use super::kitty::Kitty;
-use super::sixel::Sixel;
-use super::ueberzug::{Layer, Ueberzug};
-use crate::config::Config;
-use crate::config::album_art::ImageMethod;
-use crate::shared::image::ImageProtocol;
+use super::{
+    Backend,
+    iterm2::Iterm2,
+    kitty::Kitty,
+    sixel::Sixel,
+    ueberzug::{Layer, Ueberzug},
+};
+use crate::{
+    config::{Config, album_art::ImageMethod},
+    shared::image::ImageProtocol,
+};
 
 pub static IS_SHOWING: AtomicBool = AtomicBool::new(false);
 

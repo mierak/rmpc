@@ -1,20 +1,28 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
-use ratatui::Frame;
-use ratatui::layout::Rect;
-use ratatui::prelude::{Constraint, Layout};
-use ratatui::style::{Style, Stylize};
-use ratatui::symbols::{self, border};
-use ratatui::widgets::{Block, Borders, Clear};
+use ratatui::{
+    Frame,
+    layout::Rect,
+    prelude::{Constraint, Layout},
+    style::{Style, Stylize},
+    symbols::{self, border},
+    widgets::{Block, Borders, Clear},
+};
 
 use super::{Modal, RectExt};
-use crate::config::keys::CommonAction;
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::pop_modal;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::widgets::button::{Button, ButtonGroup, ButtonGroupState};
-use crate::ui::widgets::input::Input;
+use crate::{
+    config::keys::CommonAction,
+    context::AppContext,
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::widgets::{
+        button::{Button, ButtonGroup, ButtonGroupState},
+        input::Input,
+    },
+};
 
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.vertical_left,

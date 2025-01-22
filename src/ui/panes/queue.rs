@@ -3,33 +3,46 @@ use crossterm::event::KeyCode;
 use enum_map::{Enum, EnumMap, enum_map};
 use itertools::Itertools;
 use log::error;
-use ratatui::Frame;
-use ratatui::layout::Flex;
-use ratatui::prelude::{Constraint, Layout, Rect};
-use ratatui::style::Stylize;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Row, Table, TableState};
+use ratatui::{
+    Frame,
+    layout::Flex,
+    prelude::{Constraint, Layout, Rect},
+    style::Stylize,
+    text::{Line, Span},
+    widgets::{Block, Borders, Row, Table, TableState},
+};
 
 use super::{CommonAction, Pane};
-use crate::MpdQueryResult;
-use crate::config::keys::{GlobalAction, QueueActions};
-use crate::config::tabs::PaneType;
-use crate::config::theme::properties::{Property, SongProperty};
-use crate::context::AppContext;
-use crate::core::command::{create_env, run_external};
-use crate::mpd::commands::Song;
-use crate::mpd::mpd_client::{MpdClient, QueueMoveTarget};
-use crate::shared::ext::btreeset_ranges::BTreeSetRanges;
-use crate::shared::ext::rect::RectExt;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::{modal, status_error, status_info, status_warn};
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::UiEvent;
-use crate::ui::dirstack::DirState;
-use crate::ui::modals::confirm_modal::ConfirmModal;
-use crate::ui::modals::input_modal::InputModal;
-use crate::ui::modals::select_modal::SelectModal;
-use crate::ui::modals::song_info::SongInfoModal;
+use crate::{
+    MpdQueryResult,
+    config::{
+        keys::{GlobalAction, QueueActions},
+        tabs::PaneType,
+        theme::properties::{Property, SongProperty},
+    },
+    context::AppContext,
+    core::command::{create_env, run_external},
+    mpd::{
+        commands::Song,
+        mpd_client::{MpdClient, QueueMoveTarget},
+    },
+    shared::{
+        ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
+        key_event::KeyEvent,
+        macros::{modal, status_error, status_info, status_warn},
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{
+        UiEvent,
+        dirstack::DirState,
+        modals::{
+            confirm_modal::ConfirmModal,
+            input_modal::InputModal,
+            select_modal::SelectModal,
+            song_info::SongInfoModal,
+        },
+    },
+};
 
 #[derive(Debug)]
 pub struct QueuePane {

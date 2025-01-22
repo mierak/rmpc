@@ -2,17 +2,22 @@ use std::collections::VecDeque;
 
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::Frame;
-use ratatui::prelude::Rect;
-use ratatui::widgets::{List, ListState};
+use ratatui::{
+    Frame,
+    prelude::Rect,
+    widgets::{List, ListState},
+};
 
 use super::Pane;
-use crate::config::keys::{CommonAction, LogsActions};
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::UiEvent;
-use crate::ui::dirstack::DirState;
+use crate::{
+    config::keys::{CommonAction, LogsActions},
+    context::AppContext,
+    shared::{
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{UiEvent, dirstack::DirState},
+};
 
 #[derive(Debug)]
 pub struct LogsPane {

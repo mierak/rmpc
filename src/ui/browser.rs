@@ -3,16 +3,21 @@ use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::prelude::Rect;
 
-use super::dirstack::{DirStack, DirStackItem};
-use super::panes::Pane;
-use crate::MpdQueryResult;
-use crate::config::keys::{CommonAction, GlobalAction};
-use crate::context::AppContext;
-use crate::core::event_loop::EXTERNAL_COMMAND;
-use crate::mpd::client::Client;
-use crate::mpd::commands::Song;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use super::{
+    dirstack::{DirStack, DirStackItem},
+    panes::Pane,
+};
+use crate::{
+    MpdQueryResult,
+    config::keys::{CommonAction, GlobalAction},
+    context::AppContext,
+    core::event_loop::EXTERNAL_COMMAND,
+    mpd::{client::Client, commands::Song},
+    shared::{
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+};
 
 pub enum MoveDirection {
     Up,

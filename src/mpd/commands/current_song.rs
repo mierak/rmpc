@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use serde::Serialize;
 
-use crate::mpd::errors::MpdError;
-use crate::mpd::{FromMpd, LineHandled, ParseErrorExt};
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 #[derive(Default, Serialize, PartialEq, Eq, Clone)]
 pub struct Song {

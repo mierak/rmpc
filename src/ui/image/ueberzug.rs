@@ -1,9 +1,11 @@
-use std::fmt::Display;
-use std::io::{ErrorKind, Write};
-use std::os::unix::net::UnixStream;
-use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    fmt::Display,
+    io::{ErrorKind, Write},
+    os::unix::net::UnixStream,
+    process::{Child, Command, Stdio},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{Context, Result, anyhow};
 use crossbeam::channel::{Sender, unbounded};
@@ -13,9 +15,11 @@ use serde::Serialize;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
 use super::Backend;
-use crate::config::Size;
-use crate::shared::macros::{try_cont, try_skip};
-use crate::tmux;
+use crate::{
+    config::Size,
+    shared::macros::{try_cont, try_skip},
+    tmux,
+};
 
 #[derive(Debug)]
 pub struct Ueberzug {

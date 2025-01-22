@@ -5,10 +5,14 @@ use bon::Builder;
 use crossbeam::channel::Sender;
 use ratatui::widgets::ListItem;
 
-use crate::config::tabs::PaneType;
-use crate::mpd::client::Client;
-use crate::mpd::commands::{Decoder, Output, Song, Status, Volume};
-use crate::ui::panes::browser::DirOrSong;
+use crate::{
+    config::tabs::PaneType,
+    mpd::{
+        client::Client,
+        commands::{Decoder, Output, Song, Status, Volume},
+    },
+    ui::panes::browser::DirOrSong,
+};
 
 #[derive(derive_more::Debug, Builder)]
 pub(crate) struct MpdQuery {

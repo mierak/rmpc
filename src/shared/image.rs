@@ -1,16 +1,20 @@
-use std::env;
-use std::io::Cursor;
+use std::{env, io::Cursor};
 
 use anyhow::{Context, Result};
-use image::codecs::gif::GifDecoder;
-use image::codecs::jpeg::JpegEncoder;
-use image::{AnimationDecoder, DynamicImage, ImageDecoder};
+use image::{
+    AnimationDecoder,
+    DynamicImage,
+    ImageDecoder,
+    codecs::{gif::GifDecoder, jpeg::JpegEncoder},
+};
 use ratatui::layout::Rect;
 use rustix::path::Arg;
 
 use super::dependencies::UEBERZUGPP;
-use crate::config::Size;
-use crate::config::album_art::{HorizontalAlign, VerticalAlign};
+use crate::config::{
+    Size,
+    album_art::{HorizontalAlign, VerticalAlign},
+};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageProtocol {

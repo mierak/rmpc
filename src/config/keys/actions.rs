@@ -2,8 +2,7 @@ use itertools::Itertools;
 use strum::Display;
 
 use super::ToDescription;
-use crate::config::tabs::TabName;
-use crate::config::utils::tilde_expand;
+use crate::config::{tabs::TabName, utils::tilde_expand};
 
 // Global actions
 

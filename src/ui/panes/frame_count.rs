@@ -1,12 +1,8 @@
 use anyhow::Result;
-use ratatui::Frame;
-use ratatui::prelude::Rect;
-use ratatui::style::Stylize;
-use ratatui::text::Text;
+use ratatui::{Frame, prelude::Rect, style::Stylize, text::Text};
 
 use super::Pane;
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
+use crate::{context::AppContext, shared::key_event::KeyEvent};
 
 #[derive(Debug)]
 pub struct FrameCountPane {

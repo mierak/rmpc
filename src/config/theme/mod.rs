@@ -3,11 +3,13 @@ use anyhow::Result;
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 
-use self::header::{HeaderConfig, HeaderConfigFile};
-use self::progress_bar::{ProgressBarConfig, ProgressBarConfigFile};
-use self::queue_table::{QueueTableColumns, QueueTableColumnsFile};
-use self::scrollbar::{ScrollbarConfig, ScrollbarConfigFile};
-use self::style::{Modifiers, StringColor, ToConfigOr};
+use self::{
+    header::{HeaderConfig, HeaderConfigFile},
+    progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
+    queue_table::{QueueTableColumns, QueueTableColumnsFile},
+    scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
+    style::{Modifiers, StringColor, ToConfigOr},
+};
 
 mod header;
 mod progress_bar;
@@ -19,8 +21,10 @@ mod style;
 pub use style::{ConfigColor, StyleFile};
 
 pub use self::queue_table::{PercentOrLength, SongTableColumn};
-use super::defaults;
-use super::tabs::{BorderTypeFile, PaneOrSplitFile, SizedPaneOrSplit};
+use super::{
+    defaults,
+    tabs::{BorderTypeFile, PaneOrSplitFile, SizedPaneOrSplit},
+};
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 

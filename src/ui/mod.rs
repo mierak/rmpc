@@ -1,47 +1,54 @@
-use std::collections::HashMap;
-use std::io::Stdout;
+use std::{collections::HashMap, io::Stdout};
 
 use anyhow::{Context, Result, anyhow};
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
-use crossterm::execute;
-use crossterm::terminal::{
-    EnterAlternateScreen,
-    LeaveAlternateScreen,
-    disable_raw_mode,
-    enable_raw_mode,
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use itertools::Itertools;
-use modals::decoders::DecodersModal;
-use modals::input_modal::InputModal;
-use modals::keybinds::KeybindsModal;
-use modals::outputs::OutputsModal;
-use modals::song_info::SongInfoModal;
+use modals::{
+    decoders::DecodersModal,
+    input_modal::InputModal,
+    keybinds::KeybindsModal,
+    outputs::OutputsModal,
+    song_info::SongInfoModal,
+};
 use panes::{PaneContainer, Panes, pane_call};
-use ratatui::layout::Rect;
-use ratatui::prelude::{Backend, CrosstermBackend};
-use ratatui::style::{Color, Style};
-use ratatui::symbols::border;
-use ratatui::widgets::{Block, Borders};
-use ratatui::{Frame, Terminal};
+use ratatui::{
+    Frame,
+    Terminal,
+    layout::Rect,
+    prelude::{Backend, CrosstermBackend},
+    style::{Color, Style},
+    symbols::border,
+    widgets::{Block, Borders},
+};
 use tab_screen::TabScreen;
 
-use self::modals::Modal;
-use self::panes::Pane;
-use crate::MpdQueryResult;
-use crate::config::Config;
-use crate::config::cli::Args;
-use crate::config::keys::GlobalAction;
-use crate::config::tabs::{PaneType, SizedPaneOrSplit, TabName};
-use crate::context::AppContext;
-use crate::core::command::{create_env, run_external};
-use crate::mpd::commands::State;
-use crate::mpd::commands::idle::IdleEvent;
-use crate::mpd::mpd_client::{FilterKind, MpdClient, ValueChange};
-use crate::mpd::version::Version;
-use crate::shared::events::WorkRequest;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::{modal, status_error, status_info, status_warn};
-use crate::shared::mouse_event::MouseEvent;
+use self::{modals::Modal, panes::Pane};
+use crate::{
+    MpdQueryResult,
+    config::{
+        Config,
+        cli::Args,
+        keys::GlobalAction,
+        tabs::{PaneType, SizedPaneOrSplit, TabName},
+    },
+    context::AppContext,
+    core::command::{create_env, run_external},
+    mpd::{
+        commands::{State, idle::IdleEvent},
+        mpd_client::{FilterKind, MpdClient, ValueChange},
+        version::Version,
+    },
+    shared::{
+        events::WorkRequest,
+        key_event::KeyEvent,
+        macros::{modal, status_error, status_info, status_warn},
+        mouse_event::MouseEvent,
+    },
+};
 
 pub mod browser;
 pub mod dirstack;

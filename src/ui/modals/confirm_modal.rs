@@ -1,17 +1,23 @@
 use anyhow::Result;
-use ratatui::Frame;
-use ratatui::prelude::{Constraint, Layout};
-use ratatui::style::Style;
-use ratatui::symbols::{self, border};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::{
+    Frame,
+    prelude::{Constraint, Layout},
+    style::Style,
+    symbols::{self, border},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+};
 
 use super::{Modal, RectExt};
-use crate::config::keys::{CommonAction, GlobalAction};
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::pop_modal;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::widgets::button::{Button, ButtonGroup, ButtonGroupState};
+use crate::{
+    config::keys::{CommonAction, GlobalAction},
+    context::AppContext,
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
+};
 
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.vertical_left,

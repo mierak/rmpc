@@ -1,16 +1,15 @@
 use anyhow::Result;
-use ratatui::Frame;
-use ratatui::layout::Rect;
+use ratatui::{Frame, layout::Rect};
 
 use super::Pane;
-use crate::MpdQueryResult;
-use crate::config::tabs::PaneType;
-use crate::context::AppContext;
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::image::ImageProtocol;
-use crate::shared::key_event::KeyEvent;
-use crate::ui::UiEvent;
-use crate::ui::image::facade::AlbumArtFacade;
+use crate::{
+    MpdQueryResult,
+    config::tabs::PaneType,
+    context::AppContext,
+    mpd::mpd_client::MpdClient,
+    shared::{image::ImageProtocol, key_event::KeyEvent},
+    ui::{UiEvent, image::facade::AlbumArtFacade},
+};
 
 #[derive(Debug)]
 pub struct AlbumArtPane {
@@ -145,16 +144,19 @@ mod tests {
     use rstest::rstest;
 
     use super::AlbumArtPane;
-    use crate::config::album_art::ImageMethod;
-    use crate::config::tabs::PaneType;
-    use crate::config::{Config, Leak};
-    use crate::mpd::commands::{Song, State};
-    use crate::shared::events::{ClientRequest, WorkRequest};
-    use crate::shared::mpd_query::MpdQuery;
-    use crate::tests::fixtures::{app_context, client_request_channel, work_request_channel};
-    use crate::ui::UiEvent;
-    use crate::ui::panes::Pane;
-    use crate::ui::panes::album_art::ALBUM_ART;
+    use crate::{
+        config::{Config, Leak, album_art::ImageMethod, tabs::PaneType},
+        mpd::commands::{Song, State},
+        shared::{
+            events::{ClientRequest, WorkRequest},
+            mpd_query::MpdQuery,
+        },
+        tests::fixtures::{app_context, client_request_channel, work_request_channel},
+        ui::{
+            UiEvent,
+            panes::{Pane, album_art::ALBUM_ART},
+        },
+    };
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]

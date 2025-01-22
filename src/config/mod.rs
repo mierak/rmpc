@@ -1,5 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use address::MpdPassword;
 use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethod, ImageMethodFile};
@@ -27,12 +29,14 @@ pub mod theme;
 pub use address::MpdAddress;
 pub use search::Search;
 
-use self::keys::{KeyConfig, KeyConfigFile};
-use self::theme::{ConfigColor, UiConfig, UiConfigFile};
-use crate::shared::image;
-use crate::shared::image::ImageProtocol;
-use crate::shared::macros::status_warn;
-use crate::tmux;
+use self::{
+    keys::{KeyConfig, KeyConfigFile},
+    theme::{ConfigColor, UiConfig, UiConfigFile},
+};
+use crate::{
+    shared::{image, image::ImageProtocol, macros::status_warn},
+    tmux,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Config {
@@ -318,8 +322,7 @@ impl<T> Leak for T {
 }
 
 pub mod utils {
-    use std::borrow::Cow;
-    use std::path::MAIN_SEPARATOR;
+    use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
     use crate::shared::env::ENV;
 
@@ -389,10 +392,9 @@ mod tests {
 
     use walkdir::WalkDir;
 
-    use crate::config::ConfigFile;
     #[cfg(debug_assertions)]
     use crate::config::keys::KeyConfigFile;
-    use crate::config::theme::UiConfigFile;
+    use crate::config::{ConfigFile, theme::UiConfigFile};
 
     #[test]
     #[cfg(debug_assertions)]

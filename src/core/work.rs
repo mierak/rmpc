@@ -3,11 +3,15 @@ use std::path::PathBuf;
 use anyhow::Result;
 use crossbeam::channel::{Receiver, Sender};
 
-use crate::config::Config;
-use crate::shared::events::{AppEvent, ClientRequest, WorkDone, WorkRequest};
-use crate::shared::lrc::LrcIndex;
-use crate::shared::macros::try_skip;
-use crate::shared::mpd_query::MpdCommand;
+use crate::{
+    config::Config,
+    shared::{
+        events::{AppEvent, ClientRequest, WorkDone, WorkRequest},
+        lrc::LrcIndex,
+        macros::try_skip,
+        mpd_query::MpdCommand,
+    },
+};
 
 pub fn init(
     work_rx: Receiver<WorkRequest>,

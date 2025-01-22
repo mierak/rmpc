@@ -25,24 +25,23 @@ use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
 
-use crate::config::cli::{Args, Command};
-use crate::config::{Config, ConfigFile};
-use crate::mpd::client::Client;
-use crate::mpd::commands::State;
-use crate::shared::dependencies::{
-    DEPENDENCIES,
-    FFMPEG,
-    FFPROBE,
-    PYTHON3,
-    PYTHON3MUTAGEN,
-    UEBERZUGPP,
-    YTDLP,
+use crate::{
+    config::{
+        Config,
+        ConfigFile,
+        cli::{Args, Command},
+    },
+    mpd::{client::Client, commands::State},
+    shared::{
+        dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
+        env::ENV,
+        events::{AppEvent, ClientRequest, WorkRequest},
+        logging,
+        macros::{status_warn, try_ret},
+        mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
+        tmux,
+    },
 };
-use crate::shared::env::ENV;
-use crate::shared::events::{AppEvent, ClientRequest, WorkRequest};
-use crate::shared::macros::{status_warn, try_ret};
-use crate::shared::mpd_query::{MpdCommand, MpdQuery, MpdQueryResult};
-use crate::shared::{logging, tmux};
 
 #[cfg(test)]
 mod tests {

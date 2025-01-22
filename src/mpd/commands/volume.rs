@@ -1,8 +1,7 @@
 use derive_more::AsRef;
 use serde::Serialize;
 
-use crate::mpd::errors::MpdError;
-use crate::mpd::{FromMpd, LineHandled};
+use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
 #[derive(Debug, Serialize, Default, PartialEq, AsRef, Clone, Copy)]
 pub struct Volume(u8);

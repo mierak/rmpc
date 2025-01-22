@@ -1,25 +1,31 @@
-use std::collections::HashSet;
-use std::io::Stdout;
-use std::ops::Sub;
-use std::time::Duration;
+use std::{collections::HashSet, io::Stdout, ops::Sub, time::Duration};
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
 use itertools::Itertools;
-use ratatui::Terminal;
-use ratatui::layout::Rect;
-use ratatui::prelude::{Backend, CrosstermBackend};
+use ratatui::{
+    Terminal,
+    layout::Rect,
+    prelude::{Backend, CrosstermBackend},
+};
 
-use super::command::{create_env, run_external};
-use super::update_loop::UpdateLoop;
-use crate::context::AppContext;
-use crate::mpd::commands::{IdleEvent, State};
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::events::{AppEvent, WorkDone};
-use crate::shared::ext::duration::DurationExt;
-use crate::shared::ext::error::ErrorExt;
-use crate::shared::macros::{status_error, status_warn, try_skip};
-use crate::shared::mpd_query::MpdQueryResult;
-use crate::ui::{KeyHandleResult, Ui, UiEvent};
+use super::{
+    command::{create_env, run_external},
+    update_loop::UpdateLoop,
+};
+use crate::{
+    context::AppContext,
+    mpd::{
+        commands::{IdleEvent, State},
+        mpd_client::MpdClient,
+    },
+    shared::{
+        events::{AppEvent, WorkDone},
+        ext::{duration::DurationExt, error::ErrorExt},
+        macros::{status_error, status_warn, try_skip},
+        mpd_query::MpdQueryResult,
+    },
+    ui::{KeyHandleResult, Ui, UiEvent},
+};
 
 pub const EXTERNAL_COMMAND: &str = "external_command";
 pub const GLOBAL_STATUS_UPDATE: &str = "global_status_update";

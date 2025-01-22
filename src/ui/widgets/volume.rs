@@ -1,6 +1,8 @@
-use ratatui::prelude::Alignment;
-use ratatui::style::Style;
-use ratatui::widgets::{Block, Widget};
+use ratatui::{
+    prelude::Alignment,
+    style::Style,
+    widgets::{Block, Widget},
+};
 
 use super::get_line_offset;
 

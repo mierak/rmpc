@@ -1,17 +1,23 @@
-use std::collections::VecDeque;
-use std::io::{self, Write};
-use std::thread::Builder;
+use std::{
+    collections::VecDeque,
+    io::{self, Write},
+    thread::Builder,
+};
 
 use anyhow::Result;
-use crossbeam::channel::{Receiver, Sender, bounded, unbounded};
-use crossbeam::select;
+use crossbeam::{
+    channel::{Receiver, Sender, bounded, unbounded},
+    select,
+};
 use drop_guard::{ClientDropGuard, DropGuard};
 
-use crate::mpd::client::Client;
-use crate::mpd::commands::idle::IdleEvent;
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::events::{AppEvent, ClientRequest, WorkDone};
-use crate::shared::macros::{try_break, try_skip};
+use crate::{
+    mpd::{client::Client, commands::idle::IdleEvent, mpd_client::MpdClient},
+    shared::{
+        events::{AppEvent, ClientRequest, WorkDone},
+        macros::{try_break, try_skip},
+    },
+};
 
 pub fn init(
     client_rx: Receiver<ClientRequest>,

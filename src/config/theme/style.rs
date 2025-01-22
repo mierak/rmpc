@@ -276,8 +276,7 @@ mod tests {
     use ratatui::style::Modifier as RM;
     use test_case::test_case;
 
-    use crate::config::ConfigColor;
-    use crate::config::theme::style::Modifiers;
+    use crate::config::{ConfigColor, theme::style::Modifiers};
 
     #[test]
     #[rustfmt::skip]

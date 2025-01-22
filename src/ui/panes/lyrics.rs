@@ -1,15 +1,17 @@
 use anyhow::Result;
-use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
-use ratatui::text::Text;
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout, Rect},
+    style::Style,
+    text::Text,
+};
 
 use super::Pane;
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::lrc::Lrc;
-use crate::shared::macros::status_error;
-use crate::ui::UiEvent;
+use crate::{
+    context::AppContext,
+    shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
+    ui::UiEvent,
+};
 
 #[derive(Debug)]
 pub struct LyricsPane {

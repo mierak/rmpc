@@ -1,9 +1,13 @@
-use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, ListItem, Padding, StatefulWidget};
+use ratatui::{
+    prelude::*,
+    widgets::{Block, Borders, List, ListItem, Padding, StatefulWidget},
+};
 use style::Styled;
 
-use crate::config::Config;
-use crate::ui::dirstack::{Dir, DirStack, DirStackItem};
+use crate::{
+    config::Config,
+    ui::dirstack::{Dir, DirStack, DirStackItem},
+};
 
 #[derive(Debug)]
 pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {

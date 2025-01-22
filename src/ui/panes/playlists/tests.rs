@@ -1,24 +1,30 @@
 #![allow(clippy::unwrap_used)]
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::atomic::{AtomicU32, Ordering},
+    time::Duration,
+};
 
 use rstest::{fixture, rstest};
 
-use crate::context::AppContext;
-use crate::mpd::commands::Song;
-use crate::tests::fixtures::app_context;
-use crate::ui::browser::BrowserPane;
-use crate::ui::panes::Pane;
-use crate::ui::panes::browser::DirOrSong;
-use crate::ui::panes::playlists::PlaylistsPane;
+use crate::{
+    context::AppContext,
+    mpd::commands::Song,
+    tests::fixtures::app_context,
+    ui::{
+        browser::BrowserPane,
+        panes::{Pane, browser::DirOrSong, playlists::PlaylistsPane},
+    },
+};
 
 mod on_idle_event {
     use super::*;
-    use crate::context::AppContext;
-    use crate::shared::mpd_query::MpdQueryResult;
-    use crate::ui::panes::playlists::{INIT, OPEN_OR_PLAY, REINIT};
+    use crate::{
+        context::AppContext,
+        shared::mpd_query::MpdQueryResult,
+        ui::panes::playlists::{INIT, OPEN_OR_PLAY, REINIT},
+    };
 
     mod browsing_playlists {
 
@@ -159,8 +165,10 @@ mod on_idle_event {
         use crossbeam::channel::{Receiver, Sender};
 
         use super::*;
-        use crate::shared::events::{ClientRequest, WorkRequest};
-        use crate::tests::fixtures::{client_request_channel, work_request_channel};
+        use crate::{
+            shared::events::{ClientRequest, WorkRequest},
+            tests::fixtures::{client_request_channel, work_request_channel},
+        };
 
         #[rstest]
         fn selects_the_same_playlist_and_song(

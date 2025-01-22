@@ -1,20 +1,25 @@
-use std::io::Write;
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
-use crate::config::Config;
-use crate::config::cli::{Command, StickerCmd};
-use crate::context::AppContext;
-use crate::mpd::client::Client;
-use crate::mpd::commands::IdleEvent;
-use crate::mpd::commands::mpd_config::MpdConfig;
-use crate::mpd::commands::volume::Bound;
-use crate::mpd::mpd_client::{Filter, MpdClient, Tag};
-use crate::shared::lrc::LrcIndex;
-use crate::shared::macros::{status_error, status_info};
-use crate::shared::ytdlp::YtDlp;
+use crate::{
+    config::{
+        Config,
+        cli::{Command, StickerCmd},
+    },
+    context::AppContext,
+    mpd::{
+        client::Client,
+        commands::{IdleEvent, mpd_config::MpdConfig, volume::Bound},
+        mpd_client::{Filter, MpdClient, Tag},
+    },
+    shared::{
+        lrc::LrcIndex,
+        macros::{status_error, status_info},
+        ytdlp::YtDlp,
+    },
+};
 
 impl Command {
     pub fn execute(

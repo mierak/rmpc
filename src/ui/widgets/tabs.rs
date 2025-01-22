@@ -22,13 +22,15 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::prelude::Alignment;
-use ratatui::style::{Style, Styled};
-use ratatui::symbols;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Widget};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    prelude::Alignment,
+    style::{Style, Styled},
+    symbols,
+    text::{Line, Span},
+    widgets::{Block, Widget},
+};
 
 use super::get_line_offset;
 

@@ -1,23 +1,28 @@
-use std::cell::Cell;
-use std::collections::HashSet;
-use std::ops::AddAssign;
-use std::path::PathBuf;
+use std::{cell::Cell, collections::HashSet, ops::AddAssign, path::PathBuf};
 
 use anyhow::{Result, bail};
 use bon::bon;
 use crossbeam::channel::{SendError, Sender, bounded};
 
-use crate::config::album_art::ImageMethod;
-use crate::config::tabs::PaneType;
-use crate::config::{Config, Leak};
-use crate::mpd::client::Client;
-use crate::mpd::commands::{Song, State, Status};
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::events::ClientRequest;
-use crate::shared::lrc::{Lrc, LrcIndex};
-use crate::shared::macros::status_warn;
-use crate::shared::mpd_query::MpdQuerySync;
-use crate::{AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest};
+use crate::{
+    AppEvent,
+    MpdCommand,
+    MpdQuery,
+    MpdQueryResult,
+    WorkRequest,
+    config::{Config, Leak, album_art::ImageMethod, tabs::PaneType},
+    mpd::{
+        client::Client,
+        commands::{Song, State, Status},
+        mpd_client::MpdClient,
+    },
+    shared::{
+        events::ClientRequest,
+        lrc::{Lrc, LrcIndex},
+        macros::status_warn,
+        mpd_query::MpdQuerySync,
+    },
+};
 
 pub struct AppContext {
     pub(crate) config: &'static Config,

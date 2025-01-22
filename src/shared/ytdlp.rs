@@ -1,15 +1,14 @@
-use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
-use std::process::Command;
-use std::str::FromStr;
+use std::{os::unix::ffi::OsStrExt, path::PathBuf, process::Command, str::FromStr};
 
 use anyhow::{Result, anyhow, bail};
 use itertools::Itertools;
 use rustix::path::Arg;
 
 use super::dependencies;
-use crate::config::Config;
-use crate::shared::macros::{status_info, status_warn};
+use crate::{
+    config::Config,
+    shared::macros::{status_info, status_warn},
+};
 
 #[derive(Debug)]
 pub struct YtDlp {

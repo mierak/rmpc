@@ -1,10 +1,11 @@
-use std::io::Write;
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use anyhow::Result;
-use crossterm::cursor::{RestorePosition, SavePosition};
-use crossterm::queue;
-use crossterm::style::{Colors, SetColors};
+use crossterm::{
+    cursor::{RestorePosition, SavePosition},
+    queue,
+    style::{Colors, SetColors},
+};
 use ratatui::layout::Rect;
 
 use crate::shared::macros::csi_move;

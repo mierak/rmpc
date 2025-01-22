@@ -1,15 +1,13 @@
 use anyhow::{Context, Result};
-use ratatui::Frame;
-use ratatui::prelude::Rect;
+use ratatui::{Frame, prelude::Rect};
 
 use super::Pane;
-use crate::config::tabs::TabName;
-use crate::context::AppContext;
-use crate::shared::events::AppEvent;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::mouse_event::MouseEvent;
-use crate::ui::widgets::app_tabs::AppTabs;
-use crate::ui::{UiAppEvent, UiEvent};
+use crate::{
+    config::tabs::TabName,
+    context::AppContext,
+    shared::{events::AppEvent, key_event::KeyEvent, mouse_event::MouseEvent},
+    ui::{UiAppEvent, UiEvent, widgets::app_tabs::AppTabs},
+};
 
 #[derive(Debug)]
 pub struct TabsPane<'a> {

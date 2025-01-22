@@ -2,8 +2,7 @@ use anyhow::{Context, anyhow};
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 use serde::Serialize;
 
-use crate::mpd::errors::MpdError;
-use crate::mpd::{FromMpd, LineHandled, ParseErrorExt};
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 #[derive(Debug, Serialize, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct Outputs(pub Vec<Output>);

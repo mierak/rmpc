@@ -1,21 +1,27 @@
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::style::Style;
-use ratatui::symbols::border;
-use ratatui::text::Text;
-use ratatui::widgets::{Block, Borders, Cell, Clear, Row, Table, TableState};
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout, Margin, Rect},
+    style::Style,
+    symbols::border,
+    text::Text,
+    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
+};
 
 use super::{Modal, RectExt};
-use crate::config::keys::CommonAction;
-use crate::context::AppContext;
-use crate::mpd::commands::Decoder;
-use crate::shared::ext::iter::IntoZipLongest2;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::pop_modal;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::dirstack::DirState;
+use crate::{
+    config::keys::CommonAction,
+    context::AppContext,
+    mpd::commands::Decoder,
+    shared::{
+        ext::iter::IntoZipLongest2,
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::dirstack::DirState,
+};
 
 #[derive(Debug)]
 pub struct DecodersModal {

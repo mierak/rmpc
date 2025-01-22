@@ -6,8 +6,7 @@ use serde_with::skip_serializing_none;
 use strum::Display;
 
 use super::style::ToConfigOr;
-use crate::config::Leak;
-use crate::config::theme::StyleFile;
+use crate::config::{Leak, theme::StyleFile};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {

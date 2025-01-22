@@ -1,27 +1,35 @@
-use std::io::Write;
-use std::ops::AddAssign;
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use std::time::Instant;
+use std::{
+    io::Write,
+    ops::AddAssign,
+    sync::{Arc, atomic::Ordering},
+    time::Instant,
+};
 
 use anyhow::{Result, bail};
 use color_quant::NeuQuant;
 use crossbeam::channel::{Sender, unbounded};
-use crossterm::cursor::{MoveTo, RestorePosition, SavePosition};
-use crossterm::queue;
-use crossterm::style::Colors;
+use crossterm::{
+    cursor::{MoveTo, RestorePosition, SavePosition},
+    queue,
+    style::Colors,
+};
 use image::Rgba;
-use ratatui::layout::Rect;
-use ratatui::style::Color;
+use ratatui::{layout::Rect, style::Color};
 
 use super::{Backend, clear_area};
-use crate::config::Size;
-use crate::config::album_art::{HorizontalAlign, VerticalAlign};
-use crate::shared::ext::mpsc::RecvLast;
-use crate::shared::image::resize_image;
-use crate::shared::macros::{status_error, try_cont};
-use crate::tmux;
-use crate::ui::image::facade::IS_SHOWING;
+use crate::{
+    config::{
+        Size,
+        album_art::{HorizontalAlign, VerticalAlign},
+    },
+    shared::{
+        ext::mpsc::RecvLast,
+        image::resize_image,
+        macros::{status_error, try_cont},
+    },
+    tmux,
+    ui::image::facade::IS_SHOWING,
+};
 
 #[derive(Debug)]
 pub struct Sixel {

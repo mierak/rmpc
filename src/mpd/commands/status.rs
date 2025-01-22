@@ -4,8 +4,7 @@ use anyhow::anyhow;
 use serde::Serialize;
 
 use super::Volume;
-use crate::mpd::errors::MpdError;
-use crate::mpd::{FromMpd, LineHandled, ParseErrorExt};
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 #[derive(Debug, Serialize, Default, Clone)]
 pub struct Status {

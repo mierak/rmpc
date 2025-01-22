@@ -1,20 +1,29 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use ratatui::layout::Rect;
-use ratatui::prelude::{Constraint, Layout};
-use ratatui::style::{Style, Stylize};
-use ratatui::widgets::{Block, Borders, Clear, List, ListState};
-use ratatui::{Frame, symbols};
+use ratatui::{
+    Frame,
+    layout::Rect,
+    prelude::{Constraint, Layout},
+    style::{Style, Stylize},
+    symbols,
+    widgets::{Block, Borders, Clear, List, ListState},
+};
 
 use super::{Modal, RectExt};
-use crate::config::keys::CommonAction;
-use crate::context::AppContext;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::pop_modal;
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::dirstack::DirState;
-use crate::ui::widgets::button::{Button, ButtonGroup, ButtonGroupState};
+use crate::{
+    config::keys::CommonAction,
+    context::AppContext,
+    shared::{
+        key_event::KeyEvent,
+        macros::pop_modal,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{
+        dirstack::DirState,
+        widgets::button::{Button, ButtonGroup, ButtonGroupState},
+    },
+};
 
 #[derive(Debug)]
 enum FocusedComponent {

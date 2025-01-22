@@ -1,6 +1,8 @@
-use ratatui::prelude::{Buffer, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::widgets::Widget;
+use ratatui::{
+    prelude::{Buffer, Rect},
+    style::{Color, Style},
+    widgets::Widget,
+};
 
 #[derive(Clone)]
 pub struct ProgressBar<'a> {
@@ -109,9 +111,11 @@ impl Default for ProgressBar<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ratatui::buffer::Cell;
-    use ratatui::prelude::{Buffer, Rect};
-    use ratatui::widgets::Widget;
+    use ratatui::{
+        buffer::Cell,
+        prelude::{Buffer, Rect},
+        widgets::Widget,
+    };
 
     use super::ProgressBar;
 

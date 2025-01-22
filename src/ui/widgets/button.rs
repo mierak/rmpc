@@ -1,7 +1,9 @@
-use ratatui::layout::{Position, Rect};
-use ratatui::prelude::{Alignment, Constraint, Direction, Layout};
-use ratatui::style::{Style, Stylize};
-use ratatui::widgets::{Block, StatefulWidget, Widget};
+use ratatui::{
+    layout::{Position, Rect},
+    prelude::{Alignment, Constraint, Direction, Layout},
+    style::{Style, Stylize},
+    widgets::{Block, StatefulWidget, Widget},
+};
 
 use super::get_line_offset;
 

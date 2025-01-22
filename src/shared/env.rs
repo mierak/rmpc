@@ -1,5 +1,7 @@
-use std::ffi::{OsStr, OsString};
-use std::sync::LazyLock;
+use std::{
+    ffi::{OsStr, OsString},
+    sync::LazyLock,
+};
 
 pub struct Env {
     #[cfg(test)]

@@ -2,8 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent as CKeyEvent};
 
 #[cfg(debug_assertions)]
 use crate::config::keys::LogsActions;
-use crate::config::keys::{CommonAction, GlobalAction, QueueActions};
-use crate::context::AppContext;
+use crate::{
+    config::keys::{CommonAction, GlobalAction, QueueActions},
+    context::AppContext,
+};
 
 #[derive(Debug, Clone)]
 pub struct KeyEvent {

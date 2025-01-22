@@ -1,6 +1,8 @@
 use itertools::Itertools;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{ListItem, ListState, TableState};
+use ratatui::{
+    text::{Line, Span},
+    widgets::{ListItem, ListState, TableState},
+};
 
 mod dir;
 mod stack;
@@ -9,9 +11,7 @@ pub use dir::Dir;
 pub use stack::DirStack;
 pub use state::DirState;
 
-use crate::config::Config;
-use crate::mpd::commands::Song;
-use crate::ui::panes::browser::DirOrSong;
+use crate::{config::Config, mpd::commands::Song, ui::panes::browser::DirOrSong};
 
 pub trait DirStackItem {
     type Item;

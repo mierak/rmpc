@@ -131,8 +131,10 @@ pub mod iter {
 }
 
 pub mod mpd_client {
-    use crate::mpd::errors::{ErrorCode, MpdError, MpdFailureResponse};
-    use crate::mpd::mpd_client::MpdClient;
+    use crate::mpd::{
+        errors::{ErrorCode, MpdError, MpdFailureResponse},
+        mpd_client::MpdClient,
+    };
 
     pub trait MpdClientExt {
         fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError>;
@@ -158,8 +160,10 @@ pub mod mpd_client {
 }
 
 pub mod btreeset_ranges {
-    use std::collections::{BTreeSet, btree_set};
-    use std::ops::{Range, RangeInclusive};
+    use std::{
+        collections::{BTreeSet, btree_set},
+        ops::{Range, RangeInclusive},
+    };
 
     pub trait BTreeSetRanges<'a, T: 'a> {
         fn ranges(&'a self) -> Ranges<'a, T, std::collections::btree_set::Iter<'a, T>>;

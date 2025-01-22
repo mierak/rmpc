@@ -1,25 +1,32 @@
-use std::io::Write;
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
+use std::{
+    io::Write,
+    sync::{Arc, atomic::Ordering},
+};
 
 use anyhow::{Result, bail};
 use base64::Engine;
 use crossbeam::channel::{Sender, unbounded};
-use crossterm::cursor::{MoveTo, RestorePosition, SavePosition};
-use crossterm::queue;
-use crossterm::style::Colors;
-use ratatui::layout::Rect;
-use ratatui::style::Color;
+use crossterm::{
+    cursor::{MoveTo, RestorePosition, SavePosition},
+    queue,
+    style::Colors,
+};
+use ratatui::{layout::Rect, style::Color};
 
 use super::Backend;
-use crate::config::Size;
-use crate::config::album_art::{HorizontalAlign, VerticalAlign};
-use crate::shared::ext::mpsc::RecvLast;
-use crate::shared::image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image};
-use crate::shared::macros::try_cont;
-use crate::shared::tmux::tmux_write;
-use crate::ui::image::clear_area;
-use crate::ui::image::facade::IS_SHOWING;
+use crate::{
+    config::{
+        Size,
+        album_art::{HorizontalAlign, VerticalAlign},
+    },
+    shared::{
+        ext::mpsc::RecvLast,
+        image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
+        macros::try_cont,
+        tmux::tmux_write,
+    },
+    ui::image::{clear_area, facade::IS_SHOWING},
+};
 
 #[derive(Debug)]
 struct EncodedData {

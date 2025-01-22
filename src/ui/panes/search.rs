@@ -3,27 +3,34 @@ use std::rc::Rc;
 use anyhow::{Context, Result};
 use crossterm::event::KeyCode;
 use itertools::Itertools;
-use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-use ratatui::style::Styled;
-use ratatui::widgets::{Block, Borders, List, ListItem, Padding};
+use ratatui::{
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::Styled,
+    widgets::{Block, Borders, List, ListItem, Padding},
+};
 
 use super::{CommonAction, Pane};
-use crate::MpdQueryResult;
-use crate::config::keys::GlobalAction;
-use crate::config::tabs::PaneType;
-use crate::config::{Config, Search};
-use crate::context::AppContext;
-use crate::core::command::{create_env, run_external};
-use crate::mpd::commands::Song;
-use crate::mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag};
-use crate::shared::ext::mpd_client::MpdClientExt;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::{status_info, status_warn};
-use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
-use crate::ui::UiEvent;
-use crate::ui::dirstack::{Dir, DirStackItem};
-use crate::ui::widgets::button::Button;
-use crate::ui::widgets::input::Input;
+use crate::{
+    MpdQueryResult,
+    config::{Config, Search, keys::GlobalAction, tabs::PaneType},
+    context::AppContext,
+    core::command::{create_env, run_external},
+    mpd::{
+        commands::Song,
+        mpd_client::{Filter, FilterKind, MpdClient, Tag},
+    },
+    shared::{
+        ext::mpd_client::MpdClientExt,
+        key_event::KeyEvent,
+        macros::{status_info, status_warn},
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{
+        UiEvent,
+        dirstack::{Dir, DirStackItem},
+        widgets::{button::Button, input::Input},
+    },
+};
 
 #[derive(Debug)]
 pub struct SearchPane {

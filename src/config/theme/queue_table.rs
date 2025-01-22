@@ -4,17 +4,19 @@ use ratatui::layout::Constraint;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use super::StyleFile;
-use super::properties::{
-    Alignment,
-    Property,
-    PropertyFile,
-    PropertyKindFileOrText,
-    PropertyKindOrText,
-    SongProperty,
-    SongPropertyFile,
+use super::{
+    StyleFile,
+    properties::{
+        Alignment,
+        Property,
+        PropertyFile,
+        PropertyKindFileOrText,
+        PropertyKindOrText,
+        SongProperty,
+        SongPropertyFile,
+    },
+    style::ToConfigOr,
 };
-use super::style::ToConfigOr;
 use crate::config::Leak;
 
 #[derive(Debug, Clone, Copy)]

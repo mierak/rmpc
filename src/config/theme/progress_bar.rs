@@ -2,8 +2,7 @@ use anyhow::Result;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 
-use super::StyleFile;
-use super::style::ToConfigOr;
+use super::{StyleFile, style::ToConfigOr};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProgressBarConfig {
@@ -74,9 +73,12 @@ mod tests {
     use ratatui::style::{Color as RC, Modifier as RM};
     use test_case::test_case;
 
-    use crate::config::theme::progress_bar::ProgressBarConfigFile;
-    use crate::config::theme::style::Modifiers;
-    use crate::config::theme::{Style, StyleFile};
+    use crate::config::theme::{
+        Style,
+        StyleFile,
+        progress_bar::ProgressBarConfigFile,
+        style::Modifiers,
+    };
 
     #[test]
     fn maps_symbols() {

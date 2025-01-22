@@ -1,14 +1,15 @@
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{
+    io::{BufRead, BufReader},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use walkdir::WalkDir;
 
 use super::{Lrc, parse_length};
-use crate::mpd::commands::Song;
-use crate::shared::macros::try_cont;
+use crate::{mpd::commands::Song, shared::macros::try_cont};
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
 pub struct LrcIndex {
     index: Vec<LrcIndexEntry>,

@@ -2,8 +2,7 @@ use anyhow::Result;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 
-use super::StyleFile;
-use super::style::ToConfigOr;
+use super::{StyleFile, style::ToConfigOr};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ScrollbarConfig {
@@ -68,9 +67,12 @@ mod tests {
     use ratatui::style::{Color as RC, Modifier as RM};
     use test_case::test_case;
 
-    use crate::config::theme::scrollbar::ScrollbarConfigFile;
-    use crate::config::theme::style::Modifiers;
-    use crate::config::theme::{Style, StyleFile};
+    use crate::config::theme::{
+        Style,
+        StyleFile,
+        scrollbar::ScrollbarConfigFile,
+        style::Modifiers,
+    };
 
     #[test]
     fn maps_symbols() {

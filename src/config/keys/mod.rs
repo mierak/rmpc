@@ -208,8 +208,12 @@ mod tests {
     use crate::config::keys::LogsActions;
     #[cfg(debug_assertions)]
     use crate::config::keys::LogsActionsFile;
-    use crate::config::keys::actions::{CommonActionFile, GlobalActionFile, QueueActionsFile};
-    use crate::config::keys::{CommonAction, GlobalAction, QueueActions};
+    use crate::config::keys::{
+        CommonAction,
+        GlobalAction,
+        QueueActions,
+        actions::{CommonActionFile, GlobalActionFile, QueueActionsFile},
+    };
 
     #[test]
     #[rustfmt::skip]

@@ -1,5 +1,4 @@
-use std::process::Command;
-use std::sync::LazyLock;
+use std::{process::Command, sync::LazyLock};
 
 use crate::config::MpdAddress;
 

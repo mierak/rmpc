@@ -1,18 +1,23 @@
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpStream;
-use std::os::unix::net::UnixStream;
+use std::{
+    io::{BufRead, BufReader, Write},
+    net::TcpStream,
+    os::unix::net::UnixStream,
+};
 
 use anyhow::Result;
 use log::debug;
 
-use super::commands::mpd_config::MpdConfig;
-use super::errors::MpdError;
-use super::proto_client::{ProtoClient, SocketClient};
-use super::version::Version;
-use crate::config::MpdAddress;
-use crate::config::address::MpdPassword;
-use crate::mpd::mpd_client::MpdClient;
-use crate::shared::macros::status_warn;
+use super::{
+    commands::mpd_config::MpdConfig,
+    errors::MpdError,
+    proto_client::{ProtoClient, SocketClient},
+    version::Version,
+};
+use crate::{
+    config::{MpdAddress, address::MpdPassword},
+    mpd::mpd_client::MpdClient,
+    shared::macros::status_warn,
+};
 
 type MpdResult<T> = Result<T, MpdError>;
 
