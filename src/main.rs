@@ -20,6 +20,7 @@ use std::io::{Read, Write};
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use config::{Leak, cli_config::CliConfigFile};
 use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
@@ -27,7 +28,6 @@ use rustix::path::Arg;
 
 use crate::{
     config::{
-        Config,
         ConfigFile,
         cli::{Args, Command},
     },
@@ -144,21 +144,11 @@ fn main() -> Result<()> {
         }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");
-            let config: &'static Config =
-                Box::leak(Box::new(match ConfigFile::read(&args.config) {
-                    Ok(val) => val.into_config(
-                        Some(&args.config),
-                        std::mem::take(&mut args.address),
-                        std::mem::take(&mut args.password),
-                        true,
-                    )?,
-                    Err(_err) => ConfigFile::default().into_config(
-                        None,
-                        std::mem::take(&mut args.address),
-                        std::mem::take(&mut args.password),
-                        true,
-                    )?,
-                }));
+            let config: CliConfigFile = match CliConfigFile::read(&args.config) {
+                Ok(cfg) => cfg,
+                Err(_err) => ConfigFile::default().into(),
+            };
+            let config = config.into_config(args.address, args.password).leak();
             let mut client = Client::init(config.address, config.password, "main")?;
             client.set_read_timeout(None)?;
             (cmd.execute(config)?)(&mut client)?;

@@ -20,6 +20,7 @@ pub mod address;
 pub mod album_art;
 pub mod artists;
 pub mod cli;
+pub mod cli_config;
 mod defaults;
 pub mod keys;
 mod search;

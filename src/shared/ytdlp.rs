@@ -6,7 +6,7 @@ use rustix::path::Arg;
 
 use super::dependencies;
 use crate::{
-    config::Config,
+    config::cli_config::CliConfig,
     shared::macros::{status_info, status_warn},
 };
 
@@ -27,7 +27,7 @@ impl YtDlp {
         Ok(Self { cache_dir })
     }
 
-    pub fn init_and_download(config: &Config, url: &str) -> Result<String> {
+    pub fn init_and_download(config: &CliConfig, url: &str) -> Result<String> {
         let Some(cache_dir) = config.cache_dir else {
             bail!("Youtube support requires 'cache_dir' to be configured")
         };
