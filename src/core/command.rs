@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use crate::{
     config::{
-        Config,
         cli::{Command, StickerCmd},
+        cli_config::CliConfig,
     },
     context::AppContext,
     mpd::{
@@ -24,7 +24,7 @@ use crate::{
 impl Command {
     pub fn execute(
         mut self,
-        config: &'static Config,
+        config: &'static CliConfig,
     ) -> Result<Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static>> {
         match self {
             Command::Update { ref mut path, wait } | Command::Rescan { ref mut path, wait } => {
