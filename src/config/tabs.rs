@@ -24,7 +24,7 @@ impl From<&'static str> for TabName {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-enum PaneTypeFile {
+pub enum PaneTypeFile {
     Queue,
     #[cfg(debug_assertions)]
     Logs,
@@ -36,9 +36,15 @@ enum PaneTypeFile {
     Search,
     AlbumArt,
     Lyrics,
+    ProgressBar,
+    Header,
+    Tabs,
+    TabContent,
+    #[cfg(debug_assertions)]
+    FrameCount,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord, strum::Display)]
 pub enum PaneType {
     Queue,
     #[cfg(debug_assertions)]
@@ -51,11 +57,38 @@ pub enum PaneType {
     Search,
     AlbumArt,
     Lyrics,
+    ProgressBar,
+    Header,
+    Tabs,
+    TabContent,
+    #[cfg(debug_assertions)]
+    FrameCount,
 }
 
-impl PaneTypeFile {
-    pub fn is_focusable(self) -> bool {
-        !matches!(self, PaneTypeFile::AlbumArt | PaneTypeFile::Lyrics)
+#[cfg(debug_assertions)]
+pub const UNFOSUSABLE_TABS: [PaneType; 7] = [
+    PaneType::AlbumArt,
+    PaneType::Lyrics,
+    PaneType::ProgressBar,
+    PaneType::Header,
+    PaneType::Tabs,
+    PaneType::TabContent,
+    PaneType::FrameCount,
+];
+
+#[cfg(not(debug_assertions))]
+pub const UNFOSUSABLE_TABS: [PaneType; 6] = [
+    PaneType::AlbumArt,
+    PaneType::Lyrics,
+    PaneType::ProgressBar,
+    PaneType::Header,
+    PaneType::Tabs,
+    PaneType::TabContent,
+];
+
+impl Pane {
+    pub fn is_focusable(&self) -> bool {
+        !UNFOSUSABLE_TABS.contains(&self.pane)
     }
 }
 
@@ -73,6 +106,12 @@ impl From<&PaneTypeFile> for PaneType {
             PaneTypeFile::Search => PaneType::Search,
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
+            PaneTypeFile::ProgressBar => PaneType::ProgressBar,
+            PaneTypeFile::Header => PaneType::Header,
+            PaneTypeFile::Tabs => PaneType::Tabs,
+            PaneTypeFile::TabContent => PaneType::TabContent,
+            #[cfg(debug_assertions)]
+            PaneTypeFile::FrameCount => PaneType::FrameCount,
         }
     }
 }
@@ -101,24 +140,15 @@ impl TryFrom<TabsFile> for Tabs {
 
         ensure!(!tabs.is_empty(), "At least one tab is required");
 
-        let active_panes = tabs
-            .iter()
-            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane))
-            .sorted()
-            .dedup()
-            .collect_vec()
-            .leak();
-
         Ok(Self {
             tabs,
             names: names.leak(),
-            active_panes,
         })
     }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-enum BorderTypeFile {
+pub enum BorderTypeFile {
     Full,
     Single,
     None,
@@ -148,7 +178,6 @@ pub(super) struct TabsFile(Vec<TabFile>);
 pub struct Tabs {
     pub names: &'static [TabName],
     pub tabs: HashMap<TabName, &'static Tab>,
-    pub active_panes: &'static [PaneType],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -165,7 +194,7 @@ pub struct Tab {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-enum DirectionFile {
+pub enum DirectionFile {
     Horizontal,
     Vertical,
 }
@@ -189,7 +218,7 @@ impl From<&DirectionFile> for Direction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-enum PaneOrSplitFile {
+pub enum PaneOrSplitFile {
     Pane(PaneTypeFile),
     Split {
         direction: DirectionFile,
@@ -197,8 +226,34 @@ enum PaneOrSplitFile {
     },
 }
 
+impl Default for PaneOrSplitFile {
+    fn default() -> Self {
+        PaneOrSplitFile::Split {
+            direction: DirectionFile::Vertical,
+            panes: vec![
+                SubPaneFile {
+                    size: "2".to_string(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Header),
+                },
+                SubPaneFile {
+                    size: "3".to_string(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Tabs),
+                },
+                SubPaneFile {
+                    size: "100%".to_string(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::TabContent),
+                },
+                SubPaneFile {
+                    size: "1".to_string(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
+                },
+            ],
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct SubPaneFile {
+pub struct SubPaneFile {
     pub size: String,
     pub pane: PaneOrSplitFile,
 }
@@ -207,7 +262,6 @@ struct SubPaneFile {
 pub struct Pane {
     pub pane: PaneType,
     pub border: Borders,
-    pub focusable: bool,
     pub id: Id,
 }
 
@@ -220,6 +274,15 @@ pub enum SizedPaneOrSplit {
     },
 }
 
+impl Default for SizedPaneOrSplit {
+    fn default() -> Self {
+        Self::Split {
+            direction: Direction::Horizontal,
+            panes: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SizedSubPane {
     pub size: PercentOrLength,
@@ -227,7 +290,7 @@ pub struct SizedSubPane {
 }
 
 impl PaneOrSplitFile {
-    fn convert(&self, border_type: BorderTypeFile) -> Result<SizedPaneOrSplit> {
+    pub fn convert(&self, border_type: BorderTypeFile) -> Result<SizedPaneOrSplit> {
         self.convert_recursive(border_type, Borders::NONE)
     }
 
@@ -235,7 +298,6 @@ impl PaneOrSplitFile {
         match self {
             PaneOrSplitFile::Pane(pane) => Ok(SizedPaneOrSplit::Pane(Pane {
                 pane: pane.into(),
-                focusable: pane.is_focusable(),
                 border: borders,
                 id: id::new(),
             })),
@@ -381,4 +443,38 @@ impl Default for TabsFile {
             },
         ])
     }
+}
+
+pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()> {
+    let layout_panes = layout.panes_iter().collect_vec();
+    ensure!(
+        !layout_panes.iter().all(|pane| pane.is_focusable()),
+        "Only non-focusable panes are supported in the layout. Possible values: {}",
+        UNFOSUSABLE_TABS.iter().join(", ")
+    );
+    ensure!(
+        layout_panes
+            .iter()
+            .filter(|pane| pane.pane == PaneType::TabContent)
+            .count()
+            == 1,
+        "Layout must contain exactly one TabContent pane"
+    );
+
+    let all_tab_panes = tabs.tabs.values().flat_map(|tab| tab.panes.panes_iter()).collect_vec();
+    let panes_in_both_tabs_and_layout = all_tab_panes
+        .iter()
+        .flat_map(|tab_pane| {
+            layout_panes
+                .iter()
+                .filter(|layout_pane| layout_pane.pane == tab_pane.pane)
+        })
+        .collect_vec();
+    ensure!(
+            panes_in_both_tabs_and_layout.is_empty(),
+            "Panes cannot be in layout and tabs at the same time. Please remove following tabs from either layout or tabs: {}",
+            panes_in_both_tabs_and_layout.iter().map(|pane| pane.pane).sorted().dedup().join(", ")
+        );
+
+    Ok(())
 }

@@ -21,11 +21,14 @@ mod style;
 pub use self::queue_table::{PercentOrLength, SongTableColumn};
 pub use style::{ConfigColor, StyleFile};
 
-use super::defaults;
+use super::{
+    defaults,
+    tabs::{BorderTypeFile, PaneOrSplitFile, SizedPaneOrSplit},
+};
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct UiConfig {
     pub draw_borders: bool,
     pub background_color: Option<Color>,
@@ -46,6 +49,7 @@ pub struct UiConfig {
     pub song_table_format: &'static [SongTableColumn],
     pub header: HeaderConfig,
     pub default_album_art: &'static [u8],
+    pub layout: SizedPaneOrSplit,
 }
 
 impl std::fmt::Debug for UiConfig {
@@ -78,11 +82,14 @@ pub struct UiConfigFile {
     pub(super) song_table_format: QueueTableColumnsFile,
     pub(super) header: HeaderConfigFile,
     pub(super) default_album_art_path: Option<String>,
+    #[serde(default)]
+    pub(super) layout: PaneOrSplitFile,
 }
 
 impl Default for UiConfigFile {
     fn default() -> Self {
         Self {
+            layout: PaneOrSplitFile::default(),
             default_album_art_path: None,
             draw_borders: true,
             background_color: None,
@@ -141,6 +148,7 @@ impl Default for UiConfigFile {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TabBarFile {
+    // deprecated
     pub(super) enabled: Option<bool>,
     pub(super) active_style: Option<StyleFile>,
     pub(super) inactive_style: Option<StyleFile>,
@@ -190,6 +198,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let fallback_border_fg = Color::White;
 
         Ok(Self {
+            layout: value.layout.convert(BorderTypeFile::None)?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             modal_background_color: StringColor(value.modal_background_color).to_color()?.or(bg_color),

@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet, path::PathBuf};
+use std::{cell::Cell, collections::HashSet, ops::AddAssign, path::PathBuf};
 
 use crate::{
     config::{album_art::ImageMethod, tabs::PaneType, Config, Leak},
@@ -20,21 +20,22 @@ use bon::bon;
 use crossbeam::channel::{bounded, SendError, Sender};
 
 pub struct AppContext {
-    pub config: &'static Config,
-    pub status: Status,
-    pub queue: Vec<Song>,
-    pub supported_commands: HashSet<String>,
-    pub app_event_sender: Sender<AppEvent>,
-    pub work_sender: Sender<WorkRequest>,
-    pub client_request_sender: Sender<ClientRequest>,
-    pub needs_render: Cell<bool>,
-    pub lrc_index: LrcIndex,
-    pub should_fetch_stickers: bool,
+    pub(crate) config: &'static Config,
+    pub(crate) status: Status,
+    pub(crate) queue: Vec<Song>,
+    pub(crate) supported_commands: HashSet<String>,
+    pub(crate) app_event_sender: Sender<AppEvent>,
+    pub(crate) work_sender: Sender<WorkRequest>,
+    pub(crate) client_request_sender: Sender<ClientRequest>,
+    pub(crate) needs_render: Cell<bool>,
+    pub(crate) lrc_index: LrcIndex,
+    pub(crate) rendered_frames: u64,
+    pub(crate) should_fetch_stickers: bool,
 }
 
 #[bon]
 impl AppContext {
-    pub fn try_new(
+    pub(crate) fn try_new(
         client: &mut Client<'_>,
         mut config: Config,
         app_event_sender: Sender<AppEvent>,
@@ -70,10 +71,11 @@ impl AppContext {
             client_request_sender,
             needs_render: Cell::new(false),
             should_fetch_stickers: sticker_support_needed,
+            rendered_frames: 0,
         })
     }
 
-    pub fn render(&self) -> Result<(), SendError<AppEvent>> {
+    pub(crate) fn render(&self) -> Result<(), SendError<AppEvent>> {
         if self.needs_render.get() {
             return Ok(());
         }
@@ -82,11 +84,12 @@ impl AppContext {
         self.app_event_sender.send(AppEvent::RequestRender)
     }
 
-    pub fn finish_frame(&self) {
+    pub(crate) fn finish_frame(&mut self) {
         self.needs_render.replace(false);
+        self.rendered_frames.add_assign(1);
     }
 
-    pub fn query_sync<T: Send + Sync + 'static>(
+    pub(crate) fn query_sync<T: Send + Sync + 'static>(
         &self,
         on_done: impl FnOnce(&mut Client<'_>) -> Result<T> + Send + 'static,
     ) -> Result<T> {
@@ -112,7 +115,7 @@ impl AppContext {
     }
 
     #[builder(finish_fn(name = query))]
-    pub fn query(
+    pub(crate) fn query(
         &self,
         #[builder(finish_fn)] on_done: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
         id: &'static str,
@@ -130,7 +133,7 @@ impl AppContext {
         }
     }
 
-    pub fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
+    pub(crate) fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
         if let Err(err) = self.client_request_sender.send(ClientRequest::Command(MpdCommand {
             callback: Box::new(callback),
         })) {
@@ -138,7 +141,7 @@ impl AppContext {
         }
     }
 
-    pub fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
+    pub(crate) fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
         if self.status.state == State::Stop {
             return None;
         }
@@ -148,7 +151,7 @@ impl AppContext {
             .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
     }
 
-    pub fn find_lrc(&self) -> Result<Option<Lrc>> {
+    pub(crate) fn find_lrc(&self) -> Result<Option<Lrc>> {
         let Some((_, song)) = self.find_current_song_in_queue() else {
             return Ok(None);
         };

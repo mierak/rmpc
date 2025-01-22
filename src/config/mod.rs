@@ -12,7 +12,7 @@ use itertools::Itertools;
 use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
-use tabs::{Tabs, TabsFile};
+use tabs::{validate_tabs, PaneType, Tabs, TabsFile};
 use utils::tilde_expand;
 
 pub mod address;
@@ -57,6 +57,7 @@ pub struct Config {
     pub search: Search,
     pub artists: Artists,
     pub tabs: Tabs,
+    pub active_panes: &'static [PaneType],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -188,6 +189,17 @@ impl ConfigFile {
             .unwrap_or_default()
             .try_into()?;
 
+        let tabs: Tabs = self.tabs.try_into()?;
+        let active_panes = tabs
+            .tabs
+            .iter()
+            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane))
+            .chain(theme.layout.panes_iter().map(|pane| pane.pane))
+            .sorted()
+            .dedup()
+            .collect_vec()
+            .leak();
+
         let (address, password) = MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let album_art_method = self.album_art.method;
         let mut config = Config {
@@ -204,6 +216,8 @@ impl ConfigFile {
                 }
                 .leak() as &'static _
             }),
+            tabs,
+            active_panes,
             address,
             password,
             volume_step: self.volume_step,
@@ -215,7 +229,6 @@ impl ConfigFile {
             select_current_song_on_change: self.select_current_song_on_change,
             search: self.search.into(),
             artists: self.artists.into(),
-            tabs: self.tabs.try_into()?,
             album_art: self.album_art.into(),
             on_song_change: self.on_song_change.map(|arr| {
                 arr.into_iter()
@@ -228,6 +241,8 @@ impl ConfigFile {
         if is_cli {
             return Ok(config);
         }
+
+        validate_tabs(&config.theme.layout, &config.tabs)?;
 
         let is_tmux = tmux::is_inside_tmux();
         if is_tmux && !tmux::is_passthrough_enabled()? {

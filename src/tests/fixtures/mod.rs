@@ -54,6 +54,7 @@ pub fn app_context(
         needs_render: Cell::new(false),
         lrc_index: LrcIndex::default(),
         should_fetch_stickers: false,
+        rendered_frames: 0,
     }
 }
 

@@ -89,7 +89,7 @@ impl Pane for QueuePane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
         let AppContext { queue, config, .. } = context;
         let queue_len = queue.len();
-        self.calculate_areas(area, context);
+        self.calculate_areas(area, context)?;
 
         let title = self
             .filter
@@ -199,7 +199,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &AppContext) {
+    fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
         let AppContext { config, .. } = context;
 
         let header_height = u16::from(config.theme.show_song_table_header);
@@ -229,6 +229,8 @@ impl Pane for QueuePane {
         self.areas[Areas::TableHeader] = table_header_section;
         self.areas[Areas::TableBlock] = queue_section;
         self.areas[Areas::Scrollbar] = scrollbar_area;
+
+        Ok(())
     }
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {

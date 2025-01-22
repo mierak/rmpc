@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Support for displaying MPD stickers in the header and queue table
 - Support for manipulation of MPD stickers via CLI
 - Support for globs/multiple files and songs outside music database (with socket connection) in the `add` cli command
+- Added new `layout` config option which allows to move around the base components
 
 ### Changed
 
@@ -29,6 +30,10 @@ All notable changes to this project will be documented in this file.
 - Properly escape strings in mpd protocol
 - Preview for songs outside of the music database not working in playlists
 - AddToPlaylist not working for local songs
+
+### Deprecated
+
+- `theme.tab_bar.enabled` replaced by layout configuration
 
 ## [0.7.0] - 2024-12-24
 

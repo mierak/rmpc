@@ -99,7 +99,7 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> InputModal<'a, C> {
     }
 
     pub fn title(mut self, message: &'a str) -> Self {
-        self.input_label = message;
+        self.title = message;
         self
     }
 

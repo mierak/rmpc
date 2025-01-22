@@ -155,7 +155,7 @@ impl Widget for &mut Tabs<'_> {
             self.titles.iter().map(|t| t.width() as u16).sum(),
             tabs_area.width,
             self.alignment,
-        );
+        ) + area.x;
 
         let titles_length = self.titles.len();
         for (i, title) in self.titles.iter().enumerate() {
