@@ -31,6 +31,10 @@ All notable changes to this project will be documented in this file.
 - Preview for songs outside of the music database not working in playlists
 - AddToPlaylist not working for local songs
 
+### Deprecated
+
+- `theme.tab_bar.enabled` replaced by layout configuration
+
 ## [0.7.0] - 2024-12-24
 
 ### Added

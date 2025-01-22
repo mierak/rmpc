@@ -148,6 +148,7 @@ impl Default for UiConfigFile {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TabBarFile {
+    // deprecated
     pub(super) enabled: Option<bool>,
     pub(super) active_style: Option<StyleFile>,
     pub(super) inactive_style: Option<StyleFile>,
