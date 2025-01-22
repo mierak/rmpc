@@ -301,7 +301,7 @@ impl<'ui> Ui<'ui> {
                     context.command(move |client| {
                         client.pause_toggle()?;
                         Ok(())
-                    })
+                    });
                 }
                 GlobalAction::TogglePause => {}
                 GlobalAction::VolumeUp => {
@@ -324,7 +324,7 @@ impl<'ui> Ui<'ui> {
                     context.command(move |client| {
                         client.seek_current(ValueChange::Increase(5))?;
                         Ok(())
-                    })
+                    });
                 }
                 GlobalAction::SeekBack
                     if matches!(context.status.state, State::Play | State::Pause) =>
@@ -332,7 +332,7 @@ impl<'ui> Ui<'ui> {
                     context.command(move |client| {
                         client.seek_current(ValueChange::Decrease(5))?;
                         Ok(())
-                    })
+                    });
                 }
                 GlobalAction::NextTab => {
                     self.change_tab(context.config.next_screen(self.active_tab), context)?;

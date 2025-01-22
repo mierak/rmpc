@@ -380,7 +380,7 @@ impl SearchPane {
         for val in &mut self.inputs.filter_inputs {
             match val.variant {
                 FilterInputVariant::SelectFilterKind { ref mut value } => {
-                    *value = search_config.mode
+                    *value = search_config.mode;
                 }
                 FilterInputVariant::SelectFilterCaseSensitive { ref mut value } => {
                     *value = search_config.case_sensitive;

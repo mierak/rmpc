@@ -69,7 +69,7 @@ impl FromMpd for Status {
             "nextsongid" => self.nextsongid = Some(value.parse().logerr(key, &value)?),
             "elapsed" => self.elapsed = Duration::from_secs_f32(value.parse().logerr(key, &value)?),
             "duration" => {
-                self.duration = Duration::from_secs_f32(value.parse().logerr(key, &value)?)
+                self.duration = Duration::from_secs_f32(value.parse().logerr(key, &value)?);
             }
             "bitrate" if value != "0" => self.bitrate = Some(value.parse().logerr(key, &value)?),
             "xfade" => self.xfade = Some(value.parse().logerr(key, &value)?),
