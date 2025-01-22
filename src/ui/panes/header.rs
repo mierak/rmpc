@@ -1,6 +1,7 @@
 use anyhow::Result;
-use ratatui::{prelude::Rect, Frame};
+use ratatui::{Frame, prelude::Rect};
 
+use super::Pane;
 use crate::{
     context::AppContext,
     mpd::mpd_client::{MpdClient, ValueChange},
@@ -8,10 +9,8 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::{widgets::header::Header, UiEvent},
+    ui::{UiEvent, widgets::header::Header},
 };
-
-use super::Pane;
 
 #[derive(Debug)]
 pub struct HeaderPane {
@@ -25,7 +24,12 @@ impl HeaderPane {
 }
 
 impl Pane for HeaderPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        context: &AppContext,
+    ) -> anyhow::Result<()> {
         self.area = area;
         frame.render_widget(Header::new(context), self.area);
         Ok(())
@@ -35,7 +39,12 @@ impl Pane for HeaderPane {
         Ok(())
     }
 
-    fn on_event(&mut self, _event: &mut UiEvent, _is_visible: bool, _context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        _event: &mut UiEvent,
+        _is_visible: bool,
+        _context: &AppContext,
+    ) -> Result<()> {
         Ok(())
     }
 

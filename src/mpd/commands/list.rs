@@ -1,6 +1,6 @@
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
 #[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct MpdList(pub Vec<String>);

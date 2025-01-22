@@ -54,7 +54,11 @@ fn init_debug(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
 
 pub struct NullWriter;
 impl flexi_logger::writers::LogWriter for NullWriter {
-    fn write(&self, _now: &mut flexi_logger::DeferredNow, _record: &log::Record) -> std::io::Result<()> {
+    fn write(
+        &self,
+        _now: &mut flexi_logger::DeferredNow,
+        _record: &log::Record,
+    ) -> std::io::Result<()> {
         Ok(())
     }
 
@@ -79,11 +83,12 @@ pub struct AppEventChannelWriter {
 }
 
 impl flexi_logger::writers::LogWriter for StatusBarWriter {
-    fn write(&self, _now: &mut flexi_logger::DeferredNow, record: &log::Record) -> std::io::Result<()> {
-        match self
-            .tx
-            .send(AppEvent::Status(format!("{}", record.args()), record.level().into()))
-        {
+    fn write(
+        &self,
+        _now: &mut flexi_logger::DeferredNow,
+        record: &log::Record,
+    ) -> std::io::Result<()> {
+        match self.tx.send(AppEvent::Status(format!("{}", record.args()), record.level().into())) {
             Ok(v) => Ok(v),
             Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
         }
@@ -101,7 +106,11 @@ impl AppEventChannelWriter {
 }
 
 impl flexi_logger::writers::LogWriter for AppEventChannelWriter {
-    fn write(&self, now: &mut flexi_logger::DeferredNow, record: &log::Record) -> std::io::Result<()> {
+    fn write(
+        &self,
+        now: &mut flexi_logger::DeferredNow,
+        record: &log::Record,
+    ) -> std::io::Result<()> {
         let mut buf = Vec::new();
         (self.format_fn).map(|fun| fun(&mut buf, now, record));
 
@@ -201,7 +210,11 @@ impl std::fmt::Display for Visitor {
 }
 
 impl<'kvs> log::kv::VisitSource<'kvs> for Visitor {
-    fn visit_pair(&mut self, key: log::kv::Key<'kvs>, value: log::kv::Value<'kvs>) -> Result<(), log::kv::Error> {
+    fn visit_pair(
+        &mut self,
+        key: log::kv::Key<'kvs>,
+        value: log::kv::Value<'kvs>,
+    ) -> Result<(), log::kv::Error> {
         self.values.push((key.to_string(), value.to_string()));
         Ok(())
     }

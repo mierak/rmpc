@@ -129,10 +129,7 @@ mod tests {
         }
         .value(0.0);
         let area = Rect::new(0, 0, 3, 1);
-        let mut buf = Buffer {
-            area,
-            content: vec![Cell::default(); 3],
-        };
+        let mut buf = Buffer { area, content: vec![Cell::default(); 3] };
 
         wg.render(area, &mut buf);
 
@@ -151,10 +148,7 @@ mod tests {
         }
         .value(1.0);
         let area = Rect::new(0, 0, 3, 1);
-        let mut buf = Buffer {
-            area,
-            content: vec![Cell::default(); 3],
-        };
+        let mut buf = Buffer { area, content: vec![Cell::default(); 3] };
 
         wg.render(area, &mut buf);
 
@@ -173,10 +167,7 @@ mod tests {
         }
         .value(0.5);
         let area = Rect::new(0, 0, 3, 1);
-        let mut buf = Buffer {
-            area,
-            content: vec![Cell::default(); 3],
-        };
+        let mut buf = Buffer { area, content: vec![Cell::default(); 3] };
 
         wg.render(area, &mut buf);
 

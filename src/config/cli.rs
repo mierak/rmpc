@@ -1,5 +1,6 @@
-use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 use std::path::PathBuf;
+
+use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -8,7 +9,8 @@ pub struct Args {
     #[command(subcommand)]
     pub command: Option<Command>,
     #[arg(short, long)]
-    /// Override the address to connect to. Defaults to value in the config file.
+    /// Override the address to connect to. Defaults to value in the config
+    /// file.
     pub address: Option<String>,
     #[arg(short, long)]
     /// Override the MPD password
@@ -30,11 +32,13 @@ pub enum Command {
         #[arg(short, long, default_value = "false")]
         current: bool,
     },
-    /// Index the lyrics dir and display result, meant only for debugging purposes
+    /// Index the lyrics dir and display result, meant only for debugging
+    /// purposes
     LyricsIndex,
     /// Scan MPD's music directory for updates.
     Update {
-        /// If supplied, MPD will update only the provided directory/file. If not specified, everything is updated.
+        /// If supplied, MPD will update only the provided directory/file. If
+        /// not specified, everything is updated.
         path: Option<String>,
         /// Rmpc will wait for the update job to finish before returning.
         #[arg(short, long, default_value = "false")]
@@ -42,7 +46,8 @@ pub enum Command {
     },
     /// Scan MPD's music directory for updates. Also rescans unmodified files.
     Rescan {
-        /// If supplied, MPD will update only the provided directory/file. If not specified, everything is updated.
+        /// If supplied, MPD will update only the provided directory/file. If
+        /// not specified, everything is updated.
         path: Option<String>,
         /// Rmpc will wait for the update job to finish before returning.
         #[arg(short, long, default_value = "false")]
@@ -63,7 +68,8 @@ pub enum Command {
     DebugInfo,
     /// Prints the rmpc version
     Version,
-    /// Plays song at the position in the current playlist. Defaults to current paused song.
+    /// Plays song at the position in the current playlist. Defaults to current
+    /// paused song.
     Play {
         /// Index of the song in the queue
         position: Option<usize>,
@@ -80,7 +86,8 @@ pub enum Command {
     Next,
     /// Plays the previous song in the playlist
     Prev,
-    /// Sets volume, relative if prefixed by + or -. Prints current volume if no arguments is given.
+    /// Sets volume, relative if prefixed by + or -. Prints current volume if no
+    /// arguments is given.
     Volume {
         #[arg(allow_negative_numbers(true))]
         value: Option<String>,
@@ -100,13 +107,15 @@ pub enum Command {
     },
     /// Clear the current queue
     Clear,
-    /// Add a song to the current queue. Relative to music database root. '/' to add all files to the queue
+    /// Add a song to the current queue. Relative to music database root. '/' to
+    /// add all files to the queue
     Add {
         /// Files to add to MPD's queue
         #[arg(value_hint = ValueHint::AnyPath)]
         files: Vec<PathBuf>,
-        /// Rmpc checks whether MPD supports the added external file's extension and skips it if it does not.
-        /// This option disables this behaviour and rmpc will try to add all the files
+        /// Rmpc checks whether MPD supports the added external file's
+        /// extension and skips it if it does not. This option disables
+        /// this behaviour and rmpc will try to add all the files
         #[arg(long = "skip-ext-check", default_value = "false")]
         skip_ext_check: bool,
     },
@@ -134,8 +143,9 @@ pub enum Command {
     /// Prints various information like the playback status
     Status,
     /// Prints info about the current song.
-    /// If --path specified, prints information about the song at the given path instead.
-    /// If --path is specified multiple times, prints an array containing all the songs.
+    /// If --path specified, prints information about the song at the given path
+    /// instead. If --path is specified multiple times, prints an array
+    /// containing all the songs.
     Song {
         #[arg(short, long)]
         path: Option<Vec<String>>,

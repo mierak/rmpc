@@ -35,10 +35,7 @@ impl From<SearchFile> for Search {
             case_sensitive: value.case_sensitive,
             mode: value.mode.into(),
             tags: if value.tags.is_empty() {
-                vec![SearchableTag {
-                    label: "Any Tag",
-                    value: "any",
-                }]
+                vec![SearchableTag { label: "Any Tag", value: "any" }]
             } else {
                 value
                     .tags
@@ -60,34 +57,16 @@ impl Default for SearchFile {
             case_sensitive: false,
             mode: FilterKindFile::Contains,
             tags: [
-                SearchableTagFile {
-                    value: "any".to_string(),
-                    label: "Any Tag".to_string(),
-                },
-                SearchableTagFile {
-                    value: "artist".to_string(),
-                    label: "Artist".to_string(),
-                },
-                SearchableTagFile {
-                    value: "album".to_string(),
-                    label: "Album".to_string(),
-                },
+                SearchableTagFile { value: "any".to_string(), label: "Any Tag".to_string() },
+                SearchableTagFile { value: "artist".to_string(), label: "Artist".to_string() },
+                SearchableTagFile { value: "album".to_string(), label: "Album".to_string() },
                 SearchableTagFile {
                     value: "albumartist".to_string(),
                     label: "Album Artist".to_string(),
                 },
-                SearchableTagFile {
-                    value: "title".to_string(),
-                    label: "Title".to_string(),
-                },
-                SearchableTagFile {
-                    value: "filename".to_string(),
-                    label: "Filename".to_string(),
-                },
-                SearchableTagFile {
-                    value: "genre".to_string(),
-                    label: "Genre".to_string(),
-                },
+                SearchableTagFile { value: "title".to_string(), label: "Title".to_string() },
+                SearchableTagFile { value: "filename".to_string(), label: "Filename".to_string() },
+                SearchableTagFile { value: "genre".to_string(), label: "Genre".to_string() },
             ]
             .to_vec(),
         }

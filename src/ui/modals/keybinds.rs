@@ -1,7 +1,17 @@
-use anyhow::Result;
-use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
+use anyhow::Result;
+use itertools::Itertools;
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout, Margin, Rect},
+    style::Style,
+    symbols::border,
+    text::{Line, Text},
+    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
+};
+
+use super::{Modal, RectExt};
 use crate::{
     config::keys::{CommonAction, ToDescription},
     context::AppContext,
@@ -11,19 +21,8 @@ use crate::{
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    ui::dirstack::DirState,
 };
-use ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
-    style::Style,
-    symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
-    Frame,
-};
-
-use crate::ui::dirstack::DirState;
-
-use super::{Modal, RectExt};
 
 #[derive(Debug)]
 pub struct KeybindsModal {
@@ -37,8 +36,7 @@ trait KeybindsExt {
 
 impl<K: Display, V: Display + ToDescription> KeybindsExt for HashMap<K, V> {
     fn to_str(&self) -> impl Iterator<Item = (String, String, &str)> {
-        self.iter()
-            .map(|(key, value)| (key.to_string(), value.to_string(), value.to_description()))
+        self.iter().map(|(key, value)| (key.to_string(), value.to_string(), value.to_description()))
     }
 }
 
@@ -46,21 +44,20 @@ impl KeybindsModal {
     pub fn new(_app: &mut AppContext) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
-        Self {
-            scrolling_state,
-            table_area: Rect::default(),
-        }
+        Self { scrolling_state, table_area: Rect::default() }
     }
 }
-fn row_header<'a>(keys: &'a [(String, String, &'a str)], name: &'a str, header_style: Style) -> Option<Row<'a>> {
+fn row_header<'a>(
+    keys: &'a [(String, String, &'a str)],
+    name: &'a str,
+    header_style: Style,
+) -> Option<Row<'a>> {
     if keys.is_empty() {
         None
     } else {
         Some(Row::new(vec![
             Line::raw(Cow::<str>::Borrowed(" ")).patch_style(header_style),
-            Line::raw(Cow::<str>::Borrowed(name))
-                .patch_style(header_style)
-                .centered(),
+            Line::raw(Cow::<str>::Borrowed(name)).patch_style(header_style).centered(),
             Line::raw(Cow::<str>::Borrowed(" ")).patch_style(header_style),
         ]))
     }
@@ -78,15 +75,15 @@ fn row<'a>(
         let action = textwrap::wrap(action, action_width as usize);
         let description = textwrap::wrap(description, description_width as usize);
 
-        key.into_iter()
-            .zip_longest2(action.into_iter(), description.into_iter())
-            .map(|(key, action, description)| {
+        key.into_iter().zip_longest2(action.into_iter(), description.into_iter()).map(
+            |(key, action, description)| {
                 Row::new([
                     Cell::from(Text::from(key.unwrap_or_default())),
                     Cell::from(Text::from(action.unwrap_or_default())),
                     Cell::from(Text::from(description.unwrap_or_default())),
                 ])
-            })
+            },
+        )
     })
 }
 
@@ -105,12 +102,10 @@ impl Modal for KeybindsModal {
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Keybinds");
 
-        let margin = Margin {
-            horizontal: 1,
-            vertical: 0,
-        };
+        let margin = Margin { horizontal: 1, vertical: 0 };
         let [header_area, table_area] =
-            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(block.inner(popup_area));
+            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)])
+                .areas(block.inner(popup_area));
         let header_area = header_area.inner(margin);
         let table_area = table_area.inner(margin);
 
@@ -120,7 +115,8 @@ impl Modal for KeybindsModal {
             Constraint::Percentage(action_width),
             Constraint::Percentage(desc_width),
         ];
-        let [key_area, mut action_area, mut desc_area] = Layout::horizontal(constraints).areas(table_area);
+        let [key_area, mut action_area, mut desc_area] =
+            Layout::horizontal(constraints).areas(table_area);
         action_area.width = action_area.width.saturating_sub(1); // account for the column spacing
         desc_area.width = desc_area.width.saturating_sub(2); // account for the column spacing
 
@@ -159,18 +155,12 @@ impl Modal for KeybindsModal {
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
 
         let header_table = Table::new(
-            vec![Row::new([
-                Cell::from("Key"),
-                Cell::from("Action"),
-                Cell::from("Description"),
-            ])],
+            vec![Row::new([Cell::from("Key"), Cell::from("Action"), Cell::from("Description")])],
             constraints,
         )
         .column_spacing(1)
         .block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(app.config.as_border_style()),
+            Block::default().borders(Borders::BOTTOM).border_style(app.config.as_border_style()),
         );
 
         let table = Table::new(rows, constraints)
@@ -185,10 +175,7 @@ impl Modal for KeybindsModal {
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
-            popup_area.inner(Margin {
-                horizontal: 0,
-                vertical: 1,
-            }),
+            popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 

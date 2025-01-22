@@ -5,17 +5,15 @@ use crate::config::MpdAddress;
 pub static FFMPEG: LazyLock<Dep> = LazyLock::new(|| Dep::new("ffmpeg", "ffmpeg", &["-version"]));
 pub static FFPROBE: LazyLock<Dep> = LazyLock::new(|| Dep::new("ffprobe", "ffprobe", &["-version"]));
 pub static YTDLP: LazyLock<Dep> = LazyLock::new(|| Dep::new("yt-dlp", "yt-dlp", &["--version"]));
-pub static UEBERZUGPP: LazyLock<Dep> = LazyLock::new(|| Dep::new("ueberzugpp", "ueberzugpp", &["--version"]));
-pub static PYTHON3: LazyLock<Dep> = LazyLock::new(|| Dep::new("python3", "python3", &["--version"]));
+pub static UEBERZUGPP: LazyLock<Dep> =
+    LazyLock::new(|| Dep::new("ueberzugpp", "ueberzugpp", &["--version"]));
+pub static PYTHON3: LazyLock<Dep> =
+    LazyLock::new(|| Dep::new("python3", "python3", &["--version"]));
 pub static PYTHON3MUTAGEN: LazyLock<Dep> = LazyLock::new(|| {
-    Dep::new(
-        "python-mutagen",
-        "python3",
-        &[
-            "-c",
-            "try:\n\timport mutagen\n\tprint(\"PRESENT\")\nexcept ImportError:\n\tprint(\"NOT PRESENT\")",
-        ],
-    )
+    Dep::new("python-mutagen", "python3", &[
+        "-c",
+        "try:\n\timport mutagen\n\tprint(\"PRESENT\")\nexcept ImportError:\n\tprint(\"NOT PRESENT\")",
+    ])
 });
 
 pub static DEPENDENCIES: [&std::sync::LazyLock<Dep>; 6] =
@@ -42,11 +40,7 @@ pub fn is_youtube_supported(mpd_address: MpdAddress) -> Result<(), Vec<String>> 
         unsupported.push("socket connection to MPD".to_string());
     }
 
-    if unsupported.is_empty() {
-        Ok(())
-    } else {
-        Err(unsupported)
-    }
+    if unsupported.is_empty() { Ok(()) } else { Err(unsupported) }
 }
 
 pub struct Dep {
@@ -79,11 +73,7 @@ impl Dep {
             installed = false;
         }
 
-        Self {
-            name,
-            installed,
-            version,
-        }
+        Self { name, installed, version }
     }
 
     pub fn display(&self) -> String {

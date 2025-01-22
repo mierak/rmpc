@@ -3,11 +3,15 @@ use std::{collections::HashSet, io::Stdout, ops::Sub, time::Duration};
 use crossbeam::channel::{Receiver, RecvTimeoutError};
 use itertools::Itertools;
 use ratatui::{
+    Terminal,
     layout::Rect,
     prelude::{Backend, CrosstermBackend},
-    Terminal,
 };
 
+use super::{
+    command::{create_env, run_external},
+    update_loop::UpdateLoop,
+};
 use crate::{
     context::AppContext,
     mpd::{
@@ -21,11 +25,6 @@ use crate::{
         mpd_query::MpdQueryResult,
     },
     ui::{KeyHandleResult, Ui, UiEvent},
-};
-
-use super::{
-    command::{create_env, run_external},
-    update_loop::UpdateLoop,
 };
 
 pub const EXTERNAL_COMMAND: &str = "external_command";
@@ -60,17 +59,14 @@ fn main_task<B: Backend + std::io::Write>(
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
     let mut additional_evs = HashSet::new();
     let mut connected = true;
-    ui.before_show(area, &mut context)
-        .expect("Initial render init to succeed");
+    ui.before_show(area, &mut context).expect("Initial render init to succeed");
 
     loop {
         let now = std::time::Instant::now();
 
         let event = if render_wanted {
             match event_receiver.recv_timeout(
-                min_frame_duration
-                    .checked_sub(now - last_render)
-                    .unwrap_or(Duration::ZERO),
+                min_frame_duration.checked_sub(now - last_render).unwrap_or(Duration::ZERO),
             ) {
                 Ok(v) => Some(v),
                 Err(RecvTimeoutError::Timeout) => None,
@@ -134,7 +130,8 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
                         (GLOBAL_STATUS_UPDATE, None, MpdQueryResult::Status(status)) => {
-                            let current_song_id = context.find_current_song_in_queue().map(|(_, song)| song.id);
+                            let current_song_id =
+                                context.find_current_song_in_queue().map(|(_, song)| song.id);
                             let current_status = context.status.state;
                             context.status = status;
                             let mut song_changed = false;
@@ -142,7 +139,10 @@ fn main_task<B: Backend + std::io::Write>(
                             match context.status.state {
                                 State::Play => {
                                     if current_status != context.status.state {
-                                        try_skip!(render_loop.start(), "Failed to start render loop");
+                                        try_skip!(
+                                            render_loop.start(),
+                                            "Failed to start render loop"
+                                        );
                                     }
                                 }
                                 State::Pause => {
@@ -169,10 +169,14 @@ fn main_task<B: Backend + std::io::Write>(
                                                 k.make_ascii_uppercase();
                                                 (k, v)
                                             })
-                                            .chain(std::iter::once(("FILE".to_owned(), song.file.clone())))
+                                            .chain(std::iter::once((
+                                                "FILE".to_owned(),
+                                                song.file.clone(),
+                                            )))
                                             .chain(std::iter::once((
                                                 "DURATION".to_owned(),
-                                                song.duration.map_or_else(String::new, |d| d.to_string()),
+                                                song.duration
+                                                    .map_or_else(String::new, |d| d.to_string()),
                                             )))
                                             .collect_vec();
                                         run_external(command, env);
@@ -195,12 +199,17 @@ fn main_task<B: Backend + std::io::Write>(
                             context.queue = queue.unwrap_or_default();
                             render_wanted = true;
                         }
-                        (EXTERNAL_COMMAND, None, MpdQueryResult::ExternalCommand(command, songs)) => {
+                        (
+                            EXTERNAL_COMMAND,
+                            None,
+                            MpdQueryResult::ExternalCommand(command, songs),
+                        ) => {
                             let songs = songs.iter().map(|s| s.file.as_str());
                             run_external(command, create_env(&context, songs));
                         }
                         (id, target, data) => {
-                            if let Err(err) = ui.on_command_finished(id, target, data, &mut context) {
+                            if let Err(err) = ui.on_command_finished(id, target, data, &mut context)
+                            {
                                 log::error!(error:? = err; "UI failed to handle command finished event");
                             }
                         }
@@ -246,7 +255,8 @@ fn main_task<B: Backend + std::io::Write>(
             }
         }
         if render_wanted {
-            let till_next_frame = min_frame_duration.saturating_sub(now.duration_since(last_render));
+            let till_next_frame =
+                min_frame_duration.saturating_sub(now.duration_since(last_render));
             if till_next_frame != Duration::ZERO {
                 continue;
             }
@@ -299,11 +309,9 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
         }
         IdleEvent::Playlist | IdleEvent::Sticker => {
             let fetch_stickers = context.should_fetch_stickers;
-            context
-                .query()
-                .id(GLOBAL_QUEUE_UPDATE)
-                .replace_id("playlist")
-                .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?)));
+            context.query().id(GLOBAL_QUEUE_UPDATE).replace_id("playlist").query(move |client| {
+                Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?))
+            });
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {}

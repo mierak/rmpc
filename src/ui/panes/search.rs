@@ -1,42 +1,36 @@
 use std::rc::Rc;
 
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::event::KeyCode;
 use itertools::Itertools;
-use ratatui::layout::Alignment;
-use ratatui::layout::Rect;
-use ratatui::style::Styled;
-use ratatui::widgets::Padding;
 use ratatui::{
-    layout::{Constraint, Layout},
-    widgets::{Block, Borders, List, ListItem},
-};
-
-use crate::config::keys::GlobalAction;
-use crate::config::tabs::PaneType;
-use crate::config::Config;
-use crate::config::Search;
-use crate::context::AppContext;
-use crate::core::command::create_env;
-use crate::core::command::run_external;
-use crate::mpd::commands::Song;
-use crate::shared::ext::mpd_client::MpdClientExt;
-use crate::shared::key_event::KeyEvent;
-use crate::shared::macros::status_info;
-use crate::shared::macros::status_warn;
-use crate::shared::mouse_event::MouseEvent;
-use crate::shared::mouse_event::MouseEventKind;
-use crate::ui::dirstack::Dir;
-use crate::ui::dirstack::DirStackItem;
-use crate::ui::UiEvent;
-use crate::MpdQueryResult;
-use crate::{
-    mpd::mpd_client::{Filter, FilterKind, MpdClient, Tag},
-    ui::widgets::{button::Button, input::Input},
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::Styled,
+    widgets::{Block, Borders, List, ListItem, Padding},
 };
 
 use super::{CommonAction, Pane};
+use crate::{
+    MpdQueryResult,
+    config::{Config, Search, keys::GlobalAction, tabs::PaneType},
+    context::AppContext,
+    core::command::{create_env, run_external},
+    mpd::{
+        commands::Song,
+        mpd_client::{Filter, FilterKind, MpdClient, Tag},
+    },
+    shared::{
+        ext::mpd_client::MpdClientExt,
+        key_event::KeyEvent,
+        macros::{status_info, status_warn},
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
+    ui::{
+        UiEvent,
+        dirstack::{Dir, DirStackItem},
+        widgets::{button::Button, input::Input},
+    },
+};
 
 #[derive(Debug)]
 pub struct SearchPane {
@@ -63,9 +57,7 @@ impl SearchPane {
                 [
                     FilterInput {
                         label: " Search mode     :",
-                        variant: FilterInputVariant::SelectFilterKind {
-                            value: config.search.mode,
-                        },
+                        variant: FilterInputVariant::SelectFilterKind { value: config.search.mode },
                     },
                     FilterInput {
                         label: " Case sensitive  :",
@@ -74,10 +66,7 @@ impl SearchPane {
                         },
                     },
                 ],
-                [ButtonInput {
-                    label: " Reset",
-                    variant: ButtonInputVariant::Reset,
-                }],
+                [ButtonInput { label: " Reset", variant: ButtonInputVariant::Reset }],
             ),
             input_areas: Rc::default(),
             column_areas: [Rect::default(); 3],
@@ -138,7 +127,8 @@ impl SearchPane {
             }
             b.padding(Padding::new(0, 2, 0, 0))
         };
-        let current = List::new(self.songs_dir.to_list_items(config)).highlight_style(config.theme.current_item_style);
+        let current = List::new(self.songs_dir.to_list_items(config))
+            .highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
         directory.state.set_content_len(Some(directory.items.len()));
@@ -146,12 +136,7 @@ impl SearchPane {
         if !directory.items.is_empty() && directory.state.get_selected().is_none() {
             directory.state.select(Some(0), 0);
         }
-        let area = Rect {
-            x: area.x,
-            y: area.y,
-            width: area.width + 1,
-            height: area.height,
-        };
+        let area = Rect { x: area.x, y: area.y, width: area.width + 1, height: area.height };
         let inner_block = block.inner(area);
 
         self.column_areas[1] = inner_block;
@@ -165,24 +150,17 @@ impl SearchPane {
     }
 
     fn prepare_preview(&mut self, context: &AppContext) {
-        let Some(origin_path) = self.songs_dir.selected().map(|s| vec![s.as_path().to_owned()]) else {
+        let Some(origin_path) = self.songs_dir.selected().map(|s| vec![s.as_path().to_owned()])
+        else {
             return;
         };
         match &self.phase {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
                 let data = Some(self.songs_dir.to_list_items(context.config));
-                context
-                    .query()
-                    .id(PREVIEW)
-                    .replace_id("preview")
-                    .target(PaneType::Search)
-                    .query(|_| {
-                        Ok(MpdQueryResult::Preview {
-                            data,
-                            origin_path: Some(origin_path),
-                        })
-                    });
+                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
+                    |_| Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) }),
+                );
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
@@ -191,12 +169,8 @@ impl SearchPane {
                 let config = context.config;
                 let file = current.file.clone();
 
-                context
-                    .query()
-                    .id(PREVIEW)
-                    .replace_id("preview")
-                    .target(PaneType::Search)
-                    .query(move |client| {
+                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
+                    move |client| {
                         let data = Some(
                             client
                                 .find(&[Filter::new(Tag::File, &file)])?
@@ -205,11 +179,9 @@ impl SearchPane {
                                 .to_preview(&config.theme.symbols)
                                 .collect_vec(),
                         );
-                        Ok(MpdQueryResult::Preview {
-                            data,
-                            origin_path: Some(origin_path),
-                        })
-                    });
+                        Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
+                    },
+                );
             }
         }
     }
@@ -234,11 +206,7 @@ impl SearchPane {
         let mut idx = 0;
         for input in &self.inputs.textbox_inputs {
             match input {
-                Textbox {
-                    value,
-                    label,
-                    filter_key,
-                } => {
+                Textbox { value, label, filter_key } => {
                     let is_focused = matches!(self.inputs.focused(),
                         FocusedInputGroup::Textboxes(Textbox { filter_key: filter_key2, .. }) if filter_key == filter_key2);
 
@@ -270,9 +238,7 @@ impl SearchPane {
         }
 
         frame.render_widget(
-            Block::default()
-                .borders(Borders::TOP)
-                .border_style(config.theme.borders_style),
+            Block::default().borders(Borders::TOP).border_style(config.theme.borders_style),
             input_areas[idx],
         );
         idx += 1;
@@ -306,16 +272,16 @@ impl SearchPane {
         }
 
         frame.render_widget(
-            Block::default()
-                .borders(Borders::TOP)
-                .border_style(config.theme.borders_style),
+            Block::default().borders(Borders::TOP).border_style(config.theme.borders_style),
             input_areas[idx],
         );
         idx += 1;
 
         for input in &self.inputs.button_inputs {
             let mut button = match input.variant {
-                ButtonInputVariant::Reset => Button::default().label(input.label).label_alignment(Alignment::Left),
+                ButtonInputVariant::Reset => {
+                    Button::default().label(input.label).label_alignment(Alignment::Left)
+                }
             };
 
             let is_focused = matches!(self.inputs.focused(),
@@ -331,20 +297,17 @@ impl SearchPane {
     }
 
     fn filter_type(&self) -> (FilterKind, bool) {
-        self.inputs
-            .filter_inputs
-            .iter()
-            .fold((FilterKind::Contains, false), |mut acc, val| {
-                match val.variant {
-                    FilterInputVariant::SelectFilterKind { value } => {
-                        acc.0 = value;
-                    }
-                    FilterInputVariant::SelectFilterCaseSensitive { value } => {
-                        acc.1 = value;
-                    }
-                };
-                acc
-            })
+        self.inputs.filter_inputs.iter().fold((FilterKind::Contains, false), |mut acc, val| {
+            match val.variant {
+                FilterInputVariant::SelectFilterKind { value } => {
+                    acc.0 = value;
+                }
+                FilterInputVariant::SelectFilterCaseSensitive { value } => {
+                    acc.1 = value;
+                }
+            };
+            acc
+        })
     }
 
     fn search_add(&mut self, context: &AppContext) {
@@ -402,27 +365,18 @@ impl SearchPane {
             return;
         }
 
-        context
-            .query()
-            .id(SEARCH)
-            .replace_id(SEARCH)
-            .target(PaneType::Search)
-            .query(move |client| {
+        context.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
+            move |client| {
                 let filter = &filter
                     .iter()
                     .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
                     .collect_vec();
-                let result = if case_sensitive {
-                    client.find(filter)
-                } else {
-                    client.search(filter)
-                }?;
+                let result =
+                    if case_sensitive { client.find(filter) } else { client.search(filter) }?;
 
-                Ok(MpdQueryResult::SongsList {
-                    data: result,
-                    origin_path: None,
-                })
-            });
+                Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
+            },
+        );
     }
 
     fn reset(&mut self, search_config: &Search) {
@@ -432,7 +386,9 @@ impl SearchPane {
         }
         for val in &mut self.inputs.filter_inputs {
             match val.variant {
-                FilterInputVariant::SelectFilterKind { ref mut value } => *value = search_config.mode,
+                FilterInputVariant::SelectFilterKind { ref mut value } => {
+                    *value = search_config.mode;
+                }
                 FilterInputVariant::SelectFilterCaseSensitive { ref mut value } => {
                     *value = search_config.case_sensitive;
                 }
@@ -481,7 +437,8 @@ impl SearchPane {
             }
         }
 
-        // have to account for the separator between filter config inputs/buttons
+        // have to account for the separator between filter config
+        // inputs/buttons
         let start = start + self.inputs.filter_inputs.len() + 1;
         for i in start..start + self.inputs.button_inputs.len() {
             if self.input_areas[i].contains(event.into()) {
@@ -511,15 +468,11 @@ impl Pane for SearchPane {
         };
 
         frame.render_widget(
-            Block::default()
-                .borders(Borders::RIGHT)
-                .border_style(config.theme.borders_style),
+            Block::default().borders(Borders::RIGHT).border_style(config.theme.borders_style),
             previous_area,
         );
         frame.render_widget(
-            Block::default()
-                .borders(Borders::RIGHT)
-                .border_style(config.theme.borders_style),
+            Block::default().borders(Borders::RIGHT).border_style(config.theme.borders_style),
             current_area_init,
         );
         let previous_area = Rect {
@@ -547,7 +500,8 @@ impl Pane for SearchPane {
                     .and_then(|preview| preview.get(self.songs_dir.state.offset()..))
                 {
                     frame.render_widget(
-                        List::new(preview.to_vec()).highlight_style(config.theme.current_item_style),
+                        List::new(preview.to_vec())
+                            .highlight_style(config.theme.current_item_style),
                         preview_area,
                     );
                 }
@@ -556,7 +510,8 @@ impl Pane for SearchPane {
                 self.render_song_column(frame, current_area, config);
                 self.render_input_column(frame, previous_area, config);
                 if let Some(preview) = &self.preview {
-                    let preview = List::new(preview.clone()).highlight_style(config.theme.current_item_style);
+                    let preview =
+                        List::new(preview.clone()).highlight_style(config.theme.current_item_style);
                     frame.render_widget(preview, preview_area);
                 }
             }
@@ -568,14 +523,21 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::Database => {
                 self.songs_dir = Dir::default();
                 self.prepare_preview(context);
                 self.phase = Phase::Search;
 
-                status_warn!("The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours.");
+                status_warn!(
+                    "The music database has been updated. The current tab has been reinitialized in the root directory to prevent inconsistent behaviours."
+                );
             }
             UiEvent::Reconnected => {
                 self.phase = Phase::Search;
@@ -623,8 +585,9 @@ impl Pane for SearchPane {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
-                // Modify x coord to belong to middle column in order to satisfy the condition
-                // inside get_clicked_input. This is fine because phase is switched to Search.
+                // Modify x coord to belong to middle column in order to satisfy
+                // the condition inside get_clicked_input. This
+                // is fine because phase is switched to Search.
                 // A bit hacky, but wcyd.
                 event.x = self.input_areas[1].x;
                 if let Some(input) = self.get_clicked_input(event) {
@@ -634,51 +597,58 @@ impl Pane for SearchPane {
 
                 context.render()?;
             }
-            MouseEventKind::LeftClick if self.column_areas[2].contains(event.into()) => match self.phase {
-                Phase::SearchTextboxInput | Phase::Search => {
-                    if !self.songs_dir.items.is_empty() {
-                        self.phase = Phase::BrowseResults { filter_input_on: false };
+            MouseEventKind::LeftClick if self.column_areas[2].contains(event.into()) => {
+                match self.phase {
+                    Phase::SearchTextboxInput | Phase::Search => {
+                        if !self.songs_dir.items.is_empty() {
+                            self.phase = Phase::BrowseResults { filter_input_on: false };
 
-                        let clicked_row: usize = event.y.saturating_sub(self.column_areas[2].y).into();
-                        if let Some(idx_to_select) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
-                            self.songs_dir
-                                .state
-                                .set_viewport_len(Some(self.column_areas[2].height as usize));
-                            self.songs_dir.select_idx(idx_to_select, context.config.scrolloff);
+                            let clicked_row: usize =
+                                event.y.saturating_sub(self.column_areas[2].y).into();
+                            if let Some(idx_to_select) =
+                                self.songs_dir.state.get_at_rendered_row(clicked_row)
+                            {
+                                self.songs_dir
+                                    .state
+                                    .set_viewport_len(Some(self.column_areas[2].height as usize));
+                                self.songs_dir.select_idx(idx_to_select, context.config.scrolloff);
+                            }
+
+                            self.prepare_preview(context);
+
+                            context.render()?;
+                        }
+                    }
+                    Phase::BrowseResults { .. } => {
+                        self.add_current(false, context)?;
+                    }
+                }
+            }
+            MouseEventKind::LeftClick if self.column_areas[1].contains(event.into()) => {
+                match self.phase {
+                    Phase::SearchTextboxInput | Phase::Search => {
+                        if matches!(self.phase, Phase::SearchTextboxInput) {
+                            self.phase = Phase::Search;
+                            self.search(context);
                         }
 
-                        self.prepare_preview(context);
+                        if let Some(input) = self.get_clicked_input(event) {
+                            self.inputs.focused_idx = input;
+                        }
 
                         context.render()?;
                     }
-                }
-                Phase::BrowseResults { .. } => {
-                    self.add_current(false, context)?;
-                }
-            },
-            MouseEventKind::LeftClick if self.column_areas[1].contains(event.into()) => match self.phase {
-                Phase::SearchTextboxInput | Phase::Search => {
-                    if matches!(self.phase, Phase::SearchTextboxInput) {
-                        self.phase = Phase::Search;
-                        self.search(context);
-                    }
+                    Phase::BrowseResults { .. } => {
+                        let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
+                        if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
+                            self.songs_dir.select_idx(idx, context.config.scrolloff);
+                            self.prepare_preview(context);
 
-                    if let Some(input) = self.get_clicked_input(event) {
-                        self.inputs.focused_idx = input;
-                    }
-
-                    context.render()?;
-                }
-                Phase::BrowseResults { .. } => {
-                    let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
-                    if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
-                        self.songs_dir.select_idx(idx, context.config.scrolloff);
-                        self.prepare_preview(context);
-
-                        context.render()?;
+                            context.render()?;
+                        }
                     }
                 }
-            },
+            }
             MouseEventKind::DoubleClick => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if self.get_clicked_input(event).is_some() {
@@ -865,47 +835,48 @@ impl Pane for SearchPane {
                     }
                 }
             }
-            Phase::BrowseResults {
-                filter_input_on: filter_input_on @ true,
-            } => match event.as_common_action(context) {
-                Some(CommonAction::Close) => {
-                    *filter_input_on = false;
-                    self.songs_dir.set_filter(None, config);
-                    self.prepare_preview(context);
+            Phase::BrowseResults { filter_input_on: filter_input_on @ true } => {
+                match event.as_common_action(context) {
+                    Some(CommonAction::Close) => {
+                        *filter_input_on = false;
+                        self.songs_dir.set_filter(None, config);
+                        self.prepare_preview(context);
 
-                    context.render()?;
-                }
-                Some(CommonAction::Confirm) => {
-                    *filter_input_on = false;
+                        context.render()?;
+                    }
+                    Some(CommonAction::Confirm) => {
+                        *filter_input_on = false;
 
-                    context.render()?;
-                }
-                _ => {
-                    event.stop_propagation();
-                    match event.code() {
-                        KeyCode::Char(c) => {
-                            self.songs_dir.push_filter(c, config);
-                            self.songs_dir.jump_first_matching(config);
-                            self.prepare_preview(context);
+                        context.render()?;
+                    }
+                    _ => {
+                        event.stop_propagation();
+                        match event.code() {
+                            KeyCode::Char(c) => {
+                                self.songs_dir.push_filter(c, config);
+                                self.songs_dir.jump_first_matching(config);
+                                self.prepare_preview(context);
 
-                            context.render()?;
+                                context.render()?;
+                            }
+                            KeyCode::Backspace => {
+                                self.songs_dir.pop_filter(config);
+
+                                context.render()?;
+                            }
+                            _ => {}
                         }
-                        KeyCode::Backspace => {
-                            self.songs_dir.pop_filter(config);
-
-                            context.render()?;
-                        }
-                        _ => {}
                     }
                 }
-            },
-            Phase::BrowseResults {
-                filter_input_on: filter_input_modce @ false,
-            } => {
+            }
+            Phase::BrowseResults { filter_input_on: filter_input_modce @ false } => {
                 if let Some(action) = event.as_global_action(context) {
                     match action {
-                        GlobalAction::ExternalCommand { command, .. } if !self.songs_dir.marked().is_empty() => {
-                            let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
+                        GlobalAction::ExternalCommand { command, .. }
+                            if !self.songs_dir.marked().is_empty() =>
+                        {
+                            let songs =
+                                self.songs_dir.marked_items().map(|song| song.file.as_str());
                             run_external(command, create_env(context, songs));
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
@@ -1045,7 +1016,11 @@ struct InputGroups<const N2: usize, const N3: usize> {
 }
 
 impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
-    pub fn new(search_config: &Search, filter_inputs: [FilterInput; N2], button_inputs: [ButtonInput; N3]) -> Self {
+    pub fn new(
+        search_config: &Search,
+        filter_inputs: [FilterInput; N2],
+        button_inputs: [ButtonInput; N3],
+    ) -> Self {
         Self {
             textbox_inputs: search_config
                 .tags
@@ -1070,9 +1045,13 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
         self.focused_idx = FocusedInput::Buttons(self.button_inputs.len() - 1);
     }
 
-    pub fn focused_mut(&mut self) -> FocusedInputGroup<&mut Textbox, &mut FilterInput, &mut ButtonInput> {
+    pub fn focused_mut(
+        &mut self,
+    ) -> FocusedInputGroup<&mut Textbox, &mut FilterInput, &mut ButtonInput> {
         match self.focused_idx {
-            FocusedInput::Textboxes(idx) => FocusedInputGroup::Textboxes(&mut self.textbox_inputs[idx]),
+            FocusedInput::Textboxes(idx) => {
+                FocusedInputGroup::Textboxes(&mut self.textbox_inputs[idx])
+            }
             FocusedInput::Filters(idx) => FocusedInputGroup::Filters(&mut self.filter_inputs[idx]),
             FocusedInput::Buttons(idx) => FocusedInputGroup::Buttons(&mut self.button_inputs[idx]),
         }

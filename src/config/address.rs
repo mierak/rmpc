@@ -1,6 +1,5 @@
-use crate::shared::env::ENV;
-
 use super::utils::tilde_expand;
+use crate::shared::env::ENV;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum MpdAddress<'a> {
@@ -56,7 +55,10 @@ impl MpdAddress<'static> {
         (cfg_addr, cfg_pw)
     }
 
-    fn resolve_config(addr: String, pw: Option<String>) -> (MpdAddress<'static>, Option<MpdPassword<'static>>) {
+    fn resolve_config(
+        addr: String,
+        pw: Option<String>,
+    ) -> (MpdAddress<'static>, Option<MpdPassword<'static>>) {
         let expanded = tilde_expand(&addr);
         let addr = if expanded.starts_with('/') {
             MpdAddress::SocketPath(expanded.into_owned().leak())

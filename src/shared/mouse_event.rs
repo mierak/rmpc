@@ -1,6 +1,10 @@
 use std::time::{Duration, Instant};
 
-use crossterm::event::{MouseButton, MouseEvent as CTMouseEvent, MouseEventKind as CTMouseEventKind};
+use crossterm::event::{
+    MouseButton,
+    MouseEvent as CTMouseEvent,
+    MouseEventKind as CTMouseEventKind,
+};
 use ratatui::layout::Position;
 
 // maybe make the timout configurable?
@@ -31,39 +35,21 @@ impl MouseEventTracker {
         match value.kind {
             CTMouseEventKind::Down(MouseButton::Left) => {
                 if self.last_left_click.is_some_and(|c| c.is_doubled(x, y)) {
-                    Some(MouseEvent {
-                        x,
-                        y,
-                        kind: MouseEventKind::DoubleClick,
-                    })
+                    Some(MouseEvent { x, y, kind: MouseEventKind::DoubleClick })
                 } else {
-                    Some(MouseEvent {
-                        x,
-                        y,
-                        kind: MouseEventKind::LeftClick,
-                    })
+                    Some(MouseEvent { x, y, kind: MouseEventKind::LeftClick })
                 }
             }
-            CTMouseEventKind::Down(MouseButton::Right) => Some(MouseEvent {
-                x,
-                y,
-                kind: MouseEventKind::RightClick,
-            }),
-            CTMouseEventKind::Down(MouseButton::Middle) => Some(MouseEvent {
-                x,
-                y,
-                kind: MouseEventKind::MiddleClick,
-            }),
-            CTMouseEventKind::ScrollDown => Some(MouseEvent {
-                x,
-                y,
-                kind: MouseEventKind::ScrollDown,
-            }),
-            CTMouseEventKind::ScrollUp => Some(MouseEvent {
-                x,
-                y,
-                kind: MouseEventKind::ScrollUp,
-            }),
+            CTMouseEventKind::Down(MouseButton::Right) => {
+                Some(MouseEvent { x, y, kind: MouseEventKind::RightClick })
+            }
+            CTMouseEventKind::Down(MouseButton::Middle) => {
+                Some(MouseEvent { x, y, kind: MouseEventKind::MiddleClick })
+            }
+            CTMouseEventKind::ScrollDown => {
+                Some(MouseEvent { x, y, kind: MouseEventKind::ScrollDown })
+            }
+            CTMouseEventKind::ScrollUp => Some(MouseEvent { x, y, kind: MouseEventKind::ScrollUp }),
             CTMouseEventKind::Up(_) => None,
             CTMouseEventKind::Drag(_) => None,
             CTMouseEventKind::Moved => None,
@@ -100,11 +86,7 @@ pub struct TimedMouseEvent {
 impl From<MouseEvent> for Option<TimedMouseEvent> {
     fn from(value: MouseEvent) -> Option<TimedMouseEvent> {
         if matches!(value.kind, MouseEventKind::LeftClick) {
-            Some(TimedMouseEvent {
-                time: Instant::now(),
-                x: value.x,
-                y: value.y,
-            })
+            Some(TimedMouseEvent { time: Instant::now(), x: value.x, y: value.y })
         } else {
             None
         }

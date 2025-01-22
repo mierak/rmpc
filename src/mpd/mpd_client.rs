@@ -8,11 +8,19 @@ use derive_more::Deref;
 use itertools::Itertools;
 use strum::AsRefStr;
 
-use crate::shared::{ext::error::ErrorExt, macros::status_error};
-
 use super::{
+    FromMpd,
     client::Client,
     commands::{
+        IdleEvent,
+        ListFiles,
+        LsInfo,
+        Mounts,
+        Playlist,
+        Song,
+        Status,
+        Update,
+        Volume,
         decoders::Decoders,
         list::MpdList,
         list_playlist::FileList,
@@ -21,13 +29,12 @@ use super::{
         status::OnOffOneshot,
         stickers::{Sticker, Stickers, StickersWithFile},
         volume::Bound,
-        IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
     },
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     proto_client::{ProtoClient, SocketClient},
     version::Version,
-    FromMpd,
 };
+use crate::shared::{ext::error::ErrorExt, macros::status_error};
 
 type MpdResult<T> = Result<T, MpdError>;
 
@@ -53,8 +60,12 @@ impl FromStr for ValueChange {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            v if v.starts_with('-') => Ok(ValueChange::Decrease(v.trim_start_matches('-').parse()?)),
-            v if v.starts_with('+') => Ok(ValueChange::Increase(v.trim_start_matches('+').parse()?)),
+            v if v.starts_with('-') => {
+                Ok(ValueChange::Decrease(v.trim_start_matches('-').parse()?))
+            }
+            v if v.starts_with('+') => {
+                Ok(ValueChange::Increase(v.trim_start_matches('+').parse()?))
+            }
             v => Ok(ValueChange::Set(v.parse()?)),
         }
     }
@@ -137,18 +148,33 @@ pub trait MpdClient: Sized {
     // Stored playlists
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>>;
     fn list_playlist(&mut self, name: &str) -> MpdResult<FileList>;
-    fn list_playlist_info(&mut self, playlist: &str, range: Option<SingleOrRange>) -> MpdResult<Vec<Song>>;
+    fn list_playlist_info(
+        &mut self,
+        playlist: &str,
+        range: Option<SingleOrRange>,
+    ) -> MpdResult<Vec<Song>>;
     fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
-    fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange) -> MpdResult<()>;
-    fn move_in_playlist(&mut self, playlist_name: &str, range: &SingleOrRange, target_position: usize)
-        -> MpdResult<()>;
-    fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()>;
+    fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange)
+    -> MpdResult<()>;
+    fn move_in_playlist(
+        &mut self,
+        playlist_name: &str,
+        range: &SingleOrRange,
+        target_position: usize,
+    ) -> MpdResult<()>;
+    fn add_to_playlist(
+        &mut self,
+        playlist_name: &str,
+        uri: &str,
+        target_position: Option<usize>,
+    ) -> MpdResult<()>;
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [`Self::albumart`].
     /// If no album art is fonud it invokes [`Self::read_picture`].
-    /// If no art is still found, but no errors were encountered, None is returned.
+    /// If no art is still found, but no errors were encountered, None is
+    /// returned.
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
     // Outputs
     fn outputs(&mut self) -> MpdResult<Outputs>;
@@ -161,7 +187,8 @@ pub trait MpdClient: Sized {
 
     /// Reads a sticker value for the specified object.
     fn sticker(&mut self, uri: &str, name: &str) -> MpdResult<Option<Sticker>>;
-    /// Adds a sticker value to the specified object. If a sticker item with that name already exists, it is replaced.
+    /// Adds a sticker value to the specified object. If a sticker item with
+    /// that name already exists, it is replaced.
     fn set_sticker(&mut self, uri: &str, name: &str, value: &str) -> MpdResult<()>;
     /// Deletes a sticker value from the specified object.
     fn delete_sticker(&mut self, uri: &str, name: &str) -> MpdResult<()>;
@@ -170,15 +197,20 @@ pub trait MpdClient: Sized {
     /// Lists the stickers for the specified object.
     fn list_stickers(&mut self, uri: &str) -> MpdResult<Stickers>;
     fn list_stickers_multiple(&mut self, uris: &[&str]) -> MpdResult<Vec<Stickers>>;
-    // Searches the sticker database for stickers with the specified name, below the specified directory (URI).
+    // Searches the sticker database for stickers with the specified name, below
+    // the specified directory (URI).
     fn find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<StickersWithFile>;
 }
 
-fn read_response<T: Default + FromMpd, S: SocketClient>(mut c: ProtoClient<'_, '_, S>) -> MpdResult<T> {
+fn read_response<T: Default + FromMpd, S: SocketClient>(
+    mut c: ProtoClient<'_, '_, S>,
+) -> MpdResult<T> {
     c.read_response()
 }
 
-fn read_opt_response<T: Default + FromMpd, S: SocketClient>(mut c: ProtoClient<'_, '_, S>) -> MpdResult<Option<T>> {
+fn read_opt_response<T: Default + FromMpd, S: SocketClient>(
+    mut c: ProtoClient<'_, '_, S>,
+) -> MpdResult<Option<T>> {
     c.read_opt_response()
 }
 
@@ -215,8 +247,7 @@ impl MpdClient for Client<'_> {
     }
 
     fn password(&mut self, password: &str) -> MpdResult<()> {
-        self.send(&format!("password {}", password.quote_and_escape()))
-            .and_then(read_ok)
+        self.send(&format!("password {}", password.quote_and_escape())).and_then(read_ok)
     }
 
     // Lists commands supported by the MPD server
@@ -226,8 +257,7 @@ impl MpdClient for Client<'_> {
 
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update> {
         if let Some(path) = path {
-            self.send(&format!("update {}", path.quote_and_escape()))
-                .and_then(read_response)
+            self.send(&format!("update {}", path.quote_and_escape())).and_then(read_response)
         } else {
             self.send("update").and_then(read_response)
         }
@@ -235,8 +265,7 @@ impl MpdClient for Client<'_> {
 
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update> {
         if let Some(path) = path {
-            self.send(&format!("rescan {}", path.quote_and_escape()))
-                .and_then(read_response)
+            self.send(&format!("rescan {}", path.quote_and_escape())).and_then(read_response)
         } else {
             self.send("rescan").and_then(read_response)
         }
@@ -341,34 +370,25 @@ impl MpdClient for Client<'_> {
     }
 
     fn single(&mut self, single: OnOffOneshot) -> MpdResult<()> {
-        self.send(&format!("single {}", single.to_mpd_value()))
-            .and_then(read_ok)
+        self.send(&format!("single {}", single.to_mpd_value())).and_then(read_ok)
     }
 
     fn consume(&mut self, consume: OnOffOneshot) -> MpdResult<()> {
         if self.version < Version::new(0, 24, 0) && matches!(consume, OnOffOneshot::Oneshot) {
-            Err(MpdError::UnsupportedMpdVersion(
-                "consume oneshot can be used since MPD 0.24.0",
-            ))
+            Err(MpdError::UnsupportedMpdVersion("consume oneshot can be used since MPD 0.24.0"))
         } else {
-            self.send(&format!("consume {}", consume.to_mpd_value()))
-                .and_then(read_ok)
+            self.send(&format!("consume {}", consume.to_mpd_value())).and_then(read_ok)
         }
     }
 
     // Mounts
     fn mount(&mut self, name: &str, path: &str) -> MpdResult<()> {
-        self.send(&format!(
-            "mount {} {}",
-            name.quote_and_escape(),
-            path.quote_and_escape()
-        ))
-        .and_then(read_ok)
+        self.send(&format!("mount {} {}", name.quote_and_escape(), path.quote_and_escape()))
+            .and_then(read_ok)
     }
 
     fn unmount(&mut self, name: &str) -> MpdResult<()> {
-        self.send(&format!("unmount {}", name.quote_and_escape()))
-            .and_then(read_ok)
+        self.send(&format!("unmount {}", name.quote_and_escape())).and_then(read_ok)
     }
 
     fn list_mounts(&mut self) -> MpdResult<Mounts> {
@@ -403,7 +423,8 @@ impl MpdClient for Client<'_> {
             return Ok(songs);
         };
 
-        let mut stickers = match self.list_stickers_multiple(&songs.iter().map(|song| song.file.as_str()).collect_vec())
+        let mut stickers = match self
+            .list_stickers_multiple(&songs.iter().map(|song| song.file.as_str()).collect_vec())
         {
             Ok(stickers) => stickers,
             Err(err) => {
@@ -426,12 +447,12 @@ impl MpdClient for Client<'_> {
 
     /// Search the database for songs matching FILTER
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
-        self.send(&format!("find \"({})\"", filter.to_query_str()))
-            .and_then(read_response)
+        self.send(&format!("find \"({})\"", filter.to_query_str())).and_then(read_response)
     }
 
     /// Search the database for songs matching FILTER (see Filters).
-    /// Parameters have the same meaning as for find, except that search is not case sensitive.
+    /// Parameters have the same meaning as for find, except that search is not
+    /// case sensitive.
     fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         let query = filter.to_query_str();
         let query = query.as_str();
@@ -440,30 +461,27 @@ impl MpdClient for Client<'_> {
     }
 
     fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()> {
-        self.send(&format!("move {} {}", from.as_mpd_range(), to.as_mpd_str()))
-            .and_then(read_ok)
+        self.send(&format!("move {} {}", from.as_mpd_range(), to.as_mpd_str())).and_then(read_ok)
     }
 
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()> {
-        self.send(&format!("moveid {id} \"{}\"", to.as_mpd_str()))
-            .and_then(read_ok)
+        self.send(&format!("moveid {id} \"{}\"", to.as_mpd_str())).and_then(read_ok)
     }
 
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>> {
-        let mut songs: Vec<Song> = self
-            .send(&format!("find \"({})\"", filter.to_query_str()))
-            .and_then(read_response)?;
+        let mut songs: Vec<Song> =
+            self.send(&format!("find \"({})\"", filter.to_query_str())).and_then(read_response)?;
 
         Ok(songs.pop())
     }
 
     fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
-        self.send(&format!("findadd \"({})\"", filter.to_query_str()))
-            .and_then(read_ok)
+        self.send(&format!("findadd \"({})\"", filter.to_query_str())).and_then(read_ok)
     }
 
-    /// Search the database for songs matching FILTER (see Filters) AND add them to queue.
-    /// Parameters have the same meaning as for find, except that search is not case sensitive.
+    /// Search the database for songs matching FILTER (see Filters) AND add them
+    /// to queue. Parameters have the same meaning as for find, except that
+    /// search is not case sensitive.
     fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
         let query = filter.to_query_str();
         let query = query.as_str();
@@ -502,22 +520,27 @@ impl MpdClient for Client<'_> {
     }
 
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("readpicture {} 0", path.quote_and_escape()))
-            .and_then(read_bin)
+        self.send(&format!("readpicture {} 0", path.quote_and_escape())).and_then(read_bin)
     }
+
     fn albumart(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.send(&format!("albumart {} 0", path.quote_and_escape()))
-            .and_then(read_bin)
+        self.send(&format!("albumart {} 0", path.quote_and_escape())).and_then(read_bin)
     }
+
     // Stored playlists
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.send("listplaylists").and_then(read_response)
     }
+
     fn list_playlist(&mut self, name: &str) -> MpdResult<FileList> {
-        self.send(&format!("listplaylist {}", name.quote_and_escape()))
-            .and_then(read_response)
+        self.send(&format!("listplaylist {}", name.quote_and_escape())).and_then(read_response)
     }
-    fn list_playlist_info(&mut self, playlist: &str, range: Option<SingleOrRange>) -> MpdResult<Vec<Song>> {
+
+    fn list_playlist_info(
+        &mut self,
+        playlist: &str,
+        range: Option<SingleOrRange>,
+    ) -> MpdResult<Vec<Song>> {
         if let Some(range) = range {
             if self.version < Version::new(0, 24, 0) {
                 return Err(MpdError::UnsupportedMpdVersion(
@@ -535,24 +558,25 @@ impl MpdClient for Client<'_> {
                 .and_then(read_response)
         }
     }
+
     fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.send(&format!("load {}", name.quote_and_escape()))
-            .and_then(read_ok)
+        self.send(&format!("load {}", name.quote_and_escape())).and_then(read_ok)
     }
+
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {
-        self.send(&format!(
-            "rename {} {}",
-            name.quote_and_escape(),
-            new_name.quote_and_escape()
-        ))
-        .and_then(read_ok)
+        self.send(&format!("rename {} {}", name.quote_and_escape(), new_name.quote_and_escape()))
+            .and_then(read_ok)
     }
 
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send(&format!("rm {}", name.quote_and_escape())).and_then(read_ok)
     }
 
-    fn delete_from_playlist(&mut self, playlist_name: &str, range: &SingleOrRange) -> MpdResult<()> {
+    fn delete_from_playlist(
+        &mut self,
+        playlist_name: &str,
+        range: &SingleOrRange,
+    ) -> MpdResult<()> {
         self.send(&format!(
             "playlistdelete {} {}",
             playlist_name.quote_and_escape(),
@@ -575,7 +599,12 @@ impl MpdClient for Client<'_> {
         .and_then(read_ok)
     }
 
-    fn add_to_playlist(&mut self, playlist_name: &str, uri: &str, target_position: Option<usize>) -> MpdResult<()> {
+    fn add_to_playlist(
+        &mut self,
+        playlist_name: &str,
+        uri: &str,
+        target_position: Option<usize>,
+    ) -> MpdResult<()> {
         match target_position {
             Some(target_position) => self
                 .send(&format!(
@@ -604,8 +633,7 @@ impl MpdClient for Client<'_> {
             self.send(&format!("save {} \"{}\"", name.quote_and_escape(), mode.as_ref()))
                 .and_then(read_ok)
         } else {
-            self.send(&format!("save {}", name.quote_and_escape()))
-                .and_then(read_ok)
+            self.send(&format!("save {}", name.quote_and_escape())).and_then(read_ok)
         }
     }
 
@@ -613,28 +641,23 @@ impl MpdClient for Client<'_> {
         // path is already escaped in albumart() and read_picture()
         match self.albumart(path) {
             Ok(Some(v)) => Ok(Some(v)),
-            Ok(None)
-            | Err(MpdError::Mpd(MpdFailureResponse {
-                code: ErrorCode::NoExist,
-                ..
-            })) => match self.read_picture(path) {
-                Ok(Some(p)) => Ok(Some(p)),
-                Ok(None) => {
-                    log::debug!("No album art found, falling back to placeholder image");
-                    Ok(None)
+            Ok(None) | Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) => {
+                match self.read_picture(path) {
+                    Ok(Some(p)) => Ok(Some(p)),
+                    Ok(None) => {
+                        log::debug!("No album art found, falling back to placeholder image");
+                        Ok(None)
+                    }
+                    Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) => {
+                        log::debug!("No album art found, falling back to placeholder image");
+                        Ok(None)
+                    }
+                    Err(e) => {
+                        status_error!(error:? = e; "Failed to read picture. {}", e.to_status());
+                        Ok(None)
+                    }
                 }
-                Err(MpdError::Mpd(MpdFailureResponse {
-                    code: ErrorCode::NoExist,
-                    ..
-                })) => {
-                    log::debug!("No album art found, falling back to placeholder image");
-                    Ok(None)
-                }
-                Err(e) => {
-                    status_error!(error:? = e; "Failed to read picture. {}", e.to_status());
-                    Ok(None)
-                }
-            },
+            }
             Err(e) => {
                 status_error!(error:? = e; "Failed to read picture. {}", e.to_status());
                 Ok(None)
@@ -674,11 +697,7 @@ impl MpdClient for Client<'_> {
             ))
             .and_then(read_response);
 
-        if let Err(MpdError::Mpd(MpdFailureResponse {
-            code: ErrorCode::NoExist,
-            ..
-        })) = result
-        {
+        if let Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) = result {
             return Ok(None);
         };
 
@@ -705,13 +724,11 @@ impl MpdClient for Client<'_> {
     }
 
     fn delete_all_stickers(&mut self, uri: &str) -> MpdResult<()> {
-        self.send(&format!("sticker delete song {}", uri.quote_and_escape()))
-            .and_then(read_ok)
+        self.send(&format!("sticker delete song {}", uri.quote_and_escape())).and_then(read_ok)
     }
 
     fn list_stickers(&mut self, uri: &str) -> MpdResult<Stickers> {
-        self.send(&format!("sticker list song {}", uri.quote_and_escape()))
-            .and_then(read_response)
+        self.send(&format!("sticker list song {}", uri.quote_and_escape())).and_then(read_response)
     }
 
     /// Resulting `Vec` is of the same length as input `uri`s.
@@ -748,8 +765,8 @@ impl MpdClient for Client<'_> {
             }
         }
 
-        // In case the last sticker was fetched successfully we have to read an OK
-        // as an ack for the whole command list
+        // In case the last sticker was fetched successfully we have to read an
+        // OK as an ack for the whole command list
         if !list_ended_with_err {
             ProtoClient::new_read_only(self).read_ok()?;
         }
@@ -779,9 +796,11 @@ impl MpdClient for Client<'_> {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum QueueMoveTarget {
-    /// relative to the currently playing song; e.g. +0 moves to right after the current song
+    /// relative to the currently playing song; e.g. +0 moves to right after the
+    /// current song
     RelativeAdd(usize),
-    /// relative to the currently playing song; e.g. -0 moves to right before the current song
+    /// relative to the currently playing song; e.g. -0 moves to right before
+    /// the current song
     RelativeSub(usize),
     Absolute(usize),
 }
@@ -890,19 +909,11 @@ impl From<&'static str> for Tag {
 #[allow(dead_code)]
 impl<'value> Filter<'value> {
     pub fn new<T: Into<Tag>>(tag: T, value: &'value str) -> Self {
-        Self {
-            tag: tag.into(),
-            value,
-            kind: FilterKind::Exact,
-        }
+        Self { tag: tag.into(), value, kind: FilterKind::Exact }
     }
 
     pub fn new_with_kind<T: Into<Tag>>(tag: T, value: &'value str, kind: FilterKind) -> Self {
-        Self {
-            tag: tag.into(),
-            value,
-            kind,
-        }
+        Self { tag: tag.into(), value, kind }
     }
 
     pub fn with_type(mut self, t: FilterKind) -> Self {
@@ -912,10 +923,18 @@ impl<'value> Filter<'value> {
 
     pub fn to_query_str(&self) -> String {
         match self.kind {
-            FilterKind::Exact => format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter()),
-            FilterKind::StartsWith => format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter()),
-            FilterKind::Contains => format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter()),
-            FilterKind::Regex => format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter()),
+            FilterKind::Exact => {
+                format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter())
+            }
+            FilterKind::StartsWith => {
+                format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter())
+            }
+            FilterKind::Contains => {
+                format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter())
+            }
+            FilterKind::Regex => {
+                format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter())
+            }
         }
     }
 }
@@ -995,10 +1014,10 @@ mod strext_tests {
 
 #[cfg(test)]
 mod filter_tests {
-    use crate::mpd::mpd_client::{FilterExt, FilterKind, Tag};
+    use test_case::test_case;
 
     use super::Filter;
-    use test_case::test_case;
+    use crate::mpd::mpd_client::{FilterExt, FilterKind, Tag};
 
     #[test_case(Tag::Artist, "Artist")]
     #[test_case(Tag::Album, "Album")]
@@ -1015,46 +1034,41 @@ mod filter_tests {
 
     #[test]
     fn starts_with() {
-        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
+        let input: &[Filter<'_>] =
+            &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
 
         assert_eq!(input.to_query_str(), "(Artist =~ '^mrs singer')");
     }
 
     #[test]
     fn exact() {
-        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
+        let input: &[Filter<'_>] =
+            &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Exact)];
 
         assert_eq!(input.to_query_str(), "(Album == 'the greatest')");
     }
 
     #[test]
     fn contains() {
-        let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
+        let input: &[Filter<'_>] =
+            &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
 
         assert_eq!(input.to_query_str(), "(Album =~ '.*the greatest.*')");
     }
 
     #[test]
     fn regex() {
-        let input: &[Filter<'_>] = &[Filter::new_with_kind(
-            Tag::Album,
-            r"the greatest.*\s+[A-Za-z]+$",
-            FilterKind::Regex,
-        )];
+        let input: &[Filter<'_>] =
+            &[Filter::new_with_kind(Tag::Album, r"the greatest.*\s+[A-Za-z]+$", FilterKind::Regex)];
 
         assert_eq!(input.to_query_str(), r"(Album =~ 'the greatest.*\\\\s+[A-Za-z]+$')");
     }
 
     #[test]
     fn multiple_values() {
-        let input: &[Filter<'_>] = &[
-            Filter::new(Tag::Album, "the greatest"),
-            Filter::new(Tag::Artist, "mrs singer"),
-        ];
+        let input: &[Filter<'_>] =
+            &[Filter::new(Tag::Album, "the greatest"), Filter::new(Tag::Artist, "mrs singer")];
 
-        assert_eq!(
-            input.to_query_str(),
-            "(Album == 'the greatest') AND (Artist == 'mrs singer')"
-        );
+        assert_eq!(input.to_query_str(), "(Album == 'the greatest') AND (Artist == 'mrs singer')");
     }
 }

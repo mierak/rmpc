@@ -2,12 +2,13 @@ use std::time::Duration;
 
 use anyhow::Result;
 use ratatui::{
+    Frame,
     prelude::Rect,
     style::{Color, Style},
     widgets::Paragraph,
-    Frame,
 };
 
+use super::Pane;
 use crate::{
     context::AppContext,
     mpd::mpd_client::{MpdClient, ValueChange},
@@ -18,8 +19,6 @@ use crate::{
     ui::{StatusMessage, UiEvent},
 };
 
-use super::Pane;
-
 #[derive(Debug)]
 pub struct ProgressBarPane {
     area: Rect,
@@ -28,16 +27,17 @@ pub struct ProgressBarPane {
 
 impl ProgressBarPane {
     pub fn new() -> Self {
-        Self {
-            area: Rect::default(),
-
-            status_message: None,
-        }
+        Self { area: Rect::default(), status_message: None }
     }
 }
 
 impl Pane for ProgressBarPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> anyhow::Result<()> {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        context: &AppContext,
+    ) -> anyhow::Result<()> {
         self.area = area;
         if self
             .status_message
@@ -57,7 +57,9 @@ impl Pane for ProgressBarPane {
             let elapsed_bar = if context.status.duration == Duration::ZERO {
                 elapsed_bar.value(0.0)
             } else {
-                elapsed_bar.value(context.status.elapsed.as_secs_f32() / context.status.duration.as_secs_f32())
+                elapsed_bar.value(
+                    context.status.elapsed.as_secs_f32() / context.status.duration.as_secs_f32(),
+                )
             };
             frame.render_widget(elapsed_bar, self.area);
         }
@@ -68,7 +70,12 @@ impl Pane for ProgressBarPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, _context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _is_visible: bool,
+        _context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::Status(message, level) => {
                 self.status_message = Some(StatusMessage {
@@ -92,7 +99,9 @@ impl Pane for ProgressBarPane {
                 let second_to_seek_to = context
                     .status
                     .duration
-                    .mul_f32(f32::from(event.x.saturating_sub(self.area.x)) / f32::from(self.area.width))
+                    .mul_f32(
+                        f32::from(event.x.saturating_sub(self.area.x)) / f32::from(self.area.width),
+                    )
                     .as_secs();
                 context.command(move |client| {
                     client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;

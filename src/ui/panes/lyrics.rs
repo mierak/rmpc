@@ -1,18 +1,17 @@
 use anyhow::Result;
 use ratatui::{
+    Frame,
     layout::{Constraint, Layout, Rect},
     style::Style,
     text::Text,
-    Frame,
 };
 
+use super::Pane;
 use crate::{
     context::AppContext,
     shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
     ui::UiEvent,
 };
-
-use super::Pane;
 
 #[derive(Debug)]
 pub struct LyricsPane {
@@ -22,10 +21,7 @@ pub struct LyricsPane {
 
 impl LyricsPane {
     pub fn new(_context: &AppContext) -> Self {
-        Self {
-            current_lyrics: None,
-            initialized: false,
-        }
+        Self { current_lyrics: None, initialized: false }
     }
 }
 
@@ -86,7 +82,12 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected => match context.find_lrc() {
                 Ok(lrc) => {

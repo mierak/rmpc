@@ -18,12 +18,7 @@ pub struct Volume<'a> {
 
 impl Default for Volume<'_> {
     fn default() -> Self {
-        Self {
-            value: 0,
-            block: None,
-            alignment: Alignment::Left,
-            style: Style::default(),
-        }
+        Self { value: 0, block: None, alignment: Alignment::Left, style: Style::default() }
     }
 }
 

@@ -1,12 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent as CKeyEvent};
 
+#[cfg(debug_assertions)]
+use crate::config::keys::LogsActions;
 use crate::{
     config::keys::{CommonAction, GlobalAction, QueueActions},
     context::AppContext,
 };
-
-#[cfg(debug_assertions)]
-use crate::config::keys::LogsActions;
 
 #[derive(Debug, Clone)]
 pub struct KeyEvent {
@@ -16,10 +15,7 @@ pub struct KeyEvent {
 
 impl From<CKeyEvent> for KeyEvent {
     fn from(value: CKeyEvent) -> Self {
-        Self {
-            inner: value,
-            already_handled: false,
-        }
+        Self { inner: value, already_handled: false }
     }
 }
 

@@ -1,6 +1,6 @@
-use anyhow::Result;
 use std::path::PathBuf;
 
+use anyhow::Result;
 use crossbeam::channel::{Receiver, Sender};
 
 use crate::{

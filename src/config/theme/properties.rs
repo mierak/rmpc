@@ -5,9 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum::Display;
 
-use crate::config::{theme::StyleFile, Leak};
-
 use super::style::ToConfigOr;
+use crate::config::{Leak, theme::StyleFile};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
@@ -98,7 +97,9 @@ impl<T> PropertyKindOrText<'_, T> {
             PropertyKindOrText::Text(_) => false,
             PropertyKindOrText::Sticker(_) => true,
             PropertyKindOrText::Property(_) => false,
-            PropertyKindOrText::Group(group) => group.iter().any(|prop| prop.kind.contains_stickers()),
+            PropertyKindOrText::Group(group) => {
+                group.iter().any(|prop| prop.kind.contains_stickers())
+            }
         }
     }
 }
@@ -119,19 +120,13 @@ pub struct Property<'a, T> {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WidgetPropertyFile {
-    States {
-        active_style: Option<StyleFile>,
-        separator_style: Option<StyleFile>,
-    },
+    States { active_style: Option<StyleFile>, separator_style: Option<StyleFile> },
     Volume,
 }
 
 #[derive(Debug, Display, Clone, Copy)]
 pub enum WidgetProperty {
-    States {
-        active_style: Style,
-        separator_style: Style,
-    },
+    States { active_style: Style, separator_style: Style },
     Volume,
 }
 
@@ -191,7 +186,9 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
 impl TryFrom<PropertyFile<PropertyKindFile>> for &'static Property<'static, PropertyKind> {
     type Error = anyhow::Error;
 
-    fn try_from(value: PropertyFile<PropertyKindFile>) -> std::prelude::v1::Result<Self, Self::Error> {
+    fn try_from(
+        value: PropertyFile<PropertyKindFile>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
         Property::<'static, PropertyKind>::try_from(value).map(|v| v.leak())
     }
 }
@@ -204,24 +201,29 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value.leak()),
-                PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(match prop {
-                    PropertyKindFile::Song(s) => PropertyKind::Song(s.try_into()?),
-                    PropertyKindFile::Status(s) => PropertyKind::Status(s.try_into()?),
-                    PropertyKindFile::Widget(WidgetPropertyFile::Volume) => {
-                        PropertyKind::Widget(WidgetProperty::Volume)
-                    }
-                    PropertyKindFile::Widget(WidgetPropertyFile::States {
-                        active_style,
-                        separator_style,
-                    }) => PropertyKind::Widget(WidgetProperty::States {
-                        active_style: active_style.to_config_or(Some(Color::White), None)?,
-                        separator_style: separator_style.to_config_or(Some(Color::White), None)?,
-                    }),
-                }),
+                PropertyKindFileOrText::Property(prop) => {
+                    PropertyKindOrText::Property(match prop {
+                        PropertyKindFile::Song(s) => PropertyKind::Song(s.try_into()?),
+                        PropertyKindFile::Status(s) => PropertyKind::Status(s.try_into()?),
+                        PropertyKindFile::Widget(WidgetPropertyFile::Volume) => {
+                            PropertyKind::Widget(WidgetProperty::Volume)
+                        }
+                        PropertyKindFile::Widget(WidgetPropertyFile::States {
+                            active_style,
+                            separator_style,
+                        }) => PropertyKind::Widget(WidgetProperty::States {
+                            active_style: active_style.to_config_or(Some(Color::White), None)?,
+                            separator_style: separator_style
+                                .to_config_or(Some(Color::White), None)?,
+                        }),
+                    })
+                }
                 PropertyKindFileOrText::Group(group) => {
                     let res: Vec<_> = group
                         .into_iter()
-                        .map(|p| -> Result<&'static Property<'static, PropertyKind>> { p.try_into() })
+                        .map(|p| -> Result<&'static Property<'static, PropertyKind>> {
+                            p.try_into()
+                        })
                         .try_collect()?;
                     PropertyKindOrText::Group(res.leak())
                 }

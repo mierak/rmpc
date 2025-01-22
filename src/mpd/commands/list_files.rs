@@ -1,8 +1,7 @@
-use anyhow::anyhow;
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 // file: 03 Diode.flac
 // size: 18183774

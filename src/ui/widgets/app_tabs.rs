@@ -3,9 +3,8 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::config::{tabs::TabName, Config};
-
 use super::tabs::Tabs;
+use crate::config::{Config, tabs::TabName};
 
 #[derive(Debug)]
 pub struct AppTabs<'a> {
@@ -38,23 +37,14 @@ impl AppTabs<'_> {
     }
 
     pub fn get_tab_idx_at(&self, position: Position) -> Option<usize> {
-        self.tabs
-            .areas
-            .iter()
-            .enumerate()
-            .find(|(_, area)| area.contains(position))
-            .map(|v| v.0)
+        self.tabs.areas.iter().enumerate().find(|(_, area)| area.contains(position)).map(|v| v.0)
     }
 }
 
 impl<'a> AppTabs<'a> {
     pub fn new(active_tab: TabName, config: &'a Config) -> Self {
-        let tab_names = config
-            .tabs
-            .names
-            .iter()
-            .map(|e| format!("  {e: ^9}  "))
-            .collect::<Vec<String>>();
+        let tab_names =
+            config.tabs.names.iter().map(|e| format!("  {e: ^9}  ")).collect::<Vec<String>>();
 
         let tabs = Tabs::new(tab_names)
             .divider("")
@@ -63,10 +53,6 @@ impl<'a> AppTabs<'a> {
             .alignment(ratatui::prelude::Alignment::Center)
             .highlight_style(config.theme.tab_bar.active_style);
 
-        Self {
-            active_tab,
-            config,
-            tabs,
-        }
+        Self { active_tab, config, tabs }
     }
 }

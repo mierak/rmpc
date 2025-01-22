@@ -1,14 +1,15 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use ratatui::{
+    Frame,
     layout::Rect,
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols::{self, border},
     widgets::{Block, Borders, Clear},
-    Frame,
 };
 
+use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
@@ -22,10 +23,6 @@ use crate::{
         input::Input,
     },
 };
-
-use super::RectExt;
-
-use super::Modal;
 
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.vertical_left,
@@ -44,7 +41,9 @@ pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug
+    for InputModal<'_, Callback>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -147,7 +146,11 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
 
         frame.render_widget(input, block.inner(body_area));
         frame.render_widget(block, body_area);
-        frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
+        frame.render_stateful_widget(
+            &mut self.button_group,
+            buttons_area,
+            &mut self.button_group_state,
+        );
         Ok(())
     }
 

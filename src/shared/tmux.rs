@@ -1,12 +1,15 @@
-use anyhow::{Context, Result};
 use std::sync::LazyLock;
 
+use anyhow::{Context, Result};
+
 pub static IS_TMUX: LazyLock<bool> = LazyLock::new(|| {
-    std::env::var("TMUX").is_ok_and(|v| !v.is_empty()) && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
+    std::env::var("TMUX").is_ok_and(|v| !v.is_empty())
+        && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
 });
 
 static TMUX_PANE: LazyLock<String> = LazyLock::new(|| {
-    std::env::var("TMUX_PANE").expect("TMUX_PANE environment variable to be defined when ran inside tmux")
+    std::env::var("TMUX_PANE")
+        .expect("TMUX_PANE environment variable to be defined when ran inside tmux")
 });
 
 pub fn is_inside_tmux() -> bool {
@@ -66,10 +69,7 @@ pub fn session_has_attached_client() -> Result<bool> {
     let stdout = stdout.trim();
     log::trace!(stdout; "got attached clients to tmux session");
 
-    Ok(stdout
-        .parse::<u32>()
-        .context("Invalid tmux response when querying session_attached")?
-        > 0)
+    Ok(stdout.parse::<u32>().context("Invalid tmux response when querying session_attached")? > 0)
 }
 
 /// Returns true when rmpc is ran inside Tmux but its pane is not in a visible

@@ -21,7 +21,8 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn set_viewport_len(&mut self, viewport_len: Option<usize>) -> &Self {
         self.viewport_len = viewport_len;
-        self.scrollbar_state = self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
+        self.scrollbar_state =
+            self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
         self
     }
 
@@ -80,7 +81,9 @@ impl<T: ScrollingState> DirState<T> {
                 Some(i) => {
                     self.select(Some(i.saturating_sub(1)), scrolloff);
                 }
-                None if item_count > 0 => self.select(Some(item_count.saturating_sub(1)), scrolloff),
+                None if item_count > 0 => {
+                    self.select(Some(item_count.saturating_sub(1)), scrolloff);
+                }
                 None => self.select(None, scrolloff),
             };
         }
@@ -189,10 +192,10 @@ impl<T: ScrollingState> DirState<T> {
         let content_len = self.content_len.unwrap_or_default();
         let max_offset = content_len.saturating_sub(vieport_len);
 
-        // Always place cursor in the middle of the screen when scrolloff is too big
+        // Always place cursor in the middle of the screen when scrolloff is too
+        // big
         if scrolloff * 2 >= vieport_len {
-            self.inner
-                .set_offset(idx.saturating_sub(vieport_len / 2).min(max_offset));
+            self.inner.set_offset(idx.saturating_sub(vieport_len / 2).min(max_offset));
             return;
         }
 
@@ -204,8 +207,7 @@ impl<T: ScrollingState> DirState<T> {
         }
 
         if idx < offset + scrolloff {
-            self.inner
-                .set_offset(offset.saturating_sub((offset + scrolloff).saturating_sub(idx)));
+            self.inner.set_offset(offset.saturating_sub((offset + scrolloff).saturating_sub(idx)));
             return;
         }
     }
@@ -250,11 +252,7 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     pub fn toggle_mark(&mut self, idx: usize) -> bool {
-        if self.marked.contains(&idx) {
-            self.marked.remove(&idx)
-        } else {
-            self.marked.insert(idx)
-        }
+        if self.marked.contains(&idx) { self.marked.remove(&idx) } else { self.marked.insert(idx) }
     }
 
     pub fn invert_marked(&mut self) {
@@ -790,10 +788,8 @@ mod tests {
 
         #[test]
         fn inverts_marked() {
-            let mut subject: DirState<ListState> = DirState {
-                content_len: Some(20),
-                ..DirState::default()
-            };
+            let mut subject: DirState<ListState> =
+                DirState { content_len: Some(20), ..DirState::default() };
             subject.mark(5);
             subject.mark(10);
             subject.mark(15);

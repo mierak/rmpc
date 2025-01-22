@@ -1,7 +1,7 @@
 use std::{cell::Cell, collections::HashSet};
 
-use crossbeam::channel::{unbounded, Receiver, Sender};
-use ratatui::{backend::TestBackend, Terminal};
+use crossbeam::channel::{Receiver, Sender, unbounded};
+use ratatui::{Terminal, backend::TestBackend};
 use rstest::fixture;
 
 use crate::{

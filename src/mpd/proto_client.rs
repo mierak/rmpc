@@ -6,12 +6,12 @@ use std::{
 use anyhow::Result;
 use log::trace;
 
-use crate::mpd::errors::ErrorCode;
-
 use super::{
+    FromMpd,
     errors::{MpdError, MpdFailureResponse},
-    split_line, FromMpd,
+    split_line,
 };
+use crate::mpd::errors::ErrorCode;
 type MpdResult<T> = Result<T, MpdError>;
 
 pub struct ProtoClient<'cmd, 'client, C: SocketClient> {
@@ -52,10 +52,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     }
 
     pub fn new_read_only(client: &'client mut C) -> Self {
-        Self {
-            command: "<read_only>",
-            client,
-        }
+        Self { command: "<read_only>", client }
     }
 
     fn execute(&mut self, command: &str) -> Result<&mut Self, MpdError> {
@@ -75,13 +72,8 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'")))
             }
             Err(e) => {
-                if !matches!(
-                    e,
-                    MpdError::Mpd(MpdFailureResponse {
-                        code: ErrorCode::NoExist,
-                        ..
-                    })
-                ) {
+                if !matches!(e, MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. }))
+                {
                     log::error!(e:?; "read buffer was reinitialized");
                     self.client.clear_read_buf()?;
                 }
@@ -105,10 +97,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                     if let Err(e) = result.next(val) {
                         if !matches!(
                             e,
-                            MpdError::Mpd(MpdFailureResponse {
-                                code: ErrorCode::NoExist,
-                                ..
-                            })
+                            MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
                         ) {
                             log::error!(e:?; "read buffer was reinitialized");
                             self.client.clear_read_buf()?;
@@ -119,10 +108,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e) => {
                     if !matches!(
                         e,
-                        MpdError::Mpd(MpdFailureResponse {
-                            code: ErrorCode::NoExist,
-                            ..
-                        })
+                        MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
                     ) {
                         log::error!(e:?; "read buffer was reinitialized");
                         self.client.clear_read_buf()?;
@@ -143,16 +129,15 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         let read = self.client.read();
         loop {
             match Self::read_line(read) {
-                Ok(MpdLine::Ok) => return if found_any { Ok(Some(result)) } else { Ok(None) },
+                Ok(MpdLine::Ok) => {
+                    return if found_any { Ok(Some(result)) } else { Ok(None) };
+                }
                 Ok(MpdLine::Value(val)) => {
                     found_any = true;
                     if let Err(e) = result.next(val) {
                         if !matches!(
                             e,
-                            MpdError::Mpd(MpdFailureResponse {
-                                code: ErrorCode::NoExist,
-                                ..
-                            })
+                            MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
                         ) {
                             log::error!(e:?; "read buffer was reinitialized");
                             self.client.clear_read_buf()?;
@@ -163,10 +148,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e) => {
                     if !matches!(
                         e,
-                        MpdError::Mpd(MpdFailureResponse {
-                            code: ErrorCode::NoExist,
-                            ..
-                        })
+                        MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
                     ) {
                         log::error!(e:?; "read buffer was reinitialized");
                         self.client.clear_read_buf()?;
@@ -186,13 +168,8 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) => return Ok(None),
             Err(e) => {
-                if !matches!(
-                    e,
-                    MpdError::Mpd(MpdFailureResponse {
-                        code: ErrorCode::NoExist,
-                        ..
-                    })
-                ) {
+                if !matches!(e, MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. }))
+                {
                     log::error!(e:?; "read buffer was reinitialized");
                     self.client.clear_read_buf()?;
                 }
@@ -214,10 +191,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e) => {
                     if !matches!(
                         e,
-                        MpdError::Mpd(MpdFailureResponse {
-                            code: ErrorCode::NoExist,
-                            ..
-                        })
+                        MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
                     ) {
                         log::error!(e:?; "read buffer was reinitialized");
                         self.client.clear_read_buf()?;
@@ -229,7 +203,10 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(Some(buf))
     }
 
-    fn read_bin_inner(&mut self, binary_buf: &mut Vec<u8>) -> Result<Option<BinaryMpdResponse>, MpdError> {
+    fn read_bin_inner(
+        &mut self,
+        binary_buf: &mut Vec<u8>,
+    ) -> Result<Option<BinaryMpdResponse>, MpdError> {
         let mut result = BinaryMpdResponse::default();
         let read = self.client.read();
         {
@@ -251,7 +228,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                             key => {
                                 return Err(MpdError::Generic(format!(
                                     "Unexpected key when parsing binary response: '{key}'"
-                                )))
+                                )));
                             }
                         }
                     }
@@ -306,9 +283,8 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
 mod tests {
     use std::io::{BufReader, Cursor};
 
-    use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
-
     use super::SocketClient;
+    use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
     #[derive(Default, Debug, PartialEq, Eq)]
     struct TestMpdObject {
@@ -323,7 +299,9 @@ mod tests {
             match key {
                 "val_a" => self.val_a = value,
                 "val_b" => self.val_b = value,
-                _ => return Err(MpdError::Generic(String::from("unknown value"))),
+                _ => {
+                    return Err(MpdError::Generic(String::from("unknown value")));
+                }
             }
             Ok(LineHandled::Yes)
         }
@@ -334,15 +312,14 @@ mod tests {
     }
     impl TestClient {
         fn new(buf: &[u8]) -> Self {
-            Self {
-                read: BufReader::new(Cursor::new(buf.to_vec())),
-            }
+            Self { read: BufReader::new(Cursor::new(buf.to_vec())) }
         }
     }
     impl SocketClient for TestClient {
         fn write(&mut self, _bytes: &[u8]) -> std::io::Result<()> {
             Ok(())
         }
+
         fn read(&mut self) -> &mut impl std::io::BufRead {
             &mut self.read
         }
@@ -356,15 +333,14 @@ mod tests {
 
         use std::io::{BufReader, Cursor};
 
-        use crate::{
-            mpd::proto_client::SocketClient,
-            tests::fixtures::mpd_client::{client, TestMpdClient},
-        };
         use rstest::rstest;
 
-        use crate::mpd::{
-            errors::{ErrorCode, MpdError, MpdFailureResponse},
-            proto_client::{MpdLine, ProtoClient},
+        use crate::{
+            mpd::{
+                errors::{ErrorCode, MpdError, MpdFailureResponse},
+                proto_client::{MpdLine, ProtoClient, SocketClient},
+            },
+            tests::fixtures::mpd_client::{TestMpdClient, client},
         };
 
         #[rstest]
@@ -392,7 +368,9 @@ mod tests {
                 message: "error message boi".to_string(),
             };
 
-            client.set_read_content(Box::new(Cursor::new(b"ACK [55@2] {some_cmd} error message boi")));
+            client.set_read_content(Box::new(Cursor::new(
+                b"ACK [55@2] {some_cmd} error message boi",
+            )));
             let result = ProtoClient::<'_, '_, TestMpdClient>::read_line(client.read());
 
             assert_eq!(Err(MpdError::Mpd(err)), result);
@@ -403,6 +381,7 @@ mod tests {
             struct Mock;
             impl std::io::BufRead for Mock {
                 fn consume(&mut self, _amt: usize) {}
+
                 fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
                     Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
                 }
@@ -422,12 +401,11 @@ mod tests {
 
     mod response {
 
+        use super::*;
         use crate::mpd::{
             errors::{ErrorCode, MpdError, MpdFailureResponse},
             proto_client::ProtoClient,
         };
-
-        use super::*;
 
         #[test]
         fn parses_correct_response() {
@@ -437,13 +415,7 @@ mod tests {
                 .unwrap()
                 .read_response::<TestMpdObject>();
 
-            assert_eq!(
-                result,
-                Ok(TestMpdObject {
-                    val_a: "5".to_owned(),
-                    val_b: "a".to_owned()
-                })
-            );
+            assert_eq!(result, Ok(TestMpdObject { val_a: "5".to_owned(), val_b: "a".to_owned() }));
         }
 
         #[test]
@@ -475,12 +447,11 @@ mod tests {
         }
     }
     mod response_opt {
+        use super::*;
         use crate::mpd::{
             errors::{ErrorCode, MpdError, MpdFailureResponse},
             proto_client::ProtoClient,
         };
-
-        use super::*;
 
         #[test]
         fn parses_correct_response() {
@@ -492,10 +463,7 @@ mod tests {
 
             assert_eq!(
                 result,
-                Ok(Some(TestMpdObject {
-                    val_a: "5".to_owned(),
-                    val_b: "a".to_owned()
-                }))
+                Ok(Some(TestMpdObject { val_a: "5".to_owned(), val_b: "a".to_owned() }))
             );
         }
 
@@ -540,12 +508,11 @@ mod tests {
     }
 
     mod ok {
+        use super::*;
         use crate::mpd::{
             errors::{ErrorCode, MpdFailureResponse},
             proto_client::ProtoClient,
         };
-
-        use super::*;
 
         #[test]
         fn parses_correct_response() {
@@ -577,17 +544,14 @@ mod tests {
 
             let result = ProtoClient::new("", &mut TestClient::new(buf)).unwrap().read_ok();
 
-            assert_eq!(
-                result,
-                Err(MpdError::Generic(String::from("Expected 'OK' but got 'idc'")))
-            );
+            assert_eq!(result, Err(MpdError::Generic(String::from("Expected 'OK' but got 'idc'"))));
         }
     }
 
     mod binary {
         use crate::mpd::{
             errors::{ErrorCode, MpdError, MpdFailureResponse},
-            proto_client::{tests::TestClient, BinaryMpdResponse, ProtoClient},
+            proto_client::{BinaryMpdResponse, ProtoClient, tests::TestClient},
         };
 
         #[test]

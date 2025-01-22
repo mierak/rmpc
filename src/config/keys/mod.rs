@@ -1,22 +1,31 @@
 use std::collections::HashMap;
 
-use actions::{
-    AlbumsActionsFile, ArtistsActionsFile, CommonActionFile, DirectoriesActionsFile, GlobalActionFile,
-    PlaylistsActionsFile, QueueActionsFile,
-};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use serde::{Deserialize, Serialize};
-
 #[cfg(debug_assertions)]
 pub use actions::LogsActions;
 #[cfg(debug_assertions)]
 use actions::LogsActionsFile;
-
 pub use actions::{
-    AlbumsActions, ArtistsActions, CommonAction, DirectoriesActions, GlobalAction, PlaylistsActions, QueueActions,
+    AlbumsActions,
+    ArtistsActions,
+    CommonAction,
+    DirectoriesActions,
+    GlobalAction,
+    PlaylistsActions,
+    QueueActions,
     SearchActions,
 };
+use actions::{
+    AlbumsActionsFile,
+    ArtistsActionsFile,
+    CommonActionFile,
+    DirectoriesActionsFile,
+    GlobalActionFile,
+    PlaylistsActionsFile,
+    QueueActionsFile,
+};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use key::Key;
+use serde::{Deserialize, Serialize};
 
 mod actions;
 mod key;
@@ -180,10 +189,7 @@ impl From<KeyConfigFile> for KeyConfig {
 
 impl From<KeyEvent> for Key {
     fn from(value: KeyEvent) -> Self {
-        Self {
-            key: value.code,
-            modifiers: value.modifiers,
-        }
+        Self { key: value.code, modifiers: value.modifiers }
     }
 }
 
@@ -197,16 +203,17 @@ mod tests {
 
     use crossterm::event::{KeyCode, KeyModifiers};
 
+    use super::{Key, KeyConfig, KeyConfigFile};
     #[cfg(debug_assertions)]
     use crate::config::keys::LogsActions;
     #[cfg(debug_assertions)]
     use crate::config::keys::LogsActionsFile;
     use crate::config::keys::{
+        CommonAction,
+        GlobalAction,
+        QueueActions,
         actions::{CommonActionFile, GlobalActionFile, QueueActionsFile},
-        CommonAction, GlobalAction, QueueActions,
     };
-
-    use super::{Key, KeyConfig, KeyConfigFile};
 
     #[test]
     #[rustfmt::skip]

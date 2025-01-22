@@ -28,20 +28,12 @@ impl Widget for Input<'_> {
             return;
         };
 
-        let input_area = input_area.inner(Margin {
-            horizontal: 0,
-            vertical: 0,
-        });
+        let input_area = input_area.inner(Margin { horizontal: 0, vertical: 0 });
 
-        let block_border_style = if self.focused {
-            self.focused_style
-        } else {
-            self.unfocused_style
-        };
+        let block_border_style =
+            if self.focused { self.focused_style } else { self.unfocused_style };
 
-        let label = Paragraph::new(self.label)
-            .wrap(Wrap { trim: false })
-            .style(self.label_style);
+        let label = Paragraph::new(self.label).wrap(Wrap { trim: false }).style(self.label_style);
         let mut input = Paragraph::new(self.trimed_text(input_area)).style(self.input_style);
 
         if !self.borderless {
@@ -56,10 +48,7 @@ impl Widget for Input<'_> {
         input = input.wrap(Wrap { trim: true });
 
         label.render(
-            text_area.inner(Margin {
-                horizontal: 0,
-                vertical: u16::from(!self.borderless),
-            }),
+            text_area.inner(Margin { horizontal: 0, vertical: u16::from(!self.borderless) }),
             buf,
         );
         input.render(input_area, buf);
@@ -73,12 +62,7 @@ impl<'a> Input<'a> {
             return Cow::Borrowed(self.placeholder.unwrap_or(""));
         }
 
-        let mut input_len = input_area
-            .inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            })
-            .width as usize;
+        let mut input_len = input_area.inner(Margin { horizontal: 1, vertical: 0 }).width as usize;
 
         if self.focused {
             input_len = input_len.saturating_sub(1);
@@ -86,10 +70,7 @@ impl<'a> Input<'a> {
 
         Cow::Owned(format!(
             "{}{}",
-            self.text
-                .chars()
-                .skip(self.text.len().saturating_sub(input_len))
-                .collect::<String>(),
+            self.text.chars().skip(self.text.len().saturating_sub(input_len)).collect::<String>(),
             if self.focused { "█" } else { "" },
         ))
     }

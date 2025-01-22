@@ -1,5 +1,10 @@
 use std::any::Any;
 
+use anyhow::Result;
+use bon::Builder;
+use crossbeam::channel::Sender;
+use ratatui::widgets::ListItem;
+
 use crate::{
     config::tabs::PaneType,
     mpd::{
@@ -8,10 +13,6 @@ use crate::{
     },
     ui::panes::browser::DirOrSong,
 };
-use anyhow::Result;
-use bon::Builder;
-use crossbeam::channel::Sender;
-use ratatui::widgets::ListItem;
 
 #[derive(derive_more::Debug, Builder)]
 pub(crate) struct MpdQuery {
@@ -44,33 +45,20 @@ impl MpdQuery {
             return false;
         };
 
-        return self.id == other.id && self_replace_id == other_replace_id && self.target == other.target;
+        return self.id == other.id
+            && self_replace_id == other_replace_id
+            && self.target == other.target;
     }
 }
 
 #[derive(Debug)]
 #[allow(unused)]
 pub(crate) enum MpdQueryResult {
-    Preview {
-        data: Option<Vec<ListItem<'static>>>,
-        origin_path: Option<Vec<String>>,
-    },
-    SongsList {
-        data: Vec<Song>,
-        origin_path: Option<Vec<String>>,
-    },
-    LsInfo {
-        data: Vec<String>,
-        origin_path: Option<Vec<String>>,
-    },
-    DirOrSong {
-        data: Vec<DirOrSong>,
-        origin_path: Option<Vec<String>>,
-    },
-    AddToPlaylist {
-        playlists: Vec<String>,
-        song_file: String,
-    },
+    Preview { data: Option<Vec<ListItem<'static>>>, origin_path: Option<Vec<String>> },
+    SongsList { data: Vec<Song>, origin_path: Option<Vec<String>> },
+    LsInfo { data: Vec<String>, origin_path: Option<Vec<String>> },
+    DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },
+    AddToPlaylist { playlists: Vec<String>, song_file: String },
     AlbumArt(Option<Vec<u8>>),
     Status(Status),
     Queue(Option<Vec<Song>>),

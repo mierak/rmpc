@@ -1,8 +1,3 @@
-use crate::{
-    config::{cli::Command, tabs::PaneType},
-    mpd::commands::IdleEvent,
-    ui::{Level, UiAppEvent},
-};
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 
@@ -10,6 +5,11 @@ use super::{
     lrc::LrcIndex,
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
+};
+use crate::{
+    config::{cli::Command, tabs::PaneType},
+    mpd::commands::IdleEvent,
+    ui::{Level, UiAppEvent},
 };
 
 #[derive(Debug)]
@@ -30,14 +30,8 @@ pub(crate) enum WorkRequest {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
-    LyricsIndexed {
-        index: LrcIndex,
-    },
-    MpdCommandFinished {
-        id: &'static str,
-        target: Option<PaneType>,
-        data: MpdQueryResult,
-    },
+    LyricsIndexed { index: LrcIndex },
+    MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
     None,
 }
 

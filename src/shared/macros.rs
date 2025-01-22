@@ -68,17 +68,15 @@ macro_rules! status_warn {
 
 macro_rules! modal {
     ( $i:ident, $e:expr ) => {{
-        $i.app_event_sender
-            .send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::Modal(
-                crate::ui::ModalWrapper(Box::new($e)),
-            )))?;
+        $i.app_event_sender.send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::Modal(
+            crate::ui::ModalWrapper(Box::new($e)),
+        )))?;
     }};
 }
 
 macro_rules! pop_modal {
     ( $i:ident ) => {{
-        $i.app_event_sender
-            .send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::PopModal))?;
+        $i.app_event_sender.send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::PopModal))?;
     }};
 }
 
@@ -88,11 +86,9 @@ macro_rules! csi_move {
     };
 }
 
+pub(crate) use csi_move;
 pub(crate) use modal;
 pub(crate) use pop_modal;
-
-pub(crate) use csi_move;
-
 pub(crate) use status_error;
 pub(crate) use status_info;
 pub(crate) use status_warn;

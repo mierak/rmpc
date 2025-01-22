@@ -3,9 +3,8 @@ use std::collections::BTreeSet;
 use log::error;
 use ratatui::widgets::ListState;
 
+use super::{DirStackItem, state::DirState};
 use crate::{config::Config, shared::macros::status_warn};
-
-use super::{state::DirState, DirStackItem};
 
 #[derive(Debug)]
 pub struct Dir<T: std::fmt::Debug + DirStackItem + Clone + Send> {
@@ -44,13 +43,9 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
 
         result
     }
+
     pub fn new_with_state(items: Vec<T>, state: DirState<ListState>) -> Self {
-        return Self {
-            items,
-            state,
-            filter: None,
-            matched_item_count: 0,
-        };
+        return Self { items, state, filter: None, matched_item_count: 0 };
     }
 
     pub fn filter(&self) -> Option<&str> {
@@ -69,14 +64,16 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
     pub fn push_filter(&mut self, char: char, config: &Config) {
         if let Some(ref mut filter) = self.filter {
             filter.push(char);
-            self.matched_item_count = self.items.iter().filter(|item| item.matches(config, filter)).count();
+            self.matched_item_count =
+                self.items.iter().filter(|item| item.matches(config, filter)).count();
         }
     }
 
     pub fn pop_filter(&mut self, config: &Config) {
         if let Some(ref mut filter) = self.filter {
             filter.pop();
-            self.matched_item_count = self.items.iter().filter(|item| item.matches(config, filter)).count();
+            self.matched_item_count =
+                self.items.iter().filter(|item| item.matches(config, filter)).count();
         }
     }
 
@@ -103,19 +100,11 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
     }
 
     pub fn selected(&self) -> Option<&T> {
-        if let Some(sel) = self.state.get_selected() {
-            self.items.get(sel)
-        } else {
-            None
-        }
+        if let Some(sel) = self.state.get_selected() { self.items.get(sel) } else { None }
     }
 
     pub fn selected_mut(&mut self) -> Option<&mut T> {
-        if let Some(sel) = self.state.get_selected() {
-            self.items.get_mut(sel)
-        } else {
-            None
-        }
+        if let Some(sel) = self.state.get_selected() { self.items.get_mut(sel) } else { None }
     }
 
     pub fn selected_with_idx(&self) -> Option<(usize, &T)> {
@@ -147,27 +136,15 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
     }
 
     pub fn toggle_mark_selected(&mut self) -> bool {
-        if let Some(sel) = self.state.get_selected() {
-            self.state.toggle_mark(sel)
-        } else {
-            false
-        }
+        if let Some(sel) = self.state.get_selected() { self.state.toggle_mark(sel) } else { false }
     }
 
     pub fn mark_selected(&mut self) -> bool {
-        if let Some(sel) = self.state.get_selected() {
-            self.state.mark(sel)
-        } else {
-            false
-        }
+        if let Some(sel) = self.state.get_selected() { self.state.mark(sel) } else { false }
     }
 
     pub fn unmark_selected(&mut self) -> bool {
-        if let Some(sel) = self.state.get_selected() {
-            self.state.unmark(sel)
-        } else {
-            false
-        }
+        if let Some(sel) = self.state.get_selected() { self.state.unmark(sel) } else { false }
     }
 
     pub fn remove(&mut self, idx: usize) {
@@ -275,10 +252,7 @@ mod tests {
 
     fn create_subject() -> Dir<String> {
         let mut res = Dir {
-            items: vec!["a", "b", "c", "d", "f"]
-                .into_iter()
-                .map(ToOwned::to_owned)
-                .collect(),
+            items: vec!["a", "b", "c", "d", "f"].into_iter().map(ToOwned::to_owned).collect(),
             state: DirState::default(),
             filter: None,
             matched_item_count: 0,

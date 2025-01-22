@@ -17,7 +17,10 @@ impl Display for Key {
         let has_shift = self.modifiers.contains(KeyModifiers::SHIFT);
         let has_no_modifiers = !has_ctrl && !has_alt && !has_shift;
 
-        if has_ctrl || has_alt || (has_shift && !matches!(self.key, KeyCode::Char(c) if c.is_alphabetic())) {
+        if has_ctrl
+            || has_alt
+            || (has_shift && !matches!(self.key, KeyCode::Char(c) if c.is_alphabetic()))
+        {
             write!(f, "<")?;
         }
         if has_ctrl {
@@ -78,7 +81,10 @@ impl Display for Key {
             | KeyCode::Null => Ok(()),
         }?;
 
-        if has_ctrl || has_alt || (has_shift && !matches!(self.key, KeyCode::Char(c) if c.is_alphabetic())) {
+        if has_ctrl
+            || has_alt
+            || (has_shift && !matches!(self.key, KeyCode::Char(c) if c.is_alphabetic()))
+        {
             write!(f, ">")?;
         }
 
@@ -180,8 +186,9 @@ impl FromStr for Key {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use super::*;
     use rstest::rstest;
+
+    use super::*;
 
     #[rstest]
     #[case("a",            Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::NONE })]

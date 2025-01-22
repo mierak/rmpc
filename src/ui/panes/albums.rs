@@ -1,4 +1,10 @@
+use anyhow::{Context, Result, anyhow};
+use itertools::Itertools;
+use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+
+use super::{Pane, browser::DirOrSong};
 use crate::{
+    MpdQueryResult,
     config::tabs::PaneType,
     context::AppContext,
     mpd::{
@@ -7,20 +13,19 @@ use crate::{
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
+    shared::{
+        ext::mpd_client::MpdClientExt,
+        key_event::KeyEvent,
+        macros::status_info,
+        mouse_event::MouseEvent,
+    },
     ui::{
+        UiEvent,
         browser::BrowserPane,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
-        UiEvent,
     },
-    MpdQueryResult,
 };
-
-use super::{browser::DirOrSong, Pane};
-use anyhow::{anyhow, Context, Result};
-use itertools::Itertools;
-use ratatui::{prelude::Rect, widgets::StatefulWidget, Frame};
 
 #[derive(Debug)]
 pub struct AlbumsPane {
@@ -71,10 +76,7 @@ impl AlbumsPane {
                     .target(PaneType::Albums)
                     .query(move |client| {
                         let data = list_titles(client, current.as_path())?.collect();
-                        Ok(MpdQueryResult::DirOrSong {
-                            data,
-                            origin_path: Some(next_path),
-                        })
+                        Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -92,48 +94,44 @@ impl AlbumsPane {
 
 impl Pane for AlbumsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
-        self.browser
-            .set_filter_input_active(self.filter_input_mode)
-            .render(area, frame.buffer_mut(), &mut self.stack);
+        self.browser.set_filter_input_active(self.filter_input_mode).render(
+            area,
+            frame.buffer_mut(),
+            &mut self.stack,
+        );
 
         Ok(())
     }
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context
-                .query()
-                .id(INIT)
-                .replace_id(INIT)
-                .target(PaneType::Albums)
-                .query(move |client| {
+            context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
+                move |client| {
                     let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdQueryResult::LsInfo {
-                        data: result.0,
-                        origin_path: None,
-                    })
-                });
+                    Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+                },
+            );
             self.initialized = true;
         }
 
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                context
-                    .query()
-                    .id(INIT)
-                    .replace_id(INIT)
-                    .target(PaneType::Albums)
-                    .query(move |client| {
-                        let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                        Ok(MpdQueryResult::LsInfo {
-                            data: result.0,
-                            origin_path: None,
-                        })
-                    });
+                context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
+                    move |client| {
+                        let result =
+                            client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                        Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+                    },
+                );
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -176,10 +174,7 @@ impl Pane for AlbumsPane {
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
                 self.stack = DirStack::new(
                     data.into_iter()
-                        .map(|v| DirOrSong::Dir {
-                            full_path: String::new(),
-                            name: v,
-                        })
+                        .map(|v| DirOrSong::Dir { full_path: String::new(), name: v })
                         .collect::<Vec<_>>(),
                 );
                 self.prepare_preview(context)?;
@@ -201,21 +196,18 @@ impl Pane for AlbumsPane {
     }
 }
 
-fn list_titles(client: &mut impl MpdClient, album: &str) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
-    Ok(client
-        .find(&[Filter::new(Tag::Album, album)])?
-        .into_iter()
-        .map(DirOrSong::Song)
-        .sorted())
+fn list_titles(
+    client: &mut impl MpdClient,
+    album: &str,
+) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
+    Ok(client.find(&[Filter::new(Tag::Album, album)])?.into_iter().map(DirOrSong::Song).sorted())
 }
 
 fn find_songs(client: &mut impl MpdClient, album: &str, file: &str) -> Result<Vec<Song>, MpdError> {
-    client
-        .find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)])
-        .map(|mut v| {
-            v.sort();
-            v
-        })
+    client.find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)]).map(|mut v| {
+        v.sort();
+        v
+    })
 }
 
 impl BrowserPane<DirOrSong> for AlbumsPane {
@@ -235,9 +227,14 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.filter_input_mode
     }
 
-    fn list_songs_in_item(&self, item: DirOrSong) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+    fn list_songs_in_item(
+        &self,
+        item: DirOrSong,
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
         move |client| match item {
-            DirOrSong::Dir { name, full_path: _ } => Ok(client.find(&[Filter::new(Tag::Album, &name)])?),
+            DirOrSong::Dir { name, full_path: _ } => {
+                Ok(client.find(&[Filter::new(Tag::Album, &name)])?)
+            }
             DirOrSong::Song(song) => Ok(vec![song.clone()]),
         }
     }
@@ -256,7 +253,10 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                 let album = album.clone();
                 let name = item.dir_name_or_file_name().into_owned();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())])?;
+                    client.find_add(&[
+                        Filter::new(Tag::File, &name),
+                        Filter::new(Tag::Album, album.as_str()),
+                    ])?;
 
                     status_info!("'{name}' added to queue");
                     Ok(())

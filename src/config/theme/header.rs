@@ -2,11 +2,19 @@ use anyhow::Result;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use super::properties::{
-    Property, PropertyFile, PropertyKind, PropertyKindFile, PropertyKindFileOrText, SongPropertyFile,
-    StatusPropertyFile, WidgetPropertyFile,
+use super::{
+    properties::{
+        Property,
+        PropertyFile,
+        PropertyKind,
+        PropertyKindFile,
+        PropertyKindFileOrText,
+        SongPropertyFile,
+        StatusPropertyFile,
+        WidgetPropertyFile,
+    },
+    style::{Modifiers, StyleFile},
 };
-use super::style::{Modifiers, StyleFile};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HeaderConfigRow {
@@ -48,7 +56,9 @@ impl Default for HeaderConfigFile {
                             default: None,
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(StatusPropertyFile::State)),
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                StatusPropertyFile::State,
+                            )),
                             style: Some(StyleFile {
                                 fg: Some("yellow".to_string()),
                                 bg: None,
@@ -67,7 +77,9 @@ impl Default for HeaderConfigFile {
                         },
                     ],
                     center: vec![PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(SongPropertyFile::Title)),
+                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(
+                            SongPropertyFile::Title,
+                        )),
                         default: Some(Box::new(PropertyFile {
                             kind: PropertyKindFileOrText::Text("No Song".to_string()),
                             style: Some(StyleFile {
@@ -84,7 +96,9 @@ impl Default for HeaderConfigFile {
                         }),
                     }],
                     right: vec![PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(WidgetPropertyFile::Volume)),
+                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(
+                            WidgetPropertyFile::Volume,
+                        )),
                         style: Some(StyleFile {
                             fg: Some("blue".to_string()),
                             bg: None,
@@ -134,7 +148,9 @@ impl Default for HeaderConfigFile {
                     ],
                     center: vec![
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(SongPropertyFile::Artist)),
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(
+                                SongPropertyFile::Artist,
+                            )),
                             default: Some(Box::new(PropertyFile {
                                 kind: PropertyKindFileOrText::Text("Unknown".to_string()),
                                 style: Some(StyleFile {
@@ -156,7 +172,9 @@ impl Default for HeaderConfigFile {
                             default: None,
                         },
                         PropertyFile {
-                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(SongPropertyFile::Album)),
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(
+                                SongPropertyFile::Album,
+                            )),
                             default: Some(Box::new(PropertyFile {
                                 kind: PropertyKindFileOrText::Text("Unknown Album".to_string()),
                                 style: None,
@@ -166,18 +184,20 @@ impl Default for HeaderConfigFile {
                         },
                     ],
                     right: vec![PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(WidgetPropertyFile::States {
-                            active_style: Some(StyleFile {
-                                fg: Some("white".to_string()),
-                                bg: None,
-                                modifiers: Some(Modifiers::Bold),
-                            }),
-                            separator_style: Some(StyleFile {
-                                fg: Some("white".to_string()),
-                                bg: None,
-                                modifiers: None,
-                            }),
-                        })),
+                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(
+                            WidgetPropertyFile::States {
+                                active_style: Some(StyleFile {
+                                    fg: Some("white".to_string()),
+                                    bg: None,
+                                    modifiers: Some(Modifiers::Bold),
+                                }),
+                                separator_style: Some(StyleFile {
+                                    fg: Some("white".to_string()),
+                                    bg: None,
+                                    modifiers: None,
+                                }),
+                            },
+                        )),
                         style: Some(StyleFile {
                             fg: Some("dark_gray".to_string()),
                             bg: None,

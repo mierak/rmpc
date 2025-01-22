@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 
-use super::{style::ToConfigOr, StyleFile};
+use super::{StyleFile, style::ToConfigOr};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ScrollbarConfig {
@@ -12,9 +12,11 @@ pub struct ScrollbarConfig {
     /// Third symbol is used for the scrollbar up button
     /// Fourth symbol is used for the scrollbar down button
     pub symbols: [&'static str; 4],
-    /// Fall sback to border color for foreground and default color for background
+    /// Fall sback to border color for foreground and default color for
+    /// background
     pub track_style: Style,
-    /// Fall sback to border color for foreground and default color for background
+    /// Fall sback to border color for foreground and default color for
+    /// background
     pub ends_style: Style,
     // Falls back to blue for foreground and default color for background
     pub thumb_style: Style,
@@ -32,16 +34,8 @@ impl Default for ScrollbarConfigFile {
     fn default() -> Self {
         Self {
             symbols: vec!["│".to_owned(), "█".to_owned(), "▲".to_owned(), "▼".to_owned()],
-            track_style: Some(StyleFile {
-                fg: None,
-                bg: None,
-                modifiers: None,
-            }),
-            ends_style: Some(StyleFile {
-                fg: None,
-                bg: None,
-                modifiers: None,
-            }),
+            track_style: Some(StyleFile { fg: None, bg: None, modifiers: None }),
+            ends_style: Some(StyleFile { fg: None, bg: None, modifiers: None }),
             thumb_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
@@ -70,9 +64,15 @@ impl ScrollbarConfigFile {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::needless_pass_by_value)]
 mod tests {
-    use crate::config::theme::{scrollbar::ScrollbarConfigFile, style::Modifiers, Style, StyleFile};
     use ratatui::style::{Color as RC, Modifier as RM};
     use test_case::test_case;
+
+    use crate::config::theme::{
+        Style,
+        StyleFile,
+        scrollbar::ScrollbarConfigFile,
+        style::Modifiers,
+    };
 
     #[test]
     fn maps_symbols() {
@@ -101,21 +101,13 @@ mod tests {
                     bg: Some(c2.to_string()),
                     modifiers: None,
                 }),
-                (Some(c1), None) => Some(StyleFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
-                    modifiers: None,
-                }),
-                (None, Some(c2)) => Some(StyleFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
-                    modifiers: None,
-                }),
-                (None, None) => Some(StyleFile {
-                    fg: None,
-                    bg: None,
-                    modifiers: None,
-                }),
+                (Some(c1), None) => {
+                    Some(StyleFile { fg: Some(c1.to_string()), bg: None, modifiers: None })
+                }
+                (None, Some(c2)) => {
+                    Some(StyleFile { fg: None, bg: Some(c2.to_string()), modifiers: None })
+                }
+                (None, None) => Some(StyleFile { fg: None, bg: None, modifiers: None }),
             },
             ..Default::default()
         };
@@ -140,21 +132,13 @@ mod tests {
                     bg: Some(c2.to_string()),
                     modifiers: None,
                 }),
-                (Some(c1), None) => Some(StyleFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
-                    modifiers: None,
-                }),
-                (None, Some(c2)) => Some(StyleFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
-                    modifiers: None,
-                }),
-                (None, None) => Some(StyleFile {
-                    fg: None,
-                    bg: None,
-                    modifiers: None,
-                }),
+                (Some(c1), None) => {
+                    Some(StyleFile { fg: Some(c1.to_string()), bg: None, modifiers: None })
+                }
+                (None, Some(c2)) => {
+                    Some(StyleFile { fg: None, bg: Some(c2.to_string()), modifiers: None })
+                }
+                (None, None) => Some(StyleFile { fg: None, bg: None, modifiers: None }),
             },
             ..Default::default()
         };
@@ -179,21 +163,13 @@ mod tests {
                     bg: Some(c2.to_string()),
                     modifiers: None,
                 }),
-                (Some(c1), None) => Some(StyleFile {
-                    fg: Some(c1.to_string()),
-                    bg: None,
-                    modifiers: None,
-                }),
-                (None, Some(c2)) => Some(StyleFile {
-                    fg: None,
-                    bg: Some(c2.to_string()),
-                    modifiers: None,
-                }),
-                (None, None) => Some(StyleFile {
-                    fg: None,
-                    bg: None,
-                    modifiers: None,
-                }),
+                (Some(c1), None) => {
+                    Some(StyleFile { fg: Some(c1.to_string()), bg: None, modifiers: None })
+                }
+                (None, Some(c2)) => {
+                    Some(StyleFile { fg: None, bg: Some(c2.to_string()), modifiers: None })
+                }
+                (None, None) => Some(StyleFile { fg: None, bg: None, modifiers: None }),
             },
             ..Default::default()
         };
@@ -211,11 +187,7 @@ mod tests {
     #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
     fn thumb_modifiers(input: Modifiers, expected: RM) {
         let input = ScrollbarConfigFile {
-            thumb_style: Some(StyleFile {
-                fg: None,
-                bg: None,
-                modifiers: Some(input),
-            }),
+            thumb_style: Some(StyleFile { fg: None, bg: None, modifiers: Some(input) }),
             ..Default::default()
         };
 
@@ -235,11 +207,7 @@ mod tests {
     #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
     fn ends_modifiers(input: Modifiers, expected: RM) {
         let input = ScrollbarConfigFile {
-            ends_style: Some(StyleFile {
-                fg: None,
-                bg: None,
-                modifiers: Some(input),
-            }),
+            ends_style: Some(StyleFile { fg: None, bg: None, modifiers: Some(input) }),
             ..Default::default()
         };
 
@@ -259,11 +227,7 @@ mod tests {
     #[test_case(Modifiers::CrossedOut, RM::CROSSED_OUT; "crossed out")]
     fn track_modifiers(input: Modifiers, expected: RM) {
         let input = ScrollbarConfigFile {
-            track_style: Some(StyleFile {
-                fg: None,
-                bg: None,
-                modifiers: Some(input),
-            }),
+            track_style: Some(StyleFile { fg: None, bg: None, modifiers: Some(input) }),
             ..Default::default()
         };
 

@@ -1,17 +1,21 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use anyhow::Result;
 use ratatui::layout::Rect;
 
-use crate::config::album_art::ImageMethod;
-use crate::config::Config;
-use crate::shared::image::ImageProtocol;
-
-use super::{iterm2::Iterm2, kitty::Kitty, Backend};
 use super::{
+    Backend,
+    iterm2::Iterm2,
+    kitty::Kitty,
     sixel::Sixel,
     ueberzug::{Layer, Ueberzug},
+};
+use crate::{
+    config::{Config, album_art::ImageMethod},
+    shared::image::ImageProtocol,
 };
 
 pub static IS_SHOWING: AtomicBool = AtomicBool::new(false);
@@ -41,11 +45,19 @@ impl AlbumArtFacade {
         let valign = config.album_art.vertical_align;
         let halign = config.album_art.horizontal_align;
         let proto = match config.album_art.method.into() {
-            ImageProtocol::Kitty => ImageState::Kitty(Kitty::new(max_size, bg_color, halign, valign)),
-            ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new(Layer::Wayland, max_size)),
+            ImageProtocol::Kitty => {
+                ImageState::Kitty(Kitty::new(max_size, bg_color, halign, valign))
+            }
+            ImageProtocol::UeberzugWayland => {
+                ImageState::Ueberzug(Ueberzug::new(Layer::Wayland, max_size))
+            }
             ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11, max_size)),
-            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(max_size, bg_color, halign, valign)),
-            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(max_size, bg_color, halign, valign)),
+            ImageProtocol::Iterm2 => {
+                ImageState::Iterm2(Iterm2::new(max_size, bg_color, halign, valign))
+            }
+            ImageProtocol::Sixel => {
+                ImageState::Sixel(Sixel::new(max_size, bg_color, halign, valign))
+            }
             ImageProtocol::None => ImageState::None,
         };
         Self {

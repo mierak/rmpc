@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
 #[derive(Debug, Default, Serialize, IntoIterator, AsRef, AsMut, Into)]
 pub struct Stickers(pub HashMap<String, String>);

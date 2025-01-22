@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
 #[derive(Debug, Default, Serialize, PartialEq, Eq, Clone)]
 pub struct MpdConfig {

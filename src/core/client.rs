@@ -1,23 +1,22 @@
-use anyhow::Result;
-use drop_guard::{ClientDropGuard, DropGuard};
 use std::{
     collections::VecDeque,
     io::{self, Write},
     thread::Builder,
 };
 
+use anyhow::Result;
 use crossbeam::{
-    channel::{bounded, unbounded, Receiver, Sender},
+    channel::{Receiver, Sender, bounded, unbounded},
     select,
 };
+use drop_guard::{ClientDropGuard, DropGuard};
 
-use crate::shared::{
-    events::{AppEvent, ClientRequest, WorkDone},
-    macros::try_skip,
-};
 use crate::{
     mpd::{client::Client, commands::idle::IdleEvent, mpd_client::MpdClient},
-    shared::macros::try_break,
+    shared::{
+        events::{AppEvent, ClientRequest, WorkDone},
+        macros::{try_break, try_skip},
+    },
 };
 
 pub fn init(
@@ -30,7 +29,11 @@ pub fn init(
         .spawn(move || client_task(&client_rx, &event_tx, client))
 }
 
-fn client_task(client_rx: &Receiver<ClientRequest>, event_tx: &Sender<AppEvent>, client: Client<'_>) {
+fn client_task(
+    client_rx: &Receiver<ClientRequest>,
+    event_tx: &Sender<AppEvent>,
+    client: Client<'_>,
+) {
     let (req2idle_tx, req2idle_rx) = &bounded::<Client<'_>>(0);
     let (idle2req_tx, idle2req_rx) = &bounded::<Client<'_>>(0);
     let (idle_entered_tx, idle_entered_rx) = &bounded::<()>(0);
@@ -61,7 +64,8 @@ fn client_task(client_rx: &Receiver<ClientRequest>, event_tx: &Sender<AppEvent>,
             first_loop = false;
 
             if is_client_ok {
-                let mut client_write = client.stream.try_clone().expect("Client write clone to succeed");
+                let mut client_write =
+                    client.stream.try_clone().expect("Client write clone to succeed");
 
                 let idle = Builder::new()
                     .name("idle".to_string())
@@ -214,11 +218,9 @@ mod drop_guard {
 
     impl<'sender, 'client> ClientDropGuard<'sender, 'client> {
         pub fn new(tx: &'sender Sender<Client<'client>>, client: Client<'client>) -> Self {
-            Self {
-                tx,
-                client: Some(client),
-            }
+            Self { tx, client: Some(client) }
         }
+
         pub fn consume(mut self) -> Client<'client> {
             self.client
                 .take()
@@ -237,6 +239,7 @@ mod drop_guard {
 
     impl<'client> std::ops::Deref for ClientDropGuard<'_, 'client> {
         type Target = Client<'client>;
+
         fn deref(&self) -> &Self::Target {
             self.client.as_ref().expect("Cannot deref because client was None")
         }
@@ -272,7 +275,8 @@ fn check_connection(
     } else if client.reconnect().is_ok() {
         client.set_read_timeout(None).expect("Read timeout set to succeed");
 
-        // empty the work queue after reconnect as they might no longer be relevant
+        // empty the work queue after reconnect as they might no longer be
+        // relevant
         let _ = client_rx.try_iter().collect::<Vec<_>>();
         try_skip!(event_tx.send(AppEvent::Reconnected), "Failed to send reconnected event");
         true

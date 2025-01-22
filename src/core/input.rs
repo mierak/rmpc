@@ -6,9 +6,7 @@ use crossterm::event::Event;
 use crate::shared::{events::AppEvent, mouse_event::MouseEventTracker};
 
 pub fn init(event_tx: Sender<AppEvent>) -> std::io::Result<std::thread::JoinHandle<()>> {
-    std::thread::Builder::new()
-        .name("input".to_owned())
-        .spawn(move || input_poll_task(&event_tx))
+    std::thread::Builder::new().name("input".to_owned()).spawn(move || input_poll_task(&event_tx))
 }
 
 fn input_poll_task(event_tx: &Sender<AppEvent>) {

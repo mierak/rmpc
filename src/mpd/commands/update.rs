@@ -1,5 +1,4 @@
-use crate::mpd::errors::MpdError;
-use crate::mpd::{FromMpd, LineHandled};
+use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Update {

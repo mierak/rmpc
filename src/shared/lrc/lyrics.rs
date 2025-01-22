@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use super::parse_length;
 
@@ -53,13 +53,16 @@ impl FromStr for Lrc {
             match meta_or_time.chars().next() {
                 Some(c) if c.is_numeric() => {
                     for meta_or_time in meta_or_time.split("][") {
-                        let (minutes, time_rest) = meta_or_time
-                            .split_once(':')
-                            .with_context(|| format!("Invalid lrc minutes format: '{meta_or_time}'"))?;
+                        let (minutes, time_rest) =
+                            meta_or_time.split_once(':').with_context(|| {
+                                format!("Invalid lrc minutes format: '{meta_or_time}'")
+                            })?;
                         let (seconds, hundreths) = time_rest
                             .split_once('.')
                             .or_else(|| time_rest.split_once(':'))
-                            .with_context(|| format!("Invalid lrc seconds and hundreths format: '{time_rest}'"))?;
+                            .with_context(|| {
+                                format!("Invalid lrc seconds and hundreths format: '{time_rest}'")
+                            })?;
 
                         let mut milis = 0;
                         milis += minutes.parse::<u64>()? * 60 * 1000;
@@ -67,8 +70,12 @@ impl FromStr for Lrc {
                         milis += hundreths.parse::<u64>()? * 10;
 
                         milis = match offset {
-                            Some(offset) if offset > 0 => milis.saturating_sub(offset.unsigned_abs()),
-                            Some(offset) if offset < 0 => milis.saturating_add(offset.unsigned_abs()),
+                            Some(offset) if offset > 0 => {
+                                milis.saturating_sub(offset.unsigned_abs())
+                            }
+                            Some(offset) if offset < 0 => {
+                                milis.saturating_add(offset.unsigned_abs())
+                            }
                             _ => milis,
                         };
 
@@ -107,7 +114,7 @@ impl FromStr for Lrc {
 mod tests {
     use std::time::Duration;
 
-    use crate::shared::lrc::{lyrics::LrcLine, Lrc};
+    use crate::shared::lrc::{Lrc, lyrics::LrcLine};
 
     #[test]
     fn lrc() {
@@ -125,34 +132,28 @@ mod tests {
 
         let result: Lrc = input.parse().unwrap();
 
-        assert_eq!(
-            result,
-            Lrc {
-                title: Some("asdf".to_string()),
-                artist: Some("123".to_string()),
-                album: Some("333".to_string()),
-                author: Some("444".to_string()),
-                length: Some(Duration::from_secs(143)),
-                lines: vec![
-                    LrcLine {
-                        time: Duration::from_millis(1860),
-                        content: "line with dot before hundredths".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(4730),
-                        content: "line with colon before hundredths".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(11240),
-                        content: String::new()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(676_910),
-                        content: "line with long time".to_string()
-                    },
-                ],
-            }
-        );
+        assert_eq!(result, Lrc {
+            title: Some("asdf".to_string()),
+            artist: Some("123".to_string()),
+            album: Some("333".to_string()),
+            author: Some("444".to_string()),
+            length: Some(Duration::from_secs(143)),
+            lines: vec![
+                LrcLine {
+                    time: Duration::from_millis(1860),
+                    content: "line with dot before hundredths".to_string()
+                },
+                LrcLine {
+                    time: Duration::from_millis(4730),
+                    content: "line with colon before hundredths".to_string()
+                },
+                LrcLine { time: Duration::from_millis(11240), content: String::new() },
+                LrcLine {
+                    time: Duration::from_millis(676_910),
+                    content: "line with long time".to_string()
+                },
+            ],
+        });
     }
 
     #[test]
@@ -166,26 +167,17 @@ mod tests {
 
         let result: Lrc = input.parse().unwrap();
 
-        assert_eq!(
-            result,
-            Lrc {
-                title: None,
-                artist: None,
-                album: None,
-                author: None,
-                length: None,
-                lines: vec![
-                    LrcLine {
-                        time: Duration::from_millis(860),
-                        content: "line1".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(3730),
-                        content: "line2".to_string()
-                    },
-                ],
-            }
-        );
+        assert_eq!(result, Lrc {
+            title: None,
+            artist: None,
+            album: None,
+            author: None,
+            length: None,
+            lines: vec![
+                LrcLine { time: Duration::from_millis(860), content: "line1".to_string() },
+                LrcLine { time: Duration::from_millis(3730), content: "line2".to_string() },
+            ],
+        });
     }
 
     #[test]
@@ -199,26 +191,17 @@ mod tests {
 
         let result: Lrc = input.parse().unwrap();
 
-        assert_eq!(
-            result,
-            Lrc {
-                title: None,
-                artist: None,
-                album: None,
-                author: None,
-                length: None,
-                lines: vec![
-                    LrcLine {
-                        time: Duration::from_millis(2860),
-                        content: "line1".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(5730),
-                        content: "line2".to_string()
-                    },
-                ],
-            }
-        );
+        assert_eq!(result, Lrc {
+            title: None,
+            artist: None,
+            album: None,
+            author: None,
+            length: None,
+            lines: vec![
+                LrcLine { time: Duration::from_millis(2860), content: "line1".to_string() },
+                LrcLine { time: Duration::from_millis(5730), content: "line2".to_string() },
+            ],
+        });
     }
 
     #[test]
@@ -231,37 +214,19 @@ mod tests {
 
         let result: Lrc = input.parse().unwrap();
 
-        assert_eq!(
-            result,
-            Lrc {
-                title: None,
-                artist: None,
-                album: None,
-                author: None,
-                length: None,
-                lines: vec![
-                    LrcLine {
-                        time: Duration::from_millis(1860),
-                        content: "line1".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(4730),
-                        content: "line2".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(5730),
-                        content: "line2".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(6730),
-                        content: "line2".to_string()
-                    },
-                    LrcLine {
-                        time: Duration::from_millis(7860),
-                        content: "line3".to_string()
-                    },
-                ],
-            }
-        );
+        assert_eq!(result, Lrc {
+            title: None,
+            artist: None,
+            album: None,
+            author: None,
+            length: None,
+            lines: vec![
+                LrcLine { time: Duration::from_millis(1860), content: "line1".to_string() },
+                LrcLine { time: Duration::from_millis(4730), content: "line2".to_string() },
+                LrcLine { time: Duration::from_millis(5730), content: "line2".to_string() },
+                LrcLine { time: Duration::from_millis(6730), content: "line2".to_string() },
+                LrcLine { time: Duration::from_millis(7860), content: "line3".to_string() },
+            ],
+        });
     }
 }

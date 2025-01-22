@@ -2,14 +2,15 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use ratatui::{
+    Frame,
     layout::Rect,
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols,
     widgets::{Block, Borders, Clear, List, ListState},
-    Frame,
 };
 
+use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
@@ -23,10 +24,6 @@ use crate::{
         widgets::button::{Button, ButtonGroup, ButtonGroupState},
     },
 };
-
-use super::RectExt;
-
-use super::Modal;
 
 #[derive(Debug)]
 enum FocusedComponent {
@@ -57,7 +54,9 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> std::fmt
     }
 }
 
-impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
+impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>>
+    SelectModal<'a, V, Callback>
+{
     pub fn new(context: &AppContext) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
@@ -116,7 +115,9 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::ROUNDED
 };
 
-impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal for SelectModal<'_, V, Callback> {
+impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
+    for SelectModal<'_, V, Callback>
+{
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
@@ -131,11 +132,8 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal fo
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(list_area.height.into()));
 
-        let options = self
-            .options
-            .iter()
-            .enumerate()
-            .map(|(idx, v)| format!("{:>3}: {v}", idx + 1));
+        let options =
+            self.options.iter().enumerate().map(|(idx, v)| format!("{:>3}: {v}", idx + 1));
         let playlists = List::new(options)
             .style(app.config.as_text_style())
             .highlight_style(match self.focused {
@@ -156,19 +154,26 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal fo
             FocusedComponent::Buttons => app.config.theme.current_item_style,
         });
 
-        let scrollbar_area = Block::default()
-            .padding(ratatui::widgets::Padding::new(0, 0, 1, 0))
-            .inner(list_area);
+        let scrollbar_area =
+            Block::default().padding(ratatui::widgets::Padding::new(0, 0, 1, 0)).inner(list_area);
 
         self.options_area = list_area;
 
-        frame.render_stateful_widget(playlists, list_area, self.scrolling_state.as_render_state_ref());
+        frame.render_stateful_widget(
+            playlists,
+            list_area,
+            self.scrolling_state.as_render_state_ref(),
+        );
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
             scrollbar_area,
             self.scrolling_state.as_scrollbar_state_ref(),
         );
-        frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
+        frame.render_stateful_widget(
+            &mut self.button_group,
+            buttons_area,
+            &mut self.button_group_state,
+        );
         Ok(())
     }
 
@@ -190,7 +195,9 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal fo
                             }
                         }
                         FocusedComponent::Buttons => {
-                            if self.button_group_state.selected == self.button_group_state.button_count() - 1 {
+                            if self.button_group_state.selected
+                                == self.button_group_state.button_count() - 1
+                            {
                                 self.focused = FocusedComponent::List;
                                 self.scrolling_state.first();
                             } else {
@@ -294,12 +301,16 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal fo
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
-            MouseEventKind::ScrollUp if self.button_group.get_button_idx_at(event.into()).is_some() => {
+            MouseEventKind::ScrollUp
+                if self.button_group.get_button_idx_at(event.into()).is_some() =>
+            {
                 self.focused = FocusedComponent::Buttons;
                 self.button_group_state.prev();
                 context.render()?;
             }
-            MouseEventKind::ScrollDown if self.button_group.get_button_idx_at(event.into()).is_some() => {
+            MouseEventKind::ScrollDown
+                if self.button_group.get_button_idx_at(event.into()).is_some() =>
+            {
                 self.focused = FocusedComponent::Buttons;
                 self.button_group_state.next();
                 context.render()?;

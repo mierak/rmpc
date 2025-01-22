@@ -1,29 +1,25 @@
-use anyhow::anyhow;
-use anyhow::Context;
-use anyhow::Result;
-use crossbeam::channel::unbounded;
-use crossbeam::channel::Sender;
+use std::{
+    fmt::Display,
+    io::{ErrorKind, Write},
+    os::unix::net::UnixStream,
+    process::{Child, Command, Stdio},
+    sync::Arc,
+    time::Duration,
+};
+
+use anyhow::{Context, Result, anyhow};
+use crossbeam::channel::{Sender, unbounded};
 use ratatui::layout::Rect;
 use rustix::path::Arg;
 use serde::Serialize;
-use std::fmt::Display;
-use std::io::Write;
-use std::os::unix::net::UnixStream;
-use std::process::Child;
-use std::process::Stdio;
-use std::sync::Arc;
-use std::time::Duration;
-use std::{io::ErrorKind, process::Command};
-use sysinfo::ProcessRefreshKind;
-use sysinfo::ProcessesToUpdate;
-use sysinfo::System;
-
-use crate::config::Size;
-use crate::shared::macros::try_cont;
-use crate::shared::macros::try_skip;
-use crate::tmux;
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
 use super::Backend;
+use crate::{
+    config::Size,
+    shared::macros::{try_cont, try_skip},
+    tmux,
+};
 
 #[derive(Debug)]
 pub struct Ueberzug {
@@ -68,8 +64,8 @@ impl Backend for Ueberzug {
         if tmux::is_in_tmux_and_hidden()? {
             // We should not command ueberzugpp to rerender when rmpc is inside TMUX session
             // without any attached clients or the pane which rmpc resides in is not visible
-            // because it might make ueberzugpp popup in windows/panes/sessions
-            // that do not belong to rmpc
+            // because it might make ueberzugpp popup in windows/panes/sessions that do not
+            // belong to rmpc
             return Ok(());
         }
 
@@ -82,9 +78,7 @@ impl Backend for Ueberzug {
 
         file.write_all(&data)?;
 
-        Ok(self
-            .sender
-            .send(Action::Add(UEBERZUG_ALBUM_ART_PATH, x, y, width, height))?)
+        Ok(self.sender.send(Action::Add(UEBERZUG_ALBUM_ART_PATH, x, y, width, height))?)
     }
 
     fn hide(&mut self, _: Rect) -> Result<()> {
@@ -108,12 +102,8 @@ impl Ueberzug {
             .to_string_lossy()
             .into_owned();
 
-        let mut daemon = UeberzugDaemon {
-            pid: None,
-            pid_file: pid_file_path,
-            ueberzug_process: None,
-            layer,
-        };
+        let mut daemon =
+            UeberzugDaemon { pid: None, pid_file: pid_file_path, ueberzug_process: None, layer };
 
         let handle = std::thread::Builder::new()
             .name("ueberzugpp".to_string())
@@ -131,10 +121,16 @@ impl Ueberzug {
                             );
                         }
                         Action::Remove => {
-                            try_cont!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
+                            try_cont!(
+                                daemon.remove_image(),
+                                "Failed to send remove request to ueberzugpp"
+                            );
                         }
                         Action::Destroy => {
-                            try_skip!(daemon.remove_image(), "Failed to send remove request to ueberzugpp");
+                            try_skip!(
+                                daemon.remove_image(),
+                                "Failed to send remove request to ueberzugpp"
+                            );
 
                             if let Some(ref mut proc) = daemon.ueberzug_process {
                                 try_skip!(proc.kill(), "Failed to kill ueberzugpp process");
@@ -144,7 +140,10 @@ impl Ueberzug {
                             if let Some(pid) = daemon.pid {
                                 if let Some(pid) = rustix::process::Pid::from_raw(pid.0) {
                                     try_skip!(
-                                        rustix::process::kill_process(pid, rustix::process::Signal::Term),
+                                        rustix::process::kill_process(
+                                            pid,
+                                            rustix::process::Signal::Term
+                                        ),
                                         "Failed to send SIGTERM to ueberzugpp pid file"
                                     );
                                 }
@@ -166,23 +165,21 @@ impl Ueberzug {
 }
 
 impl UeberzugDaemon {
-    fn show_image(&self, path: &'static str, x: u16, y: u16, width: u16, height: u16) -> Result<()> {
+    fn show_image(
+        &self,
+        path: &'static str,
+        x: u16,
+        y: u16,
+        width: u16,
+        height: u16,
+    ) -> Result<()> {
         let Some(pid) = self.pid else {
             return Ok(());
         };
 
         let mut socket = UeberzugSocket::connect(pid)?;
 
-        socket.add_image(
-            pid,
-            CreateData {
-                path,
-                width,
-                height,
-                x,
-                y,
-            },
-        )?;
+        socket.add_image(pid, CreateData { path, width, height, x, y })?;
 
         Ok(())
     }
@@ -216,20 +213,9 @@ impl UeberzugDaemon {
                 log::warn!(err:?; "Failed to delete pid file");
             }
         };
-        cmd.args([
-            "layer",
-            "-so",
-            self.layer.as_str(),
-            "--no-stdin",
-            "--pid-file",
-            &self.pid_file,
-        ]);
+        cmd.args(["layer", "-so", self.layer.as_str(), "--no-stdin", "--pid-file", &self.pid_file]);
 
-        let child = cmd
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()?;
+        let child = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn()?;
 
         let pid = self.read_pid()?;
 
@@ -269,15 +255,18 @@ impl UeberzugDaemon {
 struct UeberzugSocket(UnixStream);
 impl UeberzugSocket {
     fn connect(pid: Pid) -> Result<UeberzugSocket> {
-        Ok(Self(UnixStream::connect(pid.as_socket_path()).context(anyhow!(
-            "Cannot connect to ueberzug socket: '{}'",
-            pid.as_socket_path()
-        ))?))
+        Ok(Self(
+            UnixStream::connect(pid.as_socket_path()).context(anyhow!(
+                "Cannot connect to ueberzug socket: '{}'",
+                pid.as_socket_path()
+            ))?,
+        ))
     }
 
     fn remove_image(&mut self, pid: Pid) -> Result<()> {
-        self.0
-            .write_all(format!(r#"{{"action":"remove","identifier":"{IDENTIFIER}-{pid}"}}"#).as_bytes())?;
+        self.0.write_all(
+            format!(r#"{{"action":"remove","identifier":"{IDENTIFIER}-{pid}"}}"#).as_bytes(),
+        )?;
         self.0.write_all(b"\n")?;
         Ok(())
     }
@@ -285,13 +274,7 @@ impl UeberzugSocket {
     fn add_image(
         &mut self,
         pid: Pid,
-        CreateData {
-            x,
-            y,
-            width,
-            height,
-            path,
-        }: CreateData,
+        CreateData { x, y, width, height, path }: CreateData,
     ) -> Result<()> {
         self.0.write_all(format!(r#"{{"action":"add","identifier":"{IDENTIFIER}-{pid}","max_height":{height},"max_width":{width},"path":"{path}","x":{x},"y":{y}}}"#)
             .as_bytes(),

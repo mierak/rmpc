@@ -3,7 +3,12 @@ use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::prelude::Rect;
 
+use super::{
+    dirstack::{DirStack, DirStackItem},
+    panes::Pane,
+};
 use crate::{
+    MpdQueryResult,
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
     core::event_loop::EXTERNAL_COMMAND,
@@ -12,12 +17,6 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    MpdQueryResult,
-};
-
-use super::{
-    dirstack::{DirStack, DirStackItem},
-    panes::Pane,
 };
 
 pub enum MoveDirection {
@@ -36,7 +35,10 @@ where
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, context: &AppContext) -> Result<()>;
-    fn list_songs_in_item(&self, item: T) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
+    fn list_songs_in_item(
+        &self,
+        item: T,
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
     fn add(&self, item: &T, context: &AppContext) -> Result<()>;
     fn add_all(&self, context: &AppContext) -> Result<()>;
@@ -93,7 +95,9 @@ where
 
         let config = context.config;
         match action {
-            GlobalAction::ExternalCommand { command, .. } if !self.stack().current().marked().is_empty() => {
+            GlobalAction::ExternalCommand { command, .. }
+                if !self.stack().current().marked().is_empty() =>
+            {
                 let marked_items: Vec<_> = self
                     .stack()
                     .current()
@@ -134,7 +138,9 @@ where
 
         let position = event.into();
         match event.kind {
-            MouseEventKind::LeftClick | MouseEventKind::DoubleClick if prev_area.contains(position) => {
+            MouseEventKind::LeftClick | MouseEventKind::DoubleClick
+                if prev_area.contains(position) =>
+            {
                 let clicked_row: usize = event.y.saturating_sub(prev_area.y).into();
                 let prev_stack = self.stack_mut().previous_mut();
                 if let Some(idx_to_select) = prev_stack.state.get_at_rendered_row(clicked_row) {
@@ -146,7 +152,9 @@ where
             MouseEventKind::DoubleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
-                if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
+                if let Some(idx_to_select) =
+                    self.stack().current().state.get_at_rendered_row(clicked_row)
+                {
                     self.next(context)?;
                     self.prepare_preview(context);
                 }
@@ -154,7 +162,9 @@ where
             MouseEventKind::MiddleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
-                if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
+                if let Some(idx_to_select) =
+                    self.stack().current().state.get_at_rendered_row(clicked_row)
+                {
                     self.stack_mut()
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
@@ -168,29 +178,28 @@ where
             MouseEventKind::LeftClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
 
-                if let Some(idx_to_select) = self.stack().current().state.get_at_rendered_row(clicked_row) {
+                if let Some(idx_to_select) =
+                    self.stack().current().state.get_at_rendered_row(clicked_row)
+                {
                     self.stack_mut()
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     self.prepare_preview(context);
                 }
             }
-            MouseEventKind::LeftClick | MouseEventKind::DoubleClick if preview_area.contains(position) => {
+            MouseEventKind::LeftClick | MouseEventKind::DoubleClick
+                if preview_area.contains(position) =>
+            {
                 let clicked_row: usize = event.y.saturating_sub(preview_area.y).into();
-                // Offset does not need to be accounted for since it is always scrolled all the way
-                // to the top when going deeper
+                // Offset does not need to be accounted for since it is always
+                // scrolled all the way to the top when going
+                // deeper
                 let idx_to_select = self.stack().preview().and_then(|preview| {
-                    if clicked_row < preview.len() {
-                        Some(clicked_row)
-                    } else {
-                        None
-                    }
+                    if clicked_row < preview.len() { Some(clicked_row) } else { None }
                 });
 
                 self.next(context)?;
-                self.stack_mut()
-                    .current_mut()
-                    .select_idx(idx_to_select.unwrap_or_default(), 0);
+                self.stack_mut().current_mut().select_idx(idx_to_select.unwrap_or_default(), 0);
 
                 self.prepare_preview(context);
             }
@@ -216,16 +225,12 @@ where
 
         match action {
             CommonAction::Up => {
-                self.stack_mut()
-                    .current_mut()
-                    .prev(config.scrolloff, config.wrap_navigation);
+                self.stack_mut().current_mut().prev(config.scrolloff, config.wrap_navigation);
                 self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::Down => {
-                self.stack_mut()
-                    .current_mut()
-                    .next(config.scrolloff, config.wrap_navigation);
+                self.stack_mut().current_mut().next(config.scrolloff, config.wrap_navigation);
                 self.prepare_preview(context);
                 context.render()?;
             }
@@ -236,16 +241,12 @@ where
                 self.move_selected(MoveDirection::Down, context);
             }
             CommonAction::DownHalf => {
-                self.stack_mut()
-                    .current_mut()
-                    .next_half_viewport(context.config.scrolloff);
+                self.stack_mut().current_mut().next_half_viewport(context.config.scrolloff);
                 self.prepare_preview(context);
                 context.render()?;
             }
             CommonAction::UpHalf => {
-                self.stack_mut()
-                    .current_mut()
-                    .prev_half_viewport(context.config.scrolloff);
+                self.stack_mut().current_mut().prev_half_viewport(context.config.scrolloff);
                 self.prepare_preview(context);
                 context.render()?;
             }

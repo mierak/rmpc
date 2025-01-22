@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 #[derive(Default, Serialize, PartialEq, Eq, Clone)]
 pub struct Song {
