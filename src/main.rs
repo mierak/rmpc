@@ -20,26 +20,29 @@ use std::io::{Read, Write};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::{
-    cli::{Args, Command},
-    ConfigFile,
-};
 use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
-use mpd::{client::Client, commands::State};
 use rustix::path::Arg;
-use shared::{
-    dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
-    events::{AppEvent, ClientRequest, WorkRequest},
-    mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
-};
-use shared::{env::ENV, logging, tmux};
 
-use crate::{
-    config::Config,
-    shared::macros::{status_warn, try_ret},
+use crate::config::cli::{Args, Command};
+use crate::config::{Config, ConfigFile};
+use crate::mpd::client::Client;
+use crate::mpd::commands::State;
+use crate::shared::dependencies::{
+    DEPENDENCIES,
+    FFMPEG,
+    FFPROBE,
+    PYTHON3,
+    PYTHON3MUTAGEN,
+    UEBERZUGPP,
+    YTDLP,
 };
+use crate::shared::env::ENV;
+use crate::shared::events::{AppEvent, ClientRequest, WorkRequest};
+use crate::shared::macros::{status_warn, try_ret};
+use crate::shared::mpd_query::{MpdCommand, MpdQuery, MpdQueryResult};
+use crate::shared::{logging, tmux};
 
 #[cfg(test)]
 mod tests {
@@ -62,27 +65,31 @@ fn main() -> Result<()> {
             ))?;
         }
         Some(Command::Theme { current: false }) => {
-            std::io::stdout().write_all(include_bytes!("../docs/src/content/docs/next/assets/example_theme.ron"))?;
+            std::io::stdout().write_all(include_bytes!(
+                "../docs/src/content/docs/next/assets/example_theme.ron"
+            ))?;
         }
         Some(Command::Config { current: true }) => {
-            let mut file = std::fs::File::open(&args.config)
-                .with_context(|| format!("Config file was not found at '{}'", args.config.to_string_lossy()))?;
+            let mut file = std::fs::File::open(&args.config).with_context(|| {
+                format!("Config file was not found at '{}'", args.config.to_string_lossy())
+            })?;
             let mut config = String::new();
             file.read_to_string(&mut config)?;
             println!("{config}");
         }
         Some(Command::Theme { current: true }) => {
-            let config_file = ConfigFile::read(&args.config)
-                .with_context(|| format!("Config file was not found at '{}'", args.config.to_string_lossy()))?;
-            let config_dir = args
-                .config
-                .parent()
-                .with_context(|| format!("Invalid config path '{}'", args.config.to_string_lossy()))?;
+            let config_file = ConfigFile::read(&args.config).with_context(|| {
+                format!("Config file was not found at '{}'", args.config.to_string_lossy())
+            })?;
+            let config_dir = args.config.parent().with_context(|| {
+                format!("Invalid config path '{}'", args.config.to_string_lossy())
+            })?;
             let theme_path = config_file
                 .theme_path(config_dir)
                 .context("No theme file specified in the config. Default theme is used.")?;
-            let mut file = std::fs::File::open(&theme_path)
-                .with_context(|| format!("Theme file was not found at '{}'", theme_path.to_string_lossy()))?;
+            let mut file = std::fs::File::open(&theme_path).with_context(|| {
+                format!("Theme file was not found at '{}'", theme_path.to_string_lossy())
+            })?;
             let mut theme = String::new();
             file.read_to_string(&mut theme)?;
             println!("{theme}");
@@ -104,9 +111,7 @@ fn main() -> Result<()> {
             println!(
                 "rmpc {}{}",
                 env!("CARGO_PKG_VERSION"),
-                option_env!("VERGEN_GIT_DESCRIBE")
-                    .map(|g| format!(" git {g}"))
-                    .unwrap_or_default()
+                option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
             );
             println!("\n{:<20} {}", "Config path", args.config.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
@@ -135,27 +140,26 @@ fn main() -> Result<()> {
             println!(
                 "rmpc {}{}",
                 env!("CARGO_PKG_VERSION"),
-                option_env!("VERGEN_GIT_DESCRIBE")
-                    .map(|g| format!(" git {g}"))
-                    .unwrap_or_default()
+                option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
             );
         }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");
-            let config: &'static Config = Box::leak(Box::new(match ConfigFile::read(&args.config) {
-                Ok(val) => val.into_config(
-                    Some(&args.config),
-                    std::mem::take(&mut args.address),
-                    std::mem::take(&mut args.password),
-                    true,
-                )?,
-                Err(_err) => ConfigFile::default().into_config(
-                    None,
-                    std::mem::take(&mut args.address),
-                    std::mem::take(&mut args.password),
-                    true,
-                )?,
-            }));
+            let config: &'static Config =
+                Box::leak(Box::new(match ConfigFile::read(&args.config) {
+                    Ok(val) => val.into_config(
+                        Some(&args.config),
+                        std::mem::take(&mut args.address),
+                        std::mem::take(&mut args.password),
+                        true,
+                    )?,
+                    Err(_err) => ConfigFile::default().into_config(
+                        None,
+                        std::mem::take(&mut args.address),
+                        std::mem::take(&mut args.password),
+                        true,
+                    )?,
+                }));
             let mut client = Client::init(config.address, config.password, "main")?;
             client.set_read_timeout(None)?;
             (cmd.execute(config)?)(&mut client)?;
@@ -206,11 +210,18 @@ fn main() -> Result<()> {
             let tx_clone = event_tx.clone();
 
             let context = try_ret!(
-                AppContext::try_new(&mut client, config, tx_clone, worker_tx.clone(), client_tx.clone()),
+                AppContext::try_new(
+                    &mut client,
+                    config,
+                    tx_clone,
+                    worker_tx.clone(),
+                    client_tx.clone()
+                ),
                 "Failed to create app context"
             );
 
-            let mut render_loop = UpdateLoop::try_new(client_tx.clone(), context.config.status_update_interval_ms)?;
+            let mut render_loop =
+                UpdateLoop::try_new(client_tx.clone(), context.config.status_update_interval_ms)?;
             if context.status.state == State::Play {
                 render_loop.start()?;
             }
@@ -219,9 +230,15 @@ fn main() -> Result<()> {
             let terminal = try_ret!(ui::setup_terminal(enable_mouse), "Failed to setup terminal");
 
             core::client::init(client_rx.clone(), event_tx.clone(), client)?;
-            core::work::init(worker_rx.clone(), client_tx.clone(), event_tx.clone(), context.config)?;
+            core::work::init(
+                worker_rx.clone(),
+                client_tx.clone(),
+                event_tx.clone(),
+                context.config,
+            )?;
             core::input::init(event_tx.clone())?;
-            let event_loop_handle = core::event_loop::init(context, event_rx, render_loop, terminal)?;
+            let event_loop_handle =
+                core::event_loop::init(context, event_rx, render_loop, terminal)?;
 
             let original_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {

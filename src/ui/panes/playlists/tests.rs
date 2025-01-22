@@ -10,8 +10,9 @@ use crate::context::AppContext;
 use crate::mpd::commands::Song;
 use crate::tests::fixtures::app_context;
 use crate::ui::browser::BrowserPane;
-
-use crate::ui::panes::{browser::DirOrSong, playlists::PlaylistsPane, Pane};
+use crate::ui::panes::Pane;
+use crate::ui::panes::browser::DirOrSong;
+use crate::ui::panes::playlists::PlaylistsPane;
 
 mod on_idle_event {
     use super::*;
@@ -155,13 +156,11 @@ mod on_idle_event {
     }
 
     mod browsing_songs {
-        use crate::{
-            shared::events::{ClientRequest, WorkRequest},
-            tests::fixtures::{client_request_channel, work_request_channel},
-        };
         use crossbeam::channel::{Receiver, Sender};
 
         use super::*;
+        use crate::shared::events::{ClientRequest, WorkRequest};
+        use crate::tests::fixtures::{client_request_channel, work_request_channel};
 
         #[rstest]
         fn selects_the_same_playlist_and_song(
@@ -188,10 +187,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList {
-                        data: initial_songs.clone(),
-                        origin_path: None,
-                    },
+                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
                     &app_context,
                 )
@@ -258,10 +254,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList {
-                        data: initial_songs.clone(),
-                        origin_path: None,
-                    },
+                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
                     &app_context,
                 )
@@ -329,10 +322,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList {
-                        data: initial_songs.clone(),
-                        origin_path: None,
-                    },
+                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
                     &app_context,
                 )
@@ -399,10 +389,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList {
-                        data: initial_songs.clone(),
-                        origin_path: None,
-                    },
+                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
                     &app_context,
                 )
@@ -457,10 +444,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong {
-                        data: initial_playlists,
-                        origin_path: None,
-                    },
+                    MpdQueryResult::DirOrSong { data: initial_playlists, origin_path: None },
                     true,
                     &app_context,
                 )
@@ -470,10 +454,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList {
-                        data: initial_songs.clone(),
-                        origin_path: None,
-                    },
+                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
                     &app_context,
                 )
@@ -518,10 +499,7 @@ mod on_idle_event {
 }
 
 fn dir(name: &str) -> DirOrSong {
-    DirOrSong::Dir {
-        name: name.to_string(),
-        full_path: name.to_string(),
-    }
+    DirOrSong::Dir { name: name.to_string(), full_path: name.to_string() }
 }
 
 static LAST_ID: AtomicU32 = AtomicU32::new(1);

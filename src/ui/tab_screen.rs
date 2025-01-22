@@ -1,24 +1,21 @@
-use std::{collections::HashMap, time::Instant};
+use std::collections::HashMap;
+use std::time::Instant;
 
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{layout::Rect, Frame};
+use ratatui::Frame;
+use ratatui::layout::Rect;
 
-use crate::{
-    config::{
-        keys::CommonAction,
-        tabs::{Pane, SizedPaneOrSplit},
-    },
-    context::AppContext,
-    shared::{
-        ext::{rect::RectExt, vec::VecExt},
-        id::Id,
-        key_event::KeyEvent,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-};
-
-use super::{panes::pane_call, Pane as _, PaneContainer, Panes};
+use super::panes::pane_call;
+use super::{Pane as _, PaneContainer, Panes};
+use crate::config::keys::CommonAction;
+use crate::config::tabs::{Pane, SizedPaneOrSplit};
+use crate::context::AppContext;
+use crate::shared::ext::rect::RectExt;
+use crate::shared::ext::vec::VecExt;
+use crate::shared::id::Id;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
 
 #[derive(Debug)]
 pub struct PaneData {
@@ -50,12 +47,7 @@ pub struct TabScreen {
 impl TabScreen {
     pub fn new(panes: SizedPaneOrSplit) -> Self {
         let focused = panes.panes_iter().next();
-        Self {
-            panes,
-            focused,
-            initialized: false,
-            pane_data: HashMap::default(),
-        }
+        Self { panes, focused, initialized: false, pane_data: HashMap::default() }
     }
 
     fn set_focused(&mut self, pane: Option<Pane>) {
@@ -74,8 +66,11 @@ impl TabScreen {
         area: Rect,
         context: &AppContext,
     ) -> Result<()> {
-        self.panes
-            .for_each_pane(self.focused, area, context, &mut |pane, area, block, block_area| {
+        self.panes.for_each_pane(
+            self.focused,
+            area,
+            context,
+            &mut |pane, area, block, block_area| {
                 let pane_data = self
                     .pane_data
                     .entry(pane.id)
@@ -86,7 +81,8 @@ impl TabScreen {
                 pane_call!(pane_instance, render(frame, area, context))?;
                 frame.render_widget(block, block_area);
                 Ok(())
-            })?;
+            },
+        )?;
         Ok(())
     }
 
@@ -177,9 +173,7 @@ impl TabScreen {
                 .iter()
                 .find(|(_, PaneData { area, .. })| area.contains(event.into()))
                 .and_then(|(pane_id, _)| {
-                    self.panes
-                        .panes_iter()
-                        .find(|pane| &pane.id == pane_id && pane.is_focusable())
+                    self.panes.panes_iter().find(|pane| &pane.id == pane_id && pane.is_focusable())
                 })
             else {
                 return Ok(());
@@ -205,9 +199,17 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn before_show(&mut self, pane_container: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
-        self.panes
-            .for_each_pane(self.focused, area, context, &mut |pane, pane_area, _, block_area| {
+    pub fn before_show(
+        &mut self,
+        pane_container: &mut PaneContainer,
+        area: Rect,
+        context: &AppContext,
+    ) -> Result<()> {
+        self.panes.for_each_pane(
+            self.focused,
+            area,
+            context,
+            &mut |pane, pane_area, _, block_area| {
                 let pane_data = self
                     .pane_data
                     .entry(pane.id)
@@ -218,7 +220,8 @@ impl TabScreen {
                 pane_call!(pane_instance, calculate_areas(pane_area, context))?;
                 pane_call!(pane_instance, before_show(context))?;
                 Ok(())
-            })?;
+            },
+        )?;
         if !self.initialized {
             self.set_focused(
                 self.pane_data
@@ -235,9 +238,17 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn resize(&mut self, pane_container: &mut PaneContainer, area: Rect, context: &AppContext) -> Result<()> {
-        self.panes
-            .for_each_pane(self.focused, area, context, &mut |pane, pane_area, _, block_area| {
+    pub fn resize(
+        &mut self,
+        pane_container: &mut PaneContainer,
+        area: Rect,
+        context: &AppContext,
+    ) -> Result<()> {
+        self.panes.for_each_pane(
+            self.focused,
+            area,
+            context,
+            &mut |pane, pane_area, _, block_area| {
                 let pane_data = self
                     .pane_data
                     .entry(pane.id)
@@ -248,7 +259,8 @@ impl TabScreen {
                 pane_call!(pane_instance, calculate_areas(pane_area, context))?;
                 pane_call!(pane_instance, resize(pane_area, context))?;
                 Ok(())
-            })
+            },
+        )
     }
 
     fn panes_directly_above(&self, focused_area: Rect) -> impl Iterator<Item = (&Id, &PaneData)> {

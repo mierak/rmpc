@@ -1,25 +1,19 @@
 use anyhow::Result;
-use ratatui::{
-    layout::{Constraint, Margin, Rect},
-    style::Style,
-    symbols::border,
-    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
-};
-
-use crate::{
-    config::keys::CommonAction,
-    context::AppContext,
-    mpd::{commands::Output, mpd_client::MpdClient},
-    shared::{
-        key_event::KeyEvent,
-        macros::pop_modal,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-    ui::dirstack::DirState,
-    MpdQueryResult,
-};
+use ratatui::layout::{Constraint, Margin, Rect};
+use ratatui::style::Style;
+use ratatui::symbols::border;
+use ratatui::widgets::{Block, Borders, Cell, Clear, Row, Table, TableState};
 
 use super::{Modal, RectExt};
+use crate::MpdQueryResult;
+use crate::config::keys::CommonAction;
+use crate::context::AppContext;
+use crate::mpd::commands::Output;
+use crate::mpd::mpd_client::MpdClient;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::macros::pop_modal;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use crate::ui::dirstack::DirState;
 
 #[derive(Debug)]
 pub struct OutputsModal {
@@ -72,10 +66,7 @@ impl Modal for OutputsModal {
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Outputs");
 
-        let table_area = popup_area.inner(Margin {
-            horizontal: 1,
-            vertical: 1,
-        });
+        let table_area = popup_area.inner(Margin { horizontal: 1, vertical: 1 });
 
         let rows = self.outputs.iter().map(|output| {
             Row::new([
@@ -87,40 +78,36 @@ impl Modal for OutputsModal {
 
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
 
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Length(3),
-                Constraint::Percentage(100),
-                Constraint::Length(10),
-            ],
-        )
+        let table = Table::new(rows, [
+            Constraint::Length(3),
+            Constraint::Percentage(100),
+            Constraint::Length(10),
+        ])
         .column_spacing(0)
         .style(app.config.as_text_style())
         .header(Row::new(["Id", "Name", "Enabled"]))
         .row_highlight_style(app.config.theme.current_item_style);
 
-        let table_area = table_area.inner(Margin {
-            horizontal: 1,
-            vertical: 0,
-        });
+        let table_area = table_area.inner(Margin { horizontal: 1, vertical: 0 });
         self.outputs_table_area = table_area;
 
         frame.render_widget(block, popup_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
-            popup_area.inner(Margin {
-                horizontal: 0,
-                vertical: 1,
-            }),
+            popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 
         Ok(())
     }
 
-    fn on_query_finished(&mut self, id: &'static str, data: &mut MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: &mut MpdQueryResult,
+        context: &AppContext,
+    ) -> Result<()> {
         match (id, data) {
             ("refresh_outputs", MpdQueryResult::Outputs(outputs)) => {
                 self.outputs = std::mem::take(outputs);

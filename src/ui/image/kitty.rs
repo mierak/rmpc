@@ -1,34 +1,25 @@
-use anyhow::{Context, Result};
-use crossbeam::channel::{unbounded, Sender};
-use crossterm::{
-    execute,
-    style::{Colors, SetColors},
-};
-use itertools::Itertools;
-use std::{
-    io::Write,
-    sync::{atomic::Ordering, Arc},
-    time::Instant,
-};
+use std::io::Write;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
-use crate::{
-    config::album_art::{HorizontalAlign, VerticalAlign},
-    shared::{image::create_aligned_area, macros::try_cont, tmux::tmux_write},
-};
+use anyhow::{Context, Result};
 use base64::Engine;
+use crossbeam::channel::{Sender, unbounded};
+use crossterm::execute;
+use crossterm::style::{Colors, SetColors};
 use flate2::Compression;
+use itertools::Itertools;
 use ratatui::prelude::{Color, Rect};
 
-use crate::{
-    config::Size,
-    shared::{
-        ext::mpsc::RecvLast,
-        image::{get_gif_frames, resize_image},
-        macros::status_error,
-    },
-};
-
-use super::{csi_move, facade::IS_SHOWING, Backend};
+use super::facade::IS_SHOWING;
+use super::{Backend, csi_move};
+use crate::config::Size;
+use crate::config::album_art::{HorizontalAlign, VerticalAlign};
+use crate::shared::ext::mpsc::RecvLast;
+use crate::shared::image::{create_aligned_area, get_gif_frames, resize_image};
+use crate::shared::macros::{status_error, try_cont};
+use crate::shared::tmux::tmux_write;
 
 #[derive(Debug)]
 pub struct Kitty {
@@ -51,24 +42,34 @@ impl Backend for Kitty {
 }
 
 impl Kitty {
-    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
+    pub fn new(
+        max_size: Size,
+        bg_color: Option<Color>,
+        halign: HorizontalAlign,
+        valign: VerticalAlign,
+    ) -> Self {
         let (sender, receiver) = unbounded::<(Arc<Vec<_>>, Rect)>();
-        let colors = Colors {
-            background: bg_color.map(Into::into),
-            foreground: None,
-        };
+        let colors = Colors { background: bg_color.map(Into::into), foreground: None };
 
         std::thread::Builder::new()
             .name("kitty".to_string())
             .spawn(move || {
                 let mut pending_req: Option<(Arc<Vec<_>>, Rect)> = None;
                 loop {
-                    let Ok((vec, area)) = pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) else {
+                    let Ok((vec, area)) =
+                        pending_req.take().ok_or(()).or_else(|()| receiver.recv_last())
+                    else {
                         continue;
                     };
 
-                    let data = match create_data_to_transfer(&vec, area, Compression::new(6), max_size, halign, valign)
-                    {
+                    let data = match create_data_to_transfer(
+                        &vec,
+                        area,
+                        Compression::new(6),
+                        max_size,
+                        halign,
+                        valign,
+                    ) {
                         Ok(data) => data,
                         Err(err) => {
                             status_error!(err:?; "Failed to compress image data");
@@ -78,7 +79,9 @@ impl Kitty {
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
-                        log::trace!("Not showing image because its not supposed to be displayed anymore");
+                        log::trace!(
+                            "Not showing image because its not supposed to be displayed anymore"
+                        );
                         continue;
                     }
 
@@ -92,7 +95,12 @@ impl Kitty {
                     match data {
                         Data::ImageData(data) => {
                             try_cont!(
-                                transfer_image_data(&mut w, &data.content, data.img_width, data.img_height),
+                                transfer_image_data(
+                                    &mut w,
+                                    &data.content,
+                                    data.img_width,
+                                    data.img_height
+                                ),
                                 "Failed to transfer image data"
                             );
 
@@ -142,11 +150,13 @@ fn create_data_to_transfer(
 
                 AnimationFrame {
                     delay: delay.0 / delay.1,
-                    content: base64::engine::general_purpose::STANDARD.encode(frame.buffer().as_raw()),
+                    content: base64::engine::general_purpose::STANDARD
+                        .encode(frame.buffer().as_raw()),
                 }
             })
             .try_collect()?;
-        let aligned_area = create_aligned_area(area, (width, height), max_size, halign, valign).area;
+        let aligned_area =
+            create_aligned_area(area, (width, height), max_size, halign, valign).area;
 
         Ok(Data::AnimationData(AnimationData {
             frames,
@@ -162,10 +172,8 @@ fn create_data_to_transfer(
         e.write_all(image.to_rgba8().as_raw())
             .context("Error occured when writing image bytes to zlib encoder")?;
 
-        let content = base64::engine::general_purpose::STANDARD.encode(
-            e.finish()
-                .context("Error occured when flushing image bytes to zlib encoder")?,
-        );
+        let content = base64::engine::general_purpose::STANDARD
+            .encode(e.finish().context("Error occured when flushing image bytes to zlib encoder")?);
 
         log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
         Ok(Data::ImageData(ImageData {
@@ -204,13 +212,7 @@ fn create_unicode_placeholder_grid(w: &mut impl Write, colors: Colors, area: Rec
 
 fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()> {
     let start_time = Instant::now();
-    let AnimationData {
-        frames,
-        is_compressed,
-        img_width,
-        img_height,
-        aligned_area,
-    } = data;
+    let AnimationData { frames, is_compressed, img_width, img_height, aligned_area } = data;
 
     log::debug!(frames = frames.len(), img_width, img_height, aligned_area:?; "Transferring animation data");
 
@@ -226,11 +228,12 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()
     let delay = frames[0].delay;
 
     // Create image and transfer first frame
-    tmux_write!(w,
+    tmux_write!(
+        w,
         "\x1b_Gi=1,f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
-         compression = if is_compressed { ",o=z" } else { ""},
-         cols = aligned_area.width,
-         rows = aligned_area.height
+        compression = if is_compressed { ",o=z" } else { "" },
+        cols = aligned_area.width,
+        rows = aligned_area.height
     )?;
 
     // Transfer the rest of the first frame if any
@@ -240,7 +243,8 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()
         tmux_write!(w, "\x1b_Gi=1,m={m};{chunk}\x1b\\")?;
     }
 
-    // Transfer rest of the frames, skip first because it was already transferred
+    // Transfer rest of the frames, skip first because it was already
+    // transferred
     for AnimationFrame { delay, content, .. } in frames.iter().skip(1) {
         let mut frame_iter = content.chars().peekable();
         let chunk: String = frame_iter.by_ref().take(4096).collect();
@@ -265,7 +269,12 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()
     Ok(())
 }
 
-fn transfer_image_data(w: &mut impl Write, content: &str, img_width: u32, img_height: u32) -> Result<()> {
+fn transfer_image_data(
+    w: &mut impl Write,
+    content: &str,
+    img_width: u32,
+    img_height: u32,
+) -> Result<()> {
     let start_time = Instant::now();
     log::debug!(bytes = content.len(), img_width, img_height; "Transferring compressed image data");
     let mut iter = content.chars().peekable();

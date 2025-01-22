@@ -4,13 +4,18 @@ use ratatui::layout::Constraint;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::config::Leak;
-
+use super::StyleFile;
 use super::properties::{
-    Alignment, Property, PropertyFile, PropertyKindFileOrText, PropertyKindOrText, SongProperty, SongPropertyFile,
+    Alignment,
+    Property,
+    PropertyFile,
+    PropertyKindFileOrText,
+    PropertyKindOrText,
+    SongProperty,
+    SongPropertyFile,
 };
 use super::style::ToConfigOr;
-use super::StyleFile;
+use crate::config::Leak;
 
 #[derive(Debug, Clone, Copy)]
 pub enum PercentOrLength {
@@ -43,7 +48,8 @@ impl std::str::FromStr for PercentOrLength {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongTableColumnFile {
     /// Property to display in the column
-    /// Can be one of: Duration, Filename, Artist, AlbumArtist, Title, Album, Date, Genre or Comment    
+    /// Can be one of: Duration, Filename, Artist, AlbumArtist, Title, Album,
+    /// Date, Genre or Comment
     pub(super) prop: PropertyFile<SongPropertyFile>,
     /// Label to display in the column header
     /// If not set, the property name will be used
@@ -171,10 +177,14 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                                 || -> Result<Option<PercentOrLength>> {
                                     Ok(v.width_percent.map(PercentOrLength::Percent))
                                 },
-                                |width| -> Result<Option<PercentOrLength>> { Ok(Some(width.parse()?)) },
+                                |width| -> Result<Option<PercentOrLength>> {
+                                    Ok(Some(width.parse()?))
+                                },
                             )
                             .context("Failed to parse width in song table column width.")?
-                            .context("Invalid width config. Song table column width must be specified.")?,
+                            .context(
+                                "Invalid width config. Song table column width must be specified.",
+                            )?,
                         alignment: v.alignment.unwrap_or(Alignment::Left),
                     })
                 })
@@ -186,7 +196,9 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
 impl TryFrom<PropertyFile<SongPropertyFile>> for &'static Property<'static, SongProperty> {
     type Error = anyhow::Error;
 
-    fn try_from(value: PropertyFile<SongPropertyFile>) -> std::prelude::v1::Result<Self, Self::Error> {
+    fn try_from(
+        value: PropertyFile<SongPropertyFile>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
         Property::<'static, SongProperty>::try_from(value).map(|v| v.leak())
     }
 }
@@ -198,11 +210,15 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<'static, SongProperty>
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value.leak()),
-                PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.try_into()?),
+                PropertyKindFileOrText::Property(prop) => {
+                    PropertyKindOrText::Property(prop.try_into()?)
+                }
                 PropertyKindFileOrText::Group(group) => {
                     let res: Vec<_> = group
                         .into_iter()
-                        .map(|p| -> Result<&'static Property<'static, SongProperty>> { p.try_into() })
+                        .map(|p| -> Result<&'static Property<'static, SongProperty>> {
+                            p.try_into()
+                        })
                         .try_collect()?;
                     PropertyKindOrText::Group(res.leak())
                 }

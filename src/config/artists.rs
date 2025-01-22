@@ -30,9 +30,6 @@ pub enum AlbumSortMode {
 
 impl From<ArtistsFile> for Artists {
     fn from(value: ArtistsFile) -> Self {
-        Self {
-            album_display_mode: value.album_display_mode,
-            album_sort_by: value.album_sort_by,
-        }
+        Self { album_display_mode: value.album_display_mode, album_sort_by: value.album_sort_by }
     }
 }

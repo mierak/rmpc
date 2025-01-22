@@ -1,26 +1,17 @@
 use anyhow::Result;
-use ratatui::{
-    prelude::{Constraint, Layout},
-    style::Style,
-    symbols::{self, border},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
-    Frame,
-};
+use ratatui::Frame;
+use ratatui::prelude::{Constraint, Layout};
+use ratatui::style::Style;
+use ratatui::symbols::{self, border};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
-use crate::{
-    config::keys::{CommonAction, GlobalAction},
-    context::AppContext,
-    shared::{
-        key_event::KeyEvent,
-        macros::pop_modal,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-    ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
-};
-
-use super::RectExt;
-
-use super::Modal;
+use super::{Modal, RectExt};
+use crate::config::keys::{CommonAction, GlobalAction};
+use crate::context::AppContext;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::macros::pop_modal;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use crate::ui::widgets::button::{Button, ButtonGroup, ButtonGroupState};
 
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.vertical_left,
@@ -63,13 +54,7 @@ impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callb
                     .border_style(context.config.as_border_style()),
             );
 
-        Self {
-            message: "",
-            button_group_state,
-            button_group,
-            callback: None,
-            size: (45, 6),
-        }
+        Self { message: "", button_group_state, button_group, callback: None, size: (45, 6) }
     }
 
     pub fn size(mut self, cols: u16, rows: u16) -> Self {
@@ -122,7 +107,11 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
         };
 
         frame.render_widget(paragraph, content_area);
-        frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
+        frame.render_stateful_widget(
+            &mut self.button_group,
+            buttons_area,
+            &mut self.button_group_state,
+        );
         Ok(())
     }
 

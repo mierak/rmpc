@@ -1,22 +1,29 @@
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader, Cursor},
-    ops::AddAssign,
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Cursor};
+use std::ops::AddAssign;
+use std::time::Duration;
 
 use itertools::Itertools;
 use rstest::fixture;
 
-use crate::mpd::{
-    commands::{
-        list::MpdList, list_playlist::FileList, mpd_config::MpdConfig, status::OnOffOneshot, stickers::Sticker,
-        volume::Bound, IdleEvent, ListFiles, LsInfo, Playlist, Song, Status, Update, Volume,
-    },
-    errors::MpdError,
-    mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
-    proto_client::SocketClient,
+use crate::mpd::commands::list::MpdList;
+use crate::mpd::commands::list_playlist::FileList;
+use crate::mpd::commands::mpd_config::MpdConfig;
+use crate::mpd::commands::status::OnOffOneshot;
+use crate::mpd::commands::stickers::Sticker;
+use crate::mpd::commands::volume::Bound;
+use crate::mpd::commands::{IdleEvent, ListFiles, LsInfo, Playlist, Song, Status, Update, Volume};
+use crate::mpd::errors::MpdError;
+use crate::mpd::mpd_client::{
+    Filter,
+    MpdClient,
+    QueueMoveTarget,
+    SaveMode,
+    SingleOrRange,
+    Tag,
+    ValueChange,
 };
+use crate::mpd::proto_client::SocketClient;
 
 #[fixture]
 pub fn client() -> TestMpdClient {
@@ -46,22 +53,10 @@ pub fn client() -> TestMpdClient {
         .collect();
 
     let playlists = vec![
-        TestPlaylist {
-            name: "artist_1_album_1_2".to_string(),
-            songs_indices: (0..20).collect(),
-        },
-        TestPlaylist {
-            name: "playlist_2".to_string(),
-            songs_indices: (10..20).collect(),
-        },
-        TestPlaylist {
-            name: "playlist_3".to_string(),
-            songs_indices: (20..30).collect(),
-        },
-        TestPlaylist {
-            name: "playlist_4".to_string(),
-            songs_indices: (30..40).collect(),
-        },
+        TestPlaylist { name: "artist_1_album_1_2".to_string(), songs_indices: (0..20).collect() },
+        TestPlaylist { name: "playlist_2".to_string(), songs_indices: (10..20).collect() },
+        TestPlaylist { name: "playlist_3".to_string(), songs_indices: (20..30).collect() },
+        TestPlaylist { name: "playlist_4".to_string(), songs_indices: (30..40).collect() },
     ];
 
     TestMpdClient {
@@ -291,9 +286,7 @@ impl MpdClient for TestMpdClient {
     }
 
     fn playlist_info(&mut self, _: bool) -> MpdResult<Option<Vec<Song>>> {
-        Ok(Some(
-            self.queue.iter().map(|idx| self.songs[*idx].clone()).collect_vec(),
-        ))
+        Ok(Some(self.queue.iter().map(|idx| self.songs[*idx].clone()).collect_vec()))
     }
 
     /// `FilterKind` not implemented, everything is treated as Contains
@@ -314,7 +307,9 @@ impl MpdClient for TestMpdClient {
 
                 for filter in filter {
                     let value = match filter.tag {
-                        Tag::Any => values.iter().any(|a| a.is_some_and(|a| a.contains(filter.value))),
+                        Tag::Any => {
+                            values.iter().any(|a| a.is_some_and(|a| a.contains(filter.value)))
+                        }
                         Tag::Artist => values[0].is_some_and(|a| a.contains(filter.value)),
                         Tag::AlbumArtist => values[1].is_some_and(|a| a.contains(filter.value)),
                         Tag::Album => values[2].is_some_and(|a| a.contains(filter.value)),
@@ -351,25 +346,29 @@ impl MpdClient for TestMpdClient {
 
                 for filter in filter {
                     let value = match filter.tag {
-                        Tag::Any => values
-                            .iter()
-                            .any(|a| a.is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))),
-                        Tag::Artist => {
-                            values[0].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))
-                        }
-                        Tag::AlbumArtist => {
-                            values[1].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))
-                        }
-                        Tag::Album => {
-                            values[2].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))
-                        }
-                        Tag::Title => {
-                            values[3].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))
-                        }
-                        Tag::File => values[4].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase())),
-                        Tag::Genre => {
-                            values[5].is_some_and(|a| a.to_lowercase().contains(&filter.value.to_lowercase()))
-                        }
+                        Tag::Any => values.iter().any(|a| {
+                            a.is_some_and(|a| {
+                                a.to_lowercase().contains(&filter.value.to_lowercase())
+                            })
+                        }),
+                        Tag::Artist => values[0].is_some_and(|a| {
+                            a.to_lowercase().contains(&filter.value.to_lowercase())
+                        }),
+                        Tag::AlbumArtist => values[1].is_some_and(|a| {
+                            a.to_lowercase().contains(&filter.value.to_lowercase())
+                        }),
+                        Tag::Album => values[2].is_some_and(|a| {
+                            a.to_lowercase().contains(&filter.value.to_lowercase())
+                        }),
+                        Tag::Title => values[3].is_some_and(|a| {
+                            a.to_lowercase().contains(&filter.value.to_lowercase())
+                        }),
+                        Tag::File => values[4].is_some_and(|a| {
+                            a.to_lowercase().contains(&filter.value.to_lowercase())
+                        }),
+                        Tag::Genre => values[5].is_some_and(|a| {
+                            a.to_lowercase().contains(&filter.value.to_lowercase())
+                        }),
                         Tag::Custom(_) => false,
                     };
                     if !value {
@@ -431,12 +430,7 @@ impl MpdClient for TestMpdClient {
     fn list_playlists(&mut self) -> MpdResult<Vec<Playlist>> {
         self.playlists
             .iter()
-            .map(|p| {
-                Ok(Playlist {
-                    name: p.name.clone(),
-                    last_modified: "2021-01-01".to_string(),
-                })
-            })
+            .map(|p| Ok(Playlist { name: p.name.clone(), last_modified: "2021-01-01".to_string() }))
             .collect()
     }
 
@@ -445,16 +439,17 @@ impl MpdClient for TestMpdClient {
             || Err(MpdError::Generic("Playlist not found".to_string())),
             |p| {
                 Ok(FileList(
-                    p.songs_indices
-                        .iter()
-                        .map(|idx| self.songs[*idx].file.clone())
-                        .collect(),
+                    p.songs_indices.iter().map(|idx| self.songs[*idx].file.clone()).collect(),
                 ))
             },
         )
     }
 
-    fn list_playlist_info(&mut self, playlist: &str, _range: Option<SingleOrRange>) -> MpdResult<Vec<Song>> {
+    fn list_playlist_info(
+        &mut self,
+        playlist: &str,
+        _range: Option<SingleOrRange>,
+    ) -> MpdResult<Vec<Song>> {
         self.playlists.iter().find(|p| p.name == playlist).map_or_else(
             || Err(MpdError::Generic("Playlist not found".to_string())),
             |p| {
@@ -484,7 +479,11 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn delete_from_playlist(&mut self, _playlist_name: &str, _songs: &SingleOrRange) -> MpdResult<()> {
+    fn delete_from_playlist(
+        &mut self,
+        _playlist_name: &str,
+        _songs: &SingleOrRange,
+    ) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
@@ -497,7 +496,12 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn add_to_playlist(&mut self, _playlist_name: &str, _uri: &str, _target_position: Option<usize>) -> MpdResult<()> {
+    fn add_to_playlist(
+        &mut self,
+        _playlist_name: &str,
+        _uri: &str,
+        _target_position: Option<usize>,
+    ) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
@@ -506,10 +510,7 @@ impl MpdClient for TestMpdClient {
     }
 
     fn find_album_art(&mut self, _path: &str) -> MpdResult<Option<Vec<u8>>> {
-        self.calls
-            .entry("find_album_art".to_string())
-            .or_default()
-            .add_assign(1);
+        self.calls.entry("find_album_art".to_string()).or_default().add_assign(1);
         Ok(Some(Vec::new()))
     }
 
@@ -565,14 +566,19 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn execute_cmd_list(&mut self) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
+    fn execute_cmd_list(
+        &mut self,
+    ) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
     where
         Self: SocketClient,
     {
         todo!("Not yet implemented")
     }
 
-    fn list_stickers_multiple(&mut self, _uris: &[&str]) -> MpdResult<Vec<crate::mpd::commands::stickers::Stickers>> {
+    fn list_stickers_multiple(
+        &mut self,
+        _uris: &[&str],
+    ) -> MpdResult<Vec<crate::mpd::commands::stickers::Stickers>> {
         todo!("Not yet implemented")
     }
 

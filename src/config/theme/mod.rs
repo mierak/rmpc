@@ -3,13 +3,11 @@ use anyhow::Result;
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 
-use self::{
-    header::{HeaderConfig, HeaderConfigFile},
-    progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
-    queue_table::{QueueTableColumns, QueueTableColumnsFile},
-    scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
-    style::{Modifiers, StringColor, ToConfigOr},
-};
+use self::header::{HeaderConfig, HeaderConfigFile};
+use self::progress_bar::{ProgressBarConfig, ProgressBarConfigFile};
+use self::queue_table::{QueueTableColumns, QueueTableColumnsFile};
+use self::scrollbar::{ScrollbarConfig, ScrollbarConfigFile};
+use self::style::{Modifiers, StringColor, ToConfigOr};
 
 mod header;
 mod progress_bar;
@@ -18,13 +16,11 @@ mod queue_table;
 mod scrollbar;
 mod style;
 
-pub use self::queue_table::{PercentOrLength, SongTableColumn};
 pub use style::{ConfigColor, StyleFile};
 
-use super::{
-    defaults,
-    tabs::{BorderTypeFile, PaneOrSplitFile, SizedPaneOrSplit},
-};
+pub use self::queue_table::{PercentOrLength, SongTableColumn};
+use super::defaults;
+use super::tabs::{BorderTypeFile, PaneOrSplitFile, SizedPaneOrSplit};
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
@@ -54,7 +50,27 @@ pub struct UiConfig {
 
 impl std::fmt::Debug for UiConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UiConfig {{ draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, tab_bar: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}", self.draw_borders, self.background_color, self.header_background_color, self.modal_background_color, self.borders_style, self.highlighted_item_style, self.current_item_style, self.highlight_border_style, self.tab_bar, self.column_widths, self.symbols, self.progress_bar, self.scrollbar, self.show_song_table_header, self.song_table_format, self.header, self.default_album_art.len())
+        write!(
+            f,
+            "UiConfig {{ draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, tab_bar: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}",
+            self.draw_borders,
+            self.background_color,
+            self.header_background_color,
+            self.modal_background_color,
+            self.borders_style,
+            self.highlighted_item_style,
+            self.current_item_style,
+            self.highlight_border_style,
+            self.tab_bar,
+            self.column_widths,
+            self.symbols,
+            self.progress_bar,
+            self.scrollbar,
+            self.show_song_table_header,
+            self.song_table_format,
+            self.header,
+            self.default_album_art.len()
+        )
     }
 }
 
@@ -125,11 +141,7 @@ impl Default for UiConfigFile {
                     bg: Some("blue".to_string()),
                     modifiers: Some(Modifiers::Bold),
                 }),
-                inactive_style: Some(StyleFile {
-                    fg: None,
-                    bg: None,
-                    modifiers: None,
-                }),
+                inactive_style: Some(StyleFile { fg: None, bg: None, modifiers: None }),
             },
             browser_column_widths: vec![20, 38, 42],
             progress_bar: ProgressBarConfigFile::default(),
@@ -201,12 +213,18 @@ impl TryFrom<UiConfigFile> for UiConfig {
             layout: value.layout.convert(BorderTypeFile::None)?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
-            modal_background_color: StringColor(value.modal_background_color).to_color()?.or(bg_color),
+            modal_background_color: StringColor(value.modal_background_color)
+                .to_color()?
+                .or(bg_color),
             text_color: StringColor(value.text_color).to_color()?,
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
-            highlighted_item_style: value.highlighted_item_style.to_config_or(Some(Color::Blue), None)?,
-            highlight_border_style: value.highlight_border_style.to_config_or(Some(Color::Blue), None)?,
+            highlighted_item_style: value
+                .highlighted_item_style
+                .to_config_or(Some(Color::Blue), None)?,
+            highlight_border_style: value
+                .highlight_border_style
+                .to_config_or(Some(Color::Blue), None)?,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,

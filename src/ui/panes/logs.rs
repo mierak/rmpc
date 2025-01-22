@@ -2,23 +2,17 @@ use std::collections::VecDeque;
 
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{
-    prelude::Rect,
-    widgets::{List, ListState},
-    Frame,
-};
-
-use crate::{
-    config::keys::{CommonAction, LogsActions},
-    context::AppContext,
-    shared::{
-        key_event::KeyEvent,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-    ui::{dirstack::DirState, UiEvent},
-};
+use ratatui::Frame;
+use ratatui::prelude::Rect;
+use ratatui::widgets::{List, ListState};
 
 use super::Pane;
+use crate::config::keys::{CommonAction, LogsActions};
+use crate::context::AppContext;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use crate::ui::UiEvent;
+use crate::ui::dirstack::DirState;
 
 #[derive(Debug)]
 pub struct LogsPane {
@@ -45,7 +39,12 @@ const INDENT_LEN: usize = 4;
 const INDENT: &str = "    ";
 
 impl Pane for LogsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, AppContext { config, .. }: &AppContext) -> anyhow::Result<()> {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        AppContext { config, .. }: &AppContext,
+    ) -> anyhow::Result<()> {
         let max_line_width = (area.width as usize).saturating_sub(INDENT_LEN + 3);
         let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
         let lines: Vec<_> = lines
@@ -63,7 +62,9 @@ impl Pane for LogsPane {
         let content_len = lines.len();
         self.scrolling_state.set_content_len(Some(content_len));
         self.scrolling_state.set_viewport_len(Some(area.height.into()));
-        if self.scroll_enabled && (self.scrolling_state.get_selected().is_none() || self.should_scroll_to_last) {
+        if self.scroll_enabled
+            && (self.scrolling_state.get_selected().is_none() || self.should_scroll_to_last)
+        {
             self.should_scroll_to_last = false;
             self.scrolling_state.last();
         }
@@ -89,7 +90,12 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push_back(std::mem::take(msg));
             if self.logs.len() > 1000 {
@@ -152,14 +158,12 @@ impl Pane for LogsPane {
                     context.render()?;
                 }
                 CommonAction::Up => {
-                    self.scrolling_state
-                        .prev(context.config.scrolloff, config.wrap_navigation);
+                    self.scrolling_state.prev(context.config.scrolloff, config.wrap_navigation);
 
                     context.render()?;
                 }
                 CommonAction::Down => {
-                    self.scrolling_state
-                        .next(context.config.scrolloff, config.wrap_navigation);
+                    self.scrolling_state.next(context.config.scrolloff, config.wrap_navigation);
 
                     context.render()?;
                 }

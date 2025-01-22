@@ -1,8 +1,8 @@
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use anyhow::{Context, anyhow};
 
 use super::Song;
-use anyhow::anyhow;
-use anyhow::Context;
+use crate::mpd::errors::MpdError;
+use crate::mpd::{FromMpd, LineHandled};
 
 impl FromMpd for Vec<Song> {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {

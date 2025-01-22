@@ -1,6 +1,8 @@
 use ratatui::widgets::ListItem;
 
-use super::{dir::Dir, state::DirState, DirStackItem};
+use super::DirStackItem;
+use super::dir::Dir;
+use super::state::DirState;
 
 #[derive(Debug)]
 pub struct DirStack<T: std::fmt::Debug + DirStackItem + Clone + Send> {
@@ -19,12 +21,8 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for DirStack<T> {
 #[allow(dead_code)]
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
     pub fn new(root: Vec<T>) -> Self {
-        let mut result = Self {
-            others: Vec::new(),
-            path: Vec::new(),
-            current: Dir::default(),
-            preview: None,
-        };
+        let mut result =
+            Self { others: Vec::new(), path: Vec::new(), current: Dir::default(), preview: None };
         result.push(Vec::new());
         result.current = Dir::new(root);
 
@@ -85,6 +83,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
         self.preview = preview;
         self
     }
+
     pub fn replace(&mut self, head: Vec<T>) {
         if self.pop().is_some() {
             let len = head.len();
@@ -104,7 +103,8 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
             self.path.push(current.to_owned());
         }
 
-        let old_current_dir = std::mem::replace(&mut self.current, Dir::new_with_state(head, new_state));
+        let old_current_dir =
+            std::mem::replace(&mut self.current, Dir::new_with_state(head, new_state));
         self.others.push(old_current_dir);
     }
 
@@ -207,8 +207,10 @@ mod tests {
         #[test]
         fn previous_element_is_moved_to_current() {
             let mut subject: DirStack<String> = DirStack::new(Vec::new());
-            let el: Vec<String> = vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
-            let el2: Vec<String> = vec!["e", "f", "g", "h"].into_iter().map(ToOwned::to_owned).collect();
+            let el: Vec<String> =
+                vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
+            let el2: Vec<String> =
+                vec!["e", "f", "g", "h"].into_iter().map(ToOwned::to_owned).collect();
             subject.push(el.clone());
             subject.push(el2.clone());
 
@@ -220,7 +222,8 @@ mod tests {
         #[test]
         fn returns_the_popped_element() {
             let mut val: DirStack<String> = DirStack::new(Vec::new());
-            let el: Vec<String> = vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
+            let el: Vec<String> =
+                vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
             val.push(el.clone());
 
             let result = val.pop();

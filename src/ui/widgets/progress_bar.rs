@@ -1,8 +1,6 @@
-use ratatui::{
-    prelude::{Buffer, Rect},
-    style::{Color, Style},
-    widgets::Widget,
-};
+use ratatui::prelude::{Buffer, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::Widget;
 
 #[derive(Clone)]
 pub struct ProgressBar<'a> {
@@ -111,11 +109,9 @@ impl Default for ProgressBar<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ratatui::{
-        buffer::Cell,
-        prelude::{Buffer, Rect},
-        widgets::Widget,
-    };
+    use ratatui::buffer::Cell;
+    use ratatui::prelude::{Buffer, Rect};
+    use ratatui::widgets::Widget;
 
     use super::ProgressBar;
 
@@ -129,10 +125,7 @@ mod tests {
         }
         .value(0.0);
         let area = Rect::new(0, 0, 3, 1);
-        let mut buf = Buffer {
-            area,
-            content: vec![Cell::default(); 3],
-        };
+        let mut buf = Buffer { area, content: vec![Cell::default(); 3] };
 
         wg.render(area, &mut buf);
 
@@ -151,10 +144,7 @@ mod tests {
         }
         .value(1.0);
         let area = Rect::new(0, 0, 3, 1);
-        let mut buf = Buffer {
-            area,
-            content: vec![Cell::default(); 3],
-        };
+        let mut buf = Buffer { area, content: vec![Cell::default(); 3] };
 
         wg.render(area, &mut buf);
 
@@ -173,10 +163,7 @@ mod tests {
         }
         .value(0.5);
         let area = Rect::new(0, 0, 3, 1);
-        let mut buf = Buffer {
-            area,
-            content: vec![Cell::default(); 3],
-        };
+        let mut buf = Buffer { area, content: vec![Cell::default(); 3] };
 
         wg.render(area, &mut buf);
 

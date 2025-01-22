@@ -1,4 +1,5 @@
-use std::{fmt::Display, str::FromStr};
+use std::fmt::Display;
+use std::str::FromStr;
 
 use super::errors::MpdError;
 
@@ -35,11 +36,7 @@ impl FromStr for Version {
         let patch = parts
             .next()
             .ok_or(MpdError::Parse(format!("Cannot parse patch version from '{s}'")))?;
-        Ok(Self {
-            major: major.parse()?,
-            minor: minor.parse()?,
-            patch: patch.parse()?,
-        })
+        Ok(Self { major: major.parse()?, minor: minor.parse()?, patch: patch.parse()? })
     }
 }
 

@@ -1,30 +1,29 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
+use std::collections::HashMap;
 
-use crate::{
-    config::{
-        artists::{AlbumDisplayMode, AlbumSortMode},
-        tabs::PaneType,
-    },
-    context::AppContext,
-    mpd::{
-        client::Client,
-        commands::Song,
-        mpd_client::{Filter, MpdClient, Tag},
-    },
-    shared::{ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info, mouse_event::MouseEvent},
-    ui::{
-        browser::BrowserPane,
-        dirstack::{DirStack, DirStackItem},
-        widgets::browser::Browser,
-        UiEvent,
-    },
-    MpdQueryResult,
-};
-
-use super::{browser::DirOrSong, Pane};
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use ratatui::{prelude::Rect, widgets::StatefulWidget, Frame};
+use ratatui::Frame;
+use ratatui::prelude::Rect;
+use ratatui::widgets::StatefulWidget;
+
+use super::Pane;
+use super::browser::DirOrSong;
+use crate::MpdQueryResult;
+use crate::config::artists::{AlbumDisplayMode, AlbumSortMode};
+use crate::config::tabs::PaneType;
+use crate::context::AppContext;
+use crate::mpd::client::Client;
+use crate::mpd::commands::Song;
+use crate::mpd::mpd_client::{Filter, MpdClient, Tag};
+use crate::shared::ext::mpd_client::MpdClientExt;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::macros::status_info;
+use crate::shared::mouse_event::MouseEvent;
+use crate::ui::UiEvent;
+use crate::ui::browser::BrowserPane;
+use crate::ui::dirstack::{DirStack, DirStackItem};
+use crate::ui::widgets::browser::Browser;
 
 #[derive(Debug)]
 pub enum ArtistsPaneMode {
@@ -106,14 +105,13 @@ impl ArtistsPane {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|album| album.name == current.as_path())
+                let Some(CachedAlbum { songs, .. }) =
+                    albums.0.iter().find(|album| album.name == current.as_path())
                 else {
                     return Ok(());
                 };
-                let songs = songs
-                    .iter()
-                    .map(|song| DirOrSong::Song(song.clone()))
-                    .collect::<Vec<_>>();
+                let songs =
+                    songs.iter().map(|song| DirOrSong::Song(song.clone())).collect::<Vec<_>>();
 
                 self.stack_mut().push(songs);
                 context.render()?;
@@ -130,18 +128,16 @@ impl ArtistsPane {
                 } else {
                     let artist_tag = self.artist_tag();
                     let target = self.target_pane();
-                    context
-                        .query()
-                        .id(OPEN_OR_PLAY)
-                        .replace_id(OPEN_OR_PLAY)
-                        .target(target)
-                        .query(move |client| {
-                            let all_songs: Vec<Song> = client.find(&[Filter::new(artist_tag, &current)])?;
+                    context.query().id(OPEN_OR_PLAY).replace_id(OPEN_OR_PLAY).target(target).query(
+                        move |client| {
+                            let all_songs: Vec<Song> =
+                                client.find(&[Filter::new(artist_tag, &current)])?;
                             Ok(MpdQueryResult::SongsList {
                                 data: all_songs,
                                 origin_path: Some(vec![current]),
                             })
-                        });
+                        },
+                    );
                     self.stack_mut().push(Vec::new());
                     self.stack_mut().clear_preview();
                     context.render()?;
@@ -155,7 +151,12 @@ impl ArtistsPane {
         Ok(())
     }
 
-    fn process_songs(&mut self, artist: String, data: Vec<Song>, context: &AppContext) -> &CachedArtist {
+    fn process_songs(
+        &mut self,
+        artist: String,
+        data: Vec<Song>,
+        context: &AppContext,
+    ) -> &CachedArtist {
         let display_mode = context.config.artists.album_display_mode;
         let sort_mode = context.config.artists.album_sort_by;
 
@@ -192,7 +193,8 @@ impl ArtistsPane {
                         acc.push(album);
                     }
                     AlbumDisplayMode::NameOnly => {
-                        if let Some(cached_album) = acc.iter_mut().find(|cached_album| cached_album.name == album.name)
+                        if let Some(cached_album) =
+                            acc.iter_mut().find(|cached_album| cached_album.name == album.name)
                         {
                             cached_album.songs.extend(album.songs);
                         } else {
@@ -211,9 +213,11 @@ impl ArtistsPane {
 
 impl Pane for ArtistsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
-        self.browser
-            .set_filter_input_active(self.filter_input_mode)
-            .render(area, frame.buffer_mut(), &mut self.stack);
+        self.browser.set_filter_input_active(self.filter_input_mode).render(
+            area,
+            frame.buffer_mut(),
+            &mut self.stack,
+        );
 
         Ok(())
     }
@@ -222,18 +226,10 @@ impl Pane for ArtistsPane {
         if !self.initialized {
             let target = self.target_pane();
             let artist_tag = self.artist_tag();
-            context
-                .query()
-                .id(INIT)
-                .replace_id(INIT)
-                .target(target)
-                .query(move |client| {
-                    let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                    Ok(MpdQueryResult::LsInfo {
-                        data: result.0,
-                        origin_path: None,
-                    })
-                });
+            context.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
+                let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+            });
 
             self.initialized = true;
         }
@@ -241,24 +237,22 @@ impl Pane for ArtistsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::Database => {
                 let target = self.target_pane();
                 let artist_tag = self.artist_tag();
                 self.cache = ArtistsCache::default();
-                context
-                    .query()
-                    .id(INIT)
-                    .replace_id(INIT)
-                    .target(target)
-                    .query(move |client| {
-                        let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
-                        Ok(MpdQueryResult::LsInfo {
-                            data: result.0,
-                            origin_path: None,
-                        })
-                    });
+                context.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
+                    let result =
+                        client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                    Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+                });
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -289,13 +283,15 @@ impl Pane for ArtistsPane {
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::SongsList { data, origin_path }) => {
-                let Some(artist) = origin_path.and_then(|mut v| v.first_mut().map(std::mem::take)) else {
+                let Some(artist) = origin_path.and_then(|mut v| v.first_mut().map(std::mem::take))
+                else {
                     return Ok(());
                 };
 
                 let current_item_path = self.stack().current().selected().map(|c| c.as_path());
-                // We still want to cache the result to avoid refetch later, but do not rerender current state
-                // because rmpc is already on a different item
+                // We still want to cache the result to avoid refetch later, but
+                // do not rerender current state because rmpc is
+                // already on a different item
                 let cache_only = if current_item_path == Some(&artist) {
                     false
                 } else {
@@ -312,18 +308,22 @@ impl Pane for ArtistsPane {
                 let preview = cached_artist
                     .0
                     .iter()
-                    .map(|album| DirOrSong::name_only(album.name.clone()).to_list_item_simple(context.config))
+                    .map(|album| {
+                        DirOrSong::name_only(album.name.clone()).to_list_item_simple(context.config)
+                    })
                     .collect();
                 self.stack.set_preview(Some(preview));
                 context.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
-                let Some(artist) = origin_path.and_then(|mut v| v.first_mut().map(std::mem::take)) else {
+                let Some(artist) = origin_path.and_then(|mut v| v.first_mut().map(std::mem::take))
+                else {
                     return Ok(());
                 };
 
-                // We still want to cache the result to avoid refetch later, but do not rerender current state
-                // because rmpc is already on a different item
+                // We still want to cache the result to avoid refetch later, but
+                // do not rerender current state because rmpc is
+                // already on a different item
                 let cache_only = if self.stack().path().first() == Some(&artist) {
                     false
                 } else {
@@ -347,7 +347,8 @@ impl Pane for ArtistsPane {
                 context.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
-                self.stack = DirStack::new(data.into_iter().map(DirOrSong::name_only).collect_vec());
+                self.stack =
+                    DirStack::new(data.into_iter().map(DirOrSong::name_only).collect_vec());
                 self.prepare_preview(context)?;
                 context.render()?;
             }
@@ -374,7 +375,10 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         self.filter_input_mode
     }
 
-    fn list_songs_in_item(&self, item: DirOrSong) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+    fn list_songs_in_item(
+        &self,
+        item: DirOrSong,
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
         let tag = self.artist_tag();
         let path = self.stack().path().to_owned();
         let album_name = match (self.stack().path(), &item) {
@@ -383,11 +387,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 .0
                 .get(artist)
                 .and_then(|albums| {
-                    albums
-                        .0
-                        .iter()
-                        .find(|a| &a.name == name)
-                        .map(|a| a.original_name.clone())
+                    albums.0.iter().find(|a| &a.name == name).map(|a| a.original_name.clone())
                 })
                 .unwrap_or_default(),
             _ => String::new(),
@@ -396,7 +396,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         move |client| {
             Ok(match item {
                 DirOrSong::Dir { name, full_path: _ } => match path.as_slice() {
-                    [artist] => client.find(&[Filter::new(Tag::Album, &album_name), Filter::new(tag, artist)])?,
+                    [artist] => client
+                        .find(&[Filter::new(Tag::Album, &album_name), Filter::new(tag, artist)])?,
                     [] => client.find(&[Filter::new(tag, &name)])?,
                     _ => Vec::new(),
                 },
@@ -416,11 +417,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     return Ok(());
                 };
 
-                let Some(original_name) = albums
-                    .0
-                    .iter()
-                    .find(|a| &a.name == album)
-                    .map(|a| a.original_name.clone())
+                let Some(original_name) =
+                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())
                 else {
                     return Ok(());
                 };
@@ -445,11 +443,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     return Ok(());
                 };
 
-                let Some(original_name) = albums
-                    .0
-                    .iter()
-                    .find(|a| a.name == name)
-                    .map(|a| a.original_name.clone())
+                let Some(original_name) =
+                    albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())
                 else {
                     return Ok(());
                 };
@@ -489,11 +484,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     return Ok(());
                 };
 
-                let Some(original_name) = albums
-                    .0
-                    .iter()
-                    .find(|a| &a.name == album)
-                    .map(|a| a.original_name.clone())
+                let Some(original_name) =
+                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())
                 else {
                     return Ok(());
                 };
@@ -547,7 +539,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|a| &a.name == album) else {
+                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|a| &a.name == album)
+                else {
                     return Ok(());
                 };
                 let song = songs
@@ -561,13 +554,13 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
-                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|album| album.name == current) else {
+                let Some(CachedAlbum { songs, .. }) =
+                    albums.0.iter().find(|album| album.name == current)
+                else {
                     return Ok(());
                 };
-                let songs = songs
-                    .iter()
-                    .map(|song| song.to_list_item_simple(context.config))
-                    .collect();
+                let songs =
+                    songs.iter().map(|song| song.to_list_item_simple(context.config)).collect();
                 self.stack_mut().set_preview(Some(songs));
                 context.render()?;
             }
@@ -578,7 +571,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                             .0
                             .iter()
                             .map(|CachedAlbum { name, .. }| {
-                                DirOrSong::name_only(name.to_owned()).to_list_item_simple(context.config)
+                                DirOrSong::name_only(name.to_owned())
+                                    .to_list_item_simple(context.config)
                             })
                             .collect(),
                     ));
@@ -586,24 +580,23 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 } else {
                     let artist_tag = self.artist_tag();
                     let target = self.target_pane();
-                    context
-                        .query()
-                        .id(PREVIEW)
-                        .replace_id(PREVIEW)
-                        .target(target)
-                        .query(move |client| {
-                            let all_songs: Vec<Song> = client.find(&[Filter::new(artist_tag, &current)])?;
+                    context.query().id(PREVIEW).replace_id(PREVIEW).target(target).query(
+                        move |client| {
+                            let all_songs: Vec<Song> =
+                                client.find(&[Filter::new(artist_tag, &current)])?;
                             Ok(MpdQueryResult::SongsList {
                                 data: all_songs,
                                 origin_path: Some(vec![current]),
                             })
-                        });
+                        },
+                    );
                 }
             }
             _ => {}
         };
         Ok(())
     }
+
     fn browser_areas(&self) -> [Rect; 3] {
         self.browser.areas
     }
@@ -611,20 +604,24 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        config::{Config, Leak},
-        tests::fixtures::{app_context, config},
-    };
-
-    use super::*;
     use rstest::rstest;
 
-    fn song(album: impl Into<String> + std::fmt::Debug, date: impl Into<String> + std::fmt::Debug) -> Song {
+    use super::*;
+    use crate::config::{Config, Leak};
+    use crate::tests::fixtures::{app_context, config};
+
+    fn song(
+        album: impl Into<String> + std::fmt::Debug,
+        date: impl Into<String> + std::fmt::Debug,
+    ) -> Song {
         Song {
             id: 0,
             file: format!("{date:?} {album:?}"),
             duration: None,
-            metadata: HashMap::from([("album".to_string(), album.into()), ("date".to_string(), date.into())]),
+            metadata: HashMap::from([
+                ("album".to_string(), album.into()),
+                ("date".to_string(), date.into()),
+            ]),
             stickers: None,
         }
     }

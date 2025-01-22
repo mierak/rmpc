@@ -1,14 +1,15 @@
 use anyhow::{Context, Result};
-use ratatui::{prelude::Rect, Frame};
-
-use crate::{
-    config::tabs::TabName,
-    context::AppContext,
-    shared::{events::AppEvent, key_event::KeyEvent, mouse_event::MouseEvent},
-    ui::{widgets::app_tabs::AppTabs, UiAppEvent, UiEvent},
-};
+use ratatui::Frame;
+use ratatui::prelude::Rect;
 
 use super::Pane;
+use crate::config::tabs::TabName;
+use crate::context::AppContext;
+use crate::shared::events::AppEvent;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::mouse_event::MouseEvent;
+use crate::ui::widgets::app_tabs::AppTabs;
+use crate::ui::{UiAppEvent, UiEvent};
 
 #[derive(Debug)]
 pub struct TabsPane<'a> {
@@ -29,7 +30,12 @@ impl TabsPane<'_> {
 }
 
 impl Pane for TabsPane<'_> {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> anyhow::Result<()> {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        _context: &AppContext,
+    ) -> anyhow::Result<()> {
         self.area = area;
         if self.area.height > 0 {
             self.tab_bar.set_selected(self.active_tab);
@@ -42,7 +48,12 @@ impl Pane for TabsPane<'_> {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        _is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::TabChanged(tab) => {
                 self.active_tab = *tab;
@@ -70,9 +81,7 @@ impl Pane for TabsPane<'_> {
             return Ok(());
         }
 
-        context
-            .app_event_sender
-            .send(AppEvent::UiEvent(UiAppEvent::ChangeTab(*tab_name)))?;
+        context.app_event_sender.send(AppEvent::UiEvent(UiAppEvent::ChangeTab(*tab_name)))?;
 
         Ok(())
     }

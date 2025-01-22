@@ -1,31 +1,20 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
-use ratatui::{
-    layout::Rect,
-    prelude::{Constraint, Layout},
-    style::{Style, Stylize},
-    symbols::{self, border},
-    widgets::{Block, Borders, Clear},
-    Frame,
-};
+use ratatui::Frame;
+use ratatui::layout::Rect;
+use ratatui::prelude::{Constraint, Layout};
+use ratatui::style::{Style, Stylize};
+use ratatui::symbols::{self, border};
+use ratatui::widgets::{Block, Borders, Clear};
 
-use crate::{
-    config::keys::CommonAction,
-    context::AppContext,
-    shared::{
-        key_event::KeyEvent,
-        macros::pop_modal,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-    ui::widgets::{
-        button::{Button, ButtonGroup, ButtonGroupState},
-        input::Input,
-    },
-};
-
-use super::RectExt;
-
-use super::Modal;
+use super::{Modal, RectExt};
+use crate::config::keys::CommonAction;
+use crate::context::AppContext;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::macros::pop_modal;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use crate::ui::widgets::button::{Button, ButtonGroup, ButtonGroupState};
+use crate::ui::widgets::input::Input;
 
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.vertical_left,
@@ -44,7 +33,9 @@ pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
+impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug
+    for InputModal<'_, Callback>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -147,7 +138,11 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
 
         frame.render_widget(input, block.inner(body_area));
         frame.render_widget(block, body_area);
-        frame.render_stateful_widget(&mut self.button_group, buttons_area, &mut self.button_group_state);
+        frame.render_stateful_widget(
+            &mut self.button_group,
+            buttons_area,
+            &mut self.button_group_state,
+        );
         Ok(())
     }
 

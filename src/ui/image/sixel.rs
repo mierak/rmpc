@@ -1,36 +1,27 @@
-use std::{
-    io::Write,
-    ops::AddAssign,
-    sync::{atomic::Ordering, Arc},
-    time::Instant,
-};
+use std::io::Write;
+use std::ops::AddAssign;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use color_quant::NeuQuant;
-use crossbeam::channel::{unbounded, Sender};
-use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
-    queue,
-    style::Colors,
-};
+use crossbeam::channel::{Sender, unbounded};
+use crossterm::cursor::{MoveTo, RestorePosition, SavePosition};
+use crossterm::queue;
+use crossterm::style::Colors;
 use image::Rgba;
-use ratatui::{layout::Rect, style::Color};
+use ratatui::layout::Rect;
+use ratatui::style::Color;
 
-use crate::{
-    config::{
-        album_art::{HorizontalAlign, VerticalAlign},
-        Size,
-    },
-    shared::{
-        ext::mpsc::RecvLast,
-        image::resize_image,
-        macros::{status_error, try_cont},
-    },
-    tmux,
-    ui::image::facade::IS_SHOWING,
-};
-
-use super::{clear_area, Backend};
+use super::{Backend, clear_area};
+use crate::config::Size;
+use crate::config::album_art::{HorizontalAlign, VerticalAlign};
+use crate::shared::ext::mpsc::RecvLast;
+use crate::shared::image::resize_image;
+use crate::shared::macros::{status_error, try_cont};
+use crate::tmux;
+use crate::ui::image::facade::IS_SHOWING;
 
 #[derive(Debug)]
 pub struct Sixel {
@@ -55,12 +46,14 @@ impl Backend for Sixel {
 }
 
 impl Sixel {
-    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
+    pub fn new(
+        max_size: Size,
+        bg_color: Option<Color>,
+        halign: HorizontalAlign,
+        valign: VerticalAlign,
+    ) -> Self {
         let (sender, receiver) = unbounded::<DataToEncode>();
-        let colors = Colors {
-            background: bg_color.map(Into::into),
-            foreground: None,
-        };
+        let colors = Colors { background: bg_color.map(Into::into), foreground: None };
 
         std::thread::Builder::new()
             .name("sixel".to_string())
@@ -73,12 +66,16 @@ impl Sixel {
                         continue;
                     };
 
-                    let (buf, resized_area) =
-                        try_cont!(encode(&data, area, max_size, halign, valign), "Failed to encode");
+                    let (buf, resized_area) = try_cont!(
+                        encode(&data, area, max_size, halign, valign),
+                        "Failed to encode"
+                    );
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
-                        log::trace!("Not showing image because its not supposed to be displayed anymore");
+                        log::trace!(
+                            "Not showing image because its not supposed to be displayed anymore"
+                        );
                         continue;
                     }
 
@@ -132,12 +129,7 @@ fn encode(
     let mut buf = Vec::new();
 
     if tmux {
-        write!(
-            buf,
-            "\x1bPtmux;\x1b\x1bP0;1;7q\"1;1;{};{}",
-            image.width(),
-            image.height()
-        )?;
+        write!(buf, "\x1bPtmux;\x1b\x1bP0;1;7q\"1;1;{};{}", image.width(), image.height())?;
     } else {
         write!(buf, "\x1bP0;1;7q\"1;1;{};{}", image.width(), image.height())?;
     }
@@ -171,8 +163,8 @@ fn encode(
 
         if tmux && buf.len() > 1_048_576 {
             status_error!(
-            "Tmux supports a maximum of 1MB of data. Sixel image will not be displayed. Try decreasing max album art size.",
-        );
+                "Tmux supports a maximum of 1MB of data. Sixel image will not be displayed. Try decreasing max album art size.",
+            );
             bail!("Exceeded tmux data limit")
         }
 
@@ -191,7 +183,12 @@ fn encode(
     Ok((buf, resized_area.area))
 }
 
-fn put_color<W: Write>(buf: &mut W, byte: u8, color: usize, repeat: u16) -> Result<(), std::io::Error> {
+fn put_color<W: Write>(
+    buf: &mut W,
+    byte: u8,
+    color: usize,
+    repeat: u16,
+) -> Result<(), std::io::Error> {
     if repeat == 0 {
         write!(buf, "#{}{}", color, byte as char)
     } else {

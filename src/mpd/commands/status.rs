@@ -3,34 +3,48 @@ use std::time::Duration;
 use anyhow::anyhow;
 use serde::Serialize;
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled, ParseErrorExt};
-
 use super::Volume;
+use crate::mpd::errors::MpdError;
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt};
 
 #[derive(Debug, Serialize, Default, Clone)]
 pub struct Status {
-    pub partition: String, // the name of the current partition (see Partition commands)
-    pub volume: Volume,    // 0-100 (deprecated: -1 if the volume cannot be determined)
+    pub partition: String, /* the name of the current partition (see
+                            * Partition commands) */
+    pub volume: Volume, /* 0-100 (deprecated: -1 if the volume cannot be
+                         * determined) */
     pub repeat: bool,
     pub random: bool,
     pub single: OnOffOneshot,
     pub consume: OnOffOneshot,
-    pub playlist: Option<u32>,        // 31-bit unsigned integer, the playlist version number
-    pub playlistlength: u32,          // integer, the length of the playlist
-    pub state: State,                 // play, stop, or pause
-    pub song: Option<u32>,            // playlist song number of the current song stopped on or playing
-    pub songid: Option<u32>,          // playlist songid of the current song stopped on or playing
-    pub nextsong: Option<u32>,        // playlist song number of the next song to be played
-    pub nextsongid: Option<u32>,      // playlist songid of the next song to be played
-    pub elapsed: Duration, // Total time elapsed within the current song in seconds, but with higher resolution.
-    pub duration: Duration, // Duration of the current song in seconds.
-    pub bitrate: Option<u32>, // instantaneous bitrate in kbps
-    pub xfade: Option<u32>, // crossfade in seconds (see Cross-Fading)
+    pub playlist: Option<u32>, /* 31-bit unsigned integer, the playlist
+                                * version number */
+    pub playlistlength: u32, // integer, the length of the playlist
+    pub state: State,        // play, stop, or pause
+    pub song: Option<u32>,   /* playlist song number of the current song
+                              * stopped on or playing */
+    pub songid: Option<u32>, /* playlist songid of the current song stopped
+                              * on or playing */
+    pub nextsong: Option<u32>, /* playlist song number of the next song to
+                                * be played */
+    pub nextsongid: Option<u32>, /* playlist songid of the next song to be
+                                  * played */
+    pub elapsed: Duration,    /* Total time elapsed within the current song in
+                               * seconds, but
+                               * with higher resolution. */
+    pub duration: Duration,        // Duration of the current song in seconds.
+    pub bitrate: Option<u32>,      // instantaneous bitrate in kbps
+    pub xfade: Option<u32>,        // crossfade in seconds (see Cross-Fading)
     pub mixrampdb: Option<String>, // mixramp threshold in dB
     pub mixrampdelay: Option<String>, // mixrampdelay in seconds
-    pub audio: Option<String>, // The format emitted by the decoder plugin during playback, format: samplerate:bits:channels. See Global Audio Format for a detailed explanation.
+    pub audio: Option<String>,     /* The format emitted by the decoder plugin
+                                    * during playback,
+                                    * format: samplerate:
+                                    * bits:channels. See Global Audio Format for a
+                                    * detailed
+                                    * explanation. */
     pub updating_db: Option<u32>, // job id
-    pub error: Option<String>, // if there is an error, returns message here
+    pub error: Option<String>,    // if there is an error, returns message here
 }
 
 impl FromMpd for Status {
@@ -54,7 +68,9 @@ impl FromMpd for Status {
             "nextsong" => self.nextsong = Some(value.parse().logerr(key, &value)?),
             "nextsongid" => self.nextsongid = Some(value.parse().logerr(key, &value)?),
             "elapsed" => self.elapsed = Duration::from_secs_f32(value.parse().logerr(key, &value)?),
-            "duration" => self.duration = Duration::from_secs_f32(value.parse().logerr(key, &value)?),
+            "duration" => {
+                self.duration = Duration::from_secs_f32(value.parse().logerr(key, &value)?)
+            }
             "bitrate" if value != "0" => self.bitrate = Some(value.parse().logerr(key, &value)?),
             "xfade" => self.xfade = Some(value.parse().logerr(key, &value)?),
             "mixrampdb" => self.mixrampdb = Some(value),
@@ -120,15 +136,11 @@ impl OnOffOneshot {
 
 impl std::fmt::Display for OnOffOneshot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                OnOffOneshot::On => "On",
-                OnOffOneshot::Off => "Off",
-                OnOffOneshot::Oneshot => "OS",
-            }
-        )?;
+        write!(f, "{}", match self {
+            OnOffOneshot::On => "On",
+            OnOffOneshot::Off => "Off",
+            OnOffOneshot::Oneshot => "OS",
+        })?;
         Ok(())
     }
 }
@@ -148,15 +160,11 @@ impl std::str::FromStr for OnOffOneshot {
 
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                State::Play => "Playing",
-                State::Stop => "Stopped",
-                State::Pause => "Paused",
-            }
-        )
+        write!(f, "{}", match self {
+            State::Play => "Playing",
+            State::Stop => "Stopped",
+            State::Pause => "Paused",
+        })
     }
 }
 impl std::str::FromStr for State {

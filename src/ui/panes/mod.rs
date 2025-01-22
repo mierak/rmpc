@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-#[cfg(debug_assertions)]
-use self::{frame_count::FrameCountPane, logs::LogsPane};
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
 use anyhow::Result;
@@ -13,33 +11,38 @@ use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use queue::QueuePane;
-use ratatui::{
-    layout::{Constraint, Layout},
-    prelude::Rect,
-    text::{Line, Span},
-    widgets::Block,
-    Frame,
-};
+use ratatui::Frame;
+use ratatui::layout::{Constraint, Layout};
+use ratatui::prelude::Rect;
+use ratatui::text::{Line, Span};
+use ratatui::widgets::Block;
 use search::SearchPane;
 use strum::Display;
 use tabs::TabsPane;
 
-use crate::{
-    config::{
-        keys::CommonAction,
-        tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
-        theme::{
-            properties::{Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty, WidgetProperty},
-            SymbolsConfig,
-        },
-    },
-    context::AppContext,
-    mpd::commands::{status::OnOffOneshot, volume::Bound, Song, Status},
-    shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
-    MpdQueryResult,
+#[cfg(debug_assertions)]
+use self::{frame_count::FrameCountPane, logs::LogsPane};
+use super::UiEvent;
+use super::widgets::volume::Volume;
+use crate::MpdQueryResult;
+use crate::config::keys::CommonAction;
+use crate::config::tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit};
+use crate::config::theme::SymbolsConfig;
+use crate::config::theme::properties::{
+    Property,
+    PropertyKind,
+    PropertyKindOrText,
+    SongProperty,
+    StatusProperty,
+    WidgetProperty,
 };
-
-use super::{widgets::volume::Volume, UiEvent};
+use crate::context::AppContext;
+use crate::mpd::commands::status::OnOffOneshot;
+use crate::mpd::commands::volume::Bound;
+use crate::mpd::commands::{Song, Status};
+use crate::shared::ext::duration::DurationExt;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::mouse_event::MouseEvent;
 
 pub mod album_art;
 pub mod albums;
@@ -183,7 +186,12 @@ pub(super) trait Pane {
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -215,21 +223,22 @@ pub(super) trait Pane {
 pub mod dirstack {}
 
 pub(crate) mod browser {
-    use std::{borrow::Cow, cmp::Ordering};
+    use std::borrow::Cow;
+    use std::cmp::Ordering;
 
-    use ratatui::{
-        style::{Color, Style},
-        text::{Line, Span},
-        widgets::ListItem,
-    };
+    use ratatui::style::{Color, Style};
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::ListItem;
 
-    use crate::{
-        config::theme::SymbolsConfig,
-        mpd::commands::{lsinfo::LsInfoEntry, Song},
-    };
+    use crate::config::theme::SymbolsConfig;
+    use crate::mpd::commands::Song;
+    use crate::mpd::commands::lsinfo::LsInfoEntry;
 
     impl Song {
-        pub(crate) fn to_preview(&self, _symbols: &SymbolsConfig) -> impl Iterator<Item = ListItem<'static>> {
+        pub(crate) fn to_preview(
+            &self,
+            _symbols: &SymbolsConfig,
+        ) -> impl Iterator<Item = ListItem<'static>> {
             let key_style = Style::default().fg(Color::Yellow);
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
@@ -286,11 +295,9 @@ pub(crate) mod browser {
                 ]));
             }
 
-            for (k, v) in self
-                .metadata
-                .iter()
-                .filter(|(key, _)| !["title", "album", "artist", "duration"].contains(&(*key).as_str()))
-            {
+            for (k, v) in self.metadata.iter().filter(|(key, _)| {
+                !["title", "album", "artist", "duration"].contains(&(*key).as_str())
+            }) {
                 r.push(Line::from(vec![
                     start_of_line_spacer.clone(),
                     Span::styled(k.clone(), key_style),
@@ -311,10 +318,7 @@ pub(crate) mod browser {
 
     impl DirOrSong {
         pub fn name_only(name: String) -> Self {
-            DirOrSong::Dir {
-                name,
-                full_path: String::new(),
-            }
+            DirOrSong::Dir { name, full_path: String::new() }
         }
 
         pub fn dir_name_or_file_name(&self) -> Cow<str> {
@@ -377,9 +381,8 @@ pub(crate) mod browser {
     mod test {
         use std::collections::HashMap;
 
-        use crate::mpd::commands::Song;
-
         use super::DirOrSong;
+        use crate::mpd::commands::Song;
 
         fn song(title: &str, track: Option<&str>) -> Song {
             Song {
@@ -395,72 +398,42 @@ pub(crate) mod browser {
         fn dir_before_song() {
             let mut input = vec![
                 DirOrSong::Song(Song::default()),
-                DirOrSong::Dir {
-                    name: "a".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
                 DirOrSong::Song(Song::default()),
-                DirOrSong::Dir {
-                    name: "z".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
                 DirOrSong::Song(Song::default()),
             ];
 
             input.sort();
 
-            assert_eq!(
-                input,
-                vec![
-                    DirOrSong::Dir {
-                        name: "a".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Dir {
-                        name: "z".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Song(Song::default()),
-                    DirOrSong::Song(Song::default()),
-                    DirOrSong::Song(Song::default()),
-                ]
-            );
+            assert_eq!(input, vec![
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
+                DirOrSong::Song(Song::default()),
+                DirOrSong::Song(Song::default()),
+                DirOrSong::Song(Song::default()),
+            ]);
         }
 
         #[test]
         fn all_by_track() {
             let mut input = vec![
                 DirOrSong::Song(song("a", Some("8"))),
-                DirOrSong::Dir {
-                    name: "a".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
                 DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir {
-                    name: "z".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
                 DirOrSong::Song(song("c", Some("5"))),
             ];
 
             input.sort();
 
-            assert_eq!(
-                input,
-                vec![
-                    DirOrSong::Dir {
-                        name: "a".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Dir {
-                        name: "z".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Song(song("b", Some("3"))),
-                    DirOrSong::Song(song("c", Some("5"))),
-                    DirOrSong::Song(song("a", Some("8"))),
-                ]
-            );
+            assert_eq!(input, vec![
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Song(song("c", Some("5"))),
+                DirOrSong::Song(song("a", Some("8"))),
+            ]);
         }
 
         #[test]
@@ -468,37 +441,22 @@ pub(crate) mod browser {
             let mut input = vec![
                 DirOrSong::Song(song("d", Some("10"))),
                 DirOrSong::Song(song("a", None)),
-                DirOrSong::Dir {
-                    name: "a".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
                 DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir {
-                    name: "z".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
                 DirOrSong::Song(song("c", None)),
             ];
 
             input.sort();
 
-            assert_eq!(
-                input,
-                vec![
-                    DirOrSong::Dir {
-                        name: "a".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Dir {
-                        name: "z".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Song(song("b", Some("3"))),
-                    DirOrSong::Song(song("d", Some("10"))),
-                    DirOrSong::Song(song("a", None)),
-                    DirOrSong::Song(song("c", None)),
-                ]
-            );
+            assert_eq!(input, vec![
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Song(song("d", Some("10"))),
+                DirOrSong::Song(song("a", None)),
+                DirOrSong::Song(song("c", None)),
+            ]);
         }
 
         #[test]
@@ -506,37 +464,22 @@ pub(crate) mod browser {
             let mut input = vec![
                 DirOrSong::Song(song("d", Some("10"))),
                 DirOrSong::Song(song("a", Some("lol"))),
-                DirOrSong::Dir {
-                    name: "a".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
                 DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir {
-                    name: "z".to_owned(),
-                    full_path: String::new(),
-                },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
                 DirOrSong::Song(song("c", None)),
             ];
 
             input.sort();
 
-            assert_eq!(
-                input,
-                vec![
-                    DirOrSong::Dir {
-                        name: "a".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Dir {
-                        name: "z".to_owned(),
-                        full_path: String::new()
-                    },
-                    DirOrSong::Song(song("b", Some("3"))),
-                    DirOrSong::Song(song("d", Some("10"))),
-                    DirOrSong::Song(song("a", Some("lol"))),
-                    DirOrSong::Song(song("c", None)),
-                ]
-            );
+            assert_eq!(input, vec![
+                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
+                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
+                DirOrSong::Song(song("b", Some("3"))),
+                DirOrSong::Song(song("d", Some("10"))),
+                DirOrSong::Song(song("a", Some("lol"))),
+                DirOrSong::Song(song("c", None)),
+            ]);
         }
     }
 }
@@ -551,9 +494,7 @@ impl Song {
     }
 
     pub fn file_name(&self) -> Option<Cow<str>> {
-        std::path::Path::new(&self.file)
-            .file_name()
-            .map(|file_name| file_name.to_string_lossy())
+        std::path::Path::new(&self.file).file_name().map(|file_name| file_name.to_string_lossy())
     }
 
     fn format<'song>(&'song self, property: &SongProperty) -> Option<Cow<'song, str>> {
@@ -563,19 +504,22 @@ impl Song {
             SongProperty::Title => self.title().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Artist => self.artist().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Album => self.album().map(|v| Cow::Borrowed(v.as_ref())),
-            SongProperty::Track => self
-                .metadata
-                .get("track")
-                .map(|v| Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))),
+            SongProperty::Track => self.metadata.get("track").map(|v| {
+                Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))
+            }),
             SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
-            SongProperty::Other(name) => self.metadata.get(*name).map(|v| Cow::Borrowed(v.as_str())),
+            SongProperty::Other(name) => {
+                self.metadata.get(*name).map(|v| Cow::Borrowed(v.as_str()))
+            }
         }
     }
 
     pub fn matches(&self, formats: &[&Property<'static, SongProperty>], filter: &str) -> bool {
         for format in formats {
             let match_found = match &format.kind {
-                PropertyKindOrText::Text(value) => Some(value.to_lowercase().contains(&filter.to_lowercase())),
+                PropertyKindOrText::Text(value) => {
+                    Some(value.to_lowercase().contains(&filter.to_lowercase()))
+                }
                 PropertyKindOrText::Sticker(key) => self
                     .stickers
                     .as_ref()
@@ -606,9 +550,7 @@ impl Song {
         max_len: usize,
         symbols: &SymbolsConfig,
     ) -> Option<Line<'song>> {
-        format
-            .default
-            .and_then(|f| self.as_line_ellipsized(f, max_len, symbols))
+        format.default.and_then(|f| self.as_line_ellipsized(f, max_len, symbols))
     }
 
     pub fn as_line_ellipsized<'song>(
@@ -664,7 +606,9 @@ impl Property<'static, SongProperty> {
         match &self.kind {
             PropertyKindOrText::Text(value) => Some((*value).to_string()),
             PropertyKindOrText::Sticker(key) => {
-                if let Some(sticker) = song.map(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key))) {
+                if let Some(sticker) =
+                    song.map(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key)))
+                {
                     sticker.cloned()
                 } else {
                     self.default(song)
@@ -711,7 +655,9 @@ impl Property<'static, PropertyKind> {
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(*value, style))),
             PropertyKindOrText::Sticker(key) => {
-                if let Some(sticker) = song.and_then(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key))) {
+                if let Some(sticker) =
+                    song.and_then(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key)))
+                {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
                     self.default_as_span(song, status)
@@ -728,10 +674,18 @@ impl Property<'static, PropertyKind> {
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
-                StatusProperty::State => Some(Either::Left(Span::styled(status.state.as_ref(), style))),
-                StatusProperty::Duration => Some(Either::Left(Span::styled(status.duration.to_string(), style))),
-                StatusProperty::Elapsed => Some(Either::Left(Span::styled(status.elapsed.to_string(), style))),
-                StatusProperty::Volume => Some(Either::Left(Span::styled(status.volume.value().to_string(), style))),
+                StatusProperty::State => {
+                    Some(Either::Left(Span::styled(status.state.as_ref(), style)))
+                }
+                StatusProperty::Duration => {
+                    Some(Either::Left(Span::styled(status.duration.to_string(), style)))
+                }
+                StatusProperty::Elapsed => {
+                    Some(Either::Left(Span::styled(status.elapsed.to_string(), style)))
+                }
+                StatusProperty::Volume => {
+                    Some(Either::Left(Span::styled(status.volume.value().to_string(), style)))
+                }
                 StatusProperty::Repeat => Some(Either::Left(Span::styled(
                     if status.repeat { "On" } else { "Off" },
                     style,
@@ -740,8 +694,12 @@ impl Property<'static, PropertyKind> {
                     if status.random { "On" } else { "Off" },
                     style,
                 ))),
-                StatusProperty::Consume => Some(Either::Left(Span::styled(status.consume.to_string(), style))),
-                StatusProperty::Single => Some(Either::Left(Span::styled(status.single.to_string(), style))),
+                StatusProperty::Consume => {
+                    Some(Either::Left(Span::styled(status.consume.to_string(), style)))
+                }
+                StatusProperty::Single => {
+                    Some(Either::Left(Span::styled(status.single.to_string(), style)))
+                }
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
                     || self.default_as_span(song, status),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
@@ -752,14 +710,10 @@ impl Property<'static, PropertyKind> {
                 ),
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
-                WidgetProperty::Volume => Some(Either::Left(Span::styled(
-                    Volume::get_str(*status.volume.value()),
-                    style,
-                ))),
-                WidgetProperty::States {
-                    active_style,
-                    separator_style,
-                } => {
+                WidgetProperty::Volume => {
+                    Some(Either::Left(Span::styled(Volume::get_str(*status.volume.value()), style)))
+                }
+                WidgetProperty::States { active_style, separator_style } => {
                     let separator = Span::styled(" / ", *separator_style);
                     Some(Either::Right(vec![
                         Span::styled("Repeat", if status.repeat { *active_style } else { style }),
@@ -822,7 +776,9 @@ impl SizedPaneOrSplit {
                 SizedPaneOrSplit::Split { direction, panes } => {
                     let constraints = panes.iter().map(|pane| Into::<Constraint>::into(pane.size));
                     let areas = Layout::new(*direction, constraints).split(area);
-                    stack.extend(areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)));
+                    stack.extend(
+                        areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
+                    );
                 }
             }
         }
@@ -885,26 +841,21 @@ impl StringExt for String {
 
 #[cfg(test)]
 mod format_tests {
-    use crate::{
-        config::{
-            theme::properties::{Property, PropertyKindOrText, SongProperty},
-            Leak,
-        },
-        mpd::commands::Song,
-    };
+    use crate::config::Leak;
+    use crate::config::theme::properties::{Property, PropertyKindOrText, SongProperty};
+    use crate::mpd::commands::Song;
 
     mod correct_values {
-        use std::{collections::HashMap, time::Duration};
+        use std::collections::HashMap;
+        use std::time::Duration;
 
         use ratatui::text::Span;
         use test_case::test_case;
 
-        use crate::{
-            config::theme::properties::{PropertyKind, StatusProperty},
-            mpd::commands::{status::OnOffOneshot, State, Status, Volume},
-        };
-
         use super::*;
+        use crate::config::theme::properties::{PropertyKind, StatusProperty};
+        use crate::mpd::commands::status::OnOffOneshot;
+        use crate::mpd::commands::{State, Status, Volume};
 
         #[test_case(SongProperty::Title, "title")]
         #[test_case(SongProperty::Artist, "artist")]
@@ -1133,11 +1084,7 @@ mod format_tests {
                         style: None,
                         default: None,
                     },
-                    &Property {
-                        kind: PropertyKindOrText::Text(" "),
-                        style: None,
-                        default: None,
-                    },
+                    &Property { kind: PropertyKindOrText::Text(" "), style: None, default: None },
                 ]),
                 style: None,
                 default: None,
@@ -1165,11 +1112,7 @@ mod format_tests {
                         style: None,
                         default: None,
                     },
-                    &Property {
-                        kind: PropertyKindOrText::Text(" "),
-                        style: None,
-                        default: None,
-                    },
+                    &Property { kind: PropertyKindOrText::Text(" "), style: None, default: None },
                 ]),
                 style: None,
                 default: Some(

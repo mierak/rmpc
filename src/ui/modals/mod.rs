@@ -1,14 +1,11 @@
 use anyhow::Result;
-use ratatui::{
-    prelude::{Constraint, Layout, Rect},
-    Frame,
-};
+use ratatui::Frame;
+use ratatui::prelude::{Constraint, Layout, Rect};
 
-use crate::{
-    context::AppContext,
-    shared::{key_event::KeyEvent, mouse_event::MouseEvent},
-    MpdQueryResult,
-};
+use crate::MpdQueryResult;
+use crate::context::AppContext;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::mouse_event::MouseEvent;
 
 pub mod confirm_modal;
 pub mod decoders;
@@ -26,7 +23,12 @@ pub(super) trait Modal: std::fmt::Debug {
 
     fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()>;
 
-    fn on_query_finished(&mut self, id: &'static str, data: &mut MpdQueryResult, context: &AppContext) -> Result<()> {
+    fn on_query_finished(
+        &mut self,
+        id: &'static str,
+        data: &mut MpdQueryResult,
+        context: &AppContext,
+    ) -> Result<()> {
         Ok(())
     }
 }
@@ -79,34 +81,16 @@ mod tests {
 
     #[test]
     fn exact() {
-        let input = Rect {
-            x: 25,
-            y: 25,
-            width: 250,
-            height: 250,
-        };
+        let input = Rect { x: 25, y: 25, width: 250, height: 250 };
 
         let result = input.centered_exact(60, 50);
 
-        assert_eq!(
-            result,
-            Rect {
-                x: 120,
-                y: 125,
-                width: 60,
-                height: 50,
-            }
-        );
+        assert_eq!(result, Rect { x: 120, y: 125, width: 60, height: 50 });
     }
 
     #[test]
     fn exact_width_exceeded_gives_max_possible_size() {
-        let input = Rect {
-            x: 25,
-            y: 25,
-            width: 10,
-            height: 10,
-        };
+        let input = Rect { x: 25, y: 25, width: 10, height: 10 };
 
         let result = input.centered_exact(60, 50);
 

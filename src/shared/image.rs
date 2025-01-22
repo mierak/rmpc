@@ -1,21 +1,16 @@
 use std::env;
 use std::io::Cursor;
 
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use image::codecs::gif::GifDecoder;
 use image::codecs::jpeg::JpegEncoder;
-use image::AnimationDecoder;
-use image::DynamicImage;
-use image::ImageDecoder;
+use image::{AnimationDecoder, DynamicImage, ImageDecoder};
 use ratatui::layout::Rect;
 use rustix::path::Arg;
 
-use crate::config::album_art::HorizontalAlign;
-use crate::config::album_art::VerticalAlign;
-use crate::config::Size;
-
 use super::dependencies::UEBERZUGPP;
+use crate::config::Size;
+use crate::config::album_art::{HorizontalAlign, VerticalAlign};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageProtocol {
@@ -28,7 +23,8 @@ pub enum ImageProtocol {
     None,
 }
 
-const ITERM2_TERMINAL_ENV_VARS: [&str; 3] = ["WEZTERM_EXECUTABLE", "TABBY_CONFIG_DIRECTORY", "VSCODE_INJECTION"];
+const ITERM2_TERMINAL_ENV_VARS: [&str; 3] =
+    ["WEZTERM_EXECUTABLE", "TABBY_CONFIG_DIRECTORY", "VSCODE_INJECTION"];
 const ITERM2_TERM_PROGRAMS: [&str; 3] = ["WezTerm", "vscode", "Tabby"];
 
 pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
@@ -65,16 +61,12 @@ pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
 
 pub fn is_iterm2_supported(is_tmux: bool) -> bool {
     if is_tmux {
-        if ITERM2_TERMINAL_ENV_VARS
-            .iter()
-            .any(|v| env::var_os(v).is_some_and(|v| !v.is_empty()))
-        {
+        if ITERM2_TERMINAL_ENV_VARS.iter().any(|v| env::var_os(v).is_some_and(|v| !v.is_empty())) {
             return true;
         }
-    } else if ITERM2_TERM_PROGRAMS
-        .iter()
-        .any(|v| env::var_os("TERM_PROGRAM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v)))
-    {
+    } else if ITERM2_TERM_PROGRAMS.iter().any(|v| {
+        env::var_os("TERM_PROGRAM").is_some_and(|var| var.as_str().unwrap_or_default().contains(v))
+    }) {
         return true;
     }
     return false;
@@ -93,7 +85,8 @@ pub fn query_device_attrs(is_tmux: bool) -> Result<ImageProtocol> {
 
     termios.local_modes &= !rustix::termios::LocalModes::ICANON;
     termios.local_modes &= !rustix::termios::LocalModes::ECHO;
-    // Set read timeout to 100ms as we cannot reliably check for end of terminal response
+    // Set read timeout to 100ms as we cannot reliably check for end of terminal
+    // response
     termios.special_codes[rustix::termios::SpecialCodeIndex::VTIME] = 1;
     // Set read minimum to 0
     termios.special_codes[rustix::termios::SpecialCodeIndex::VMIN] = 0;
@@ -143,7 +136,8 @@ pub fn read_size_csi() -> Result<Option<(u16, u16)>> {
 
     termios.local_modes &= !rustix::termios::LocalModes::ICANON;
     termios.local_modes &= !rustix::termios::LocalModes::ECHO;
-    // Set read timeout to 100ms as we cannot reliably check for end of terminal response
+    // Set read timeout to 100ms as we cannot reliably check for end of terminal
+    // response
     termios.special_codes[rustix::termios::SpecialCodeIndex::VTIME] = 1;
     // Set read minimum to 0
     termios.special_codes[rustix::termios::SpecialCodeIndex::VMIN] = 0;
@@ -191,10 +185,10 @@ pub struct AlignedArea {
     pub size_px: Size,
 }
 
-/// Returns a new aligned area contained by [`available_area`] with aspect ratio provided by [`image_size`].
-/// Constrains area by [`max_size_px`].
-/// Returns the input [`available_area`] and [`max_size_px`] if terminal's size cannot be determined properly.
-/// Also returns resulting area size in pixels.
+/// Returns a new aligned area contained by [`available_area`] with aspect ratio
+/// provided by [`image_size`]. Constrains area by [`max_size_px`].
+/// Returns the input [`available_area`] and [`max_size_px`] if terminal's size
+/// cannot be determined properly. Also returns resulting area size in pixels.
 #[allow(clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn create_aligned_area(
     available_area: Rect,
@@ -205,18 +199,12 @@ pub fn create_aligned_area(
 ) -> AlignedArea {
     let Ok(window_size) = crossterm::terminal::window_size() else {
         log::warn!(available_area:?, max_size_px:?; "Failed to query terminal size");
-        return AlignedArea {
-            area: available_area,
-            size_px: max_size_px,
-        };
+        return AlignedArea { area: available_area, size_px: max_size_px };
     };
 
     if window_size.width == 0 || window_size.height == 0 {
         log::warn!(available_area:?, max_size_px:?; "Terminal returned invalid size");
-        return AlignedArea {
-            area: available_area,
-            size_px: max_size_px,
-        };
+        return AlignedArea { area: available_area, size_px: max_size_px };
     };
 
     let available_width = available_area.width as f64;
@@ -249,12 +237,16 @@ pub fn create_aligned_area(
 
     let new_x = match halign {
         HorizontalAlign::Left => available_area.x,
-        HorizontalAlign::Center => available_area.x + (available_area.width.saturating_sub(new_width)) / 2,
+        HorizontalAlign::Center => {
+            available_area.x + (available_area.width.saturating_sub(new_width)) / 2
+        }
         HorizontalAlign::Right => available_area.right().saturating_sub(new_width),
     };
     let new_y = match valign {
         VerticalAlign::Top => available_area.y,
-        VerticalAlign::Center => available_area.y + (available_area.height.saturating_sub(new_height)) / 2,
+        VerticalAlign::Center => {
+            available_area.y + (available_area.height.saturating_sub(new_height)) / 2
+        }
         VerticalAlign::Bottom => available_area.bottom().saturating_sub(new_height),
     };
 
@@ -320,10 +312,7 @@ pub fn get_gif_frames(data: &[u8]) -> Result<Option<GifData<'_>>> {
 
     if GifDecoder::new(Cursor::new(data))?.into_frames().take(2).count() > 1 {
         let gif = GifDecoder::new(Cursor::new(data))?;
-        Ok(Some(GifData {
-            dimensions: gif.dimensions(),
-            frames: gif.into_frames(),
-        }))
+        Ok(Some(GifData { dimensions: gif.dimensions(), frames: gif.into_frames() }))
     } else {
         Ok(None)
     }

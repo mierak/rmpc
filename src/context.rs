@@ -1,23 +1,23 @@
-use std::{cell::Cell, collections::HashSet, ops::AddAssign, path::PathBuf};
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::ops::AddAssign;
+use std::path::PathBuf;
 
-use crate::{
-    config::{album_art::ImageMethod, tabs::PaneType, Config, Leak},
-    mpd::{
-        client::Client,
-        commands::{Song, State, Status},
-        mpd_client::MpdClient,
-    },
-    shared::{
-        events::ClientRequest,
-        lrc::{Lrc, LrcIndex},
-        macros::status_warn,
-        mpd_query::MpdQuerySync,
-    },
-    AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest,
-};
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use bon::bon;
-use crossbeam::channel::{bounded, SendError, Sender};
+use crossbeam::channel::{SendError, Sender, bounded};
+
+use crate::config::album_art::ImageMethod;
+use crate::config::tabs::PaneType;
+use crate::config::{Config, Leak};
+use crate::mpd::client::Client;
+use crate::mpd::commands::{Song, State, Status};
+use crate::mpd::mpd_client::MpdClient;
+use crate::shared::events::ClientRequest;
+use crate::shared::lrc::{Lrc, LrcIndex};
+use crate::shared::macros::status_warn;
+use crate::shared::mpd_query::MpdQuerySync;
+use crate::{AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest};
 
 pub struct AppContext {
     pub(crate) config: &'static Config,
@@ -47,7 +47,9 @@ impl AppContext {
         log::info!(supported_commands:? = supported_commands, sticker_support_needed; "Supported commands by server");
 
         if sticker_support_needed && !supported_commands.contains("sticker") {
-            bail!("Rmpc was configured to display stickers but MPD did not report sticker support.\nCheck if you have 'sticker_file' configured your in mpd.conf.");
+            bail!(
+                "Rmpc was configured to display stickers but MPD did not report sticker support.\nCheck if you have 'sticker_file' configured your in mpd.conf."
+            );
         }
 
         let status = client.get_status()?;
@@ -117,26 +119,27 @@ impl AppContext {
     #[builder(finish_fn(name = query))]
     pub(crate) fn query(
         &self,
-        #[builder(finish_fn)] on_done: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static,
+        #[builder(finish_fn)] on_done: impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult>
+        + Send
+        + 'static,
         id: &'static str,
         target: Option<PaneType>,
         replace_id: Option<&'static str>,
     ) {
-        let query = MpdQuery {
-            id,
-            target,
-            replace_id,
-            callback: Box::new(on_done),
-        };
+        let query = MpdQuery { id, target, replace_id, callback: Box::new(on_done) };
         if let Err(err) = self.client_request_sender.send(ClientRequest::Query(query)) {
             log::error!(error:? = err; "Failed to send query request");
         }
     }
 
-    pub(crate) fn command(&self, callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static) {
-        if let Err(err) = self.client_request_sender.send(ClientRequest::Command(MpdCommand {
-            callback: Box::new(callback),
-        })) {
+    pub(crate) fn command(
+        &self,
+        callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static,
+    ) {
+        if let Err(err) = self
+            .client_request_sender
+            .send(ClientRequest::Command(MpdCommand { callback: Box::new(callback) }))
+        {
             log::error!(error:? = err; "Failed to send command request");
         }
     }
@@ -162,7 +165,8 @@ impl AppContext {
 
         let mut path: PathBuf = PathBuf::from(lyrics_dir);
         path.push(&song.file);
-        let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy())) else {
+        let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy()))
+        else {
             bail!("No file stem for lyrics path: {path:?}");
         };
 
@@ -189,16 +193,8 @@ impl AppContext {
 
 impl Config {
     fn sticker_support_needed(&self) -> bool {
-        self.theme
-            .song_table_format
-            .iter()
-            .any(|column| column.prop.kind.contains_stickers())
-            || self
-                .theme
-                .browser_song_format
-                .0
-                .iter()
-                .any(|prop| prop.kind.contains_stickers())
+        self.theme.song_table_format.iter().any(|column| column.prop.kind.contains_stickers())
+            || self.theme.browser_song_format.0.iter().any(|prop| prop.kind.contains_stickers())
             || self.theme.header.rows.iter().any(|row| {
                 row.left.iter().any(|left| left.kind.contains_stickers())
                     || row.center.iter().any(|center| center.kind.contains_stickers())

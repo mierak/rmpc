@@ -12,8 +12,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,15 +22,13 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    prelude::Alignment,
-    style::{Style, Styled},
-    symbols,
-    text::{Line, Span},
-    widgets::{Block, Widget},
-};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::prelude::Alignment;
+use ratatui::style::{Style, Styled};
+use ratatui::symbols;
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Widget};
 
 use super::get_line_offset;
 
@@ -167,21 +165,11 @@ impl Widget for &mut Tabs<'_> {
                 break;
             }
             let pos = buf.set_line(x, tabs_area.top(), title, remaining_width);
-            self.areas[i] = Rect {
-                x,
-                y: tabs_area.top(),
-                width: pos.0 - x,
-                height: 1,
-            };
+            self.areas[i] = Rect { x, y: tabs_area.top(), width: pos.0 - x, height: 1 };
 
             if i == self.selected {
                 buf.set_style(
-                    Rect {
-                        x,
-                        y: tabs_area.top(),
-                        width: pos.0.saturating_sub(x),
-                        height: 1,
-                    },
+                    Rect { x, y: tabs_area.top(), width: pos.0.saturating_sub(x), height: 1 },
                     self.highlight_style,
                 );
             }
@@ -189,12 +177,14 @@ impl Widget for &mut Tabs<'_> {
             let remaining_width = tabs_area.right().saturating_sub(x);
             if remaining_width == 0 || last_title {
                 if i < self.areas.len() - 2 {
-                    // make the rest of the areas empty since we ran out of space
+                    // make the rest of the areas empty since we ran out of
+                    // space
                     self.areas[i + 1..].iter_mut().for_each(|a| *a = Rect::default());
                 }
                 break;
             }
-            let pos = buf.set_span(x - 1, tabs_area.top(), &self.divider, self.divider.width() as u16);
+            let pos =
+                buf.set_span(x - 1, tabs_area.top(), &self.divider, self.divider.width() as u16);
             x = pos.0;
         }
     }
@@ -202,8 +192,9 @@ impl Widget for &mut Tabs<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use ratatui::style::{Color, Modifier, Stylize};
+
+    use super::*;
 
     #[test]
     fn can_be_stylized() {

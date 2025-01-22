@@ -1,16 +1,12 @@
 use either::Either;
-use ratatui::{
-    prelude::{Constraint, Layout},
-    style::Style,
-    text::Line,
-    widgets::{Block, Widget},
-};
+use ratatui::prelude::{Constraint, Layout};
+use ratatui::style::Style;
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Widget};
 
-use crate::{
-    config::theme::properties::{Property, PropertyKind},
-    context::AppContext,
-    mpd::commands::{Song, Status},
-};
+use crate::config::theme::properties::{Property, PropertyKind};
+use crate::context::AppContext;
+use crate::mpd::commands::{Song, Status};
 
 pub struct Header<'a> {
     context: &'a AppContext,
@@ -21,9 +17,7 @@ impl Widget for Header<'_> {
         let config = self.context.config;
 
         if let Some(header_bg_color) = config.theme.header_background_color {
-            Block::default()
-                .style(Style::default().bg(header_bg_color))
-                .render(area, buf);
+            Block::default().style(Style::default().bg(header_bg_color)).render(area, buf);
         }
 
         let row_count = config.theme.header.rows.len();

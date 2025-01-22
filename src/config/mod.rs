@@ -3,8 +3,7 @@ use std::str::FromStr;
 
 use address::MpdPassword;
 use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethod, ImageMethodFile};
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use artists::{Artists, ArtistsFile};
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
@@ -12,7 +11,7 @@ use itertools::Itertools;
 use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
-use tabs::{validate_tabs, PaneType, Tabs, TabsFile};
+use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
 use utils::tilde_expand;
 
 pub mod address;
@@ -25,18 +24,15 @@ mod search;
 pub mod tabs;
 pub mod theme;
 
+pub use address::MpdAddress;
+pub use search::Search;
+
+use self::keys::{KeyConfig, KeyConfigFile};
+use self::theme::{ConfigColor, UiConfig, UiConfigFile};
 use crate::shared::image;
 use crate::shared::image::ImageProtocol;
 use crate::shared::macros::status_warn;
 use crate::tmux;
-pub use address::MpdAddress;
-
-use self::{
-    keys::{KeyConfig, KeyConfigFile},
-    theme::{ConfigColor, UiConfig, UiConfigFile},
-};
-
-pub use search::Search;
 
 #[derive(Debug, Default, Clone)]
 pub struct Config {
@@ -110,10 +106,7 @@ pub struct Size {
 
 impl Default for Size {
     fn default() -> Self {
-        Self {
-            width: 1200,
-            height: 1200,
-        }
+        Self { width: 1200, height: 1200 }
     }
 }
 
@@ -157,9 +150,7 @@ impl ConfigFile {
 
     pub fn theme_path(&self, config_dir: &Path) -> Option<PathBuf> {
         self.theme.as_ref().map(|theme_name| {
-            PathBuf::from(config_dir)
-                .join("themes")
-                .join(format!("{theme_name}.ron"))
+            PathBuf::from(config_dir).join("themes").join(format!("{theme_name}.ron"))
         })
     }
 
@@ -167,8 +158,9 @@ impl ConfigFile {
         self.theme_path(config_dir).map_or_else(
             || Ok(UiConfigFile::default()),
             |path| {
-                let file = std::fs::File::open(&path)
-                    .with_context(|| format!("Failed to open theme file {:?}", path.to_string_lossy()))?;
+                let file = std::fs::File::open(&path).with_context(|| {
+                    format!("Failed to open theme file {:?}", path.to_string_lossy())
+                })?;
                 let read = std::io::BufReader::new(file);
                 let theme: UiConfigFile = ron::de::from_reader(read)?;
                 Ok(theme)
@@ -200,7 +192,8 @@ impl ConfigFile {
             .collect_vec()
             .leak();
 
-        let (address, password) = MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
+        let (address, password) =
+            MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme,
@@ -209,12 +202,7 @@ impl ConfigFile {
                 .map(|v| if v.ends_with('/') { v } else { format!("{v}/") }.leak() as &'static _),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
-                if v.ends_with('/') {
-                    v.into_owned()
-                } else {
-                    format!("{v}/")
-                }
-                .leak() as &'static _
+                if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }.leak() as &'static _
             }),
             tabs,
             active_panes,
@@ -252,9 +240,13 @@ impl ConfigFile {
         config.album_art.method = match self.image_method.unwrap_or(album_art_method) {
             ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
             ImageMethodFile::Kitty => ImageMethod::Kitty,
-            ImageMethodFile::UeberzugWayland if image::is_ueberzug_wayland_supported() => ImageMethod::UeberzugWayland,
+            ImageMethodFile::UeberzugWayland if image::is_ueberzug_wayland_supported() => {
+                ImageMethod::UeberzugWayland
+            }
             ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-            ImageMethodFile::UeberzugX11 if image::is_ueberzug_x11_supported() => ImageMethod::UeberzugX11,
+            ImageMethodFile::UeberzugX11 if image::is_ueberzug_x11_supported() => {
+                ImageMethod::UeberzugX11
+            }
             ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
             ImageMethodFile::Sixel => ImageMethod::Sixel,
             ImageMethodFile::None => ImageMethod::None,
@@ -354,9 +346,10 @@ pub mod utils {
     mod tests {
         use std::sync::{LazyLock, Mutex};
 
+        use test_case::test_case;
+
         use super::tilde_expand;
         use crate::shared::env::ENV;
-        use test_case::test_case;
 
         static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -396,9 +389,10 @@ mod tests {
 
     use walkdir::WalkDir;
 
+    use crate::config::ConfigFile;
     #[cfg(debug_assertions)]
     use crate::config::keys::KeyConfigFile;
-    use crate::config::{theme::UiConfigFile, ConfigFile};
+    use crate::config::theme::UiConfigFile;
 
     #[test]
     #[cfg(debug_assertions)]
@@ -454,7 +448,8 @@ mod tests {
 
             if f_name.ends_with(".ron") {
                 dbg!(entry.path());
-                ron::de::from_str::<UiConfigFile>(&std::fs::read_to_string(entry.path()).unwrap()).unwrap();
+                ron::de::from_str::<UiConfigFile>(&std::fs::read_to_string(entry.path()).unwrap())
+                    .unwrap();
             }
         }
     }

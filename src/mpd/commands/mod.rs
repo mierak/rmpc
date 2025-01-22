@@ -23,7 +23,6 @@ pub use self::list_mounts::Mounts;
 pub use self::list_playlists::Playlist;
 pub use self::lsinfo::LsInfo;
 pub use self::outputs::Output;
-pub use self::status::State;
-pub use self::status::Status;
+pub use self::status::{State, Status};
 pub use self::update::Update;
 pub use self::volume::Volume;

@@ -1,27 +1,20 @@
-use crate::{
-    config::keys::CommonAction,
-    context::AppContext,
-    mpd::commands::Song,
-    shared::{
-        key_event::KeyEvent,
-        macros::pop_modal,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-};
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
-    style::Style,
-    symbols::border,
-    text::Text,
-    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
-    Frame,
-};
-
-use crate::ui::dirstack::DirState;
+use ratatui::Frame;
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
+use ratatui::style::Style;
+use ratatui::symbols::border;
+use ratatui::text::Text;
+use ratatui::widgets::{Block, Borders, Cell, Clear, Row, Table, TableState};
 
 use super::{Modal, RectExt};
+use crate::config::keys::CommonAction;
+use crate::context::AppContext;
+use crate::mpd::commands::Song;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::macros::pop_modal;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use crate::ui::dirstack::DirState;
 
 #[derive(Debug)]
 pub struct SongInfoModal {
@@ -34,15 +27,16 @@ impl SongInfoModal {
     pub fn new(song: Song) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
-        Self {
-            scrolling_state,
-            song,
-            table_area: Rect::default(),
-        }
+        Self { scrolling_state, song, table_area: Rect::default() }
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    fn row<'a>(key: &'a str, key_width: u16, value: &'a str, value_width: u16) -> impl Iterator<Item = Row<'a>> {
+    fn row<'a>(
+        key: &'a str,
+        key_width: u16,
+        value: &'a str,
+        value_width: u16,
+    ) -> impl Iterator<Item = Row<'a>> {
         let key = textwrap::wrap(key, key_width as usize);
         let value = textwrap::wrap(value, value_width as usize);
 
@@ -76,12 +70,10 @@ impl Modal for SongInfoModal {
             .title("Song info");
 
         let (key_col_width, val_col_width) = (30, 70);
-        let margin = Margin {
-            horizontal: 1,
-            vertical: 0,
-        };
+        let margin = Margin { horizontal: 1, vertical: 0 };
         let [header_area, table_area] =
-            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(block.inner(popup_area));
+            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)])
+                .areas(block.inner(popup_area));
         let header_area = header_area.inner(margin);
         let table_area = table_area.inner(margin);
 
@@ -114,11 +106,7 @@ impl Modal for SongInfoModal {
         if let Some(album) = song.album() {
             rows.extend(SongInfoModal::row("Album", tag_area.width, album, value_area.width));
         }
-        let duration = song
-            .duration
-            .as_ref()
-            .map(|d| d.as_secs().to_string())
-            .unwrap_or_default();
+        let duration = song.duration.as_ref().map(|d| d.as_secs().to_string()).unwrap_or_default();
         if !duration.is_empty() {
             rows.extend(SongInfoModal::row(
                 "Duration",
@@ -131,33 +119,27 @@ impl Modal for SongInfoModal {
         rows.extend(
             song.metadata
                 .iter()
-                .filter(|(key, _)| !["title", "album", "artist", "duration"].contains(&(*key).as_str()))
+                .filter(|(key, _)| {
+                    !["title", "album", "artist", "duration"].contains(&(*key).as_str())
+                })
                 .flat_map(|(k, v)| SongInfoModal::row(k, tag_area.width, v, value_area.width)),
         );
 
         self.scrolling_state.set_content_len(Some(rows.len()));
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
 
-        let header_table = Table::new(
-            vec![Row::new([Cell::from("Tag"), Cell::from("Value")])],
-            [
-                Constraint::Percentage(key_col_width),
-                Constraint::Percentage(val_col_width),
-            ],
-        )
+        let header_table = Table::new(vec![Row::new([Cell::from("Tag"), Cell::from("Value")])], [
+            Constraint::Percentage(key_col_width),
+            Constraint::Percentage(val_col_width),
+        ])
         .column_spacing(1)
         .block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(app.config.as_border_style()),
+            Block::default().borders(Borders::BOTTOM).border_style(app.config.as_border_style()),
         );
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Percentage(key_col_width),
-                Constraint::Percentage(val_col_width),
-            ],
-        )
+        let table = Table::new(rows, [
+            Constraint::Percentage(key_col_width),
+            Constraint::Percentage(val_col_width),
+        ])
         .column_spacing(1)
         .style(app.config.as_text_style())
         .row_highlight_style(app.config.theme.current_item_style);
@@ -169,10 +151,7 @@ impl Modal for SongInfoModal {
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
-            popup_area.inner(Margin {
-                horizontal: 0,
-                vertical: 1,
-            }),
+            popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 

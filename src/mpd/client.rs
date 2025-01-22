@@ -1,31 +1,22 @@
-use std::{
-    io::{BufRead, BufReader, Write},
-    net::TcpStream,
-    os::unix::net::UnixStream,
-};
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpStream;
+use std::os::unix::net::UnixStream;
 
-use crate::{
-    config::{address::MpdPassword, MpdAddress},
-    mpd::mpd_client::MpdClient,
-    shared::macros::status_warn,
-};
-
-use super::{
-    commands::mpd_config::MpdConfig,
-    errors::MpdError,
-    proto_client::{ProtoClient, SocketClient},
-    version::Version,
-};
 use anyhow::Result;
 use log::debug;
 
+use super::commands::mpd_config::MpdConfig;
+use super::errors::MpdError;
+use super::proto_client::{ProtoClient, SocketClient};
+use super::version::Version;
+use crate::config::MpdAddress;
+use crate::config::address::MpdPassword;
+use crate::mpd::mpd_client::MpdClient;
+use crate::shared::macros::status_warn;
+
 type MpdResult<T> = Result<T, MpdError>;
 
-const MIN_SUPPORTED_VERSION: Version = Version {
-    major: 0,
-    minor: 23,
-    patch: 5,
-};
+const MIN_SUPPORTED_VERSION: Version = Version { major: 0, minor: 23, patch: 5 };
 
 pub struct Client<'name> {
     name: &'name str,
@@ -126,7 +117,9 @@ impl<'name> Client<'name> {
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
         };
-        let Some(version): Option<Version> = buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok()) else {
+        let Some(version): Option<Version> =
+            buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok())
+        else {
             return Err(MpdError::Generic(format!(
                 "Handshake validation failed. Cannot parse version from '{buf}'"
             )));
@@ -140,22 +133,15 @@ impl<'name> Client<'name> {
             );
         }
 
-        let mut client = Self {
-            name,
-            rx,
-            stream,
-            addr,
-            password,
-            version,
-            config: None,
-        };
+        let mut client = Self { name, rx, stream, addr, password, version, config: None };
 
         if let Some(MpdPassword(password)) = password {
             debug!("Used password auth to MPD");
             client.password(password)?;
         }
 
-        // 2^18 seems to be max limit supported by MPD and higher values dont have any effect
+        // 2^18 seems to be max limit supported by MPD and higher values dont
+        // have any effect
         client.binary_limit(2u64.pow(18))?;
 
         Ok(client)
@@ -177,7 +163,9 @@ impl<'name> Client<'name> {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
         };
 
-        let Some(version): Option<Version> = buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok()) else {
+        let Some(version): Option<Version> =
+            buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok())
+        else {
             return Err(MpdError::Generic(format!(
                 "Handshake validation failed. Cannot parse version from '{buf}'"
             )));
@@ -200,15 +188,24 @@ impl<'name> Client<'name> {
         Ok(self)
     }
 
-    pub fn set_read_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
+    pub fn set_read_timeout(
+        &mut self,
+        timeout: Option<std::time::Duration>,
+    ) -> std::io::Result<()> {
         self.stream.set_read_timeout(timeout)
     }
 
-    pub fn set_write_timeout(&mut self, timeout: Option<std::time::Duration>) -> std::io::Result<()> {
+    pub fn set_write_timeout(
+        &mut self,
+        timeout: Option<std::time::Duration>,
+    ) -> std::io::Result<()> {
         self.stream.set_write_timeout(timeout)
     }
 
-    pub fn send<'cmd>(&mut self, command: &'cmd str) -> Result<ProtoClient<'cmd, '_, Self>, MpdError> {
+    pub fn send<'cmd>(
+        &mut self,
+        command: &'cmd str,
+    ) -> Result<ProtoClient<'cmd, '_, Self>, MpdError> {
         ProtoClient::new(command, self)
     }
 

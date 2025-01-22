@@ -23,16 +23,19 @@ impl Bound<u8> for Volume {
         }
         self
     }
+
     fn inc_by(&mut self, step: u8) -> &Self {
         self.0 = self.0.saturating_add(step).min(100);
         self
     }
+
     fn dec(&mut self) -> &Self {
         if self.0 > 0 {
             self.0 -= 1;
         }
         self
     }
+
     fn dec_by(&mut self, step: u8) -> &Self {
         self.0 = self.0.saturating_sub(step);
         self

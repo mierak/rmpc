@@ -1,18 +1,16 @@
-use std::{cell::Cell, collections::HashSet};
+use std::cell::Cell;
+use std::collections::HashSet;
 
-use crossbeam::channel::{unbounded, Receiver, Sender};
-use ratatui::{backend::TestBackend, Terminal};
+use crossbeam::channel::{Receiver, Sender, unbounded};
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use rstest::fixture;
 
-use crate::{
-    config::{Config, ConfigFile, Leak},
-    context::AppContext,
-    mpd::commands::Status,
-    shared::{
-        events::{ClientRequest, WorkRequest},
-        lrc::LrcIndex,
-    },
-};
+use crate::config::{Config, ConfigFile, Leak};
+use crate::context::AppContext;
+use crate::mpd::commands::Status;
+use crate::shared::events::{ClientRequest, WorkRequest};
+use crate::shared::lrc::LrcIndex;
 
 pub mod mpd_client;
 

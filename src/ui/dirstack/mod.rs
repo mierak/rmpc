@@ -1,8 +1,6 @@
 use itertools::Itertools;
-use ratatui::{
-    text::{Line, Span},
-    widgets::{ListItem, ListState, TableState},
-};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{ListItem, ListState, TableState};
 
 mod dir;
 mod stack;
@@ -11,7 +9,9 @@ pub use dir::Dir;
 pub use stack::DirStack;
 pub use state::DirState;
 
-use crate::{config::Config, mpd::commands::Song, ui::panes::browser::DirOrSong};
+use crate::config::Config;
+use crate::mpd::commands::Song;
+use crate::ui::panes::browser::DirOrSong;
 
 pub trait DirStackItem {
     type Item;
@@ -62,29 +62,26 @@ impl DirStackItem for DirOrSong {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
 
-        let mut value = match self {
-            DirOrSong::Dir { name, .. } => Line::from(vec![
-                marker_span,
-                Span::from(format!(
-                    "{} {}",
-                    symbols.dir,
-                    if name.is_empty() { "Untitled" } else { name.as_str() }
-                )),
-            ]),
-            DirOrSong::Song(s) => {
-                let spans = [marker_span, Span::from(symbols.song), Span::from(" ")]
-                    .into_iter()
-                    .chain(
-                        config
-                            .theme
-                            .browser_song_format
-                            .0
-                            .iter()
-                            .map(|prop| Span::from(prop.as_string(Some(s)).unwrap_or_default())),
-                    );
-                Line::from(spans.collect_vec())
-            }
-        };
+        let mut value =
+            match self {
+                DirOrSong::Dir { name, .. } => Line::from(vec![
+                    marker_span,
+                    Span::from(format!(
+                        "{} {}",
+                        symbols.dir,
+                        if name.is_empty() { "Untitled" } else { name.as_str() }
+                    )),
+                ]),
+                DirOrSong::Song(s) => {
+                    let spans =
+                        [marker_span, Span::from(symbols.song), Span::from(" ")].into_iter().chain(
+                            config.theme.browser_song_format.0.iter().map(|prop| {
+                                Span::from(prop.as_string(Some(s)).unwrap_or_default())
+                            }),
+                        );
+                    Line::from(spans.collect_vec())
+                }
+            };
         if let Some(content) = additional_content {
             value.push_span(Span::raw(content));
         }
@@ -125,13 +122,8 @@ impl DirStackItem for Song {
         let artist = self.artist_str().to_owned();
         let separator_span = Span::from(" - ");
         let icon_span = Span::from(format!("{} ", symbols.song));
-        let mut result = vec![
-            marker_span,
-            icon_span,
-            Span::from(artist),
-            separator_span,
-            Span::from(title),
-        ];
+        let mut result =
+            vec![marker_span, icon_span, Span::from(artist), separator_span, Span::from(title)];
         if let Some(content) = additional_content {
             result.push(Span::raw(content));
         }
@@ -190,6 +182,7 @@ impl ScrollingState for ListState {
 #[cfg(test)]
 impl DirStackItem for String {
     type Item = ListItem<'static>;
+
     fn as_path(&self) -> &str {
         self
     }

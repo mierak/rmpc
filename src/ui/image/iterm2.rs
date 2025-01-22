@@ -1,33 +1,25 @@
-use anyhow::{bail, Result};
+use std::io::Write;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+
+use anyhow::{Result, bail};
 use base64::Engine;
-use crossbeam::channel::{unbounded, Sender};
-use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
-    queue,
-    style::Colors,
-};
-use std::{
-    io::Write,
-    sync::{atomic::Ordering, Arc},
-};
-
-use ratatui::{layout::Rect, style::Color};
-
-use crate::{
-    config::{
-        album_art::{HorizontalAlign, VerticalAlign},
-        Size,
-    },
-    shared::{
-        ext::mpsc::RecvLast,
-        image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
-        macros::try_cont,
-        tmux::tmux_write,
-    },
-    ui::image::{clear_area, facade::IS_SHOWING},
-};
+use crossbeam::channel::{Sender, unbounded};
+use crossterm::cursor::{MoveTo, RestorePosition, SavePosition};
+use crossterm::queue;
+use crossterm::style::Colors;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
 
 use super::Backend;
+use crate::config::Size;
+use crate::config::album_art::{HorizontalAlign, VerticalAlign};
+use crate::shared::ext::mpsc::RecvLast;
+use crate::shared::image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image};
+use crate::shared::macros::try_cont;
+use crate::shared::tmux::tmux_write;
+use crate::ui::image::clear_area;
+use crate::ui::image::facade::IS_SHOWING;
 
 #[derive(Debug)]
 struct EncodedData {
@@ -61,12 +53,14 @@ impl Backend for Iterm2 {
 }
 
 impl Iterm2 {
-    pub fn new(max_size: Size, bg_color: Option<Color>, halign: HorizontalAlign, valign: VerticalAlign) -> Self {
+    pub fn new(
+        max_size: Size,
+        bg_color: Option<Color>,
+        halign: HorizontalAlign,
+        valign: VerticalAlign,
+    ) -> Self {
         let (sender, receiver) = unbounded::<DataToEncode>();
-        let colors = Colors {
-            background: bg_color.map(Into::into),
-            foreground: None,
-        };
+        let colors = Colors { background: bg_color.map(Into::into), foreground: None };
 
         std::thread::Builder::new()
             .name("iterm2".to_string())
@@ -79,11 +73,16 @@ impl Iterm2 {
                         continue;
                     };
 
-                    let encoded = try_cont!(encode(area, &data, max_size, halign, valign), "Failed to encode data");
+                    let encoded = try_cont!(
+                        encode(area, &data, max_size, halign, valign),
+                        "Failed to encode data"
+                    );
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
-                        log::trace!("Not showing image because its not supposed to be displayed anymore");
+                        log::trace!(
+                            "Not showing image because its not supposed to be displayed anymore"
+                        );
                         continue;
                     }
 
@@ -93,7 +92,10 @@ impl Iterm2 {
                         continue;
                     };
 
-                    try_cont!(clear_area(&mut w, colors, area), "Failed to clear iterm2 image area");
+                    try_cont!(
+                        clear_area(&mut w, colors, area),
+                        "Failed to clear iterm2 image area"
+                    );
                     try_cont!(display(&mut w, encoded), "Failed to display iterm2 image");
                 }
             })
@@ -104,29 +106,26 @@ impl Iterm2 {
 }
 
 fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
-    let EncodedData {
-        content,
-        size,
-        aligned_area,
-        img_width_px,
-        img_height_px,
-    } = data;
+    let EncodedData { content, size, aligned_area, img_width_px, img_height_px } = data;
 
     queue!(w, SavePosition)?;
     queue!(w, MoveTo(aligned_area.x, aligned_area.y))?;
 
     // TODO: https://iterm2.com/documentation-images.html
-    // A new way of sending files was introduced in iTerm2 version 3.5 which works in tmux integration mode
-    // by splitting the giant control sequence into a number of smaller ones:
-    // First, send:
+    // A new way of sending files was introduced in iTerm2 version 3.5 which
+    // works in tmux integration mode by splitting the giant control
+    // sequence into a number of smaller ones: First, send:
     // ESC ] 1337 ; MultipartFile = [optional arguments] ^G
     // Then, send one or more of:
     // ESC ] 1337 ; FilePart = base64 encoded file contents ^G
-    // What size chunks should you use? Older versions of tmux have a limit of 256 bytes for the entire sequence.
-    // In newer versions of tmux, the limit is 1,048,576 bytes. iTerm2 also imposes a limit of 1,048,576 bytes.
-    // Finally, send:
-    // ESC ] 1337 ; FileEnd ^G
-    tmux_write!(w, "\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n")?;
+    // What size chunks should you use? Older versions of tmux have a limit of
+    // 256 bytes for the entire sequence. In newer versions of tmux, the
+    // limit is 1,048,576 bytes. iTerm2 also imposes a limit of 1,048,576
+    // bytes. Finally, send: ESC ] 1337 ; FileEnd ^G
+    tmux_write!(
+        w,
+        "\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n"
+    )?;
     queue!(w, RestorePosition)?;
 
     Ok(())
@@ -141,10 +140,13 @@ fn encode(
 ) -> Result<EncodedData> {
     let start = std::time::Instant::now();
 
-    let (len, width_px, height_px, data, aligned_area) = if let Some(gif_data) = get_gif_frames(data)? {
+    let (len, width_px, height_px, data, aligned_area) = if let Some(gif_data) =
+        get_gif_frames(data)?
+    {
         log::debug!("encoding animated gif");
 
-        // Take smaller of the two dimensions to make the gif stretch over available area and not overflow
+        // Take smaller of the two dimensions to make the gif stretch over available
+        // area and not overflow
         let (width, height) = gif_data.dimensions;
         let aligned_area = create_aligned_area(area, (width, height), max_size_px, halign, valign);
         log::debug!(aligned_area:?, dims:? = gif_data.dimensions; "encoded");
@@ -165,9 +167,7 @@ fn encode(
                 bail!("Failed to resize image, err: {}", err);
             }
         };
-        let Ok(jpg) = jpg_encode(&image) else {
-            bail!("Failed to encode image as jpg")
-        };
+        let Ok(jpg) = jpg_encode(&image) else { bail!("Failed to encode image as jpg") };
         (
             jpg.len(),
             image.width(),

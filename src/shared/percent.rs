@@ -1,6 +1,7 @@
-use anyhow::{anyhow, Context, Error};
-use derive_more::Into;
 use std::str::FromStr;
+
+use anyhow::{Context, Error, anyhow};
+use derive_more::Into;
 
 #[derive(Debug, derive_more::Deref, Into, Clone, Copy, Eq, PartialEq)]
 #[into(u16, u32, u64, u128)]

@@ -1,7 +1,5 @@
-use std::{
-    ffi::{OsStr, OsString},
-    sync::LazyLock,
-};
+use std::ffi::{OsStr, OsString};
+use std::sync::LazyLock;
 
 pub struct Env {
     #[cfg(test)]
@@ -32,12 +30,7 @@ impl Env {
             return Err(std::env::VarError::NotUnicode("".into()));
         };
 
-        self.vars
-            .lock()
-            .unwrap()
-            .get(key)
-            .cloned()
-            .ok_or(std::env::VarError::NotPresent)
+        self.vars.lock().unwrap().get(key).cloned().ok_or(std::env::VarError::NotPresent)
     }
 
     pub fn var_os<K: AsRef<OsStr>>(&self, key: K) -> Option<OsString> {
@@ -46,6 +39,7 @@ impl Env {
             .and_then(|v| self.vars.lock().unwrap().get(v).cloned())
             .map(|v| v.into())
     }
+
     pub fn set(&self, key: String, value: String) {
         self.vars.lock().unwrap().insert(key, value);
     }

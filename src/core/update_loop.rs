@@ -1,15 +1,11 @@
-use anyhow::Result;
 use std::time::Duration;
 
-use crossbeam::channel::{unbounded, Sender, TryRecvError};
+use anyhow::Result;
+use crossbeam::channel::{Sender, TryRecvError, unbounded};
 
-use crate::{
-    mpd::mpd_client::MpdClient,
-    shared::{
-        events::ClientRequest,
-        mpd_query::{MpdQuery, MpdQueryResult},
-    },
-};
+use crate::mpd::mpd_client::MpdClient;
+use crate::shared::events::ClientRequest;
+use crate::shared::mpd_query::{MpdQuery, MpdQueryResult};
 
 enum LoopEvent {
     Start,
@@ -22,7 +18,10 @@ pub struct UpdateLoop {
 }
 
 impl UpdateLoop {
-    pub fn try_new(work_tx: Sender<ClientRequest>, status_update_interval_ms: Option<u64>) -> Result<Self> {
+    pub fn try_new(
+        work_tx: Sender<ClientRequest>,
+        status_update_interval_ms: Option<u64>,
+    ) -> Result<Self> {
         let (tx, rx) = unbounded::<LoopEvent>();
 
         // send stop event at the start to not start the loop immedietally
@@ -44,7 +43,8 @@ impl UpdateLoop {
                     Err(TryRecvError::Disconnected) => {
                         log::error!("Render loop channel is disconnected");
                     }
-                    Ok(LoopEvent::Start) | Err(TryRecvError::Empty) => {} // continue with the update loop
+                    Ok(LoopEvent::Start) | Err(TryRecvError::Empty) => {} /* continue with the
+                                                                           * update loop */
                 }
 
                 std::thread::sleep(update_interval);
@@ -52,7 +52,9 @@ impl UpdateLoop {
                     id: "global_status_update",
                     target: None,
                     replace_id: None,
-                    callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
+                    callback: Box::new(move |client| {
+                        Ok(MpdQueryResult::Status(client.get_status()?))
+                    }),
                 })) {
                     log::error!(error:? = err; "Failed to send status update request");
                 }
@@ -62,18 +64,10 @@ impl UpdateLoop {
     }
 
     pub fn start(&mut self) -> Result<()> {
-        if let Some(tx) = &self.event_tx {
-            Ok(tx.send(LoopEvent::Start)?)
-        } else {
-            Ok(())
-        }
+        if let Some(tx) = &self.event_tx { Ok(tx.send(LoopEvent::Start)?) } else { Ok(()) }
     }
 
     pub fn stop(&mut self) -> Result<()> {
-        if let Some(tx) = &self.event_tx {
-            Ok(tx.send(LoopEvent::Stop)?)
-        } else {
-            Ok(())
-        }
+        if let Some(tx) = &self.event_tx { Ok(tx.send(LoopEvent::Stop)?) } else { Ok(()) }
     }
 }

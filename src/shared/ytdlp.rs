@@ -1,14 +1,15 @@
-use anyhow::{anyhow, bail, Result};
+use std::os::unix::ffi::OsStrExt;
+use std::path::PathBuf;
+use std::process::Command;
+use std::str::FromStr;
+
+use anyhow::{Result, anyhow, bail};
 use itertools::Itertools;
 use rustix::path::Arg;
-use std::{os::unix::ffi::OsStrExt, path::PathBuf, process::Command, str::FromStr};
-
-use crate::{
-    config::Config,
-    shared::macros::{status_info, status_warn},
-};
 
 use super::dependencies;
+use crate::config::Config;
+use crate::shared::macros::{status_info, status_warn};
 
 #[derive(Debug)]
 pub struct YtDlp {
@@ -94,10 +95,11 @@ impl YtDlp {
             );
         }
 
-        // yt-dlp for some reason does not respect output file template when doing post processing
-        // with ffmpeg. This results in the file having different extensions than the one specified
-        // so we work around it by trying to find the file in the cache directory as that should
-        // still be reliable.
+        // yt-dlp for some reason does not respect output file template when
+        // doing post processing with ffmpeg. This results in the file
+        // having different extensions than the one specified so we work
+        // around it by trying to find the file in the cache directory as that
+        // should still be reliable.
         id.get_cached(&self.cache_dir)?
             .map(|v| -> Result<_> { Ok(v.as_str()?.to_string()) })
             .transpose()?
@@ -117,7 +119,9 @@ impl VideoId {
                     && v.file_name().as_ref().is_some_and(|v| {
                         v.as_bytes()
                             .windows(self.0.len())
-                            // NOTE this will likely be a problem if we ever decide to support windows at some point
+                            // NOTE this will likely be a problem if we ever
+                            // decide to support
+                            // windows at some point
                             .any(|window| window == self.0.as_bytes())
                     })
             }))
@@ -132,7 +136,9 @@ impl VideoId {
                     && v.file_name().as_ref().is_some_and(|v| {
                         v.as_bytes()
                             .windows(self.0.len())
-                            // NOTE this will likely be a problem if we ever decide to support windows at some point
+                            // NOTE this will likely be a problem if we ever
+                            // decide to support
+                            // windows at some point
                             .any(|window| window == self.0.as_bytes())
                     })
             })

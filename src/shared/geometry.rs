@@ -28,14 +28,7 @@ pub struct Geometry {
 
 impl Geometry {
     pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-            taken_size_horiz: 0,
-            taken_size_vert: 0,
-        }
+        Self { x, y, width, height, taken_size_horiz: 0, taken_size_vert: 0 }
     }
 
     pub fn top_left_dist(&self, other: Self) -> u16 {
@@ -50,10 +43,7 @@ impl Geometry {
     }
 
     pub fn middle(self) -> Point {
-        Point {
-            x: self.x + self.width / 2,
-            y: self.y + self.height / 2,
-        }
+        Point { x: self.x + self.width / 2, y: self.y + self.height / 2 }
     }
 
     pub fn top_left(self) -> Point {

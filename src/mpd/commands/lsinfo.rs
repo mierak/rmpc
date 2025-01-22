@@ -1,9 +1,9 @@
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use anyhow::{Context, anyhow};
+use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
 use super::Song;
-use anyhow::anyhow;
-use anyhow::Context;
-use derive_more::{AsMut, AsRef, Into, IntoIterator};
+use crate::mpd::errors::MpdError;
+use crate::mpd::{FromMpd, LineHandled};
 
 #[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct LsInfo(pub Vec<LsInfoEntry>);
@@ -36,7 +36,11 @@ impl FromMpd for Dir {
                 value
                     .split('/')
                     .last()
-                    .context(anyhow!("Failed to parse dir name. Key: '{}' Value: '{}'", key, value))?
+                    .context(anyhow!(
+                        "Failed to parse dir name. Key: '{}' Value: '{}'",
+                        key,
+                        value
+                    ))?
                     .clone_into(&mut self.path);
                 self.full_path = value;
             }
@@ -84,9 +88,8 @@ impl FromMpd for LsInfo {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::mpd::commands::lsinfo::{Dir, LsInfoEntry, Playlist};
-
     use super::{FromMpd, LsInfo};
+    use crate::mpd::commands::lsinfo::{Dir, LsInfoEntry, Playlist};
 
     #[test]
     fn can_parse_playlist_entry() {
@@ -104,19 +107,12 @@ Last-Modified: 2024-08-12T03:03:40Z";
         let mut result = LsInfo::default();
         for line in input.lines() {
             let (key, value) = line.split_once(": ").unwrap();
-            result
-                .next_internal(key.to_lowercase().as_str(), value.to_owned())
-                .unwrap();
+            result.next_internal(key.to_lowercase().as_str(), value.to_owned()).unwrap();
         }
 
         let result = result.0;
         assert_eq!(result.len(), 5);
-        assert_eq!(
-            result[0],
-            LsInfoEntry::Playlist(Playlist {
-                name: "autechre.m3u".to_owned(),
-            })
-        );
+        assert_eq!(result[0], LsInfoEntry::Playlist(Playlist { name: "autechre.m3u".to_owned() }));
         assert_eq!(
             result[1],
             LsInfoEntry::Dir(Dir {

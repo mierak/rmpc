@@ -1,12 +1,14 @@
-use std::{io::BufRead, io::BufReader, path::PathBuf, time::Duration};
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
+use std::time::Duration;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::{mpd::commands::Song, shared::macros::try_cont};
-
-use super::{parse_length, Lrc};
+use super::{Lrc, parse_length};
+use crate::mpd::commands::Song;
+use crate::shared::macros::try_cont;
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
 pub struct LrcIndex {
     index: Vec<LrcIndexEntry>,
@@ -50,18 +52,28 @@ impl LrcIndex {
 
     pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {
         match (song.artist(), song.title(), song.album(), song.duration) {
-            (Some(artist), Some(title), Some(album), length) => self.find_lrc(artist, title, album, length),
+            (Some(artist), Some(title), Some(album), length) => {
+                self.find_lrc(artist, title, album, length)
+            }
             _ => None,
         }
         .map_or(Ok(None), |lrc| Ok(Some(std::fs::read_to_string(&lrc.path)?.parse()?)))
     }
 
-    fn find_lrc(&self, artist: &str, title: &str, album: &str, length: Option<Duration>) -> Option<&LrcIndexEntry> {
+    fn find_lrc(
+        &self,
+        artist: &str,
+        title: &str,
+        album: &str,
+        length: Option<Duration>,
+    ) -> Option<&LrcIndexEntry> {
         self.index.iter().find(|entry| {
             log::trace!(entry:?; "searching entry");
 
             let length_matches = match (entry.length, length) {
-                (Some(entry_length), Some(length)) => entry_length.abs_diff(length) < Duration::from_secs(3),
+                (Some(entry_length), Some(length)) => {
+                    entry_length.abs_diff(length) < Duration::from_secs(3)
+                }
                 _ => true,
             };
 
@@ -137,12 +149,6 @@ impl LrcIndexEntry {
             return Ok(None);
         };
 
-        Ok(Some(Self {
-            path,
-            title,
-            artist,
-            album,
-            length,
-        }))
+        Ok(Some(Self { path, title, artist, album, length }))
     }
 }

@@ -1,7 +1,7 @@
-use anyhow::anyhow;
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 
-use crate::mpd::{errors::MpdError, FromMpd, LineHandled};
+use crate::mpd::errors::MpdError;
+use crate::mpd::{FromMpd, LineHandled};
 
 #[derive(Default, Debug)]
 pub struct Playlist {

@@ -24,12 +24,20 @@ impl Display for MpdError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MpdError::Parse(msg) => write!(f, "ParseError: '{msg}'"),
-            MpdError::UnknownCode(code) => write!(f, "UnknownCodeError: '{code}'"),
+            MpdError::UnknownCode(code) => {
+                write!(f, "UnknownCodeError: '{code}'")
+            }
             MpdError::Generic(msg) => write!(f, "GenericError: '{msg}'"),
-            MpdError::ClientClosed => write!(f, "Client has been already closed."),
+            MpdError::ClientClosed => {
+                write!(f, "Client has been already closed.")
+            }
             MpdError::Mpd(err) => write!(f, "MpdError: '{err}'"),
-            MpdError::ValueExpected(val) => write!(f, "Expected value from MPD but got '{val}'"),
-            MpdError::UnsupportedMpdVersion(val) => write!(f, "Unsupported MPD version: '{val}'"),
+            MpdError::ValueExpected(val) => {
+                write!(f, "Expected value from MPD but got '{val}'")
+            }
+            MpdError::UnsupportedMpdVersion(val) => {
+                write!(f, "Unsupported MPD version: '{val}'")
+            }
         }
     }
 }
@@ -64,29 +72,26 @@ pub enum ErrorCode {
 
 impl Display for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                ErrorCode::NotList => "not a list",
-                ErrorCode::Argument => "bad argument",
-                ErrorCode::Password => "invalid password",
-                ErrorCode::Permission => "no permission",
-                ErrorCode::UnknownCmd => "unknown command",
-                ErrorCode::NoExist => "resource does not exist",
-                ErrorCode::PlaylistMax => "maximum playlist size",
-                ErrorCode::System => "system error",
-                ErrorCode::PlaylistLoad => "unable to load playlist",
-                ErrorCode::UpdateAlready => "database update already in progress",
-                ErrorCode::PlayerSync => "player is in an inconsistent state",
-                ErrorCode::Exist => "resource already exists",
-            }
-        )
+        write!(f, "{}", match self {
+            ErrorCode::NotList => "not a list",
+            ErrorCode::Argument => "bad argument",
+            ErrorCode::Password => "invalid password",
+            ErrorCode::Permission => "no permission",
+            ErrorCode::UnknownCmd => "unknown command",
+            ErrorCode::NoExist => "resource does not exist",
+            ErrorCode::PlaylistMax => "maximum playlist size",
+            ErrorCode::System => "system error",
+            ErrorCode::PlaylistLoad => "unable to load playlist",
+            ErrorCode::UpdateAlready => "database update already in progress",
+            ErrorCode::PlayerSync => "player is in an inconsistent state",
+            ErrorCode::Exist => "resource already exists",
+        })
     }
 }
 
 impl std::str::FromStr for ErrorCode {
     type Err = MpdError;
+
     fn from_str(s: &str) -> Result<ErrorCode, MpdError> {
         if let Ok(s) = s.parse() {
             match s {

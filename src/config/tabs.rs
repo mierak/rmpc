@@ -1,14 +1,15 @@
-use anyhow::{ensure, Result};
-use derive_more::{Deref, Display, Into};
-use itertools::Itertools;
 use std::collections::HashMap;
 
-use ratatui::{layout::Direction, widgets::Borders};
+use anyhow::{Result, ensure};
+use derive_more::{Deref, Display, Into};
+use itertools::Itertools;
+use ratatui::layout::Direction;
+use ratatui::widgets::Borders;
 use serde::{Deserialize, Serialize};
 
+use super::Leak;
+use super::theme::PercentOrLength;
 use crate::shared::id::{self, Id};
-
-use super::{theme::PercentOrLength, Leak};
 
 #[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]
 pub struct TabName(pub &'static str);
@@ -118,32 +119,24 @@ impl From<&PaneTypeFile> for PaneType {
 
 impl TryFrom<TabsFile> for Tabs {
     type Error = anyhow::Error;
+
     fn try_from(value: TabsFile) -> Result<Self, Self::Error> {
         let (names, tabs): (Vec<_>, HashMap<_, _>) = value
             .0
             .into_iter()
             .map(|tab| -> Result<_> {
-                Ok(Tab {
-                    name: tab.name.into(),
-                    panes: tab.pane.convert(tab.border_type)?,
-                })
+                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert(tab.border_type)? })
             })
-            .try_fold(
-                (Vec::new(), HashMap::new()),
-                |(mut names, mut tabs), tab| -> Result<_> {
-                    let tab = tab?;
-                    names.push(tab.name);
-                    tabs.insert(tab.name, tab.leak());
-                    Ok((names, tabs))
-                },
-            )?;
+            .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {
+                let tab = tab?;
+                names.push(tab.name);
+                tabs.insert(tab.name, tab.leak());
+                Ok((names, tabs))
+            })?;
 
         ensure!(!tabs.is_empty(), "At least one tab is required");
 
-        Ok(Self {
-            tabs,
-            names: names.leak(),
-        })
+        Ok(Self { tabs, names: names.leak() })
     }
 }
 
@@ -220,10 +213,7 @@ impl From<&DirectionFile> for Direction {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PaneOrSplitFile {
     Pane(PaneTypeFile),
-    Split {
-        direction: DirectionFile,
-        panes: Vec<SubPaneFile>,
-    },
+    Split { direction: DirectionFile, panes: Vec<SubPaneFile> },
 }
 
 impl Default for PaneOrSplitFile {
@@ -268,18 +258,12 @@ pub struct Pane {
 #[derive(Debug, Clone)]
 pub enum SizedPaneOrSplit {
     Pane(Pane),
-    Split {
-        direction: Direction,
-        panes: Vec<SizedSubPane>,
-    },
+    Split { direction: Direction, panes: Vec<SizedSubPane> },
 }
 
 impl Default for SizedPaneOrSplit {
     fn default() -> Self {
-        Self::Split {
-            direction: Direction::Horizontal,
-            panes: Vec::new(),
-        }
+        Self::Split { direction: Direction::Horizontal, panes: Vec::new() }
     }
 }
 
@@ -294,17 +278,18 @@ impl PaneOrSplitFile {
         self.convert_recursive(border_type, Borders::NONE)
     }
 
-    fn convert_recursive(&self, border_type: BorderTypeFile, borders: Borders) -> Result<SizedPaneOrSplit> {
+    fn convert_recursive(
+        &self,
+        border_type: BorderTypeFile,
+        borders: Borders,
+    ) -> Result<SizedPaneOrSplit> {
         match self {
             PaneOrSplitFile::Pane(pane) => Ok(SizedPaneOrSplit::Pane(Pane {
                 pane: pane.into(),
                 border: borders,
                 id: id::new(),
             })),
-            PaneOrSplitFile::Split {
-                direction,
-                panes: sub_panes,
-            } => Ok(SizedPaneOrSplit::Split {
+            PaneOrSplitFile::Split { direction, panes: sub_panes } => Ok(SizedPaneOrSplit::Split {
                 direction: direction.into(),
                 panes: sub_panes
                     .iter()
@@ -321,8 +306,12 @@ impl PaneOrSplitFile {
                             }
                             BorderTypeFile::Single => {
                                 let result = match direction {
-                                    DirectionFile::Horizontal if idx < sub_panes.len() - 1 => Borders::RIGHT | borders,
-                                    DirectionFile::Vertical if idx < sub_panes.len() - 1 => Borders::BOTTOM | borders,
+                                    DirectionFile::Horizontal if idx < sub_panes.len() - 1 => {
+                                        Borders::RIGHT | borders
+                                    }
+                                    DirectionFile::Vertical if idx < sub_panes.len() - 1 => {
+                                        Borders::BOTTOM | borders
+                                    }
                                     _ => Borders::NONE | borders,
                                 };
                                 if let PercentOrLength::Length(ref mut len) = size {
@@ -378,7 +367,9 @@ impl SizedPaneOrSplit {
         PaneIter {
             queue: match self {
                 p @ SizedPaneOrSplit::Pane { .. } => vec![p],
-                SizedPaneOrSplit::Split { panes: sub_panes, .. } => sub_panes.iter().map(|v| &v.pane).collect(),
+                SizedPaneOrSplit::Split { panes: sub_panes, .. } => {
+                    sub_panes.iter().map(|v| &v.pane).collect()
+                }
             },
         }
     }
@@ -453,11 +444,7 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
         UNFOSUSABLE_TABS.iter().join(", ")
     );
     ensure!(
-        layout_panes
-            .iter()
-            .filter(|pane| pane.pane == PaneType::TabContent)
-            .count()
-            == 1,
+        layout_panes.iter().filter(|pane| pane.pane == PaneType::TabContent).count() == 1,
         "Layout must contain exactly one TabContent pane"
     );
 
@@ -465,16 +452,14 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
     let panes_in_both_tabs_and_layout = all_tab_panes
         .iter()
         .flat_map(|tab_pane| {
-            layout_panes
-                .iter()
-                .filter(|layout_pane| layout_pane.pane == tab_pane.pane)
+            layout_panes.iter().filter(|layout_pane| layout_pane.pane == tab_pane.pane)
         })
         .collect_vec();
     ensure!(
-            panes_in_both_tabs_and_layout.is_empty(),
-            "Panes cannot be in layout and tabs at the same time. Please remove following tabs from either layout or tabs: {}",
-            panes_in_both_tabs_and_layout.iter().map(|pane| pane.pane).sorted().dedup().join(", ")
-        );
+        panes_in_both_tabs_and_layout.is_empty(),
+        "Panes cannot be in layout and tabs at the same time. Please remove following tabs from either layout or tabs: {}",
+        panes_in_both_tabs_and_layout.iter().map(|pane| pane.pane).sorted().dedup().join(", ")
+    );
 
     Ok(())
 }

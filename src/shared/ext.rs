@@ -20,8 +20,12 @@ pub mod error {
                 MpdError::Generic(e) => format!("Generic error: {e}"),
                 MpdError::ClientClosed => "Client closed".to_string(),
                 MpdError::Mpd(e) => format!("MPD Error: {e}"),
-                MpdError::ValueExpected(e) => format!("Expected Value but got '{e}'"),
-                MpdError::UnsupportedMpdVersion(e) => format!("Unsuported MPD version: {e}"),
+                MpdError::ValueExpected(e) => {
+                    format!("Expected Value but got '{e}'")
+                }
+                MpdError::UnsupportedMpdVersion(e) => {
+                    format!("Unsuported MPD version: {e}")
+                }
             }
         }
     }
@@ -62,7 +66,8 @@ pub mod mpsc {
             })
         }
 
-        /// recv the last message in the channel in a non-blocking manner and drop all the other ones
+        /// recv the last message in the channel in a non-blocking manner and
+        /// drop all the other ones
         fn try_recv_last(&self) -> Result<T, TryRecvError> {
             self.try_recv().map(|data| {
                 let mut result = data;
@@ -120,20 +125,14 @@ pub mod iter {
         where
             Self: Sized,
         {
-            ZipLongest2 {
-                iter_a: self.fuse(),
-                iter_b: b.fuse(),
-                iter_c: c.fuse(),
-            }
+            ZipLongest2 { iter_a: self.fuse(), iter_b: b.fuse(), iter_c: c.fuse() }
         }
     }
 }
 
 pub mod mpd_client {
-    use crate::mpd::{
-        errors::{ErrorCode, MpdError, MpdFailureResponse},
-        mpd_client::MpdClient,
-    };
+    use crate::mpd::errors::{ErrorCode, MpdError, MpdFailureResponse};
+    use crate::mpd::mpd_client::MpdClient;
 
     pub trait MpdClientExt {
         fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError>;
@@ -143,13 +142,12 @@ pub mod mpd_client {
         fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError> {
             match self.play_pos(queue_len) {
                 Ok(()) => {}
-                Err(MpdError::Mpd(MpdFailureResponse {
-                    code: ErrorCode::Argument,
-                    ..
-                })) => {
-                    // This can happen when multiple clients modify the queue at the same
-                    // time. But a more robust solution would require refetching the whole
-                    // queue and searching for the added song. This should be good enough.
+                Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::Argument, .. })) => {
+                    // This can happen when multiple clients modify the queue at
+                    // the same time. But a more robust
+                    // solution would require refetching the whole
+                    // queue and searching for the added song. This should be
+                    // good enough.
                     log::warn!("Failed to autoplay song");
                 }
                 Err(err) => return Err(err),
@@ -160,10 +158,8 @@ pub mod mpd_client {
 }
 
 pub mod btreeset_ranges {
-    use std::{
-        collections::{btree_set, BTreeSet},
-        ops::{Range, RangeInclusive},
-    };
+    use std::collections::{BTreeSet, btree_set};
+    use std::ops::{Range, RangeInclusive};
 
     pub trait BTreeSetRanges<'a, T: 'a> {
         fn ranges(&'a self) -> Ranges<'a, T, std::collections::btree_set::Iter<'a, T>>;
@@ -176,10 +172,7 @@ pub mod btreeset_ranges {
 
     impl<'a, T: Default + 'a> BTreeSetRanges<'a, T> for BTreeSet<T> {
         fn ranges(&'a self) -> Ranges<'a, T, btree_set::Iter<'a, T>> {
-            Ranges {
-                iter: self.iter(),
-                current_range: None,
-            }
+            Ranges { iter: self.iter(), current_range: None }
         }
     }
 
@@ -334,11 +327,7 @@ pub mod vec {
 
     impl<T> VecExt<T> for Vec<T> {
         fn or_else_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T> {
-            if self.is_empty() {
-                cb()
-            } else {
-                self
-            }
+            if self.is_empty() { cb() } else { self }
         }
     }
 }

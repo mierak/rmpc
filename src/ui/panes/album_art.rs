@@ -1,15 +1,16 @@
-use crate::{
-    config::tabs::PaneType,
-    context::AppContext,
-    mpd::mpd_client::MpdClient,
-    shared::{image::ImageProtocol, key_event::KeyEvent},
-    ui::{image::facade::AlbumArtFacade, UiEvent},
-    MpdQueryResult,
-};
 use anyhow::Result;
-use ratatui::{layout::Rect, Frame};
+use ratatui::Frame;
+use ratatui::layout::Rect;
 
 use super::Pane;
+use crate::MpdQueryResult;
+use crate::config::tabs::PaneType;
+use crate::context::AppContext;
+use crate::mpd::mpd_client::MpdClient;
+use crate::shared::image::ImageProtocol;
+use crate::shared::key_event::KeyEvent;
+use crate::ui::UiEvent;
+use crate::ui::image::facade::AlbumArtFacade;
 
 #[derive(Debug)]
 pub struct AlbumArtPane {
@@ -20,9 +21,7 @@ const ALBUM_ART: &str = "album_art";
 
 impl AlbumArtPane {
     pub fn new(context: &AppContext) -> Self {
-        Self {
-            album_art: AlbumArtFacade::new(context.config),
-        }
+        Self { album_art: AlbumArtFacade::new(context.config) }
     }
 
     /// returns none if album art is supposed to be hidden
@@ -41,19 +40,14 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
-        context
-            .query()
-            .id(ALBUM_ART)
-            .replace_id(ALBUM_ART)
-            .target(PaneType::AlbumArt)
-            .query(move |client| {
-                let start = std::time::Instant::now();
-                log::debug!(file = song_uri.as_str(); "Searching for album art");
-                let result = client.find_album_art(&song_uri)?;
-                log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
+        context.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneType::AlbumArt).query(move |client| {
+            let start = std::time::Instant::now();
+            log::debug!(file = song_uri.as_str(); "Searching for album art");
+            let result = client.find_album_art(&song_uri)?;
+            log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
 
-                Ok(MpdQueryResult::AlbumArt(result))
-            });
+            Ok(MpdQueryResult::AlbumArt(result))
+        });
 
         Some(())
     }
@@ -112,7 +106,12 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &AppContext) -> Result<()> {
+    fn on_event(
+        &mut self,
+        event: &mut UiEvent,
+        is_visible: bool,
+        context: &AppContext,
+    ) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected if is_visible => {
                 if AlbumArtPane::fetch_album_art(context).is_none() {
@@ -140,25 +139,22 @@ impl Pane for AlbumArtPane {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crossbeam::channel::RecvTimeoutError;
-    use crossbeam::channel::{Receiver, Sender};
-    use rstest::rstest;
     use std::time::Duration;
 
-    use super::AlbumArtPane;
+    use crossbeam::channel::{Receiver, RecvTimeoutError, Sender};
+    use rstest::rstest;
 
+    use super::AlbumArtPane;
     use crate::config::album_art::ImageMethod;
-    use crate::config::Config;
-    use crate::config::Leak;
-    use crate::mpd::commands::Song;
-    use crate::mpd::commands::State;
+    use crate::config::tabs::PaneType;
+    use crate::config::{Config, Leak};
+    use crate::mpd::commands::{Song, State};
     use crate::shared::events::{ClientRequest, WorkRequest};
     use crate::shared::mpd_query::MpdQuery;
-    use crate::tests::fixtures::work_request_channel;
-    use crate::tests::fixtures::{app_context, client_request_channel};
-    use crate::ui::panes::Pane;
+    use crate::tests::fixtures::{app_context, client_request_channel, work_request_channel};
     use crate::ui::UiEvent;
-    use crate::{config::tabs::PaneType, ui::panes::album_art::ALBUM_ART};
+    use crate::ui::panes::Pane;
+    use crate::ui::panes::album_art::ALBUM_ART;
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
@@ -180,10 +176,7 @@ mod tests {
         let mut config = Config::default();
         config.album_art.method = method;
         app_context.config = config.leak();
-        app_context.queue.push(Song {
-            id: selected_song_id,
-            ..Default::default()
-        });
+        app_context.queue.push(Song { id: selected_song_id, ..Default::default() });
         app_context.status.songid = Some(selected_song_id);
         app_context.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&app_context);
@@ -201,9 +194,10 @@ mod tests {
                 })
             ));
         } else {
-            assert!(rx
-                .recv_timeout(Duration::from_millis(100))
-                .is_err_and(|err| RecvTimeoutError::Timeout == err));
+            assert!(
+                rx.recv_timeout(Duration::from_millis(100))
+                    .is_err_and(|err| RecvTimeoutError::Timeout == err)
+            );
         }
     }
 
@@ -227,10 +221,7 @@ mod tests {
         let mut config = Config::default();
         config.album_art.method = method;
         app_context.config = config.leak();
-        app_context.queue.push(Song {
-            id: selected_song_id,
-            ..Default::default()
-        });
+        app_context.queue.push(Song { id: selected_song_id, ..Default::default() });
         app_context.status.songid = Some(selected_song_id);
         app_context.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&app_context);

@@ -1,14 +1,13 @@
 include!("src/config/cli.rs");
 
-use clap::Command as ClapCommand;
-use clap::CommandFactory;
-use clap_complete::generate_to;
-use clap_complete::Shell::{Bash, Fish, Zsh};
-use clap_mangen::Man;
 use std::error::Error;
 use std::fs;
-use vergen_gitcl::Emitter;
-use vergen_gitcl::GitclBuilder;
+
+use clap::{Command as ClapCommand, CommandFactory};
+use clap_complete::Shell::{Bash, Fish, Zsh};
+use clap_complete::generate_to;
+use clap_mangen::Man;
+use vergen_gitcl::{Emitter, GitclBuilder};
 
 static NAME: &str = "rmpc";
 
@@ -23,9 +22,7 @@ fn generate_man_pages(cmd: ClapCommand) -> Result<(), Box<dyn Error>> {
 }
 
 fn generate_shell_completions(mut cmd: ClapCommand) -> Result<(), Box<dyn Error>> {
-    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("completions");
+    let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target").join("completions");
 
     std::fs::create_dir_all(&out)?;
     for shell in [Bash, Fish, Zsh] {

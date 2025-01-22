@@ -1,9 +1,9 @@
 use itertools::Itertools;
 use strum::Display;
 
-use crate::config::{tabs::TabName, utils::tilde_expand};
-
 use super::ToDescription;
+use crate::config::tabs::TabName;
+use crate::config::utils::tilde_expand;
 
 // Global actions
 
@@ -30,17 +30,13 @@ pub enum GlobalAction {
     NextTab,
     PreviousTab,
     SwitchToTab(TabName),
-    Command {
-        command: &'static str,
-        description: Option<&'static str>,
-    },
-    ExternalCommand {
-        command: &'static [&'static str],
-        description: Option<&'static str>,
-    },
+    Command { command: &'static str, description: Option<&'static str> },
+    ExternalCommand { command: &'static [&'static str], description: Option<&'static str> },
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
+)]
 pub enum GlobalActionFile {
     Quit,
     ShowHelp,
@@ -69,14 +65,8 @@ pub enum GlobalActionFile {
     PlaylistsTab,
     SearchTab,
     CommandMode,
-    Command {
-        command: String,
-        description: Option<String>,
-    },
-    ExternalCommand {
-        command: Vec<String>,
-        description: Option<String>,
-    },
+    Command { command: String, description: Option<String> },
+    ExternalCommand { command: Vec<String>, description: Option<String> },
 }
 
 impl From<GlobalActionFile> for GlobalAction {
@@ -113,14 +103,16 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::AlbumsTab => GlobalAction::SwitchToTab("Albums".into()),
             GlobalActionFile::PlaylistsTab => GlobalAction::SwitchToTab("Playlists".into()),
             GlobalActionFile::SearchTab => GlobalAction::SwitchToTab("Search".into()),
-            GlobalActionFile::ExternalCommand { command, description } => GlobalAction::ExternalCommand {
-                command: command
-                    .into_iter()
-                    .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
-                    .collect_vec()
-                    .leak(),
-                description: description.map(|s| s.leak() as &'static str),
-            },
+            GlobalActionFile::ExternalCommand { command, description } => {
+                GlobalAction::ExternalCommand {
+                    command: command
+                        .into_iter()
+                        .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
+                        .collect_vec()
+                        .leak(),
+                    description: description.map(|s| s.leak() as &'static str),
+                }
+            }
         }
     }
 }
@@ -131,7 +123,9 @@ impl ToDescription for GlobalAction {
             GlobalAction::Quit => "Exit rmpc",
             GlobalAction::ShowOutputs => "Show MPD outputs config",
             GlobalAction::ShowDecoders => "Show MPD decoder plugins",
-            GlobalAction::ShowCurrentSongInfo => "Show metadata of the currently playing song in a modal popup",
+            GlobalAction::ShowCurrentSongInfo => {
+                "Show metadata of the currently playing song in a modal popup"
+            }
             GlobalAction::ToggleRepeat => "Toggle repeat",
             GlobalAction::ToggleSingle => {
                 "Whether to stop playing after single track or repeat track/playlist when repeat is on"
@@ -149,7 +143,9 @@ impl ToDescription for GlobalAction {
             GlobalAction::NextTab => "Switch to next tab",
             GlobalAction::PreviousTab => "Switch to previous tab",
             GlobalAction::SwitchToTab(TabName("Queue")) => "Switch directly to Queue tab",
-            GlobalAction::SwitchToTab(TabName("Directories")) => "Switch directly to Directories tab",
+            GlobalAction::SwitchToTab(TabName("Directories")) => {
+                "Switch directly to Directories tab"
+            }
             GlobalAction::SwitchToTab(TabName("Artists")) => "Switch directly to Artists tab",
             GlobalAction::SwitchToTab(TabName("Albums")) => "Switch directly to Albums tab",
             GlobalAction::SwitchToTab(TabName("Playlists")) => "Switch directly to Playlists tab",
@@ -158,15 +154,11 @@ impl ToDescription for GlobalAction {
             GlobalAction::ShowHelp => "Show keybinds",
             GlobalAction::CommandMode => "Enter command mode",
             GlobalAction::Command { description: None, .. } => "Execute a command",
-            GlobalAction::Command {
-                description: Some(desc),
-                ..
-            } => desc,
-            GlobalAction::ExternalCommand { description: None, .. } => "Execute an external command",
-            GlobalAction::ExternalCommand {
-                description: Some(desc),
-                ..
-            } => desc,
+            GlobalAction::Command { description: Some(desc), .. } => desc,
+            GlobalAction::ExternalCommand { description: None, .. } => {
+                "Execute an external command"
+            }
+            GlobalAction::ExternalCommand { description: Some(desc), .. } => desc,
         }
     }
 }
@@ -314,14 +306,18 @@ impl ToDescription for QueueActions {
             QueueActions::Save => "Save current queue as a new playlist",
             QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist",
             QueueActions::ShowInfo => "Show metadata of the song under cursor in a modal popup",
-            QueueActions::JumpToCurrent => "Moves the cursor in Queue table to the currently playing song",
+            QueueActions::JumpToCurrent => {
+                "Moves the cursor in Queue table to the currently playing song"
+            }
         }
     }
 }
 
 // Common actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
+)]
 pub enum CommonActionFile {
     Down,
     Up,
@@ -397,15 +393,25 @@ impl ToDescription for CommonAction {
             CommonAction::EnterSearch => "Enter search mode",
             CommonAction::NextResult => "When a filter is active, jump to the next result",
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result",
-            CommonAction::Select => "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist",
+            CommonAction::Select => {
+                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist"
+            }
             CommonAction::InvertSelection => "Inverts the current selected items",
             CommonAction::Add => "Add item to queue",
             CommonAction::AddAll => "Add all items to queue",
-            CommonAction::Delete => "Delete. For example a playlist, song from a playlist or wipe the current queue",
+            CommonAction::Delete => {
+                "Delete. For example a playlist, song from a playlist or wipe the current queue"
+            }
             CommonAction::Rename => "Rename. Currently only for playlists",
-            CommonAction::Close => "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.",
-            CommonAction::Confirm => "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor",
-            CommonAction::FocusInput => "Focuses textbox if any is on the screen and is not focused",
+            CommonAction::Close => {
+                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc."
+            }
+            CommonAction::Confirm => {
+                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor"
+            }
+            CommonAction::FocusInput => {
+                "Focuses textbox if any is on the screen and is not focused"
+            }
             CommonAction::PaneDown => "Focus the pane below the current one",
             CommonAction::PaneUp => "Focus the pane above the current one",
             CommonAction::PaneRight => "Focus the pane to the right of the current one",

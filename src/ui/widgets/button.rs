@@ -1,9 +1,7 @@
-use ratatui::{
-    layout::{Position, Rect},
-    prelude::{Alignment, Constraint, Direction, Layout},
-    style::{Style, Stylize},
-    widgets::{Block, StatefulWidget, Widget},
-};
+use ratatui::layout::{Position, Rect};
+use ratatui::prelude::{Alignment, Constraint, Direction, Layout};
+use ratatui::style::{Style, Stylize};
+use ratatui::widgets::{Block, StatefulWidget, Widget};
 
 use super::get_line_offset;
 
@@ -17,12 +15,7 @@ pub struct Button<'a> {
 
 impl Default for Button<'_> {
     fn default() -> Self {
-        Self {
-            label_alignment: Alignment::Center,
-            label: "",
-            block: None,
-            style: Style::default(),
-        }
+        Self { label_alignment: Alignment::Center, label: "", block: None, style: Style::default() }
     }
 }
 
@@ -72,7 +65,8 @@ impl Widget for &mut Button<'_> {
         };
 
         buf.set_string(
-            area.left() + get_line_offset(self.label.len() as u16, area.width, self.label_alignment),
+            area.left()
+                + get_line_offset(self.label.len() as u16, area.width, self.label_alignment),
             area.top(),
             self.label,
             self.style,
@@ -112,7 +106,12 @@ impl Default for ButtonGroup<'_> {
 impl StatefulWidget for &mut ButtonGroup<'_> {
     type State = ButtonGroupState;
 
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
+    fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        state: &mut Self::State,
+    ) {
         // buf.set_style(area, self.inactive_style);
         let area = match &self.block {
             Some(b) => {
@@ -125,14 +124,11 @@ impl StatefulWidget for &mut ButtonGroup<'_> {
 
         let button_count = self.buttons.len();
         let portion_per_button = (100.0 / button_count as f32).floor() as usize;
-        let constraints: Vec<Constraint> = (0..button_count)
-            .map(|_| Constraint::Percentage(portion_per_button as u16))
-            .collect();
+        let constraints: Vec<Constraint> =
+            (0..button_count).map(|_| Constraint::Percentage(portion_per_button as u16)).collect();
 
-        let chunks = Layout::default()
-            .direction(self.direction)
-            .constraints(constraints)
-            .split(area);
+        let chunks =
+            Layout::default().direction(self.direction).constraints(constraints).split(area);
 
         self.buttons.iter_mut().enumerate().for_each(|(idx, button)| {
             if idx == state.selected {
@@ -185,11 +181,7 @@ impl<'a> ButtonGroup<'a> {
     }
 
     pub fn get_button_idx_at(&self, position: Position) -> Option<usize> {
-        self.areas
-            .iter()
-            .enumerate()
-            .find(|(_, area)| area.contains(position))
-            .map(|v| v.0)
+        self.areas.iter().enumerate().find(|(_, area)| area.contains(position)).map(|v| v.0)
     }
 }
 

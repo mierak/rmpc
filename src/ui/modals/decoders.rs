@@ -1,28 +1,21 @@
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
-    style::Style,
-    symbols::border,
-    text::Text,
-    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
-    Frame,
-};
-
-use crate::{
-    config::keys::CommonAction,
-    context::AppContext,
-    mpd::commands::Decoder,
-    shared::{
-        ext::iter::IntoZipLongest2,
-        key_event::KeyEvent,
-        macros::pop_modal,
-        mouse_event::{MouseEvent, MouseEventKind},
-    },
-    ui::dirstack::DirState,
-};
+use ratatui::Frame;
+use ratatui::layout::{Constraint, Layout, Margin, Rect};
+use ratatui::style::Style;
+use ratatui::symbols::border;
+use ratatui::text::Text;
+use ratatui::widgets::{Block, Borders, Cell, Clear, Row, Table, TableState};
 
 use super::{Modal, RectExt};
+use crate::config::keys::CommonAction;
+use crate::context::AppContext;
+use crate::mpd::commands::Decoder;
+use crate::shared::ext::iter::IntoZipLongest2;
+use crate::shared::key_event::KeyEvent;
+use crate::shared::macros::pop_modal;
+use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+use crate::ui::dirstack::DirState;
 
 #[derive(Debug)]
 pub struct DecodersModal {
@@ -42,11 +35,8 @@ impl DecodersModal {
                 (name, mime, suffixes)
             })
             .collect();
-        let mut result = Self {
-            decoders,
-            scrolling_state: DirState::default(),
-            table_area: Rect::default(),
-        };
+        let mut result =
+            Self { decoders, scrolling_state: DirState::default(), table_area: Rect::default() };
         result.scrolling_state.set_content_len(Some(result.decoders.len()));
         result.scrolling_state.first();
 
@@ -66,15 +56,15 @@ impl DecodersModal {
         let mime = textwrap::wrap(mime, mime_width as usize);
         let suffixes = textwrap::wrap(suffixes, suffixes_width as usize);
 
-        name.into_iter()
-            .zip_longest2(mime.into_iter(), suffixes.into_iter())
-            .map(|(name, mime, suffix)| {
+        name.into_iter().zip_longest2(mime.into_iter(), suffixes.into_iter()).map(
+            |(name, mime, suffix)| {
                 Row::new([
                     Cell::from(Text::from(name.unwrap_or_default())),
                     Cell::from(Text::from(mime.unwrap_or_default())),
                     Cell::from(Text::from(suffix.unwrap_or_default())),
                 ])
-            })
+            },
+        )
     }
 }
 
@@ -94,12 +84,10 @@ impl Modal for DecodersModal {
             .title("Decoder plugins");
 
         let (name_col_width, mime_col_width, suffix_col_width) = (10, 45, 45);
-        let margin = Margin {
-            horizontal: 1,
-            vertical: 0,
-        };
+        let margin = Margin { horizontal: 1, vertical: 0 };
         let [header_area, table_area] =
-            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)]).areas(block.inner(popup_area));
+            Layout::vertical([Constraint::Length(2), Constraint::Percentage(100)])
+                .areas(block.inner(popup_area));
         let header_area = header_area.inner(margin);
         let table_area = table_area.inner(margin);
 
@@ -143,18 +131,13 @@ impl Modal for DecodersModal {
         )
         .column_spacing(1)
         .block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(app.config.as_border_style()),
+            Block::default().borders(Borders::BOTTOM).border_style(app.config.as_border_style()),
         );
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Percentage(name_col_width),
-                Constraint::Percentage(mime_col_width),
-                Constraint::Percentage(suffix_col_width),
-            ],
-        )
+        let table = Table::new(rows, [
+            Constraint::Percentage(name_col_width),
+            Constraint::Percentage(mime_col_width),
+            Constraint::Percentage(suffix_col_width),
+        ])
         .column_spacing(1)
         .style(app.config.as_text_style())
         .row_highlight_style(app.config.theme.current_item_style);
@@ -166,10 +149,7 @@ impl Modal for DecodersModal {
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
         frame.render_stateful_widget(
             app.config.as_styled_scrollbar(),
-            popup_area.inner(Margin {
-                horizontal: 0,
-                vertical: 1,
-            }),
+            popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
             self.scrolling_state.as_scrollbar_state_ref(),
         );
 
