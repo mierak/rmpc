@@ -257,7 +257,6 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::LostConnection => {
                     if context.status.state != State::Stop {
-                        // try_skip!(render_loop.stop(), "Failed to stop render loop");
                         _update_loop_guard = None;
                         context.status.state = State::Stop;
                     }
