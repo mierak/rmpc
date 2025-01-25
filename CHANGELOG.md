@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Increased default album art `max_size_px` to `(1200, 1200)`.
 - Improved navigation between Pane splits by including recency bias
 - CLI now parses only the required part of the config
+- Status messages will now disappar automatically even when idle
 
 ### Fixed
 
