@@ -11,11 +11,11 @@ use crate::{
     MpdQueryResult,
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
-    core::event_loop::EXTERNAL_COMMAND,
     mpd::{client::Client, commands::Song},
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
+        mpd_query::EXTERNAL_COMMAND,
     },
 };
 

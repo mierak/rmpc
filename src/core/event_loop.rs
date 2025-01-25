@@ -1,7 +1,6 @@
 use std::{collections::HashSet, io::Stdout, ops::Sub, time::Duration};
 
-use anyhow::Result;
-use crossbeam::channel::{Receiver, RecvTimeoutError, Sender};
+use crossbeam::channel::{Receiver, RecvTimeoutError};
 use itertools::Itertools;
 use ratatui::{
     Terminal,
@@ -17,18 +16,20 @@ use crate::{
         mpd_client::MpdClient,
     },
     shared::{
-        events::{AppEvent, ClientRequest, WorkDone},
+        events::{AppEvent, WorkDone},
         ext::{duration::DurationExt, error::ErrorExt},
-        macros::{status_error, status_warn, try_skip},
-        mpd_query::{MpdQuery, MpdQueryResult},
+        macros::{status_error, status_warn},
+        mpd_query::{
+            EXTERNAL_COMMAND,
+            GLOBAL_QUEUE_UPDATE,
+            GLOBAL_STATUS_UPDATE,
+            GLOBAL_VOLUME_UPDATE,
+            MpdQueryResult,
+            run_status_update,
+        },
     },
     ui::{KeyHandleResult, Ui, UiEvent},
 };
-
-pub const EXTERNAL_COMMAND: &str = "external_command";
-pub const GLOBAL_STATUS_UPDATE: &str = "global_status_update";
-pub const GLOBAL_VOLUME_UPDATE: &str = "global_volume_update";
-pub const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
 
 pub fn init(
     context: AppContext,
@@ -342,19 +343,4 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
     if let Ok(ev) = event.try_into() {
         result_ui_evs.insert(ev);
     }
-}
-
-// Is used as a scheduled function and thus needs the -> Result<()>
-#[allow(clippy::unnecessary_wraps)]
-fn run_status_update((_, client_tx): &(Sender<AppEvent>, Sender<ClientRequest>)) -> Result<()> {
-    try_skip!(
-        client_tx.send(ClientRequest::Query(MpdQuery {
-            id: GLOBAL_STATUS_UPDATE,
-            target: None,
-            replace_id: Some("status"),
-            callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
-        })),
-        "Failed to send status update query"
-    );
-    Ok(())
 }

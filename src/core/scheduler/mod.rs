@@ -112,7 +112,7 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
     /// Schedules a job to run after the specified duration.
     /// A job must guarantee that it will not block the scheduler.
     pub(crate) fn schedule(
-        &mut self,
+        &self,
         timeout: Duration,
         callback: impl FnOnce(&T) -> Result<()> + Send + 'static,
     ) {
@@ -132,7 +132,7 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
     /// not guarantee that the job will not run at least once more.
     #[must_use = "When the return value is dropped the job is cancelled"]
     pub(crate) fn repeated(
-        &mut self,
+        &self,
         interval: Duration,
         callback: impl FnMut(&T) -> Result<()> + Send + 'static,
     ) -> TaskGuard<T> {
