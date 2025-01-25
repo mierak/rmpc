@@ -101,8 +101,11 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
     /// current thread.
     pub(crate) fn stop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            self.add_job_tx.send(SchedulerCommand::StopScheduler).expect("");
-            handle.join().expect("");
+            try_skip!(
+                self.add_job_tx.send(SchedulerCommand::StopScheduler),
+                "Failed to send stop scheduler command"
+            );
+            handle.join().expect("Scheduler thread to stop properly");
         }
     }
 
