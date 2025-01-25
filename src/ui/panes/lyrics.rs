@@ -9,7 +9,7 @@ use ratatui::{
 use super::Pane;
 use crate::{
     context::AppContext,
-    shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error},
+    shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error, mpd_query::run_status_update},
     ui::UiEvent,
 };
 
@@ -17,11 +17,12 @@ use crate::{
 pub struct LyricsPane {
     current_lyrics: Option<Lrc>,
     initialized: bool,
+    last_requested_line_idx: usize,
 }
 
 impl LyricsPane {
     pub fn new(_context: &AppContext) -> Self {
-        Self { current_lyrics: None, initialized: false }
+        Self { current_lyrics: None, initialized: false, last_requested_line_idx: 0 }
     }
 }
 
@@ -63,6 +64,16 @@ impl Pane for LyricsPane {
             frame.render_widget(p, areas[i]);
         }
 
+        // Try to schedule the next line to be displayed on time
+        if self.last_requested_line_idx != current_line_idx + 1 {
+            if let Some(line) = lrc.lines.get(current_line_idx + 1) {
+                self.last_requested_line_idx = current_line_idx + 1;
+                context
+                    .scheduler
+                    .schedule(line.time.saturating_sub(context.status.elapsed), run_status_update);
+            }
+        }
+
         Ok(())
     }
 
@@ -74,8 +85,10 @@ impl Pane for LyricsPane {
                 }
                 Err(err) => {
                     status_error!("Failed to load lyrics file: '{err}'");
+                    self.current_lyrics = None;
                 }
             }
+            self.last_requested_line_idx = 0;
             self.initialized = true;
         }
 
@@ -89,24 +102,32 @@ impl Pane for LyricsPane {
         context: &AppContext,
     ) -> Result<()> {
         match event {
-            UiEvent::SongChanged | UiEvent::Reconnected => match context.find_lrc() {
-                Ok(lrc) => {
-                    self.current_lyrics = lrc;
-                    context.render()?;
+            UiEvent::SongChanged | UiEvent::Reconnected => {
+                match context.find_lrc() {
+                    Ok(lrc) => {
+                        self.current_lyrics = lrc;
+                        context.render()?;
+                    }
+                    Err(err) => {
+                        self.current_lyrics = None;
+                        status_error!("Failed to load lyrics file: '{err}'");
+                    }
                 }
-                Err(err) => {
-                    status_error!("Failed to load lyrics file: '{err}'");
+                self.last_requested_line_idx = 0;
+            }
+            UiEvent::LyricsIndexed if self.current_lyrics.is_none() => {
+                match context.find_lrc() {
+                    Ok(lrc) => {
+                        self.current_lyrics = lrc;
+                        context.render()?;
+                    }
+                    Err(err) => {
+                        self.current_lyrics = None;
+                        status_error!("Failed to load lyrics file: '{err}'");
+                    }
                 }
-            },
-            UiEvent::LyricsIndexed if self.current_lyrics.is_none() => match context.find_lrc() {
-                Ok(lrc) => {
-                    self.current_lyrics = lrc;
-                    context.render()?;
-                }
-                Err(err) => {
-                    status_error!("Failed to load lyrics file: '{err}'");
-                }
-            },
+                self.last_requested_line_idx = 0;
+            }
             _ => {}
         }
         Ok(())
