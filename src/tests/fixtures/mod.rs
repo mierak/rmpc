@@ -7,6 +7,7 @@ use rstest::fixture;
 use crate::{
     config::{Config, ConfigFile, Leak},
     context::AppContext,
+    core::scheduler::Scheduler,
     mpd::commands::Status,
     shared::{
         events::{ClientRequest, WorkRequest},
@@ -37,12 +38,12 @@ pub fn app_context(
     client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
 ) -> AppContext {
     let chan1 = unbounded();
-    chan1.1.leak();
     let config = ConfigFile::default()
         .into_config(None, None, None, true)
         .expect("Test default config to convert correctly")
         .leak();
 
+    let scheduler = Scheduler::new((chan1.clone().0, unbounded().0));
     AppContext {
         status: Status::default(),
         config,
@@ -55,6 +56,7 @@ pub fn app_context(
         lrc_index: LrcIndex::default(),
         should_fetch_stickers: false,
         rendered_frames: 0,
+        scheduler,
     }
 }
 

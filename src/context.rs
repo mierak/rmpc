@@ -11,6 +11,7 @@ use crate::{
     MpdQueryResult,
     WorkRequest,
     config::{Config, Leak, album_art::ImageMethod, tabs::PaneType},
+    core::scheduler::Scheduler,
     mpd::{
         client::Client,
         commands::{Song, State, Status},
@@ -36,6 +37,7 @@ pub struct AppContext {
     pub(crate) lrc_index: LrcIndex,
     pub(crate) rendered_frames: u64,
     pub(crate) should_fetch_stickers: bool,
+    pub(crate) scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>)>,
 }
 
 #[bon]
@@ -46,6 +48,7 @@ impl AppContext {
         app_event_sender: Sender<AppEvent>,
         work_sender: Sender<WorkRequest>,
         client_request_sender: Sender<ClientRequest>,
+        mut scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>)>,
     ) -> Result<Self> {
         let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
         let sticker_support_needed = config.sticker_support_needed();
@@ -67,6 +70,7 @@ impl AppContext {
 
         log::info!(config:? = config; "Resolved config");
 
+        scheduler.start();
         Ok(Self {
             lrc_index: LrcIndex::default(),
             config: config.leak(),
@@ -75,6 +79,7 @@ impl AppContext {
             supported_commands,
             app_event_sender,
             work_sender,
+            scheduler,
             client_request_sender,
             needs_render: Cell::new(false),
             should_fetch_stickers: sticker_support_needed,

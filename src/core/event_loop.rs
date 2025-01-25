@@ -1,6 +1,7 @@
 use std::{collections::HashSet, io::Stdout, ops::Sub, time::Duration};
 
-use crossbeam::channel::{Receiver, RecvTimeoutError};
+use anyhow::Result;
+use crossbeam::channel::{Receiver, RecvTimeoutError, Sender};
 use itertools::Itertools;
 use ratatui::{
     Terminal,
@@ -8,10 +9,7 @@ use ratatui::{
     prelude::{Backend, CrosstermBackend},
 };
 
-use super::{
-    command::{create_env, run_external},
-    update_loop::UpdateLoop,
-};
+use super::command::{create_env, run_external};
 use crate::{
     context::AppContext,
     mpd::{
@@ -19,10 +17,10 @@ use crate::{
         mpd_client::MpdClient,
     },
     shared::{
-        events::{AppEvent, WorkDone},
+        events::{AppEvent, ClientRequest, WorkDone},
         ext::{duration::DurationExt, error::ErrorExt},
         macros::{status_error, status_warn, try_skip},
-        mpd_query::MpdQueryResult,
+        mpd_query::{MpdQuery, MpdQueryResult},
     },
     ui::{KeyHandleResult, Ui, UiEvent},
 };
@@ -35,18 +33,16 @@ pub const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
 pub fn init(
     context: AppContext,
     event_rx: Receiver<AppEvent>,
-    update_loop: UpdateLoop,
     terminal: Terminal<CrosstermBackend<Stdout>>,
 ) -> std::io::Result<std::thread::JoinHandle<Terminal<CrosstermBackend<Stdout>>>> {
     std::thread::Builder::new()
         .name("main".to_owned())
-        .spawn(move || main_task(context, event_rx, update_loop, terminal))
+        .spawn(move || main_task(context, event_rx, terminal))
 }
 
 fn main_task<B: Backend + std::io::Write>(
     mut context: AppContext,
     event_rx: Receiver<AppEvent>,
-    mut render_loop: UpdateLoop,
     mut terminal: Terminal<B>,
 ) -> Terminal<B> {
     let size = terminal.size().expect("To be able to get terminal size");
@@ -60,6 +56,16 @@ fn main_task<B: Backend + std::io::Write>(
     let mut additional_evs = HashSet::new();
     let mut connected = true;
     ui.before_show(area, &mut context).expect("Initial render init to succeed");
+    let mut _update_loop_guard = None;
+
+    // Check the playback status and start the periodic status update if needed
+    if context.status.state == State::Play {
+        _update_loop_guard = context
+            .config
+            .status_update_interval_ms
+            .map(Duration::from_millis)
+            .map(|interval| context.scheduler.repeated(interval, run_status_update));
+    }
 
     loop {
         let now = std::time::Instant::now();
@@ -103,6 +109,12 @@ fn main_task<B: Backend + std::io::Write>(
                     if let Err(err) = ui.on_event(UiEvent::Status(message, level), &context) {
                         log::error!(error:? = err; "UI failed to handle status message event");
                     }
+                    render_wanted = true;
+                    // Send delayed render event to make the status message
+                    // disappear
+                    context.scheduler.schedule(Duration::from_secs(5), |(tx, _)| {
+                        Ok(tx.send(AppEvent::RequestRender)?)
+                    });
                 }
                 AppEvent::Log(msg) => {
                     if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &context) {
@@ -139,22 +151,23 @@ fn main_task<B: Backend + std::io::Write>(
                             match context.status.state {
                                 State::Play => {
                                     if current_status != context.status.state {
-                                        try_skip!(
-                                            render_loop.start(),
-                                            "Failed to start render loop"
-                                        );
+                                        _update_loop_guard = context
+                                            .config
+                                            .status_update_interval_ms
+                                            .map(Duration::from_millis)
+                                            .map(|interval| {
+                                                context
+                                                    .scheduler
+                                                    .repeated(interval, run_status_update)
+                                            });
                                     }
                                 }
                                 State::Pause => {
-                                    if current_status != context.status.state {
-                                        try_skip!(render_loop.stop(), "Failed to stop render loop");
-                                    }
+                                    _update_loop_guard = None;
                                 }
                                 State::Stop => {
                                     song_changed = true;
-                                    if current_status != context.status.state {
-                                        try_skip!(render_loop.stop(), "Failed to stop render loop");
-                                    }
+                                    _update_loop_guard = None;
                                 }
                             }
 
@@ -244,7 +257,8 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::LostConnection => {
                     if context.status.state != State::Stop {
-                        try_skip!(render_loop.stop(), "Failed to stop render loop");
+                        // try_skip!(render_loop.stop(), "Failed to stop render loop");
+                        _update_loop_guard = None;
                         context.status.state = State::Stop;
                     }
                     if connected {
@@ -329,4 +343,19 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
     if let Ok(ev) = event.try_into() {
         result_ui_evs.insert(ev);
     }
+}
+
+// Is used as a scheduled function and thus needs the -> Result<()>
+#[allow(clippy::unnecessary_wraps)]
+fn run_status_update((_, client_tx): &(Sender<AppEvent>, Sender<ClientRequest>)) -> Result<()> {
+    try_skip!(
+        client_tx.send(ClientRequest::Query(MpdQuery {
+            id: GLOBAL_STATUS_UPDATE,
+            target: None,
+            replace_id: Some("status"),
+            callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
+        })),
+        "Failed to send status update query"
+    );
+    Ok(())
 }

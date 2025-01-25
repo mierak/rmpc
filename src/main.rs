@@ -15,7 +15,7 @@
     clippy::redundant_closure_for_method_calls,
     unused_macros
 )]
-use core::update_loop::UpdateLoop;
+use core::scheduler::Scheduler;
 use std::io::{Read, Write};
 
 use anyhow::{Context, Result};
@@ -31,7 +31,7 @@ use crate::{
         ConfigFile,
         cli::{Args, Command},
     },
-    mpd::{client::Client, commands::State},
+    mpd::client::Client,
     shared::{
         dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
         env::ENV,
@@ -204,16 +204,11 @@ fn main() -> Result<()> {
                     config,
                     tx_clone,
                     worker_tx.clone(),
-                    client_tx.clone()
+                    client_tx.clone(),
+                    Scheduler::new((event_tx.clone(), client_tx.clone())),
                 ),
                 "Failed to create app context"
             );
-
-            let mut render_loop =
-                UpdateLoop::try_new(client_tx.clone(), context.config.status_update_interval_ms)?;
-            if context.status.state == State::Play {
-                render_loop.start()?;
-            }
 
             let enable_mouse = context.config.enable_mouse;
             let terminal = try_ret!(ui::setup_terminal(enable_mouse), "Failed to setup terminal");
@@ -226,8 +221,7 @@ fn main() -> Result<()> {
                 context.config,
             )?;
             core::input::init(event_tx.clone())?;
-            let event_loop_handle =
-                core::event_loop::init(context, event_rx, render_loop, terminal)?;
+            let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {
