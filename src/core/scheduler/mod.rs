@@ -54,13 +54,12 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
             let mut jobs = BinaryHeap::new();
             loop {
                 let timeout = duration.map_or_else(never, after);
+                log::trace!(duration:?; "Starting new schedule loop");
                 // Bias towards the job receiver so we do not lose jobs when timeout happens at
                 // the same time
-                log::debug!(duration:?, timeout:?; "looping");
                 select_biased!(
                     recv(add_job_rx) -> job => {
-                        log::debug!(job:?; "looping got job");
-                        let job = try_cont!(job, "fail push");
+                        let job = try_cont!(job, "Failed to process scheduler command");
                         match job {
                             SchedulerCommand::AddJob(job) => jobs.push(Reverse(JobOrRepeatedJob::Job(job))),
                             SchedulerCommand::AddRepeatedJob(job) => jobs.push(Reverse(JobOrRepeatedJob::RepeatedJob(job))),
@@ -72,7 +71,7 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
                             SchedulerCommand::StopScheduler => break,
                         }
                     }
-                    recv(timeout) -> _ => log::debug!("looping timeout"),
+                    recv(timeout) -> _ => log::trace!(jobs:?; "Scheduler timed out, trying to run a job"),
                 );
 
                 let now = Instant::now();
@@ -92,7 +91,7 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
 
                 duration =
                     jobs.peek().map(|Reverse(job)| job.run_at().saturating_duration_since(now));
-                log::debug!(duration:?, jobs:? = jobs; "next run");
+                log::trace!(duration:?, jobs:? = jobs; "Schedule loop finished, waiting");
             }
         }));
     }

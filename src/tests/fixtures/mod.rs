@@ -43,12 +43,13 @@ pub fn app_context(
         .expect("Test default config to convert correctly")
         .leak();
 
-    let scheduler = Scheduler::new((chan1.clone().0, unbounded().0));
+    let chan1 = chan1.leak();
+    let scheduler = Scheduler::new((chan1.0.clone(), unbounded().0));
     AppContext {
         status: Status::default(),
         config,
         queue: Vec::default(),
-        app_event_sender: chan1.0,
+        app_event_sender: chan1.0.clone(),
         work_sender: work_request_channel.0.clone(),
         client_request_sender: client_request_channel.0.clone(),
         supported_commands: HashSet::new(),
