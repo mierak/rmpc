@@ -175,6 +175,7 @@ fn client_task(
                                                     Some(MpdError::TimedOut(err)) => {
                                                         status_error!(err:?; "Reading response from MPD timed out, will try to reconnect");
                                                         try_break!(client.reconnect(), "Failed to reconnect");
+                                                        try_break!(client.set_write_timeout(Some(config.mpd_write_timeout)), "Failed to set write timeout");
                                                         client_write = try_break!(client.stream.try_clone(), "Client write clone to succeed");
                                                     },
                                                     _ => {
