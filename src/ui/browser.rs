@@ -250,6 +250,16 @@ where
                 self.prepare_preview(context);
                 context.render()?;
             }
+            CommonAction::PageUp => {
+                self.stack_mut().current_mut().prev_viewport(context.config.scrolloff);
+                self.prepare_preview(context);
+                context.render()?;
+            }
+            CommonAction::PageDown => {
+                self.stack_mut().current_mut().next_viewport(context.config.scrolloff);
+                self.prepare_preview(context);
+                context.render()?;
+            }
             CommonAction::Bottom => {
                 self.stack_mut().current_mut().last();
                 self.prepare_preview(context);

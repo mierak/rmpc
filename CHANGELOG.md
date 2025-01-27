@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Support for manipulation of MPD stickers via CLI
 - Support for globs/multiple files and songs outside music database (with socket connection) in the `add` cli command
 - Added new `layout` config option which allows to move around the base components
+- `PageUp` and `PageDown` actions
 
 ### Changed
 

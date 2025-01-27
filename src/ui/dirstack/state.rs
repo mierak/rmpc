@@ -173,6 +173,37 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
+    pub fn next_viewport(&mut self, scrolloff: usize) {
+        if let Some(item_count) = self.content_len {
+            if let Some(viewport) = self.viewport_len {
+                self.select(
+                    self.get_selected()
+                        .map(|i| i.saturating_add(viewport).min(item_count.saturating_sub(1))),
+                    scrolloff,
+                );
+            } else {
+                self.select(None, scrolloff);
+            }
+        } else {
+            self.select(None, scrolloff);
+        }
+    }
+
+    pub fn prev_viewport(&mut self, scrolloff: usize) {
+        if self.content_len.is_some() {
+            if let Some(viewport) = self.viewport_len {
+                self.select(
+                    self.get_selected().map(|i| i.saturating_sub(viewport).max(0)),
+                    scrolloff,
+                );
+            } else {
+                self.select(None, scrolloff);
+            }
+        } else {
+            self.select(None, scrolloff);
+        }
+    }
+
     pub fn select(&mut self, idx: Option<usize>, scrolloff: usize) {
         let content_len = self.content_len.unwrap_or_default();
         let idx = idx.map(|idx| idx.max(0).min(content_len.saturating_sub(1)));

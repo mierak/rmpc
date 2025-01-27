@@ -182,26 +182,7 @@ impl Pane for LogsPane {
 
                     context.render()?;
                 }
-                CommonAction::Right => {}
-                CommonAction::Left => {}
-                CommonAction::EnterSearch => {}
-                CommonAction::NextResult => {}
-                CommonAction::PreviousResult => {}
-                CommonAction::Add => {}
-                CommonAction::Select => {}
-                CommonAction::InvertSelection => {}
-                CommonAction::Delete => {}
-                CommonAction::Rename => {}
-                CommonAction::MoveUp => {}
-                CommonAction::MoveDown => {}
-                CommonAction::Close => {}
-                CommonAction::Confirm => {}
-                CommonAction::FocusInput => {}
-                CommonAction::AddAll => {}
-                CommonAction::PaneDown => {}
-                CommonAction::PaneUp => {}
-                CommonAction::PaneRight => {}
-                CommonAction::PaneLeft => {}
+                _ => {}
             }
         }
 

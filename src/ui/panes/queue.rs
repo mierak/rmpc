@@ -685,6 +685,20 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
+                CommonAction::PageDown => {
+                    if !context.queue.is_empty() {
+                        self.scrolling_state.next_viewport(context.config.scrolloff);
+                    }
+
+                    context.render()?;
+                }
+                CommonAction::PageUp => {
+                    if !context.queue.is_empty() {
+                        self.scrolling_state.prev_viewport(context.config.scrolloff);
+                    }
+
+                    context.render()?;
+                }
                 CommonAction::Bottom => {
                     if !context.queue.is_empty() {
                         self.scrolling_state.last();
