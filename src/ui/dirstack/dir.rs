@@ -183,6 +183,14 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.state.prev_half_viewport(scrolloff);
     }
 
+    pub fn next_viewport(&mut self, scrolloff: usize) {
+        self.state.next_viewport(scrolloff);
+    }
+
+    pub fn prev_viewport(&mut self, scrolloff: usize) {
+        self.state.prev_viewport(scrolloff);
+    }
+
     pub fn last(&mut self) {
         self.state.last();
     }

@@ -773,6 +773,8 @@ impl Pane for SearchPane {
                         CommonAction::MoveUp => {}
                         CommonAction::DownHalf => {}
                         CommonAction::UpHalf => {}
+                        CommonAction::PageDown => {}
+                        CommonAction::PageUp => {}
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
                             self.phase = Phase::BrowseResults { filter_input_on: false };
                             self.preview = None;
@@ -913,6 +915,18 @@ impl Pane for SearchPane {
                         }
                         CommonAction::UpHalf => {
                             self.songs_dir.prev_half_viewport(context.config.scrolloff);
+                            self.prepare_preview(context);
+
+                            context.render()?;
+                        }
+                        CommonAction::PageDown => {
+                            self.songs_dir.next_viewport(context.config.scrolloff);
+                            self.prepare_preview(context);
+
+                            context.render()?;
+                        }
+                        CommonAction::PageUp => {
+                            self.songs_dir.prev_viewport(context.config.scrolloff);
                             self.prepare_preview(context);
 
                             context.render()?;
