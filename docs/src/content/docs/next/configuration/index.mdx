@@ -63,6 +63,18 @@ Directory for rmpc's cache files. Used for files downloaded for youtube and migh
 
 Directory where rmpc should search for `lrc` files. Please see the <a href={path("configuration/lyrics")}>lyrics page</a> for more information.
 
+### mpd_read_timeout_ms
+
+<ConfigValue name="mpd_read_timeout_ms" type="number" />
+
+How long to wait for response to MPD command before giving up and reconnecting. Defaults to `10_000` milliseconds.
+
+### mpd_write_timeout_ms
+
+<ConfigValue name="mpd_write_timeout_ms" type="number" />
+
+How long to wait for write to MPD socket to finish before giving up and reconnecting. Defaults to `5_000` milliseconds.
+
 ### theme
 
 <ConfigValue optional name="theme" type="string" />
