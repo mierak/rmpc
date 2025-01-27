@@ -194,7 +194,8 @@ fn main() -> Result<()> {
                 Client::init(config.address, config.password, "command"),
                 "Failed to connect to MPD"
             );
-            client.set_read_timeout(None)?;
+            client.set_read_timeout(Some(config.mpd_read_timeout))?;
+            client.set_write_timeout(Some(config.mpd_write_timeout))?;
 
             let tx_clone = event_tx.clone();
 
@@ -213,7 +214,7 @@ fn main() -> Result<()> {
             let enable_mouse = context.config.enable_mouse;
             let terminal = try_ret!(ui::setup_terminal(enable_mouse), "Failed to setup terminal");
 
-            core::client::init(client_rx.clone(), event_tx.clone(), client)?;
+            core::client::init(client_rx.clone(), event_tx.clone(), client, context.config)?;
             core::work::init(
                 worker_rx.clone(),
                 client_tx.clone(),

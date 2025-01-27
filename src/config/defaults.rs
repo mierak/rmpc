@@ -19,6 +19,14 @@ pub fn default_scrolloff() -> usize {
     0
 }
 
+pub fn default_read_timeout() -> u64 {
+    10_000
+}
+
+pub fn default_write_timeout() -> u64 {
+    5000
+}
+
 #[allow(clippy::unnecessary_wraps)]
 pub fn default_progress_update_interval_ms() -> Option<u64> {
     Some(1000)
