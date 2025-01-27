@@ -1,6 +1,7 @@
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
+    time::Duration,
 };
 
 use address::MpdPassword;
@@ -52,6 +53,8 @@ pub struct Config {
     pub enable_mouse: bool,
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
+    pub mpd_read_timeout: Duration,
+    pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<&'static [&'static str]>,
@@ -83,7 +86,11 @@ pub struct ConfigFile {
     status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
     select_current_song_on_change: bool,
-    #[serde(default = "defaults::default_true")]
+    #[serde(default = "defaults::default_read_timeout")]
+    mpd_read_timeout_ms: u64,
+    #[serde(default = "defaults::default_write_timeout")]
+    mpd_write_timeout_ms: u64,
+    #[serde(default = "defaults::default_false")]
     enable_mouse: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
@@ -123,6 +130,8 @@ impl Default for ConfigFile {
             volume_step: 5,
             scrolloff: 0,
             status_update_interval_ms: Some(1000),
+            mpd_write_timeout_ms: 5000,
+            mpd_read_timeout_ms: 10_000,
             theme: None,
             cache_dir: None,
             lyrics_dir: None,
@@ -217,6 +226,8 @@ impl ConfigFile {
             scrolloff: self.scrolloff,
             wrap_navigation: self.wrap_navigation,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
+            mpd_read_timeout: Duration::from_millis(self.mpd_read_timeout_ms),
+            mpd_write_timeout: Duration::from_millis(self.mpd_write_timeout_ms),
             enable_mouse: self.enable_mouse,
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,

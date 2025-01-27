@@ -113,8 +113,8 @@ impl<'name> Client<'name> {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
-        stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
+        stream.set_write_timeout(None)?;
+        stream.set_read_timeout(None)?;
         let mut rx = BufReader::new(stream.try_clone()?);
 
         let mut buf = String::new();
@@ -158,8 +158,8 @@ impl<'name> Client<'name> {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
-        stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
+        stream.set_write_timeout(None)?;
+        stream.set_read_timeout(None)?;
         let mut rx = BufReader::new(stream.try_clone()?);
 
         let mut buf = String::new();

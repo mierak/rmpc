@@ -26,6 +26,7 @@ pub mod error {
                 MpdError::UnsupportedMpdVersion(e) => {
                     format!("Unsuported MPD version: {e}")
                 }
+                MpdError::TimedOut(_) => "Request to MPD timed out".to_string(),
             }
         }
     }

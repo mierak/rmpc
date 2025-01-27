@@ -12,10 +12,11 @@ use crossbeam::{
 use drop_guard::{ClientDropGuard, DropGuard};
 
 use crate::{
-    mpd::{client::Client, commands::idle::IdleEvent, mpd_client::MpdClient},
+    config::Config,
+    mpd::{client::Client, commands::idle::IdleEvent, errors::MpdError, mpd_client::MpdClient},
     shared::{
         events::{AppEvent, ClientRequest, WorkDone},
-        macros::{try_break, try_skip},
+        macros::{status_error, try_break, try_skip},
     },
 };
 
@@ -23,16 +24,18 @@ pub fn init(
     client_rx: Receiver<ClientRequest>,
     event_tx: Sender<AppEvent>,
     client: Client<'static>,
+    config: &'static Config,
 ) -> io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new()
         .name("client task".to_owned())
-        .spawn(move || client_task(&client_rx, &event_tx, client))
+        .spawn(move || client_task(&client_rx, &event_tx, client, config))
 }
 
 fn client_task(
     client_rx: &Receiver<ClientRequest>,
     event_tx: &Sender<AppEvent>,
     client: Client<'_>,
+    config: &'static Config,
 ) {
     let (req2idle_tx, req2idle_rx) = &bounded::<Client<'_>>(0);
     let (idle2req_tx, idle2req_rx) = &bounded::<Client<'_>>(0);
@@ -60,7 +63,8 @@ fn client_task(
                     break;
                 }
             };
-            let is_client_ok = check_connection(first_loop, &mut client, client_rx, event_tx);
+            let is_client_ok =
+                check_connection(first_loop, &mut client, client_rx, event_tx, config);
             first_loop = false;
 
             if is_client_ok {
@@ -88,6 +92,7 @@ fn client_task(
 
                                     log::trace!("Trying to acquire client lock for idle");
 
+                                    try_break!(client.set_read_timeout(None), "Failed to set read timeout");
                                     let mut idle_client = try_break!(client.enter_idle(), "Failed to enter idle state");
                                     try_break!(idle_entered_tx.send(()), "Failed to send idle confirmation");
                                     let events: Vec<IdleEvent> = try_break!(idle_client.read_response(), "Failed to read idle events");
@@ -139,6 +144,7 @@ fn client_task(
                                     let client = try_break!(idle2req_rx.recv(), "Failed to receive client from idle thread");
                                     let mut client = ClientDropGuard::new(client_return_tx, client);
 
+                                    try_break!(client.set_read_timeout(Some(config.mpd_read_timeout)), "Failed to set read timeout");
                                     while let Some(request) = buffer.pop_front() {
                                         while let Ok(request) = client_rx.try_recv() {
                                             log::trace!(count = buffer.len(), buffer:?; "Got more requests");
@@ -157,7 +163,7 @@ fn client_task(
                                             continue;
                                         }
 
-                                        match handle_client_request(&mut client, request,) {
+                                        match handle_client_request(&mut client, request) {
                                             Ok(result) => {
                                                 try_break!(
                                                     event_tx.send(AppEvent::WorkDone(Ok(result))),
@@ -165,10 +171,20 @@ fn client_task(
                                                 );
                                             }
                                             Err(err) => {
-                                                try_break!(
-                                                    event_tx.send(AppEvent::WorkDone(Err(err))),
-                                                    "Failed to send work done error event"
-                                                );
+                                                match err.downcast_ref::<MpdError>() {
+                                                    Some(MpdError::TimedOut(err)) => {
+                                                        status_error!(err:?; "Reading response from MPD timed out, will try to reconnect");
+                                                        try_break!(client.reconnect(), "Failed to reconnect");
+                                                        try_break!(client.set_write_timeout(Some(config.mpd_write_timeout)), "Failed to set write timeout");
+                                                        client_write = try_break!(client.stream.try_clone(), "Client write clone to succeed");
+                                                    },
+                                                    _ => {
+                                                        try_break!(
+                                                            event_tx.send(AppEvent::WorkDone(Err(err))),
+                                                            "Failed to send work done error event"
+                                                        );
+                                                    },
+                                                }
                                             }
                                         }
                                     }
@@ -269,16 +285,23 @@ fn check_connection(
     client: &mut Client<'_>,
     client_rx: &Receiver<ClientRequest>,
     event_tx: &Sender<AppEvent>,
+    config: &Config,
 ) -> bool {
     if first_loop {
         true
     } else if client.reconnect().is_ok() {
-        client.set_read_timeout(None).expect("Read timeout set to succeed");
-
         // empty the work queue after reconnect as they might no longer be
         // relevant
         let _ = client_rx.try_iter().collect::<Vec<_>>();
         try_skip!(event_tx.send(AppEvent::Reconnected), "Failed to send reconnected event");
+        if let Err(err) = client.set_read_timeout(Some(config.mpd_read_timeout)) {
+            log::error!(error:? = err; "Failed to set read timeout");
+            return false;
+        }
+        if let Err(err) = client.set_write_timeout(Some(config.mpd_write_timeout)) {
+            log::error!(error:? = err; "Failed to set write timeout");
+            return false;
+        }
         true
     } else {
         false

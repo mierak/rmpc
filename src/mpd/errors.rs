@@ -11,12 +11,18 @@ pub enum MpdError {
     Mpd(MpdFailureResponse),
     ValueExpected(String),
     UnsupportedMpdVersion(&'static str),
+    TimedOut(String),
 }
 
 impl std::error::Error for MpdError {}
 impl From<std::io::Error> for MpdError {
     fn from(err: std::io::Error) -> Self {
-        MpdError::Generic(format!("{err}"))
+        match err.kind() {
+            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => {
+                MpdError::TimedOut(err.to_string())
+            }
+            _ => MpdError::Generic(format!("{err}")),
+        }
     }
 }
 
@@ -38,6 +44,7 @@ impl Display for MpdError {
             MpdError::UnsupportedMpdVersion(val) => {
                 write!(f, "Unsupported MPD version: '{val}'")
             }
+            MpdError::TimedOut(msg) => write!(f, "Reading response from MPD timed out, '{msg}'"),
         }
     }
 }
