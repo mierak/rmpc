@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Support for globs/multiple files and songs outside music database (with socket connection) in the `add` cli command
 - Added new `layout` config option which allows to move around the base components
 - `PageUp` and `PageDown` actions
+- Configurable timeout for connection to MPD
 
 ### Changed
 
@@ -34,6 +35,7 @@ All notable changes to this project will be documented in this file.
 - Properly escape strings in mpd protocol
 - Preview for songs outside of the music database not working in playlists
 - AddToPlaylist not working for local songs
+- rmpc waiting potentionally forever for MPD's response
 
 ### Deprecated
 
