@@ -1,6 +1,7 @@
 use crossbeam::channel::Sender;
 use flexi_logger::{FileSpec, FlexiLoggerError, LoggerHandle};
 
+use super::events::Level;
 use crate::AppEvent;
 
 pub fn init(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
@@ -129,14 +130,14 @@ impl flexi_logger::writers::LogWriter for AppEventChannelWriter {
     }
 }
 
-impl From<log::Level> for crate::ui::Level {
+impl From<log::Level> for Level {
     fn from(level: log::Level) -> Self {
         match level {
-            log::Level::Error => crate::ui::Level::Error,
-            log::Level::Warn => crate::ui::Level::Warn,
-            log::Level::Info => crate::ui::Level::Info,
-            log::Level::Debug => crate::ui::Level::Debug,
-            log::Level::Trace => crate::ui::Level::Trace,
+            log::Level::Error => Level::Error,
+            log::Level::Warn => Level::Warn,
+            log::Level::Info => Level::Info,
+            log::Level::Debug => Level::Debug,
+            log::Level::Trace => Level::Trace,
         }
     }
 }

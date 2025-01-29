@@ -18,6 +18,7 @@ use crate::{
     shared::{
         events::{AppEvent, WorkDone},
         ext::{duration::DurationExt, error::ErrorExt},
+        lrc::get_lrc_path,
         macros::{status_error, status_warn},
         mpd_query::{
             EXTERNAL_COMMAND,
@@ -181,8 +182,19 @@ fn main_task<B: Backend + std::io::Write>(
                             if let Some((_, song)) = context.find_current_song_in_queue() {
                                 if Some(song.id) != current_song_id {
                                     if let Some(command) = context.config.on_song_change {
+                                        let lrc_path = context
+                                            .config
+                                            .lyrics_dir
+                                            .and_then(|dir| get_lrc_path(dir, &song.file).ok())
+                                            .map(|path| path.to_string_lossy().into_owned())
+                                            .unwrap_or_default();
                                         let lrc = context.find_lrc().ok().flatten();
-                                        let env = song
+                                        let pid = std::process::id();
+                                        let duration = song
+                                            .duration
+                                            .map_or_else(String::new, |d| d.to_string());
+
+                                        let mut env = song
                                             .clone()
                                             .metadata
                                             .into_iter()
@@ -190,24 +202,13 @@ fn main_task<B: Backend + std::io::Write>(
                                                 k.make_ascii_uppercase();
                                                 (k, v)
                                             })
-                                            .chain(std::iter::once((
-                                                "FILE".to_owned(),
-                                                song.file.clone(),
-                                            )))
-                                            .chain(std::iter::once((
-                                                "DURATION".to_owned(),
-                                                song.duration
-                                                    .map_or_else(String::new, |d| d.to_string()),
-                                            )))
-                                            .chain(std::iter::once((
-                                                "PID".to_owned(),
-                                                std::process::id().to_string(),
-                                            )))
-                                            .chain(std::iter::once((
-                                                "HAS_LRC".to_owned(),
-                                                lrc.is_some().to_string(),
-                                            )))
                                             .collect_vec();
+
+                                        env.push(("FILE".to_owned(), song.file.clone()));
+                                        env.push(("DURATION".to_owned(), duration));
+                                        env.push(("PID".to_owned(), pid.to_string()));
+                                        env.push(("HAS_LRC".to_owned(), lrc.is_some().to_string()));
+                                        env.push(("LRC_FILE".to_owned(), lrc_path));
                                         run_external(command, env);
                                     }
                                     song_changed = true;

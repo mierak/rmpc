@@ -43,7 +43,7 @@ use crate::{
         version::Version,
     },
     shared::{
-        events::WorkRequest,
+        events::{Level, WorkRequest},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
@@ -57,16 +57,6 @@ pub mod modals;
 pub mod panes;
 pub mod tab_screen;
 pub mod widgets;
-
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
-#[allow(dead_code)]
-pub enum Level {
-    Trace,
-    Debug,
-    Warn,
-    Error,
-    Info,
-}
 
 #[derive(Debug)]
 pub struct StatusMessage {

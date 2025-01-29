@@ -136,17 +136,11 @@ for the script to execute and increment the play count.
 Provided by [wvffle on github](https://github.com/mierak/rmpc/issues/230)
 
 ```bash
-#!/usr/bin/env bash
+#!/bin/env sh
+
+LRCLIB_INSTANCE="https://lrclib.net"
 
 if [ "$HAS_LRC" = "false" ]; then
-    LRCLIB_INSTANCE="https://lrclib.net"
-    LYRICS_DIR="$HOME/Music/lyrics"
-
-    LRC_FILE="$LYRICS_DIR/$ARTIST/$ALBUM/$LRC_DIR/$TITLE.lrc"
-    if [ -f "$LRC_FILE" ]; then
-        exit 0
-    fi
-
     mkdir -p "$(dirname "$LRC_FILE")"
 
     LYRICS="$(curl -X GET -sG \
@@ -155,9 +149,14 @@ if [ "$HAS_LRC" = "false" ]; then
         --data-urlencode "album_name=$ALBUM" \
         "$LRCLIB_INSTANCE/api/get" | jq -r '.syncedLyrics')"
 
-    if [ -z "$LYRICS" ] || [ "$LYRICS" == "null" ]; then
-        echo "Lyrics not found"
-        exit 1
+    if [ -z "$LYRICS" ]; then
+        rmpc remote --pid "$PID" status "Failed to download lyrics for $ARTIST - $TITLE" --level error
+        exit
+    fi
+
+    if [ "$LYRICS" = "null" ]; then
+        rmpc remote --pid "$PID" status "Lyrics for $ARTIST - $TITLE not found" --level warn
+        exit
     fi
 
     echo "[ar:$ARTIST]" >"$LRC_FILE"
@@ -167,6 +166,7 @@ if [ "$HAS_LRC" = "false" ]; then
     } >>"$LRC_FILE"
     echo "$LYRICS" | sed -E '/^\[(ar|al|ti):/d' >>"$LRC_FILE"
 
-    rmpc notify indexlrc --pid "$PID" --path "$LRC_FILE"
+    rmpc remote --pid "$PID" indexlrc --path "$LRC_FILE"
+    rmpc remote --pid "$PID" status "Downloaded lyrics for $ARTIST - $TITLE" --level info
 fi
 ```

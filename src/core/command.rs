@@ -1,11 +1,11 @@
-use std::{io::Write, os::unix::net::UnixStream, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
 use crate::{
     config::{
-        cli::{Command, NotifyCmd, StickerCmd},
+        cli::{Command, StickerCmd},
         cli_config::CliConfig,
     },
     context::AppContext,
@@ -17,7 +17,6 @@ use crate::{
     shared::{
         lrc::LrcIndex,
         macros::{status_error, status_info},
-        socket::{IndexLrcCommand, SocketCommand, get_socket_path},
         ytdlp::YtDlp,
     },
 };
@@ -28,6 +27,11 @@ impl Command {
         config: &'static CliConfig,
     ) -> Result<Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static>> {
         match self {
+            Command::Config { .. } => bail!("Cannot use config command here."),
+            Command::Theme { .. } => bail!("Cannot use theme command here."),
+            Command::Version => bail!("Cannot use version command here."),
+            Command::DebugInfo => bail!("Cannot use debuginfo command here."),
+            Command::Remote { .. } => bail!("Cannot use remote command here."),
             Command::Update { ref mut path, wait } | Command::Rescan { ref mut path, wait } => {
                 let path = path.take();
                 Ok(Box::new(move |client| {
@@ -180,10 +184,6 @@ impl Command {
                 println!("{}", serde_json::ser::to_string(&client.outputs()?)?);
                 Ok(())
             })),
-            Command::Config { .. } => bail!("Cannot use config command here."),
-            Command::Theme { .. } => bail!("Cannot use theme command here."),
-            Command::Version => bail!("Cannot use version command here."),
-            Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::ToggleOutput { id } => {
                 Ok(Box::new(move |client| Ok(client.toggle_output(id)?)))
             }
@@ -305,17 +305,6 @@ impl Command {
                     Ok(())
                 }))
             }
-            Command::Notify { command } => Ok(Box::new(move |_client| {
-                match command {
-                    NotifyCmd::IndexLrc { path, pid } => {
-                        let mut stream = UnixStream::connect(get_socket_path(pid))?;
-                        let cmd = SocketCommand::IndexLrc(IndexLrcCommand { path });
-                        let cmd = serde_json::to_string(&cmd)?;
-                        stream.write_all(cmd.as_bytes())?;
-                    }
-                }
-                Ok(())
-            })),
         }
     }
 }

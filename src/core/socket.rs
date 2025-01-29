@@ -4,39 +4,47 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossbeam::channel::Sender;
 
 use crate::{
     AppEvent,
     WorkRequest,
     config::Config,
-    shared::socket::{SocketCommand, SocketCommandExecute, get_socket_path},
+    shared::{
+        macros::try_cont,
+        socket::{SocketCommand, SocketCommandExecute, get_socket_path},
+    },
 };
 
 pub(crate) fn init(
     event_tx: Sender<AppEvent>,
     work_tx: Sender<WorkRequest>,
     config: &'static Config,
-) -> SocketGuard {
+) -> Result<SocketGuard> {
     let pid = std::process::id();
     let addr = get_socket_path(pid);
     let guard = SocketGuard(addr.clone());
-    let listener = UnixListener::bind(&addr).unwrap();
+    let listener = UnixListener::bind(&addr).context("Failed to bind to unix socket")?;
 
     std::thread::spawn(move || {
         for stream in listener.incoming() {
-            let stream = stream.unwrap();
+            let stream = try_cont!(stream, "Failed to connect to socket client");
             let mut reader = BufReader::new(stream);
 
             let mut buf = String::new();
-            reader.read_line(&mut buf).unwrap();
-            let command: SocketCommand = serde_json::from_str(&buf).unwrap();
-            log::debug!(command:?; "got command");
-            command.execute(&event_tx, &work_tx, config).unwrap();
+            try_cont!(reader.read_line(&mut buf), "Failed to read from socket client");
+            let command: SocketCommand =
+                try_cont!(serde_json::from_str(&buf), "Failed to parse socket command");
+
+            log::debug!(command:?, addr:?; "Got command from unix socket");
+            try_cont!(
+                command.execute(&event_tx, &work_tx, config),
+                "Socket command execution failed"
+            );
         }
     });
-    guard
+    Ok(guard)
 }
 
 /// The guard handles deletion of the unix domain socket upon dropping

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use crossterm::event::KeyEvent;
+use serde::{Deserialize, Serialize};
 
 use super::{
     lrc::{LrcIndex, LrcIndexEntry},
@@ -11,7 +12,7 @@ use super::{
 use crate::{
     config::{cli::Command, tabs::PaneType},
     mpd::commands::IdleEvent,
-    ui::{Level, UiAppEvent},
+    ui::UiAppEvent,
 };
 
 #[derive(Debug)]
@@ -57,4 +58,14 @@ pub(crate) enum AppEvent {
     UiEvent(UiAppEvent),
     Reconnected,
     LostConnection,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]
+#[allow(dead_code)]
+pub enum Level {
+    Trace,
+    Debug,
+    Warn,
+    Error,
+    Info,
 }

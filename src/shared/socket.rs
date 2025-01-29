@@ -4,6 +4,7 @@ use anyhow::Result;
 use crossbeam::channel::Sender;
 use serde::{Deserialize, Serialize};
 
+use super::events::Level;
 use crate::{AppEvent, WorkRequest, config::Config};
 
 pub fn get_socket_path(pid: u32) -> PathBuf {
@@ -24,6 +25,7 @@ pub(crate) trait SocketCommandExecute {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) enum SocketCommand {
     IndexLrc(IndexLrcCommand),
+    StatusMessage(StatusMessageCommand),
 }
 
 impl SocketCommandExecute for SocketCommand {
@@ -35,7 +37,26 @@ impl SocketCommandExecute for SocketCommand {
     ) -> Result<()> {
         match self {
             SocketCommand::IndexLrc(cmd) => cmd.execute(event_tx, work_tx, config),
+            SocketCommand::StatusMessage(cmd) => cmd.execute(event_tx, work_tx, config),
         }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct StatusMessageCommand {
+    pub(crate) message: String,
+    pub(crate) level: Level,
+}
+
+impl SocketCommandExecute for StatusMessageCommand {
+    fn execute(
+        self,
+        event_tx: &Sender<AppEvent>,
+        _work_tx: &Sender<WorkRequest>,
+        _config: &'static Config,
+    ) -> Result<()> {
+        event_tx.send(AppEvent::Status(self.message, self.level))?;
+        Ok(())
     }
 }
 

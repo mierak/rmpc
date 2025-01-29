@@ -161,7 +161,9 @@ pub enum Command {
         #[command(subcommand)]
         cmd: StickerCmd,
     },
-    Notify {
+    Remote {
+        #[arg(long)]
+        pid: u32,
         #[command(subcommand)]
         command: NotifyCmd,
     },
@@ -174,9 +176,19 @@ pub enum NotifyCmd {
         /// Absolute path to the lrc file
         #[arg(short, long)]
         path: PathBuf,
-        #[arg(long)]
-        pid: u32,
     },
+    Status {
+        message: String,
+        #[arg(short, long)]
+        level: Level,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Parser, ValueEnum)]
+pub enum Level {
+    Info,
+    Error,
+    Warn,
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
