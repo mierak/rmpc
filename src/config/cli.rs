@@ -161,6 +161,22 @@ pub enum Command {
         #[command(subcommand)]
         cmd: StickerCmd,
     },
+    Notify {
+        #[command(subcommand)]
+        command: NotifyCmd,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+pub enum NotifyCmd {
+    IndexLrc {
+        /// Absolute path to the lrc file
+        #[arg(short, long)]
+        path: PathBuf,
+        #[arg(long)]
+        pid: u32,
+    },
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]

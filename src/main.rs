@@ -222,6 +222,8 @@ fn main() -> Result<()> {
                 context.config,
             )?;
             core::input::init(event_tx.clone())?;
+            let _sock_guard =
+                core::socket::init(event_tx.clone(), worker_tx.clone(), context.config);
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();

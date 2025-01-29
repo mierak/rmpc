@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 
 use super::{
-    lrc::LrcIndex,
+    lrc::{LrcIndex, LrcIndexEntry},
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
@@ -23,7 +25,13 @@ pub(crate) enum ClientRequest {
 #[derive(Debug)]
 #[allow(unused)]
 pub(crate) enum WorkRequest {
-    IndexLyrics { lyrics_dir: &'static str },
+    IndexLyrics {
+        lyrics_dir: &'static str,
+    },
+    IndexSingleLrc {
+        /// Absolute path to the lrc file
+        path: PathBuf,
+    },
     Command(Command),
 }
 
@@ -31,6 +39,7 @@ pub(crate) enum WorkRequest {
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
     LyricsIndexed { index: LrcIndex },
+    SingleLrcIndexed { lrc_entry: LrcIndexEntry },
     MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
     None,
 }

@@ -130,3 +130,43 @@ for the script to execute and increment the play count.
         ```
 
 </Steps>
+
+## Automatically fetch lyrics
+
+Provided by [wvffle on github](https://github.com/mierak/rmpc/issues/230)
+
+```bash
+#!/usr/bin/env bash
+
+if [ "$HAS_LRC" = "false" ]; then
+    LRCLIB_INSTANCE="https://lrclib.net"
+    LYRICS_DIR="$HOME/Music/lyrics"
+
+    LRC_FILE="$LYRICS_DIR/$ARTIST/$ALBUM/$LRC_DIR/$TITLE.lrc"
+    if [ -f "$LRC_FILE" ]; then
+        exit 0
+    fi
+
+    mkdir -p "$(dirname "$LRC_FILE")"
+
+    LYRICS="$(curl -X GET -sG \
+        --data-urlencode "artist_name=$ARTIST" \
+        --data-urlencode "track_name=$TITLE" \
+        --data-urlencode "album_name=$ALBUM" \
+        "$LRCLIB_INSTANCE/api/get" | jq -r '.syncedLyrics')"
+
+    if [ -z "$LYRICS" ] || [ "$LYRICS" == "null" ]; then
+        echo "Lyrics not found"
+        exit 1
+    fi
+
+    echo "[ar:$ARTIST]" >"$LRC_FILE"
+    {
+        echo "[al:$ALBUM]"
+        echo "[ti:$TITLE]"
+    } >>"$LRC_FILE"
+    echo "$LYRICS" | sed -E '/^\[(ar|al|ti):/d' >>"$LRC_FILE"
+
+    rmpc notify indexlrc --pid "$PID" --path "$LRC_FILE"
+fi
+```

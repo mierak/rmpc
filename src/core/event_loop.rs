@@ -138,7 +138,13 @@ fn main_task<B: Backend + std::io::Write>(
                     WorkDone::LyricsIndexed { index } => {
                         context.lrc_index = index;
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &context) {
-                            log::error!(error:? = err; "UI failed to lyrics indexed event");
+                            log::error!(error:? = err; "UI failed to handle lyrics indexed event");
+                        }
+                    }
+                    WorkDone::SingleLrcIndexed { lrc_entry } => {
+                        context.lrc_index.add(lrc_entry);
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &context) {
+                            log::error!(error:? = err; "UI failed to handle single lyrics indexed event");
                         }
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
@@ -175,6 +181,7 @@ fn main_task<B: Backend + std::io::Write>(
                             if let Some((_, song)) = context.find_current_song_in_queue() {
                                 if Some(song.id) != current_song_id {
                                     if let Some(command) = context.config.on_song_change {
+                                        let lrc = context.find_lrc().ok().flatten();
                                         let env = song
                                             .clone()
                                             .metadata
@@ -191,6 +198,14 @@ fn main_task<B: Backend + std::io::Write>(
                                                 "DURATION".to_owned(),
                                                 song.duration
                                                     .map_or_else(String::new, |d| d.to_string()),
+                                            )))
+                                            .chain(std::iter::once((
+                                                "PID".to_owned(),
+                                                std::process::id().to_string(),
+                                            )))
+                                            .chain(std::iter::once((
+                                                "HAS_LRC".to_owned(),
+                                                lrc.is_some().to_string(),
                                             )))
                                             .collect_vec();
                                         run_external(command, env);

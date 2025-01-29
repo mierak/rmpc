@@ -4,7 +4,7 @@ mod lyrics;
 use std::time::Duration;
 
 use anyhow::Context;
-pub use index::LrcIndex;
+pub use index::{LrcIndex, LrcIndexEntry};
 pub use lyrics::Lrc;
 
 fn parse_length(input: &str) -> anyhow::Result<Duration> {

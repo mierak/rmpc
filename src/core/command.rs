@@ -1,11 +1,11 @@
-use std::{io::Write, path::PathBuf};
+use std::{io::Write, os::unix::net::UnixStream, path::PathBuf};
 
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
 use crate::{
     config::{
-        cli::{Command, StickerCmd},
+        cli::{Command, NotifyCmd, StickerCmd},
         cli_config::CliConfig,
     },
     context::AppContext,
@@ -17,6 +17,7 @@ use crate::{
     shared::{
         lrc::LrcIndex,
         macros::{status_error, status_info},
+        socket::{IndexLrcCommand, SocketCommand, get_socket_path},
         ytdlp::YtDlp,
     },
 };
@@ -304,6 +305,17 @@ impl Command {
                     Ok(())
                 }))
             }
+            Command::Notify { command } => Ok(Box::new(move |_client| {
+                match command {
+                    NotifyCmd::IndexLrc { path, pid } => {
+                        let mut stream = UnixStream::connect(get_socket_path(pid))?;
+                        let cmd = SocketCommand::IndexLrc(IndexLrcCommand { path });
+                        let cmd = serde_json::to_string(&cmd)?;
+                        stream.write_all(cmd.as_bytes())?;
+                    }
+                }
+                Ok(())
+            })),
         }
     }
 }
@@ -369,6 +381,7 @@ pub fn create_env<'a>(
     if let Some((_, current)) = context.find_current_song_in_queue() {
         result.push(("CURRENT_SONG", current.file.clone()));
     }
+    result.push(("PID", std::process::id().to_string()));
 
     let songs =
         selected_songs_paths.into_iter().enumerate().fold(String::new(), |mut acc, (idx, val)| {
