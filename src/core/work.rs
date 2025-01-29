@@ -51,11 +51,7 @@ fn handle_work_request(
             Ok(WorkDone::LyricsIndexed { index })
         }
         WorkRequest::IndexSingleLrc { path } => {
-            if let Some(lrc_entry) = LrcIndex::index_single(path)? {
-                Ok(WorkDone::SingleLrcIndexed { lrc_entry })
-            } else {
-                Ok(WorkDone::None)
-            }
+            Ok(WorkDone::SingleLrcIndexed { lrc_entry: LrcIndex::index_single(path)? })
         }
     }
 }

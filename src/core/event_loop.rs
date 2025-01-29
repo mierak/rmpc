@@ -143,7 +143,9 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                     }
                     WorkDone::SingleLrcIndexed { lrc_entry } => {
-                        context.lrc_index.add(lrc_entry);
+                        if let Some(lrc_entry) = lrc_entry {
+                            context.lrc_index.add(lrc_entry);
+                        }
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &context) {
                             log::error!(error:? = err; "UI failed to handle single lyrics indexed event");
                         }

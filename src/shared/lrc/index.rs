@@ -60,7 +60,6 @@ impl LrcIndex {
             log::trace!(path:?; "skipping non lrc file");
             return Ok(None);
         }
-        log::debug!("not skipping {path:?}");
         let file = std::fs::File::open(&path).context("failed to open entry file")?;
 
         log::trace!(file:?, entry:? = path; "Trying to index lyrics entry");

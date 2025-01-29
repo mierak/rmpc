@@ -40,7 +40,7 @@ pub(crate) enum WorkRequest {
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
     LyricsIndexed { index: LrcIndex },
-    SingleLrcIndexed { lrc_entry: LrcIndexEntry },
+    SingleLrcIndexed { lrc_entry: Option<LrcIndexEntry> },
     MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
     None,
 }
