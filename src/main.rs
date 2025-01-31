@@ -25,6 +25,7 @@ use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
+use shared::socket::{get_socket_path, list_all_socket_paths};
 
 use crate::{
     config::{
@@ -37,7 +38,7 @@ use crate::{
         env::ENV,
         events::{AppEvent, ClientRequest, WorkRequest},
         logging,
-        macros::{status_warn, try_ret},
+        macros::status_warn,
         mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
         tmux,
     },
@@ -142,6 +143,21 @@ fn main() -> Result<()> {
                 option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
             );
         }
+        Some(Command::Remote { command, pid }) => {
+            if let Some(pid) = pid {
+                let path = get_socket_path(pid);
+                command.write_to_socket(&path)?;
+                eprintln!("Successfully sent remote command to {path:?}");
+            } else {
+                for path in list_all_socket_paths()? {
+                    if let Err(err) = command.clone().write_to_socket(&path) {
+                        eprintln!("Failed to send remote command. Error: '{err:?}'");
+                        continue;
+                    }
+                    eprintln!("Successfully sent remote command to {path:?}");
+                }
+            }
+        }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");
             let config: CliConfigFile = match CliConfigFile::read(&args.config) {
@@ -183,36 +199,31 @@ fn main() -> Result<()> {
             };
 
             if let Some(lyrics_dir) = config.lyrics_dir {
-                try_ret!(
-                    worker_tx.send(WorkRequest::IndexLyrics { lyrics_dir }),
-                    "Failed to request lyrics indexing"
-                );
+                worker_tx
+                    .send(WorkRequest::IndexLyrics { lyrics_dir })
+                    .context("Failed to request lyrics indexing")?;
             }
-            try_ret!(event_tx.send(AppEvent::RequestRender), "Failed to render first frame");
+            event_tx.send(AppEvent::RequestRender).context("Failed to render first frame")?;
 
-            let mut client = try_ret!(
-                Client::init(config.address, config.password, "command"),
-                "Failed to connect to MPD"
-            );
+            let mut client = Client::init(config.address, config.password, "command")
+                .context("Failed to connect to MPD")?;
             client.set_read_timeout(Some(config.mpd_read_timeout))?;
             client.set_write_timeout(Some(config.mpd_write_timeout))?;
 
             let tx_clone = event_tx.clone();
 
-            let context = try_ret!(
-                AppContext::try_new(
-                    &mut client,
-                    config,
-                    tx_clone,
-                    worker_tx.clone(),
-                    client_tx.clone(),
-                    Scheduler::new((event_tx.clone(), client_tx.clone())),
-                ),
-                "Failed to create app context"
-            );
+            let context = AppContext::try_new(
+                &mut client,
+                config,
+                tx_clone,
+                worker_tx.clone(),
+                client_tx.clone(),
+                Scheduler::new((event_tx.clone(), client_tx.clone())),
+            )
+            .context("Failed to create app context")?;
 
             let enable_mouse = context.config.enable_mouse;
-            let terminal = try_ret!(ui::setup_terminal(enable_mouse), "Failed to setup terminal");
+            let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
 
             core::client::init(client_rx.clone(), event_tx.clone(), client, context.config)?;
             core::work::init(
@@ -222,6 +233,9 @@ fn main() -> Result<()> {
                 context.config,
             )?;
             core::input::init(event_tx.clone())?;
+            let _sock_guard =
+                core::socket::init(event_tx.clone(), worker_tx.clone(), context.config)
+                    .context("Failed to initialize socket listener")?;
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();
@@ -235,10 +249,9 @@ fn main() -> Result<()> {
             info!("Application initialized successfully");
 
             let mut terminal = event_loop_handle.join().expect("event loop to not panic");
-            try_ret!(
-                ui::restore_terminal(&mut terminal, enable_mouse),
-                "Terminal restore to succeed"
-            );
+
+            ui::restore_terminal(&mut terminal, enable_mouse)
+                .context("Terminal restore to succeed")?;
         }
     }
 

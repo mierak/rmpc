@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet, ops::AddAssign, path::PathBuf};
+use std::{cell::Cell, collections::HashSet, ops::AddAssign};
 
 use anyhow::{Result, bail};
 use bon::bon;
@@ -19,7 +19,7 @@ use crate::{
     },
     shared::{
         events::ClientRequest,
-        lrc::{Lrc, LrcIndex},
+        lrc::{Lrc, LrcIndex, get_lrc_path},
         macros::status_warn,
         mpd_query::MpdQuerySync,
     },
@@ -173,15 +173,7 @@ impl AppContext {
             return Ok(None);
         };
 
-        let mut path: PathBuf = PathBuf::from(lyrics_dir);
-        path.push(&song.file);
-        let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy()))
-        else {
-            bail!("No file stem for lyrics path: {path:?}");
-        };
-
-        path.pop();
-        path.push(stem);
+        let path = get_lrc_path(lyrics_dir, &song.file)?;
         log::debug!(path:?; "getting lrc at path");
         match std::fs::read_to_string(&path) {
             Ok(lrc) => return Ok(Some(lrc.parse()?)),

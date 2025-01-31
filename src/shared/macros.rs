@@ -1,15 +1,3 @@
-macro_rules! try_ret {
-        ( $e:expr, $msg:literal ) => {
-            match $e {
-                Ok(x) => x,
-                Err(e) => {
-                    log::error!(error:? = e; $msg);
-                    return Err(anyhow::anyhow!("Message: '{}', inner error: '{:?}'", $msg, e))
-                },
-            }
-        };
-    }
-
 macro_rules! try_cont {
         ( $e:expr, $msg:literal ) => {
             match $e {
@@ -94,5 +82,4 @@ pub(crate) use status_info;
 pub(crate) use status_warn;
 pub(crate) use try_break;
 pub(crate) use try_cont;
-pub(crate) use try_ret;
 pub(crate) use try_skip;

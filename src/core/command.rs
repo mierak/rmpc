@@ -27,6 +27,11 @@ impl Command {
         config: &'static CliConfig,
     ) -> Result<Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static>> {
         match self {
+            Command::Config { .. } => bail!("Cannot use config command here."),
+            Command::Theme { .. } => bail!("Cannot use theme command here."),
+            Command::Version => bail!("Cannot use version command here."),
+            Command::DebugInfo => bail!("Cannot use debuginfo command here."),
+            Command::Remote { .. } => bail!("Cannot use remote command here."),
             Command::Update { ref mut path, wait } | Command::Rescan { ref mut path, wait } => {
                 let path = path.take();
                 Ok(Box::new(move |client| {
@@ -179,10 +184,6 @@ impl Command {
                 println!("{}", serde_json::ser::to_string(&client.outputs()?)?);
                 Ok(())
             })),
-            Command::Config { .. } => bail!("Cannot use config command here."),
-            Command::Theme { .. } => bail!("Cannot use theme command here."),
-            Command::Version => bail!("Cannot use version command here."),
-            Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::ToggleOutput { id } => {
                 Ok(Box::new(move |client| Ok(client.toggle_output(id)?)))
             }
@@ -369,6 +370,7 @@ pub fn create_env<'a>(
     if let Some((_, current)) = context.find_current_song_in_queue() {
         result.push(("CURRENT_SONG", current.file.clone()));
     }
+    result.push(("PID", std::process::id().to_string()));
 
     let songs =
         selected_songs_paths.into_iter().enumerate().fold(String::new(), |mut acc, (idx, val)| {
@@ -382,6 +384,7 @@ pub fn create_env<'a>(
     if !songs.is_empty() {
         result.push(("SELECTED_SONGS", songs));
     }
+    result.push(("VERSION", env!("CARGO_PKG_VERSION").to_string()));
 
     result.push(("STATE", context.status.state.to_string()));
 

@@ -1,15 +1,18 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use crossterm::event::KeyEvent;
+use serde::{Deserialize, Serialize};
 
 use super::{
-    lrc::LrcIndex,
+    lrc::{LrcIndex, LrcIndexEntry},
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
 use crate::{
     config::{cli::Command, tabs::PaneType},
     mpd::commands::IdleEvent,
-    ui::{Level, UiAppEvent},
+    ui::UiAppEvent,
 };
 
 #[derive(Debug)]
@@ -23,7 +26,13 @@ pub(crate) enum ClientRequest {
 #[derive(Debug)]
 #[allow(unused)]
 pub(crate) enum WorkRequest {
-    IndexLyrics { lyrics_dir: &'static str },
+    IndexLyrics {
+        lyrics_dir: &'static str,
+    },
+    IndexSingleLrc {
+        /// Absolute path to the lrc file
+        path: PathBuf,
+    },
     Command(Command),
 }
 
@@ -31,6 +40,7 @@ pub(crate) enum WorkRequest {
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
     LyricsIndexed { index: LrcIndex },
+    SingleLrcIndexed { lrc_entry: Option<LrcIndexEntry> },
     MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
     None,
 }
@@ -48,4 +58,14 @@ pub(crate) enum AppEvent {
     UiEvent(UiAppEvent),
     Reconnected,
     LostConnection,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]
+#[allow(dead_code)]
+pub enum Level {
+    Trace,
+    Debug,
+    Warn,
+    Error,
+    Info,
 }

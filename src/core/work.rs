@@ -50,5 +50,8 @@ fn handle_work_request(
             let index = LrcIndex::index(&PathBuf::from(lyrics_dir));
             Ok(WorkDone::LyricsIndexed { index })
         }
+        WorkRequest::IndexSingleLrc { path } => {
+            Ok(WorkDone::SingleLrcIndexed { lrc_entry: LrcIndex::index_single(path)? })
+        }
     }
 }
