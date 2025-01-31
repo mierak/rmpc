@@ -16,23 +16,16 @@
     unused_macros
 )]
 use core::scheduler::Scheduler;
-use std::{
-    io::{Read, Write},
-    os::unix::net::UnixStream,
-};
+use std::io::{Read, Write};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::{
-    Leak,
-    cli::{Level, NotifyCmd},
-    cli_config::CliConfigFile,
-};
+use config::{Leak, cli_config::CliConfigFile};
 use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
-use shared::socket::{IndexLrcCommand, SocketCommand, StatusMessageCommand, get_socket_path};
+use shared::socket::{get_socket_path, list_all_socket_paths};
 
 use crate::{
     config::{
@@ -151,23 +144,19 @@ fn main() -> Result<()> {
             );
         }
         Some(Command::Remote { command, pid }) => {
-            let mut stream = UnixStream::connect(get_socket_path(pid))?;
-            let cmd = match command {
-                NotifyCmd::IndexLrc { path } => SocketCommand::IndexLrc(IndexLrcCommand { path }),
-                NotifyCmd::Status { message, level } => {
-                    SocketCommand::StatusMessage(StatusMessageCommand {
-                        level: match level {
-                            Level::Info => crate::shared::events::Level::Info,
-                            Level::Error => crate::shared::events::Level::Error,
-                            Level::Warn => crate::shared::events::Level::Warn,
-                        },
-                        message,
-                    })
+            if let Some(pid) = pid {
+                let path = get_socket_path(pid);
+                command.write_to_socket(&path)?;
+                eprintln!("Successfully sent remote command to {path:?}");
+            } else {
+                for path in list_all_socket_paths()? {
+                    if let Err(err) = command.clone().write_to_socket(&path) {
+                        eprintln!("Failed to send remote command. Error: '{err:?}'");
+                        continue;
+                    }
+                    eprintln!("Successfully sent remote command to {path:?}");
                 }
-            };
-
-            let cmd = serde_json::to_string(&cmd)?;
-            stream.write_all(cmd.as_bytes())?;
+            }
         }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");

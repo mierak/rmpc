@@ -384,6 +384,7 @@ pub fn create_env<'a>(
     if !songs.is_empty() {
         result.push(("SELECTED_SONGS", songs));
     }
+    result.push(("VERSION", env!("CARGO_PKG_VERSION").to_string()));
 
     result.push(("STATE", context.status.state.to_string()));
 

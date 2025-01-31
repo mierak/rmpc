@@ -10,12 +10,20 @@ import { path } from "../data.ts";
 
 Rmpc provides <a href={path("configuration#on_song_change")}>on_song_change</a> property in the config file
 which can be used to run a command whenever the song changes. This can be used for various purposes
-like showing a desktop notification.
+like showing a desktop notification, automatic lyrics download and more.
+
+All song metadata are available to the script as environment variables. For example `$TITLE`, `$FILE`, `$DURATION`, etc.
+
+Additional environment variables available to the script are:
+
+- `$VERSION` - rmpc's version
+- `$PID` - intended for use with the `remote` command and allows it to target specific rmpc instance
+- `$LRC_FILE` - contains the path where rmpc expects to find the lrc file
+- `$HAS_LRC` - indicates whether any lyrics were found for the current song.
 
 ## Desktop notification on song change
 
 Assuming you have a notification daemon with support for images like [dunst](https://dunst-project.org/) running.
-All song metadata are available to the script as environment variables. For example `$TITLE`, `$FILE`, `$DURATION`, etc.
 
 <Steps>
 1. Create a script and place it somewhere. For example `~/.config/rmpc/notify`. Below is an example of such script.
@@ -133,7 +141,10 @@ for the script to execute and increment the play count.
 
 ## Automatically fetch lyrics
 
-Provided by [wvffle on github](https://github.com/mierak/rmpc/issues/230)
+Provided by [wvffle on github](https://github.com/mierak/rmpc/issues/230). This script allows you to automatically
+download lrc files from [lrclib.net](https://lrclib.net). Status message is also displayed in rmpc when the operation
+finishes. The script assumes you have your `lyrics_dir` configured. The script is just an example and you are encouraged
+to create your own!
 
 ```bash
 #!/bin/env sh
@@ -144,6 +155,7 @@ if [ "$HAS_LRC" = "false" ]; then
     mkdir -p "$(dirname "$LRC_FILE")"
 
     LYRICS="$(curl -X GET -sG \
+        -H "Lrclib-Client: rmpc-$VERSION" \
         --data-urlencode "artist_name=$ARTIST" \
         --data-urlencode "track_name=$TITLE" \
         --data-urlencode "album_name=$ALBUM" \

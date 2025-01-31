@@ -211,6 +211,10 @@ fn main_task<B: Backend + std::io::Write>(
                                         env.push(("PID".to_owned(), pid.to_string()));
                                         env.push(("HAS_LRC".to_owned(), lrc.is_some().to_string()));
                                         env.push(("LRC_FILE".to_owned(), lrc_path));
+                                        env.push((
+                                            "VERSION".to_owned(),
+                                            env!("CARGO_PKG_VERSION").to_string(),
+                                        ));
                                         run_external(command, env);
                                     }
                                     song_changed = true;

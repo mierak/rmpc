@@ -161,9 +161,12 @@ pub enum Command {
         #[command(subcommand)]
         cmd: StickerCmd,
     },
+    /// Send a remote command to running rmpc instance
     Remote {
+        /// PID of the rmpc instance to send the remote command to. If not
+        /// provided, rmpc will try to notify all the running instances.
         #[arg(long)]
-        pid: u32,
+        pid: Option<u32>,
         #[command(subcommand)]
         command: NotifyCmd,
     },
@@ -172,14 +175,19 @@ pub enum Command {
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
 pub enum NotifyCmd {
+    /// Notify rmpc that a new lyrics file has been added
     IndexLrc {
         /// Absolute path to the lrc file
         #[arg(short, long)]
         path: PathBuf,
     },
+    /// Display a message in the status bar
     Status {
+        /// Message to display in the status bar
         message: String,
+        /// Controls the color of the message in the status bar
         #[arg(short, long)]
+        #[clap(value_enum, default_value_t = Level::Info)]
         level: Level,
     },
 }

@@ -48,6 +48,7 @@ pub(crate) fn init(
 }
 
 /// The guard handles deletion of the unix domain socket upon dropping
+#[must_use]
 pub struct SocketGuard(PathBuf);
 impl Drop for SocketGuard {
     fn drop(&mut self) {
