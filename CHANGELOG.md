@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - Added new `layout` config option which allows to move around the base components
 - `PageUp` and `PageDown` actions
 - Configurable timeout for connection to MPD
+- `$PID`, `$VERSION` to external commands
+- `$HAS_LRC`, `$LRC_PATH` to `on_song_change`
+- `remote` command to cli which allows for IPC with running rmpc instances
+- Example script to automatically download lyrics from [https://lrclib.net/](https://lrclib.net/)
 
 ### Changed
 
@@ -23,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - CLI now parses only the required part of the config
 - Status messages will now disappar automatically even when idle
 - Lyrics should now sync better because they are now scheduled precisely instead of periodically
+- MSRV to 1.82
 
 ### Fixed
 
