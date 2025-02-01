@@ -20,6 +20,11 @@
     borders_style: (fg: "blue"),
     highlight_border_style: (fg: "blue"),
     symbols: (song: "S", dir: "D", marker: "M", ellipsis: "..."),
+    playback_state: (
+        play_label: "Playing",
+        paused_label: "Paused",
+        stopped_label: "Stopped",
+    ),
     progress_bar: (
         symbols: ["-", ">", " "],
         track_style: (fg: "#1e2030"),
