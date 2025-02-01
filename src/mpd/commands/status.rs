@@ -4,7 +4,10 @@ use anyhow::anyhow;
 use serde::Serialize;
 
 use super::Volume;
-use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
+use crate::{
+    config::theme::PlaybackStateConfig,
+    mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError},
+};
 
 #[derive(Debug, Serialize, Default, Clone)]
 pub struct Status {
@@ -85,15 +88,22 @@ impl FromMpd for Status {
     }
 }
 
-#[derive(Debug, Serialize, Default, PartialEq, Clone, Copy, strum::AsRefStr)]
+#[derive(Debug, Serialize, Default, PartialEq, Clone, Copy)]
 pub enum State {
-    #[strum(serialize = "Playing")]
     Play,
     #[default]
-    #[strum(serialize = "Stopped")]
     Stop,
-    #[strum(serialize = "Paused")]
     Pause,
+}
+
+impl State {
+    pub fn as_str(self, config: &PlaybackStateConfig) -> &'static str {
+        match self {
+            State::Play => config.play_label,
+            State::Stop => config.stopped_label,
+            State::Pause => config.paused_label,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Default, Clone, Copy, strum::AsRefStr)]

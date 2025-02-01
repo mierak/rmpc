@@ -28,6 +28,7 @@ use super::{UiEvent, widgets::volume::Volume};
 use crate::{
     MpdQueryResult,
     config::{
+        Config,
         keys::CommonAction,
         tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
         theme::{
@@ -647,14 +648,16 @@ impl Property<'static, PropertyKind> {
         &self,
         song: Option<&'song Song>,
         status: &'song Status,
+        config: &Config,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        self.default.and_then(|p| p.as_span(song, status))
+        self.default.and_then(|p| p.as_span(song, status, config))
     }
 
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
         status: &'song Status,
+        config: &Config,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
@@ -665,23 +668,24 @@ impl Property<'static, PropertyKind> {
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
-                    self.default_as_span(song, status)
+                    self.default_as_span(song, status, config)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
                     song.format(property).map_or_else(
-                        || self.default_as_span(Some(song), status),
+                        || self.default_as_span(Some(song), status, config),
                         |s| Some(Either::Left(Span::styled(s, style))),
                     )
                 } else {
-                    self.default_as_span(song, status)
+                    self.default_as_span(song, status, config)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
-                StatusProperty::State => {
-                    Some(Either::Left(Span::styled(status.state.as_ref(), style)))
-                }
+                StatusProperty::State => Some(Either::Left(Span::styled(
+                    status.state.as_str(&config.theme.playback_state),
+                    style,
+                ))),
                 StatusProperty::Duration => {
                     Some(Either::Left(Span::styled(status.duration.to_string(), style)))
                 }
@@ -706,11 +710,11 @@ impl Property<'static, PropertyKind> {
                     Some(Either::Left(Span::styled(status.single.to_string(), style)))
                 }
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
+                    || self.default_as_span(song, status, config),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
+                    || self.default_as_span(song, status, config),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
             },
@@ -742,7 +746,7 @@ impl Property<'static, PropertyKind> {
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
                 for format in *group {
-                    match format.as_span(song, status) {
+                    match format.as_span(song, status, config) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
                         None => return None,
@@ -862,7 +866,14 @@ mod format_tests {
 
         use super::*;
         use crate::{
-            config::theme::properties::{PropertyKind, StatusProperty},
+            config::{
+                Config,
+                theme::{
+                    PlaybackStateConfig,
+                    PlaybackStateConfigFile,
+                    properties::{PropertyKind, StatusProperty},
+                },
+            },
             mpd::commands::{State, Status, Volume, status::OnOffOneshot},
         };
 
@@ -939,11 +950,43 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_span(Some(&song), &status);
+            let result = format.as_span(Some(&song), &status, &Config::default());
 
             assert_eq!(
                 result,
                 Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[test_case(PlaybackStateConfigFile { play_label: String::from("otherplay"), ..Default::default() }, State::Play, "otherplay")]
+        #[test_case(PlaybackStateConfigFile { paused_label: String::from("otherpaused"), ..Default::default() }, State::Pause, "otherpaused")]
+        #[test_case(PlaybackStateConfigFile { stopped_label: String::from("otherstopped"), ..Default::default() }, State::Stop, "otherstopped")]
+        #[test_case(PlaybackStateConfigFile {  ..Default::default() }, State::Play, "Playing")]
+        #[test_case(PlaybackStateConfigFile {  ..Default::default() }, State::Pause, "Paused")]
+        #[test_case(PlaybackStateConfigFile {  ..Default::default() }, State::Stop, "Stopped")]
+        fn playback_state_label_is_correct(
+            state_config: PlaybackStateConfigFile,
+            state: State,
+            expected_label: &str,
+        ) {
+            dbg!(&state_config);
+            let state_config: PlaybackStateConfig = state_config.into();
+            let format = Property::<'static, PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(StatusProperty::State)),
+                style: None,
+                default: None,
+            };
+            let mut config = Config::default();
+            config.theme.playback_state = state_config;
+
+            let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
+            let status = Status { state, ..Default::default() };
+
+            let result = format.as_span(Some(&song), &status, &config);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected_label)))
             );
         }
     }

@@ -7,7 +7,10 @@ use ratatui::{
 };
 
 use crate::{
-    config::theme::properties::{Property, PropertyKind},
+    config::{
+        Config,
+        theme::properties::{Property, PropertyKind},
+    },
     context::AppContext,
     mpd::commands::{Song, Status},
 };
@@ -38,15 +41,15 @@ impl Widget for Header<'_> {
                 return;
             };
             let template = PropertyTemplates(config.theme.header.rows[row].left);
-            let widget = template.format(song, &self.context.status).left_aligned();
+            let widget = template.format(song, &self.context.status, config).left_aligned();
             widget.render(left, buf);
 
             let template = PropertyTemplates(config.theme.header.rows[row].center);
-            let widget = template.format(song, &self.context.status).centered();
+            let widget = template.format(song, &self.context.status, config).centered();
             widget.render(center, buf);
 
             let template = PropertyTemplates(config.theme.header.rows[row].right);
-            let widget = template.format(song, &self.context.status).right_aligned();
+            let widget = template.format(song, &self.context.status, config).right_aligned();
             widget.render(right, buf);
         }
     }
@@ -54,9 +57,9 @@ impl Widget for Header<'_> {
 
 struct PropertyTemplates<'a>(&'a [&'a Property<'static, PropertyKind>]);
 impl<'a> PropertyTemplates<'a> {
-    fn format(&'a self, song: Option<&'a Song>, status: &'a Status) -> Line<'a> {
+    fn format(&'a self, song: Option<&'a Song>, status: &'a Status, config: &Config) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
-            match val.as_span(song, status) {
+            match val.as_span(song, status, config) {
                 Some(Either::Left(span)) => acc.push(span),
                 Some(Either::Right(ref mut spans)) => acc.append(spans),
                 None => {}
