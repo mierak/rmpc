@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - `remote` command to cli which allows for IPC with running rmpc instances
 - Example script to automatically download lyrics from [https://lrclib.net/](https://lrclib.net/)
 - Added `max_fps` to config
+- Introduced `StateV2` property as a replacement for `State`. It has additional config properties compared to its predecesor.
 
 ### Changed
 
@@ -46,6 +47,7 @@ All notable changes to this project will be documented in this file.
 ### Deprecated
 
 - `theme.tab_bar.enabled` replaced by layout configuration
+- `State` header property
 
 ## [0.7.0] - 2024-12-24
 
