@@ -47,6 +47,7 @@ pub struct Config {
     pub cache_dir: Option<&'static str>,
     pub lyrics_dir: Option<&'static str>,
     pub volume_step: u8,
+    pub max_fps: u32,
     pub scrolloff: usize,
     pub wrap_navigation: bool,
     pub keybinds: KeyConfig,
@@ -78,6 +79,8 @@ pub struct ConfigFile {
     pub theme: Option<String>,
     #[serde(default = "defaults::default_volume_step")]
     volume_step: u8,
+    #[serde(default = "defaults::default_max_fps")]
+    pub max_fps: u32,
     #[serde(default = "defaults::default_scrolloff")]
     scrolloff: usize,
     #[serde(default = "defaults::default_false")]
@@ -132,6 +135,7 @@ impl Default for ConfigFile {
             status_update_interval_ms: Some(1000),
             mpd_write_timeout_ms: 5000,
             mpd_read_timeout_ms: 10_000,
+            max_fps: 30,
             theme: None,
             cache_dir: None,
             lyrics_dir: None,
@@ -223,6 +227,7 @@ impl ConfigFile {
             address,
             password,
             volume_step: self.volume_step,
+            max_fps: self.max_fps,
             scrolloff: self.scrolloff,
             wrap_navigation: self.wrap_navigation,
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),

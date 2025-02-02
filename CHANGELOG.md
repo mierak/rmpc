@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - `$HAS_LRC`, `$LRC_PATH` to `on_song_change`
 - `remote` command to cli which allows for IPC with running rmpc instances
 - Example script to automatically download lyrics from [https://lrclib.net/](https://lrclib.net/)
+- Added `max_fps` to config
 
 ### Changed
 
