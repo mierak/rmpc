@@ -107,6 +107,14 @@ Keybinds to use. The default keybinds are used if this property is absent. More 
 
 Determines the step when changing volume with the volume up and down keybinds. Default is 5%.
 
+### max_fps
+
+<ConfigValue name="max_fps" type="number" />
+
+Rmpc batches rendered frames to save resources, meaning it could skip a render on input and make the frame
+a bit delayed if many frames are requested at the same time. This option sets how many frames rmpc can render
+in one second. Default is `30`.
+
 ### scrolloff
 
 <ConfigValue name="scrolloff" type="number" />

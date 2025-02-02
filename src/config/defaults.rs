@@ -15,6 +15,10 @@ pub fn default_volume_step() -> u8 {
     5
 }
 
+pub fn default_max_fps() -> u32 {
+    30
+}
+
 pub fn default_scrolloff() -> usize {
     0
 }

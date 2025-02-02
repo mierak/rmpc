@@ -8,6 +8,7 @@
     cache_dir: None,
     on_song_change: None,
     volume_step: 5,
+    max_fps: 30,
     scrolloff: 0,
     wrap_navigation: false,
     enable_mouse: true,
