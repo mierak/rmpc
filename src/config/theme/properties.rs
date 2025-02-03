@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use strum::Display;
 
 use super::style::ToConfigOr;
-use crate::config::{Leak, theme::StyleFile};
+use crate::config::{Leak, defaults, theme::StyleFile};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
@@ -32,7 +32,7 @@ pub enum SongProperty {
     Other(&'static str),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum StatusPropertyFile {
     Volume,
     Repeat,
@@ -40,6 +40,14 @@ pub enum StatusPropertyFile {
     Single,
     Consume,
     State,
+    StateV2 {
+        #[serde(default = "defaults::default_playing_label")]
+        playing_label: String,
+        #[serde(default = "defaults::default_paused_label")]
+        paused_label: String,
+        #[serde(default = "defaults::default_stopped_label")]
+        stopped_label: String,
+    },
     Elapsed,
     Duration,
     Crossfade,
@@ -53,7 +61,7 @@ pub enum StatusProperty {
     Random,
     Single,
     Consume,
-    State,
+    State { playing_label: &'static str, paused_label: &'static str, stopped_label: &'static str },
     Elapsed,
     Duration,
     Crossfade,
@@ -169,7 +177,20 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
 
     fn try_from(value: StatusPropertyFile) -> Result<Self, Self::Error> {
         Ok(match value {
-            StatusPropertyFile::State => StatusProperty::State,
+            StatusPropertyFile::StateV2 {
+                playing_label: play_label,
+                paused_label: pause_label,
+                stopped_label: stop_label,
+            } => StatusProperty::State {
+                playing_label: play_label.leak(),
+                paused_label: pause_label.leak(),
+                stopped_label: stop_label.leak(),
+            },
+            StatusPropertyFile::State => StatusProperty::State {
+                playing_label: defaults::default_playing_label().leak(),
+                paused_label: defaults::default_paused_label().leak(),
+                stopped_label: defaults::default_stopped_label().leak(),
+            },
             StatusPropertyFile::Duration => StatusProperty::Duration,
             StatusPropertyFile::Elapsed => StatusProperty::Elapsed,
             StatusPropertyFile::Volume => StatusProperty::Volume,

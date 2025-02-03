@@ -28,43 +28,6 @@ use super::{
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(Debug, Default, Clone)]
-pub struct PlaybackStateConfig {
-    pub(crate) play_label: &'static str,
-    pub(crate) paused_label: &'static str,
-    pub(crate) stopped_label: &'static str,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct PlaybackStateConfigFile {
-    #[serde(default = "defaults::default_playing_label")]
-    pub(crate) play_label: String,
-    #[serde(default = "defaults::default_paused_label")]
-    pub(crate) paused_label: String,
-    #[serde(default = "defaults::default_stopped_label")]
-    pub(crate) stopped_label: String,
-}
-
-impl Default for PlaybackStateConfigFile {
-    fn default() -> Self {
-        Self {
-            play_label: defaults::default_playing_label(),
-            paused_label: defaults::default_paused_label(),
-            stopped_label: defaults::default_stopped_label(),
-        }
-    }
-}
-
-impl From<PlaybackStateConfigFile> for PlaybackStateConfig {
-    fn from(value: PlaybackStateConfigFile) -> Self {
-        Self {
-            play_label: value.play_label.leak(),
-            paused_label: value.paused_label.leak(),
-            stopped_label: value.stopped_label.leak(),
-        }
-    }
-}
-
 #[derive(Default, Clone)]
 pub struct UiConfig {
     pub draw_borders: bool,
@@ -87,7 +50,6 @@ pub struct UiConfig {
     pub header: HeaderConfig,
     pub default_album_art: &'static [u8],
     pub layout: SizedPaneOrSplit,
-    pub playback_state: PlaybackStateConfig,
 }
 
 impl std::fmt::Debug for UiConfig {
@@ -142,8 +104,6 @@ pub struct UiConfigFile {
     pub(super) default_album_art_path: Option<String>,
     #[serde(default)]
     pub(super) layout: PaneOrSplitFile,
-    #[serde(default)]
-    pub(super) playback_state: PlaybackStateConfigFile,
 }
 
 impl Default for UiConfigFile {
@@ -190,7 +150,6 @@ impl Default for UiConfigFile {
             browser_column_widths: vec![20, 38, 42],
             progress_bar: ProgressBarConfigFile::default(),
             scrollbar: ScrollbarConfigFile::default(),
-            playback_state: PlaybackStateConfigFile::default(),
             symbols: SymbolsFile {
                 song: "S".to_owned(),
                 dir: "D".to_owned(),
@@ -274,7 +233,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
             progress_bar: value.progress_bar.into_config()?,
-            playback_state: value.playback_state.into(),
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?
                 .0
                 .leak(),

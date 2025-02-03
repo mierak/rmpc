@@ -20,11 +20,6 @@
     borders_style: (fg: "blue"),
     highlight_border_style: (fg: "blue"),
     symbols: (song: "S", dir: "D", marker: "M", ellipsis: "..."),
-    playback_state: (
-        play_label: "Playing",
-        paused_label: "Paused",
-        stopped_label: "Stopped",
-    ),
     progress_bar: (
         symbols: ["-", ">", " "],
         track_style: (fg: "#1e2030"),
@@ -90,7 +85,7 @@
             (
                 left: [
                     (kind: Text("["), style: (fg: "yellow", modifiers: "Bold")),
-                    (kind: Property(Status(State)), style: (fg: "yellow", modifiers: "Bold")),
+                    (kind: Property(Status(StateV2(play_label: "Playing", pause_label: "Paused", stop_label: "Stopped"))), style: (fg: "yellow", modifiers: "Bold")),
                     (kind: Text("]"), style: (fg: "yellow", modifiers: "Bold"))
                 ],
                 center: [
