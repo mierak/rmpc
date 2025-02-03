@@ -63,3 +63,15 @@ pub fn default_paused_label() -> String {
 pub fn default_stopped_label() -> String {
     "Stopped".to_string()
 }
+
+pub fn default_on_label() -> String {
+    "On".to_string()
+}
+
+pub fn default_off_label() -> String {
+    "Off".to_string()
+}
+
+pub fn default_oneshot_label() -> String {
+    "OS".to_string()
+}

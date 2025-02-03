@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 - Example script to automatically download lyrics from [https://lrclib.net/](https://lrclib.net/)
 - Added `max_fps` to config
 - Introduced `StateV2` property as a replacement for `State`. It has additional config properties compared to its predecesor.
+- Introduced `RandomV2`, `ConsumeV2`, `RepeatV2` and `SingleV2` properties as a replacement for their respective earlier versions.
+They have additional config properties compared to their predecesors.
 
 ### Changed
 
@@ -48,6 +50,7 @@ All notable changes to this project will be documented in this file.
 
 - `theme.tab_bar.enabled` replaced by layout configuration
 - `State` header property
+- `RandomV2`, `ConsumeV2`, `RepeatV2` and `SingleV2` header properties
 
 ## [0.7.0] - 2024-12-24
 
