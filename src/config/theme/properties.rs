@@ -40,6 +40,34 @@ pub enum StatusPropertyFile {
     Single,
     Consume,
     State,
+    RepeatV2 {
+        #[serde(default = "defaults::default_on_label")]
+        on_label: String,
+        #[serde(default = "defaults::default_off_label")]
+        off_label: String,
+    },
+    RandomV2 {
+        #[serde(default = "defaults::default_on_label")]
+        on_label: String,
+        #[serde(default = "defaults::default_off_label")]
+        off_label: String,
+    },
+    SingleV2 {
+        #[serde(default = "defaults::default_on_label")]
+        on_label: String,
+        #[serde(default = "defaults::default_off_label")]
+        off_label: String,
+        #[serde(default = "defaults::default_oneshot_label")]
+        oneshot_label: String,
+    },
+    ConsumeV2 {
+        #[serde(default = "defaults::default_on_label")]
+        on_label: String,
+        #[serde(default = "defaults::default_off_label")]
+        off_label: String,
+        #[serde(default = "defaults::default_oneshot_label")]
+        oneshot_label: String,
+    },
     StateV2 {
         #[serde(default = "defaults::default_playing_label")]
         playing_label: String,
@@ -57,10 +85,10 @@ pub enum StatusPropertyFile {
 #[derive(Debug, Clone, Display)]
 pub enum StatusProperty {
     Volume,
-    Repeat,
-    Random,
-    Single,
-    Consume,
+    Repeat { on_label: &'static str, off_label: &'static str },
+    Random { on_label: &'static str, off_label: &'static str },
+    Single { on_label: &'static str, off_label: &'static str, oneshot_label: &'static str },
+    Consume { on_label: &'static str, off_label: &'static str, oneshot_label: &'static str },
     State { playing_label: &'static str, paused_label: &'static str, stopped_label: &'static str },
     Elapsed,
     Duration,
@@ -194,12 +222,46 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             StatusPropertyFile::Duration => StatusProperty::Duration,
             StatusPropertyFile::Elapsed => StatusProperty::Elapsed,
             StatusPropertyFile::Volume => StatusProperty::Volume,
-            StatusPropertyFile::Repeat => StatusProperty::Repeat,
-            StatusPropertyFile::Random => StatusProperty::Random,
-            StatusPropertyFile::Consume => StatusProperty::Consume,
-            StatusPropertyFile::Single => StatusProperty::Single,
             StatusPropertyFile::Bitrate => StatusProperty::Bitrate,
             StatusPropertyFile::Crossfade => StatusProperty::Crossfade,
+            StatusPropertyFile::Repeat => StatusProperty::Repeat {
+                on_label: defaults::default_on_label().leak(),
+                off_label: defaults::default_off_label().leak(),
+            },
+            StatusPropertyFile::Random => StatusProperty::Random {
+                on_label: defaults::default_on_label().leak(),
+                off_label: defaults::default_off_label().leak(),
+            },
+            StatusPropertyFile::Consume => StatusProperty::Consume {
+                on_label: defaults::default_on_label().leak(),
+                off_label: defaults::default_off_label().leak(),
+                oneshot_label: defaults::default_oneshot_label().leak(),
+            },
+            StatusPropertyFile::Single => StatusProperty::Single {
+                on_label: defaults::default_on_label().leak(),
+                off_label: defaults::default_off_label().leak(),
+                oneshot_label: defaults::default_oneshot_label().leak(),
+            },
+            StatusPropertyFile::RepeatV2 { on_label, off_label } => {
+                StatusProperty::Repeat { on_label: on_label.leak(), off_label: off_label.leak() }
+            }
+            StatusPropertyFile::RandomV2 { on_label, off_label } => {
+                StatusProperty::Random { on_label: on_label.leak(), off_label: off_label.leak() }
+            }
+            StatusPropertyFile::ConsumeV2 { on_label, off_label, oneshot_label } => {
+                StatusProperty::Consume {
+                    on_label: on_label.leak(),
+                    off_label: off_label.leak(),
+                    oneshot_label: oneshot_label.leak(),
+                }
+            }
+            StatusPropertyFile::SingleV2 { on_label, off_label, oneshot_label } => {
+                StatusProperty::Single {
+                    on_label: on_label.leak(),
+                    off_label: off_label.leak(),
+                    oneshot_label: oneshot_label.leak(),
+                }
+            }
         })
     }
 }
