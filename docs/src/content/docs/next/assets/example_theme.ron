@@ -85,7 +85,7 @@
             (
                 left: [
                     (kind: Text("["), style: (fg: "yellow", modifiers: "Bold")),
-                    (kind: Property(Status(State)), style: (fg: "yellow", modifiers: "Bold")),
+                    (kind: Property(Status(StateV2(play_label: "Playing", pause_label: "Paused", stop_label: "Stopped"))), style: (fg: "yellow", modifiers: "Bold")),
                     (kind: Text("]"), style: (fg: "yellow", modifiers: "Bold"))
                 ],
                 center: [

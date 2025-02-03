@@ -85,14 +85,11 @@ impl FromMpd for Status {
     }
 }
 
-#[derive(Debug, Serialize, Default, PartialEq, Clone, Copy, strum::AsRefStr)]
+#[derive(Debug, Serialize, Default, PartialEq, Clone, Copy)]
 pub enum State {
-    #[strum(serialize = "Playing")]
     Play,
     #[default]
-    #[strum(serialize = "Stopped")]
     Stop,
-    #[strum(serialize = "Paused")]
     Pause,
 }
 

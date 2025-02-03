@@ -43,7 +43,7 @@ use crate::{
         },
     },
     context::AppContext,
-    mpd::commands::{Song, Status, status::OnOffOneshot, volume::Bound},
+    mpd::commands::{Song, State, Status, status::OnOffOneshot, volume::Bound},
     shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
 };
 
@@ -679,9 +679,18 @@ impl Property<'static, PropertyKind> {
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
-                StatusProperty::State => {
-                    Some(Either::Left(Span::styled(status.state.as_ref(), style)))
-                }
+                StatusProperty::State {
+                    playing_label: play_label,
+                    paused_label: pause_label,
+                    stopped_label: stop_label,
+                } => Some(Either::Left(Span::styled(
+                    match status.state {
+                        State::Play => *play_label,
+                        State::Stop => *stop_label,
+                        State::Pause => *pause_label,
+                    },
+                    style,
+                ))),
                 StatusProperty::Duration => {
                     Some(Either::Left(Span::styled(status.duration.to_string(), style)))
                 }
@@ -944,6 +953,36 @@ mod format_tests {
             assert_eq!(
                 result,
                 Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[test_case("otherplay", "otherstopped", "otherpaused", State::Play, "otherplay")]
+        #[test_case("otherplay", "otherstopped", "otherpaused", State::Pause, "otherpaused")]
+        #[test_case("otherplay", "otherstopped", "otherpaused", State::Stop, "otherstopped")]
+        fn playback_state_label_is_correct(
+            playing_label: &'static str,
+            stopped_label: &'static str,
+            paused_label: &'static str,
+            state: State,
+            expected_label: &str,
+        ) {
+            let format =
+                Property::<'static, PropertyKind> {
+                    kind: PropertyKindOrText::Property(PropertyKind::Status(
+                        StatusProperty::State { playing_label, paused_label, stopped_label },
+                    )),
+                    style: None,
+                    default: None,
+                };
+
+            let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
+            let status = Status { state, ..Default::default() };
+
+            let result = format.as_span(Some(&song), &status);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected_label)))
             );
         }
     }

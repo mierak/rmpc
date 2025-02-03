@@ -91,7 +91,7 @@ currently playing. The `Other` variant can be used to display any tag, even thos
         "Property(Status(Random))",
         "Property(Status(Single))",
         "Property(Status(Consume))",
-        "Property(Status(State))",
+        "Property(Status(StateV2))",
         "Property(Status(Elapsed))",
         "Property(Status(Duration))",
         "Property(Status(Crossfade))",
@@ -100,6 +100,17 @@ currently playing. The `Other` variant can be used to display any tag, even thos
 />
 These values display the current state of the player. For example, `Volume` will display the current volume, `Repeat`
 will display if the repeat mode is on or off, etc.
+
+#### StateV2
+
+<ConfigValue
+    name="kind"
+    type="other"
+    customText='Property(Status(StateV2(playing_label: "<your label>", paused_label: "<your label>", stopped_label: "<your label>")))'
+/>
+
+The `StateV2` property has additional configuration options. If you omit any of the values, the default is used, so you can for example
+do just: `Status(StateV2(playing_label: "Playing"))`or`Status(StateV2())`. The default value is `Status(StateV2(playing_label: "Playing", paused_label: "Paused", stopped_label: "Stopped"))`.
 
 ### Property(Widget)
 

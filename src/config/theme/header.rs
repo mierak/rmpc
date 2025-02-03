@@ -2,18 +2,21 @@ use anyhow::Result;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    properties::{
-        Property,
-        PropertyFile,
-        PropertyKind,
-        PropertyKindFile,
-        PropertyKindFileOrText,
-        SongPropertyFile,
-        StatusPropertyFile,
-        WidgetPropertyFile,
+use crate::config::{
+    defaults,
+    theme::{
+        properties::{
+            Property,
+            PropertyFile,
+            PropertyKind,
+            PropertyKindFile,
+            PropertyKindFileOrText,
+            SongPropertyFile,
+            StatusPropertyFile,
+            WidgetPropertyFile,
+        },
+        style::{Modifiers, StyleFile},
     },
-    style::{Modifiers, StyleFile},
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -57,7 +60,11 @@ impl Default for HeaderConfigFile {
                         },
                         PropertyFile {
                             kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                                StatusPropertyFile::State,
+                                StatusPropertyFile::StateV2 {
+                                    playing_label: defaults::default_playing_label(),
+                                    paused_label: defaults::default_paused_label(),
+                                    stopped_label: defaults::default_stopped_label(),
+                                },
                             )),
                             style: Some(StyleFile {
                                 fg: Some("yellow".to_string()),

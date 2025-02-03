@@ -51,3 +51,15 @@ pub fn mpd_port() -> String {
 pub fn disabled_album_art_protos() -> Vec<String> {
     ["http://", "https://"].into_iter().map(|p| p.to_owned()).collect()
 }
+
+pub fn default_playing_label() -> String {
+    "Playing".to_string()
+}
+
+pub fn default_paused_label() -> String {
+    "Paused".to_string()
+}
+
+pub fn default_stopped_label() -> String {
+    "Stopped".to_string()
+}
