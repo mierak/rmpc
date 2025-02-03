@@ -103,11 +103,14 @@ will display if the repeat mode is on or off, etc.
 
 #### StateV2
 
-The `StateV2` property has additional configuration options. You can set what text appears for each state by specifying
-`Status(StateV2(playing_label: "<your label>", paused_label: "<your label>", stopped_label: "<your label>"))`.
-If you omit any of the values, the default is used, so you can for example do just: `Status(StateV2(playing_label: "Playing"))`
-or `Status(StateV2())`.
-The default value is `Status(StateV2(playing_label: "Playing", paused_label: "Paused", stopped_label: "Stopped"))`.
+<ConfigValue
+    name="kind"
+    type="other"
+    customText='Property(Status(StateV2(playing_label: "<your label>", paused_label: "<your label>", stopped_label: "<your label>")))'
+/>
+
+The `StateV2` property has additional configuration options. If you omit any of the values, the default is used, so you can for example
+do just: `Status(StateV2(playing_label: "Playing"))`or`Status(StateV2())`. The default value is `Status(StateV2(playing_label: "Playing", paused_label: "Paused", stopped_label: "Stopped"))`.
 
 ### Property(Widget)
 
