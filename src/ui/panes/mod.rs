@@ -126,7 +126,7 @@ impl<'panes> PaneContainer<'panes> {
         })
     }
 
-    pub fn get_mut<'pane_ref>(&'pane_ref mut self, screen: PaneType) -> Panes<'pane_ref, 'panes> {
+    pub fn get_mut<'pane_ref>(&'pane_ref mut self, screen: &PaneType) -> Panes<'pane_ref, 'panes> {
         match screen {
             PaneType::Queue => Panes::Queue(&mut self.queue),
             #[cfg(debug_assertions)]
@@ -804,30 +804,45 @@ impl Property<'static, PropertyKind> {
 impl SizedPaneOrSplit {
     pub fn for_each_pane(
         &self,
-        focused: Option<ConfigPane>,
         area: Rect,
-        context: &AppContext,
-        callback: &mut impl FnMut(ConfigPane, Rect, Block, Rect) -> Result<()>,
+        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect) -> Result<()>,
+    ) -> Result<()> {
+        self.for_each_pane_custom_data(
+            area,
+            (),
+            &mut |pane, pane_area, block, block_area, ()| {
+                pane_callback(pane, pane_area, block, block_area)?;
+                Ok(())
+            },
+            &mut |_, _, ()| Ok(()),
+        )
+    }
+
+    pub fn for_each_pane_custom_data<T>(
+        &self,
+        area: Rect,
+        mut custom_data: T,
+        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect, &mut T) -> Result<()>,
+        split_callback: &mut impl FnMut(Block, Rect, &mut T) -> Result<()>,
     ) -> Result<()> {
         let mut stack = vec![(self, area)];
 
         while let Some((configured_panes, area)) = stack.pop() {
             match configured_panes {
                 SizedPaneOrSplit::Pane(pane) => {
-                    let block = Block::default()
-                        .border_style(if focused.is_some_and(|p| p.id == pane.id) {
-                            context.config.as_focused_border_style()
-                        } else {
-                            context.config.as_border_style()
-                        })
-                        .borders(pane.border);
+                    let block = Block::default().borders(pane.borders);
                     let pane_area = block.inner(area);
 
-                    callback(*pane, pane_area, block, area)?;
+                    pane_callback(pane, pane_area, block, area, &mut custom_data)?;
                 }
-                SizedPaneOrSplit::Split { direction, panes } => {
+                SizedPaneOrSplit::Split { direction, panes, borders } => {
                     let constraints = panes.iter().map(|pane| Into::<Constraint>::into(pane.size));
-                    let areas = Layout::new(*direction, constraints).split(area);
+                    let block = Block::default().borders(*borders);
+                    let pane_areas = block.inner(area);
+                    let areas = Layout::new(*direction, constraints).split(pane_areas);
+
+                    split_callback(block, area, &mut custom_data)?;
+
                     stack.extend(
                         areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
                     );

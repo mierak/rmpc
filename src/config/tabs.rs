@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO remove after cleanup
 use std::collections::HashMap;
 
 use anyhow::{Result, ensure};
@@ -22,7 +23,7 @@ impl From<&'static str> for TabName {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PaneTypeFile {
     Queue,
     #[cfg(debug_assertions)]
@@ -41,9 +42,10 @@ pub enum PaneTypeFile {
     TabContent,
     #[cfg(debug_assertions)]
     FrameCount,
+    // Property(PropertyKindFileOrText<PropertyKindFile>),
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord, strum::Display)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, strum::Display)]
 pub enum PaneType {
     Queue,
     #[cfg(debug_assertions)]
@@ -62,6 +64,7 @@ pub enum PaneType {
     TabContent,
     #[cfg(debug_assertions)]
     FrameCount,
+    // Property(PropertyKindOrText<'static, PropertyKind>),
 }
 
 #[cfg(debug_assertions)]
@@ -123,7 +126,7 @@ impl TryFrom<TabsFile> for Tabs {
             .0
             .into_iter()
             .map(|tab| -> Result<_> {
-                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert(tab.border_type)? })
+                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert()? })
             })
             .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {
                 let tab = tab?;
@@ -174,6 +177,7 @@ pub struct Tabs {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct TabFile {
     name: String,
+    #[deprecated]
     border_type: BorderTypeFile,
     pane: PaneOrSplitFile,
 }
@@ -211,28 +215,38 @@ impl From<&DirectionFile> for Direction {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PaneOrSplitFile {
     Pane(PaneTypeFile),
-    Split { direction: DirectionFile, panes: Vec<SubPaneFile> },
+    Split {
+        direction: DirectionFile,
+        #[serde(default)]
+        borders: BordersFile,
+        panes: Vec<SubPaneFile>,
+    },
 }
 
 impl Default for PaneOrSplitFile {
     fn default() -> Self {
         PaneOrSplitFile::Split {
             direction: DirectionFile::Vertical,
+            borders: BordersFile::NONE,
             panes: vec![
                 SubPaneFile {
                     size: "2".to_string(),
+                    borders: BordersFile::NONE,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Header),
                 },
                 SubPaneFile {
                     size: "3".to_string(),
+                    borders: BordersFile::NONE,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Tabs),
                 },
                 SubPaneFile {
                     size: "100%".to_string(),
+                    borders: BordersFile::NONE,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::TabContent),
                 },
                 SubPaneFile {
                     size: "1".to_string(),
+                    borders: BordersFile::NONE,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
                 },
             ],
@@ -240,28 +254,49 @@ impl Default for PaneOrSplitFile {
     }
 }
 
+use bitflags::bitflags;
+bitflags! {
+    #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+    pub struct BordersFile: u8 {
+        const NONE   = 0b0000;
+        const TOP    = 0b0001;
+        const RIGHT  = 0b0010;
+        const BOTTOM = 0b0100;
+        const LEFT   = 0b1000;
+        const ALL = Self::TOP.bits() | Self::RIGHT.bits() | Self::BOTTOM.bits() | Self::LEFT.bits();
+    }
+}
+
+impl From<BordersFile> for Borders {
+    fn from(value: BordersFile) -> Self {
+        self::Borders::from_bits_truncate(value.bits())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubPaneFile {
     pub size: String,
+    #[serde(default)]
+    pub borders: BordersFile,
     pub pane: PaneOrSplitFile,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Pane {
     pub pane: PaneType,
-    pub border: Borders,
+    pub borders: Borders,
     pub id: Id,
 }
 
 #[derive(Debug, Clone)]
 pub enum SizedPaneOrSplit {
     Pane(Pane),
-    Split { direction: Direction, panes: Vec<SizedSubPane> },
+    Split { borders: Borders, direction: Direction, panes: Vec<SizedSubPane> },
 }
 
 impl Default for SizedPaneOrSplit {
     fn default() -> Self {
-        Self::Split { direction: Direction::Horizontal, panes: Vec::new() }
+        Self::Split { direction: Direction::Horizontal, panes: Vec::new(), borders: Borders::NONE }
     }
 }
 
@@ -272,72 +307,32 @@ pub struct SizedSubPane {
 }
 
 impl PaneOrSplitFile {
-    pub fn convert(&self, border_type: BorderTypeFile) -> Result<SizedPaneOrSplit> {
-        self.convert_recursive(border_type, Borders::NONE)
-    }
-
-    fn convert_recursive(
-        &self,
-        border_type: BorderTypeFile,
-        borders: Borders,
-    ) -> Result<SizedPaneOrSplit> {
-        match self {
-            PaneOrSplitFile::Pane(pane) => Ok(SizedPaneOrSplit::Pane(Pane {
-                pane: pane.into(),
-                border: borders,
+    pub fn convert_recursive(&self, b: Borders) -> Result<SizedPaneOrSplit> {
+        Ok(match self {
+            PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
+                pane: pane_type_file.into(),
+                borders: b,
                 id: id::new(),
-            })),
-            PaneOrSplitFile::Split { direction, panes: sub_panes } => Ok(SizedPaneOrSplit::Split {
+            }),
+            PaneOrSplitFile::Split { direction, borders, panes } => SizedPaneOrSplit::Split {
                 direction: direction.into(),
-                panes: sub_panes
+                borders: Into::<Borders>::into(*borders) | b,
+                panes: panes
                     .iter()
-                    .enumerate()
-                    .map(|(idx, sub_pane)| -> Result<_> {
-                        let mut size: PercentOrLength = sub_pane.size.parse()?;
+                    .map(|sub_pane| -> Result<_> {
+                        let borders: Borders = sub_pane.borders.into();
+                        let size: PercentOrLength = sub_pane.size.parse()?;
+                        let pane = sub_pane.pane.convert_recursive(borders)?;
 
-                        let borders = match border_type {
-                            BorderTypeFile::Full => {
-                                if let PercentOrLength::Length(ref mut len) = size {
-                                    *len += 2;
-                                };
-                                Borders::ALL
-                            }
-                            BorderTypeFile::Single => {
-                                let result = match direction {
-                                    DirectionFile::Horizontal if idx < sub_panes.len() - 1 => {
-                                        Borders::RIGHT | borders
-                                    }
-                                    DirectionFile::Vertical if idx < sub_panes.len() - 1 => {
-                                        Borders::BOTTOM | borders
-                                    }
-                                    _ => Borders::NONE | borders,
-                                };
-                                if let PercentOrLength::Length(ref mut len) = size {
-                                    match direction {
-                                        DirectionFile::Horizontal => {
-                                            *len += u16::from(result.contains(Borders::LEFT))
-                                                + u16::from(result.contains(Borders::RIGHT));
-                                        }
-                                        DirectionFile::Vertical => {
-                                            *len += u16::from(result.contains(Borders::TOP))
-                                                + u16::from(result.contains(Borders::BOTTOM));
-                                        }
-                                    }
-                                };
-
-                                result
-                            }
-                            BorderTypeFile::None => Borders::NONE,
-                        };
-
-                        Ok(SizedSubPane {
-                            size,
-                            pane: sub_pane.pane.convert_recursive(border_type, borders)?,
-                        })
+                        Ok(SizedSubPane { size, pane })
                     })
                     .try_collect()?,
-            }),
-        }
+            },
+        })
+    }
+
+    pub fn convert(&self) -> Result<SizedPaneOrSplit> {
+        self.convert_recursive(Borders::NONE)
     }
 }
 
@@ -345,12 +340,12 @@ pub struct PaneIter<'a> {
     queue: Vec<&'a SizedPaneOrSplit>,
 }
 
-impl Iterator for PaneIter<'_> {
-    type Item = Pane;
+impl<'a> Iterator for PaneIter<'a> {
+    type Item = &'a Pane;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.queue.pop() {
-            Some(SizedPaneOrSplit::Pane(pane)) => Some(*pane),
+            Some(SizedPaneOrSplit::Pane(pane)) => Some(pane),
             Some(SizedPaneOrSplit::Split { panes: sub_panes, .. }) => {
                 self.queue.extend(sub_panes.iter().map(|v| &v.pane));
                 self.next()
@@ -381,14 +376,17 @@ impl Default for TabsFile {
                 border_type: BorderTypeFile::None,
                 pane: PaneOrSplitFile::Split {
                     direction: DirectionFile::Horizontal,
+                    borders: BordersFile::NONE,
                     panes: vec![
                         SubPaneFile {
                             pane: PaneOrSplitFile::Pane(PaneTypeFile::AlbumArt),
                             size: "40%".to_string(),
+                            borders: BordersFile::NONE,
                         },
                         SubPaneFile {
                             pane: PaneOrSplitFile::Pane(PaneTypeFile::Queue),
                             size: "60%".to_string(),
+                            borders: BordersFile::NONE,
                         },
                     ],
                 },
@@ -456,7 +454,7 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
     ensure!(
         panes_in_both_tabs_and_layout.is_empty(),
         "Panes cannot be in layout and tabs at the same time. Please remove following tabs from either layout or tabs: {}",
-        panes_in_both_tabs_and_layout.iter().map(|pane| pane.pane).sorted().dedup().join(", ")
+        panes_in_both_tabs_and_layout.iter().map(|pane| &pane.pane).sorted().dedup().join(", ")
     );
 
     Ok(())

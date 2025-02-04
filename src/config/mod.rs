@@ -203,10 +203,11 @@ impl ConfigFile {
         let active_panes = tabs
             .tabs
             .iter()
-            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane))
-            .chain(theme.layout.panes_iter().map(|pane| pane.pane))
+            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| &pane.pane))
+            .chain(theme.layout.panes_iter().map(|pane| &pane.pane))
             .sorted()
             .dedup()
+            .cloned()
             .collect_vec()
             .leak();
 
