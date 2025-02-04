@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use ratatui::{Frame, layout::Rect};
 
@@ -37,20 +37,22 @@ impl PaneData {
 
 #[derive(Debug)]
 pub struct TabScreen {
-    focused: Option<Id>, // can focused ever be none?
+    focused: Id, // can focused ever be none?
     pub panes: SizedPaneOrSplit,
     pane_data: HashMap<Id, PaneData>,
     initialized: bool,
 }
 
 impl TabScreen {
-    pub fn new(panes: SizedPaneOrSplit) -> Self {
-        Self { panes, focused: None, initialized: false, pane_data: HashMap::default() }
+    pub fn new(panes: SizedPaneOrSplit) -> Result<Self> {
+        let focused =
+            panes.panes_iter().next().context("Tab needs at least one pane to be valid!")?.id;
+        Ok(Self { panes, focused, initialized: false, pane_data: HashMap::default() })
     }
 
-    fn set_focused(&mut self, pane: Option<Id>) {
-        self.focused = pane.or(self.focused);
-        if let Some(data) = pane.and_then(|id| self.pane_data.get_mut(&id)) {
+    fn set_focused(&mut self, id: Id) {
+        self.focused = id;
+        if let Some(data) = self.pane_data.get_mut(&id) {
             data.active = Instant::now();
         }
     }
@@ -64,7 +66,7 @@ impl TabScreen {
         area: Rect,
         context: &AppContext,
     ) -> Result<()> {
-        let focused = self.panes.panes_iter().find(|pane| Some(pane.id) == self.focused);
+        let focused = self.panes.panes_iter().find(|pane| pane.id == self.focused);
         self.panes.for_each_pane_custom_data(
             area,
             frame,
@@ -103,12 +105,8 @@ impl TabScreen {
         event: &mut KeyEvent,
         context: &mut AppContext,
     ) -> Result<()> {
-        let Some(focused) = self.focused else {
-            return Ok(());
-        };
-
-        let Some(focused_pane_data) = self.pane_data.get(&focused) else {
-            log::warn!(focused:?, pane_areas:? = self.pane_data; "Tried to find focused pane area but it does not exist");
+        let Some(focused_pane_data) = self.pane_data.get(&self.focused) else {
+            log::warn!(focused:? = self.focused, pane_areas:? = self.pane_data; "Tried to find focused pane area but it does not exist");
             return Ok(());
         };
         let focused_area = focused_pane_data.area;
@@ -123,7 +121,9 @@ impl TabScreen {
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
 
-                self.set_focused(pane_to_focus.map(|pane| pane.id));
+                if let Some(pane) = pane_to_focus {
+                    self.set_focused(pane.id);
+                }
                 context.render()?;
             }
             Some(CommonAction::PaneDown) => {
@@ -135,7 +135,9 @@ impl TabScreen {
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
 
-                self.set_focused(pane_to_focus.map(|pane| pane.id));
+                if let Some(pane) = pane_to_focus {
+                    self.set_focused(pane.id);
+                }
                 context.render()?;
             }
             Some(CommonAction::PaneRight) => {
@@ -147,7 +149,9 @@ impl TabScreen {
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
 
-                self.set_focused(pane_to_focus.map(|pane| pane.id));
+                if let Some(pane) = pane_to_focus {
+                    self.set_focused(pane.id);
+                }
                 context.render()?;
             }
             Some(CommonAction::PaneLeft) => {
@@ -159,12 +163,15 @@ impl TabScreen {
                     .max_by_key(|(_, data)| data.active)
                     .and_then(|(id, _)| self.panes.panes_iter().find(|pane| pane.id == *id));
 
-                self.set_focused(pane_to_focus.map(|pane| pane.id));
+                if let Some(pane) = pane_to_focus {
+                    self.set_focused(pane.id);
+                }
                 context.render()?;
             }
             Some(_) | None => {
                 event.abandon();
-                let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == focused) else {
+                let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == self.focused)
+                else {
                     log::error!(
                         "Unable to find focused pane, this should not happen. Please report this issue."
                     );
@@ -195,15 +202,11 @@ impl TabScreen {
             else {
                 return Ok(());
             };
-            self.set_focused(Some(pane.id));
+            self.set_focused(pane.id);
             context.render()?;
         }
 
-        let Some(focused) = self.focused else {
-            return Ok(());
-        };
-
-        let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == focused) else {
+        let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == self.focused) else {
             log::error!(
                 "Unable to find focused pane, this should not happen. Please report this issue."
             );
@@ -239,16 +242,19 @@ impl TabScreen {
             Ok(())
         })?;
         if !self.initialized {
-            self.set_focused(
-                self.pane_data
-                    .iter()
-                    .filter(|(_, PaneData { focusable, .. })| *focusable)
-                    .min_by(|(_, PaneData { area: a, .. }), (_, PaneData { area: b, .. })| {
-                        a.left().cmp(&b.left()).then(a.top().cmp(&b.top()))
-                    })
-                    .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
-                    .map(|pane| pane.id),
-            );
+            let pane_to_focus = self
+                .pane_data
+                .iter()
+                .filter(|(_, PaneData { focusable, .. })| *focusable)
+                .min_by(|(_, PaneData { area: a, .. }), (_, PaneData { area: b, .. })| {
+                    a.left().cmp(&b.left()).then(a.top().cmp(&b.top()))
+                })
+                .and_then(|entry| self.panes.panes_iter().find(|pane| &pane.id == entry.0))
+                .map(|pane| pane.id);
+
+            if let Some(pane) = pane_to_focus {
+                self.set_focused(pane);
+            }
             self.initialized = true;
         };
 

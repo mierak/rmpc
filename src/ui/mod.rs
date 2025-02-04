@@ -101,7 +101,7 @@ impl<'ui> Ui<'ui> {
                 .tabs
                 .iter()
                 .map(|(name, screen)| -> Result<_> {
-                    Ok((*name, TabScreen::new(screen.panes.clone())))
+                    Ok((*name, TabScreen::new(screen.panes.clone())?))
                 })
                 .try_collect()?,
             area: Rect::default(),
