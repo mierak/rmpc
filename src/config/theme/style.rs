@@ -22,7 +22,7 @@ impl StringColor {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StyleFile {
     pub(super) fg: Option<String>,
     pub(super) bg: Option<String>,
@@ -195,7 +195,7 @@ impl TryFrom<&[u8]> for crate::config::ConfigColor {
 }
 
 bitflags! {
-    #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
     pub struct Modifiers: u16 {
         const Bold       = 0b0000_0000_0001;
         const Dim        = 0b0000_0000_0010;
