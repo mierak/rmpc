@@ -141,10 +141,11 @@ impl TryFrom<TabsFile> for Tabs {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BorderTypeFile {
     Full,
     Single,
+    #[default]
     None,
 }
 
@@ -178,6 +179,7 @@ pub struct Tabs {
 struct TabFile {
     name: String,
     #[deprecated]
+    #[serde(default)]
     border_type: BorderTypeFile,
     pane: PaneOrSplitFile,
 }
