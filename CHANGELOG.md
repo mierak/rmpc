@@ -45,6 +45,7 @@ They have additional config properties compared to their predecesors.
 - Preview for songs outside of the music database not working in playlists
 - AddToPlaylist not working for local songs
 - rmpc waiting potentionally forever for MPD's response
+- Adding songs which do not belong to any album not working in `Artists` and `AlbumArtists` panes not working
 
 ### Deprecated
 
