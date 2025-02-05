@@ -173,25 +173,25 @@ impl ArtistsPane {
             .into_group_map_by(|song| {
                 let album = song.album().map_or("<no album>", |v| v.as_str());
                 let song_date = song.metadata.get("date").map_or("<no date>", |v| v.as_str());
-                (album.to_string(), song_date.to_string())
+                (album.to_string(), song_date.to_string(), song.album().cloned())
             })
-            .iter_mut()
-            .sorted_by(|((album_a, date_a), _), ((album_b, date_b), _)| match sort_mode {
+            .into_iter()
+            .sorted_by(|((album_a, date_a, _), _), ((album_b, date_b, _), _)| match sort_mode {
                 AlbumSortMode::Name => match album_a.cmp(album_b) {
                     Ordering::Equal => date_a.cmp(date_b),
                     ordering => ordering,
                 },
                 AlbumSortMode::Date => date_a.cmp(date_b),
             })
-            .map(|((album, date), songs)| CachedAlbum {
+            .map(|((album, date, original_name), songs)| CachedAlbum {
                 name: match display_mode {
                     AlbumDisplayMode::SplitByDate => {
                         format!("({date}) {album}")
                     }
                     AlbumDisplayMode::NameOnly => album.to_string(),
                 },
-                original_name: album.to_string(),
-                songs: std::mem::take(songs),
+                original_name: original_name.unwrap_or_else(String::new),
+                songs,
             })
             .fold(Vec::new(), |mut acc, album| {
                 match display_mode {
