@@ -7,7 +7,13 @@ use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use super::{Leak, theme::PercentOrLength};
+use super::{
+    Leak,
+    theme::{
+        PercentOrLength,
+        properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
+    },
+};
 use crate::shared::id::{self, Id};
 
 #[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]
@@ -42,10 +48,14 @@ pub enum PaneTypeFile {
     TabContent,
     #[cfg(debug_assertions)]
     FrameCount,
-    // Property(PropertyKindFileOrText<PropertyKindFile>),
+    Property {
+        properties: Vec<PropertyFile<PropertyKindFile>>,
+        #[serde(default)]
+        align: super::theme::properties::Alignment,
+    },
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, strum::Display)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display)]
 pub enum PaneType {
     Queue,
     #[cfg(debug_assertions)]
@@ -64,7 +74,10 @@ pub enum PaneType {
     TabContent,
     #[cfg(debug_assertions)]
     FrameCount,
-    // Property(PropertyKindOrText<'static, PropertyKind>),
+    Property {
+        properties: &'static [&'static Property<'static, PropertyKind>],
+        align: ratatui::layout::Alignment,
+    },
 }
 
 #[cfg(debug_assertions)]
@@ -114,6 +127,14 @@ impl From<&PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
+            PaneTypeFile::Property { properties, align } => PaneType::Property {
+                properties: properties
+                    .iter()
+                    .map(|prop| prop.try_into().expect(""))
+                    .collect_vec()
+                    .leak(),
+                align: (*align).into(),
+            },
         }
     }
 }
@@ -439,7 +460,7 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
     ensure!(
         panes_in_both_tabs_and_layout.is_empty(),
         "Panes cannot be in layout and tabs at the same time. Please remove following tabs from either layout or tabs: {}",
-        panes_in_both_tabs_and_layout.iter().map(|pane| &pane.pane).sorted().dedup().join(", ")
+        panes_in_both_tabs_and_layout.iter().map(|pane| &pane.pane).dedup().join(", ")
     );
 
     Ok(())
