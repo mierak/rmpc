@@ -152,8 +152,8 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::TabContent => Panes::TabContent,
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Panes::FrameCount(&mut self.frame_count),
-            PaneType::Property { properties, align } => {
-                Panes::Property(PropertyPane::new(properties, *align, context))
+            PaneType::Property { content, align } => {
+                Panes::Property(PropertyPane::new(content, *align, context))
             }
         }
     }

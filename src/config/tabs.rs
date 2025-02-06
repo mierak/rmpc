@@ -49,7 +49,7 @@ pub enum PaneTypeFile {
     #[cfg(debug_assertions)]
     FrameCount,
     Property {
-        properties: Vec<PropertyFile<PropertyKindFile>>,
+        content: Vec<PropertyFile<PropertyKindFile>>,
         #[serde(default)]
         align: super::theme::properties::Alignment,
     },
@@ -75,7 +75,7 @@ pub enum PaneType {
     #[cfg(debug_assertions)]
     FrameCount,
     Property {
-        properties: &'static [&'static Property<'static, PropertyKind>],
+        content: &'static [&'static Property<'static, PropertyKind>],
         align: ratatui::layout::Alignment,
     },
 }
@@ -127,8 +127,8 @@ impl From<&PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
-            PaneTypeFile::Property { properties, align } => PaneType::Property {
-                properties: properties
+            PaneTypeFile::Property { content: properties, align } => PaneType::Property {
+                content: properties
                     .iter()
                     .map(|prop| prop.try_into().expect(""))
                     .collect_vec()
