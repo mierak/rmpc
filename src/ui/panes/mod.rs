@@ -10,6 +10,7 @@ use header::HeaderPane;
 use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
+use property::PropertyPane;
 use queue::QueuePane;
 use ratatui::{
     Frame,
@@ -59,6 +60,7 @@ pub mod logs;
 pub mod lyrics;
 pub mod playlists;
 pub mod progress_bar;
+pub mod property;
 pub mod queue;
 pub mod search;
 pub mod tabs;
@@ -82,6 +84,7 @@ pub enum Panes<'pane_ref, 'pane> {
     #[cfg(debug_assertions)]
     FrameCount(&'pane_ref mut FrameCountPane),
     TabContent,
+    Property(PropertyPane),
 }
 
 #[derive(Debug)]
@@ -126,7 +129,11 @@ impl<'panes> PaneContainer<'panes> {
         })
     }
 
-    pub fn get_mut<'pane_ref>(&'pane_ref mut self, screen: &PaneType) -> Panes<'pane_ref, 'panes> {
+    pub fn get_mut<'pane_ref>(
+        &'pane_ref mut self,
+        screen: &PaneType,
+        context: &AppContext,
+    ) -> Panes<'pane_ref, 'panes> {
         match screen {
             PaneType::Queue => Panes::Queue(&mut self.queue),
             #[cfg(debug_assertions)]
@@ -145,6 +152,9 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::TabContent => Panes::TabContent,
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Panes::FrameCount(&mut self.frame_count),
+            PaneType::Property { properties, align } => {
+                Panes::Property(PropertyPane::new(properties, *align, context))
+            }
         }
     }
 }
@@ -169,6 +179,7 @@ macro_rules! pane_call {
             Panes::TabContent => Ok(()),
             #[cfg(debug_assertions)]
             Panes::FrameCount(ref mut s) => s.$fn($($param),+),
+            Panes::Property(ref mut s) => s.$fn($($param),+),
         }
     }
 }

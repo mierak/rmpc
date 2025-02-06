@@ -20,7 +20,7 @@ pub enum SongPropertyFile {
     Other(String),
 }
 
-#[derive(Debug, Copy, Clone, Display)]
+#[derive(Debug, Copy, Clone, Display, Hash, Eq, PartialEq)]
 pub enum SongProperty {
     Filename,
     File,
@@ -82,7 +82,7 @@ pub enum StatusPropertyFile {
     Bitrate,
 }
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
 pub enum StatusProperty {
     Volume,
     Repeat { on_label: &'static str, off_label: &'static str },
@@ -119,7 +119,7 @@ pub struct PropertyFile<T: Clone> {
     pub default: Option<Box<PropertyFile<T>>>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum PropertyKindOrText<'a, T> {
     Text(&'a str),
     Sticker(&'a str),
@@ -140,14 +140,14 @@ impl<T> PropertyKindOrText<'_, T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum PropertyKind {
     Song(SongProperty),
     Status(StatusProperty),
     Widget(WidgetProperty),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Property<'a, T> {
     pub kind: PropertyKindOrText<'a, T>,
     pub style: Option<Style>,
@@ -160,14 +160,15 @@ pub enum WidgetPropertyFile {
     Volume,
 }
 
-#[derive(Debug, Display, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum WidgetProperty {
     States { active_style: Style, separator_style: Style },
     Volume,
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alignment {
+    #[default]
     Left,
     Right,
     Center,
@@ -263,6 +264,26 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                 }
             }
         })
+    }
+}
+
+impl TryFrom<&PropertyFile<PropertyKindFile>> for &'static Property<'static, PropertyKind> {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: &PropertyFile<PropertyKindFile>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
+        Property::<'static, PropertyKind>::try_from(value.clone()).map(|v| v.leak())
+    }
+}
+
+impl TryFrom<&PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind> {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: &PropertyFile<PropertyKindFile>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
+        Property::<'static, PropertyKind>::try_from(value.clone())
     }
 }
 

@@ -205,7 +205,6 @@ impl ConfigFile {
             .iter()
             .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| &pane.pane))
             .chain(theme.layout.panes_iter().map(|pane| &pane.pane))
-            .sorted()
             .dedup()
             .cloned()
             .collect_vec()
