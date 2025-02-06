@@ -5,7 +5,8 @@ use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::Styled,
+    style::{Styled, Stylize},
+    text::Span,
     widgets::{Block, Borders, List, ListItem, Padding},
 };
 
@@ -24,6 +25,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
+        mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
@@ -36,7 +38,7 @@ use crate::{
 pub struct SearchPane {
     inputs: InputGroups<2, 1>,
     phase: Phase,
-    preview: Option<Vec<ListItem<'static>>>,
+    preview: Option<Vec<PreviewGroup>>,
     songs_dir: Dir<Song>,
     input_areas: Rc<[Rect]>,
     column_areas: [Rect; 3],
@@ -157,7 +159,10 @@ impl SearchPane {
         match &self.phase {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
-                let data = Some(self.songs_dir.to_list_items(context.config));
+                let data = Some(vec![PreviewGroup::from(
+                    None,
+                    self.songs_dir.to_list_items(context.config),
+                )]);
                 context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
                     |_| Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) }),
                 );
@@ -176,8 +181,7 @@ impl SearchPane {
                                 .find(&[Filter::new(Tag::File, &file)])?
                                 .first()
                                 .context("Expected to find exactly one song")?
-                                .to_preview(&config.theme.symbols)
-                                .collect_vec(),
+                                .to_preview(&config.theme.symbols),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
                     },
@@ -499,19 +503,31 @@ impl Pane for SearchPane {
                     .as_ref()
                     .and_then(|preview| preview.get(self.songs_dir.state.offset()..))
                 {
-                    frame.render_widget(
-                        List::new(preview.to_vec())
-                            .highlight_style(config.theme.current_item_style),
-                        preview_area,
-                    );
+                    let mut result = Vec::new();
+                    for group in *preview {
+                        if let Some(name) = group.name {
+                            result.push(ListItem::new(name).yellow().bold());
+                        }
+                        result.extend(group.items.clone());
+                        result.push(ListItem::new(Span::raw("")));
+                    }
+                    let preview = List::new(result).style(config.as_text_style());
+                    frame.render_widget(preview, preview_area);
                 }
             }
             Phase::BrowseResults { filter_input_on: _ } => {
                 self.render_song_column(frame, current_area, config);
                 self.render_input_column(frame, previous_area, config);
                 if let Some(preview) = &self.preview {
-                    let preview =
-                        List::new(preview.clone()).highlight_style(config.theme.current_item_style);
+                    let mut result = Vec::new();
+                    for group in preview {
+                        if let Some(name) = group.name {
+                            result.push(ListItem::new(name).yellow().bold());
+                        }
+                        result.extend(group.items.clone());
+                        result.push(ListItem::new(Span::raw("")));
+                    }
+                    let preview = List::new(result).style(config.as_text_style());
                     frame.render_widget(preview, preview_area);
                 }
             }
@@ -573,7 +589,10 @@ impl Pane for SearchPane {
             }
             (SEARCH, MpdQueryResult::SongsList { data, origin_path: _ }) => {
                 self.songs_dir = Dir::new(data);
-                self.preview = Some(self.songs_dir.to_list_items(context.config));
+                self.preview = Some(vec![PreviewGroup::from(
+                    None,
+                    self.songs_dir.to_list_items(context.config),
+                )]);
                 context.render()?;
             }
             _ => {}

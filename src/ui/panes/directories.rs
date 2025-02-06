@@ -17,6 +17,7 @@ use crate::{
         key_event::KeyEvent,
         macros::status_info,
         mouse_event::MouseEvent,
+        mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
@@ -340,7 +341,10 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         .map(|v| v.to_list_item_simple(config))
                         .collect();
 
-                        Ok(MpdQueryResult::Preview { data: Some(data), origin_path })
+                        Ok(MpdQueryResult::Preview {
+                            data: Some(vec![PreviewGroup::from(None, data)]),
+                            origin_path,
+                        })
                     });
             }
             Some(DirOrSong::Song(song)) => {
@@ -355,7 +359,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         Ok(MpdQueryResult::Preview {
                             data: client
                                 .find_one(&[Filter::new(Tag::File, &file)])?
-                                .map(|v| v.to_preview(&config.theme.symbols).collect()),
+                                .map(|v| v.to_preview(&config.theme.symbols)),
                             origin_path,
                         })
                     });
