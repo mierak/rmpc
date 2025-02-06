@@ -25,18 +25,24 @@ use crate::{
     },
 };
 
+#[derive(derive_more::Debug)]
 pub struct AppContext {
     pub(crate) config: &'static Config,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
     pub(crate) supported_commands: HashSet<String>,
+    #[debug(skip)]
     pub(crate) app_event_sender: Sender<AppEvent>,
+    #[debug(skip)]
     pub(crate) work_sender: Sender<WorkRequest>,
+    #[debug(skip)]
     pub(crate) client_request_sender: Sender<ClientRequest>,
     pub(crate) needs_render: Cell<bool>,
+    #[debug(skip)]
     pub(crate) lrc_index: LrcIndex,
     pub(crate) rendered_frames: u64,
     pub(crate) should_fetch_stickers: bool,
+    #[debug(skip)]
     pub(crate) scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>)>,
 }
 
