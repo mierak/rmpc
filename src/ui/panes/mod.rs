@@ -536,7 +536,7 @@ impl Song {
                     .or_else(|| format.default.map(|f| self.matches(&[f], filter))),
                 PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                     || format.default.map(|f| self.matches(&[f], filter)),
-                    |p| Some(p.to_lowercase().contains(filter)),
+                    |p| Some(p.to_lowercase().contains(&filter.to_lowercase())),
                 ),
                 PropertyKindOrText::Group(_) => format
                     .as_string(Some(self))
