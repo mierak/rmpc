@@ -15,24 +15,24 @@ use crate::{
 
 #[derive(Debug)]
 pub struct PropertyPane {
-    property: &'static [&'static Property<'static, PropertyKind>],
+    content: &'static [&'static Property<'static, PropertyKind>],
     align: Alignment,
 }
 
 impl PropertyPane {
     pub fn new(
-        property: &'static [&'static Property<'static, PropertyKind>],
+        content: &'static [&'static Property<'static, PropertyKind>],
         align: Alignment,
         _context: &AppContext,
     ) -> Self {
-        Self { property, align }
+        Self { content, align }
     }
 }
 
 impl Pane for PropertyPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         let song = context.find_current_song_in_queue().map(|(_, song)| song);
-        let line = Line::from(self.property.iter().fold(Vec::new(), |mut acc, val| {
+        let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(song, &context.status) {
                 Some(Either::Left(span)) => acc.push(span),
                 Some(Either::Right(ref mut spans)) => acc.append(spans),
