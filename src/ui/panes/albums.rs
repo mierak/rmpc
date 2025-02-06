@@ -18,6 +18,7 @@ use crate::{
         key_event::KeyEvent,
         macros::status_info,
         mouse_event::MouseEvent,
+        mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
@@ -325,8 +326,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                                     album,
                                     current
                                 ))?
-                                .to_preview(&config.theme.symbols)
-                                .collect_vec(),
+                                .to_preview(&config.theme.symbols),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });
@@ -338,11 +338,11 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let data = Some(
-                            list_titles(client, &current)?
-                                .map(|v| v.to_list_item_simple(config))
-                                .collect_vec(),
-                        );
+                        let data = list_titles(client, &current)?
+                            .map(|v| v.to_list_item_simple(config))
+                            .collect_vec();
+                        let data = PreviewGroup::from(None, data);
+                        let data = Some(vec![data]);
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }

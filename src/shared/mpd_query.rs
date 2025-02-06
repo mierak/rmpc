@@ -59,10 +59,30 @@ impl MpdQuery {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct PreviewGroup {
+    pub name: Option<&'static str>,
+    pub items: Vec<ListItem<'static>>,
+}
+
+impl PreviewGroup {
+    pub fn new(name: Option<&'static str>) -> Self {
+        Self { name, items: Vec::new() }
+    }
+
+    pub fn from(name: Option<&'static str>, items: Vec<ListItem<'static>>) -> Self {
+        Self { name, items }
+    }
+
+    pub fn push(&mut self, item: ListItem<'static>) {
+        self.items.push(item);
+    }
+}
+
 #[derive(Debug)]
 #[allow(unused)]
 pub(crate) enum MpdQueryResult {
-    Preview { data: Option<Vec<ListItem<'static>>>, origin_path: Option<Vec<String>> },
+    Preview { data: Option<Vec<PreviewGroup>>, origin_path: Option<Vec<String>> },
     SongsList { data: Vec<Song>, origin_path: Option<Vec<String>> },
     LsInfo { data: Vec<String>, origin_path: Option<Vec<String>> },
     DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },

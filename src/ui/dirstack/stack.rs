@@ -1,12 +1,11 @@
-use ratatui::widgets::ListItem;
-
 use super::{DirStackItem, dir::Dir, state::DirState};
+use crate::shared::mpd_query::PreviewGroup;
 
 #[derive(Debug)]
 pub struct DirStack<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     current: Dir<T>,
     others: Vec<Dir<T>>,
-    preview: Option<Vec<ListItem<'static>>>,
+    preview: Option<Vec<PreviewGroup>>,
     path: Vec<String>,
 }
 
@@ -66,7 +65,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
     }
 
     /// Returns the element at the second element from the top of the stack
-    pub fn preview(&self) -> Option<&Vec<ListItem<'static>>> {
+    pub fn preview(&self) -> Option<&Vec<PreviewGroup>> {
         self.preview.as_ref()
     }
 
@@ -77,7 +76,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
     }
 
     /// Returns the element at the second element from the top of the stack
-    pub fn set_preview(&mut self, preview: Option<Vec<ListItem<'static>>>) -> &Self {
+    pub fn set_preview(&mut self, preview: Option<Vec<PreviewGroup>>) -> &Self {
         self.preview = preview;
         self
     }

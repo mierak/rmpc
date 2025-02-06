@@ -22,6 +22,7 @@ use crate::{
         key_event::KeyEvent,
         macros::status_info,
         mouse_event::MouseEvent,
+        mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
@@ -311,13 +312,17 @@ impl Pane for ArtistsPane {
                     return Ok(());
                 }
 
-                let preview = cached_artist
-                    .0
-                    .iter()
-                    .map(|album| {
-                        DirOrSong::name_only(album.name.clone()).to_list_item_simple(context.config)
-                    })
-                    .collect();
+                let preview = vec![PreviewGroup::from(
+                    None,
+                    cached_artist
+                        .0
+                        .iter()
+                        .map(|album| {
+                            DirOrSong::name_only(album.name.clone())
+                                .to_list_item_simple(context.config)
+                        })
+                        .collect(),
+                )];
                 self.stack.set_preview(Some(preview));
                 context.render()?;
             }
@@ -552,7 +557,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 let song = songs
                     .iter()
                     .find(|song| song.file == current)
-                    .map(|song| song.to_preview(&context.config.theme.symbols).collect());
+                    .map(|song| song.to_preview(&context.config.theme.symbols));
                 self.stack_mut().set_preview(song);
                 context.render()?;
             }
@@ -565,14 +570,17 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 else {
                     return Ok(());
                 };
-                let songs =
-                    songs.iter().map(|song| song.to_list_item_simple(context.config)).collect();
+                let songs = vec![PreviewGroup::from(
+                    None,
+                    songs.iter().map(|song| song.to_list_item_simple(context.config)).collect_vec(),
+                )];
                 self.stack_mut().set_preview(Some(songs));
                 context.render()?;
             }
             [] => {
                 if let Some(albums) = self.cache.0.get(&current) {
-                    self.stack.set_preview(Some(
+                    self.stack.set_preview(Some(vec![PreviewGroup::from(
+                        None,
                         albums
                             .0
                             .iter()
@@ -581,7 +589,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                                     .to_list_item_simple(context.config)
                             })
                             .collect(),
-                    ));
+                    )]));
                     context.render()?;
                 } else {
                     let artist_tag = self.artist_tag();

@@ -228,25 +228,25 @@ pub mod dirstack {}
 pub(crate) mod browser {
     use std::{borrow::Cow, cmp::Ordering};
 
+    use itertools::Itertools;
     use ratatui::{
         style::{Color, Style},
         text::{Line, Span},
-        widgets::ListItem,
     };
 
     use crate::{
         config::theme::SymbolsConfig,
         mpd::commands::{Song, lsinfo::LsInfoEntry},
+        shared::mpd_query::PreviewGroup,
     };
 
     impl Song {
-        pub(crate) fn to_preview(
-            &self,
-            _symbols: &SymbolsConfig,
-        ) -> impl Iterator<Item = ListItem<'static>> {
+        pub(crate) fn to_preview(&self, _symbols: &SymbolsConfig) -> Vec<PreviewGroup> {
             let key_style = Style::default().fg(Color::Yellow);
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
+
+            let mut info_group = PreviewGroup::new(Some(" --- [Info]"));
 
             let file = Line::from(vec![
                 start_of_line_spacer.clone(),
@@ -254,64 +254,88 @@ pub(crate) mod browser {
                 separator.clone(),
                 Span::from(self.file.clone()),
             ]);
-            let mut r = vec![file];
+            info_group.push(file.into());
 
             if let Some(file_name) = self.file_name() {
-                r.push(Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Filename", key_style),
-                    separator.clone(),
-                    Span::from(file_name.into_owned()),
-                ]));
+                info_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled("Filename", key_style),
+                        separator.clone(),
+                        Span::from(file_name.into_owned()),
+                    ])
+                    .into(),
+                );
             }
 
             if let Some(title) = self.title() {
-                r.push(Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Title", key_style),
-                    separator.clone(),
-                    Span::from(title.clone()),
-                ]));
+                info_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled("Title", key_style),
+                        separator.clone(),
+                        Span::from(title.clone()),
+                    ])
+                    .into(),
+                );
             }
             if let Some(artist) = self.artist() {
-                r.push(Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Artist", key_style),
-                    separator.clone(),
-                    Span::from(artist.clone()),
-                ]));
+                info_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled("Artist", key_style),
+                        separator.clone(),
+                        Span::from(artist.clone()),
+                    ])
+                    .into(),
+                );
             }
 
             if let Some(album) = self.album() {
-                r.push(Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Album", key_style),
-                    separator.clone(),
-                    Span::from(album.clone()),
-                ]));
+                info_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled("Album", key_style),
+                        separator.clone(),
+                        Span::from(album.clone()),
+                    ])
+                    .into(),
+                );
             }
 
             if let Some(duration) = &self.duration {
-                r.push(Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Duration", key_style),
-                    separator.clone(),
-                    Span::from(duration.as_secs().to_string()),
-                ]));
+                info_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled("Duration", key_style),
+                        separator.clone(),
+                        Span::from(duration.as_secs().to_string()),
+                    ])
+                    .into(),
+                );
             }
 
-            for (k, v) in self.metadata.iter().filter(|(key, _)| {
-                !["title", "album", "artist", "duration"].contains(&(*key).as_str())
-            }) {
-                r.push(Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled(k.clone(), key_style),
-                    separator.clone(),
-                    Span::from(v.clone()),
-                ]));
+            let mut tags_group = PreviewGroup::new(Some(" --- [Tags]"));
+            for (k, v) in self
+                .metadata
+                .iter()
+                .filter(|(key, _)| {
+                    !["title", "album", "artist", "duration"].contains(&(*key).as_str())
+                })
+                .sorted_by_key(|(key, _)| *key)
+            {
+                tags_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled(k.clone(), key_style),
+                        separator.clone(),
+                        Span::from(v.clone()),
+                    ])
+                    .into(),
+                );
             }
 
-            r.into_iter().map(ListItem::new)
+            vec![info_group, tags_group]
         }
     }
 

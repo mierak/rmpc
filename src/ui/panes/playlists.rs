@@ -17,6 +17,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info},
         mouse_event::MouseEvent,
+        mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
@@ -518,14 +519,15 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             .query(move |client| {
                 let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
                     let response = match current {
-                        DirOrSong::Dir { name: d, .. } => Some(
+                        DirOrSong::Dir { name: d, .. } => Some(vec![PreviewGroup::from(
+                            None,
                             client
                                 .list_playlist_info(d, None)?
                                 .into_iter()
                                 .map(DirOrSong::Song)
                                 .map(|s| s.to_list_item_simple(config))
                                 .collect_vec(),
-                        ),
+                        )]),
                         DirOrSong::Song(song) => {
                             match client
                                 .lsinfo(Some(&song.file))
@@ -535,7 +537,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .context("Expected to find exactly one song for preview")?
                             {
                                 LsInfoEntry::File(song) => {
-                                    Some(song.to_preview(&config.theme.symbols).collect_vec())
+                                    Some(song.to_preview(&config.theme.symbols))
                                 }
                                 _ => None,
                             }

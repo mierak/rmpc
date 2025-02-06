@@ -81,9 +81,17 @@ where
 
         if self.widths[2] > 0 {
             self.areas[2] = preview_area;
-            let preview = List::new(preview.unwrap_or_default())
-                .highlight_style(self.config.theme.current_item_style)
-                .style(self.config.as_text_style());
+
+            let mut result = Vec::new();
+            for group in preview.unwrap_or_default() {
+                if let Some(name) = group.name {
+                    result.push(ListItem::new(name).yellow().bold());
+                }
+                result.extend(group.items);
+                result.push(ListItem::new(Span::raw("")));
+            }
+
+            let preview = List::new(result).style(self.config.as_text_style());
             ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
 
