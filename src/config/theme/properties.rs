@@ -8,7 +8,7 @@ use strum::Display;
 use super::style::ToConfigOr;
 use crate::config::{Leak, defaults, theme::StyleFile};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
     Filename,
     File,
@@ -32,7 +32,7 @@ pub enum SongProperty {
     Other(&'static str),
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum StatusPropertyFile {
     Volume,
     Repeat,
@@ -96,15 +96,15 @@ pub enum StatusProperty {
     Bitrate,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PropertyKindFile {
     Song(SongPropertyFile),
     Status(StatusPropertyFile),
     Widget(WidgetPropertyFile),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum PropertyKindFileOrText<T> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum PropertyKindFileOrText<T: Clone> {
     Text(String),
     Sticker(String),
     Property(T),
@@ -112,8 +112,8 @@ pub enum PropertyKindFileOrText<T> {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct PropertyFile<T> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PropertyFile<T: Clone> {
     pub kind: PropertyKindFileOrText<T>,
     pub style: Option<StyleFile>,
     pub default: Option<Box<PropertyFile<T>>>,
@@ -154,7 +154,7 @@ pub struct Property<'a, T> {
     pub default: Option<&'a Property<'a, T>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WidgetPropertyFile {
     States { active_style: Option<StyleFile>, separator_style: Option<StyleFile> },
     Volume,
@@ -323,7 +323,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongFormatFile(pub Vec<PropertyFile<SongPropertyFile>>);
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SongFormat(pub &'static [&'static Property<'static, SongProperty>]);
 
 impl TryFrom<SongFormatFile> for SongFormat {
