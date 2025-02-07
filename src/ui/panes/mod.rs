@@ -10,6 +10,7 @@ use header::HeaderPane;
 use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
+use property::PropertyPane;
 use queue::QueuePane;
 use ratatui::{
     Frame,
@@ -59,6 +60,7 @@ pub mod logs;
 pub mod lyrics;
 pub mod playlists;
 pub mod progress_bar;
+pub mod property;
 pub mod queue;
 pub mod search;
 pub mod tabs;
@@ -82,6 +84,7 @@ pub enum Panes<'pane_ref, 'pane> {
     #[cfg(debug_assertions)]
     FrameCount(&'pane_ref mut FrameCountPane),
     TabContent,
+    Property(PropertyPane),
 }
 
 #[derive(Debug)]
@@ -126,7 +129,11 @@ impl<'panes> PaneContainer<'panes> {
         })
     }
 
-    pub fn get_mut<'pane_ref>(&'pane_ref mut self, screen: PaneType) -> Panes<'pane_ref, 'panes> {
+    pub fn get_mut<'pane_ref>(
+        &'pane_ref mut self,
+        screen: &PaneType,
+        context: &AppContext,
+    ) -> Panes<'pane_ref, 'panes> {
         match screen {
             PaneType::Queue => Panes::Queue(&mut self.queue),
             #[cfg(debug_assertions)]
@@ -145,6 +152,9 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::TabContent => Panes::TabContent,
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Panes::FrameCount(&mut self.frame_count),
+            PaneType::Property { content, align } => {
+                Panes::Property(PropertyPane::new(content, *align, context))
+            }
         }
     }
 }
@@ -169,6 +179,7 @@ macro_rules! pane_call {
             Panes::TabContent => Ok(()),
             #[cfg(debug_assertions)]
             Panes::FrameCount(ref mut s) => s.$fn($($param),+),
+            Panes::Property(ref mut s) => s.$fn($($param),+),
         }
     }
 }
@@ -804,30 +815,45 @@ impl Property<'static, PropertyKind> {
 impl SizedPaneOrSplit {
     pub fn for_each_pane(
         &self,
-        focused: Option<ConfigPane>,
         area: Rect,
-        context: &AppContext,
-        callback: &mut impl FnMut(ConfigPane, Rect, Block, Rect) -> Result<()>,
+        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect) -> Result<()>,
+    ) -> Result<()> {
+        self.for_each_pane_custom_data(
+            area,
+            (),
+            &mut |pane, pane_area, block, block_area, ()| {
+                pane_callback(pane, pane_area, block, block_area)?;
+                Ok(())
+            },
+            &mut |_, _, ()| Ok(()),
+        )
+    }
+
+    pub fn for_each_pane_custom_data<T>(
+        &self,
+        area: Rect,
+        mut custom_data: T,
+        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect, &mut T) -> Result<()>,
+        split_callback: &mut impl FnMut(Block, Rect, &mut T) -> Result<()>,
     ) -> Result<()> {
         let mut stack = vec![(self, area)];
 
         while let Some((configured_panes, area)) = stack.pop() {
             match configured_panes {
                 SizedPaneOrSplit::Pane(pane) => {
-                    let block = Block::default()
-                        .border_style(if focused.is_some_and(|p| p.id == pane.id) {
-                            context.config.as_focused_border_style()
-                        } else {
-                            context.config.as_border_style()
-                        })
-                        .borders(pane.border);
+                    let block = Block::default().borders(pane.borders);
                     let pane_area = block.inner(area);
 
-                    callback(*pane, pane_area, block, area)?;
+                    pane_callback(pane, pane_area, block, area, &mut custom_data)?;
                 }
-                SizedPaneOrSplit::Split { direction, panes } => {
+                SizedPaneOrSplit::Split { direction, panes, borders } => {
                     let constraints = panes.iter().map(|pane| Into::<Constraint>::into(pane.size));
-                    let areas = Layout::new(*direction, constraints).split(area);
+                    let block = Block::default().borders(*borders);
+                    let pane_areas = block.inner(area);
+                    let areas = Layout::new(*direction, constraints).split(pane_areas);
+
+                    split_callback(block, area, &mut custom_data)?;
+
                     stack.extend(
                         areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
                     );

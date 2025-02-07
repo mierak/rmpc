@@ -8,7 +8,7 @@ use strum::Display;
 use super::style::ToConfigOr;
 use crate::config::{Leak, defaults, theme::StyleFile};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
     Filename,
     File,
@@ -20,7 +20,7 @@ pub enum SongPropertyFile {
     Other(String),
 }
 
-#[derive(Debug, Copy, Clone, Display)]
+#[derive(Debug, Copy, Clone, Display, Hash, Eq, PartialEq)]
 pub enum SongProperty {
     Filename,
     File,
@@ -32,7 +32,7 @@ pub enum SongProperty {
     Other(&'static str),
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum StatusPropertyFile {
     Volume,
     Repeat,
@@ -82,7 +82,7 @@ pub enum StatusPropertyFile {
     Bitrate,
 }
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
 pub enum StatusProperty {
     Volume,
     Repeat { on_label: &'static str, off_label: &'static str },
@@ -96,15 +96,15 @@ pub enum StatusProperty {
     Bitrate,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PropertyKindFile {
     Song(SongPropertyFile),
     Status(StatusPropertyFile),
     Widget(WidgetPropertyFile),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum PropertyKindFileOrText<T> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum PropertyKindFileOrText<T: Clone> {
     Text(String),
     Sticker(String),
     Property(T),
@@ -112,14 +112,14 @@ pub enum PropertyKindFileOrText<T> {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct PropertyFile<T> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PropertyFile<T: Clone> {
     pub kind: PropertyKindFileOrText<T>,
     pub style: Option<StyleFile>,
     pub default: Option<Box<PropertyFile<T>>>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum PropertyKindOrText<'a, T> {
     Text(&'a str),
     Sticker(&'a str),
@@ -140,34 +140,35 @@ impl<T> PropertyKindOrText<'_, T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum PropertyKind {
     Song(SongProperty),
     Status(StatusProperty),
     Widget(WidgetProperty),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Property<'a, T> {
     pub kind: PropertyKindOrText<'a, T>,
     pub style: Option<Style>,
     pub default: Option<&'a Property<'a, T>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WidgetPropertyFile {
     States { active_style: Option<StyleFile>, separator_style: Option<StyleFile> },
     Volume,
 }
 
-#[derive(Debug, Display, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum WidgetProperty {
     States { active_style: Style, separator_style: Style },
     Volume,
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alignment {
+    #[default]
     Left,
     Right,
     Center,
@@ -266,6 +267,26 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
     }
 }
 
+impl TryFrom<&PropertyFile<PropertyKindFile>> for &'static Property<'static, PropertyKind> {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: &PropertyFile<PropertyKindFile>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
+        Property::<'static, PropertyKind>::try_from(value.clone()).map(|v| v.leak())
+    }
+}
+
+impl TryFrom<&PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind> {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        value: &PropertyFile<PropertyKindFile>,
+    ) -> std::prelude::v1::Result<Self, Self::Error> {
+        Property::<'static, PropertyKind>::try_from(value.clone())
+    }
+}
+
 impl TryFrom<PropertyFile<PropertyKindFile>> for &'static Property<'static, PropertyKind> {
     type Error = anyhow::Error;
 
@@ -323,7 +344,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongFormatFile(pub Vec<PropertyFile<SongPropertyFile>>);
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SongFormat(pub &'static [&'static Property<'static, SongProperty>]);
 
 impl TryFrom<SongFormatFile> for SongFormat {

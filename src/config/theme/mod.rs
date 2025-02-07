@@ -23,12 +23,12 @@ pub use style::{ConfigColor, StyleFile};
 pub use self::queue_table::{PercentOrLength, SongTableColumn};
 use super::{
     defaults,
-    tabs::{BorderTypeFile, PaneOrSplitFile, SizedPaneOrSplit},
+    tabs::{PaneOrSplitFile, SizedPaneOrSplit},
 };
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(Default, Clone)]
+#[derive(derive_more::Debug, Default, Clone)]
 pub struct UiConfig {
     pub draw_borders: bool,
     pub background_color: Option<Color>,
@@ -48,34 +48,9 @@ pub struct UiConfig {
     pub show_song_table_header: bool,
     pub song_table_format: &'static [SongTableColumn],
     pub header: HeaderConfig,
+    #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
     pub layout: SizedPaneOrSplit,
-}
-
-impl std::fmt::Debug for UiConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "UiConfig {{ draw_borders: {}, background_color: {:?}, header_background_color: {:?}, background_color_modal: {:?}, borders_style: {:?}, highlighted_item_style: {:?}, current_item_style: {:?}, highlight_border_style: {:?}, tab_bar: {:?}, column_widths: {:?}, symbols: {:?}, progress_bar: {:?}, scrollbar: {:?}, show_song_table_header: {}, song_table_format: {:?}, header: {:?}, default_album_art: [u8; {}] }}",
-            self.draw_borders,
-            self.background_color,
-            self.header_background_color,
-            self.modal_background_color,
-            self.borders_style,
-            self.highlighted_item_style,
-            self.current_item_style,
-            self.highlight_border_style,
-            self.tab_bar,
-            self.column_widths,
-            self.symbols,
-            self.progress_bar,
-            self.scrollbar,
-            self.show_song_table_header,
-            self.song_table_format,
-            self.header,
-            self.default_album_art.len()
-        )
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -214,7 +189,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let fallback_border_fg = Color::White;
 
         Ok(Self {
-            layout: value.layout.convert(BorderTypeFile::None)?,
+            layout: value.layout.convert()?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             modal_background_color: StringColor(value.modal_background_color)
