@@ -48,6 +48,7 @@ They have additional config properties compared to their predecesors.
 - rmpc waiting potentionally forever for MPD's response
 - Adding songs which do not belong to any album not working in `Artists` and `AlbumArtists` panes not working
 - Songs metadata not being sorted in preview column
+- Prevent album art rendering when modal is open
 
 ### Deprecated
 
