@@ -14,13 +14,19 @@ use crate::{
 #[derive(Debug)]
 pub struct AlbumArtPane {
     album_art: AlbumArtFacade,
+    is_modal_open: bool,
+    fetch_needed: bool,
 }
 
 const ALBUM_ART: &str = "album_art";
 
 impl AlbumArtPane {
     pub fn new(context: &AppContext) -> Self {
-        Self { album_art: AlbumArtFacade::new(context.config) }
+        Self {
+            album_art: AlbumArtFacade::new(context.config),
+            is_modal_open: false,
+            fetch_needed: false,
+        }
     }
 
     /// returns none if album art is supposed to be hidden
@@ -72,6 +78,9 @@ impl Pane for AlbumArtPane {
     }
 
     fn resize(&mut self, area: Rect, _context: &AppContext) -> Result<()> {
+        if self.is_modal_open {
+            return Ok(());
+        }
         self.album_art.set_size(area);
         self.album_art.show_current()
     }
@@ -90,7 +99,7 @@ impl Pane for AlbumArtPane {
         is_visible: bool,
         _context: &AppContext,
     ) -> Result<()> {
-        if !is_visible {
+        if !is_visible || self.is_modal_open {
             return Ok(());
         }
         match (id, data) {
@@ -113,17 +122,25 @@ impl Pane for AlbumArtPane {
     ) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected if is_visible => {
-                if AlbumArtPane::fetch_album_art(context).is_none() {
-                    self.album_art.show_default()?;
+                if self.is_modal_open {
+                    self.fetch_needed = true;
+                    return Ok(());
                 }
+                self.before_show(context)?;
             }
             UiEvent::ModalOpened if is_visible => {
+                self.is_modal_open = true;
                 self.album_art.hide()?;
-                context.render()?;
             }
             UiEvent::ModalClosed if is_visible => {
+                self.is_modal_open = false;
+
+                if self.fetch_needed {
+                    self.fetch_needed = false;
+                    self.before_show(context)?;
+                    return Ok(());
+                }
                 self.album_art.show_current()?;
-                context.render()?;
             }
             UiEvent::Exit => {
                 self.album_art.cleanup()?;
