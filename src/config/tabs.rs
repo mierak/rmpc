@@ -149,23 +149,6 @@ pub enum BorderTypeFile {
     None,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum BorderType {
-    Full,
-    Single,
-    None,
-}
-
-impl From<BorderTypeFile> for BorderType {
-    fn from(value: BorderTypeFile) -> Self {
-        match value {
-            BorderTypeFile::Full => BorderType::Full,
-            BorderTypeFile::Single => BorderType::Single,
-            BorderTypeFile::None => BorderType::None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(super) struct TabsFile(Vec<TabFile>);
 
