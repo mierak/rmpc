@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Introduced `StateV2` property as a replacement for `State`. It has additional config properties compared to its predecesor.
 - Introduced `RandomV2`, `ConsumeV2`, `RepeatV2` and `SingleV2` properties as a replacement for their respective earlier versions.
 They have additional config properties compared to their predecesors.
+- `borders` configuration in the tabs configuration
 
 ### Changed
 
@@ -52,6 +53,7 @@ They have additional config properties compared to their predecesors.
 
 ### Deprecated
 
+- `border_type` in tabs config. It has been replaced by the new and more powerful `borders`
 - `theme.tab_bar.enabled` replaced by layout configuration
 - `State` header property
 - `RandomV2`, `ConsumeV2`, `RepeatV2` and `SingleV2` header properties

@@ -101,7 +101,7 @@ impl<'ui> Ui<'ui> {
                 .tabs
                 .iter()
                 .map(|(name, screen)| -> Result<_> {
-                    Ok((*name, TabScreen::new(screen.panes.clone())))
+                    Ok((*name, TabScreen::new(screen.panes.clone())?))
                 })
                 .try_collect()?,
             area: Rect::default(),
@@ -113,8 +113,8 @@ impl<'ui> Ui<'ui> {
     }
 
     fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
-        self.layout.for_each_pane(None, self.area, context, &mut |pane, _, _, _| {
-            match self.panes.get_mut(pane.pane) {
+        self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
+            match self.panes.get_mut(&pane.pane) {
                 Panes::TabContent => {
                     active_tab_call!(self, on_hide(context))?;
                 }
@@ -126,8 +126,8 @@ impl<'ui> Ui<'ui> {
         self.active_tab = new_tab;
         self.on_event(UiEvent::TabChanged(new_tab), context)?;
 
-        self.layout.for_each_pane(None, self.area, context, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(pane.pane) {
+        self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
+            match self.panes.get_mut(&pane.pane) {
                 Panes::TabContent => {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
@@ -144,12 +144,11 @@ impl<'ui> Ui<'ui> {
                 .render_widget(Block::default().style(Style::default().bg(bg_color)), frame.area());
         }
 
-        self.layout.for_each_pane(
-            None,
+        self.layout.for_each_pane_custom_data(
             self.area,
-            context,
-            &mut |pane, pane_area, block, block_area| {
-                match self.panes.get_mut(pane.pane) {
+            &mut *frame,
+            &mut |pane, pane_area, block, block_area, frame| {
+                match self.panes.get_mut(&pane.pane) {
                     Panes::TabContent => {
                         active_tab_call!(self, render(frame, pane_area, context))?;
                     }
@@ -157,7 +156,17 @@ impl<'ui> Ui<'ui> {
                         pane_call!(pane_instance, render(frame, pane_area, context))?;
                     }
                 };
-                frame.render_widget(block, block_area);
+                frame.render_widget(
+                    block.border_style(context.config.as_border_style()),
+                    block_area,
+                );
+                Ok(())
+            },
+            &mut |block, block_area, frame| {
+                frame.render_widget(
+                    block.border_style(context.config.as_border_style()),
+                    block_area,
+                );
                 Ok(())
             },
         )?;
@@ -179,8 +188,8 @@ impl<'ui> Ui<'ui> {
             return Ok(());
         }
 
-        self.layout.for_each_pane(None, self.area, context, &mut |pane, _, _, _| {
-            match self.panes.get_mut(pane.pane) {
+        self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
+            match self.panes.get_mut(&pane.pane) {
                 Panes::TabContent => {
                     active_tab_call!(self, handle_mouse_event(event, context))?;
                 }
@@ -393,8 +402,8 @@ impl<'ui> Ui<'ui> {
     pub fn before_show(&mut self, area: Rect, context: &mut AppContext) -> Result<()> {
         self.calc_areas(area, context);
 
-        self.layout.for_each_pane(None, self.area, context, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(pane.pane) {
+        self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
+            match self.panes.get_mut(&pane.pane) {
                 Panes::TabContent => {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
@@ -428,8 +437,8 @@ impl<'ui> Ui<'ui> {
         log::trace!(area:?; "Terminal was resized");
         self.calc_areas(area, context);
 
-        self.layout.for_each_pane(None, self.area, context, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(pane.pane) {
+        self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
+            match self.panes.get_mut(&pane.pane) {
                 Panes::TabContent => {
                     active_tab_call!(self, resize(pane_area, context))?;
                 }
@@ -460,7 +469,7 @@ impl<'ui> Ui<'ui> {
         };
 
         for name in context.config.active_panes {
-            match self.panes.get_mut(*name) {
+            match self.panes.get_mut(name) {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => p.on_event(&mut event, contains_pane(PaneType::Logs), context),
                 Panes::Queue(p) => p.on_event(&mut event, contains_pane(PaneType::Queue), context),
@@ -520,7 +529,7 @@ impl<'ui> Ui<'ui> {
                 || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
         match pane {
-            Some(pane) => match self.panes.get_mut(pane) {
+            Some(pane) => match self.panes.get_mut(&pane) {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Logs), context)

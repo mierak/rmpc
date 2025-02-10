@@ -114,7 +114,6 @@
     tabs: [
         (
             name: "Queue",
-            border_type: None,
             pane: Split(
                 direction: Horizontal,
                 panes: [(size: "40%", pane: Pane(AlbumArt)), (size: "60%", pane: Pane(Queue))],
@@ -122,32 +121,26 @@
         ),
         (
             name: "Directories",
-            border_type: None,
             pane: Pane(Directories),
         ),
         (
             name: "Artists",
-            border_type: None,
             pane: Pane(Artists),
         ),
         (
             name: "Album Artists",
-            border_type: None,
             pane: Pane(AlbumArtists),
         ),
         (
             name: "Albums",
-            border_type: None,
             pane: Pane(Albums),
         ),
         (
             name: "Playlists",
-            border_type: None,
             pane: Pane(Playlists),
         ),
         (
             name: "Search",
-            border_type: None,
             pane: Pane(Search),
         ),
     ],
