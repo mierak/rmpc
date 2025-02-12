@@ -206,7 +206,7 @@ impl ConfigFile {
             .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| &pane.pane))
             .chain(theme.layout.panes_iter().map(|pane| &pane.pane))
             .dedup()
-            .cloned()
+            .copied()
             .collect_vec()
             .leak();
 
