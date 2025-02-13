@@ -64,6 +64,9 @@ impl Default for HeaderConfigFile {
                                     playing_label: defaults::default_playing_label(),
                                     paused_label: defaults::default_paused_label(),
                                     stopped_label: defaults::default_stopped_label(),
+                                    playing_style: None,
+                                    paused_style: None,
+                                    stopped_style: None,
                                 },
                             )),
                             style: Some(StyleFile {

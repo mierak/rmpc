@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use bitflags::bitflags;
+use bon::Builder;
 use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -22,7 +23,7 @@ impl StringColor {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Builder)]
 pub struct StyleFile {
     pub(super) fg: Option<String>,
     pub(super) bg: Option<String>,
