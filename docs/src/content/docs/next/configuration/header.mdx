@@ -113,7 +113,8 @@ will display if the repeat mode is on or off, etc.
 <ConfigValue
     name="kind"
     type="other"
-    customText='Property(Status(StateV2(playing_label: "<your label>", paused_label: "<your label>", stopped_label: "<your label>")))'
+    customText='Property(Status(StateV2(playing_label: "<your label>", paused_label: "<your label>", stopped_label: "<your label>",
+    playing_style: <style>, paused_style: <style>, stopped_style: <style>)))'
 />
 
 The `StateV2` property has additional configuration options. If you omit any of the values, the default is used, so you can for example
@@ -124,7 +125,7 @@ do just: `Status(StateV2(playing_label: "Playing"))`or`Status(StateV2())`. The d
 <ConfigValue
     name="kind"
     type="other"
-    customText='Property(Status(RepeatV2(on_label: "<your label>", off_label: "<your label>")))'
+    customText='Property(Status(RepeatV2(on_label: "<your label>", off_label: "<your label>", on_style: <style>, off_style: <style>)))'
 />
 
 Similar to `StateV2`. Allows you to configure labels for on/off states.
@@ -134,7 +135,7 @@ Similar to `StateV2`. Allows you to configure labels for on/off states.
 <ConfigValue
     name="kind"
     type="other"
-    customText='Property(Status(RandomV2(on_label: "<your label>", off_label: "<your label>")))'
+    customText='Property(Status(RandomV2(on_label: "<your label>", off_label: "<your label>", on_style: <style>, off_style: <style>)))'
 />
 
 Similar to `StateV2`. Allows you to configure labels for on/off states.
@@ -144,7 +145,8 @@ Similar to `StateV2`. Allows you to configure labels for on/off states.
 <ConfigValue
     name="kind"
     type="other"
-    customText='Property(Status(ConsumeV2(on_label: "<your label>", off_label: "<your label>", oneshot_label: "<your label>")))'
+    customText='Property(Status(ConsumeV2(on_label: "<your label>", off_label: "<your label>",
+    oneshot_label: "<your label>", on_style: <style>, off_style: <style>, oneshot_style: <style>)))'
 />
 
 Similar to `StateV2`. Allows you to configure labels for on/off and one shot states. Note that oneshot state is available
@@ -155,7 +157,8 @@ from MPD version 0.24.0, with earlier versions it get silently ignored.
 <ConfigValue
     name="kind"
     type="other"
-    customText='Property(Status(SingleV2(on_label: "<your label>", off_label: "<your label>", oneshot_label: "<your label>")))'
+    customText='Property(Status(SingleV2(on_label: "<your label>", off_label: "<your label>", oneshot_label: "<your label>",
+    oneshot_label: "<your label>", on_style: <style>, off_style: <style>, oneshot_style: <style>)))'
 />
 
 Similar to `StateV2`. Allows you to configure labels for on/off and one shot states.
