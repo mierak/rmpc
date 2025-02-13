@@ -45,12 +45,20 @@ pub enum StatusPropertyFile {
         on_label: String,
         #[serde(default = "defaults::default_off_label")]
         off_label: String,
+        #[serde(default)]
+        on_style: Option<StyleFile>,
+        #[serde(default)]
+        off_style: Option<StyleFile>,
     },
     RandomV2 {
         #[serde(default = "defaults::default_on_label")]
         on_label: String,
         #[serde(default = "defaults::default_off_label")]
         off_label: String,
+        #[serde(default)]
+        on_style: Option<StyleFile>,
+        #[serde(default)]
+        off_style: Option<StyleFile>,
     },
     SingleV2 {
         #[serde(default = "defaults::default_on_label")]
@@ -59,6 +67,12 @@ pub enum StatusPropertyFile {
         off_label: String,
         #[serde(default = "defaults::default_oneshot_label")]
         oneshot_label: String,
+        #[serde(default)]
+        on_style: Option<StyleFile>,
+        #[serde(default)]
+        off_style: Option<StyleFile>,
+        #[serde(default)]
+        oneshot_style: Option<StyleFile>,
     },
     ConsumeV2 {
         #[serde(default = "defaults::default_on_label")]
@@ -67,6 +81,12 @@ pub enum StatusPropertyFile {
         off_label: String,
         #[serde(default = "defaults::default_oneshot_label")]
         oneshot_label: String,
+        #[serde(default)]
+        on_style: Option<StyleFile>,
+        #[serde(default)]
+        off_style: Option<StyleFile>,
+        #[serde(default)]
+        oneshot_style: Option<StyleFile>,
     },
     StateV2 {
         #[serde(default = "defaults::default_playing_label")]
@@ -75,6 +95,12 @@ pub enum StatusPropertyFile {
         paused_label: String,
         #[serde(default = "defaults::default_stopped_label")]
         stopped_label: String,
+        #[serde(default)]
+        playing_style: Option<StyleFile>,
+        #[serde(default)]
+        paused_style: Option<StyleFile>,
+        #[serde(default)]
+        stopped_style: Option<StyleFile>,
     },
     Elapsed,
     Duration,
@@ -85,11 +111,42 @@ pub enum StatusPropertyFile {
 #[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
 pub enum StatusProperty {
     Volume,
-    Repeat { on_label: &'static str, off_label: &'static str },
-    Random { on_label: &'static str, off_label: &'static str },
-    Single { on_label: &'static str, off_label: &'static str, oneshot_label: &'static str },
-    Consume { on_label: &'static str, off_label: &'static str, oneshot_label: &'static str },
-    State { playing_label: &'static str, paused_label: &'static str, stopped_label: &'static str },
+    Repeat {
+        on_label: &'static str,
+        off_label: &'static str,
+        on_style: Option<Style>,
+        off_style: Option<Style>,
+    },
+    Random {
+        on_label: &'static str,
+        off_label: &'static str,
+        on_style: Option<Style>,
+        off_style: Option<Style>,
+    },
+    Single {
+        on_label: &'static str,
+        off_label: &'static str,
+        oneshot_label: &'static str,
+        on_style: Option<Style>,
+        off_style: Option<Style>,
+        oneshot_style: Option<Style>,
+    },
+    Consume {
+        on_label: &'static str,
+        off_label: &'static str,
+        oneshot_label: &'static str,
+        on_style: Option<Style>,
+        off_style: Option<Style>,
+        oneshot_style: Option<Style>,
+    },
+    State {
+        playing_label: &'static str,
+        paused_label: &'static str,
+        stopped_label: &'static str,
+        playing_style: Option<Style>,
+        paused_style: Option<Style>,
+        stopped_style: Option<Style>,
+    },
     Elapsed,
     Duration,
     Crossfade,
@@ -210,15 +267,30 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                 playing_label: play_label,
                 paused_label: pause_label,
                 stopped_label: stop_label,
+                playing_style,
+                paused_style,
+                stopped_style,
             } => StatusProperty::State {
                 playing_label: play_label.leak(),
                 paused_label: pause_label.leak(),
                 stopped_label: stop_label.leak(),
+                playing_style: playing_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+                paused_style: paused_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+                stopped_style: stopped_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
             },
             StatusPropertyFile::State => StatusProperty::State {
                 playing_label: defaults::default_playing_label().leak(),
                 paused_label: defaults::default_paused_label().leak(),
                 stopped_label: defaults::default_stopped_label().leak(),
+                playing_style: None,
+                paused_style: None,
+                stopped_style: None,
             },
             StatusPropertyFile::Duration => StatusProperty::Duration,
             StatusPropertyFile::Elapsed => StatusProperty::Elapsed,
@@ -228,41 +300,97 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             StatusPropertyFile::Repeat => StatusProperty::Repeat {
                 on_label: defaults::default_on_label().leak(),
                 off_label: defaults::default_off_label().leak(),
+                on_style: None,
+                off_style: None,
             },
             StatusPropertyFile::Random => StatusProperty::Random {
                 on_label: defaults::default_on_label().leak(),
                 off_label: defaults::default_off_label().leak(),
+                on_style: None,
+                off_style: None,
             },
             StatusPropertyFile::Consume => StatusProperty::Consume {
                 on_label: defaults::default_on_label().leak(),
                 off_label: defaults::default_off_label().leak(),
                 oneshot_label: defaults::default_oneshot_label().leak(),
+                on_style: None,
+                off_style: None,
+                oneshot_style: None,
             },
             StatusPropertyFile::Single => StatusProperty::Single {
                 on_label: defaults::default_on_label().leak(),
                 off_label: defaults::default_off_label().leak(),
                 oneshot_label: defaults::default_oneshot_label().leak(),
+                on_style: None,
+                off_style: None,
+                oneshot_style: None,
             },
-            StatusPropertyFile::RepeatV2 { on_label, off_label } => {
-                StatusProperty::Repeat { on_label: on_label.leak(), off_label: off_label.leak() }
-            }
-            StatusPropertyFile::RandomV2 { on_label, off_label } => {
-                StatusProperty::Random { on_label: on_label.leak(), off_label: off_label.leak() }
-            }
-            StatusPropertyFile::ConsumeV2 { on_label, off_label, oneshot_label } => {
-                StatusProperty::Consume {
+            StatusPropertyFile::RepeatV2 { on_label, off_label, on_style, off_style } => {
+                StatusProperty::Repeat {
                     on_label: on_label.leak(),
                     off_label: off_label.leak(),
-                    oneshot_label: oneshot_label.leak(),
+                    on_style: on_style
+                        .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                        .transpose()?,
+                    off_style: off_style
+                        .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                        .transpose()?,
                 }
             }
-            StatusPropertyFile::SingleV2 { on_label, off_label, oneshot_label } => {
-                StatusProperty::Single {
+            StatusPropertyFile::RandomV2 { on_label, off_label, on_style, off_style } => {
+                StatusProperty::Random {
                     on_label: on_label.leak(),
                     off_label: off_label.leak(),
-                    oneshot_label: oneshot_label.leak(),
+                    on_style: on_style
+                        .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                        .transpose()?,
+                    off_style: off_style
+                        .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                        .transpose()?,
                 }
             }
+            StatusPropertyFile::ConsumeV2 {
+                on_label,
+                off_label,
+                oneshot_label,
+                on_style,
+                off_style,
+                oneshot_style,
+            } => StatusProperty::Consume {
+                on_label: on_label.leak(),
+                off_label: off_label.leak(),
+                oneshot_label: oneshot_label.leak(),
+                on_style: on_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+                off_style: off_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+                oneshot_style: oneshot_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+            },
+            StatusPropertyFile::SingleV2 {
+                on_label,
+                off_label,
+                oneshot_label,
+                on_style,
+                off_style,
+                oneshot_style,
+            } => StatusProperty::Single {
+                on_label: on_label.leak(),
+                off_label: off_label.leak(),
+                oneshot_label: oneshot_label.leak(),
+                on_style: on_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+                off_style: off_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+                oneshot_style: oneshot_style
+                    .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                    .transpose()?,
+            },
         })
     }
 }
