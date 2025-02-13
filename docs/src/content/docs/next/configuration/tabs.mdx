@@ -119,7 +119,7 @@ tabs: [
             ],
         ),
     ),
-]
+],
 ```
 
 </details>
@@ -147,7 +147,7 @@ tabs: [
             ],
         ),
     ),
-]
+],
 ```
 
 </details>
@@ -168,66 +168,67 @@ another `Property` pane with combination of `Elapsed` and `Duration` status prop
 <summary>Click to expand</summary>
 
 ```rust
-(
-    name: "Test",
-    pane: Split(
-        direction: Vertical,
-        panes: [
-            (
-                size: "100%",
-                borders: "ALL",
-                pane: Split(
+tabs: [
+    (
+        name: "Test",
+        pane: Split(
+            direction: Vertical,
+            panes: [
+                (
+                    size: "100%",
                     borders: "ALL",
-                    direction: Horizontal,
-                    panes: [
-                        (
-                            size: "40%",
-                            borders: "RIGHT",
-                            pane: Pane(AlbumArt),
-                        ),
-                        (
-                            size: "60%",
-                            pane: Pane(Queue),
-                        ),
-                    ],
+                    pane: Split(
+                        borders: "ALL",
+                        direction: Horizontal,
+                        panes: [
+                            (
+                                size: "40%",
+                                borders: "RIGHT",
+                                pane: Pane(AlbumArt),
+                            ),
+                            (
+                                size: "60%",
+                                pane: Pane(Queue),
+                            ),
+                        ],
+                    ),
                 ),
-            ),
-            (
-                size: "3",
-                borders: "ALL",
-                pane: Split(
-                    direction: Horizontal,
-                    panes: [
-                        (
-                            pane: Pane(Property(content: [(kind: Property(Status(StateV2())))], align: Left)),
-                            size: "10",
-                        ),
-                        (
-                            size: "100%",
-                            pane: Pane(ProgressBar),
-                        ),
-                        (
-                            size: "14",
-                            pane: Pane(Property(
-                                content: [
-                                    (kind: Property(Status(Elapsed))),
-                                    (kind: Text(" / ")),
-                                    (kind: Property(Status(Duration))),
-                                    (kind: Group([
-                                        (kind: Text(" (")),
-                                        (kind: Property(Status(Bitrate))),
-                                        (kind: Text(" kbps)")),
-                                    ])),
-                                ], align: Right,
-                            )),
-                        ),
-                    ]
+                (
+                    size: "3",
+                    borders: "ALL",
+                    pane: Split(
+                        direction: Horizontal,
+                        panes: [
+                            (
+                                pane: Pane(Property(content: [(kind: Property(Status(StateV2())))], align: Left)),
+                                size: "10",
+                            ),
+                            (
+                                size: "100%",
+                                pane: Pane(ProgressBar),
+                            ),
+                            (
+                                size: "14",
+                                pane: Pane(Property(
+                                    content: [
+                                        (kind: Property(Status(Elapsed))),
+                                        (kind: Text(" / ")),
+                                        (kind: Property(Status(Duration))),
+                                        (kind: Group([
+                                            (kind: Text(" (")),
+                                            (kind: Property(Status(Bitrate))),
+                                            (kind: Text(" kbps)")),
+                                        ])),
+                                    ], align: Right,
+                                )),
+                            ),
+                        ]
+                    ),
                 ),
-            ),
-        ],
+            ],
+        ),
     ),
-),
-
+],
 ```
 
 </details>
