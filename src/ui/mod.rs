@@ -114,7 +114,7 @@ impl<'ui> Ui<'ui> {
 
     fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane) {
+            match self.panes.get_mut(&pane.pane, context) {
                 Panes::TabContent => {
                     active_tab_call!(self, on_hide(context))?;
                 }
@@ -127,7 +127,7 @@ impl<'ui> Ui<'ui> {
         self.on_event(UiEvent::TabChanged(new_tab), context)?;
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane) {
+            match self.panes.get_mut(&pane.pane, context) {
                 Panes::TabContent => {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
@@ -148,7 +148,7 @@ impl<'ui> Ui<'ui> {
             self.area,
             &mut *frame,
             &mut |pane, pane_area, block, block_area, frame| {
-                match self.panes.get_mut(&pane.pane) {
+                match self.panes.get_mut(&pane.pane, context) {
                     Panes::TabContent => {
                         active_tab_call!(self, render(frame, pane_area, context))?;
                     }
@@ -189,7 +189,7 @@ impl<'ui> Ui<'ui> {
         }
 
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane) {
+            match self.panes.get_mut(&pane.pane, context) {
                 Panes::TabContent => {
                     active_tab_call!(self, handle_mouse_event(event, context))?;
                 }
@@ -403,7 +403,7 @@ impl<'ui> Ui<'ui> {
         self.calc_areas(area, context);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane) {
+            match self.panes.get_mut(&pane.pane, context) {
                 Panes::TabContent => {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
@@ -438,7 +438,7 @@ impl<'ui> Ui<'ui> {
         self.calc_areas(area, context);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane) {
+            match self.panes.get_mut(&pane.pane, context) {
                 Panes::TabContent => {
                     active_tab_call!(self, resize(pane_area, context))?;
                 }
@@ -469,7 +469,7 @@ impl<'ui> Ui<'ui> {
         };
 
         for name in context.config.active_panes {
-            match self.panes.get_mut(name) {
+            match self.panes.get_mut(name, context) {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => p.on_event(&mut event, contains_pane(PaneType::Logs), context),
                 Panes::Queue(p) => p.on_event(&mut event, contains_pane(PaneType::Queue), context),
@@ -509,6 +509,7 @@ impl<'ui> Ui<'ui> {
                 Panes::FrameCount(p) => {
                     p.on_event(&mut event, contains_pane(PaneType::Tabs), context)
                 }
+                Panes::Property(_) => Ok(()), // Property panes do not need to receive events
             }?;
         }
 
@@ -529,7 +530,7 @@ impl<'ui> Ui<'ui> {
                 || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
         match pane {
-            Some(pane) => match self.panes.get_mut(&pane) {
+            Some(pane) => match self.panes.get_mut(&pane, context) {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Logs), context)
@@ -575,6 +576,8 @@ impl<'ui> Ui<'ui> {
                 Panes::FrameCount(p) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::FrameCount), context)
                 }
+                // Property panes do not need to receive command notifications
+                Panes::Property(_) => Ok(()),
             }?,
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {

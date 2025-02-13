@@ -67,6 +67,10 @@ impl<'a> ProgressBar<'a> {
 
 impl Widget for ProgressBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        if area.height < 1 {
+            return;
+        }
+
         let left = area.left();
         let right = area.right();
         let len = right - left;

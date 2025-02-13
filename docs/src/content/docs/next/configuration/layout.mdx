@@ -11,6 +11,7 @@ import { path } from "../data.ts";
 import { Image } from "astro:assets";
 import example_layout_album_art_in_header from "../assets/example_layout_album_art_in_header.png";
 import example_layout_default from "../assets/example_layout_default.png";
+import example_layout_default_borders from "../assets/example_layout_default_borders.png";
 
 Layout controls the base layout of the application. This layout is similar to <a href={path("configuration/tabs#pane--split")}>tabs</a>
 configuration except it contains a single `Pane` or `Split`. It is configured inside your <a href={path("configuration/theme#layout")}>theme.ron</a>.
@@ -81,7 +82,6 @@ layout: Split(
         ),
     ],
 ),
-
 ```
 
 </details>
@@ -116,12 +116,50 @@ layout: Split(
             size: "1",
         ),
     ],
-)
+),
 ```
 
 </details>
 
 <Image src={example_layout_default} width={800} alt="Example default layout" />
+
+### Default layout with borders
+
+This is the default layout, but with borders around all layout panes except the tabs.
+
+<details>
+<summary>Click to show theme.ron</summary>
+
+```rust
+layout: Split(
+    direction: Vertical,
+    panes: [
+        (
+            size: "4",
+            borders: "ALL",
+            pane: Pane(Header),
+        ),
+        (
+            size: "3",
+            pane: Pane(Tabs),
+        ),
+        (
+            size: "100%",
+            borders: "ALL",
+            pane: Pane(TabContent),
+        ),
+        (
+            size: "3",
+            borders: "ALL",
+            pane: Pane(ProgressBar),
+        ),
+    ],
+),
+```
+
+</details>
+
+<Image src={example_layout_default_borders} width={800} alt="Example default layout with borders" />
 
 ### No layout, just the tab's content
 

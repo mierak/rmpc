@@ -28,8 +28,8 @@ Property of the song to display in the column. Described in [its own section](#p
 <ConfigValue name="width" type="string" />
 Portion of the table width reserved for this column. Can be one of:
 
--   Exact value: `"5"` which will result in 5 column width
--   Percentage: `"50%"` which will result in half the table width
+- Exact value: `"5"` which will result in 5 column width
+- Percentage: `"50%"` which will result in half the table width
 
 ### alignment
 
@@ -73,7 +73,7 @@ Will display static text in the table. Mostly useful for default values. For exa
 
 ### Group
 
-<ConfigValue name="kind" type="other" customText="Group(<property>)" link="#property" />
+<ConfigValue name="kind" type="other" customText="Group(<property>[])" link="#property" />
 
 A special kind of property that groups multiple properties together. If any of the properties in the group results
 in a `None` value, the whole group is considered `None` and the default value is used.

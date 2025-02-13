@@ -7,7 +7,13 @@ use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use super::{Leak, theme::PercentOrLength};
+use super::{
+    Leak,
+    theme::{
+        PercentOrLength,
+        properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
+    },
+};
 use crate::shared::id::{self, Id};
 
 #[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]
@@ -42,10 +48,15 @@ pub enum PaneTypeFile {
     TabContent,
     #[cfg(debug_assertions)]
     FrameCount,
-    // Property(PropertyKindFileOrText<PropertyKindFile>),
+    Property {
+        content: Vec<PropertyFile<PropertyKindFile>>,
+        #[serde(default)]
+        align: super::theme::properties::Alignment,
+    },
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, strum::Display)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
+#[strum_discriminants(derive(strum::Display, Hash))]
 pub enum PaneType {
     Queue,
     #[cfg(debug_assertions)]
@@ -64,33 +75,41 @@ pub enum PaneType {
     TabContent,
     #[cfg(debug_assertions)]
     FrameCount,
-    // Property(PropertyKindOrText<'static, PropertyKind>),
+    Property {
+        content: &'static [&'static Property<'static, PropertyKind>],
+        align: ratatui::layout::Alignment,
+    },
 }
 
+pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 1] =
+    [PaneTypeDiscriminants::Property];
+
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneType; 7] = [
-    PaneType::AlbumArt,
-    PaneType::Lyrics,
-    PaneType::ProgressBar,
-    PaneType::Header,
-    PaneType::Tabs,
-    PaneType::TabContent,
-    PaneType::FrameCount,
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 8] = [
+    PaneTypeDiscriminants::AlbumArt,
+    PaneTypeDiscriminants::Lyrics,
+    PaneTypeDiscriminants::ProgressBar,
+    PaneTypeDiscriminants::Header,
+    PaneTypeDiscriminants::Tabs,
+    PaneTypeDiscriminants::TabContent,
+    PaneTypeDiscriminants::FrameCount,
+    PaneTypeDiscriminants::Property,
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneType; 6] = [
-    PaneType::AlbumArt,
-    PaneType::Lyrics,
-    PaneType::ProgressBar,
-    PaneType::Header,
-    PaneType::Tabs,
-    PaneType::TabContent,
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 7] = [
+    PaneTypeDiscriminants::AlbumArt,
+    PaneTypeDiscriminants::Lyrics,
+    PaneTypeDiscriminants::ProgressBar,
+    PaneTypeDiscriminants::Header,
+    PaneTypeDiscriminants::Tabs,
+    PaneTypeDiscriminants::TabContent,
+    PaneTypeDiscriminants::Property,
 ];
 
 impl Pane {
     pub fn is_focusable(&self) -> bool {
-        !UNFOSUSABLE_TABS.contains(&self.pane)
+        !UNFOSUSABLE_TABS.contains(&self.pane.into())
     }
 }
 
@@ -114,6 +133,14 @@ impl From<&PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
+            PaneTypeFile::Property { content: properties, align } => PaneType::Property {
+                content: properties
+                    .iter()
+                    .map(|prop| prop.try_into().expect(""))
+                    .collect_vec()
+                    .leak(),
+                align: (*align).into(),
+            },
         }
     }
 }
@@ -435,11 +462,14 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
         .flat_map(|tab_pane| {
             layout_panes.iter().filter(|layout_pane| layout_pane.pane == tab_pane.pane)
         })
+        .filter(|pane| !PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT.contains(&pane.pane.into()))
+        .map(|pane| PaneTypeDiscriminants::from(pane.pane))
+        .unique()
         .collect_vec();
     ensure!(
         panes_in_both_tabs_and_layout.is_empty(),
         "Panes cannot be in layout and tabs at the same time. Please remove following tabs from either layout or tabs: {}",
-        panes_in_both_tabs_and_layout.iter().map(|pane| &pane.pane).sorted().dedup().join(", ")
+        panes_in_both_tabs_and_layout.iter().join(", ")
     );
 
     Ok(())
