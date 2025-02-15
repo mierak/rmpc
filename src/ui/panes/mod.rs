@@ -30,7 +30,7 @@ use crate::{
     MpdQueryResult,
     config::{
         keys::CommonAction,
-        tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
+        tabs::{Pane as ConfigPane, PaneType, PaneTypeDiscriminants, SizedPaneOrSplit},
         theme::{
             SymbolsConfig,
             properties::{
@@ -129,12 +129,40 @@ impl<'panes> PaneContainer<'panes> {
         })
     }
 
+    pub fn get_mut_by_discr<'pane_ref>(
+        &'pane_ref mut self,
+        pane: PaneTypeDiscriminants,
+    ) -> Option<Panes<'pane_ref, 'panes>> {
+        match pane {
+            PaneTypeDiscriminants::Queue => Some(Panes::Queue(&mut self.queue)),
+            #[cfg(debug_assertions)]
+            PaneTypeDiscriminants::Logs => Some(Panes::Logs(&mut self.logs)),
+            PaneTypeDiscriminants::Directories => Some(Panes::Directories(&mut self.directories)),
+            PaneTypeDiscriminants::Artists => Some(Panes::Artists(&mut self.artists)),
+            PaneTypeDiscriminants::AlbumArtists => {
+                Some(Panes::AlbumArtists(&mut self.album_artists))
+            }
+            PaneTypeDiscriminants::Albums => Some(Panes::Albums(&mut self.albums)),
+            PaneTypeDiscriminants::Playlists => Some(Panes::Playlists(&mut self.playlists)),
+            PaneTypeDiscriminants::Search => Some(Panes::Search(&mut self.search)),
+            PaneTypeDiscriminants::AlbumArt => Some(Panes::AlbumArt(&mut self.album_art)),
+            PaneTypeDiscriminants::Lyrics => Some(Panes::Lyrics(&mut self.lyrics)),
+            PaneTypeDiscriminants::ProgressBar => Some(Panes::ProgressBar(&mut self.progress_bar)),
+            PaneTypeDiscriminants::Header => Some(Panes::Header(&mut self.header)),
+            PaneTypeDiscriminants::Tabs => Some(Panes::Tabs(&mut self.tabs)),
+            PaneTypeDiscriminants::TabContent => Some(Panes::TabContent),
+            #[cfg(debug_assertions)]
+            PaneTypeDiscriminants::FrameCount => Some(Panes::FrameCount(&mut self.frame_count)),
+            PaneTypeDiscriminants::Property => None,
+        }
+    }
+
     pub fn get_mut<'pane_ref>(
         &'pane_ref mut self,
-        screen: &PaneType,
+        pane: &PaneType,
         context: &AppContext,
     ) -> Panes<'pane_ref, 'panes> {
-        match screen {
+        match pane {
             PaneType::Queue => Panes::Queue(&mut self.queue),
             #[cfg(debug_assertions)]
             PaneType::Logs => Panes::Logs(&mut self.logs),

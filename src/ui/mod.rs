@@ -469,7 +469,11 @@ impl<'ui> Ui<'ui> {
         };
 
         for name in context.config.active_panes {
-            match self.panes.get_mut(name, context) {
+            let Some(pane) = self.panes.get_mut_by_discr(*name) else {
+                continue;
+            };
+
+            match pane {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => p.on_event(&mut event, contains_pane(PaneType::Logs), context),
                 Panes::Queue(p) => p.on_event(&mut event, contains_pane(PaneType::Queue), context),
