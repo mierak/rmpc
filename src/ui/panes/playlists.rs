@@ -301,6 +301,7 @@ impl Pane for PlaylistsPane {
                             .select(Some(idx_to_select), context.config.scrolloff);
 
                         self.stack = new_stack;
+                        self.prepare_preview(context)?;
                     }
                     _ => {
                         log::error!(stack:? = self.stack; "Invalid playlist stack state");
