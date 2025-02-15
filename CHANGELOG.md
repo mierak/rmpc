@@ -52,6 +52,7 @@ They have additional config properties compared to their predecesors.
 - Songs metadata not being sorted in preview column
 - Prevent album art rendering when modal is open
 - Fix panic when `ProgressBar` pane had insufficient height
+- Middle mouse click not working in search when browsing songs
 
 ### Deprecated
 

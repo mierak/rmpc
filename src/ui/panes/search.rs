@@ -680,6 +680,30 @@ impl Pane for SearchPane {
                     self.add_current(false, context)?;
                 }
             },
+            MouseEventKind::MiddleClick if self.column_areas[1].contains(event.into()) => {
+                match self.phase {
+                    Phase::SearchTextboxInput | Phase::Search => {}
+                    Phase::BrowseResults { .. } => {
+                        let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
+                        if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
+                            self.songs_dir.select_idx(idx, context.config.scrolloff);
+                            self.prepare_preview(context);
+
+                            self.songs_dir.select_idx(idx, context.config.scrolloff);
+                            if let Some(item) = self.songs_dir.selected() {
+                                let item = item.file.clone();
+                                context.command(move |client| {
+                                    client.add(&item)?;
+                                    status_info!("Added '{item}' to queue");
+                                    Ok(())
+                                });
+                            }
+                            self.prepare_preview(context);
+                            context.render()?;
+                        }
+                    }
+                }
+            }
             MouseEventKind::ScrollDown => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if matches!(self.phase, Phase::SearchTextboxInput) {
