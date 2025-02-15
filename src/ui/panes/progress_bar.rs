@@ -11,7 +11,10 @@ use ratatui::{
 use super::Pane;
 use crate::{
     context::AppContext,
-    mpd::mpd_client::{MpdClient, ValueChange},
+    mpd::{
+        commands::State,
+        mpd_client::{MpdClient, ValueChange},
+    },
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -95,7 +98,9 @@ impl Pane for ProgressBarPane {
         }
 
         match event.kind {
-            MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
+            MouseEventKind::LeftClick | MouseEventKind::DoubleClick
+                if matches!(context.status.state, State::Play | State::Pause) =>
+            {
                 let second_to_seek_to = context
                     .status
                     .duration
