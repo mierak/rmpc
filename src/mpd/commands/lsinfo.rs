@@ -26,6 +26,7 @@ pub struct Dir {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Playlist {
     name: String,
+    last_modified: String,
 }
 
 impl FromMpd for Dir {
@@ -54,6 +55,7 @@ impl FromMpd for Playlist {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "playlist" => self.name = value,
+            "last-modified" => self.last_modified = value,
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
@@ -111,7 +113,13 @@ Last-Modified: 2024-08-12T03:03:40Z";
 
         let result = result.0;
         assert_eq!(result.len(), 5);
-        assert_eq!(result[0], LsInfoEntry::Playlist(Playlist { name: "autechre.m3u".to_owned() }));
+        assert_eq!(
+            result[0],
+            LsInfoEntry::Playlist(Playlist {
+                name: "autechre.m3u".to_owned(),
+                last_modified: "2024-10-30T00:04:26Z".to_string()
+            })
+        );
         assert_eq!(
             result[1],
             LsInfoEntry::Dir(Dir {
