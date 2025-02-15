@@ -22,7 +22,6 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 | Terminal  | Backend                   | Tmux    | Additional Info                                                                                                                                                      |
 | --------- | ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Kitty     | Kitty                     | yes     | -                                                                                                                                                                    |
-| Ghostty   | Kitty                     | yes     | -                                                                                                                                                                    |
 | WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                    |
 | vscode    | ITerm2                    | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                                                                                                             |
 | Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                             |
@@ -46,10 +45,9 @@ Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is 
 <ConfigValue name="max_size_px" type="other" customText="(<width>, <height>)" />
 
 Sets limit for the album art size. If the album art is larger than this, it will be resized to fit the limit.
-
-You can set this to `(0, 0)` (no limit) if you use terminal emulator which properly reports its size and rmpc will figure
-out the maximum size itself. This is needed only for terminals which do not report their size correctly.
-Default is `(1200, 1200)`. Ueberzug backend is not influenced by this setting.
+You should not set this option unless needed because preferred image methods will figure out the correct size
+themselves. This is needed only for terminals that do not report their size correctly. Default is `(600, 600)`.
+`(0, 0)` means no practical limit. Ueberzug method is not influenced by this setting.
 
 ### disabled_protocols
 
@@ -57,18 +55,6 @@ Default is `(1200, 1200)`. Ueberzug backend is not influenced by this setting.
 
 Album art will NOT be fetched and displayed for songs with path starting with any of the given protocols. Set to empty array
 to enable all protocols. Defaults to `["http://", "https://]`
-
-### vertical_align
-
-<ConfigValue name="vertical_align" type={["Top", "Center", "Bottom"]} />
-
-Where to align album art vertically. Not supported by ueberzugpp backend.
-
-### horizontal_align
-
-<ConfigValue name="horizontal_align" type={["Left", "Center", "Right"]} />
-
-Where to align album art horizontally. Not supported by ueberzugpp backend.
 
 ## Backends
 
@@ -83,7 +69,7 @@ Cons:
 
 ### Ueberzugpp
 
-Requires [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Art is aligned to the top of and its position cannot be changed.
+Requires [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Art is aligned to the top of the window and not centered.
 
 Pros:
 
