@@ -23,6 +23,7 @@
     background_color: "#24273a",
     header_background_color: "#1e2030",
     modal_background_color: None,
+    modal_backdrop: false,
     tab_bar: (
         enabled: false,
         active_style: (fg: "black", bg: "#c6a0f6", modifiers: "Bold"),

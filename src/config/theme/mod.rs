@@ -34,6 +34,7 @@ pub struct UiConfig {
     pub background_color: Option<Color>,
     pub header_background_color: Option<Color>,
     pub modal_background_color: Option<Color>,
+    pub modal_backdrop: bool,
     pub text_color: Option<Color>,
     pub borders_style: Style,
     pub highlighted_item_style: Style,
@@ -69,6 +70,8 @@ pub struct UiConfigFile {
     pub(super) text_color: Option<String>,
     pub(super) header_background_color: Option<String>,
     pub(super) modal_background_color: Option<String>,
+    #[serde(default)]
+    pub(super) modal_backdrop: bool,
     pub(super) borders_style: Option<StyleFile>,
     pub(super) highlighted_item_style: Option<StyleFile>,
     pub(super) current_item_style: Option<StyleFile>,
@@ -93,6 +96,7 @@ impl Default for UiConfigFile {
             show_song_table_header: true,
             header: HeaderConfigFile::default(),
             modal_background_color: None,
+            modal_backdrop: false,
             borders_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
@@ -195,6 +199,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             modal_background_color: StringColor(value.modal_background_color)
                 .to_color()?
                 .or(bg_color),
+            modal_backdrop: value.modal_backdrop,
             text_color: StringColor(value.text_color).to_color()?,
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,

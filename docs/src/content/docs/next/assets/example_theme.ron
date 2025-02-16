@@ -10,6 +10,7 @@
     text_color: None,
     header_background_color: None,
     modal_background_color: None,
+    modal_backdrop: false,
     tab_bar: (
         enabled: true,
         active_style: (fg: "black", bg: "blue", modifiers: "Bold"),
