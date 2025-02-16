@@ -8,6 +8,7 @@ homepage = "https://mierak.github.io/rmpc/"
 repository = "https://github.com/mierak/rmpc"
 readme = "README.md"
 rust-version = "1.82.0"
+exclude = ["/docs/**/*", "!/docs/src/content/docs/next/assets/example_theme.ron", "!/docs/src/content/docs/next/assets/example_config.ron"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
