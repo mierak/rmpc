@@ -31,14 +31,6 @@ directory and then configuring the `theme` property in the config file filename 
 
 Below is a list of properties that can be changed.
 
-### layout
-
-<ConfigValue name="layout" type="other" customText="layout: Pane | Split" />
-
-Base layout of the application, lets you configure where the various components are placed on the screen.
-
-<LinkCard title="layout" description="Configuration of rmpc's base layout" href={path("configuration/layout/")} />
-
 ### default_album_art_path
 
 <ConfigValue name="default_album_art_path" type="string" optional />
@@ -173,9 +165,11 @@ Foreground color of basic text. Defaults to your terminal's foreground color.
 
 Tab bar at the top of the windo below header. Shows what tab is currently active.
 
-#### ~~tab_bar.enabled~~
+#### tab_bar.enabled
 
-Do not use. Deprecated in favor of the <a href={path("configuration/layout")}>layout config</a>.
+<ConfigValue name="enabled" type="boolean" />
+
+Whether to show tab bar at the top of the window. Default to `true`.
 
 #### tab_bar.active_style
 

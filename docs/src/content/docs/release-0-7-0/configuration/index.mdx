@@ -63,18 +63,6 @@ Directory for rmpc's cache files. Used for files downloaded for youtube and migh
 
 Directory where rmpc should search for `lrc` files. Please see the <a href={path("configuration/lyrics")}>lyrics page</a> for more information.
 
-### mpd_read_timeout_ms
-
-<ConfigValue name="mpd_read_timeout_ms" type="number" />
-
-How long to wait for response to MPD command before giving up and reconnecting. Defaults to `10_000` milliseconds.
-
-### mpd_write_timeout_ms
-
-<ConfigValue name="mpd_write_timeout_ms" type="number" />
-
-How long to wait for write to MPD socket to finish before giving up and reconnecting. Defaults to `5_000` milliseconds.
-
 ### theme
 
 <ConfigValue optional name="theme" type="string" />
@@ -107,14 +95,6 @@ Keybinds to use. The default keybinds are used if this property is absent. More 
 
 Determines the step when changing volume with the volume up and down keybinds. Default is 5%.
 
-### max_fps
-
-<ConfigValue name="max_fps" type="number" />
-
-Rmpc batches rendered frames to save resources, meaning it could skip a render on input and make the frame
-a bit delayed if many frames are requested at the same time. This option sets how many frames rmpc can render
-in one second. Default is `30`.
-
 ### scrolloff
 
 <ConfigValue name="scrolloff" type="number" />
@@ -140,7 +120,8 @@ of the screen and switching tabs is supported. Enabled by default.
 <ConfigValue name="status_update_interval_ms" type="number" optional />
 
 Interval in milliseconds to update the status when a song is playing. Status means song progress, current bitrate, etc.
-Default is 1000ms.
+Default is 1000ms. If set to `None` or absent, the progress bar at the bottom of the window is hidden as it serves no
+purpose at that point.
 
 ### select_current_song_on_change
 

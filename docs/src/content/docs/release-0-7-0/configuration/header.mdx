@@ -43,7 +43,7 @@ defined
 
 ## header_property_kind
 
-Kind can be one of two values, static `Text`, `Property` or `Group` which can display song metadata, various player status info
+Kind can be one of two values, static `Text` or `Property` which can display song metadata, various player status info
 or predefined widgets.
 
 ### Text
@@ -52,25 +52,12 @@ or predefined widgets.
 Will display static text in the table. Mostly useful for default values. For example if a song is missing an album tag,
 "Unknown Album" can be displayed by specifying `Text("Unknown Album")` as the default.
 
-### Group
-
-<ConfigValue name="kind" type="other" customText="Group(<property>[])" link="#property" />
-
-A special kind of property that groups multiple properties together. If any of the properties in the group results
-in a `None` value, the whole group is considered `None` and the default value is used.
-
 ### Property
 
 <ConfigValue name="kind" type={["Property(Song(...))", "Property(Status(...)))", "Property(Widget(...)))"]} />
-Can display values from the currently playing song metadata, just like in the
+Can display values from currently playing song metadata, just like in the
 <a href={path("configuration/song-table/#property")}>song table</a>, info about the player status (volume, playing or
 stopped, current bitrate, ...) or a predefined widget.
-
-### Sticker
-
-<ConfigValue name="kind" type="other" customText='Sticker("<sticker_key")' />
-
-Can display stickers from the currently playing song, just like in the <a href={path("configuration/song-table/#sticker")}>song table</a>.
 
 ### Property(Song)
 
@@ -94,11 +81,11 @@ currently playing. The `Other` variant can be used to display any tag, even thos
     name="kind"
     type={[
         "Property(Status(Volume))",
-        "Property(Status(RepeatV2))",
-        "Property(Status(RandomV2))",
-        "Property(Status(SingleV2))",
-        "Property(Status(ConsumeV2))",
-        "Property(Status(StateV2))",
+        "Property(Status(Repeat))",
+        "Property(Status(Random))",
+        "Property(Status(Single))",
+        "Property(Status(Consume))",
+        "Property(Status(State))",
         "Property(Status(Elapsed))",
         "Property(Status(Duration))",
         "Property(Status(Crossfade))",
@@ -107,61 +94,6 @@ currently playing. The `Other` variant can be used to display any tag, even thos
 />
 These values display the current state of the player. For example, `Volume` will display the current volume, `Repeat`
 will display if the repeat mode is on or off, etc.
-
-#### StateV2
-
-<ConfigValue
-    name="kind"
-    type="other"
-    customText='Property(Status(StateV2(playing_label: "<your label>", paused_label: "<your label>", stopped_label: "<your label>",
-    playing_style: <style>, paused_style: <style>, stopped_style: <style>)))'
-/>
-
-The `StateV2` property has additional configuration options. If you omit any of the values, the default is used, so you can for example
-do just: `Status(StateV2(playing_label: "Playing"))`or`Status(StateV2())`. The default value is `Status(StateV2(playing_label: "Playing", paused_label: "Paused", stopped_label: "Stopped"))`.
-
-#### RepeatV2
-
-<ConfigValue
-    name="kind"
-    type="other"
-    customText='Property(Status(RepeatV2(on_label: "<your label>", off_label: "<your label>", on_style: <style>, off_style: <style>)))'
-/>
-
-Similar to `StateV2`. Allows you to configure labels for on/off states.
-
-#### RandomV2
-
-<ConfigValue
-    name="kind"
-    type="other"
-    customText='Property(Status(RandomV2(on_label: "<your label>", off_label: "<your label>", on_style: <style>, off_style: <style>)))'
-/>
-
-Similar to `StateV2`. Allows you to configure labels for on/off states.
-
-#### ConsumeV2
-
-<ConfigValue
-    name="kind"
-    type="other"
-    customText='Property(Status(ConsumeV2(on_label: "<your label>", off_label: "<your label>",
-    oneshot_label: "<your label>", on_style: <style>, off_style: <style>, oneshot_style: <style>)))'
-/>
-
-Similar to `StateV2`. Allows you to configure labels for on/off and one shot states. Note that oneshot state is available
-from MPD version 0.24.0, with earlier versions it get silently ignored.
-
-#### SingleV2
-
-<ConfigValue
-    name="kind"
-    type="other"
-    customText='Property(Status(SingleV2(on_label: "<your label>", off_label: "<your label>", oneshot_label: "<your label>",
-    oneshot_label: "<your label>", on_style: <style>, off_style: <style>, oneshot_style: <style>)))'
-/>
-
-Similar to `StateV2`. Allows you to configure labels for on/off and one shot states.
 
 ### Property(Widget)
 

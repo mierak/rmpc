@@ -59,33 +59,12 @@
             alignment: Right,
         ),
     ],
-    layout: Split(
-        direction: Vertical,
-        panes: [
-            (
-                pane: Pane(Header),
-                size: "2",
-            ),
-            (
-                pane: Pane(Tabs),
-                size: "3",
-            ),
-            (
-                pane: Pane(TabContent),
-                size: "100%",
-            ),
-            (
-                pane: Pane(ProgressBar),
-                size: "1",
-            ),
-        ],
-    ),
     header: (
         rows: [
             (
                 left: [
                     (kind: Text("["), style: (fg: "yellow", modifiers: "Bold")),
-                    (kind: Property(Status(StateV2(playing_label: "Playing", paused_label: "Paused", stopped_label: "Stopped"))), style: (fg: "yellow", modifiers: "Bold")),
+                    (kind: Property(Status(State)), style: (fg: "yellow", modifiers: "Bold")),
                     (kind: Text("]"), style: (fg: "yellow", modifiers: "Bold"))
                 ],
                 center: [
@@ -144,4 +123,5 @@
         ),
     ],
 )
+
 
