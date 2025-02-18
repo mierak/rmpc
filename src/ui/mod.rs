@@ -171,6 +171,11 @@ impl<'ui> Ui<'ui> {
             },
         )?;
 
+        if context.config.theme.modal_backdrop && !self.modals.is_empty() {
+            let buffer = frame.buffer_mut();
+            buffer.set_style(*buffer.area(), Style::default().fg(Color::DarkGray));
+        };
+
         for modal in &mut self.modals {
             modal.render(frame, context)?;
         }
