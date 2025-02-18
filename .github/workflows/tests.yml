@@ -1,6 +1,9 @@
 name: Run Tests
 
-on: [pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [ testing/flaky-tests ]
+  workflow_dispatch:
 
 jobs:
   test:
