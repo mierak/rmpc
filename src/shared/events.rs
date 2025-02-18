@@ -58,6 +58,7 @@ pub(crate) enum AppEvent {
     UiEvent(UiAppEvent),
     Reconnected,
     LostConnection,
+    TmuxHook { hook: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]

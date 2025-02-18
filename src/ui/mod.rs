@@ -633,6 +633,8 @@ pub enum UiEvent {
     Reconnected,
     Status(String, Level),
     TabChanged(TabName),
+    Displayed,
+    Hidden,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
