@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: Test Debug Mode
+    name: Test Debug Mode2
     runs-on: macos-latest
     steps:
     - name: Checkout
