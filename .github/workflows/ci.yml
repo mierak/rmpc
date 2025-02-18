@@ -1,6 +1,6 @@
 name: Test and Validate
 
-on: [pull_request, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
   test:
