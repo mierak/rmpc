@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Album art staying on the old one when in tmux and not visible
+
 ## [0.8.0] - 2025-02-16
 
 ### Added

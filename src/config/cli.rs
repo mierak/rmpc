@@ -190,6 +190,8 @@ pub enum NotifyCmd {
         #[clap(value_enum, default_value_t = Level::Info)]
         level: Level,
     },
+    #[clap(hide = true)]
+    Tmux { hook: String },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Parser, ValueEnum)]

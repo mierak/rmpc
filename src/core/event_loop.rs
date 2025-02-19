@@ -60,6 +60,17 @@ fn main_task<B: Backend + std::io::Write>(
     ui.before_show(area, &mut context).expect("Initial render init to succeed");
     let mut _update_loop_guard = None;
 
+    // Tmux hooks have to be initialized after ui, because ueberzugpp replaces all
+    // hooks on its init instead of simply appending and might break rmpc's hooks
+    let mut tmux = match crate::shared::tmux::TmuxHooks::new() {
+        Ok(Some(val)) => Some(val),
+        Ok(None) => None,
+        Err(err) => {
+            log::error!(error:? = err; "Failed to install tmux hooks");
+            None
+        }
+    };
+
     // Check the playback status and start the periodic status update if needed
     if context.status.state == State::Play {
         _update_loop_guard = context
@@ -287,6 +298,29 @@ fn main_task<B: Backend + std::io::Write>(
                         status_error!("rmpc lost connection to MPD and will try to reconnect");
                     }
                     connected = false;
+                }
+                AppEvent::TmuxHook { hook } => {
+                    if let Some(tmux) = &mut tmux {
+                        let old_visible = tmux.visible;
+                        if let Err(err) = tmux.update_visible() {
+                            log::error!(err:?, hook:?; "Failed to update tmux visibility");
+                            continue;
+                        }
+
+                        let event = match (tmux.visible, old_visible) {
+                            (true, false) => UiEvent::Displayed,
+                            (false, true) => UiEvent::Hidden,
+                            _ => continue,
+                        };
+
+                        match ui.on_event(event, &context) {
+                            Ok(()) => {}
+                            Err(err) => {
+                                status_error!(err:?; "Error: {}", err.to_status());
+                                render_wanted = true;
+                            }
+                        }
+                    }
                 }
             }
         }

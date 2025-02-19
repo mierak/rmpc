@@ -104,6 +104,9 @@ impl Ueberzug {
 
         let mut daemon =
             UeberzugDaemon { pid: None, pid_file: pid_file_path, ueberzug_process: None, layer };
+        if let Ok(pid) = daemon.spawn_daemon_if_needed() {
+            daemon.pid = Some(pid);
+        }
 
         let handle = std::thread::Builder::new()
             .name("ueberzugpp".to_string())

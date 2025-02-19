@@ -52,6 +52,7 @@ pub(crate) trait SocketCommandExecute {
 pub(crate) enum SocketCommand {
     IndexLrc(IndexLrcCommand),
     StatusMessage(StatusMessageCommand),
+    TmuxHook(TmuxHookCommand),
 }
 
 impl SocketCommandExecute for SocketCommand {
@@ -64,6 +65,7 @@ impl SocketCommandExecute for SocketCommand {
         match self {
             SocketCommand::IndexLrc(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::StatusMessage(cmd) => cmd.execute(event_tx, work_tx, config),
+            SocketCommand::TmuxHook(cmd) => cmd.execute(event_tx, work_tx, config),
         }
     }
 }
@@ -81,6 +83,7 @@ impl NotifyCmd {
 
 impl From<NotifyCmd> for SocketCommand {
     fn from(value: NotifyCmd) -> Self {
+        log::debug!(value:?; "Got remote command");
         match value {
             NotifyCmd::IndexLrc { ref path } => {
                 SocketCommand::IndexLrc(IndexLrcCommand { path: path.clone() })
@@ -95,6 +98,7 @@ impl From<NotifyCmd> for SocketCommand {
                     message: message.clone(),
                 })
             }
+            NotifyCmd::Tmux { hook } => SocketCommand::TmuxHook(TmuxHookCommand { hook }),
         }
     }
 }
@@ -130,6 +134,23 @@ impl SocketCommandExecute for IndexLrcCommand {
         _config: &'static Config,
     ) -> Result<()> {
         work_tx.send(WorkRequest::IndexSingleLrc { path: self.path })?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct TmuxHookCommand {
+    hook: String,
+}
+
+impl SocketCommandExecute for TmuxHookCommand {
+    fn execute(
+        self,
+        event_tx: &Sender<AppEvent>,
+        _work_tx: &Sender<WorkRequest>,
+        _config: &'static Config,
+    ) -> Result<()> {
+        event_tx.send(AppEvent::TmuxHook { hook: self.hook })?;
         Ok(())
     }
 }

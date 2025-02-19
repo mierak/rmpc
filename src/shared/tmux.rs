@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 pub static IS_TMUX: LazyLock<bool> = LazyLock::new(|| {
     std::env::var("TMUX").is_ok_and(|v| !v.is_empty())
@@ -16,22 +16,98 @@ pub fn is_inside_tmux() -> bool {
     *IS_TMUX
 }
 
-/// [write!] except it wraps the given sequence in TMUX's pass through if tmux
-/// is detected
-macro_rules! tmux_write {
-    ( $w:ident, $($t:tt)* ) => {{
-        if *crate::tmux::IS_TMUX {
-            write!($w, "\x1bPtmux;")
-                .and_then(|()| {
-                    write!($w, "{}", format!($($t)*).replace('\x1b', "\x1b\x1b"))
-                        .and_then(|()| write!($w, "\x1b\\"))
-            })
-        } else {
-            write!($w, $($t)*)
-        }
-    }}
+#[must_use]
+#[derive(Debug)]
+pub(crate) struct TmuxHooks {
+    commands: Vec<std::process::Command>,
+    pub(crate) visible: bool,
 }
-pub(crate) use tmux_write;
+
+impl Drop for TmuxHooks {
+    fn drop(&mut self) {
+        if !*IS_TMUX {
+            return;
+        }
+
+        for command in &mut self.commands {
+            try_cont!(command.spawn(), "Failed to uninstall tmux hook");
+        }
+    }
+}
+
+impl TmuxHooks {
+    pub fn new() -> Result<Option<TmuxHooks>> {
+        if !*IS_TMUX {
+            return Ok(None);
+        }
+
+        log::debug!("in tmux installing hooks");
+        let mut commands = Vec::new();
+
+        let pid = std::process::id();
+        let current_exe = std::env::current_exe()?;
+        let current_exe = current_exe.to_string_lossy();
+
+        for hook in ["session-window-changed", "client-attached", "client-session-changed"] {
+            let mut cmd = std::process::Command::new("tmux");
+            let cmd = cmd.args([
+                "set-hook",
+                "-a",
+                "-t",
+                &TMUX_PANE,
+                &format!("{hook}[{pid}]"),
+                &format!("run-shell '{current_exe} remote --pid {pid} tmux {hook}'"),
+            ]);
+            log::debug!(cmd:?; "installing hook");
+            let stdout = cmd.output()?.stdout;
+            log::debug!(stdout:?; "hook installed");
+
+            let mut command = std::process::Command::new("tmux");
+            command.args([
+                "set-hook",
+                "-u",
+                "-t",
+                &TMUX_PANE,
+                &format!("{hook}[{pid}]"),
+                "run-shell",
+            ]);
+            commands.push(command);
+        }
+
+        let mut cmd = std::process::Command::new("tmux");
+        let cmd = cmd.args([
+            "set-hook",
+            "-a",
+            "-g",
+            &format!("client-session-changed[{pid}]"),
+            &format!("run-shell '{current_exe} remote --pid {pid} tmux client-session-changed'",),
+        ]);
+        log::debug!(cmd:?; "installing hook");
+        let stdout = cmd.output()?.stdout;
+        log::debug!(stdout:?; "hook installed");
+        let mut command = std::process::Command::new("tmux");
+        command.args(["set-hook", "-gu", &format!("client-session-changed[{pid}]")]);
+        commands.push(command);
+
+        Ok(Some(TmuxHooks { commands, visible: true }))
+    }
+
+    pub fn update_visible(&mut self) -> Result<()> {
+        let val = {
+            if !is_inside_tmux() {
+                true
+            } else if !session_has_attached_client()? {
+                false
+            } else {
+                is_in_visible_pane()?
+            }
+        };
+
+        self.visible = val;
+
+        Ok(())
+    }
+}
 
 pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
     let mut cmd = std::process::Command::new("tmux");
@@ -68,8 +144,10 @@ pub fn session_has_attached_client() -> Result<bool> {
     let stdout = String::from_utf8(stdout)?;
     let stdout = stdout.trim();
     log::trace!(stdout; "got attached clients to tmux session");
+    let sum: u32 =
+        stdout.lines().try_fold(0, |acc, line| -> Result<_> { Ok(acc + line.parse::<u32>()?) })?;
 
-    Ok(stdout.parse::<u32>().context("Invalid tmux response when querying session_attached")? > 0)
+    Ok(sum > 0)
 }
 
 /// Returns true when rmpc is ran inside Tmux but its pane is not in a visible
@@ -92,3 +170,22 @@ pub fn is_in_tmux_and_hidden() -> Result<bool> {
 
     Ok(false)
 }
+
+/// [write!] except it wraps the given sequence in TMUX's pass through if tmux
+/// is detected
+macro_rules! tmux_write {
+    ( $w:ident, $($t:tt)* ) => {{
+        if *crate::tmux::IS_TMUX {
+            write!($w, "\x1bPtmux;")
+                .and_then(|()| {
+                    write!($w, "{}", format!($($t)*).replace('\x1b', "\x1b\x1b"))
+                        .and_then(|()| write!($w, "\x1b\\"))
+            })
+        } else {
+            write!($w, $($t)*)
+        }
+    }}
+}
+pub(crate) use tmux_write;
+
+use crate::shared::macros::try_cont;
