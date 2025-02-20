@@ -21,7 +21,7 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "starlight-links-validator": "^0.14.3",
-        "starlight-sidebar-topics": "^0.4.0",
+        "starlight-sidebar-topics": "^0.4.1",
         "typescript": "^5.7.3"
     },
     "devDependencies": {
