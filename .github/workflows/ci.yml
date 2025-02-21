@@ -26,7 +26,7 @@ jobs:
       run: |
         cargo test --release
   test-macos:
-    name: Test Debug Mode2
+    name: macos - Test Debug Mode
     runs-on: macos-latest
     steps:
     - name: Checkout
@@ -35,7 +35,7 @@ jobs:
       run: |
         cargo test
   test-macos-release:
-    name: Test Release Mode
+    name: macos - Test Release Mode
     runs-on: macos-latest
     steps:
     - name: Checkout
