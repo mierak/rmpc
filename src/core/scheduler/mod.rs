@@ -1,11 +1,8 @@
-use std::{
-    cmp::Reverse,
-    collections::BinaryHeap,
-    time::{Duration, Instant},
-};
+use std::{cmp::Reverse, collections::BinaryHeap, time::Duration};
 
 use anyhow::Result;
 use crossbeam::channel::{Receiver, Sender, after, never, select_biased, unbounded};
+use time_provider::{DefaultTimeProvider, TimeProvider};
 
 use self::{job::Job, repeated_job::RepeatedJob};
 use crate::shared::{
@@ -15,6 +12,7 @@ use crate::shared::{
 
 mod job;
 mod repeated_job;
+pub(crate) mod time_provider;
 
 /// Scheduler can run jobs after a specified duration or at a specified
 /// interval. These jobs run on a separate thread and are guaranteed to run
@@ -23,21 +21,43 @@ mod repeated_job;
 /// will block until the current job is finished and all other jobs in the queue
 /// are discarded.
 #[derive(Debug)]
-pub(crate) struct Scheduler<T: Clone + Send + 'static + std::fmt::Debug> {
+pub(crate) struct Scheduler<T, P>
+where
+    T: Clone + Send + 'static + std::fmt::Debug,
+    P: TimeProvider + Clone + Send + 'static + std::fmt::Debug,
+{
     add_job_tx: Sender<SchedulerCommand<T>>,
     add_job_rx: Receiver<SchedulerCommand<T>>,
     args: T,
     handle: Option<std::thread::JoinHandle<()>>,
+    time_provider: P,
 }
 
-impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
+impl<T> Scheduler<T, DefaultTimeProvider>
+where
+    T: Clone + Send + 'static + std::fmt::Debug,
+{
     /// Create a new scheduler. The [`args`] will be available to all the jobs
     /// as a parameter by reference. Args must be [`Clone`] because it is cloned
     /// every time the scheduler is started in order to move it to the jobs
     /// thread.
     pub(crate) fn new(args: T) -> Self {
+        Scheduler::new_with_provider(args, DefaultTimeProvider)
+    }
+}
+
+impl<T, P> Scheduler<T, P>
+where
+    T: Clone + Send + 'static + std::fmt::Debug,
+    P: TimeProvider + Clone + Send + 'static + std::fmt::Debug,
+{
+    /// Create a new scheduler. The [`args`] will be available to all the jobs
+    /// as a parameter by reference. Args must be [`Clone`] because it is cloned
+    /// every time the scheduler is started in order to move it to the jobs
+    /// thread.
+    pub(crate) fn new_with_provider(args: T, time_provider: P) -> Self {
         let (add_job_tx, add_job_rx) = unbounded::<SchedulerCommand<T>>();
-        Self { add_job_tx, add_job_rx, args, handle: None }
+        Self { add_job_tx, add_job_rx, args, handle: None, time_provider }
     }
 
     /// Starts the scheduler if not running already.
@@ -49,6 +69,7 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
         let add_job_rx = self.add_job_rx.clone();
         let args = self.args.clone();
 
+        let time_provider = self.time_provider.clone();
         self.handle = Some(std::thread::spawn(move || {
             let mut duration = None;
             let mut jobs = BinaryHeap::new();
@@ -74,7 +95,7 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
                     recv(timeout) -> _ => log::trace!(jobs:?; "Scheduler timed out, trying to run a job"),
                 );
 
-                let now = Instant::now();
+                let now = time_provider.now();
                 match jobs.peek() {
                     Some(Reverse(job)) if job.run_at() <= now => match jobs.pop() {
                         Some(Reverse(JobOrRepeatedJob::Job(job))) => job.run(&args),
@@ -120,7 +141,12 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
         // Skip errors as this should never really happen, but still want to log it in
         // case it does
         try_skip!(
-            self.add_job_tx.send(SchedulerCommand::AddJob(Job::new(id, timeout, callback))),
+            self.add_job_tx.send(SchedulerCommand::AddJob(Job::new(
+                id,
+                timeout,
+                self.time_provider.now(),
+                callback
+            ))),
             "Failed to schedule a job"
         );
     }
@@ -140,8 +166,12 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
         // Skip errors as this should never really happen, but still want to log it in
         // case it does
         try_skip!(
-            self.add_job_tx
-                .send(SchedulerCommand::AddRepeatedJob(RepeatedJob::new(id, interval, callback))),
+            self.add_job_tx.send(SchedulerCommand::AddRepeatedJob(RepeatedJob::new(
+                id,
+                interval,
+                self.time_provider.now(),
+                callback
+            ))),
             "Failed to schedule a repeated job"
         );
 
@@ -149,7 +179,11 @@ impl<T: Clone + Send + 'static + std::fmt::Debug> Scheduler<T> {
     }
 }
 
-impl<T: Clone + Send + 'static + std::fmt::Debug> Drop for Scheduler<T> {
+impl<T, P> Drop for Scheduler<T, P>
+where
+    T: Clone + Send + 'static + std::fmt::Debug,
+    P: TimeProvider + Clone + Send + 'static + std::fmt::Debug,
+{
     fn drop(&mut self) {
         self.stop();
     }
@@ -182,7 +216,7 @@ enum JobOrRepeatedJob<T> {
 }
 
 impl<T> JobOrRepeatedJob<T> {
-    fn run_at(&self) -> Instant {
+    fn run_at(&self) -> std::time::Instant {
         match self {
             JobOrRepeatedJob::Job(job) => job.run_at,
             JobOrRepeatedJob::RepeatedJob(job) => job.run_at,
@@ -212,15 +246,50 @@ impl<T> Ord for JobOrRepeatedJob<T> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use std::{
+        collections::VecDeque,
         sync::{Arc, Mutex},
-        time::Duration,
+        time::{Duration, Instant},
     };
 
-    use super::Scheduler;
+    use super::{Scheduler, TimeProvider};
+
+    #[derive(Clone, Debug)]
+    struct FakeTimeProvider(Arc<Mutex<VecDeque<Instant>>>);
+    impl TimeProvider for FakeTimeProvider {
+        fn now(&self) -> Instant {
+            let instant = self.0.lock().unwrap().pop_front();
+            instant.unwrap_or_else(Instant::now)
+        }
+    }
+    impl FakeTimeProvider {
+        fn new(times: impl Into<VecDeque<Instant>>) -> Self {
+            let times: VecDeque<Instant> = times.into();
+            Self(Arc::new(Mutex::new(times)))
+        }
+    }
 
     #[test]
     fn schedules_jobs_in_the_correct_order() {
-        let mut scheduler = Scheduler::new(());
+        let start = Instant::now();
+        let mut scheduler = Scheduler::new_with_provider(
+            (),
+            FakeTimeProvider::new([
+                // scheduling jobs
+                start,
+                start, // dummy that is read after each add
+                start + Duration::from_micros(1),
+                start + Duration::from_micros(1), // dummy that is read after each add
+                start + Duration::from_micros(2),
+                start + Duration::from_micros(2), // dummy that is read after each add
+                start + Duration::from_micros(3),
+                start + Duration::from_micros(3), // dummy that is read after each add
+                // job runs
+                start + Duration::from_micros(10100),
+                start + Duration::from_micros(20100),
+                start + Duration::from_micros(30100),
+                start + Duration::from_micros(40100),
+            ]),
+        );
         let results = Arc::new(Mutex::new(Vec::new()));
 
         let res = Arc::clone(&results);
@@ -267,7 +336,26 @@ mod tests {
 
     #[test]
     fn schedules_repeated_jobs() {
-        let mut scheduler = Scheduler::new(());
+        let start = Instant::now();
+        let mut scheduler = Scheduler::new_with_provider(
+            (),
+            FakeTimeProvider::new([
+                // scheduling jobs
+                start,
+                start, // dummy that is read after each add
+                start + Duration::from_micros(1),
+                start + Duration::from_micros(1), // dummy that is read after each add
+                // first set of runs
+                start + Duration::from_micros(10100),
+                start + Duration::from_micros(10100),
+                // second set of runs
+                start + Duration::from_micros(30100),
+                start + Duration::from_micros(30100),
+                // third set of runs
+                start + Duration::from_micros(40100),
+                start + Duration::from_micros(40100),
+            ]),
+        );
         let results = Arc::new(Mutex::new(Vec::new()));
 
         let res = Arc::clone(&results);
@@ -300,63 +388,81 @@ mod tests {
 
     #[test]
     fn interleaves_repeated_and_scheduled_jobs() {
-        let expected_results = 9;
-        let mut scheduler = Scheduler::new(());
+        let expected_results = 10;
+        let start = Instant::now();
+        let schedule_delays = &[
+            Duration::from_millis(10),
+            Duration::from_millis(10),
+            Duration::from_millis(40),
+            Duration::from_millis(40),
+            Duration::from_millis(70),
+            Duration::from_millis(70),
+            Duration::from_millis(30),
+            Duration::from_millis(30),
+        ];
+        let mut scheduler = Scheduler::new_with_provider(
+            (),
+            FakeTimeProvider::new([
+                // scheduling jobs
+                start,
+                start, // dummy that is read after each add
+                start + Duration::from_micros(1),
+                start + Duration::from_micros(1), // dummy that is read after each add
+                start + Duration::from_micros(2),
+                start + Duration::from_micros(2), // dummy that is read after each add
+                start + Duration::from_micros(3),
+                start + Duration::from_micros(3), // dummy that is read after each add
+                start + Duration::from_micros(4),
+                start + Duration::from_micros(4), // dummy that is read after each add
+                start + Duration::from_micros(5),
+                start + Duration::from_micros(5), // dummy that is read after each add
+                // scheduling repeated jobs
+                start + Duration::from_micros(6),
+                start + Duration::from_micros(6), // dummy that is read after each add
+                start + Duration::from_micros(7),
+                start + Duration::from_micros(7), // dummy that is read after each add
+                // first two jobs running
+                start + Duration::from_micros(10100),
+                start + Duration::from_micros(10100),
+                // repeated jobs running now
+                start + Duration::from_micros(30100),
+                start + Duration::from_micros(30100),
+                // second two jobs running
+                start + Duration::from_micros(40100),
+                start + Duration::from_micros(40100),
+                // repeated jobs should run again
+                start + Duration::from_micros(60100),
+                start + Duration::from_micros(60100),
+                // last job should run now
+                start + Duration::from_micros(70100),
+                start + Duration::from_micros(70100),
+            ]),
+        );
         let results = Arc::new(Mutex::new(Vec::new()));
 
+        for (i, _) in schedule_delays.iter().enumerate().take(6) {
+            let res = Arc::clone(&results);
+            scheduler.schedule(schedule_delays[i], move |()| {
+                let mut results = res.lock().unwrap();
+                if results.len() < expected_results {
+                    results.push(i + 1);
+                }
+                Ok(())
+            });
+        }
         let res = Arc::clone(&results);
-        scheduler.schedule(Duration::from_millis(5), move |()| {
+        let guard1 = scheduler.repeated(schedule_delays[6], move |()| {
             let mut results = res.lock().unwrap();
             if results.len() < expected_results {
-                results.push(5);
+                results.push(11);
             }
             Ok(())
         });
         let res = Arc::clone(&results);
-        scheduler.schedule(Duration::from_millis(8), move |()| {
+        let guard2 = scheduler.repeated(schedule_delays[7], move |()| {
             let mut results = res.lock().unwrap();
             if results.len() < expected_results {
-                results.push(6);
-            }
-            Ok(())
-        });
-        let res = Arc::clone(&results);
-        scheduler.schedule(Duration::from_millis(15), move |()| {
-            let mut results = res.lock().unwrap();
-            if results.len() < expected_results {
-                results.push(7);
-            }
-            Ok(())
-        });
-        let res = Arc::clone(&results);
-        scheduler.schedule(Duration::from_millis(18), move |()| {
-            let mut results = res.lock().unwrap();
-            if results.len() < expected_results {
-                results.push(8);
-            }
-            Ok(())
-        });
-        let res = Arc::clone(&results);
-        scheduler.schedule(Duration::from_millis(25), move |()| {
-            let mut results = res.lock().unwrap();
-            if results.len() < expected_results {
-                results.push(9);
-            }
-            Ok(())
-        });
-        let res = Arc::clone(&results);
-        let guard1 = scheduler.repeated(Duration::from_millis(10), move |()| {
-            let mut results = res.lock().unwrap();
-            if results.len() < expected_results {
-                results.push(1);
-            }
-            Ok(())
-        });
-        let res = Arc::clone(&results);
-        let guard2 = scheduler.repeated(Duration::from_millis(10), move |()| {
-            let mut results = res.lock().unwrap();
-            if results.len() < expected_results {
-                results.push(2);
+                results.push(22);
             }
             Ok(())
         });
@@ -369,6 +475,6 @@ mod tests {
         drop(guard2);
         scheduler.stop();
 
-        assert_eq!(*results.lock().unwrap(), vec![5, 6, 1, 2, 7, 8, 1, 2, 9]);
+        assert_eq!(*results.lock().unwrap(), vec![1, 2, 11, 22, 3, 4, 11, 22, 5, 6]);
     }
 }

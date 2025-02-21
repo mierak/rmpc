@@ -17,9 +17,10 @@ impl<T> RepeatedJob<T> {
     pub(super) fn new(
         id: Id,
         interval: Duration,
+        now: Instant,
         callback: impl FnMut(&T) -> Result<()> + Send + 'static,
     ) -> Self {
-        Self { id, interval, callback: Box::new(callback), run_at: Instant::now() + interval }
+        Self { id, interval, callback: Box::new(callback), run_at: now + interval }
     }
 
     pub(super) fn run(&mut self, args: &T, now: Instant) {
