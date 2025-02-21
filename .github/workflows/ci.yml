@@ -1,6 +1,6 @@
 name: Test and Validate
 
-on: [workflow_dispatch]
+on: [pull_request, workflow_dispatch]
 
 jobs:
   test:
@@ -15,6 +15,24 @@ jobs:
   test-release:
     name: Test Release Mode
     runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Cargo test
+      run: |
+        cargo test --release
+  test-macos:
+    name: Test Debug Mode2
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Cargo test
+      run: |
+        cargo test
+  test-macos-release:
+    name: Test Release Mode
+    runs-on: macos-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4
