@@ -21,6 +21,24 @@ jobs:
     - name: Cargo test
       run: |
         cargo test --release
+  test-macos:
+    name: Test Debug Mode2
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Cargo test
+      run: |
+        cargo test
+  test-macos-release:
+    name: Test Release Mode
+    runs-on: macos-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Cargo test
+      run: |
+        cargo test --release
   format:
     name: Check Formatting
     runs-on: ubuntu-latest

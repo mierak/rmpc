@@ -16,9 +16,10 @@ impl<T> Job<T> {
     pub(super) fn new(
         id: Id,
         timeout: Duration,
+        now: Instant,
         callback: impl FnOnce(&T) -> Result<()> + Send + 'static,
     ) -> Self {
-        Self { id, run_at: Instant::now() + timeout, callback: Box::new(callback) }
+        Self { id, run_at: now + timeout, callback: Box::new(callback) }
     }
 
     pub(super) fn run(self, args: &T) {
