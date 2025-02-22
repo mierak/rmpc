@@ -56,3 +56,23 @@ test-case = "3.3.1"
 
 [workspace.dependencies]
 clap = { version = "4.5.30", features = ["derive", "cargo", "string" ] }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+single_match = "allow"
+type_complexity = "allow"
+module_name_repetitions = "allow"
+unused_self = "allow"
+unnested_or_patterns = "allow"
+match_same_arms = "allow"
+manual_let_else = "allow"
+needless_return = "allow"
+zero_sized_map_values = "allow"
+too_many_lines = "allow"
+match_single_binding = "allow"
+struct_field_names = "allow"
+redundant_closure_for_method_calls = "allow"
+unwrap_used = "deny"
+
+[lints.rust]
+unused_macros = "allow"

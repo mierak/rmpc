@@ -1,20 +1,3 @@
-#![deny(clippy::unwrap_used, clippy::pedantic)]
-#![allow(
-    clippy::single_match,
-    clippy::type_complexity,
-    clippy::module_name_repetitions,
-    clippy::unused_self,
-    clippy::unnested_or_patterns,
-    clippy::match_same_arms,
-    clippy::manual_let_else,
-    clippy::needless_return,
-    clippy::zero_sized_map_values,
-    clippy::too_many_lines,
-    clippy::match_single_binding,
-    clippy::struct_field_names,
-    clippy::redundant_closure_for_method_calls,
-    unused_macros
-)]
 use core::scheduler::Scheduler;
 use std::io::{Read, Write};
 
