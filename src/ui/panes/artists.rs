@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+use ratatui::{Frame, prelude::Rect};
 
 use super::{Pane, browser::DirOrSong};
 use crate::{
@@ -65,12 +65,12 @@ struct CachedAlbum {
 }
 
 impl ArtistsPane {
-    pub fn new(mode: ArtistsPaneMode, context: &AppContext) -> Self {
+    pub fn new(mode: ArtistsPaneMode, _context: &AppContext) -> Self {
         Self {
             mode,
             stack: DirStack::default(),
             filter_input_mode: false,
-            browser: Browser::new(context.config),
+            browser: Browser::new(),
             initialized: false,
             cache: ArtistsCache::default(),
         }
@@ -219,11 +219,12 @@ impl ArtistsPane {
 }
 
 impl Pane for ArtistsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
+            context.config,
         );
 
         Ok(())

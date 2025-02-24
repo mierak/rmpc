@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+use ratatui::{Frame, prelude::Rect};
 
 use super::{Pane, browser::DirOrSong};
 use crate::{
@@ -41,11 +41,11 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl AlbumsPane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(_context: &AppContext) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
-            browser: Browser::new(context.config),
+            browser: Browser::new(),
             initialized: false,
         }
     }
@@ -94,11 +94,12 @@ impl AlbumsPane {
 }
 
 impl Pane for AlbumsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
+            context.config,
         );
 
         Ok(())
