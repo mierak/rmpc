@@ -802,7 +802,7 @@ impl Pane for SearchPane {
                 if let Some(action) = event.as_global_action(context) {
                     if let GlobalAction::ExternalCommand { command, .. } = action {
                         let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                        run_external(command, create_env(context, songs));
+                        run_external(command.clone(), create_env(context, songs));
                     } else {
                         event.abandon();
                     }
@@ -936,11 +936,11 @@ impl Pane for SearchPane {
                         {
                             let songs =
                                 self.songs_dir.marked_items().map(|song| song.file.as_str());
-                            run_external(command, create_env(context, songs));
+                            run_external(command.clone(), create_env(context, songs));
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                            run_external(command, create_env(context, selected));
+                            run_external(command.clone(), create_env(context, selected));
                         }
                         _ => {
                             event.abandon();

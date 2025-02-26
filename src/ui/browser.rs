@@ -94,7 +94,7 @@ where
         };
 
         let config = context.config;
-        match action {
+        match action.clone() {
             GlobalAction::ExternalCommand { command, .. }
                 if !self.stack().current().marked().is_empty() =>
             {

@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossbeam::channel::{Receiver, Sender};
 
 use crate::{
-    config::{Config, Leak, cli_config::CliConfig},
+    config::{Config, cli_config::CliConfig},
     shared::{
         events::{AppEvent, ClientRequest, WorkDone, WorkRequest},
         lrc::LrcIndex,
@@ -20,10 +20,9 @@ pub fn init(
     config: Config,
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new().name("work".to_owned()).spawn(move || {
-        let cli_config: CliConfig = config.into();
-        let cli_config = cli_config.leak();
+        let cli_config = config.into();
         while let Ok(req) = work_rx.recv() {
-            let result = handle_work_request(req, &client_tx, cli_config);
+            let result = handle_work_request(req, &client_tx, &cli_config);
             try_skip!(
                 event_tx.send(AppEvent::WorkDone(result)),
                 "Failed to send work done notification"
@@ -35,7 +34,7 @@ pub fn init(
 fn handle_work_request(
     request: WorkRequest,
     client_tx: &Sender<ClientRequest>,
-    config: &'static CliConfig,
+    config: &CliConfig,
 ) -> Result<WorkDone> {
     match request {
         WorkRequest::Command(command) => {

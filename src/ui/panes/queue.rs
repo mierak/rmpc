@@ -771,7 +771,7 @@ impl Pane for QueuePane {
                         .get_selected()
                         .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
 
-                    run_external(command, create_env(context, song));
+                    run_external(command.clone(), create_env(context, song));
                 }
                 _ => {
                     event.abandon();

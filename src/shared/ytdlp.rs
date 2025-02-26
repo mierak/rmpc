@@ -41,7 +41,7 @@ impl YtDlp {
             status_info!("Downloading '{url}'");
         }
 
-        let ytdlp = YtDlp::new(&cache_dir)?;
+        let ytdlp = YtDlp::new(cache_dir)?;
         let file_path = ytdlp.download(url)?;
 
         Ok(file_path)

@@ -6,7 +6,7 @@ use crate::config::{tabs::TabName, utils::tilde_expand};
 
 // Global actions
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, PartialEq, Eq, Hash, Clone)]
 pub enum GlobalAction {
     Quit,
     ShowHelp,
@@ -29,8 +29,8 @@ pub enum GlobalAction {
     NextTab,
     PreviousTab,
     SwitchToTab(TabName),
-    Command { command: &'static str, description: Option<&'static str> },
-    ExternalCommand { command: &'static [&'static str], description: Option<&'static str> },
+    Command { command: String, description: Option<String> },
+    ExternalCommand { command: Vec<String>, description: Option<String> },
 }
 
 #[derive(
@@ -76,10 +76,9 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::ShowDecoders => GlobalAction::ShowDecoders,
             GlobalActionFile::ShowCurrentSongInfo => GlobalAction::ShowCurrentSongInfo,
             GlobalActionFile::CommandMode => GlobalAction::CommandMode,
-            GlobalActionFile::Command { command, description } => GlobalAction::Command {
-                command: command.leak(),
-                description: description.map(|s| s.leak() as &'static str),
-            },
+            GlobalActionFile::Command { command, description } => {
+                GlobalAction::Command { command, description }
+            }
             GlobalActionFile::ShowHelp => GlobalAction::ShowHelp,
             GlobalActionFile::NextTrack => GlobalAction::NextTrack,
             GlobalActionFile::PreviousTrack => GlobalAction::PreviousTrack,
@@ -106,10 +105,9 @@ impl From<GlobalActionFile> for GlobalAction {
                 GlobalAction::ExternalCommand {
                     command: command
                         .into_iter()
-                        .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
-                        .collect_vec()
-                        .leak(),
-                    description: description.map(|s| s.leak() as &'static str),
+                        .map(|v| tilde_expand(&v).into_owned())
+                        .collect_vec(),
+                    description,
                 }
             }
         }

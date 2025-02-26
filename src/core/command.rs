@@ -24,7 +24,7 @@ use crate::{
 impl Command {
     pub fn execute(
         mut self,
-        config: &'static CliConfig,
+        config: &CliConfig,
     ) -> Result<Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static>> {
         match self {
             Command::Config { .. } => bail!("Cannot use config command here."),
@@ -61,16 +61,19 @@ impl Command {
                     Ok(())
                 }))
             }
-            Command::LyricsIndex => Ok(Box::new(|_| {
-                let Some(dir) = &config.lyrics_dir else {
-                    bail!("Lyrics dir is not configured");
-                };
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&LrcIndex::index(&PathBuf::from(dir)))?
-                );
-                Ok(())
-            })),
+            Command::LyricsIndex => {
+                let lyrics_dir = config.lyrics_dir.clone();
+                Ok(Box::new(|_| {
+                    let Some(dir) = lyrics_dir else {
+                        bail!("Lyrics dir is not configured");
+                    };
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&LrcIndex::index(&PathBuf::from(dir)))?
+                    );
+                    Ok(())
+                }))
+            }
             Command::Play { position: None } => Ok(Box::new(|client| Ok(client.play()?))),
             Command::Play { position: Some(pos) } => {
                 Ok(Box::new(move |client| Ok(client.play_pos(pos)?)))
@@ -309,7 +312,7 @@ impl Command {
     }
 }
 
-pub fn run_external_blocking<'a, E>(command: &[&str], envs: E) -> Result<()>
+pub fn run_external_blocking<'a, E>(command: &[String], envs: E) -> Result<()>
 where
     E: IntoIterator<Item = (&'a str, &'a str)> + std::fmt::Debug,
 {
@@ -346,16 +349,14 @@ where
     Ok(())
 }
 
-pub fn run_external<'a: 'static, K: Into<String>, V: Into<String>>(
-    command: &'a [&'a str],
-    envs: Vec<(K, V)>,
-) {
+pub fn run_external<K: Into<String>, V: Into<String>>(command: Vec<String>, envs: Vec<(K, V)>) {
     let envs = envs.into_iter().map(|(k, v)| (k.into(), v.into())).collect_vec();
 
     std::thread::spawn(move || {
-        if let Err(err) =
-            run_external_blocking(command, envs.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-        {
+        if let Err(err) = run_external_blocking(
+            command.as_slice(),
+            envs.iter().map(|(k, v)| (k.as_str(), v.as_str())),
+        ) {
             status_error!("{}", err);
         }
     });

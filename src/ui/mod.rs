@@ -354,8 +354,8 @@ impl<'ui> Ui<'ui> {
                     context.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
-                    if context.config.tabs.names.contains(&name) {
-                        self.change_tab(name, context)?;
+                    if context.config.tabs.names.contains(name) {
+                        self.change_tab(*name, context)?;
                         context.render()?;
                     } else {
                         status_error!(
@@ -370,7 +370,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
                 GlobalAction::ExternalCommand { command, .. } => {
-                    run_external(command, create_env(context, std::iter::empty::<&str>()));
+                    run_external(command.clone(), create_env(context, std::iter::empty::<&str>()));
                 }
                 GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                 GlobalAction::ShowHelp => {
@@ -473,7 +473,7 @@ impl<'ui> Ui<'ui> {
                 || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
 
-        for name in context.config.active_panes {
+        for name in &context.config.active_panes {
             let Some(pane) = self.panes.get_mut_by_discr(*name) else {
                 continue;
             };

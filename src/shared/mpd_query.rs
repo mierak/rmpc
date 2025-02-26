@@ -93,7 +93,7 @@ pub(crate) enum MpdQueryResult {
     Volume(Volume),
     Outputs(Vec<Output>),
     Decoders(Vec<Decoder>),
-    ExternalCommand(&'static [&'static str], Vec<Song>),
+    ExternalCommand(Vec<String>, Vec<Song>),
     Any(Box<dyn Any + Send + Sync>),
 }
 
