@@ -756,17 +756,17 @@ impl Property<PropertyKind> {
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
                 StatusProperty::State {
-                    playing_label: play_label,
-                    paused_label: pause_label,
-                    stopped_label: stop_label,
+                    playing_label,
+                    paused_label,
+                    stopped_label,
                     playing_style,
                     paused_style,
                     stopped_style,
                 } => Some(Either::Left(Span::styled(
                     match status.state {
-                        State::Play => *play_label,
-                        State::Stop => *stop_label,
-                        State::Pause => *pause_label,
+                        State::Play => playing_label,
+                        State::Stop => stopped_label,
+                        State::Pause => paused_label,
                     },
                     match status.state {
                         State::Play => playing_style,
@@ -786,13 +786,13 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::Repeat { on_label, off_label, on_style, off_style } => {
                     Some(Either::Left(Span::styled(
-                        *if status.repeat { on_label } else { off_label },
+                        if status.repeat { on_label } else { off_label },
                         if status.repeat { on_style } else { off_style }.unwrap_or(style),
                     )))
                 }
                 StatusProperty::Random { on_label, off_label, on_style, off_style } => {
                     Some(Either::Left(Span::styled(
-                        *if status.random { on_label } else { off_label },
+                        if status.random { on_label } else { off_label },
                         if status.random { on_style } else { off_style }.unwrap_or(style),
                     )))
                 }
@@ -804,7 +804,7 @@ impl Property<PropertyKind> {
                     off_style,
                     oneshot_style,
                 } => Some(Either::Left(Span::styled(
-                    *match status.consume {
+                    match status.consume {
                         OnOffOneshot::On => on_label,
                         OnOffOneshot::Off => off_label,
                         OnOffOneshot::Oneshot => oneshot_label,
@@ -824,7 +824,7 @@ impl Property<PropertyKind> {
                     off_style,
                     oneshot_style,
                 } => Some(Either::Left(Span::styled(
-                    *match status.single {
+                    match status.single {
                         OnOffOneshot::On => on_label,
                         OnOffOneshot::Off => off_label,
                         OnOffOneshot::Oneshot => oneshot_label,
@@ -1106,9 +1106,9 @@ mod format_tests {
         ) {
             let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(StatusProperty::State {
-                    playing_label,
-                    paused_label,
-                    stopped_label,
+                    playing_label: playing_label.to_string(),
+                    paused_label: paused_label.to_string(),
+                    stopped_label: stopped_label.to_string(),
                     playing_style: None,
                     paused_style: None,
                     stopped_style: None,

@@ -112,37 +112,37 @@ pub enum StatusPropertyFile {
 pub enum StatusProperty {
     Volume,
     Repeat {
-        on_label: &'static str,
-        off_label: &'static str,
+        on_label: String,
+        off_label: String,
         on_style: Option<Style>,
         off_style: Option<Style>,
     },
     Random {
-        on_label: &'static str,
-        off_label: &'static str,
+        on_label: String,
+        off_label: String,
         on_style: Option<Style>,
         off_style: Option<Style>,
     },
     Single {
-        on_label: &'static str,
-        off_label: &'static str,
-        oneshot_label: &'static str,
+        on_label: String,
+        off_label: String,
+        oneshot_label: String,
         on_style: Option<Style>,
         off_style: Option<Style>,
         oneshot_style: Option<Style>,
     },
     Consume {
-        on_label: &'static str,
-        off_label: &'static str,
-        oneshot_label: &'static str,
+        on_label: String,
+        off_label: String,
+        oneshot_label: String,
         on_style: Option<Style>,
         off_style: Option<Style>,
         oneshot_style: Option<Style>,
     },
     State {
-        playing_label: &'static str,
-        paused_label: &'static str,
-        stopped_label: &'static str,
+        playing_label: String,
+        paused_label: String,
+        stopped_label: String,
         playing_style: Option<Style>,
         paused_style: Option<Style>,
         stopped_style: Option<Style>,
@@ -264,16 +264,16 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
     fn try_from(value: StatusPropertyFile) -> Result<Self, Self::Error> {
         Ok(match value {
             StatusPropertyFile::StateV2 {
-                playing_label: play_label,
-                paused_label: pause_label,
-                stopped_label: stop_label,
+                playing_label,
+                paused_label,
+                stopped_label,
                 playing_style,
                 paused_style,
                 stopped_style,
             } => StatusProperty::State {
-                playing_label: play_label.leak(),
-                paused_label: pause_label.leak(),
-                stopped_label: stop_label.leak(),
+                playing_label,
+                paused_label,
+                stopped_label,
                 playing_style: playing_style
                     .map(|s| -> Result<_> { s.to_config_or(None, None) })
                     .transpose()?,
@@ -285,9 +285,9 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                     .transpose()?,
             },
             StatusPropertyFile::State => StatusProperty::State {
-                playing_label: defaults::default_playing_label().leak(),
-                paused_label: defaults::default_paused_label().leak(),
-                stopped_label: defaults::default_stopped_label().leak(),
+                playing_label: defaults::default_playing_label(),
+                paused_label: defaults::default_paused_label(),
+                stopped_label: defaults::default_stopped_label(),
                 playing_style: None,
                 paused_style: None,
                 stopped_style: None,
@@ -298,37 +298,37 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             StatusPropertyFile::Bitrate => StatusProperty::Bitrate,
             StatusPropertyFile::Crossfade => StatusProperty::Crossfade,
             StatusPropertyFile::Repeat => StatusProperty::Repeat {
-                on_label: defaults::default_on_label().leak(),
-                off_label: defaults::default_off_label().leak(),
+                on_label: defaults::default_on_label(),
+                off_label: defaults::default_off_label(),
                 on_style: None,
                 off_style: None,
             },
             StatusPropertyFile::Random => StatusProperty::Random {
-                on_label: defaults::default_on_label().leak(),
-                off_label: defaults::default_off_label().leak(),
+                on_label: defaults::default_on_label(),
+                off_label: defaults::default_off_label(),
                 on_style: None,
                 off_style: None,
             },
             StatusPropertyFile::Consume => StatusProperty::Consume {
-                on_label: defaults::default_on_label().leak(),
-                off_label: defaults::default_off_label().leak(),
-                oneshot_label: defaults::default_oneshot_label().leak(),
+                on_label: defaults::default_on_label(),
+                off_label: defaults::default_off_label(),
+                oneshot_label: defaults::default_oneshot_label(),
                 on_style: None,
                 off_style: None,
                 oneshot_style: None,
             },
             StatusPropertyFile::Single => StatusProperty::Single {
-                on_label: defaults::default_on_label().leak(),
-                off_label: defaults::default_off_label().leak(),
-                oneshot_label: defaults::default_oneshot_label().leak(),
+                on_label: defaults::default_on_label(),
+                off_label: defaults::default_off_label(),
+                oneshot_label: defaults::default_oneshot_label(),
                 on_style: None,
                 off_style: None,
                 oneshot_style: None,
             },
             StatusPropertyFile::RepeatV2 { on_label, off_label, on_style, off_style } => {
                 StatusProperty::Repeat {
-                    on_label: on_label.leak(),
-                    off_label: off_label.leak(),
+                    on_label,
+                    off_label,
                     on_style: on_style
                         .map(|s| -> Result<_> { s.to_config_or(None, None) })
                         .transpose()?,
@@ -339,8 +339,8 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             }
             StatusPropertyFile::RandomV2 { on_label, off_label, on_style, off_style } => {
                 StatusProperty::Random {
-                    on_label: on_label.leak(),
-                    off_label: off_label.leak(),
+                    on_label,
+                    off_label,
                     on_style: on_style
                         .map(|s| -> Result<_> { s.to_config_or(None, None) })
                         .transpose()?,
@@ -357,9 +357,9 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                 off_style,
                 oneshot_style,
             } => StatusProperty::Consume {
-                on_label: on_label.leak(),
-                off_label: off_label.leak(),
-                oneshot_label: oneshot_label.leak(),
+                on_label,
+                off_label,
+                oneshot_label,
                 on_style: on_style
                     .map(|s| -> Result<_> { s.to_config_or(None, None) })
                     .transpose()?,
@@ -378,9 +378,9 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                 off_style,
                 oneshot_style,
             } => StatusProperty::Single {
-                on_label: on_label.leak(),
-                off_label: off_label.leak(),
-                oneshot_label: oneshot_label.leak(),
+                on_label,
+                off_label,
+                oneshot_label,
                 on_style: on_style
                     .map(|s| -> Result<_> { s.to_config_or(None, None) })
                     .transpose()?,
