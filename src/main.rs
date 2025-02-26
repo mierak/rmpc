@@ -148,7 +148,7 @@ fn main() -> Result<()> {
                 Err(_err) => ConfigFile::default().into(),
             };
             let config = config.into_config(args.address, args.password).leak();
-            let mut client = Client::init(config.address, config.password, "main")?;
+            let mut client = Client::init(config.address.clone(), config.password.clone(), "main")?;
             client.set_read_timeout(None)?;
             (cmd.execute(config)?)(&mut client)?;
         }
@@ -188,8 +188,9 @@ fn main() -> Result<()> {
             }
             event_tx.send(AppEvent::RequestRender).context("Failed to render first frame")?;
 
-            let mut client = Client::init(config.address, config.password, "command")
-                .context("Failed to connect to MPD")?;
+            let mut client =
+                Client::init(config.address.clone(), config.password.clone(), "command")
+                    .context("Failed to connect to MPD")?;
             client.set_read_timeout(Some(config.mpd_read_timeout))?;
             client.set_write_timeout(Some(config.mpd_write_timeout))?;
 
@@ -213,7 +214,7 @@ fn main() -> Result<()> {
                 worker_rx.clone(),
                 client_tx.clone(),
                 event_tx.clone(),
-                context.config,
+                context.config.clone(),
             )?;
             core::input::init(event_tx.clone())?;
             let _sock_guard =

@@ -19,8 +19,8 @@ pub struct CliConfigFile {
 
 #[derive(Debug, Default, Clone)]
 pub struct CliConfig {
-    pub address: MpdAddress<'static>,
-    pub password: Option<MpdPassword<'static>>,
+    pub address: MpdAddress,
+    pub password: Option<MpdPassword>,
     pub cache_dir: Option<&'static str>,
     pub lyrics_dir: Option<&'static str>,
 }
@@ -36,8 +36,8 @@ impl From<ConfigFile> for CliConfigFile {
     }
 }
 
-impl<'a> From<&'a Config> for CliConfig {
-    fn from(value: &'a Config) -> Self {
+impl From<Config> for CliConfig {
+    fn from(value: Config) -> Self {
         Self {
             address: value.address,
             password: value.password,

@@ -42,8 +42,8 @@ use crate::{
 
 #[derive(Debug, Default, Clone)]
 pub struct Config {
-    pub address: MpdAddress<'static>,
-    pub password: Option<MpdPassword<'static>>,
+    pub address: MpdAddress,
+    pub password: Option<MpdPassword>,
     pub cache_dir: Option<&'static str>,
     pub lyrics_dir: Option<&'static str>,
     pub volume_step: u8,

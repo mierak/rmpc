@@ -27,8 +27,8 @@ pub struct Client<'name> {
     name: &'name str,
     rx: BufReader<TcpOrUnixStream>,
     pub stream: TcpOrUnixStream,
-    addr: MpdAddress<'name>,
-    password: Option<MpdPassword<'name>>,
+    addr: MpdAddress,
+    password: Option<MpdPassword>,
     pub version: Version,
     pub config: Option<MpdConfig>,
 }
@@ -105,13 +105,13 @@ impl std::io::Write for TcpOrUnixStream {
 #[allow(dead_code)]
 impl<'name> Client<'name> {
     pub fn init(
-        addr: MpdAddress<'name>,
-        password: Option<MpdPassword<'name>>,
+        addr: MpdAddress,
+        password: Option<MpdPassword>,
         name: &'name str,
     ) -> MpdResult<Client<'name>> {
         let mut stream = match addr {
-            MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
-            MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
+            MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
+            MpdAddress::SocketPath(ref addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;
@@ -140,7 +140,7 @@ impl<'name> Client<'name> {
 
         let mut client = Self { name, rx, stream, addr, password, version, config: None };
 
-        if let Some(MpdPassword(password)) = password {
+        if let Some(MpdPassword(ref password)) = client.password.clone() {
             debug!("Used password auth to MPD");
             client.password(password)?;
         }
@@ -154,9 +154,9 @@ impl<'name> Client<'name> {
 
     pub fn reconnect(&mut self) -> MpdResult<&Client> {
         debug!(name = self.name, addr:? = self.addr; "trying to reconnect");
-        let mut stream = match self.addr {
-            MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
-            MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
+        let mut stream = match &self.addr {
+            MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
+            MpdAddress::SocketPath(ref addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;
@@ -183,7 +183,7 @@ impl<'name> Client<'name> {
 
         debug!(name = self.name, addr:? = self.addr, handshake = buf.trim(), version = version.to_string().as_str(); "MPD client initialized");
 
-        if let Some(MpdPassword(password)) = self.password {
+        if let Some(MpdPassword(password)) = &self.password.clone() {
             debug!("Used password auth to MPD");
             self.password(password)?;
         }

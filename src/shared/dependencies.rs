@@ -19,7 +19,7 @@ pub static PYTHON3MUTAGEN: LazyLock<Dep> = LazyLock::new(|| {
 pub static DEPENDENCIES: [&std::sync::LazyLock<Dep>; 6] =
     [&FFMPEG, &FFPROBE, &YTDLP, &UEBERZUGPP, &PYTHON3, &PYTHON3MUTAGEN];
 
-pub fn is_youtube_supported(mpd_address: MpdAddress) -> Result<(), Vec<String>> {
+pub fn is_youtube_supported(mpd_address: &MpdAddress) -> Result<(), Vec<String>> {
     let mut unsupported = Vec::new();
     if !YTDLP.installed {
         unsupported.push("yt-dlp".to_string());

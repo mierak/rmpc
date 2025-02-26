@@ -17,7 +17,7 @@ pub fn init(
     work_rx: Receiver<WorkRequest>,
     client_tx: Sender<ClientRequest>,
     event_tx: Sender<AppEvent>,
-    config: &'static Config,
+    config: Config,
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new().name("work".to_owned()).spawn(move || {
         let cli_config: CliConfig = config.into();

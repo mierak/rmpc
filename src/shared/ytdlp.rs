@@ -32,7 +32,7 @@ impl YtDlp {
             bail!("Youtube support requires 'cache_dir' to be configured")
         };
 
-        if let Err(unsupported_list) = dependencies::is_youtube_supported(config.address) {
+        if let Err(unsupported_list) = dependencies::is_youtube_supported(&config.address) {
             status_warn!(
                 "Youtube support requires the following and may thus not work properly: {}",
                 unsupported_list.join(", ")
