@@ -20,7 +20,7 @@ pub enum SongPropertyFile {
     Other(String),
 }
 
-#[derive(Debug, Copy, Clone, Display, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
 pub enum SongProperty {
     Filename,
     File,
@@ -29,7 +29,7 @@ pub enum SongProperty {
     Album,
     Duration,
     Track,
-    Other(&'static str),
+    Other(String),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -243,7 +243,7 @@ impl TryFrom<SongPropertyFile> for SongProperty {
             SongPropertyFile::Album => SongProperty::Album,
             SongPropertyFile::Duration => SongProperty::Duration,
             SongPropertyFile::Track => SongProperty::Track,
-            SongPropertyFile::Other(name) => SongProperty::Other(name.leak()),
+            SongPropertyFile::Other(name) => SongProperty::Other(name),
         })
     }
 }

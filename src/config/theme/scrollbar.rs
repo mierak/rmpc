@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 
 use super::{StyleFile, style::ToConfigOr};
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct ScrollbarConfig {
     /// Symbols used for the scrollbar
     /// First symbol is used for the scrollbar track
     /// Second symbol is used for the scrollbar thumb
     /// Third symbol is used for the scrollbar up button
     /// Fourth symbol is used for the scrollbar down button
-    pub symbols: [&'static str; 4],
+    pub symbols: [String; 4],
     /// Fall sback to border color for foreground and default color for
     /// background
     pub track_style: Style,
@@ -53,7 +53,7 @@ impl ScrollbarConfigFile {
         let sb_down = std::mem::take(&mut self.symbols[3]);
 
         Ok(ScrollbarConfig {
-            symbols: [sb_track.leak(), sb_thumb.leak(), sb_up.leak(), sb_down.leak()],
+            symbols: [sb_track, sb_thumb, sb_up, sb_down],
             ends_style: self.ends_style.to_config_or(Some(fallback_color), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(fallback_color), None)?,

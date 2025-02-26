@@ -54,7 +54,7 @@ where
         config: &Config,
     ) {
         let scrollbar_margin = if config.theme.draw_borders {
-            let scrollbar_track = config.theme.scrollbar.symbols[0];
+            let scrollbar_track = &config.theme.scrollbar.symbols[0];
             Margin { vertical: 0, horizontal: scrollbar_track.is_empty().into() }
         } else {
             Margin { vertical: 0, horizontal: 0 }

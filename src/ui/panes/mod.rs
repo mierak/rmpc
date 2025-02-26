@@ -576,9 +576,7 @@ impl Song {
                 Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))
             }),
             SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
-            SongProperty::Other(name) => {
-                self.metadata.get(*name).map(|v| Cow::Borrowed(v.as_str()))
-            }
+            SongProperty::Other(name) => self.metadata.get(name).map(|v| Cow::Borrowed(v.as_str())),
         }
     }
 
@@ -1024,7 +1022,7 @@ mod format_tests {
         #[test_case(SongProperty::Album, "album")]
         #[test_case(SongProperty::Track, "123")]
         #[test_case(SongProperty::Duration, "2:03")]
-        #[test_case(SongProperty::Other("track"), "123")]
+        #[test_case(SongProperty::Other("track".to_string()), "123")]
         fn song_property_resolves_correctly(prop: SongProperty, expected: &str) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(prop),

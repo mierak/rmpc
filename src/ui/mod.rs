@@ -783,22 +783,19 @@ impl Config {
             .thumb_style(progress_bar_colors.thumb_style)
             .track_style(progress_bar_colors.track_style)
             .elapsed_style(progress_bar_colors.elapsed_style)
-            .elapsed_char(self.theme.progress_bar.symbols[0])
-            .thumb_char(self.theme.progress_bar.symbols[1])
-            .track_char(self.theme.progress_bar.symbols[2])
+            .elapsed_char(&self.theme.progress_bar.symbols[0])
+            .thumb_char(&self.theme.progress_bar.symbols[1])
+            .track_char(&self.theme.progress_bar.symbols[2])
     }
 
     fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
-        let symbols = self.theme.scrollbar.symbols;
-        let track = if symbols[0].is_empty() { None } else { Some(symbols[0]) };
-        let begin = if symbols[2].is_empty() { None } else { Some(symbols[2]) };
-        let end = if symbols[3].is_empty() { None } else { Some(symbols[3]) };
+        let symbols = &self.theme.scrollbar.symbols;
         ratatui::widgets::Scrollbar::default()
             .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-            .track_symbol(track)
-            .thumb_symbol(self.theme.scrollbar.symbols[1])
-            .begin_symbol(begin)
-            .end_symbol(end)
+            .track_symbol(if symbols[0].is_empty() { None } else { Some(&symbols[0]) })
+            .thumb_symbol(&self.theme.scrollbar.symbols[1])
+            .begin_symbol(if symbols[2].is_empty() { None } else { Some(&symbols[2]) })
+            .end_symbol(if symbols[3].is_empty() { None } else { Some(&symbols[3]) })
             .track_style(self.theme.scrollbar.track_style)
             .begin_style(self.theme.scrollbar.ends_style)
             .end_style(self.theme.scrollbar.ends_style)
