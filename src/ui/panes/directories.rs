@@ -110,7 +110,7 @@ impl Pane for DirectoriesPane {
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            context.config,
+            &context.config,
         );
 
         Ok(())
@@ -316,7 +316,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     return Ok(());
                 };
                 let next_path = next_path.join("/").to_string();
-                let config = context.config;
+                let config = std::sync::Arc::clone(&context.config);
 
                 self.stack_mut().clear_preview();
                 context
@@ -345,7 +345,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             LsInfoEntry::Playlist(_) => None,
                         })
                         .sorted()
-                        .map(|v| v.to_list_item_simple(config))
+                        .map(|v| v.to_list_item_simple(&config))
                         .collect();
 
                         Ok(MpdQueryResult::Preview {
@@ -356,7 +356,6 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
-                let config = context.config;
                 context
                     .query()
                     .id(PREVIEW)
@@ -366,7 +365,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         Ok(MpdQueryResult::Preview {
                             data: client
                                 .find_one(&[Filter::new(Tag::File, &file)])?
-                                .map(|v| v.to_preview(&config.theme.symbols)),
+                                .map(|v| v.to_preview()),
                             origin_path,
                         })
                     });

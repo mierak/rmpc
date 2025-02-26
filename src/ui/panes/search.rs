@@ -49,7 +49,7 @@ const SEARCH: &str = "search";
 
 impl SearchPane {
     pub fn new(context: &AppContext) -> Self {
-        let config = context.config;
+        let config = &context.config;
         Self {
             preview: None,
             phase: Phase::Search,
@@ -161,7 +161,7 @@ impl SearchPane {
             Phase::Search => {
                 let data = Some(vec![PreviewGroup::from(
                     None,
-                    self.songs_dir.to_list_items(context.config),
+                    self.songs_dir.to_list_items(&context.config),
                 )]);
                 context
                     .query()
@@ -176,7 +176,6 @@ impl SearchPane {
                 let Some(current) = self.songs_dir.selected() else {
                     return;
                 };
-                let config = context.config;
                 let file = current.file.clone();
 
                 context
@@ -190,7 +189,7 @@ impl SearchPane {
                                 .find(&[Filter::new(Tag::File, &file)])?
                                 .first()
                                 .context("Expected to find exactly one song")?
-                                .to_preview(&config.theme.symbols),
+                                .to_preview(),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
                     });
@@ -605,7 +604,7 @@ impl Pane for SearchPane {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(vec![PreviewGroup::from(
                     None,
-                    self.songs_dir.to_list_items(context.config),
+                    self.songs_dir.to_list_items(&context.config),
                 )]);
                 context.render()?;
             }
@@ -760,7 +759,7 @@ impl Pane for SearchPane {
     }
 
     fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        let config = context.config;
+        let config = &context.config;
         match &mut self.phase {
             Phase::SearchTextboxInput => match event.as_common_action(context) {
                 Some(CommonAction::Close) => {

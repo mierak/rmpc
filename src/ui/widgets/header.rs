@@ -18,7 +18,7 @@ pub struct Header<'a> {
 
 impl Widget for Header<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let config = self.context.config;
+        let config = &self.context.config;
 
         if let Some(header_bg_color) = config.theme.header_background_color {
             Block::default().style(Style::default().bg(header_bg_color)).render(area, buf);

@@ -99,7 +99,7 @@ impl Pane for AlbumsPane {
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            context.config,
+            &context.config,
         );
 
         Ok(())
@@ -309,7 +309,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             return Ok(());
         };
         let current = current.to_owned();
-        let config = context.config;
+        let config = std::sync::Arc::clone(&context.config);
         let origin_path = Some(self.stack().path().to_vec());
 
         self.stack_mut().clear_preview();
@@ -330,7 +330,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                                     album,
                                     current
                                 ))?
-                                .to_preview(&config.theme.symbols),
+                                .to_preview(),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });
@@ -343,7 +343,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = list_titles(client, &current)?
-                            .map(|v| v.to_list_item_simple(config))
+                            .map(|v| v.to_list_item_simple(&config))
                             .collect_vec();
                         let data = PreviewGroup::from(None, data);
                         let data = Some(vec![data]);

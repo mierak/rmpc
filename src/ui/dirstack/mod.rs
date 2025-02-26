@@ -18,12 +18,12 @@ pub trait DirStackItem {
     fn matches(&self, config: &Config, filter: &str) -> bool;
     fn to_list_item<'a>(
         &self,
-        config: &'a Config,
+        config: &Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a>;
-    fn to_list_item_simple<'a>(&self, config: &'a Config) -> ListItem<'a> {
+    fn to_list_item_simple<'a>(&self, config: &Config) -> ListItem<'a> {
         self.to_list_item(config, false, false, None)
     }
 }
@@ -47,38 +47,38 @@ impl DirStackItem for DirOrSong {
 
     fn to_list_item<'a>(
         &self,
-        config: &'a Config,
+        config: &Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a> {
-        let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(&symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
+            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
-        let mut value =
-            match self {
-                DirOrSong::Dir { name, .. } => Line::from(vec![
-                    marker_span,
-                    Span::from(format!(
-                        "{} {}",
-                        symbols.dir,
-                        if name.is_empty() { "Untitled" } else { name.as_str() }
-                    )),
-                ]),
-                DirOrSong::Song(s) => {
-                    let spans =
-                        [marker_span, Span::from(&symbols.song), Span::from(" ")]
-                            .into_iter()
-                            .chain(config.theme.browser_song_format.0.iter().map(|prop| {
+        let mut value = match self {
+            DirOrSong::Dir { name, .. } => Line::from(vec![
+                marker_span,
+                Span::from(format!(
+                    "{} {}",
+                    config.theme.symbols.dir,
+                    if name.is_empty() { "Untitled" } else { name.as_str() }
+                )),
+            ]),
+            DirOrSong::Song(s) => {
+                let spans =
+                    [marker_span, Span::from(config.theme.symbols.song.clone()), Span::from(" ")]
+                        .into_iter()
+                        .chain(
+                            config.theme.browser_song_format.0.iter().map(|prop| {
                                 Span::from(prop.as_string(Some(s)).unwrap_or_default())
-                            }));
-                    Line::from(spans.collect_vec())
-                }
-            };
+                            }),
+                        );
+                Line::from(spans.collect_vec())
+            }
+        };
         if let Some(content) = additional_content {
             value.push_span(Span::raw(content));
         }
@@ -101,22 +101,21 @@ impl DirStackItem for Song {
 
     fn to_list_item<'a>(
         &self,
-        config: &'a Config,
+        config: &Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a> {
-        let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(&symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
+            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
         let title = self.title_str().to_owned();
         let artist = self.artist_str().to_owned();
         let separator_span = Span::from(" - ");
-        let icon_span = Span::from(format!("{} ", symbols.song));
+        let icon_span = Span::from(format!("{} ", config.theme.symbols.song));
         let mut result =
             vec![marker_span, icon_span, Span::from(artist), separator_span, Span::from(title)];
         if let Some(content) = additional_content {
@@ -186,16 +185,15 @@ impl DirStackItem for String {
 
     fn to_list_item<'a>(
         &self,
-        config: &'a Config,
+        config: &Config,
         is_marked: bool,
         matches_filter: bool,
         _additional_content: Option<String>,
     ) -> ListItem<'a> {
-        let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(&symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
+            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
         if matches_filter {

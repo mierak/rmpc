@@ -61,14 +61,16 @@ impl Pane for HeaderPane {
                 });
             }
             MouseEventKind::ScrollUp => {
-                context.command(|client| {
-                    client.volume(ValueChange::Increase(context.config.volume_step.into()))?;
+                let volume_step = context.config.volume_step.into();
+                context.command(move |client| {
+                    client.volume(ValueChange::Increase(volume_step))?;
                     Ok(())
                 });
             }
             MouseEventKind::ScrollDown => {
-                context.command(|client| {
-                    client.volume(ValueChange::Decrease(context.config.volume_step.into()))?;
+                let volume_step = context.config.volume_step.into();
+                context.command(move |client| {
+                    client.volume(ValueChange::Decrease(volume_step))?;
                     Ok(())
                 });
             }

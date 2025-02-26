@@ -107,7 +107,7 @@ impl Pane for PlaylistsPane {
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            context.config,
+            &context.config,
         );
 
         Ok(())
@@ -517,7 +517,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
-        let config = context.config;
+        let config = std::sync::Arc::clone(&context.config);
         let s = self.stack().current().selected().cloned();
         self.stack_mut().clear_preview();
         let origin_path = Some(self.stack().path().to_vec());
@@ -535,7 +535,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .list_playlist_info(d, None)?
                                 .into_iter()
                                 .map(DirOrSong::Song)
-                                .map(|s| s.to_list_item_simple(config))
+                                .map(|s| s.to_list_item_simple(&config))
                                 .collect_vec(),
                         )]),
                         DirOrSong::Song(song) => {
@@ -546,9 +546,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .first()
                                 .context("Expected to find exactly one song for preview")?
                             {
-                                LsInfoEntry::File(song) => {
-                                    Some(song.to_preview(&config.theme.symbols))
-                                }
+                                LsInfoEntry::File(song) => Some(song.to_preview()),
                                 _ => None,
                             }
                         }

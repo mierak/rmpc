@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::{Leak, cli_config::CliConfigFile};
+use config::cli_config::CliConfigFile;
 use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
@@ -147,10 +147,14 @@ fn main() -> Result<()> {
                 Ok(cfg) => cfg,
                 Err(_err) => ConfigFile::default().into(),
             };
-            let config = config.into_config(args.address, args.password).leak();
-            let mut client = Client::init(config.address.clone(), config.password.clone(), "main")?;
+            let mut config = config.into_config(args.address, args.password);
+            let mut client = Client::init(
+                std::mem::take(&mut config.address),
+                std::mem::take(&mut config.password),
+                "main",
+            )?;
             client.set_read_timeout(None)?;
-            (cmd.execute(config)?)(&mut client)?;
+            (cmd.execute(&config)?)(&mut client)?;
         }
         None => {
             let (worker_tx, worker_rx) = unbounded::<WorkRequest>();
@@ -209,16 +213,21 @@ fn main() -> Result<()> {
             let enable_mouse = context.config.enable_mouse;
             let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
 
-            core::client::init(client_rx.clone(), event_tx.clone(), client, context.config)?;
+            core::client::init(
+                client_rx.clone(),
+                event_tx.clone(),
+                client,
+                (*context.config).clone(),
+            )?;
             core::work::init(
                 worker_rx.clone(),
                 client_tx.clone(),
                 event_tx.clone(),
-                context.config.clone(),
+                (*context.config).clone(),
             )?;
             core::input::init(event_tx.clone())?;
             let _sock_guard =
-                core::socket::init(event_tx.clone(), worker_tx.clone(), context.config)
+                core::socket::init(event_tx.clone(), worker_tx.clone(), (*context.config).clone())
                     .context("Failed to initialize socket listener")?;
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 

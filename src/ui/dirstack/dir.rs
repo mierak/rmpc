@@ -77,7 +77,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         }
     }
 
-    pub fn to_list_items<'a>(&self, config: &'a Config) -> Vec<ListItem<'a>> {
+    pub fn to_list_items<'a>(&self, config: &Config) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
         let current_item_idx = self.selected_with_idx().map(|(idx, _)| idx);
         self.items

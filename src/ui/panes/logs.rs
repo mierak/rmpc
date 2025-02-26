@@ -138,7 +138,7 @@ impl Pane for LogsPane {
     }
 
     fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        let config = context.config;
+        let config = &context.config;
         if let Some(action) = event.as_logs_action(context) {
             match action {
                 LogsActions::Clear => {

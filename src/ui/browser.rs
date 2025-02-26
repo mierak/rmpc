@@ -57,7 +57,7 @@ where
             return Ok(());
         }
 
-        let config = context.config;
+        let config = &context.config;
         match event.as_common_action(context) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
@@ -93,7 +93,7 @@ where
             return Ok(());
         };
 
-        let config = context.config;
+        let config = &context.config;
         match action.clone() {
             GlobalAction::ExternalCommand { command, .. }
                 if !self.stack().current().marked().is_empty() =>
@@ -221,7 +221,7 @@ where
         let Some(action) = event.as_common_action(context) else {
             return Ok(());
         };
-        let config = context.config;
+        let config = &context.config;
 
         match action {
             CommonAction::Up => {

@@ -274,13 +274,12 @@ pub(crate) mod browser {
     };
 
     use crate::{
-        config::theme::SymbolsConfig,
         mpd::commands::{Song, lsinfo::LsInfoEntry},
         shared::mpd_query::PreviewGroup,
     };
 
     impl Song {
-        pub(crate) fn to_preview(&self, _symbols: &SymbolsConfig) -> Vec<PreviewGroup> {
+        pub(crate) fn to_preview(&self) -> Vec<PreviewGroup> {
             let key_style = Style::default().fg(Color::Yellow);
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");

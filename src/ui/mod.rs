@@ -754,7 +754,7 @@ impl Config {
         Block::default().border_style(self.as_border_style())
     }
 
-    fn as_tabs_block(&self) -> ratatui::widgets::Block {
+    fn as_tabs_block<'block>(&self) -> ratatui::widgets::Block<'block> {
         if !self.theme.draw_borders {
             return ratatui::widgets::Block::default()/* .padding(Padding::new(0, 0, 1, 1)) */;
         }

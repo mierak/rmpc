@@ -23,7 +23,7 @@ const ALBUM_ART: &str = "album_art";
 impl AlbumArtPane {
     pub fn new(context: &AppContext) -> Self {
         Self {
-            album_art: AlbumArtFacade::new(context.config),
+            album_art: AlbumArtFacade::new(&context.config),
             is_modal_open: false,
             fetch_needed: false,
         }
@@ -165,7 +165,7 @@ mod tests {
 
     use super::AlbumArtPane;
     use crate::{
-        config::{Config, Leak, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
+        config::{Config, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
         mpd::commands::{Song, State},
         shared::{
             events::{ClientRequest, WorkRequest},
@@ -197,7 +197,7 @@ mod tests {
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
-        app_context.config = config.leak();
+        app_context.config = std::sync::Arc::new(config);
         app_context.queue.push(Song { id: selected_song_id, ..Default::default() });
         app_context.status.songid = Some(selected_song_id);
         app_context.status.state = State::Play;
@@ -242,7 +242,7 @@ mod tests {
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
-        app_context.config = config.leak();
+        app_context.config = std::sync::Arc::new(config);
         app_context.queue.push(Song { id: selected_song_id, ..Default::default() });
         app_context.status.songid = Some(selected_song_id);
         app_context.status.state = State::Play;

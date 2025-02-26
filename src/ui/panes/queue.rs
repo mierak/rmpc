@@ -67,7 +67,7 @@ const ADD_TO_PLAYLIST: &str = "add_to_playlist";
 
 impl QueuePane {
     pub fn new(context: &AppContext) -> Self {
-        let config = context.config;
+        let config = &context.config;
         Self {
             scrolling_state: DirState::default(),
             filter: None,
@@ -121,7 +121,7 @@ impl Pane for QueuePane {
 
         self.scrolling_state.set_content_len(Some(queue_len));
 
-        let widths = Layout::horizontal(self.column_widths.clone())
+        let widths = Layout::horizontal(self.column_widths.as_slice())
             .flex(Flex::Start)
             .spacing(1)
             .split(self.areas[Areas::Table]);

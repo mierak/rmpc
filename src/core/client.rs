@@ -24,18 +24,18 @@ pub fn init(
     client_rx: Receiver<ClientRequest>,
     event_tx: Sender<AppEvent>,
     client: Client<'static>,
-    config: &'static Config,
+    config: Config,
 ) -> io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new()
         .name("client task".to_owned())
-        .spawn(move || client_task(&client_rx, &event_tx, client, config))
+        .spawn(move || client_task(&client_rx, &event_tx, client, &config))
 }
 
 fn client_task(
     client_rx: &Receiver<ClientRequest>,
     event_tx: &Sender<AppEvent>,
     client: Client<'_>,
-    config: &'static Config,
+    config: &Config,
 ) {
     let (req2idle_tx, req2idle_rx) = &bounded::<Client<'_>>(0);
     let (idle2req_tx, idle2req_rx) = &bounded::<Client<'_>>(0);

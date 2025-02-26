@@ -20,7 +20,7 @@ use crate::{
 pub(crate) fn init(
     event_tx: Sender<AppEvent>,
     work_tx: Sender<WorkRequest>,
-    config: &'static Config,
+    config: Config,
 ) -> Result<SocketGuard> {
     let pid = std::process::id();
     let addr = get_socket_path(pid);
@@ -39,7 +39,7 @@ pub(crate) fn init(
 
             log::debug!(command:?, addr:?; "Got command from unix socket");
             try_cont!(
-                command.execute(&event_tx, &work_tx, config),
+                command.execute(&event_tx, &work_tx, &config),
                 "Socket command execution failed"
             );
         }

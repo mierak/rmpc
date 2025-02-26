@@ -10,7 +10,7 @@ use crate::{
     MpdQuery,
     MpdQueryResult,
     WorkRequest,
-    config::{Config, Leak, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
+    config::{Config, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
     core::scheduler::{Scheduler, time_provider::DefaultTimeProvider},
     mpd::{
         client::Client,
@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(derive_more::Debug)]
 pub struct AppContext {
-    pub(crate) config: &'static Config,
+    pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
     pub(crate) supported_commands: HashSet<String>,
@@ -79,7 +79,7 @@ impl AppContext {
         scheduler.start();
         Ok(Self {
             lrc_index: LrcIndex::default(),
-            config: config.leak(),
+            config: std::sync::Arc::new(config),
             status,
             queue,
             supported_commands,
