@@ -175,7 +175,7 @@ impl AppContext {
             return Ok(None);
         };
 
-        let Some(lyrics_dir) = self.config.lyrics_dir else {
+        let Some(lyrics_dir) = &self.config.lyrics_dir else {
             return Ok(None);
         };
 

@@ -62,7 +62,7 @@ impl Command {
                 }))
             }
             Command::LyricsIndex => Ok(Box::new(|_| {
-                let Some(dir) = config.lyrics_dir else {
+                let Some(dir) = &config.lyrics_dir else {
                     bail!("Lyrics dir is not configured");
                 };
                 println!(

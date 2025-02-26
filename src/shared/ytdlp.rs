@@ -16,7 +16,7 @@ pub struct YtDlp {
 }
 
 impl YtDlp {
-    pub fn new(cache_dir: &'static str) -> Result<Self> {
+    pub fn new(cache_dir: &str) -> Result<Self> {
         let cache_dir = format!("{cache_dir}youtube/");
 
         if which::which("yt-dlp").is_err() {
@@ -28,7 +28,7 @@ impl YtDlp {
     }
 
     pub fn init_and_download(config: &CliConfig, url: &str) -> Result<String> {
-        let Some(cache_dir) = config.cache_dir else {
+        let Some(cache_dir) = &config.cache_dir else {
             bail!("Youtube support requires 'cache_dir' to be configured")
         };
 
@@ -41,7 +41,7 @@ impl YtDlp {
             status_info!("Downloading '{url}'");
         }
 
-        let ytdlp = YtDlp::new(cache_dir)?;
+        let ytdlp = YtDlp::new(&cache_dir)?;
         let file_path = ytdlp.download(url)?;
 
         Ok(file_path)

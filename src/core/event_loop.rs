@@ -198,7 +198,8 @@ fn main_task<B: Backend + std::io::Write>(
                                         let lrc_path = context
                                             .config
                                             .lyrics_dir
-                                            .and_then(|dir| get_lrc_path(dir, &song.file).ok())
+                                            .as_ref()
+                                            .and_then(|dir| get_lrc_path(&dir, &song.file).ok())
                                             .map(|path| path.to_string_lossy().into_owned())
                                             .unwrap_or_default();
                                         let lrc = context.find_lrc().ok().flatten();

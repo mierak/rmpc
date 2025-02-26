@@ -128,7 +128,7 @@ impl MpdAddress {
 
 #[cfg(test)]
 #[rustfmt::skip]
-#[allow(clippy::unwrap_used, clippy::too_many_arguments)]
+#[allow(clippy::unwrap_used, clippy::too_many_arguments, clippy::needless_pass_by_value)]
 mod tests {
     use std::sync::{LazyLock, Mutex};
 

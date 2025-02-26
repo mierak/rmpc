@@ -181,9 +181,9 @@ fn main() -> Result<()> {
                 }
             };
 
-            if let Some(lyrics_dir) = config.lyrics_dir {
+            if let Some(lyrics_dir) = &config.lyrics_dir {
                 worker_tx
-                    .send(WorkRequest::IndexLyrics { lyrics_dir })
+                    .send(WorkRequest::IndexLyrics { lyrics_dir: lyrics_dir.clone() })
                     .context("Failed to request lyrics indexing")?;
             }
             event_tx.send(AppEvent::RequestRender).context("Failed to render first frame")?;
