@@ -14,24 +14,21 @@ pub use state::DirState;
 use crate::{config::Config, mpd::commands::Song, ui::panes::browser::DirOrSong};
 
 pub trait DirStackItem {
-    type Item;
     fn as_path(&self) -> &str;
     fn matches(&self, config: &Config, filter: &str) -> bool;
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
-        config: &Config,
+        config: &'a Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
-    ) -> Self::Item;
-    fn to_list_item_simple(&self, config: &Config) -> Self::Item {
+    ) -> ListItem<'a>;
+    fn to_list_item_simple<'a>(&self, config: &'a Config) -> ListItem<'a> {
         self.to_list_item(config, false, false, None)
     }
 }
 
 impl DirStackItem for DirOrSong {
-    type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         match self {
             DirOrSong::Dir { name, .. } => name,
@@ -48,16 +45,16 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
-        config: &Config,
+        config: &'a Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
-    ) -> Self::Item {
+    ) -> ListItem<'a> {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(&symbols.marker, config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
@@ -74,11 +71,11 @@ impl DirStackItem for DirOrSong {
                 ]),
                 DirOrSong::Song(s) => {
                     let spans =
-                        [marker_span, Span::from(symbols.song), Span::from(" ")].into_iter().chain(
-                            config.theme.browser_song_format.0.iter().map(|prop| {
+                        [marker_span, Span::from(&symbols.song), Span::from(" ")]
+                            .into_iter()
+                            .chain(config.theme.browser_song_format.0.iter().map(|prop| {
                                 Span::from(prop.as_string(Some(s)).unwrap_or_default())
-                            }),
-                        );
+                            }));
                     Line::from(spans.collect_vec())
                 }
             };
@@ -94,8 +91,6 @@ impl DirStackItem for DirOrSong {
 }
 
 impl DirStackItem for Song {
-    type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         &self.file
     }
@@ -104,16 +99,16 @@ impl DirStackItem for Song {
         self.matches(config.theme.browser_song_format.0.as_slice(), filter)
     }
 
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
-        config: &Config,
+        config: &'a Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
-    ) -> Self::Item {
+    ) -> ListItem<'a> {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(&symbols.marker, config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };
@@ -181,8 +176,6 @@ impl ScrollingState for ListState {
 
 #[cfg(test)]
 impl DirStackItem for String {
-    type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         self
     }
@@ -191,16 +184,16 @@ impl DirStackItem for String {
         self.to_lowercase().contains(&filter.to_lowercase())
     }
 
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
-        config: &Config,
+        config: &'a Config,
         is_marked: bool,
         matches_filter: bool,
         _additional_content: Option<String>,
-    ) -> Self::Item {
+    ) -> ListItem<'a> {
         let symbols = &config.theme.symbols;
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(&symbols.marker, config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(symbols.marker.chars().count()))
         };

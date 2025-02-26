@@ -42,9 +42,9 @@ const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
     ..symbols::border::PLAIN
 };
 
-impl<'a, T> Browser<T>
+impl<T> Browser<T>
 where
-    T: std::fmt::Debug + DirStackItem<Item = ListItem<'a>> + Clone + Send,
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
 {
     pub fn render(
         &mut self,

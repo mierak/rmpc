@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use log::error;
-use ratatui::widgets::ListState;
+use ratatui::widgets::{ListItem, ListState};
 
 use super::{DirStackItem, state::DirState};
 use crate::{config::Config, shared::macros::status_warn};
@@ -77,7 +77,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         }
     }
 
-    pub fn to_list_items(&self, config: &crate::config::Config) -> Vec<T::Item> {
+    pub fn to_list_items<'a>(&self, config: &'a Config) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
         let current_item_idx = self.selected_with_idx().map(|(idx, _)| idx);
         self.items

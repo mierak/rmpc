@@ -580,6 +580,7 @@ impl<'ui> Ui<'ui> {
                 Some(Panes::Tabs(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Tabs), context)
                 }
+                #[cfg(debug_assertions)]
                 Some(Panes::FrameCount(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::FrameCount), context)
                 }

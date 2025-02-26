@@ -156,7 +156,7 @@ impl Pane for QueuePane {
 
                     if is_marked && i == 0 {
                         let marker_span = Span::styled(
-                            config.theme.symbols.marker,
+                            &config.theme.symbols.marker,
                             config.theme.highlighted_item_style,
                         );
                         line.spans.splice(..0, std::iter::once(marker_span));
