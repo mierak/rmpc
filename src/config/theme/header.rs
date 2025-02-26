@@ -19,16 +19,16 @@ use crate::config::{
     },
 };
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct HeaderConfigRow {
-    pub left: &'static [&'static Property<'static, PropertyKind>],
-    pub center: &'static [&'static Property<'static, PropertyKind>],
-    pub right: &'static [&'static Property<'static, PropertyKind>],
+    pub left: Vec<Property<PropertyKind>>,
+    pub center: Vec<Property<PropertyKind>>,
+    pub right: Vec<Property<PropertyKind>>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct HeaderConfig {
-    pub rows: &'static [HeaderConfigRow],
+    pub rows: Vec<HeaderConfigRow>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -232,27 +232,23 @@ impl TryFrom<HeaderConfigFile> for HeaderConfig {
                 let left = row
                     .left
                     .into_iter()
-                    .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
+                    .map(TryInto::<Property<PropertyKind>>::try_into)
                     .collect::<Result<Vec<_>>>()?;
                 let center = row
                     .center
                     .into_iter()
-                    .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
+                    .map(TryInto::<Property<PropertyKind>>::try_into)
                     .collect::<Result<Vec<_>>>()?;
                 let right = row
                     .right
                     .into_iter()
-                    .map(TryInto::<&'static Property<'static, PropertyKind>>::try_into)
+                    .map(TryInto::<Property<PropertyKind>>::try_into)
                     .collect::<Result<Vec<_>>>()?;
 
-                Ok(HeaderConfigRow {
-                    left: left.leak(),
-                    center: center.leak(),
-                    right: right.leak(),
-                })
+                Ok(HeaderConfigRow { left, center, right })
             })
             .try_collect()?;
 
-        Ok(Self { rows: rows.leak() })
+        Ok(Self { rows })
     }
 }

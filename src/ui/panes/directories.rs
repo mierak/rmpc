@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect};
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::tabs::PaneTypeDiscriminants,
     context::AppContext,
     mpd::{
         client::Client,
@@ -65,7 +65,7 @@ impl DirectoriesPane {
                     .query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
-                    .target(PaneType::Directories)
+                    .target(PaneTypeDiscriminants::Directories)
                     .query(move |client| {
                         let new_current = client.lsinfo(Some(&next_path.join("/").to_string()))?;
                         let res = new_current
@@ -118,8 +118,12 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
-                move |client| {
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneTypeDiscriminants::Directories)
+                .query(move |client| {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
@@ -127,8 +131,7 @@ impl Pane for DirectoriesPane {
                         .sorted()
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                },
-            );
+                });
             self.initialized = true;
         }
 
@@ -143,8 +146,12 @@ impl Pane for DirectoriesPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
-                    move |client| {
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(PaneTypeDiscriminants::Directories)
+                    .query(move |client| {
                         let result = client
                             .lsinfo(None)?
                             .into_iter()
@@ -152,8 +159,7 @@ impl Pane for DirectoriesPane {
                             .sorted()
                             .collect::<Vec<_>>();
                         Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                    },
-                );
+                    });
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -317,7 +323,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     .query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
-                    .target(PaneType::Directories)
+                    .target(PaneTypeDiscriminants::Directories)
                     .query(move |client| {
                         let data: Vec<_> = match client.lsinfo(Some(&next_path)) {
                             Ok(val) => val,
@@ -355,7 +361,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     .query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
-                    .target(PaneType::Directories)
+                    .target(PaneTypeDiscriminants::Directories)
                     .query(move |client| {
                         Ok(MpdQueryResult::Preview {
                             data: client

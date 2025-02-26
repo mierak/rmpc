@@ -9,7 +9,7 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
-        tabs::PaneType,
+        tabs::PaneTypeDiscriminants,
     },
     context::AppContext,
     mpd::{
@@ -83,10 +83,10 @@ impl ArtistsPane {
         }
     }
 
-    fn target_pane(&self) -> PaneType {
+    fn target_pane(&self) -> PaneTypeDiscriminants {
         match self.mode {
-            ArtistsPaneMode::AlbumArtist => PaneType::AlbumArtists,
-            ArtistsPaneMode::Artist => PaneType::Artists,
+            ArtistsPaneMode::AlbumArtist => PaneTypeDiscriminants::AlbumArtists,
+            ArtistsPaneMode::Artist => PaneTypeDiscriminants::Artists,
         }
     }
 

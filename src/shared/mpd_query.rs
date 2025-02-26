@@ -7,7 +7,7 @@ use ratatui::widgets::ListItem;
 
 use super::events::AppEvent;
 use crate::{
-    config::tabs::PaneType,
+    config::tabs::PaneTypeDiscriminants,
     mpd::{
         client::Client,
         commands::{Decoder, Output, Song, Status, Volume},
@@ -26,7 +26,7 @@ pub const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
 pub(crate) struct MpdQuery {
     pub id: &'static str,
     pub replace_id: Option<&'static str>,
-    pub target: Option<PaneType>,
+    pub target: Option<PaneTypeDiscriminants>,
     #[debug(skip)]
     pub callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send>,
 }

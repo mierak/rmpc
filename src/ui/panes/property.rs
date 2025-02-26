@@ -14,14 +14,14 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct PropertyPane {
-    content: &'static [&'static Property<'static, PropertyKind>],
+pub struct PropertyPane<'content> {
+    content: &'content Vec<Property<PropertyKind>>,
     align: Alignment,
 }
 
-impl PropertyPane {
+impl<'content> PropertyPane<'content> {
     pub fn new(
-        content: &'static [&'static Property<'static, PropertyKind>],
+        content: &'content Vec<Property<PropertyKind>>,
         align: Alignment,
         _context: &AppContext,
     ) -> Self {
@@ -29,7 +29,7 @@ impl PropertyPane {
     }
 }
 
-impl Pane for PropertyPane {
+impl Pane for PropertyPane<'_> {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         let song = context.find_current_song_in_queue().map(|(_, song)| song);
         let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {

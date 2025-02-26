@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use strum::Display;
 
 use super::style::ToConfigOr;
-use crate::config::{Leak, defaults, theme::StyleFile};
+use crate::config::{defaults, theme::StyleFile};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
@@ -176,15 +176,15 @@ pub struct PropertyFile<T: Clone> {
     pub default: Option<Box<PropertyFile<T>>>,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
-pub enum PropertyKindOrText<'a, T> {
-    Text(&'a str),
-    Sticker(&'a str),
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum PropertyKindOrText<T> {
+    Text(String),
+    Sticker(String),
     Property(T),
-    Group(&'a [&'a Property<'a, T>]),
+    Group(Vec<Property<T>>),
 }
 
-impl<T> PropertyKindOrText<'_, T> {
+impl<T> PropertyKindOrText<T> {
     pub fn contains_stickers(&self) -> bool {
         match self {
             PropertyKindOrText::Text(_) => false,
@@ -205,10 +205,10 @@ pub enum PropertyKind {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct Property<'a, T> {
-    pub kind: PropertyKindOrText<'a, T>,
+pub struct Property<T> {
+    pub kind: PropertyKindOrText<T>,
     pub style: Option<Style>,
-    pub default: Option<&'a Property<'a, T>>,
+    pub default: Option<Box<Property<T>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -395,44 +395,14 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
     }
 }
 
-impl TryFrom<&PropertyFile<PropertyKindFile>> for &'static Property<'static, PropertyKind> {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        value: &PropertyFile<PropertyKindFile>,
-    ) -> std::prelude::v1::Result<Self, Self::Error> {
-        Property::<'static, PropertyKind>::try_from(value.clone()).map(|v| v.leak())
-    }
-}
-
-impl TryFrom<&PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind> {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        value: &PropertyFile<PropertyKindFile>,
-    ) -> std::prelude::v1::Result<Self, Self::Error> {
-        Property::<'static, PropertyKind>::try_from(value.clone())
-    }
-}
-
-impl TryFrom<PropertyFile<PropertyKindFile>> for &'static Property<'static, PropertyKind> {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        value: PropertyFile<PropertyKindFile>,
-    ) -> std::prelude::v1::Result<Self, Self::Error> {
-        Property::<'static, PropertyKind>::try_from(value).map(|v| v.leak())
-    }
-}
-
-impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind> {
+impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
     type Error = anyhow::Error;
 
     fn try_from(value: PropertyFile<PropertyKindFile>) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             kind: match value.kind {
-                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value.leak()),
-                PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value.leak()),
+                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => {
                     PropertyKindOrText::Property(match prop {
                         PropertyKindFile::Song(s) => PropertyKind::Song(s.try_into()?),
@@ -453,17 +423,17 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
                 PropertyKindFileOrText::Group(group) => {
                     let res: Vec<_> = group
                         .into_iter()
-                        .map(|p| -> Result<&'static Property<'static, PropertyKind>> {
-                            p.try_into()
-                        })
+                        .map(|p| -> Result<Property<PropertyKind>> { p.try_into() })
                         .try_collect()?;
-                    PropertyKindOrText::Group(res.leak())
+                    PropertyKindOrText::Group(res)
                 }
             },
             style: Some(value.style.to_config_or(None, None)?),
             default: value
                 .default
-                .map(|v| TryFrom::<PropertyFile<PropertyKindFile>>::try_from(*v))
+                .map(|v| -> Result<_> {
+                    Ok(Box::new(TryFrom::<PropertyFile<PropertyKindFile>>::try_from(*v)?))
+                })
                 .transpose()?,
         })
     }
@@ -472,15 +442,15 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<'static, PropertyKind>
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongFormatFile(pub Vec<PropertyFile<SongPropertyFile>>);
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SongFormat(pub &'static [&'static Property<'static, SongProperty>]);
+#[derive(Debug, Default, Clone)]
+pub struct SongFormat(pub Vec<Property<SongProperty>>);
 
 impl TryFrom<SongFormatFile> for SongFormat {
     type Error = anyhow::Error;
 
     fn try_from(value: SongFormatFile) -> Result<Self, Self::Error> {
         let properites: Vec<_> = value.0.into_iter().map(|v| v.try_into()).try_collect()?;
-        Ok(SongFormat(properites.leak()))
+        Ok(SongFormat(properites))
     }
 }
 

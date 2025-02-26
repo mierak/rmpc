@@ -44,7 +44,7 @@ impl DirStackItem for DirOrSong {
             DirOrSong::Dir { name, .. } => if name.is_empty() { "Untitled" } else { name.as_str() }
                 .to_lowercase()
                 .contains(&filter.to_lowercase()),
-            DirOrSong::Song(s) => s.matches(config.theme.browser_song_format.0, filter),
+            DirOrSong::Song(s) => s.matches(config.theme.browser_song_format.0.as_slice(), filter),
         }
     }
 
@@ -101,7 +101,7 @@ impl DirStackItem for Song {
     }
 
     fn matches(&self, config: &Config, filter: &str) -> bool {
-        self.matches(config.theme.browser_song_format.0, filter)
+        self.matches(config.theme.browser_song_format.0.as_slice(), filter)
     }
 
     fn to_list_item(

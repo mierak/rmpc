@@ -204,9 +204,9 @@ impl ConfigFile {
             .tabs
             .iter()
             .flat_map(|(_, tab)| {
-                tab.panes.panes_iter().map(|pane| PaneTypeDiscriminants::from(pane.pane))
+                tab.panes.panes_iter().map(|pane| PaneTypeDiscriminants::from(&pane.pane))
             })
-            .chain(theme.layout.panes_iter().map(|pane| PaneTypeDiscriminants::from(pane.pane)))
+            .chain(theme.layout.panes_iter().map(|pane| PaneTypeDiscriminants::from(&pane.pane)))
             .unique()
             .collect_vec()
             .leak();

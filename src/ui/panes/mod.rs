@@ -84,7 +84,7 @@ pub enum Panes<'pane_ref, 'pane> {
     #[cfg(debug_assertions)]
     FrameCount(&'pane_ref mut FrameCountPane),
     TabContent,
-    Property(PropertyPane),
+    Property(PropertyPane<'pane_ref>),
 }
 
 #[derive(Debug)]
@@ -157,9 +157,9 @@ impl<'panes> PaneContainer<'panes> {
         }
     }
 
-    pub fn get_mut<'pane_ref>(
+    pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
         &'pane_ref mut self,
-        pane: &PaneType,
+        pane: &'pane_type_ref PaneType,
         context: &AppContext,
     ) -> Panes<'pane_ref, 'panes> {
         match pane {
@@ -181,7 +181,7 @@ impl<'panes> PaneContainer<'panes> {
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Panes::FrameCount(&mut self.frame_count),
             PaneType::Property { content, align } => {
-                Panes::Property(PropertyPane::new(content, *align, context))
+                Panes::Property(PropertyPane::<'pane_type_ref>::new(content, *align, context))
             }
         }
     }
@@ -582,7 +582,11 @@ impl Song {
         }
     }
 
-    pub fn matches(&self, formats: &[&Property<'static, SongProperty>], filter: &str) -> bool {
+    pub fn matches<'a>(
+        &self,
+        formats: impl IntoIterator<Item = &'a Property<SongProperty>>,
+        filter: &str,
+    ) -> bool {
         for format in formats {
             let match_found = match &format.kind {
                 PropertyKindOrText::Text(value) => {
@@ -593,12 +597,22 @@ impl Song {
                     .as_ref()
                     .and_then(|stickers| {
                         stickers
-                            .get(*key)
+                            .get(key)
                             .map(|value| value.to_lowercase().contains(&filter.to_lowercase()))
                     })
-                    .or_else(|| format.default.map(|f| self.matches(&[f], filter))),
+                    .or_else(|| {
+                        format
+                            .default
+                            .as_ref()
+                            .map(|f| self.matches(std::iter::once(f.as_ref()), filter))
+                    }),
                 PropertyKindOrText::Property(property) => self.format(property).map_or_else(
-                    || format.default.map(|f| self.matches(&[f], filter)),
+                    || {
+                        format
+                            .default
+                            .as_ref()
+                            .map(|f| self.matches(std::iter::once(f.as_ref()), filter))
+                    },
                     |p| Some(p.to_lowercase().contains(&filter.to_lowercase())),
                 ),
                 PropertyKindOrText::Group(_) => format
@@ -614,16 +628,16 @@ impl Song {
 
     fn default_as_line_ellipsized<'song>(
         &'song self,
-        format: &'static Property<'static, SongProperty>,
+        format: &Property<SongProperty>,
         max_len: usize,
         symbols: &SymbolsConfig,
     ) -> Option<Line<'song>> {
-        format.default.and_then(|f| self.as_line_ellipsized(f, max_len, symbols))
+        format.default.as_ref().and_then(|f| self.as_line_ellipsized(f.as_ref(), max_len, symbols))
     }
 
     pub fn as_line_ellipsized<'song>(
         &'song self,
-        format: &'static Property<'static, SongProperty>,
+        format: &Property<SongProperty>,
         max_len: usize,
         symbols: &SymbolsConfig,
     ) -> Option<Line<'song>> {
@@ -635,12 +649,12 @@ impl Song {
             PropertyKindOrText::Sticker(key) => self
                 .stickers
                 .as_ref()
-                .and_then(|stickers| stickers.get(*key))
+                .and_then(|stickers| stickers.get(key))
                 .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style))
                 .or_else(|| {
-                    format
-                        .default
-                        .and_then(|format| self.as_line_ellipsized(format, max_len, symbols))
+                    format.default.as_ref().and_then(|format| {
+                        self.as_line_ellipsized(format.as_ref(), max_len, symbols)
+                    })
                 }),
             PropertyKindOrText::Property(property) => self.format(property).map_or_else(
                 || self.default_as_line_ellipsized(format, max_len, symbols),
@@ -648,7 +662,7 @@ impl Song {
             ),
             PropertyKindOrText::Group(group) => {
                 let mut buf = Line::default();
-                for grformat in *group {
+                for grformat in group {
                     if let Some(res) = self.as_line_ellipsized(grformat, max_len, symbols) {
                         for span in res.spans {
                             buf.push_span(span);
@@ -656,6 +670,7 @@ impl Song {
                     } else {
                         return format
                             .default
+                            .as_ref()
                             .and_then(|format| self.as_line_ellipsized(format, max_len, symbols));
                     }
                 }
@@ -665,9 +680,9 @@ impl Song {
     }
 }
 
-impl Property<'static, SongProperty> {
+impl Property<SongProperty> {
     fn default(&self, song: Option<&Song>) -> Option<String> {
-        self.default.and_then(|p| p.as_string(song))
+        self.default.as_ref().and_then(|p| p.as_string(song))
     }
 
     pub fn as_string(&self, song: Option<&Song>) -> Option<String> {
@@ -675,7 +690,7 @@ impl Property<'static, SongProperty> {
             PropertyKindOrText::Text(value) => Some((*value).to_string()),
             PropertyKindOrText::Sticker(key) => {
                 if let Some(sticker) =
-                    song.map(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key)))
+                    song.map(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(key)))
                 {
                     sticker.cloned()
                 } else {
@@ -692,11 +707,11 @@ impl Property<'static, SongProperty> {
             }
             PropertyKindOrText::Group(group) => {
                 let mut buf = String::new();
-                for format in *group {
+                for format in group {
                     if let Some(res) = format.as_string(song) {
                         buf.push_str(&res);
                     } else {
-                        return self.default.and_then(|d| d.as_string(song));
+                        return self.default.as_ref().and_then(|d| d.as_string(song));
                     }
                 }
                 return Some(buf);
@@ -705,13 +720,13 @@ impl Property<'static, SongProperty> {
     }
 }
 
-impl Property<'static, PropertyKind> {
+impl Property<PropertyKind> {
     fn default_as_span<'song: 's, 's>(
-        &self,
+        &'s self,
         song: Option<&'song Song>,
         status: &'song Status,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        self.default.and_then(|p| p.as_span(song, status))
+        self.default.as_ref().and_then(|p| p.as_span(song, status))
     }
 
     pub fn as_span<'song: 's, 's>(
@@ -721,10 +736,10 @@ impl Property<'static, PropertyKind> {
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
-            PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(*value, style))),
+            PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),
             PropertyKindOrText::Sticker(key) => {
                 if let Some(sticker) =
-                    song.and_then(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(*key)))
+                    song.and_then(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(key)))
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
@@ -859,7 +874,7 @@ impl Property<'static, PropertyKind> {
             },
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
-                for format in *group {
+                for format in group {
                     match format.as_span(song, status) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
@@ -981,10 +996,7 @@ impl StringExt for String {
 #[allow(clippy::unwrap_used)]
 mod format_tests {
     use crate::{
-        config::{
-            Leak,
-            theme::properties::{Property, PropertyKindOrText, SongProperty},
-        },
+        config::theme::properties::{Property, PropertyKindOrText, SongProperty},
         mpd::commands::Song,
     };
 
@@ -1014,7 +1026,7 @@ mod format_tests {
         #[test_case(SongProperty::Duration, "2:03")]
         #[test_case(SongProperty::Other("track"), "123")]
         fn song_property_resolves_correctly(prop: SongProperty, expected: &str) {
-            let format = Property::<'static, SongProperty> {
+            let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(prop),
                 style: None,
                 default: None,
@@ -1044,7 +1056,7 @@ mod format_tests {
         #[test_case(StatusProperty::Crossfade, "3")]
         #[test_case(StatusProperty::Bitrate, "123")]
         fn status_property_resolves_correctly(prop: StatusProperty, expected: &str) {
-            let format = Property::<'static, PropertyKind> {
+            let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
                 style: None,
                 default: None,
@@ -1094,7 +1106,7 @@ mod format_tests {
             state: State,
             expected_label: &str,
         ) {
-            let format = Property::<'static, PropertyKind> {
+            let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(StatusProperty::State {
                     playing_label,
                     paused_label,
@@ -1143,7 +1155,7 @@ mod format_tests {
             status: &Status,
             expected_label: &str,
         ) {
-            let format = Property::<'static, PropertyKind> {
+            let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(prop.try_into().unwrap())),
                 style: None,
                 default: None,
@@ -1169,7 +1181,7 @@ mod format_tests {
             status: &Status,
             expected_style: Option<Style>,
         ) {
-            let format = Property::<'static, PropertyKind> {
+            let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(prop.try_into().unwrap())),
                 style: None,
                 default: None,
@@ -1194,7 +1206,7 @@ mod format_tests {
 
         #[test]
         fn works() {
-            let format = Property::<'static, SongProperty> {
+            let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(SongProperty::Title),
                 style: None,
                 default: None,
@@ -1215,16 +1227,16 @@ mod format_tests {
 
         #[test]
         fn falls_back() {
-            let format = Property::<'static, SongProperty> {
+            let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(SongProperty::Track),
                 style: None,
                 default: Some(
                     Property {
-                        kind: PropertyKindOrText::Text("fallback"),
+                        kind: PropertyKindOrText::Text("fallback".into()),
                         style: None,
                         default: None,
                     }
-                    .leak(),
+                    .into(),
                 ),
             };
 
@@ -1243,7 +1255,7 @@ mod format_tests {
 
         #[test]
         fn falls_back_to_none() {
-            let format = Property::<'static, SongProperty> {
+            let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(SongProperty::Track),
                 style: None,
                 default: None,
@@ -1270,8 +1282,8 @@ mod format_tests {
 
         #[test]
         fn works() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Text("test"),
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Text("test".into()),
                 style: None,
                 default: None,
             };
@@ -1291,16 +1303,16 @@ mod format_tests {
 
         #[test]
         fn fallback_is_ignored() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Text("test"),
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Text("test".into()),
                 style: None,
                 default: Some(
                     Property {
-                        kind: PropertyKindOrText::Text("fallback"),
+                        kind: PropertyKindOrText::Text("fallback".into()),
                         style: None,
                         default: None,
                     }
-                    .leak(),
+                    .into(),
                 ),
             };
 
@@ -1325,14 +1337,18 @@ mod format_tests {
 
         #[test]
         fn group_no_fallback() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Group(&[
-                    &Property {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Group(vec![
+                    Property {
                         kind: PropertyKindOrText::Property(SongProperty::Track),
                         style: None,
                         default: None,
                     },
-                    &Property { kind: PropertyKindOrText::Text(" "), style: None, default: None },
+                    Property {
+                        kind: PropertyKindOrText::Text(" ".into()),
+                        style: None,
+                        default: None,
+                    },
                 ]),
                 style: None,
                 default: None,
@@ -1353,23 +1369,27 @@ mod format_tests {
 
         #[test]
         fn group_fallback() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Group(&[
-                    &Property {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Group(vec![
+                    Property {
                         kind: PropertyKindOrText::Property(SongProperty::Track),
                         style: None,
                         default: None,
                     },
-                    &Property { kind: PropertyKindOrText::Text(" "), style: None, default: None },
+                    Property {
+                        kind: PropertyKindOrText::Text(" ".into()),
+                        style: None,
+                        default: None,
+                    },
                 ]),
                 style: None,
                 default: Some(
                     Property {
-                        kind: PropertyKindOrText::Text("fallback"),
+                        kind: PropertyKindOrText::Text("fallback".into()),
                         style: None,
                         default: None,
                     }
-                    .leak(),
+                    .into(),
                 ),
             };
 
@@ -1388,15 +1408,15 @@ mod format_tests {
 
         #[test]
         fn group_resolved() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Group(&[
-                    &Property {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Group(vec![
+                    Property {
                         kind: PropertyKindOrText::Property(SongProperty::Title),
                         style: None,
                         default: None,
                     },
-                    &Property {
-                        kind: PropertyKindOrText::Text("text"),
+                    Property {
+                        kind: PropertyKindOrText::Text("text".into()),
                         style: None,
                         default: None,
                     },
@@ -1404,11 +1424,11 @@ mod format_tests {
                 style: None,
                 default: Some(
                     Property {
-                        kind: PropertyKindOrText::Text("fallback"),
+                        kind: PropertyKindOrText::Text("fallback".into()),
                         style: None,
                         default: None,
                     }
-                    .leak(),
+                    .into(),
                 ),
             };
 
@@ -1427,19 +1447,22 @@ mod format_tests {
 
         #[test]
         fn group_fallback_in_group() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Group(&[
-                    &Property {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Group(vec![
+                    Property {
                         kind: PropertyKindOrText::Property(SongProperty::Track),
                         style: None,
-                        default: Some(&Property {
-                            kind: PropertyKindOrText::Text("fallback"),
-                            style: None,
-                            default: None,
-                        }),
+                        default: Some(
+                            Property {
+                                kind: PropertyKindOrText::Text("fallback".into()),
+                                style: None,
+                                default: None,
+                            }
+                            .into(),
+                        ),
                     },
-                    &Property {
-                        kind: PropertyKindOrText::Text("text"),
+                    Property {
+                        kind: PropertyKindOrText::Text("text".into()),
                         style: None,
                         default: None,
                     },
@@ -1463,30 +1486,33 @@ mod format_tests {
 
         #[test]
         fn group_nesting() {
-            let format = Property::<'static, SongProperty> {
-                kind: PropertyKindOrText::Group(&[
-                    &Property {
-                        kind: PropertyKindOrText::Group(&[
-                            &Property {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Group(vec![
+                    Property {
+                        kind: PropertyKindOrText::Group(vec![
+                            Property {
                                 kind: PropertyKindOrText::Property(SongProperty::Track),
                                 style: None,
                                 default: None,
                             },
-                            &Property {
-                                kind: PropertyKindOrText::Text("inner"),
+                            Property {
+                                kind: PropertyKindOrText::Text("inner".into()),
                                 style: None,
                                 default: None,
                             },
                         ]),
                         style: None,
-                        default: Some(&Property {
-                            kind: PropertyKindOrText::Text("innerfallback"),
-                            style: None,
-                            default: None,
-                        }),
+                        default: Some(
+                            Property {
+                                kind: PropertyKindOrText::Text("innerfallback".into()),
+                                style: None,
+                                default: None,
+                            }
+                            .into(),
+                        ),
                     },
-                    &Property {
-                        kind: PropertyKindOrText::Text("outer"),
+                    Property {
+                        kind: PropertyKindOrText::Text("outer".into()),
                         style: None,
                         default: None,
                     },

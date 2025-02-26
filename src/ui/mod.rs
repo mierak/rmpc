@@ -33,7 +33,7 @@ use crate::{
         Config,
         cli::Args,
         keys::GlobalAction,
-        tabs::{PaneType, SizedPaneOrSplit, TabName},
+        tabs::{PaneType, PaneTypeDiscriminants, SizedPaneOrSplit, TabName},
     },
     context::AppContext,
     core::command::{create_env, run_external},
@@ -528,7 +528,7 @@ impl<'ui> Ui<'ui> {
     pub(crate) fn on_command_finished(
         &mut self,
         id: &'static str,
-        pane: Option<PaneType>,
+        pane: Option<PaneTypeDiscriminants>,
         data: MpdQueryResult,
         context: &mut AppContext,
     ) -> Result<()> {
@@ -539,54 +539,52 @@ impl<'ui> Ui<'ui> {
                 || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
         match pane {
-            Some(pane) => match self.panes.get_mut(&pane, context) {
+            Some(pane) => match self.panes.get_mut_by_discr(pane) {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => {
+                Some(Panes::Logs(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Logs), context)
                 }
-                Panes::Queue(p) => {
+                Some(Panes::Queue(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Queue), context)
                 }
-                Panes::Directories(p) => {
+                Some(Panes::Directories(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Directories), context)
                 }
-                Panes::Albums(p) => {
+                Some(Panes::Albums(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Albums), context)
                 }
-                Panes::Artists(p) => {
+                Some(Panes::Artists(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Artists), context)
                 }
-                Panes::Playlists(p) => {
+                Some(Panes::Playlists(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Playlists), context)
                 }
-                Panes::Search(p) => {
+                Some(Panes::Search(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Search), context)
                 }
-                Panes::AlbumArtists(p) => {
+                Some(Panes::AlbumArtists(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::AlbumArtists), context)
                 }
-                Panes::AlbumArt(p) => {
+                Some(Panes::AlbumArt(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::AlbumArt), context)
                 }
-                Panes::Lyrics(p) => {
+                Some(Panes::Lyrics(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Lyrics), context)
                 }
-                Panes::ProgressBar(p) => {
+                Some(Panes::ProgressBar(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::ProgressBar), context)
                 }
-                Panes::Header(p) => {
+                Some(Panes::Header(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Header), context)
                 }
-                Panes::Tabs(p) => {
+                Some(Panes::Tabs(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Tabs), context)
                 }
-                Panes::TabContent => Ok(()),
-                #[cfg(debug_assertions)]
-                Panes::FrameCount(p) => {
+                Some(Panes::FrameCount(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::FrameCount), context)
                 }
                 // Property panes do not need to receive command notifications
-                Panes::Property(_) => Ok(()),
+                Some(Panes::Property(_)) | Some(Panes::TabContent) | None => Ok(()),
             }?,
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {

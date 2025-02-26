@@ -10,7 +10,7 @@ use crate::{
     MpdQuery,
     MpdQueryResult,
     WorkRequest,
-    config::{Config, Leak, album_art::ImageMethod, tabs::PaneType},
+    config::{Config, Leak, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
     core::scheduler::{Scheduler, time_provider::DefaultTimeProvider},
     mpd::{
         client::Client,
@@ -139,7 +139,7 @@ impl AppContext {
         + Send
         + 'static,
         id: &'static str,
-        target: Option<PaneType>,
+        target: Option<PaneTypeDiscriminants>,
         replace_id: Option<&'static str>,
     ) {
         let query = MpdQuery { id, target, replace_id, callback: Box::new(on_done) };

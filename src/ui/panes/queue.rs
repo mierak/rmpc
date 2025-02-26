@@ -17,7 +17,7 @@ use crate::{
     MpdQueryResult,
     config::{
         keys::{GlobalAction, QueueActions},
-        tabs::PaneType,
+        tabs::PaneTypeDiscriminants,
         theme::properties::{Property, SongProperty},
     },
     context::AppContext,
@@ -49,9 +49,9 @@ pub struct QueuePane {
     scrolling_state: DirState<TableState>,
     filter: Option<String>,
     filter_input_mode: bool,
-    header: Vec<&'static str>,
+    header: Vec<String>,
     column_widths: Vec<Constraint>,
-    column_formats: Vec<&'static Property<'static, SongProperty>>,
+    column_formats: Vec<Property<SongProperty>>,
     areas: EnumMap<Areas, Rect>,
 }
 
@@ -72,14 +72,19 @@ impl QueuePane {
             scrolling_state: DirState::default(),
             filter: None,
             filter_input_mode: false,
-            header: config.theme.song_table_format.iter().map(|v| v.label).collect_vec(),
+            header: config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
             column_widths: config
                 .theme
                 .song_table_format
                 .iter()
                 .map(|v| Into::<Constraint>::into(v.width))
                 .collect_vec(),
-            column_formats: config.theme.song_table_format.iter().map(|v| v.prop).collect_vec(),
+            column_formats: config
+                .theme
+                .song_table_format
+                .iter()
+                .map(|v| v.prop.clone())
+                .collect_vec(),
             areas: enum_map! {
                 _ => Rect::default(),
             },
@@ -145,7 +150,7 @@ impl Pane for QueuePane {
                     }
 
                     let mut line = song
-                        .as_line_ellipsized(formats[i].prop, max_len, &config.theme.symbols)
+                        .as_line_ellipsized(&formats[i].prop, max_len, &config.theme.symbols)
                         .unwrap_or_default()
                         .alignment(formats[i].alignment.into());
 
@@ -181,7 +186,7 @@ impl Pane for QueuePane {
         if config.theme.show_song_table_header {
             let header_table = Table::default()
                 .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
-                    Line::from(*title).alignment(formats[idx].alignment.into())
+                    Line::from(title.as_str()).alignment(formats[idx].alignment.into())
                 })))
                 .style(config.as_text_style())
                 .widths(self.column_widths.clone())
@@ -506,7 +511,7 @@ impl Pane for QueuePane {
                             .query()
                             .id(ADD_TO_PLAYLIST)
                             .replace_id(ADD_TO_PLAYLIST)
-                            .target(PaneType::Queue)
+                            .target(PaneTypeDiscriminants::Queue)
                             .query(move |client| {
                                 let playlists = client
                                     .list_playlists()?

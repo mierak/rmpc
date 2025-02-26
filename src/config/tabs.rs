@@ -55,7 +55,7 @@ pub enum PaneTypeFile {
     },
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(strum::Display, Hash))]
 pub enum PaneType {
     Queue,
@@ -76,7 +76,7 @@ pub enum PaneType {
     #[cfg(debug_assertions)]
     FrameCount,
     Property {
-        content: &'static [&'static Property<'static, PropertyKind>],
+        content: Vec<Property<PropertyKind>>,
         align: ratatui::layout::Alignment,
     },
 }
@@ -109,12 +109,12 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 7] = [
 
 impl Pane {
     pub fn is_focusable(&self) -> bool {
-        !UNFOSUSABLE_TABS.contains(&self.pane.into())
+        !UNFOSUSABLE_TABS.contains(&PaneTypeDiscriminants::from(&self.pane))
     }
 }
 
-impl From<&PaneTypeFile> for PaneType {
-    fn from(value: &PaneTypeFile) -> Self {
+impl From<PaneTypeFile> for PaneType {
+    fn from(value: PaneTypeFile) -> Self {
         match value {
             PaneTypeFile::Queue => PaneType::Queue,
             #[cfg(debug_assertions)]
@@ -135,11 +135,10 @@ impl From<&PaneTypeFile> for PaneType {
             PaneTypeFile::FrameCount => PaneType::FrameCount,
             PaneTypeFile::Property { content: properties, align } => PaneType::Property {
                 content: properties
-                    .iter()
+                    .into_iter()
                     .map(|prop| prop.try_into().expect(""))
-                    .collect_vec()
-                    .leak(),
-                align: (*align).into(),
+                    .collect_vec(),
+                align: (align).into(),
             },
         }
     }
@@ -322,7 +321,7 @@ impl PaneOrSplitFile {
     pub fn convert_recursive(&self, b: Borders) -> Result<SizedPaneOrSplit> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
-                pane: pane_type_file.into(),
+                pane: pane_type_file.clone().into(),
                 borders: b,
                 id: id::new(),
             }),
@@ -462,8 +461,10 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
         .flat_map(|tab_pane| {
             layout_panes.iter().filter(|layout_pane| layout_pane.pane == tab_pane.pane)
         })
-        .filter(|pane| !PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT.contains(&pane.pane.into()))
-        .map(|pane| PaneTypeDiscriminants::from(pane.pane))
+        .filter(|pane| {
+            !PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT.contains(&PaneTypeDiscriminants::from(&pane.pane))
+        })
+        .map(|pane| PaneTypeDiscriminants::from(&pane.pane))
         .unique()
         .collect_vec();
     ensure!(

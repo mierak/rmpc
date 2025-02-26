@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect};
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::tabs::PaneTypeDiscriminants,
     context::AppContext,
     mpd::{
         client::Client,
@@ -74,7 +74,7 @@ impl AlbumsPane {
                     .query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
-                    .target(PaneType::Albums)
+                    .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = list_titles(client, current.as_path())?.collect();
                         Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
@@ -107,7 +107,7 @@ impl Pane for AlbumsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
+            context.query().id(INIT).replace_id(INIT).target(PaneTypeDiscriminants::Albums).query(
                 move |client| {
                     let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
                     Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
@@ -127,13 +127,16 @@ impl Pane for AlbumsPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
-                    move |client| {
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(PaneTypeDiscriminants::Albums)
+                    .query(move |client| {
                         let result =
                             client.list_tag(Tag::Album, None).context("Cannot list tags")?;
                         Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
-                    },
-                );
+                    });
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -317,7 +320,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
-                    .target(PaneType::Albums)
+                    .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = Some(
                             find_songs(client, &album, &current)?
@@ -337,7 +340,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
-                    .target(PaneType::Albums)
+                    .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = list_titles(client, &current)?
                             .map(|v| v.to_list_item_simple(config))
