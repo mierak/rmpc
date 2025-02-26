@@ -139,14 +139,7 @@ impl ToDescription for GlobalAction {
             GlobalAction::SeekBack => "Seek currently playing track backwards",
             GlobalAction::NextTab => "Switch to next tab",
             GlobalAction::PreviousTab => "Switch to previous tab",
-            GlobalAction::SwitchToTab(TabName("Queue")) => "Switch directly to Queue tab",
-            GlobalAction::SwitchToTab(TabName("Directories")) => {
-                "Switch directly to Directories tab"
-            }
-            GlobalAction::SwitchToTab(TabName("Artists")) => "Switch directly to Artists tab",
-            GlobalAction::SwitchToTab(TabName("Albums")) => "Switch directly to Albums tab",
-            GlobalAction::SwitchToTab(TabName("Playlists")) => "Switch directly to Playlists tab",
-            GlobalAction::SwitchToTab(TabName("Search")) => "Switch directly to Search tab",
+            // TODO this leak
             GlobalAction::SwitchToTab(name) => format!("Switch directly to {name} tab").leak(),
             GlobalAction::ShowHelp => "Show keybinds",
             GlobalAction::CommandMode => "Enter command mode",

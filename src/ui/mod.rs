@@ -89,7 +89,8 @@ macro_rules! active_tab_call {
 
 impl<'ui> Ui<'ui> {
     pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
-        let active_tab = *context.config.tabs.names.first().context("Expected at least one tab")?;
+        let active_tab =
+            context.config.tabs.names.first().context("Expected at least one tab")?.clone();
         Ok(Self {
             active_tab,
             panes: PaneContainer::new(context)?,
@@ -101,7 +102,7 @@ impl<'ui> Ui<'ui> {
                 .tabs
                 .iter()
                 .map(|(name, screen)| -> Result<_> {
-                    Ok((*name, TabScreen::new(screen.panes.clone())?))
+                    Ok((name.clone(), TabScreen::new(screen.panes.clone())?))
                 })
                 .try_collect()?,
             area: Rect::default(),
@@ -123,7 +124,7 @@ impl<'ui> Ui<'ui> {
             Ok(())
         })?;
 
-        self.active_tab = new_tab;
+        self.active_tab = new_tab.clone();
         self.on_event(UiEvent::TabChanged(new_tab), context)?;
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
@@ -346,16 +347,16 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::NextTab => {
-                    self.change_tab(context.config.next_screen(self.active_tab), context)?;
+                    self.change_tab(context.config.next_screen(&self.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::PreviousTab => {
-                    self.change_tab(context.config.prev_screen(self.active_tab), context)?;
+                    self.change_tab(context.config.prev_screen(&self.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
                     if context.config.tabs.names.contains(name) {
-                        self.change_tab(*name, context)?;
+                        self.change_tab(name.clone(), context)?;
                         context.render()?;
                     } else {
                         status_error!(
@@ -725,26 +726,29 @@ impl FilterKind {
 }
 
 impl Config {
-    fn next_screen(&self, current_screen: TabName) -> TabName {
-        let names = self.tabs.names;
-        *names
+    fn next_screen(&self, current_screen: &TabName) -> TabName {
+        let names = &self.tabs.names;
+        names
             .iter()
             .enumerate()
-            .find(|(_, s)| **s == current_screen)
+            .find(|(_, s)| *s == current_screen)
             .and_then(|(idx, _)| names.get((idx + 1) % names.len()))
-            .unwrap_or(&current_screen)
+            .unwrap_or(current_screen)
+            .clone()
     }
 
-    fn prev_screen(&self, current_screen: TabName) -> TabName {
-        let names = self.tabs.names;
-        *names
+    fn prev_screen(&self, current_screen: &TabName) -> TabName {
+        let names = &self.tabs.names;
+        self.tabs
+            .names
             .iter()
             .enumerate()
-            .find(|(_, s)| **s == current_screen)
+            .find(|(_, s)| *s == current_screen)
             .and_then(|(idx, _)| {
                 names.get((if idx == 0 { names.len() - 1 } else { idx - 1 }) % names.len())
             })
-            .unwrap_or(&current_screen)
+            .unwrap_or(current_screen)
+            .clone()
     }
 
     fn as_header_table_block(&self) -> ratatui::widgets::Block {

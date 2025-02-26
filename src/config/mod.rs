@@ -323,16 +323,6 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
     }
 }
 
-pub trait Leak {
-    fn leak(self) -> &'static Self;
-}
-
-impl<T> Leak for T {
-    fn leak(self) -> &'static Self {
-        Box::leak(Box::new(self))
-    }
-}
-
 pub mod utils {
     use std::{borrow::Cow, path::MAIN_SEPARATOR};
 

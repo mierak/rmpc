@@ -5,7 +5,7 @@ use ratatui::{Terminal, backend::TestBackend};
 use rstest::fixture;
 
 use crate::{
-    config::{Config, ConfigFile, Leak},
+    config::{Config, ConfigFile},
     context::AppContext,
     core::scheduler::Scheduler,
     mpd::commands::Status,
@@ -42,7 +42,7 @@ pub fn app_context(
         .into_config(None, None, None, true)
         .expect("Test default config to convert correctly");
 
-    let chan1 = chan1.leak();
+    let chan1 = Box::leak(Box::new(chan1));
     let scheduler = Scheduler::new((chan1.0.clone(), unbounded().0));
     AppContext {
         status: Status::default(),

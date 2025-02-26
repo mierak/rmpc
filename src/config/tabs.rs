@@ -7,25 +7,29 @@ use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    Leak,
-    theme::{
-        PercentOrLength,
-        properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
-    },
+use super::theme::{
+    PercentOrLength,
+    properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
 };
 use crate::shared::id::{self, Id};
 
-#[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Clone, Copy, Display)]
-pub struct TabName(pub &'static str);
+#[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Display)]
+pub struct TabName(pub std::sync::Arc<String>);
 impl From<String> for TabName {
     fn from(value: String) -> Self {
-        Self(value.leak())
+        Self(value.into())
     }
 }
-impl From<&'static str> for TabName {
-    fn from(value: &'static str) -> Self {
-        Self(value)
+
+impl From<&str> for TabName {
+    fn from(value: &str) -> Self {
+        Self(value.to_owned().into())
+    }
+}
+
+impl Clone for TabName {
+    fn clone(&self) -> Self {
+        TabName(std::sync::Arc::clone(&self.0))
     }
 }
 
@@ -156,14 +160,14 @@ impl TryFrom<TabsFile> for Tabs {
             })
             .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {
                 let tab = tab?;
-                names.push(tab.name);
-                tabs.insert(tab.name, tab.leak());
+                names.push(tab.name.clone());
+                tabs.insert(tab.name.clone(), tab);
                 Ok((names, tabs))
             })?;
 
         ensure!(!tabs.is_empty(), "At least one tab is required");
 
-        Ok(Self { tabs, names: names.leak() })
+        Ok(Self { names, tabs })
     }
 }
 
@@ -180,8 +184,8 @@ pub(super) struct TabsFile(Vec<TabFile>);
 
 #[derive(Debug, Default, Clone)]
 pub struct Tabs {
-    pub names: &'static [TabName],
-    pub tabs: HashMap<TabName, &'static Tab>,
+    pub names: Vec<TabName>,
+    pub tabs: HashMap<TabName, Tab>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

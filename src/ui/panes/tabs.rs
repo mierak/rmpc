@@ -18,7 +18,8 @@ pub struct TabsPane<'a> {
 
 impl TabsPane<'_> {
     pub fn new(context: &AppContext) -> Result<Self> {
-        let active_tab = *context.config.tabs.names.first().context("Expected at least one tab")?;
+        let active_tab =
+            context.config.tabs.names.first().context("Expected at least one tab")?.clone();
         let tab_names = context
             .config
             .tabs
@@ -81,7 +82,7 @@ impl Pane for TabsPane<'_> {
     ) -> Result<()> {
         match event {
             UiEvent::TabChanged(tab) => {
-                self.active_tab = *tab;
+                self.active_tab = tab.clone();
                 context.render()?;
             }
             _ => {}
@@ -104,7 +105,9 @@ impl Pane for TabsPane<'_> {
             return Ok(());
         }
 
-        context.app_event_sender.send(AppEvent::UiEvent(UiAppEvent::ChangeTab(*tab_name)))?;
+        context
+            .app_event_sender
+            .send(AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name.clone())))?;
 
         Ok(())
     }
