@@ -58,11 +58,11 @@ impl SearchPane {
                 &config.search,
                 [
                     FilterInput {
-                        label: " Search mode     :",
+                        label: " Search mode     :".to_string(),
                         variant: FilterInputVariant::SelectFilterKind { value: config.search.mode },
                     },
                     FilterInput {
-                        label: " Case sensitive  :",
+                        label: " Case sensitive  :".to_string(),
                         variant: FilterInputVariant::SelectFilterCaseSensitive {
                             value: config.search.case_sensitive,
                         },
@@ -261,13 +261,13 @@ impl SearchPane {
                     .set_borderless(true)
                     .set_label_style(config.as_text_style())
                     .set_input_style(config.as_text_style())
-                    .set_label(input.label)
+                    .set_label(&input.label)
                     .set_text(Into::into(&value)),
                 FilterInputVariant::SelectFilterCaseSensitive { value } => Input::default()
                     .set_borderless(true)
                     .set_label_style(config.as_text_style())
                     .set_input_style(config.as_text_style())
-                    .set_label(input.label)
+                    .set_label(&input.label)
                     .set_text(if value { "Yes" } else { "No" }),
             };
 
@@ -326,12 +326,12 @@ impl SearchPane {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key as &'static str, value.to_owned(), filter_kind))
+                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
             }
             _ => None,
         });
 
-        let filter = filter.collect_vec();
+        let mut filter = filter.collect_vec();
 
         if filter.is_empty() {
             return;
@@ -341,8 +341,10 @@ impl SearchPane {
             context.command(move |client| {
                 client.find_add(
                     &filter
-                        .iter()
-                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .iter_mut()
+                        .map(|(ref mut key, ref value, kind)| {
+                            Filter::new(std::mem::take(key), value).with_type(*kind)
+                        })
                         .collect_vec(),
                 )?;
                 Ok(())
@@ -351,8 +353,10 @@ impl SearchPane {
             context.command(move |client| {
                 client.search_add(
                     &filter
-                        .iter()
-                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .iter_mut()
+                        .map(|(ref mut key, ref value, kind)| {
+                            Filter::new(std::mem::take(key), value).with_type(*kind)
+                        })
                         .collect_vec(),
                 )?;
                 Ok(())
@@ -364,12 +368,12 @@ impl SearchPane {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key as &'static str, value.to_owned(), filter_kind))
+                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
             }
             _ => None,
         });
 
-        let filter = filter.collect_vec();
+        let mut filter = filter.collect_vec();
 
         if filter.is_empty() {
             let _ = std::mem::take(&mut self.songs_dir);
@@ -379,12 +383,14 @@ impl SearchPane {
 
         context.query().id(SEARCH).replace_id(SEARCH).target(PaneTypeDiscriminants::Search).query(
             move |client| {
-                let filter = &filter
-                    .iter()
-                    .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                let filter = filter
+                    .iter_mut()
+                    .map(|(ref mut key, ref value, kind)| {
+                        Filter::new(std::mem::take(key), value).with_type(*kind)
+                    })
                     .collect_vec();
                 let result =
-                    if case_sensitive { client.find(filter) } else { client.search(filter) }?;
+                    if case_sensitive { client.find(&filter) } else { client.search(&filter) }?;
 
                 Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
             },
@@ -1091,7 +1097,7 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
                 .tags
                 .iter()
                 .map(|tag| Textbox {
-                    filter_key: tag.value,
+                    filter_key: tag.value.clone(),
                     label: format!(" {:<16}:", tag.label),
                     value: String::new(),
                 })
@@ -1230,13 +1236,13 @@ enum Phase {
 struct Textbox {
     value: String,
     label: String,
-    filter_key: &'static str,
+    filter_key: String,
 }
 
 #[derive(Debug)]
 struct FilterInput {
     variant: FilterInputVariant,
-    label: &'static str,
+    label: String,
 }
 
 #[derive(Debug, PartialEq)]

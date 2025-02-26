@@ -21,7 +21,7 @@ pub struct AlbumArtConfigFile {
 pub struct AlbumArtConfig {
     pub method: ImageMethod,
     pub max_size_px: Size,
-    pub disabled_protocols: Vec<&'static str>,
+    pub disabled_protocols: Vec<String>,
     pub vertical_align: VerticalAlign,
     pub horizontal_align: HorizontalAlign,
 }
@@ -89,11 +89,7 @@ impl From<AlbumArtConfigFile> for AlbumArtConfig {
                 width: if size.width == 0 { u16::MAX } else { size.width },
                 height: if size.height == 0 { u16::MAX } else { size.height },
             },
-            disabled_protocols: value
-                .disabled_protocols
-                .into_iter()
-                .map(|proto| proto.leak() as &'static _)
-                .collect(),
+            disabled_protocols: value.disabled_protocols,
             vertical_align: value.vertical_align.into(),
             horizontal_align: value.horizontal_align.into(),
         }

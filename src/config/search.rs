@@ -7,7 +7,7 @@ use crate::mpd::mpd_client::FilterKind;
 pub struct Search {
     pub case_sensitive: bool,
     pub mode: FilterKind,
-    pub tags: &'static [SearchableTag],
+    pub tags: Vec<SearchableTag>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -19,8 +19,8 @@ pub struct SearchFile {
 
 #[derive(Debug, Default, Clone)]
 pub struct SearchableTag {
-    pub label: &'static str,
-    pub value: &'static str,
+    pub label: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -35,18 +35,14 @@ impl From<SearchFile> for Search {
             case_sensitive: value.case_sensitive,
             mode: value.mode.into(),
             tags: if value.tags.is_empty() {
-                vec![SearchableTag { label: "Any Tag", value: "any" }]
+                vec![SearchableTag { label: "Any Tag".to_string(), value: "any".to_string() }]
             } else {
                 value
                     .tags
                     .into_iter()
-                    .map(|SearchableTagFile { value: tag, label }| SearchableTag {
-                        value: tag.leak(),
-                        label: label.leak(),
-                    })
+                    .map(|SearchableTagFile { value, label }| SearchableTag { label, value })
                     .collect_vec()
-            }
-            .leak(),
+            },
         }
     }
 }

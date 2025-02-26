@@ -855,7 +855,7 @@ impl SingleOrRange {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(unused)]
 pub enum Tag {
     Any,
@@ -865,7 +865,7 @@ pub enum Tag {
     Title,
     File,
     Genre,
-    Custom(&'static str),
+    Custom(String),
 }
 
 impl Tag {
@@ -900,8 +900,8 @@ pub struct Filter<'value> {
     pub kind: FilterKind,
 }
 
-impl From<&'static str> for Tag {
-    fn from(value: &'static str) -> Self {
+impl From<String> for Tag {
+    fn from(value: String) -> Self {
         Self::Custom(value)
     }
 }
@@ -1025,7 +1025,7 @@ mod filter_tests {
     #[test_case(Tag::Title, "Title")]
     #[test_case(Tag::File, "File")]
     #[test_case(Tag::Genre, "Genre")]
-    #[test_case(Tag::Custom("customtag"), "customtag")]
+    #[test_case(Tag::Custom("customtag".to_string()), "customtag")]
     fn single_value(tag: Tag, expected: &str) {
         let input: &[Filter<'_>] = &[Filter::new(tag, "mrs singer")];
 
