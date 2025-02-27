@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use crossbeam::channel::{Receiver, Sender};
@@ -17,10 +17,10 @@ pub fn init(
     work_rx: Receiver<WorkRequest>,
     client_tx: Sender<ClientRequest>,
     event_tx: Sender<AppEvent>,
-    config: Config,
+    config: Arc<Config>,
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new().name("work".to_owned()).spawn(move || {
-        let cli_config = config.into();
+        let cli_config = config.as_ref().into();
         while let Ok(req) = work_rx.recv() {
             let result = handle_work_request(req, &client_tx, &cli_config);
             try_skip!(

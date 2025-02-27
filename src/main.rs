@@ -1,5 +1,8 @@
 use core::scheduler::Scheduler;
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -217,18 +220,21 @@ fn main() -> Result<()> {
                 client_rx.clone(),
                 event_tx.clone(),
                 client,
-                (*context.config).clone(),
+                Arc::clone(&context.config),
             )?;
             core::work::init(
                 worker_rx.clone(),
                 client_tx.clone(),
                 event_tx.clone(),
-                (*context.config).clone(),
+                Arc::clone(&context.config),
             )?;
             core::input::init(event_tx.clone())?;
-            let _sock_guard =
-                core::socket::init(event_tx.clone(), worker_tx.clone(), (*context.config).clone())
-                    .context("Failed to initialize socket listener")?;
+            let _sock_guard = core::socket::init(
+                event_tx.clone(),
+                worker_tx.clone(),
+                Arc::clone(&context.config),
+            )
+            .context("Failed to initialize socket listener")?;
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();

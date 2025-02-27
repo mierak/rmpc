@@ -47,6 +47,17 @@ impl From<Config> for CliConfig {
     }
 }
 
+impl From<&Config> for CliConfig {
+    fn from(value: &Config) -> Self {
+        Self {
+            address: value.address.clone(),
+            password: value.password.clone(),
+            cache_dir: value.cache_dir.clone(),
+            lyrics_dir: value.lyrics_dir.clone(),
+        }
+    }
+}
+
 impl CliConfigFile {
     pub fn read(path: &PathBuf) -> Result<Self> {
         let file = std::fs::File::open(path)?;

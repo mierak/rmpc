@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 use strum::Display;
 
@@ -115,40 +117,39 @@ impl From<GlobalActionFile> for GlobalAction {
 }
 
 impl ToDescription for GlobalAction {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> Cow<'static, str> {
         match self {
-            GlobalAction::Quit => "Exit rmpc",
-            GlobalAction::ShowOutputs => "Show MPD outputs config",
-            GlobalAction::ShowDecoders => "Show MPD decoder plugins",
+            GlobalAction::Quit => "Exit rmpc".into(),
+            GlobalAction::ShowOutputs => "Show MPD outputs config".into(),
+            GlobalAction::ShowDecoders => "Show MPD decoder plugins".into(),
             GlobalAction::ShowCurrentSongInfo => {
-                "Show metadata of the currently playing song in a modal popup"
+                "Show metadata of the currently playing song in a modal popup".into()
             }
-            GlobalAction::ToggleRepeat => "Toggle repeat",
+            GlobalAction::ToggleRepeat => "Toggle repeat".into(),
             GlobalAction::ToggleSingle => {
-                "Whether to stop playing after single track or repeat track/playlist when repeat is on"
+                "Whether to stop playing after single track or repeat track/playlist when repeat is on".into()
             }
-            GlobalAction::ToggleRandom => "Toggles random playback",
-            GlobalAction::ToggleConsume => "Remove song from the queue after playing",
-            GlobalAction::TogglePause => "Pause/Unpause playback",
-            GlobalAction::Stop => "Stop playback",
-            GlobalAction::VolumeUp => "Raise volume",
-            GlobalAction::VolumeDown => "Lower volume",
-            GlobalAction::NextTrack => "Play next track in the queue",
-            GlobalAction::PreviousTrack => "Play previous track in the queue",
-            GlobalAction::SeekForward => "Seek currently playing track forwards",
-            GlobalAction::SeekBack => "Seek currently playing track backwards",
-            GlobalAction::NextTab => "Switch to next tab",
-            GlobalAction::PreviousTab => "Switch to previous tab",
-            // TODO this leak
-            GlobalAction::SwitchToTab(name) => format!("Switch directly to {name} tab").leak(),
-            GlobalAction::ShowHelp => "Show keybinds",
-            GlobalAction::CommandMode => "Enter command mode",
-            GlobalAction::Command { description: None, .. } => "Execute a command",
-            GlobalAction::Command { description: Some(desc), .. } => desc,
+            GlobalAction::ToggleRandom => "Toggles random playback".into(),
+            GlobalAction::ToggleConsume => "Remove song from the queue after playing".into(),
+            GlobalAction::TogglePause => "Pause/Unpause playback".into(),
+            GlobalAction::Stop => "Stop playback".into(),
+            GlobalAction::VolumeUp => "Raise volume".into(),
+            GlobalAction::VolumeDown => "Lower volume".into(),
+            GlobalAction::NextTrack => "Play next track in the queue".into(),
+            GlobalAction::PreviousTrack => "Play previous track in the queue".into(),
+            GlobalAction::SeekForward => "Seek currently playing track forwards".into(),
+            GlobalAction::SeekBack => "Seek currently playing track backwards".into(),
+            GlobalAction::NextTab => "Switch to next tab".into(),
+            GlobalAction::PreviousTab => "Switch to previous tab".into(),
+            GlobalAction::SwitchToTab(name) => Cow::Owned(format!("Switch directly to {name} tab")),
+            GlobalAction::ShowHelp => "Show keybinds".into(),
+            GlobalAction::CommandMode => "Enter command mode".into(),
+            GlobalAction::Command { description: None, .. } => "Execute a command".into(),
+            GlobalAction::Command { description: Some(desc), .. } => Cow::Owned(desc.to_owned()),
             GlobalAction::ExternalCommand { description: None, .. } => {
-                "Execute an external command"
+                "Execute an external command".into()
             }
-            GlobalAction::ExternalCommand { description: Some(desc), .. } => desc,
+            GlobalAction::ExternalCommand { description: Some(desc), .. } => Cow::Owned(desc.to_string()),
         }
     }
 }
@@ -168,8 +169,8 @@ impl From<AlbumsActionsFile> for AlbumsActions {
 }
 
 impl ToDescription for AlbumsActions {
-    fn to_description(&self) -> &'static str {
-        ""
+    fn to_description(&self) -> Cow<'static, str> {
+        "".into()
     }
 }
 
@@ -182,8 +183,8 @@ pub enum ArtistsActionsFile {}
 pub enum ArtistsActions {}
 
 impl ToDescription for ArtistsActions {
-    fn to_description(&self) -> &'static str {
-        ""
+    fn to_description(&self) -> Cow<'static, str> {
+        "".into()
     }
 }
 
@@ -202,8 +203,8 @@ pub enum DirectoriesActionsFile {}
 pub enum DirectoriesActions {}
 
 impl ToDescription for DirectoriesActions {
-    fn to_description(&self) -> &'static str {
-        ""
+    fn to_description(&self) -> Cow<'static, str> {
+        "".into()
     }
 }
 
@@ -241,11 +242,12 @@ impl From<LogsActionsFile> for LogsActions {
 
 #[cfg(debug_assertions)]
 impl ToDescription for LogsActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> Cow<'static, str> {
         match self {
             LogsActions::Clear => "Clear logs",
             LogsActions::ToggleScroll => "Toggle automatic scrolling when log gets added",
         }
+        .into()
     }
 }
 
@@ -288,7 +290,7 @@ impl From<QueueActionsFile> for QueueActions {
 }
 
 impl ToDescription for QueueActions {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> Cow<'static, str> {
         match self {
             QueueActions::Delete => "Remove song under curor from the queue",
             QueueActions::DeleteAll => "Clear current queue",
@@ -300,6 +302,7 @@ impl ToDescription for QueueActions {
                 "Moves the cursor in Queue table to the currently playing song"
             }
         }
+        .into()
     }
 }
 
@@ -372,7 +375,7 @@ pub enum CommonAction {
 }
 
 impl ToDescription for CommonAction {
-    fn to_description(&self) -> &str {
+    fn to_description(&self) -> Cow<'static, str> {
         match self {
             CommonAction::Up => "Go up",
             CommonAction::Down => "Go down",
@@ -412,7 +415,7 @@ impl ToDescription for CommonAction {
             CommonAction::PaneUp => "Focus the pane above the current one",
             CommonAction::PaneRight => "Focus the pane to the right of the current one",
             CommonAction::PaneLeft => "Focus the pane to the left of the current one",
-        }
+        }.into()
     }
 }
 
@@ -460,8 +463,8 @@ pub enum PlaylistsActionsFile {}
 pub enum PlaylistsActions {}
 
 impl ToDescription for PlaylistsActions {
-    fn to_description(&self) -> &'static str {
-        ""
+    fn to_description(&self) -> Cow<'static, str> {
+        "".into()
     }
 }
 
@@ -478,8 +481,8 @@ pub enum SearchActionsFile {}
 pub enum SearchActions {}
 
 impl ToDescription for SearchActions {
-    fn to_description(&self) -> &'static str {
-        ""
+    fn to_description(&self) -> Cow<'static, str> {
+        "".into()
     }
 }
 

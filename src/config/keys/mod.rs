@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 #[cfg(debug_assertions)]
 pub use actions::LogsActions;
@@ -194,7 +194,7 @@ impl From<KeyEvent> for Key {
 }
 
 pub trait ToDescription {
-    fn to_description(&self) -> &str;
+    fn to_description(&self) -> Cow<'static, str>;
 }
 
 #[cfg(test)]

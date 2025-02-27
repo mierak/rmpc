@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     io::{self, Write},
+    sync::Arc,
     thread::Builder,
 };
 
@@ -24,7 +25,7 @@ pub fn init(
     client_rx: Receiver<ClientRequest>,
     event_tx: Sender<AppEvent>,
     client: Client<'static>,
-    config: Config,
+    config: Arc<Config>,
 ) -> io::Result<std::thread::JoinHandle<()>> {
     std::thread::Builder::new()
         .name("client task".to_owned())
