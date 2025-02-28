@@ -47,7 +47,7 @@ pub struct UiConfig {
     pub tab_bar: TabBar,
     pub scrollbar: ScrollbarConfig,
     pub show_song_table_header: bool,
-    pub song_table_format: &'static [SongTableColumn],
+    pub song_table_format: Vec<SongTableColumn>,
     pub header: HeaderConfig,
     #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
@@ -151,7 +151,6 @@ pub struct TabBarFile {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TabBar {
-    pub enabled: bool,
     pub active_style: Style,
     pub inactive_style: Style,
 }
@@ -164,21 +163,21 @@ pub struct SymbolsFile {
     pub(super) ellipsis: Option<String>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct SymbolsConfig {
-    pub song: &'static str,
-    pub dir: &'static str,
-    pub marker: &'static str,
-    pub ellipsis: &'static str,
+    pub song: String,
+    pub dir: String,
+    pub marker: String,
+    pub ellipsis: String,
 }
 
 impl From<SymbolsFile> for SymbolsConfig {
     fn from(value: SymbolsFile) -> Self {
         Self {
-            song: value.song.leak(),
-            dir: value.dir.leak(),
-            marker: value.marker.leak(),
-            ellipsis: value.ellipsis.unwrap_or_else(|| "...".to_string()).leak(),
+            song: value.song,
+            dir: value.dir,
+            marker: value.marker,
+            ellipsis: value.ellipsis.unwrap_or_else(|| "...".to_string()),
         }
     }
 }
@@ -213,9 +212,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
             progress_bar: value.progress_bar.into_config()?,
-            song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?
-                .0
-                .leak(),
+            song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
             header: value.header.try_into()?,
             column_widths: [
                 value.browser_column_widths[0],
@@ -223,7 +220,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 value.browser_column_widths[2],
             ],
             tab_bar: TabBar {
-                enabled: value.tab_bar.enabled.unwrap_or(true),
                 active_style: value
                     .tab_bar
                     .active_style

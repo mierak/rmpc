@@ -10,7 +10,7 @@ use super::{
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
 use crate::{
-    config::{cli::Command, tabs::PaneType},
+    config::{cli::Command, tabs::PaneTypeDiscriminants},
     mpd::commands::IdleEvent,
     ui::UiAppEvent,
 };
@@ -27,7 +27,7 @@ pub(crate) enum ClientRequest {
 #[allow(unused)]
 pub(crate) enum WorkRequest {
     IndexLyrics {
-        lyrics_dir: &'static str,
+        lyrics_dir: String,
     },
     IndexSingleLrc {
         /// Absolute path to the lrc file
@@ -39,9 +39,17 @@ pub(crate) enum WorkRequest {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
-    LyricsIndexed { index: LrcIndex },
-    SingleLrcIndexed { lrc_entry: Option<LrcIndexEntry> },
-    MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
+    LyricsIndexed {
+        index: LrcIndex,
+    },
+    SingleLrcIndexed {
+        lrc_entry: Option<LrcIndexEntry>,
+    },
+    MpdCommandFinished {
+        id: &'static str,
+        target: Option<PaneTypeDiscriminants>,
+        data: MpdQueryResult,
+    },
     None,
 }
 

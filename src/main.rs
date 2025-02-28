@@ -1,9 +1,12 @@
 use core::scheduler::Scheduler;
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::{Leak, cli_config::CliConfigFile};
+use config::cli_config::CliConfigFile;
 use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
@@ -147,10 +150,14 @@ fn main() -> Result<()> {
                 Ok(cfg) => cfg,
                 Err(_err) => ConfigFile::default().into(),
             };
-            let config = config.into_config(args.address, args.password).leak();
-            let mut client = Client::init(config.address, config.password, "main")?;
+            let mut config = config.into_config(args.address, args.password);
+            let mut client = Client::init(
+                std::mem::take(&mut config.address),
+                std::mem::take(&mut config.password),
+                "main",
+            )?;
             client.set_read_timeout(None)?;
-            (cmd.execute(config)?)(&mut client)?;
+            (cmd.execute(&config)?)(&mut client)?;
         }
         None => {
             let (worker_tx, worker_rx) = unbounded::<WorkRequest>();
@@ -181,15 +188,16 @@ fn main() -> Result<()> {
                 }
             };
 
-            if let Some(lyrics_dir) = config.lyrics_dir {
+            if let Some(lyrics_dir) = &config.lyrics_dir {
                 worker_tx
-                    .send(WorkRequest::IndexLyrics { lyrics_dir })
+                    .send(WorkRequest::IndexLyrics { lyrics_dir: lyrics_dir.clone() })
                     .context("Failed to request lyrics indexing")?;
             }
             event_tx.send(AppEvent::RequestRender).context("Failed to render first frame")?;
 
-            let mut client = Client::init(config.address, config.password, "command")
-                .context("Failed to connect to MPD")?;
+            let mut client =
+                Client::init(config.address.clone(), config.password.clone(), "command")
+                    .context("Failed to connect to MPD")?;
             client.set_read_timeout(Some(config.mpd_read_timeout))?;
             client.set_write_timeout(Some(config.mpd_write_timeout))?;
 
@@ -208,17 +216,25 @@ fn main() -> Result<()> {
             let enable_mouse = context.config.enable_mouse;
             let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
 
-            core::client::init(client_rx.clone(), event_tx.clone(), client, context.config)?;
+            core::client::init(
+                client_rx.clone(),
+                event_tx.clone(),
+                client,
+                Arc::clone(&context.config),
+            )?;
             core::work::init(
                 worker_rx.clone(),
                 client_tx.clone(),
                 event_tx.clone(),
-                context.config,
+                Arc::clone(&context.config),
             )?;
             core::input::init(event_tx.clone())?;
-            let _sock_guard =
-                core::socket::init(event_tx.clone(), worker_tx.clone(), context.config)
-                    .context("Failed to initialize socket listener")?;
+            let _sock_guard = core::socket::init(
+                event_tx.clone(),
+                worker_tx.clone(),
+                Arc::clone(&context.config),
+            )
+            .context("Failed to initialize socket listener")?;
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();

@@ -14,24 +14,21 @@ pub use state::DirState;
 use crate::{config::Config, mpd::commands::Song, ui::panes::browser::DirOrSong};
 
 pub trait DirStackItem {
-    type Item;
     fn as_path(&self) -> &str;
     fn matches(&self, config: &Config, filter: &str) -> bool;
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
         config: &Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
-    ) -> Self::Item;
-    fn to_list_item_simple(&self, config: &Config) -> Self::Item {
+    ) -> ListItem<'a>;
+    fn to_list_item_simple<'a>(&self, config: &Config) -> ListItem<'a> {
         self.to_list_item(config, false, false, None)
     }
 }
 
 impl DirStackItem for DirOrSong {
-    type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         match self {
             DirOrSong::Dir { name, .. } => name,
@@ -44,44 +41,44 @@ impl DirStackItem for DirOrSong {
             DirOrSong::Dir { name, .. } => if name.is_empty() { "Untitled" } else { name.as_str() }
                 .to_lowercase()
                 .contains(&filter.to_lowercase()),
-            DirOrSong::Song(s) => s.matches(config.theme.browser_song_format.0, filter),
+            DirOrSong::Song(s) => s.matches(config.theme.browser_song_format.0.as_slice(), filter),
         }
     }
 
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
         config: &Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
-    ) -> Self::Item {
-        let symbols = &config.theme.symbols;
+    ) -> ListItem<'a> {
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
+            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
-        let mut value =
-            match self {
-                DirOrSong::Dir { name, .. } => Line::from(vec![
-                    marker_span,
-                    Span::from(format!(
-                        "{} {}",
-                        symbols.dir,
-                        if name.is_empty() { "Untitled" } else { name.as_str() }
-                    )),
-                ]),
-                DirOrSong::Song(s) => {
-                    let spans =
-                        [marker_span, Span::from(symbols.song), Span::from(" ")].into_iter().chain(
+        let mut value = match self {
+            DirOrSong::Dir { name, .. } => Line::from(vec![
+                marker_span,
+                Span::from(format!(
+                    "{} {}",
+                    config.theme.symbols.dir,
+                    if name.is_empty() { "Untitled" } else { name.as_str() }
+                )),
+            ]),
+            DirOrSong::Song(s) => {
+                let spans =
+                    [marker_span, Span::from(config.theme.symbols.song.clone()), Span::from(" ")]
+                        .into_iter()
+                        .chain(
                             config.theme.browser_song_format.0.iter().map(|prop| {
                                 Span::from(prop.as_string(Some(s)).unwrap_or_default())
                             }),
                         );
-                    Line::from(spans.collect_vec())
-                }
-            };
+                Line::from(spans.collect_vec())
+            }
+        };
         if let Some(content) = additional_content {
             value.push_span(Span::raw(content));
         }
@@ -94,34 +91,31 @@ impl DirStackItem for DirOrSong {
 }
 
 impl DirStackItem for Song {
-    type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         &self.file
     }
 
     fn matches(&self, config: &Config, filter: &str) -> bool {
-        self.matches(config.theme.browser_song_format.0, filter)
+        self.matches(config.theme.browser_song_format.0.as_slice(), filter)
     }
 
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
         config: &Config,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
-    ) -> Self::Item {
-        let symbols = &config.theme.symbols;
+    ) -> ListItem<'a> {
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
+            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
         let title = self.title_str().to_owned();
         let artist = self.artist_str().to_owned();
         let separator_span = Span::from(" - ");
-        let icon_span = Span::from(format!("{} ", symbols.song));
+        let icon_span = Span::from(format!("{} ", config.theme.symbols.song));
         let mut result =
             vec![marker_span, icon_span, Span::from(artist), separator_span, Span::from(title)];
         if let Some(content) = additional_content {
@@ -181,8 +175,6 @@ impl ScrollingState for ListState {
 
 #[cfg(test)]
 impl DirStackItem for String {
-    type Item = ListItem<'static>;
-
     fn as_path(&self) -> &str {
         self
     }
@@ -191,18 +183,17 @@ impl DirStackItem for String {
         self.to_lowercase().contains(&filter.to_lowercase())
     }
 
-    fn to_list_item(
+    fn to_list_item<'a>(
         &self,
         config: &Config,
         is_marked: bool,
         matches_filter: bool,
         _additional_content: Option<String>,
-    ) -> Self::Item {
-        let symbols = &config.theme.symbols;
+    ) -> ListItem<'a> {
         let marker_span = if is_marked {
-            Span::styled(symbols.marker, config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
-            Span::from(" ".repeat(symbols.marker.chars().count()))
+            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
         if matches_filter {

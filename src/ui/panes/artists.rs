@@ -2,14 +2,14 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+use ratatui::{Frame, prelude::Rect};
 
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
-        tabs::PaneType,
+        tabs::PaneTypeDiscriminants,
     },
     context::AppContext,
     mpd::{
@@ -65,12 +65,12 @@ struct CachedAlbum {
 }
 
 impl ArtistsPane {
-    pub fn new(mode: ArtistsPaneMode, context: &AppContext) -> Self {
+    pub fn new(mode: ArtistsPaneMode, _context: &AppContext) -> Self {
         Self {
             mode,
             stack: DirStack::default(),
             filter_input_mode: false,
-            browser: Browser::new(context.config),
+            browser: Browser::new(),
             initialized: false,
             cache: ArtistsCache::default(),
         }
@@ -83,10 +83,10 @@ impl ArtistsPane {
         }
     }
 
-    fn target_pane(&self) -> PaneType {
+    fn target_pane(&self) -> PaneTypeDiscriminants {
         match self.mode {
-            ArtistsPaneMode::AlbumArtist => PaneType::AlbumArtists,
-            ArtistsPaneMode::Artist => PaneType::Artists,
+            ArtistsPaneMode::AlbumArtist => PaneTypeDiscriminants::AlbumArtists,
+            ArtistsPaneMode::Artist => PaneTypeDiscriminants::Artists,
         }
     }
 
@@ -219,11 +219,12 @@ impl ArtistsPane {
 }
 
 impl Pane for ArtistsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
+            &context.config,
         );
 
         Ok(())
@@ -319,7 +320,7 @@ impl Pane for ArtistsPane {
                         .iter()
                         .map(|album| {
                             DirOrSong::name_only(album.name.clone())
-                                .to_list_item_simple(context.config)
+                                .to_list_item_simple(&context.config)
                         })
                         .collect(),
                 )];
@@ -554,10 +555,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 else {
                     return Ok(());
                 };
-                let song = songs
-                    .iter()
-                    .find(|song| song.file == current)
-                    .map(|song| song.to_preview(&context.config.theme.symbols));
+                let song =
+                    songs.iter().find(|song| song.file == current).map(|song| song.to_preview());
                 self.stack_mut().set_preview(song);
                 context.render()?;
             }
@@ -572,7 +571,10 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                 };
                 let songs = vec![PreviewGroup::from(
                     None,
-                    songs.iter().map(|song| song.to_list_item_simple(context.config)).collect_vec(),
+                    songs
+                        .iter()
+                        .map(|song| song.to_list_item_simple(&context.config))
+                        .collect_vec(),
                 )];
                 self.stack_mut().set_preview(Some(songs));
                 context.render()?;
@@ -586,7 +588,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                             .iter()
                             .map(|CachedAlbum { name, .. }| {
                                 DirOrSong::name_only(name.to_owned())
-                                    .to_list_item_simple(context.config)
+                                    .to_list_item_simple(&context.config)
                             })
                             .collect(),
                     )]));
@@ -622,7 +624,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::{Config, Leak},
+        config::Config,
         tests::fixtures::{app_context, config},
     };
 
@@ -646,7 +648,7 @@ mod tests {
     fn albums_no_date_sort_name(mut app_context: AppContext, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Name;
-        app_context.config = config.leak();
+        app_context.config = std::sync::Arc::new(config);
         let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
         let artist = String::from("artist");
         let songs = vec![
@@ -667,7 +669,7 @@ mod tests {
     fn albums_split_date_sort_name(mut app_context: AppContext, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Name;
-        app_context.config = config.leak();
+        app_context.config = std::sync::Arc::new(config);
         let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
         let artist = String::from("artist");
         let songs = vec![
@@ -689,7 +691,7 @@ mod tests {
     fn albums_split_date_sort_date(mut app_context: AppContext, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        app_context.config = config.leak();
+        app_context.config = std::sync::Arc::new(config);
         let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
         let artist = String::from("artist");
         let songs = vec![
@@ -711,7 +713,7 @@ mod tests {
     fn albums_no_date_sort_date(mut app_context: AppContext, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        app_context.config = config.leak();
+        app_context.config = std::sync::Arc::new(config);
         let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
         let artist = String::from("artist");
         let songs = vec![

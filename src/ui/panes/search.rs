@@ -13,7 +13,7 @@ use ratatui::{
 use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
-    config::{Config, Search, keys::GlobalAction, tabs::PaneType},
+    config::{Config, Search, keys::GlobalAction, tabs::PaneTypeDiscriminants},
     context::AppContext,
     core::command::{create_env, run_external},
     mpd::{
@@ -49,7 +49,7 @@ const SEARCH: &str = "search";
 
 impl SearchPane {
     pub fn new(context: &AppContext) -> Self {
-        let config = context.config;
+        let config = &context.config;
         Self {
             preview: None,
             phase: Phase::Search,
@@ -58,11 +58,11 @@ impl SearchPane {
                 &config.search,
                 [
                     FilterInput {
-                        label: " Search mode     :",
+                        label: " Search mode     :".to_string(),
                         variant: FilterInputVariant::SelectFilterKind { value: config.search.mode },
                     },
                     FilterInput {
-                        label: " Case sensitive  :",
+                        label: " Case sensitive  :".to_string(),
                         variant: FilterInputVariant::SelectFilterCaseSensitive {
                             value: config.search.case_sensitive,
                         },
@@ -161,31 +161,38 @@ impl SearchPane {
             Phase::Search => {
                 let data = Some(vec![PreviewGroup::from(
                     None,
-                    self.songs_dir.to_list_items(context.config),
+                    self.songs_dir.to_list_items(&context.config),
                 )]);
-                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
-                    |_| Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) }),
-                );
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("preview")
+                    .target(PaneTypeDiscriminants::Search)
+                    .query(|_| {
+                        Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
+                    });
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
                     return;
                 };
-                let config = context.config;
                 let file = current.file.clone();
 
-                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
-                    move |client| {
+                context
+                    .query()
+                    .id(PREVIEW)
+                    .replace_id("preview")
+                    .target(PaneTypeDiscriminants::Search)
+                    .query(move |client| {
                         let data = Some(
                             client
                                 .find(&[Filter::new(Tag::File, &file)])?
                                 .first()
                                 .context("Expected to find exactly one song")?
-                                .to_preview(&config.theme.symbols),
+                                .to_preview(),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
-                    },
-                );
+                    });
             }
         }
     }
@@ -253,13 +260,13 @@ impl SearchPane {
                     .set_borderless(true)
                     .set_label_style(config.as_text_style())
                     .set_input_style(config.as_text_style())
-                    .set_label(input.label)
+                    .set_label(&input.label)
                     .set_text(Into::into(&value)),
                 FilterInputVariant::SelectFilterCaseSensitive { value } => Input::default()
                     .set_borderless(true)
                     .set_label_style(config.as_text_style())
                     .set_input_style(config.as_text_style())
-                    .set_label(input.label)
+                    .set_label(&input.label)
                     .set_text(if value { "Yes" } else { "No" }),
             };
 
@@ -318,12 +325,12 @@ impl SearchPane {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key as &'static str, value.to_owned(), filter_kind))
+                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
             }
             _ => None,
         });
 
-        let filter = filter.collect_vec();
+        let mut filter = filter.collect_vec();
 
         if filter.is_empty() {
             return;
@@ -333,8 +340,10 @@ impl SearchPane {
             context.command(move |client| {
                 client.find_add(
                     &filter
-                        .iter()
-                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .iter_mut()
+                        .map(|(ref mut key, ref value, kind)| {
+                            Filter::new(std::mem::take(key), value).with_type(*kind)
+                        })
                         .collect_vec(),
                 )?;
                 Ok(())
@@ -343,8 +352,10 @@ impl SearchPane {
             context.command(move |client| {
                 client.search_add(
                     &filter
-                        .iter()
-                        .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                        .iter_mut()
+                        .map(|(ref mut key, ref value, kind)| {
+                            Filter::new(std::mem::take(key), value).with_type(*kind)
+                        })
                         .collect_vec(),
                 )?;
                 Ok(())
@@ -356,12 +367,12 @@ impl SearchPane {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key as &'static str, value.to_owned(), filter_kind))
+                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
             }
             _ => None,
         });
 
-        let filter = filter.collect_vec();
+        let mut filter = filter.collect_vec();
 
         if filter.is_empty() {
             let _ = std::mem::take(&mut self.songs_dir);
@@ -369,14 +380,16 @@ impl SearchPane {
             return;
         }
 
-        context.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
+        context.query().id(SEARCH).replace_id(SEARCH).target(PaneTypeDiscriminants::Search).query(
             move |client| {
-                let filter = &filter
-                    .iter()
-                    .map(|(key, value, kind)| Filter::new(*key, value).with_type(*kind))
+                let filter = filter
+                    .iter_mut()
+                    .map(|(ref mut key, ref value, kind)| {
+                        Filter::new(std::mem::take(key), value).with_type(*kind)
+                    })
                     .collect_vec();
                 let result =
-                    if case_sensitive { client.find(filter) } else { client.search(filter) }?;
+                    if case_sensitive { client.find(&filter) } else { client.search(&filter) }?;
 
                 Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
             },
@@ -591,7 +604,7 @@ impl Pane for SearchPane {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(vec![PreviewGroup::from(
                     None,
-                    self.songs_dir.to_list_items(context.config),
+                    self.songs_dir.to_list_items(&context.config),
                 )]);
                 context.render()?;
             }
@@ -746,7 +759,7 @@ impl Pane for SearchPane {
     }
 
     fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        let config = context.config;
+        let config = &context.config;
         match &mut self.phase {
             Phase::SearchTextboxInput => match event.as_common_action(context) {
                 Some(CommonAction::Close) => {
@@ -788,7 +801,7 @@ impl Pane for SearchPane {
                 if let Some(action) = event.as_global_action(context) {
                     if let GlobalAction::ExternalCommand { command, .. } = action {
                         let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                        run_external(command, create_env(context, songs));
+                        run_external(command.clone(), create_env(context, songs));
                     } else {
                         event.abandon();
                     }
@@ -922,11 +935,11 @@ impl Pane for SearchPane {
                         {
                             let songs =
                                 self.songs_dir.marked_items().map(|song| song.file.as_str());
-                            run_external(command, create_env(context, songs));
+                            run_external(command.clone(), create_env(context, songs));
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                            run_external(command, create_env(context, selected));
+                            run_external(command.clone(), create_env(context, selected));
                         }
                         _ => {
                             event.abandon();
@@ -1083,7 +1096,7 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
                 .tags
                 .iter()
                 .map(|tag| Textbox {
-                    filter_key: tag.value,
+                    filter_key: tag.value.clone(),
                     label: format!(" {:<16}:", tag.label),
                     value: String::new(),
                 })
@@ -1222,13 +1235,13 @@ enum Phase {
 struct Textbox {
     value: String,
     label: String,
-    filter_key: &'static str,
+    filter_key: String,
 }
 
 #[derive(Debug)]
 struct FilterInput {
     variant: FilterInputVariant,
-    label: &'static str,
+    label: String,
 }
 
 #[derive(Debug, PartialEq)]

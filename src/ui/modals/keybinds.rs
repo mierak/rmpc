@@ -31,11 +31,11 @@ pub struct KeybindsModal {
 }
 
 trait KeybindsExt {
-    fn to_str(&self) -> impl Iterator<Item = (String, String, &str)>;
+    fn to_str(&self) -> impl Iterator<Item = (String, String, Cow<'static, str>)>;
 }
 
 impl<K: Display, V: Display + ToDescription> KeybindsExt for HashMap<K, V> {
-    fn to_str(&self) -> impl Iterator<Item = (String, String, &str)> {
+    fn to_str(&self) -> impl Iterator<Item = (String, String, Cow<'static, str>)> {
         self.iter().map(|(key, value)| (key.to_string(), value.to_string(), value.to_description()))
     }
 }
@@ -48,7 +48,7 @@ impl KeybindsModal {
     }
 }
 fn row_header<'a>(
-    keys: &'a [(String, String, &'a str)],
+    keys: &'a [(String, String, Cow<'a, str>)],
     name: &'a str,
     header_style: Style,
 ) -> Option<Row<'a>> {
@@ -65,7 +65,7 @@ fn row_header<'a>(
 
 #[allow(clippy::cast_possible_truncation)]
 fn row<'a>(
-    keys: &'a [(String, String, &'a str)],
+    keys: &'a [(String, String, Cow<'a, str>)],
     key_width: u16,
     action_width: u16,
     description_width: u16,

@@ -18,7 +18,7 @@ pub struct Header<'a> {
 
 impl Widget for Header<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let config = self.context.config;
+        let config = &self.context.config;
 
         if let Some(header_bg_color) = config.theme.header_background_color {
             Block::default().style(Style::default().bg(header_bg_color)).render(area, buf);
@@ -37,22 +37,22 @@ impl Widget for Header<'_> {
             .split(layouts[row]) else {
                 return;
             };
-            let template = PropertyTemplates(config.theme.header.rows[row].left);
+            let template = PropertyTemplates(&config.theme.header.rows[row].left);
             let widget = template.format(song, &self.context.status).left_aligned();
             widget.render(left, buf);
 
-            let template = PropertyTemplates(config.theme.header.rows[row].center);
+            let template = PropertyTemplates(&config.theme.header.rows[row].center);
             let widget = template.format(song, &self.context.status).centered();
             widget.render(center, buf);
 
-            let template = PropertyTemplates(config.theme.header.rows[row].right);
+            let template = PropertyTemplates(&config.theme.header.rows[row].right);
             let widget = template.format(song, &self.context.status).right_aligned();
             widget.render(right, buf);
         }
     }
 }
 
-struct PropertyTemplates<'a>(&'a [&'a Property<'static, PropertyKind>]);
+struct PropertyTemplates<'a>(&'a [Property<PropertyKind>]);
 impl<'a> PropertyTemplates<'a> {
     fn format(&'a self, song: Option<&'a Song>, status: &'a Status) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {

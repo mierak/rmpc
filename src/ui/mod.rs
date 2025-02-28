@@ -33,7 +33,7 @@ use crate::{
         Config,
         cli::Args,
         keys::GlobalAction,
-        tabs::{PaneType, SizedPaneOrSplit, TabName},
+        tabs::{PaneType, PaneTypeDiscriminants, SizedPaneOrSplit, TabName},
     },
     context::AppContext,
     core::command::{create_env, run_external},
@@ -89,7 +89,8 @@ macro_rules! active_tab_call {
 
 impl<'ui> Ui<'ui> {
     pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
-        let active_tab = *context.config.tabs.names.first().context("Expected at least one tab")?;
+        let active_tab =
+            context.config.tabs.names.first().context("Expected at least one tab")?.clone();
         Ok(Self {
             active_tab,
             panes: PaneContainer::new(context)?,
@@ -101,7 +102,7 @@ impl<'ui> Ui<'ui> {
                 .tabs
                 .iter()
                 .map(|(name, screen)| -> Result<_> {
-                    Ok((*name, TabScreen::new(screen.panes.clone())?))
+                    Ok((name.clone(), TabScreen::new(screen.panes.clone())?))
                 })
                 .try_collect()?,
             area: Rect::default(),
@@ -123,7 +124,7 @@ impl<'ui> Ui<'ui> {
             Ok(())
         })?;
 
-        self.active_tab = new_tab;
+        self.active_tab = new_tab.clone();
         self.on_event(UiEvent::TabChanged(new_tab), context)?;
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
@@ -346,16 +347,16 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::NextTab => {
-                    self.change_tab(context.config.next_screen(self.active_tab), context)?;
+                    self.change_tab(context.config.next_screen(&self.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::PreviousTab => {
-                    self.change_tab(context.config.prev_screen(self.active_tab), context)?;
+                    self.change_tab(context.config.prev_screen(&self.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
-                    if context.config.tabs.names.contains(&name) {
-                        self.change_tab(name, context)?;
+                    if context.config.tabs.names.contains(name) {
+                        self.change_tab(name.clone(), context)?;
                         context.render()?;
                     } else {
                         status_error!(
@@ -370,7 +371,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
                 GlobalAction::ExternalCommand { command, .. } => {
-                    run_external(command, create_env(context, std::iter::empty::<&str>()));
+                    run_external(command.clone(), create_env(context, std::iter::empty::<&str>()));
                 }
                 GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                 GlobalAction::ShowHelp => {
@@ -473,7 +474,7 @@ impl<'ui> Ui<'ui> {
                 || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
 
-        for name in context.config.active_panes {
+        for name in &context.config.active_panes {
             let Some(pane) = self.panes.get_mut_by_discr(*name) else {
                 continue;
             };
@@ -528,7 +529,7 @@ impl<'ui> Ui<'ui> {
     pub(crate) fn on_command_finished(
         &mut self,
         id: &'static str,
-        pane: Option<PaneType>,
+        pane: Option<PaneTypeDiscriminants>,
         data: MpdQueryResult,
         context: &mut AppContext,
     ) -> Result<()> {
@@ -539,54 +540,53 @@ impl<'ui> Ui<'ui> {
                 || self.layout.panes_iter().any(|pane| pane.pane == p)
         };
         match pane {
-            Some(pane) => match self.panes.get_mut(&pane, context) {
+            Some(pane) => match self.panes.get_mut_by_discr(pane) {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => {
+                Some(Panes::Logs(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Logs), context)
                 }
-                Panes::Queue(p) => {
+                Some(Panes::Queue(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Queue), context)
                 }
-                Panes::Directories(p) => {
+                Some(Panes::Directories(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Directories), context)
                 }
-                Panes::Albums(p) => {
+                Some(Panes::Albums(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Albums), context)
                 }
-                Panes::Artists(p) => {
+                Some(Panes::Artists(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Artists), context)
                 }
-                Panes::Playlists(p) => {
+                Some(Panes::Playlists(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Playlists), context)
                 }
-                Panes::Search(p) => {
+                Some(Panes::Search(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Search), context)
                 }
-                Panes::AlbumArtists(p) => {
+                Some(Panes::AlbumArtists(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::AlbumArtists), context)
                 }
-                Panes::AlbumArt(p) => {
+                Some(Panes::AlbumArt(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::AlbumArt), context)
                 }
-                Panes::Lyrics(p) => {
+                Some(Panes::Lyrics(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Lyrics), context)
                 }
-                Panes::ProgressBar(p) => {
+                Some(Panes::ProgressBar(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::ProgressBar), context)
                 }
-                Panes::Header(p) => {
+                Some(Panes::Header(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Header), context)
                 }
-                Panes::Tabs(p) => {
+                Some(Panes::Tabs(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::Tabs), context)
                 }
-                Panes::TabContent => Ok(()),
                 #[cfg(debug_assertions)]
-                Panes::FrameCount(p) => {
+                Some(Panes::FrameCount(p)) => {
                     p.on_query_finished(id, data, contains_pane(PaneType::FrameCount), context)
                 }
                 // Property panes do not need to receive command notifications
-                Panes::Property(_) => Ok(()),
+                Some(Panes::Property(_)) | Some(Panes::TabContent) | None => Ok(()),
             }?,
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {
@@ -726,26 +726,29 @@ impl FilterKind {
 }
 
 impl Config {
-    fn next_screen(&self, current_screen: TabName) -> TabName {
-        let names = self.tabs.names;
-        *names
+    fn next_screen(&self, current_screen: &TabName) -> TabName {
+        let names = &self.tabs.names;
+        names
             .iter()
             .enumerate()
-            .find(|(_, s)| **s == current_screen)
+            .find(|(_, s)| *s == current_screen)
             .and_then(|(idx, _)| names.get((idx + 1) % names.len()))
-            .unwrap_or(&current_screen)
+            .unwrap_or(current_screen)
+            .clone()
     }
 
-    fn prev_screen(&self, current_screen: TabName) -> TabName {
-        let names = self.tabs.names;
-        *names
+    fn prev_screen(&self, current_screen: &TabName) -> TabName {
+        let names = &self.tabs.names;
+        self.tabs
+            .names
             .iter()
             .enumerate()
-            .find(|(_, s)| **s == current_screen)
+            .find(|(_, s)| *s == current_screen)
             .and_then(|(idx, _)| {
                 names.get((if idx == 0 { names.len() - 1 } else { idx - 1 }) % names.len())
             })
-            .unwrap_or(&current_screen)
+            .unwrap_or(current_screen)
+            .clone()
     }
 
     fn as_header_table_block(&self) -> ratatui::widgets::Block {
@@ -755,7 +758,7 @@ impl Config {
         Block::default().border_style(self.as_border_style())
     }
 
-    fn as_tabs_block(&self) -> ratatui::widgets::Block {
+    fn as_tabs_block<'block>(&self) -> ratatui::widgets::Block<'block> {
         if !self.theme.draw_borders {
             return ratatui::widgets::Block::default()/* .padding(Padding::new(0, 0, 1, 1)) */;
         }
@@ -784,22 +787,19 @@ impl Config {
             .thumb_style(progress_bar_colors.thumb_style)
             .track_style(progress_bar_colors.track_style)
             .elapsed_style(progress_bar_colors.elapsed_style)
-            .elapsed_char(self.theme.progress_bar.symbols[0])
-            .thumb_char(self.theme.progress_bar.symbols[1])
-            .track_char(self.theme.progress_bar.symbols[2])
+            .elapsed_char(&self.theme.progress_bar.symbols[0])
+            .thumb_char(&self.theme.progress_bar.symbols[1])
+            .track_char(&self.theme.progress_bar.symbols[2])
     }
 
     fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
-        let symbols = self.theme.scrollbar.symbols;
-        let track = if symbols[0].is_empty() { None } else { Some(symbols[0]) };
-        let begin = if symbols[2].is_empty() { None } else { Some(symbols[2]) };
-        let end = if symbols[3].is_empty() { None } else { Some(symbols[3]) };
+        let symbols = &self.theme.scrollbar.symbols;
         ratatui::widgets::Scrollbar::default()
             .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-            .track_symbol(track)
-            .thumb_symbol(self.theme.scrollbar.symbols[1])
-            .begin_symbol(begin)
-            .end_symbol(end)
+            .track_symbol(if symbols[0].is_empty() { None } else { Some(&symbols[0]) })
+            .thumb_symbol(&self.theme.scrollbar.symbols[1])
+            .begin_symbol(if symbols[2].is_empty() { None } else { Some(&symbols[2]) })
+            .end_symbol(if symbols[3].is_empty() { None } else { Some(&symbols[3]) })
             .track_style(self.theme.scrollbar.track_style)
             .begin_style(self.theme.scrollbar.ends_style)
             .end_style(self.theme.scrollbar.ends_style)

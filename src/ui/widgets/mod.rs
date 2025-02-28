@@ -6,7 +6,6 @@
 )]
 use ratatui::prelude::Alignment;
 
-pub mod app_tabs;
 pub mod browser;
 pub mod button;
 pub mod header;

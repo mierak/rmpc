@@ -5,7 +5,7 @@ use ratatui::{Terminal, backend::TestBackend};
 use rstest::fixture;
 
 use crate::{
-    config::{Config, ConfigFile, Leak},
+    config::{Config, ConfigFile},
     context::AppContext,
     core::scheduler::Scheduler,
     mpd::commands::Status,
@@ -40,14 +40,13 @@ pub fn app_context(
     let chan1 = unbounded();
     let config = ConfigFile::default()
         .into_config(None, None, None, true)
-        .expect("Test default config to convert correctly")
-        .leak();
+        .expect("Test default config to convert correctly");
 
-    let chan1 = chan1.leak();
+    let chan1 = Box::leak(Box::new(chan1));
     let scheduler = Scheduler::new((chan1.0.clone(), unbounded().0));
     AppContext {
         status: Status::default(),
-        config,
+        config: std::sync::Arc::new(config),
         queue: Vec::default(),
         app_event_sender: chan1.0.clone(),
         work_sender: work_request_channel.0.clone(),

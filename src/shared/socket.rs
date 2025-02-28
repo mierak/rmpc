@@ -44,7 +44,7 @@ pub(crate) trait SocketCommandExecute {
         self,
         event_tx: &Sender<AppEvent>,
         work_tx: &Sender<WorkRequest>,
-        config: &'static Config,
+        config: &Config,
     ) -> Result<()>;
 }
 
@@ -60,7 +60,7 @@ impl SocketCommandExecute for SocketCommand {
         self,
         event_tx: &Sender<AppEvent>,
         work_tx: &Sender<WorkRequest>,
-        config: &'static Config,
+        config: &Config,
     ) -> Result<()> {
         match self {
             SocketCommand::IndexLrc(cmd) => cmd.execute(event_tx, work_tx, config),
@@ -114,7 +114,7 @@ impl SocketCommandExecute for StatusMessageCommand {
         self,
         event_tx: &Sender<AppEvent>,
         _work_tx: &Sender<WorkRequest>,
-        _config: &'static Config,
+        _config: &Config,
     ) -> Result<()> {
         event_tx.send(AppEvent::Status(self.message, self.level))?;
         Ok(())
@@ -131,7 +131,7 @@ impl SocketCommandExecute for IndexLrcCommand {
         self,
         _event_tx: &Sender<AppEvent>,
         work_tx: &Sender<WorkRequest>,
-        _config: &'static Config,
+        _config: &Config,
     ) -> Result<()> {
         work_tx.send(WorkRequest::IndexSingleLrc { path: self.path })?;
         Ok(())
@@ -148,7 +148,7 @@ impl SocketCommandExecute for TmuxHookCommand {
         self,
         event_tx: &Sender<AppEvent>,
         _work_tx: &Sender<WorkRequest>,
-        _config: &'static Config,
+        _config: &Config,
     ) -> Result<()> {
         event_tx.send(AppEvent::TmuxHook { hook: self.hook })?;
         Ok(())

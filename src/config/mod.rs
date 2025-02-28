@@ -42,10 +42,10 @@ use crate::{
 
 #[derive(Debug, Default, Clone)]
 pub struct Config {
-    pub address: MpdAddress<'static>,
-    pub password: Option<MpdPassword<'static>>,
-    pub cache_dir: Option<&'static str>,
-    pub lyrics_dir: Option<&'static str>,
+    pub address: MpdAddress,
+    pub password: Option<MpdPassword>,
+    pub cache_dir: Option<String>,
+    pub lyrics_dir: Option<String>,
     pub volume_step: u8,
     pub max_fps: u32,
     pub scrolloff: usize,
@@ -58,11 +58,11 @@ pub struct Config {
     pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
     pub album_art: AlbumArtConfig,
-    pub on_song_change: Option<&'static [&'static str]>,
+    pub on_song_change: Option<Vec<String>>,
     pub search: Search,
     pub artists: Artists,
     pub tabs: Tabs,
-    pub active_panes: &'static [PaneTypeDiscriminants],
+    pub active_panes: Vec<PaneTypeDiscriminants>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -204,24 +204,21 @@ impl ConfigFile {
             .tabs
             .iter()
             .flat_map(|(_, tab)| {
-                tab.panes.panes_iter().map(|pane| PaneTypeDiscriminants::from(pane.pane))
+                tab.panes.panes_iter().map(|pane| PaneTypeDiscriminants::from(&pane.pane))
             })
-            .chain(theme.layout.panes_iter().map(|pane| PaneTypeDiscriminants::from(pane.pane)))
+            .chain(theme.layout.panes_iter().map(|pane| PaneTypeDiscriminants::from(&pane.pane)))
             .unique()
-            .collect_vec()
-            .leak();
+            .collect_vec();
 
         let (address, password) =
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme,
-            cache_dir: self
-                .cache_dir
-                .map(|v| if v.ends_with('/') { v } else { format!("{v}/") }.leak() as &'static _),
+            cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
-                if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }.leak() as &'static _
+                if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
             }),
             tabs,
             active_panes,
@@ -240,12 +237,9 @@ impl ConfigFile {
             search: self.search.into(),
             artists: self.artists.into(),
             album_art: self.album_art.into(),
-            on_song_change: self.on_song_change.map(|arr| {
-                arr.into_iter()
-                    .map(|v| tilde_expand(&v).into_owned().leak() as &'static str)
-                    .collect_vec()
-                    .leak() as &'static [_]
-            }),
+            on_song_change: self
+                .on_song_change
+                .map(|arr| arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec()),
         };
 
         if is_cli {
@@ -326,16 +320,6 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
             OnOffOneshot::Off => crate::mpd::commands::status::OnOffOneshot::Off,
             OnOffOneshot::Oneshot => crate::mpd::commands::status::OnOffOneshot::Oneshot,
         }
-    }
-}
-
-pub trait Leak {
-    fn leak(self) -> &'static Self;
-}
-
-impl<T> Leak for T {
-    fn leak(self) -> &'static Self {
-        Box::leak(Box::new(self))
     }
 }
 

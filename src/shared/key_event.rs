@@ -43,12 +43,15 @@ impl KeyEvent {
         }
     }
 
-    pub fn as_global_action(&mut self, context: &AppContext) -> Option<GlobalAction> {
+    pub fn as_global_action<'ctx>(
+        &mut self,
+        context: &'ctx AppContext,
+    ) -> Option<&'ctx GlobalAction> {
         if self.already_handled {
             None
         } else if let Some(action) = context.config.keybinds.global.get(&self.inner.into()) {
             self.already_handled = true;
-            Some(*action)
+            Some(action)
         } else {
             None
         }

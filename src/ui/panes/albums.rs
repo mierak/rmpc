@@ -1,11 +1,11 @@
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+use ratatui::{Frame, prelude::Rect};
 
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::tabs::PaneTypeDiscriminants,
     context::AppContext,
     mpd::{
         client::Client,
@@ -41,11 +41,11 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl AlbumsPane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(_context: &AppContext) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
-            browser: Browser::new(context.config),
+            browser: Browser::new(),
             initialized: false,
         }
     }
@@ -74,7 +74,7 @@ impl AlbumsPane {
                     .query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
-                    .target(PaneType::Albums)
+                    .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = list_titles(client, current.as_path())?.collect();
                         Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
@@ -94,11 +94,12 @@ impl AlbumsPane {
 }
 
 impl Pane for AlbumsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
+            &context.config,
         );
 
         Ok(())
@@ -106,7 +107,7 @@ impl Pane for AlbumsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
+            context.query().id(INIT).replace_id(INIT).target(PaneTypeDiscriminants::Albums).query(
                 move |client| {
                     let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
                     Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
@@ -126,13 +127,16 @@ impl Pane for AlbumsPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
-                    move |client| {
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(PaneTypeDiscriminants::Albums)
+                    .query(move |client| {
                         let result =
                             client.list_tag(Tag::Album, None).context("Cannot list tags")?;
                         Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
-                    },
-                );
+                    });
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -305,7 +309,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             return Ok(());
         };
         let current = current.to_owned();
-        let config = context.config;
+        let config = std::sync::Arc::clone(&context.config);
         let origin_path = Some(self.stack().path().to_vec());
 
         self.stack_mut().clear_preview();
@@ -316,7 +320,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
-                    .target(PaneType::Albums)
+                    .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = Some(
                             find_songs(client, &album, &current)?
@@ -326,7 +330,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                                     album,
                                     current
                                 ))?
-                                .to_preview(&config.theme.symbols),
+                                .to_preview(),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });
@@ -336,10 +340,10 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
-                    .target(PaneType::Albums)
+                    .target(PaneTypeDiscriminants::Albums)
                     .query(move |client| {
                         let data = list_titles(client, &current)?
-                            .map(|v| v.to_list_item_simple(config))
+                            .map(|v| v.to_list_item_simple(&config))
                             .collect_vec();
                         let data = PreviewGroup::from(None, data);
                         let data = Some(vec![data]);

@@ -1,11 +1,11 @@
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+use ratatui::{Frame, prelude::Rect};
 
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::tabs::PaneTypeDiscriminants,
     context::AppContext,
     mpd::{
         client::Client,
@@ -46,11 +46,11 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl PlaylistsPane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(_context: &AppContext) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
-            browser: Browser::new(context.config),
+            browser: Browser::new(),
             initialized: false,
             selected_song: None,
         }
@@ -76,12 +76,14 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query().id(action_id).target(PaneType::Playlists).query(move |client| {
-                    Ok(MpdQueryResult::SongsList {
-                        data: client.list_playlist_info(&playlist, None)?,
-                        origin_path: Some(next_path),
-                    })
-                });
+                context.query().id(action_id).target(PaneTypeDiscriminants::Playlists).query(
+                    move |client| {
+                        Ok(MpdQueryResult::SongsList {
+                            data: client.list_playlist_info(&playlist, None)?,
+                            origin_path: Some(next_path),
+                        })
+                    },
+                );
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -100,11 +102,12 @@ impl PlaylistsPane {
 }
 
 impl Pane for PlaylistsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
+            &context.config,
         );
 
         Ok(())
@@ -112,8 +115,12 @@ impl Pane for PlaylistsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).target(PaneType::Playlists).replace_id(INIT).query(
-                move |client| {
+            context
+                .query()
+                .id(INIT)
+                .target(PaneTypeDiscriminants::Playlists)
+                .replace_id(INIT)
+                .query(move |client| {
                     let result: Vec<_> = client
                         .list_playlists()
                         .context("Cannot list playlists")?
@@ -125,8 +132,7 @@ impl Pane for PlaylistsPane {
                         .sorted()
                         .collect();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                },
-            );
+                });
 
             self.initialized = true;
         }
@@ -147,8 +153,12 @@ impl Pane for PlaylistsPane {
         match event {
             UiEvent::Database | UiEvent::StoredPlaylist => {
                 if let Some(id) = id {
-                    context.query().id(id).replace_id(id).target(PaneType::Playlists).query(
-                        move |client| {
+                    context
+                        .query()
+                        .id(id)
+                        .replace_id(id)
+                        .target(PaneTypeDiscriminants::Playlists)
+                        .query(move |client| {
                             let result: Vec<_> = client
                                 .list_playlists()
                                 .context("Cannot list playlists")?
@@ -160,8 +170,7 @@ impl Pane for PlaylistsPane {
                                 .sorted()
                                 .collect();
                             Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                        },
-                    );
+                        });
                 }
             }
             UiEvent::Reconnected => {
@@ -508,7 +517,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
-        let config = context.config;
+        let config = std::sync::Arc::clone(&context.config);
         let s = self.stack().current().selected().cloned();
         self.stack_mut().clear_preview();
         let origin_path = Some(self.stack().path().to_vec());
@@ -516,7 +525,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             .query()
             .id(PREVIEW)
             .replace_id("playlists_preview")
-            .target(PaneType::Playlists)
+            .target(PaneTypeDiscriminants::Playlists)
             .query(move |client| {
                 let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
                     let response = match current {
@@ -526,7 +535,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .list_playlist_info(d, None)?
                                 .into_iter()
                                 .map(DirOrSong::Song)
-                                .map(|s| s.to_list_item_simple(config))
+                                .map(|s| s.to_list_item_simple(&config))
                                 .collect_vec(),
                         )]),
                         DirOrSong::Song(song) => {
@@ -537,9 +546,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .first()
                                 .context("Expected to find exactly one song for preview")?
                             {
-                                LsInfoEntry::File(song) => {
-                                    Some(song.to_preview(&config.theme.symbols))
-                                }
+                                LsInfoEntry::File(song) => Some(song.to_preview()),
                                 _ => None,
                             }
                         }

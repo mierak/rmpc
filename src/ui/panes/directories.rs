@@ -1,11 +1,11 @@
 use anyhow::Result;
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect, widgets::StatefulWidget};
+use ratatui::{Frame, prelude::Rect};
 
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::tabs::PaneTypeDiscriminants,
     context::AppContext,
     mpd::{
         client::Client,
@@ -40,11 +40,11 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl DirectoriesPane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(_context: &AppContext) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
-            browser: Browser::new(context.config),
+            browser: Browser::new(),
             initialized: false,
         }
     }
@@ -65,7 +65,7 @@ impl DirectoriesPane {
                     .query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
-                    .target(PaneType::Directories)
+                    .target(PaneTypeDiscriminants::Directories)
                     .query(move |client| {
                         let new_current = client.lsinfo(Some(&next_path.join("/").to_string()))?;
                         let res = new_current
@@ -104,12 +104,13 @@ impl Pane for DirectoriesPane {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        _context: &AppContext,
+        context: &AppContext,
     ) -> anyhow::Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
+            &context.config,
         );
 
         Ok(())
@@ -117,8 +118,12 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
-                move |client| {
+            context
+                .query()
+                .id(INIT)
+                .replace_id(INIT)
+                .target(PaneTypeDiscriminants::Directories)
+                .query(move |client| {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
@@ -126,8 +131,7 @@ impl Pane for DirectoriesPane {
                         .sorted()
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                },
-            );
+                });
             self.initialized = true;
         }
 
@@ -142,8 +146,12 @@ impl Pane for DirectoriesPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
-                    move |client| {
+                context
+                    .query()
+                    .id(INIT)
+                    .replace_id(INIT)
+                    .target(PaneTypeDiscriminants::Directories)
+                    .query(move |client| {
                         let result = client
                             .lsinfo(None)?
                             .into_iter()
@@ -151,8 +159,7 @@ impl Pane for DirectoriesPane {
                             .sorted()
                             .collect::<Vec<_>>();
                         Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                    },
-                );
+                    });
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -309,14 +316,14 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     return Ok(());
                 };
                 let next_path = next_path.join("/").to_string();
-                let config = context.config;
+                let config = std::sync::Arc::clone(&context.config);
 
                 self.stack_mut().clear_preview();
                 context
                     .query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
-                    .target(PaneType::Directories)
+                    .target(PaneTypeDiscriminants::Directories)
                     .query(move |client| {
                         let data: Vec<_> = match client.lsinfo(Some(&next_path)) {
                             Ok(val) => val,
@@ -338,7 +345,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             LsInfoEntry::Playlist(_) => None,
                         })
                         .sorted()
-                        .map(|v| v.to_list_item_simple(config))
+                        .map(|v| v.to_list_item_simple(&config))
                         .collect();
 
                         Ok(MpdQueryResult::Preview {
@@ -349,17 +356,16 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
-                let config = context.config;
                 context
                     .query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
-                    .target(PaneType::Directories)
+                    .target(PaneTypeDiscriminants::Directories)
                     .query(move |client| {
                         Ok(MpdQueryResult::Preview {
                             data: client
                                 .find_one(&[Filter::new(Tag::File, &file)])?
-                                .map(|v| v.to_preview(&config.theme.symbols)),
+                                .map(|v| v.to_preview()),
                             origin_path,
                         })
                     });

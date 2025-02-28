@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use super::{StyleFile, style::ToConfigOr};
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct ProgressBarConfig {
     /// Symbols for the rogress bar at the bottom of the screen
     /// First symbol is used for the elapsed part of the progress bar
     /// Second symbol is used for the thumb
     /// Third symbol is used for the remaining part of the progress bar
-    pub symbols: [&'static str; 3],
+    pub symbols: [String; 3],
     /// Fall sback to black for foreground and default color for background
     /// For transparent track you should set the track symbol to empty string
     pub track_style: Style,
@@ -59,7 +59,7 @@ impl ProgressBarConfigFile {
         let track = std::mem::take(&mut self.symbols[2]);
 
         Ok(ProgressBarConfig {
-            symbols: [elapsed.leak(), thumb.leak(), track.leak()],
+            symbols: [elapsed, thumb, track],
             elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::Black), None)?,

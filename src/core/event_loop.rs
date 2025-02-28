@@ -194,10 +194,11 @@ fn main_task<B: Backend + std::io::Write>(
 
                             if let Some((_, song)) = context.find_current_song_in_queue() {
                                 if Some(song.id) != current_song_id {
-                                    if let Some(command) = context.config.on_song_change {
+                                    if let Some(command) = &context.config.on_song_change {
                                         let lrc_path = context
                                             .config
                                             .lyrics_dir
+                                            .as_ref()
                                             .and_then(|dir| get_lrc_path(dir, &song.file).ok())
                                             .map(|path| path.to_string_lossy().into_owned())
                                             .unwrap_or_default();
@@ -226,7 +227,7 @@ fn main_task<B: Backend + std::io::Write>(
                                             "VERSION".to_owned(),
                                             env!("CARGO_PKG_VERSION").to_string(),
                                         ));
-                                        run_external(command, env);
+                                        run_external(command.clone(), env);
                                     }
                                     song_changed = true;
                                 }

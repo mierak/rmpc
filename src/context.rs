@@ -10,7 +10,7 @@ use crate::{
     MpdQuery,
     MpdQueryResult,
     WorkRequest,
-    config::{Config, Leak, album_art::ImageMethod, tabs::PaneType},
+    config::{Config, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
     core::scheduler::{Scheduler, time_provider::DefaultTimeProvider},
     mpd::{
         client::Client,
@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(derive_more::Debug)]
 pub struct AppContext {
-    pub(crate) config: &'static Config,
+    pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
     pub(crate) supported_commands: HashSet<String>,
@@ -79,7 +79,7 @@ impl AppContext {
         scheduler.start();
         Ok(Self {
             lrc_index: LrcIndex::default(),
-            config: config.leak(),
+            config: std::sync::Arc::new(config),
             status,
             queue,
             supported_commands,
@@ -139,7 +139,7 @@ impl AppContext {
         + Send
         + 'static,
         id: &'static str,
-        target: Option<PaneType>,
+        target: Option<PaneTypeDiscriminants>,
         replace_id: Option<&'static str>,
     ) {
         let query = MpdQuery { id, target, replace_id, callback: Box::new(on_done) };
@@ -175,7 +175,7 @@ impl AppContext {
             return Ok(None);
         };
 
-        let Some(lyrics_dir) = self.config.lyrics_dir else {
+        let Some(lyrics_dir) = &self.config.lyrics_dir else {
             return Ok(None);
         };
 

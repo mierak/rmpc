@@ -16,7 +16,7 @@ pub struct YtDlp {
 }
 
 impl YtDlp {
-    pub fn new(cache_dir: &'static str) -> Result<Self> {
+    pub fn new(cache_dir: &str) -> Result<Self> {
         let cache_dir = format!("{cache_dir}youtube/");
 
         if which::which("yt-dlp").is_err() {
@@ -28,11 +28,11 @@ impl YtDlp {
     }
 
     pub fn init_and_download(config: &CliConfig, url: &str) -> Result<String> {
-        let Some(cache_dir) = config.cache_dir else {
+        let Some(cache_dir) = &config.cache_dir else {
             bail!("Youtube support requires 'cache_dir' to be configured")
         };
 
-        if let Err(unsupported_list) = dependencies::is_youtube_supported(config.address) {
+        if let Err(unsupported_list) = dependencies::is_youtube_supported(&config.address) {
             status_warn!(
                 "Youtube support requires the following and may thus not work properly: {}",
                 unsupported_list.join(", ")
