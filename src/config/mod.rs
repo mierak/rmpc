@@ -57,6 +57,7 @@ pub struct Config {
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
+    pub theme_name: Option<String>,
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<Vec<String>>,
     pub search: Search,
@@ -191,7 +192,7 @@ impl ConfigFile {
         config_path: Option<&Path>,
         address_cli: Option<String>,
         password_cli: Option<String>,
-        is_cli: bool,
+        skip_album_art_check: bool,
     ) -> Result<Config> {
         let theme: UiConfig = config_path
             .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
@@ -215,6 +216,7 @@ impl ConfigFile {
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme,
+            theme_name: self.theme,
             cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
@@ -242,11 +244,11 @@ impl ConfigFile {
                 .map(|arr| arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec()),
         };
 
-        if is_cli {
+        validate_tabs(&config.theme.layout, &config.tabs)?;
+
+        if skip_album_art_check {
             return Ok(config);
         }
-
-        validate_tabs(&config.theme.layout, &config.tabs)?;
 
         let is_tmux = tmux::is_inside_tmux();
         if is_tmux && !tmux::is_passthrough_enabled()? {

@@ -18,28 +18,32 @@ pub struct TabsPane<'a> {
 
 impl TabsPane<'_> {
     pub fn new(context: &AppContext) -> Result<Self> {
-        let active_tab =
-            context.config.tabs.names.first().context("Expected at least one tab")?.clone();
-        let tab_names = context
-            .config
-            .tabs
-            .names
-            .iter()
-            .map(|e| format!("  {e: ^9}  "))
-            .collect::<Vec<String>>();
-
-        let tabs = Tabs::new(tab_names)
-            .divider("")
-            .block(context.config.as_tabs_block())
-            .style(context.config.theme.tab_bar.inactive_style)
-            .alignment(ratatui::prelude::Alignment::Center)
-            .highlight_style(context.config.theme.tab_bar.active_style);
+        let active_tab = Self::init_active_tab(context)?;
+        let tab_names = Self::init_tab_names(context);
+        let tabs = Self::init_tabs(tab_names, context);
 
         Ok(Self { area: Rect::default(), active_tab, tabs })
     }
 
     pub fn get_tab_idx_at(&self, position: Position) -> Option<usize> {
         self.tabs.areas.iter().enumerate().find(|(_, area)| area.contains(position)).map(|v| v.0)
+    }
+
+    fn init_active_tab(context: &AppContext) -> Result<TabName> {
+        Ok(context.config.tabs.names.first().context("Expected at least one tab")?.clone())
+    }
+
+    fn init_tab_names(context: &AppContext) -> Vec<String> {
+        context.config.tabs.names.iter().map(|e| format!("  {e: ^9}  ")).collect::<Vec<String>>()
+    }
+
+    fn init_tabs<'a>(tab_names: Vec<String>, context: &AppContext) -> Tabs<'a> {
+        Tabs::new(tab_names)
+            .divider("")
+            .block(context.config.as_tabs_block())
+            .style(context.config.theme.tab_bar.inactive_style)
+            .alignment(ratatui::prelude::Alignment::Center)
+            .highlight_style(context.config.theme.tab_bar.active_style)
     }
 }
 
@@ -84,6 +88,26 @@ impl Pane for TabsPane<'_> {
             UiEvent::TabChanged(tab) => {
                 self.active_tab = tab.clone();
                 context.render()?;
+            }
+            UiEvent::ConfigChanged => {
+                self.tabs.block = Some(context.config.as_tabs_block());
+                self.tabs.style = context.config.theme.tab_bar.inactive_style;
+                self.tabs.highlight_style = context.config.theme.tab_bar.active_style;
+
+                let new_active_tab = context
+                    .config
+                    .tabs
+                    .names
+                    .iter()
+                    .find(|tab| tab == &&self.active_tab)
+                    .or(context.config.tabs.names.first())
+                    .context("Expected at least one tab")
+                    .cloned()?;
+
+                let tab_names = Self::init_tab_names(context);
+
+                self.active_tab = new_active_tab;
+                self.tabs.titles(tab_names);
             }
             _ => {}
         }

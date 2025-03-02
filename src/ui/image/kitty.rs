@@ -64,11 +64,14 @@ impl Kitty {
             .spawn(move || {
                 let mut pending_req: Option<(Arc<Vec<_>>, Rect)> = None;
                 loop {
-                    let Ok((vec, area)) =
-                        pending_req.take().ok_or(()).or_else(|()| receiver.recv_last())
-                    else {
-                        continue;
-                    };
+                    let (vec, area) =
+                        match pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) {
+                            Ok((vec, area)) => (vec, area),
+                            Err(err) => {
+                                log::warn!(err:?, msg = err.to_string().as_str(); "Failed to get image data to show");
+                                break;
+                            }
+                        };
 
                     let data = match create_data_to_transfer(
                         &vec,
