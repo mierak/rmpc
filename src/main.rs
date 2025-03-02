@@ -236,11 +236,15 @@ fn main() -> Result<()> {
             )
             .context("Failed to initialize socket listener")?;
 
-            let _config_watcher = core::config_watcher::init(
-                args.config,
-                context.config.theme_name.clone(),
-                event_tx.clone(),
-            )?;
+            let _config_watcher_guard = context
+                .config
+                .enable_config_hot_reload
+                .then_some(core::config_watcher::init(
+                    args.config,
+                    context.config.theme_name.clone(),
+                    event_tx.clone(),
+                ))
+                .transpose()?;
 
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 

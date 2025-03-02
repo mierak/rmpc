@@ -17,6 +17,7 @@ use notify_debouncer_full::{
 
 use crate::{AppEvent, config::ConfigFile, status_warn};
 
+#[must_use = "Returns a drop guard for the config directory watcher"]
 pub(crate) fn init(
     config_path: PathBuf,
     theme_name: Option<String>,
