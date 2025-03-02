@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - `theme.modal_backdrop` adds a visual backdrop to modals
+- rmpc will now reload config changes automatically
 
 ### Changed
 

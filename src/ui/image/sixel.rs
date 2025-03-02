@@ -68,10 +68,12 @@ impl Sixel {
             .spawn(move || {
                 let mut pending_req = None;
                 loop {
-                    let Ok(DataToEncode { area, data }) =
-                        pending_req.take().ok_or(()).or_else(|()| receiver.recv_last())
-                    else {
-                        continue;
+                    let DataToEncode { area, data } = match pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) {
+                        Ok(data) => data,
+                        Err(err) => {
+                            log::warn!(err:?, msg = err.to_string().as_str(); "Failed to get image data to show");
+                            break;
+                        }
                     };
 
                     let (buf, resized_area) = try_cont!(

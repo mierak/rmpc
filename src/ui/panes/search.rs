@@ -573,6 +573,9 @@ impl Pane for SearchPane {
                 self.preview = None;
                 self.songs_dir = Dir::default();
             }
+            UiEvent::ConfigChanged => {
+                *self = Self::new(context);
+            }
             _ => {}
         }
         Ok(())

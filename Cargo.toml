@@ -43,6 +43,7 @@ color_quant = "1.1.0"
 enum-map = "2.7.3"
 textwrap = "0.16.1"
 crossbeam = "0.8.4"
+notify-debouncer-full = "0.5.0"
 
 [build-dependencies]
 clap = { workspace = true }

@@ -235,6 +235,17 @@ fn main() -> Result<()> {
                 Arc::clone(&context.config),
             )
             .context("Failed to initialize socket listener")?;
+
+            let _config_watcher_guard = context
+                .config
+                .enable_config_hot_reload
+                .then_some(core::config_watcher::init(
+                    args.config,
+                    context.config.theme_name.clone(),
+                    event_tx.clone(),
+                ))
+                .transpose()?;
+
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();

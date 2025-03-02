@@ -67,28 +67,33 @@ const ADD_TO_PLAYLIST: &str = "add_to_playlist";
 
 impl QueuePane {
     pub fn new(context: &AppContext) -> Self {
-        let config = &context.config;
+        let (header, column_widths, column_formats) = Self::init(context);
+
         Self {
             scrolling_state: DirState::default(),
             filter: None,
             filter_input_mode: false,
-            header: config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
-            column_widths: config
+            header,
+            column_widths,
+            column_formats,
+            areas: enum_map! {
+                _ => Rect::default(),
+            },
+        }
+    }
+
+    fn init(context: &AppContext) -> (Vec<String>, Vec<Constraint>, Vec<Property<SongProperty>>) {
+        (
+            context.config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
+            context
+                .config
                 .theme
                 .song_table_format
                 .iter()
                 .map(|v| Into::<Constraint>::into(v.width))
                 .collect_vec(),
-            column_formats: config
-                .theme
-                .song_table_format
-                .iter()
-                .map(|v| v.prop.clone())
-                .collect_vec(),
-            areas: enum_map! {
-                _ => Rect::default(),
-            },
-        }
+            context.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
+        )
     }
 }
 
@@ -279,6 +284,12 @@ impl Pane for QueuePane {
             }
             UiEvent::Reconnected => {
                 self.before_show(context)?;
+            }
+            UiEvent::ConfigChanged => {
+                let (header, column_widths, column_formats) = Self::init(context);
+                self.header = header;
+                self.column_formats = column_formats;
+                self.column_widths = column_widths;
             }
             _ => {}
         }

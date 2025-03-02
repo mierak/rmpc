@@ -53,19 +53,19 @@ use super::get_line_offset;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Tabs<'a> {
     /// A block to wrap this widget in if necessary
-    block: Option<Block<'a>>,
+    pub block: Option<Block<'a>>,
     /// One title for each tab
-    titles: Vec<Line<'a>>,
+    pub titles: Vec<Line<'a>>,
     /// The index of the selected tabs
     selected: usize,
     /// The style used to draw the text
-    style: Style,
+    pub style: Style,
     /// Style to apply to the selected item
-    highlight_style: Style,
+    pub highlight_style: Style,
     /// Tab divider
-    divider: Span<'a>,
+    pub divider: Span<'a>,
     /// Alignment of the tabs
-    alignment: Alignment,
+    pub alignment: Alignment,
     /// Vec of areas that tabs were last rendered in
     pub areas: Vec<Rect>,
 }
@@ -101,6 +101,12 @@ impl<'a> Tabs<'a> {
 
     pub fn style(mut self, style: Style) -> Tabs<'a> {
         self.style = style;
+        self
+    }
+
+    pub fn titles(&mut self, titles: Vec<impl Into<Line<'a>>>) -> &mut Tabs<'a> {
+        let titles: Vec<_> = titles.into_iter().map(Into::into).collect();
+        self.titles = titles;
         self
     }
 

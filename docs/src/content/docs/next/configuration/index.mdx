@@ -11,9 +11,9 @@ import { path } from "../data.ts";
 
 Rmpc uses [ron](https://github.com/ron-rs/ron) format for its configuration file. The file can be located at:
 
--   `$XDG_CONFIG_HOME/rmpc/config.ron`
--   `$HOME/.config/rmpc/config.ron`
--   `Specific path specified by the --config flag`
+- `$XDG_CONFIG_HOME/rmpc/config.ron`
+- `$HOME/.config/rmpc/config.ron`
+- `Specific path specified by the --config flag`
 
 ## Bootstrapping a config file
 
@@ -135,6 +135,15 @@ Whether to wrap around on Up/Down action in queue/browser panes upon reaching bo
 Enables mouse support. Currently only seeking the currently playing song by clicking on the progress bar at the bottom
 of the screen and switching tabs is supported. Enabled by default.
 
+### enable_config_hot_reload
+
+<ConfigValue name="enable_config_hot_reload" type="bool" />
+
+Whether rmpc should watch its config directory and reload the config when it changes. Most options can be changed during
+runtime but some will still require you to restart rmpc. These include things like album art method and MPD connection
+information.
+Config hot reload is enabled by default.
+
 ### status_update_interval_ms
 
 <ConfigValue name="status_update_interval_ms" type="number" optional />
@@ -184,16 +193,16 @@ artists: (
 
 Can be one of the following:
 
--   `SplitByDate` - songs in the album will be split into separate album entries, one for each date and the
-    album date will be displayed in front of the album name in the following format: `(<date value>) <album name>`
--   `NameOnly` - only one entry for an album will be created and the album date will not be displayed
+- `SplitByDate` - songs in the album will be split into separate album entries, one for each date and the
+  album date will be displayed in front of the album name in the following format: `(<date value>) <album name>`
+- `NameOnly` - only one entry for an album will be created and the album date will not be displayed
 
 #### album_sort_by
 
 Can be one of the following:
 
--   `Name` - albums are sorted by their name first and date second if their names are identical
--   `Date` - albums will be simply sorted by date.
+- `Name` - albums are sorted by their name first and date second if their names are identical
+- `Date` - albums will be simply sorted by date.
 
 :::caution
 

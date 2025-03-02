@@ -53,7 +53,7 @@ fn main_task<B: Backend + std::io::Write>(
     let event_receiver = event_rx;
     let mut render_wanted = false;
     let max_fps = f64::from(context.config.max_fps);
-    let min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
+    let mut min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
     let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
     let mut additional_evs = HashSet::new();
     let mut connected = true;
@@ -98,6 +98,28 @@ fn main_task<B: Backend + std::io::Write>(
         if let Some(event) = event {
             let _lock = std::io::stdout().lock();
             match event {
+                AppEvent::ConfigChanged { config: mut new_config } => {
+                    // Techical limitation. Keep the old image backend because it was not rechecked
+                    // anyway. Sending the escape sequences to determine image support would mess up
+                    // the terminal output at this point.
+                    new_config.album_art.method = context.config.album_art.method;
+
+                    context.config = std::sync::Arc::new(new_config);
+                    let max_fps = f64::from(context.config.max_fps);
+                    min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
+
+                    if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &context) {
+                        log::error!(error:? = err; "UI failed to handle config changed event");
+                    }
+
+                    // Need to clear the terminal to avoid artifacts from album art and other
+                    // elements
+                    if let Err(err) = terminal.clear() {
+                        log::error!(error:? = err; "Failed to clear terminal after config change");
+                    }
+
+                    render_wanted = true;
+                }
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context) {
                     Ok(KeyHandleResult::None) => continue,
                     Ok(KeyHandleResult::Quit) => {

@@ -89,24 +89,30 @@ macro_rules! active_tab_call {
 
 impl<'ui> Ui<'ui> {
     pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
-        let active_tab =
-            context.config.tabs.names.first().context("Expected at least one tab")?.clone();
         Ok(Self {
-            active_tab,
+            active_tab: Self::init_active_tab(context)?,
             panes: PaneContainer::new(context)?,
             layout: context.config.theme.layout.clone(),
             modals: Vec::default(),
-            tabs: context
-                .config
-                .tabs
-                .tabs
-                .iter()
-                .map(|(name, screen)| -> Result<_> {
-                    Ok((name.clone(), TabScreen::new(screen.panes.clone())?))
-                })
-                .try_collect()?,
             area: Rect::default(),
+            tabs: Self::init_tabs(context)?,
         })
+    }
+
+    fn init_active_tab(context: &AppContext) -> Result<TabName> {
+        Ok(context.config.tabs.names.first().context("Expected at least one tab")?.clone())
+    }
+
+    fn init_tabs(context: &AppContext) -> Result<HashMap<TabName, TabScreen>> {
+        context
+            .config
+            .tabs
+            .tabs
+            .iter()
+            .map(|(name, screen)| -> Result<_> {
+                Ok((name.clone(), TabScreen::new(screen.panes.clone())?))
+            })
+            .try_collect()
     }
 
     fn calc_areas(&mut self, area: Rect, _context: &AppContext) {
@@ -464,6 +470,34 @@ impl<'ui> Ui<'ui> {
                     "The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours."
                 );
             }
+            UiEvent::ConfigChanged => {
+                self.layout = context.config.theme.layout.clone();
+                let new_active_tab = context
+                    .config
+                    .tabs
+                    .names
+                    .iter()
+                    .find(|tab| tab == &&self.active_tab)
+                    .or(context.config.tabs.names.first())
+                    .context("Expected at least one tab")?;
+
+                if self.active_tab == *new_active_tab {
+                    self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
+                        match self.panes.get_mut(&pane.pane, context) {
+                            Panes::TabContent => {
+                                active_tab_call!(self, calculate_areas(pane_area, context))?;
+                            }
+                            mut pane_instance => {
+                                pane_call!(pane_instance, calculate_areas(pane_area, context))?;
+                            }
+                        };
+                        Ok(())
+                    })?;
+                } else {
+                    self.change_tab(new_active_tab.clone(), context)?;
+                }
+                self.tabs = Self::init_tabs(context)?;
+            }
             _ => {}
         }
 
@@ -635,6 +669,7 @@ pub enum UiEvent {
     TabChanged(TabName),
     Displayed,
     Hidden,
+    ConfigChanged,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {

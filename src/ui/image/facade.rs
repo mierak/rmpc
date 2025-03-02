@@ -136,6 +136,15 @@ impl AlbumArtFacade {
     pub fn set_size(&mut self, area: Rect) {
         self.last_size = area;
     }
+
+    pub fn reinit(&mut self, config: &Config) {
+        let current_album_art = std::mem::take(&mut self.current_album_art);
+        let last_size = self.last_size;
+
+        *self = Self::new(config);
+        self.current_album_art = current_album_art;
+        self.last_size = last_size;
+    }
 }
 
 impl From<ImageMethod> for ImageProtocol {

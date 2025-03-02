@@ -145,6 +145,12 @@ impl Pane for AlbumArtPane {
                 }
                 self.album_art.show_current()?;
             }
+            UiEvent::ConfigChanged => {
+                self.album_art.reinit(&context.config);
+                if is_visible && !self.is_modal_open {
+                    self.album_art.show_current()?;
+                }
+            }
             UiEvent::Exit => {
                 self.album_art.cleanup()?;
             }

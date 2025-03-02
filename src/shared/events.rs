@@ -10,7 +10,7 @@ use super::{
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
 use crate::{
-    config::{cli::Command, tabs::PaneTypeDiscriminants},
+    config::{Config, cli::Command, tabs::PaneTypeDiscriminants},
     mpd::commands::IdleEvent,
     ui::UiAppEvent,
 };
@@ -67,6 +67,7 @@ pub(crate) enum AppEvent {
     Reconnected,
     LostConnection,
     TmuxHook { hook: String },
+    ConfigChanged { config: Config },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]

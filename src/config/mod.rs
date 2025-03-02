@@ -40,6 +40,7 @@ use crate::{
     tmux,
 };
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     pub address: MpdAddress,
@@ -52,11 +53,13 @@ pub struct Config {
     pub wrap_navigation: bool,
     pub keybinds: KeyConfig,
     pub enable_mouse: bool,
+    pub enable_config_hot_reload: bool,
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
+    pub theme_name: Option<String>,
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<Vec<String>>,
     pub search: Search,
@@ -65,6 +68,7 @@ pub struct Config {
     pub active_panes: Vec<PaneTypeDiscriminants>,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
     #[serde(default = "defaults::mpd_address")]
@@ -93,8 +97,10 @@ pub struct ConfigFile {
     mpd_read_timeout_ms: u64,
     #[serde(default = "defaults::default_write_timeout")]
     mpd_write_timeout_ms: u64,
-    #[serde(default = "defaults::default_false")]
+    #[serde(default = "defaults::default_true")]
     enable_mouse: bool,
+    #[serde(default = "defaults::default_true")]
+    pub enable_config_hot_reload: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
     #[serde(default)]
@@ -150,6 +156,7 @@ impl Default for ConfigFile {
             search: SearchFile::default(),
             tabs: TabsFile::default(),
             enable_mouse: true,
+            enable_config_hot_reload: true,
             wrap_navigation: false,
             password: None,
             artists: ArtistsFile::default(),
@@ -191,7 +198,7 @@ impl ConfigFile {
         config_path: Option<&Path>,
         address_cli: Option<String>,
         password_cli: Option<String>,
-        is_cli: bool,
+        skip_album_art_check: bool,
     ) -> Result<Config> {
         let theme: UiConfig = config_path
             .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
@@ -215,6 +222,7 @@ impl ConfigFile {
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme,
+            theme_name: self.theme,
             cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
@@ -232,6 +240,7 @@ impl ConfigFile {
             mpd_read_timeout: Duration::from_millis(self.mpd_read_timeout_ms),
             mpd_write_timeout: Duration::from_millis(self.mpd_write_timeout_ms),
             enable_mouse: self.enable_mouse,
+            enable_config_hot_reload: self.enable_config_hot_reload,
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
             search: self.search.into(),
@@ -242,11 +251,11 @@ impl ConfigFile {
                 .map(|arr| arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec()),
         };
 
-        if is_cli {
+        validate_tabs(&config.theme.layout, &config.tabs)?;
+
+        if skip_album_art_check {
             return Ok(config);
         }
-
-        validate_tabs(&config.theme.layout, &config.tabs)?;
 
         let is_tmux = tmux::is_inside_tmux();
         if is_tmux && !tmux::is_passthrough_enabled()? {
