@@ -164,6 +164,12 @@ impl Default for ConfigFile {
     }
 }
 
+impl Config {
+    pub fn validate(&self) -> Result<()> {
+        validate_tabs(&self.theme.layout, &self.tabs)
+    }
+}
+
 impl ConfigFile {
     pub fn read(path: &PathBuf) -> Result<Self> {
         let file = std::fs::File::open(path)?;
@@ -201,7 +207,13 @@ impl ConfigFile {
         skip_album_art_check: bool,
     ) -> Result<Config> {
         let theme: UiConfig = config_path
-            .map(|d| self.read_theme(d.parent().expect("Config path to be defined correctly")))
+            .map(|path| {
+                path.parent()
+                    .with_context(|| {
+                        format!("Expected config path to have parent directory. Path: '{path:?}'")
+                    })
+                    .and_then(|path| self.read_theme(path))
+            })
             .transpose()?
             .unwrap_or_default()
             .try_into()?;
@@ -250,8 +262,6 @@ impl ConfigFile {
                 .on_song_change
                 .map(|arr| arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec()),
         };
-
-        validate_tabs(&config.theme.layout, &config.tabs)?;
 
         if skip_album_art_check {
             return Ok(config);

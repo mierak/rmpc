@@ -1,4 +1,4 @@
-use std::{collections::HashSet, io::Stdout, ops::Sub, time::Duration};
+use std::{collections::HashSet, io::Stdout, ops::Sub, sync::Arc, time::Duration};
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
 use itertools::Itertools;
@@ -98,15 +98,46 @@ fn main_task<B: Backend + std::io::Write>(
         if let Some(event) = event {
             let _lock = std::io::stdout().lock();
             match event {
-                AppEvent::ConfigChanged { config: mut new_config } => {
+                AppEvent::ConfigChanged { config: mut new_config, keep_old_theme } => {
                     // Techical limitation. Keep the old image backend because it was not rechecked
                     // anyway. Sending the escape sequences to determine image support would mess up
                     // the terminal output at this point.
                     new_config.album_art.method = context.config.album_art.method;
+                    if keep_old_theme {
+                        new_config.theme = context.config.theme.clone();
+                    }
 
-                    context.config = std::sync::Arc::new(new_config);
+                    if let Err(err) = new_config.validate() {
+                        status_error!(error:? = err; "Cannot change config, invalid value: '{err}'");
+                        continue;
+                    }
+
+                    context.config = Arc::new(new_config);
                     let max_fps = f64::from(context.config.max_fps);
                     min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
+
+                    if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &context) {
+                        log::error!(error:? = err; "UI failed to handle config changed event");
+                        continue;
+                    }
+
+                    // Need to clear the terminal to avoid artifacts from album art and other
+                    // elements
+                    if let Err(err) = terminal.clear() {
+                        log::error!(error:? = err; "Failed to clear terminal after config change");
+                        continue;
+                    }
+
+                    render_wanted = true;
+                }
+                AppEvent::ThemeChanged { theme } => {
+                    let mut config = context.config.as_ref().clone();
+                    config.theme = theme;
+                    if let Err(err) = config.validate() {
+                        status_error!(error:? = err; "Cannot change theme, invalid config: '{err}'");
+                        continue;
+                    }
+                    context.config = Arc::new(config);
 
                     if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &context) {
                         log::error!(error:? = err; "UI failed to handle config changed event");
@@ -116,8 +147,8 @@ fn main_task<B: Backend + std::io::Write>(
                     // elements
                     if let Err(err) = terminal.clear() {
                         log::error!(error:? = err; "Failed to clear terminal after config change");
+                        continue;
                     }
-
                     render_wanted = true;
                 }
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context) {

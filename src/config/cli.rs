@@ -168,13 +168,13 @@ pub enum Command {
         #[arg(long)]
         pid: Option<u32>,
         #[command(subcommand)]
-        command: NotifyCmd,
+        command: RemoteCmd,
     },
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
-pub enum NotifyCmd {
+pub enum RemoteCmd {
     /// Notify rmpc that a new lyrics file has been added
     IndexLrc {
         /// Absolute path to the lrc file
@@ -192,6 +192,32 @@ pub enum NotifyCmd {
     },
     #[clap(hide = true)]
     Tmux { hook: String },
+    /// Sets a value in running rmpc instance
+    Set {
+        #[command(subcommand)]
+        command: SetCommand,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+pub enum SetCommand {
+    /// Replaces config in a running rmpc instance with the provided one, theme
+    /// is NOT replaced.
+    #[clap(hide = true)]
+    Config {
+        /// Value to set the path to. Can be either path to a file or "-" to
+        /// read from stdin
+        #[arg(value_hint = ValueHint::AnyPath)]
+        path: String,
+    },
+    /// Replaces theme in a running rmpc instance with the provided one
+    Theme {
+        /// Value to set the path to. Can be either path to a file or "-" to
+        /// read from stdin
+        #[arg(value_hint = ValueHint::AnyPath)]
+        path: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Parser, ValueEnum)]
