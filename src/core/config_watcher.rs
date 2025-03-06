@@ -62,7 +62,10 @@ pub(crate) fn init(
                     .inspect(|config| {
                         theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
                     })
-                    .and_then(|config| Ok(event_tx.send(AppEvent::ConfigChanged { config })?))
+                    .and_then(|config| {
+                        Ok(event_tx
+                            .send(AppEvent::ConfigChanged { config, keep_old_theme: false })?)
+                    })
                 {
                     status_warn!(err:?, config_path:?; "Failed to read config. Keeping the current config. Check logs for more information");
                 }

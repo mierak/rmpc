@@ -11,7 +11,7 @@ use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
-use shared::socket::{get_socket_path, list_all_socket_paths};
+use shared::ipc::{get_socket_path, list_all_socket_paths};
 
 use crate::{
     config::{
@@ -188,6 +188,8 @@ fn main() -> Result<()> {
                 }
             };
 
+            config.validate()?;
+
             if let Some(lyrics_dir) = &config.lyrics_dir {
                 worker_tx
                     .send(WorkRequest::IndexLyrics { lyrics_dir: lyrics_dir.clone() })
@@ -241,7 +243,7 @@ fn main() -> Result<()> {
                 .enable_config_hot_reload
                 .then_some(core::config_watcher::init(
                     args.config,
-                    context.config.theme_name.clone(),
+                    context.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
                     event_tx.clone(),
                 ))
                 .transpose()?;

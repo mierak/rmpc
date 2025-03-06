@@ -13,8 +13,8 @@ use crate::{
     WorkRequest,
     config::Config,
     shared::{
+        ipc::{SocketCommand, SocketCommandExecute, get_socket_path},
         macros::try_cont,
-        socket::{SocketCommand, SocketCommandExecute, get_socket_path},
     },
 };
 
