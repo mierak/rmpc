@@ -13,26 +13,34 @@ use crossterm::{
 };
 use flate2::Compression;
 use itertools::Itertools;
-use ratatui::prelude::{Color, Rect};
+use ratatui::prelude::Rect;
 
-use super::{Backend, csi_move, facade::IS_SHOWING};
+use super::{
+    AlbumArtConfig,
+    Backend,
+    EncodeRequest,
+    ImageBackendRequest,
+    csi_move,
+    facade::IS_SHOWING,
+};
 use crate::{
     config::{
         Size,
         album_art::{HorizontalAlign, VerticalAlign},
     },
     shared::{
-        ext::mpsc::RecvLast,
         image::{create_aligned_area, get_gif_frames, resize_image},
         macros::{status_error, try_cont},
         tmux::tmux_write,
     },
+    ui::image::recv_data,
 };
 
 #[derive(Debug)]
 pub struct Kitty {
-    sender: Sender<(Arc<Vec<u8>>, Rect)>,
+    sender: Sender<ImageBackendRequest>,
     colors: Colors,
+    handle: std::thread::JoinHandle<()>,
 }
 
 impl Backend for Kitty {
@@ -41,45 +49,49 @@ impl Backend for Kitty {
     }
 
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
-        Ok(self.sender.send((data, area))?)
+        Ok(self.sender.send(ImageBackendRequest::Encode(EncodeRequest { area, data }))?)
     }
 
     fn cleanup(self: Box<Self>, area: Rect) -> Result<()> {
-        clear_area(&mut std::io::stdout().lock(), self.colors, area)
+        clear_area(&mut std::io::stdout().lock(), self.colors, area)?;
+        self.sender.send(ImageBackendRequest::Stop)?;
+        self.handle.join().expect("kitty thread to end gracefully");
+        Ok(())
+    }
+
+    fn set_config(&self, config: AlbumArtConfig) -> Result<()> {
+        Ok(self.sender.send(ImageBackendRequest::SetConfig(config))?)
     }
 }
 
 impl Kitty {
-    pub fn new(
-        max_size: Size,
-        bg_color: Option<Color>,
-        halign: HorizontalAlign,
-        valign: VerticalAlign,
-    ) -> Self {
-        let (sender, receiver) = unbounded::<(Arc<Vec<_>>, Rect)>();
-        let colors = Colors { background: bg_color.map(Into::into), foreground: None };
+    pub(super) fn new(config: AlbumArtConfig) -> Self {
+        let (sender, receiver) = unbounded::<ImageBackendRequest>();
+        let colors = config.colors;
 
-        std::thread::Builder::new()
+        let handle = std::thread::Builder::new()
             .name("kitty".to_string())
             .spawn(move || {
-                let mut pending_req: Option<(Arc<Vec<_>>, Rect)> = None;
-                loop {
-                    let (vec, area) =
-                        match pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) {
-                            Ok((vec, area)) => (vec, area),
+                let mut config = config;
+                let mut pending_req: Option<EncodeRequest> = None;
+                'outer: loop {
+                    let EncodeRequest { data, area } =
+                        match recv_data(&mut pending_req, &mut config, &receiver) {
+                            Ok(Some(msg)) => msg,
+                            Ok(None) => break,
                             Err(err) => {
-                                log::warn!(err:?, msg = err.to_string().as_str(); "Failed to get image data to show");
+                                log::error!("Error receiving ImageBackendRequest message: {}", err);
                                 break;
                             }
                         };
 
                     let data = match create_data_to_transfer(
-                        &vec,
+                        &data,
                         area,
                         Compression::new(6),
-                        max_size,
-                        halign,
-                        valign,
+                        config.max_size,
+                        config.halign,
+                        config.valign,
                     ) {
                         Ok(data) => data,
                         Err(err) => {
@@ -87,6 +99,22 @@ impl Kitty {
                             continue;
                         }
                     };
+
+                    // consume all pending messages, skipping older encode requests
+                    log::debug!("iterating over pending messages");
+                    for msg in receiver.try_iter() {
+                        match msg {
+                            ImageBackendRequest::Stop => break 'outer,
+                            ImageBackendRequest::SetConfig(cfg) => config = cfg,
+                            ImageBackendRequest::Encode(req) => {
+                                pending_req = Some(req);
+                                log::debug!(
+                                    "Skipping image because another one is waiting in the queue"
+                                );
+                                continue 'outer;
+                            }
+                        }
+                    }
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
@@ -96,13 +124,10 @@ impl Kitty {
                         continue;
                     }
 
-                    if let Ok(msg) = receiver.try_recv_last() {
-                        pending_req = Some(msg);
-                        log::trace!("Skipping image because another one is waiting in the queue");
-                        continue;
-                    };
-
-                    try_cont!(clear_area(&mut w, colors, area), "Failed to clear kitty image area");
+                    try_cont!(
+                        clear_area(&mut w, config.colors, area),
+                        "Failed to clear kitty image area"
+                    );
                     match data {
                         Data::ImageData(data) => {
                             try_cont!(
@@ -116,7 +141,11 @@ impl Kitty {
                             );
 
                             try_cont!(
-                                create_unicode_placeholder_grid(&mut w, colors, data.aligned_area),
+                                create_unicode_placeholder_grid(
+                                    &mut w,
+                                    config.colors,
+                                    data.aligned_area
+                                ),
                                 "Failed to create unicode placeholders"
                             );
                         }
@@ -127,7 +156,11 @@ impl Kitty {
                                 "Failed to transfer animation data"
                             );
                             try_cont!(
-                                create_unicode_placeholder_grid(&mut w, colors, aligned_area),
+                                create_unicode_placeholder_grid(
+                                    &mut w,
+                                    config.colors,
+                                    aligned_area
+                                ),
                                 "Failed to create unicode placeholders"
                             );
                         }
@@ -136,7 +169,7 @@ impl Kitty {
             })
             .expect("Kitty thread to be spawned");
 
-        Self { sender, colors }
+        Self { sender, colors, handle }
     }
 }
 

@@ -90,10 +90,6 @@ impl Pane for TabsPane<'_> {
                 context.render()?;
             }
             UiEvent::ConfigChanged => {
-                self.tabs.block = Some(context.config.as_tabs_block());
-                self.tabs.style = context.config.theme.tab_bar.inactive_style;
-                self.tabs.highlight_style = context.config.theme.tab_bar.active_style;
-
                 let new_active_tab = context
                     .config
                     .tabs
@@ -105,9 +101,9 @@ impl Pane for TabsPane<'_> {
                     .cloned()?;
 
                 let tab_names = Self::init_tab_names(context);
+                self.tabs = Self::init_tabs(tab_names, context);
 
                 self.active_tab = new_active_tab;
-                self.tabs.titles(tab_names);
             }
             _ => {}
         }

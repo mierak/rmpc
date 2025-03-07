@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use itertools::Itertools;
 use strum::Display;
@@ -32,7 +32,7 @@ pub enum GlobalAction {
     PreviousTab,
     SwitchToTab(TabName),
     Command { command: String, description: Option<String> },
-    ExternalCommand { command: Vec<String>, description: Option<String> },
+    ExternalCommand { command: Arc<Vec<String>>, description: Option<String> },
 }
 
 #[derive(
@@ -105,10 +105,9 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::SearchTab => GlobalAction::SwitchToTab("Search".into()),
             GlobalActionFile::ExternalCommand { command, description } => {
                 GlobalAction::ExternalCommand {
-                    command: command
-                        .into_iter()
-                        .map(|v| tilde_expand(&v).into_owned())
-                        .collect_vec(),
+                    command: Arc::new(
+                        command.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec(),
+                    ),
                     description,
                 }
             }

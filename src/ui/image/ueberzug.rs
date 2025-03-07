@@ -14,9 +14,8 @@ use rustix::path::Arg;
 use serde::Serialize;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
-use super::Backend;
+use super::{AlbumArtConfig, Backend};
 use crate::{
-    config::Size,
     shared::macros::{try_cont, try_skip},
     tmux,
 };
@@ -90,10 +89,14 @@ impl Backend for Ueberzug {
         self.handle.join().expect("Ueberzug thread to end gracefully");
         Ok(())
     }
+
+    fn set_config(&self, _config: AlbumArtConfig) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl Ueberzug {
-    pub fn new(layer: Layer, _: Size) -> Self {
+    pub fn new(layer: Layer) -> Self {
         let (tx, rx) = unbounded();
 
         let pid_file_path = std::env::temp_dir()
