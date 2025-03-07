@@ -21,6 +21,8 @@ The usual environmental variables are available to the script with addition of:
 
 This can be used to for example change your theme on the fly when rmpc is resized.
 
+Save the following script to for example `~/.config/rmpc/scripts/onresize`.
+
 ```bash
 #!/usr/bin/env bash
 
@@ -31,4 +33,11 @@ else
     rmpc remote --pid "$PID" set theme ~/.config/rmpc/themes/small.ron
     rmpc remote --pid "$PID" status "Small theme set"
 fi
+```
+
+then put following into your config:
+
+```rust
+on_resize: ["~/.config/rmpc/scripts/onresize"],
+
 ```

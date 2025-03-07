@@ -165,6 +165,14 @@ Execute given command when the song changes. First element of the array is the c
 arguments passed to the command. Nothing will be executed if left empty. Can be used to
 send <a href={path("guides/on_song_change")}>notifications</a> when the song changes.
 
+### on_resize
+
+<ConfigValue name="on_resize" type="other" customText={'["notify-send", "rmpc resized!"]'} />
+
+Execute given command when rmpc resizes. First element of the array is the command to execute and the rest are the
+arguments passed to the command. Nothing will be executed if left empty. Check <a href={path("guides/on_resize")}>on_resize</a>
+for more info.
+
 ### search
 
 <ConfigValue name="search" type="other" customText="<search>" link={path("configuration/search/")} />
