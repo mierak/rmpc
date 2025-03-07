@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, sync::Arc};
 
 use anyhow::Result;
 use bon::Builder;
@@ -93,7 +93,7 @@ pub(crate) enum MpdQueryResult {
     Volume(Volume),
     Outputs(Vec<Output>),
     Decoders(Vec<Decoder>),
-    ExternalCommand(Vec<String>, Vec<Song>),
+    ExternalCommand(Arc<Vec<String>>, Vec<Song>),
     Any(Box<dyn Any + Send + Sync>),
 }
 

@@ -1,4 +1,10 @@
-use std::{collections::HashSet, io::Stdout, ops::Sub, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    io::Stdout,
+    ops::Sub,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
 use itertools::Itertools;
@@ -18,6 +24,7 @@ use crate::{
     shared::{
         events::{AppEvent, WorkDone},
         ext::{duration::DurationExt, error::ErrorExt},
+        id::{self, Id},
         lrc::get_lrc_path,
         macros::{status_error, status_warn},
         mpd_query::{
@@ -31,6 +38,8 @@ use crate::{
     },
     ui::{KeyHandleResult, Ui, UiEvent},
 };
+
+static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
 
 pub fn init(
     context: AppContext,
@@ -116,7 +125,7 @@ fn main_task<B: Backend + std::io::Write>(
                     let max_fps = f64::from(context.config.max_fps);
                     min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
 
-                    if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &context) {
+                    if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &mut context) {
                         log::error!(error:? = err; "UI failed to handle config changed event");
                         continue;
                     }
@@ -139,7 +148,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     context.config = Arc::new(config);
 
-                    if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &context) {
+                    if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &mut context) {
                         log::error!(error:? = err; "UI failed to handle config changed event");
                     }
 
@@ -154,7 +163,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut context) {
                     Ok(KeyHandleResult::None) => continue,
                     Ok(KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &context) {
+                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut context) {
                             log::error!(error:? = err, event:?; "UI failed to handle quit event");
                         }
                         break;
@@ -172,7 +181,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 },
                 AppEvent::Status(message, level) => {
-                    if let Err(err) = ui.on_event(UiEvent::Status(message, level), &context) {
+                    if let Err(err) = ui.on_event(UiEvent::Status(message, level), &mut context) {
                         log::error!(error:? = err; "UI failed to handle status message event");
                     }
                     render_wanted = true;
@@ -183,14 +192,14 @@ fn main_task<B: Backend + std::io::Write>(
                     });
                 }
                 AppEvent::Log(msg) => {
-                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &context) {
+                    if let Err(err) = ui.on_event(UiEvent::LogAdded(msg), &mut context) {
                         log::error!(error:? = err; "UI failed to handle log event");
                     }
                 }
                 AppEvent::IdleEvent(event) => {
                     handle_idle_event(event, &context, &mut additional_evs);
                     for ev in additional_evs.drain() {
-                        if let Err(err) = ui.on_event(ev, &context) {
+                        if let Err(err) = ui.on_event(ev, &mut context) {
                             status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
                     }
@@ -202,7 +211,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::WorkDone(Ok(result)) => match result {
                     WorkDone::LyricsIndexed { index } => {
                         context.lrc_index = index;
-                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &context) {
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context) {
                             log::error!(error:? = err; "UI failed to handle lyrics indexed event");
                         }
                     }
@@ -210,7 +219,7 @@ fn main_task<B: Backend + std::io::Write>(
                         if let Some(lrc_entry) = lrc_entry {
                             context.lrc_index.add(lrc_entry);
                         }
-                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &context) {
+                        if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut context) {
                             log::error!(error:? = err; "UI failed to handle single lyrics indexed event");
                         }
                     }
@@ -286,7 +295,7 @@ fn main_task<B: Backend + std::io::Write>(
                                 }
                             }
                             if song_changed {
-                                if let Err(err) = ui.on_event(UiEvent::SongChanged, &context) {
+                                if let Err(err) = ui.on_event(UiEvent::SongChanged, &mut context) {
                                     status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
                                 }
                             }
@@ -321,10 +330,29 @@ fn main_task<B: Backend + std::io::Write>(
                     status_error!("{}", err);
                 }
                 AppEvent::Resized { columns, rows } => {
+                    context.scheduler.schedule_replace(
+                        *ON_RESIZE_SCHEDULE_ID,
+                        Duration::from_millis(500),
+                        move |(tx, _)| {
+                            tx.send(AppEvent::ResizedDebounced { columns, rows })?;
+                            Ok(())
+                        },
+                    );
+                    render_wanted = true;
+                }
+                AppEvent::ResizedDebounced { columns, rows } => {
                     if let Err(err) = ui.resize(Rect::new(0, 0, columns, rows), &context) {
                         log::error!(error:? = err, event:?; "UI failed to handle resize event");
                     }
-                    render_wanted = true;
+
+                    if let Some(cmd) = &context.config.on_resize {
+                        let cmd = Arc::clone(cmd);
+                        let mut env = create_env(&context, std::iter::empty::<&str>());
+                        env.push(("COLS", columns.to_string()));
+                        env.push(("ROWS", rows.to_string()));
+                        log::debug!("Executing on resize");
+                        run_external(cmd, env);
+                    }
                 }
                 AppEvent::UiEvent(event) => match ui.on_ui_app_event(event, &mut context) {
                     Ok(()) => {}
@@ -337,7 +365,7 @@ fn main_task<B: Backend + std::io::Write>(
                     for ev in [IdleEvent::Player, IdleEvent::Playlist, IdleEvent::Options] {
                         handle_idle_event(ev, &context, &mut additional_evs);
                     }
-                    if let Err(err) = ui.on_event(UiEvent::Reconnected, &context) {
+                    if let Err(err) = ui.on_event(UiEvent::Reconnected, &mut context) {
                         log::error!(error:? = err, event:?; "UI failed to handle resize event");
                     }
                     status_warn!("rmpc reconnected to MPD and will reinitialize");
@@ -367,7 +395,7 @@ fn main_task<B: Backend + std::io::Write>(
                             _ => continue,
                         };
 
-                        match ui.on_event(event, &context) {
+                        match ui.on_event(event, &mut context) {
                             Ok(()) => {}
                             Err(err) => {
                                 status_error!(err:?; "Error: {}", err.to_status());

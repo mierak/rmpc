@@ -1,4 +1,4 @@
-use std::{io::Write, path::PathBuf};
+use std::{io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::{Result, bail};
 use itertools::Itertools;
@@ -349,7 +349,10 @@ where
     Ok(())
 }
 
-pub fn run_external<K: Into<String>, V: Into<String>>(command: Vec<String>, envs: Vec<(K, V)>) {
+pub fn run_external<K: Into<String>, V: Into<String>>(
+    command: Arc<Vec<String>>,
+    envs: Vec<(K, V)>,
+) {
     let envs = envs.into_iter().map(|(k, v)| (k.into(), v.into())).collect_vec();
 
     std::thread::spawn(move || {
@@ -365,7 +368,7 @@ pub fn run_external<K: Into<String>, V: Into<String>>(command: Vec<String>, envs
 pub fn create_env<'a>(
     context: &AppContext,
     selected_songs_paths: impl IntoIterator<Item = &'a str>,
-) -> Vec<(impl Into<String>, impl Into<String>)> {
+) -> Vec<(&'static str, String)> {
     let mut result = Vec::new();
 
     if let Some((_, current)) = context.find_current_song_in_queue() {

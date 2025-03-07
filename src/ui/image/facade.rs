@@ -40,28 +40,16 @@ enum ImageState {
 
 impl AlbumArtFacade {
     pub fn new(config: &Config) -> Self {
-        let max_size = config.album_art.max_size_px;
-        let bg_color = config.theme.background_color;
-        let valign = config.album_art.vertical_align;
-        let halign = config.album_art.horizontal_align;
-        let proto = match config.album_art.method.into() {
-            ImageProtocol::Kitty => {
-                ImageState::Kitty(Kitty::new(max_size, bg_color, halign, valign))
-            }
-            ImageProtocol::UeberzugWayland => {
-                ImageState::Ueberzug(Ueberzug::new(Layer::Wayland, max_size))
-            }
-            ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11, max_size)),
-            ImageProtocol::Iterm2 => {
-                ImageState::Iterm2(Iterm2::new(max_size, bg_color, halign, valign))
-            }
-            ImageProtocol::Sixel => {
-                ImageState::Sixel(Sixel::new(max_size, bg_color, halign, valign))
-            }
+        let image_state = match config.album_art.method.into() {
+            ImageProtocol::Kitty => ImageState::Kitty(Kitty::new(config.into())),
+            ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new(Layer::Wayland)),
+            ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11)),
+            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(config.into())),
+            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(config.into())),
             ImageProtocol::None => ImageState::None,
         };
         Self {
-            image_state: proto,
+            image_state,
             current_album_art: None,
             last_size: Rect::default(),
             default_album_art: Arc::new(config.theme.default_album_art.to_vec()),
@@ -137,13 +125,15 @@ impl AlbumArtFacade {
         self.last_size = area;
     }
 
-    pub fn reinit(&mut self, config: &Config) {
-        let current_album_art = std::mem::take(&mut self.current_album_art);
-        let last_size = self.last_size;
-
-        *self = Self::new(config);
-        self.current_album_art = current_album_art;
-        self.last_size = last_size;
+    pub fn set_config(&mut self, config: &Config) -> Result<()> {
+        match &mut self.image_state {
+            ImageState::Kitty(kitty) => kitty.set_config(config.into())?,
+            ImageState::Ueberzug(ueberzug) => ueberzug.set_config(config.into())?,
+            ImageState::Iterm2(iterm2) => iterm2.set_config(config.into())?,
+            ImageState::Sixel(sixel) => sixel.set_config(config.into())?,
+            ImageState::None => {}
+        }
+        Ok(())
     }
 }
 

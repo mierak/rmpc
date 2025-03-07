@@ -11,21 +11,20 @@ use crossterm::{
     queue,
     style::Colors,
 };
-use ratatui::{layout::Rect, style::Color};
+use ratatui::layout::Rect;
 
-use super::Backend;
+use super::{AlbumArtConfig, Backend, EncodeRequest, ImageBackendRequest};
 use crate::{
     config::{
         Size,
         album_art::{HorizontalAlign, VerticalAlign},
     },
     shared::{
-        ext::mpsc::RecvLast,
         image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
         macros::try_cont,
         tmux::tmux_write,
     },
-    ui::image::{clear_area, facade::IS_SHOWING},
+    ui::image::{clear_area, facade::IS_SHOWING, recv_data},
 };
 
 #[derive(Debug)]
@@ -38,15 +37,10 @@ struct EncodedData {
 }
 
 #[derive(Debug)]
-struct DataToEncode {
-    area: Rect,
-    data: Arc<Vec<u8>>,
-}
-
-#[derive(Debug)]
 pub struct Iterm2 {
-    sender: Sender<DataToEncode>,
+    sender: Sender<ImageBackendRequest>,
     colors: Colors,
+    handle: std::thread::JoinHandle<()>,
 }
 
 impl Backend for Iterm2 {
@@ -55,37 +49,60 @@ impl Backend for Iterm2 {
     }
 
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
-        Ok(self.sender.send(DataToEncode { area, data })?)
+        Ok(self.sender.send(ImageBackendRequest::Encode(EncodeRequest { area, data }))?)
+    }
+
+    fn set_config(&self, config: AlbumArtConfig) -> Result<()> {
+        Ok(self.sender.send(ImageBackendRequest::SetConfig(config))?)
+    }
+
+    fn cleanup(self: Box<Self>, _area: Rect) -> Result<()> {
+        self.sender.send(ImageBackendRequest::Stop)?;
+        self.handle.join().expect("iterm2 thread to end gracefully");
+        Ok(())
     }
 }
 
 impl Iterm2 {
-    pub fn new(
-        max_size: Size,
-        bg_color: Option<Color>,
-        halign: HorizontalAlign,
-        valign: VerticalAlign,
-    ) -> Self {
-        let (sender, receiver) = unbounded::<DataToEncode>();
-        let colors = Colors { background: bg_color.map(Into::into), foreground: None };
+    pub(super) fn new(config: AlbumArtConfig) -> Self {
+        let (sender, receiver) = unbounded::<ImageBackendRequest>();
+        let colors = config.colors;
 
-        std::thread::Builder::new()
+        let handle = std::thread::Builder::new()
             .name("iterm2".to_string())
             .spawn(move || {
+                let mut config = config;
                 let mut pending_req = None;
-                loop {
-                    let DataToEncode { area, data } = match pending_req.take().ok_or(()).or_else(|()| receiver.recv_last()) {
-                        Ok(data) => data,
-                        Err(err) => {
-                            log::warn!(err:?, msg = err.to_string().as_str(); "Failed to get image data to show");
-                            break;
-                        }
-                    };
+                'outer: loop {
+                    let EncodeRequest { data, area } =
+                        match recv_data(&mut pending_req, &mut config, &receiver) {
+                            Ok(Some(msg)) => msg,
+                            Ok(None) => break,
+                            Err(err) => {
+                                log::error!("Error receiving ImageBackendRequest message: {}", err);
+                                break;
+                            }
+                        };
 
                     let encoded = try_cont!(
-                        encode(area, &data, max_size, halign, valign),
+                        encode(area, &data, config.max_size, config.halign, config.valign),
                         "Failed to encode data"
                     );
+
+                    // consume all pending messages, skipping older encode requests
+                    for msg in receiver.try_iter() {
+                        match msg {
+                            ImageBackendRequest::Stop => break 'outer,
+                            ImageBackendRequest::SetConfig(cfg) => config = cfg,
+                            ImageBackendRequest::Encode(req) => {
+                                pending_req = Some(req);
+                                log::debug!(
+                                    "Skipping image because another one is waiting in the queue"
+                                );
+                                continue 'outer;
+                            }
+                        }
+                    }
 
                     let mut w = std::io::stdout().lock();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
@@ -95,14 +112,8 @@ impl Iterm2 {
                         continue;
                     }
 
-                    if let Ok(msg) = receiver.try_recv_last() {
-                        pending_req = Some(msg);
-                        log::trace!("Skipping image because another one is waiting in the queue");
-                        continue;
-                    };
-
                     try_cont!(
-                        clear_area(&mut w, colors, area),
+                        clear_area(&mut w, config.colors, area),
                         "Failed to clear iterm2 image area"
                     );
                     try_cont!(display(&mut w, encoded), "Failed to display iterm2 image");
@@ -110,7 +121,7 @@ impl Iterm2 {
             })
             .expect("iterm2 thread to be spawned");
 
-        Self { sender, colors }
+        Self { sender, colors, handle }
     }
 }
 

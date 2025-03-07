@@ -62,6 +62,7 @@ pub(crate) enum AppEvent {
     IdleEvent(IdleEvent),
     RequestRender,
     Resized { columns: u16, rows: u16 },
+    ResizedDebounced { columns: u16, rows: u16 },
     WorkDone(Result<WorkDone>),
     UiEvent(UiAppEvent),
     Reconnected,

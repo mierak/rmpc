@@ -1,6 +1,7 @@
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -61,7 +62,8 @@ pub struct Config {
     pub theme: UiConfig,
     pub theme_name: Option<String>,
     pub album_art: AlbumArtConfig,
-    pub on_song_change: Option<Vec<String>>,
+    pub on_song_change: Option<Arc<Vec<String>>>,
+    pub on_resize: Option<Arc<Vec<String>>>,
     pub search: Search,
     pub artists: Artists,
     pub tabs: Tabs,
@@ -112,6 +114,8 @@ pub struct ConfigFile {
     #[serde(default)]
     on_song_change: Option<Vec<String>>,
     #[serde(default)]
+    on_resize: Option<Vec<String>>,
+    #[serde(default)]
     search: SearchFile,
     #[serde(default)]
     artists: ArtistsFile,
@@ -153,6 +157,7 @@ impl Default for ConfigFile {
                 ..Default::default()
             },
             on_song_change: None,
+            on_resize: None,
             search: SearchFile::default(),
             tabs: TabsFile::default(),
             enable_mouse: true,
@@ -258,9 +263,12 @@ impl ConfigFile {
             search: self.search.into(),
             artists: self.artists.into(),
             album_art: self.album_art.into(),
-            on_song_change: self
-                .on_song_change
-                .map(|arr| arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec()),
+            on_song_change: self.on_song_change.map(|arr| {
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
+            }),
+            on_resize: self.on_resize.map(|arr| {
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
+            }),
         };
 
         if skip_album_art_check {

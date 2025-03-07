@@ -119,7 +119,7 @@ impl<'ui> Ui<'ui> {
         self.area = area;
     }
 
-    fn change_tab(&mut self, new_tab: TabName, context: &AppContext) -> Result<()> {
+    fn change_tab(&mut self, new_tab: TabName, context: &mut AppContext) -> Result<()> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
             match self.panes.get_mut(&pane.pane, context) {
                 Panes::TabContent => {
@@ -463,7 +463,7 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    pub fn on_event(&mut self, mut event: UiEvent, context: &AppContext) -> Result<()> {
+    pub fn on_event(&mut self, mut event: UiEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiEvent::Database => {
                 status_warn!(
@@ -471,6 +471,20 @@ impl<'ui> Ui<'ui> {
                 );
             }
             UiEvent::ConfigChanged => {
+                // Call on_hide for all panes in the current tab and current layout because they
+                // might not be visible after the change
+                self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
+                    match self.panes.get_mut(&pane.pane, context) {
+                        Panes::TabContent => {
+                            active_tab_call!(self, on_hide(context))?;
+                        }
+                        mut pane_instance => {
+                            pane_call!(pane_instance, on_hide(context))?;
+                        }
+                    };
+                    Ok(())
+                })?;
+
                 self.layout = context.config.theme.layout.clone();
                 let new_active_tab = context
                     .config
@@ -481,22 +495,12 @@ impl<'ui> Ui<'ui> {
                     .or(context.config.tabs.names.first())
                     .context("Expected at least one tab")?;
 
-                if self.active_tab == *new_active_tab {
-                    self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-                        match self.panes.get_mut(&pane.pane, context) {
-                            Panes::TabContent => {
-                                active_tab_call!(self, calculate_areas(pane_area, context))?;
-                            }
-                            mut pane_instance => {
-                                pane_call!(pane_instance, calculate_areas(pane_area, context))?;
-                            }
-                        };
-                        Ok(())
-                    })?;
-                } else {
-                    self.change_tab(new_active_tab.clone(), context)?;
-                }
+                self.on_event(UiEvent::TabChanged(new_active_tab.clone()), context)?;
+
                 self.tabs = Self::init_tabs(context)?;
+                // Call before_show here, because we have "hidden" all the panes before and this
+                // will force them to reinitialize
+                self.before_show(self.area, context)?;
             }
             _ => {}
         }

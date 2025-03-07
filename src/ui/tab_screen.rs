@@ -261,23 +261,6 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn calculate_areas(
-        &mut self,
-        pane_container: &mut PaneContainer,
-        area: Rect,
-        context: &AppContext,
-    ) -> Result<()> {
-        self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
-            let pane_data =
-                self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
-            pane_data.area = area;
-            pane_data.block_area = block_area;
-            let pane_instance = &mut pane_container.get_mut(&pane.pane, context);
-            pane_call!(pane_instance, calculate_areas(pane_area, context))?;
-            Ok(())
-        })
-    }
-
     pub fn resize(
         &mut self,
         pane_container: &mut PaneContainer,

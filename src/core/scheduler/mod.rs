@@ -82,7 +82,14 @@ where
                     recv(add_job_rx) -> job => {
                         let job = try_cont!(job, "Failed to process scheduler command");
                         match job {
-                            SchedulerCommand::AddJob(job) => jobs.push(Reverse(JobOrRepeatedJob::Job(job))),
+                            SchedulerCommand::AddJob(job) => {
+                                 jobs.retain(|Reverse(existing_job)| match &existing_job {
+                                        JobOrRepeatedJob::Job(existing_job) => existing_job.id != job.id,
+                                        JobOrRepeatedJob::RepeatedJob(existing_job) => existing_job.id != job.id,
+                                    }
+                                );
+                                jobs.push(Reverse(JobOrRepeatedJob::Job(job)));
+                            }
                             SchedulerCommand::AddRepeatedJob(job) => jobs.push(Reverse(JobOrRepeatedJob::RepeatedJob(job))),
                             SchedulerCommand::CancelJob(id) => jobs.retain(|job| match &job.0 {
                                     JobOrRepeatedJob::Job(job) => job.id != id,
@@ -132,12 +139,14 @@ where
 
     /// Schedules a job to run after the specified duration.
     /// A job must guarantee that it will not block the scheduler.
-    pub(crate) fn schedule(
+    /// If job with given ID already exists, it will be replaced with the new
+    /// one.
+    pub(crate) fn schedule_replace(
         &self,
+        id: Id,
         timeout: Duration,
         callback: impl FnOnce(&T) -> Result<()> + Send + 'static,
     ) {
-        let id = id::new();
         // Skip errors as this should never really happen, but still want to log it in
         // case it does
         try_skip!(
@@ -149,6 +158,17 @@ where
             ))),
             "Failed to schedule a job"
         );
+    }
+
+    /// Schedules a job to run after the specified duration.
+    /// A job must guarantee that it will not block the scheduler.
+    pub(crate) fn schedule(
+        &self,
+        timeout: Duration,
+        callback: impl FnOnce(&T) -> Result<()> + Send + 'static,
+    ) {
+        let id = id::new();
+        self.schedule_replace(id, timeout, callback);
     }
 
     /// Schedule a repeated job to run at the specified interval.
@@ -252,6 +272,7 @@ mod tests {
     };
 
     use super::{Scheduler, TimeProvider};
+    use crate::shared::id;
 
     #[derive(Clone, Debug)]
     struct FakeTimeProvider(Arc<Mutex<VecDeque<Instant>>>);
@@ -384,6 +405,47 @@ mod tests {
         scheduler.stop();
 
         assert_eq!(*results.lock().unwrap(), vec![1, 2, 1, 2, 1, 2]);
+    }
+
+    #[test]
+    fn replaces_job() {
+        let start = Instant::now();
+        let mut scheduler = Scheduler::new_with_provider(
+            (),
+            FakeTimeProvider::new([
+                // scheduling jobs
+                start,
+                start, // dummy that is read after each add
+                start + Duration::from_micros(1),
+                start + Duration::from_micros(1), // dummy that is read after each add
+                // first set of runs
+                start + Duration::from_millis(10),
+                start + Duration::from_millis(10),
+            ]),
+        );
+        let results = Arc::new(Mutex::new(Vec::new()));
+
+        let res = Arc::clone(&results);
+        let id = id::new();
+        scheduler.schedule_replace(id, Duration::from_millis(5), move |()| {
+            let mut results = res.lock().unwrap();
+            results.push(1);
+            Ok(())
+        });
+        let res = Arc::clone(&results);
+        scheduler.schedule_replace(id, Duration::from_millis(10), move |()| {
+            let mut results = res.lock().unwrap();
+            results.push(1);
+            Ok(())
+        });
+
+        scheduler.start();
+
+        while results.lock().unwrap().len() < 1 {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(*results.lock().unwrap(), vec![1]);
     }
 
     #[test]

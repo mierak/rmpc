@@ -94,7 +94,7 @@ where
         };
 
         let config = &context.config;
-        match action.clone() {
+        match &action {
             GlobalAction::ExternalCommand { command, .. }
                 if !self.stack().current().marked().is_empty() =>
             {
@@ -105,6 +105,7 @@ where
                     .map(|item| self.list_songs_in_item(item.clone()))
                     .collect();
                 let path = self.stack().path().to_owned();
+                let command = std::sync::Arc::clone(command);
                 context.query().id(EXTERNAL_COMMAND).query(move |client| {
                     let songs: Vec<_> = marked_items
                         .into_iter()
@@ -119,6 +120,7 @@ where
                     let selected = selected.clone();
                     let path = self.stack().path().to_owned();
                     let songs = self.list_songs_in_item(selected);
+                    let command = std::sync::Arc::clone(command);
                     context.query().id(EXTERNAL_COMMAND).query(move |client| {
                         let songs = (songs)(client)?;
                         Ok(MpdQueryResult::ExternalCommand(command, songs))
