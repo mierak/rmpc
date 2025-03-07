@@ -39,7 +39,7 @@ pub fn app_context(
 ) -> AppContext {
     let chan1 = unbounded();
     let config = ConfigFile::default()
-        .into_config(None, None, None, true)
+        .into_config(None, None, None, None, true)
         .expect("Test default config to convert correctly");
 
     let chan1 = Box::leak(Box::new(chan1));

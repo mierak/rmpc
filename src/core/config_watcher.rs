@@ -58,7 +58,9 @@ pub(crate) fn init(
 
                 log::debug!(event:?; "File event");
                 if let Err(err) = ConfigFile::read(&config_path)
-                    .and_then(|config| config.into_config(Some(&config_path), None, None, true))
+                    .and_then(|config| {
+                        config.into_config(None, Some(&config_path), None, None, true)
+                    })
                     .inspect(|config| {
                         theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
                     })

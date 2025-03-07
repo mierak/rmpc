@@ -207,21 +207,28 @@ impl ConfigFile {
     pub fn into_config(
         self,
         config_path: Option<&Path>,
+        theme_cli: Option<&Path>,
         address_cli: Option<String>,
         password_cli: Option<String>,
         skip_album_art_check: bool,
     ) -> Result<Config> {
-        let theme: UiConfig = config_path
-            .map(|path| {
-                path.parent()
-                    .with_context(|| {
-                        format!("Expected config path to have parent directory. Path: '{path:?}'")
-                    })
-                    .and_then(|path| self.read_theme(path))
-            })
-            .transpose()?
-            .unwrap_or_default()
-            .try_into()?;
+        let theme = if let Some(path) = theme_cli {
+            let file = std::fs::File::open(path).with_context(|| {
+                format!("Failed to open theme file {:?}", path.to_string_lossy())
+            })?;
+            let read = std::io::BufReader::new(file);
+            ron::de::from_reader(read)?
+        } else if let Some(path) = config_path {
+            let config_dir = path.parent().with_context(|| {
+                format!("Expected config path to have parent directory. Path: '{path:?}'")
+            })?;
+
+            self.read_theme(config_dir)?
+        } else {
+            UiConfigFile::default()
+        };
+
+        let theme = UiConfig::try_from(theme)?;
 
         let tabs: Tabs = self.tabs.try_into()?;
         let active_panes = tabs
