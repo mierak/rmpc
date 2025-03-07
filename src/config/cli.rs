@@ -4,8 +4,10 @@ use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 
 #[derive(Parser, Debug)]
 pub struct Args {
-    #[arg(short, long, value_name = "FILE", default_value = get_default_config_path().into_os_string())]
+    #[arg(short, long, value_hint = ValueHint::AnyPath, value_name = "FILE", default_value = get_default_config_path().into_os_string())]
     pub config: PathBuf,
+    #[arg(short, long, value_hint = ValueHint::AnyPath, value_name = "FILE")]
+    pub theme: Option<PathBuf>,
     #[command(subcommand)]
     pub command: Option<Command>,
     #[arg(short, long)]

@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - rmpc will now reload config changes automatically
 - remote command to change theme
 - `on_resize` which is called whenever rmpc is resized
+- `--theme` cli argument to override theme in the config file
 
 ### Changed
 

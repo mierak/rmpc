@@ -84,6 +84,7 @@ fn main() -> Result<()> {
             let config_file = ConfigFile::read(&args.config).unwrap_or_default();
             let config = config_file.clone().into_config(
                 Some(&args.config),
+                args.theme.as_deref(),
                 std::mem::take(&mut args.address),
                 std::mem::take(&mut args.password),
                 false,
@@ -173,6 +174,7 @@ fn main() -> Result<()> {
             let config = match ConfigFile::read(&args.config) {
                 Ok(val) => val.into_config(
                     Some(&args.config),
+                    args.theme.as_deref(),
                     std::mem::take(&mut args.address),
                     std::mem::take(&mut args.password),
                     false,
@@ -180,6 +182,7 @@ fn main() -> Result<()> {
                 Err(err) => {
                     status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
                     ConfigFile::default().into_config(
+                        None,
                         None,
                         std::mem::take(&mut args.address),
                         std::mem::take(&mut args.password),

@@ -27,7 +27,7 @@ impl SocketCommandExecute for SetIpcCommand {
     ) -> Result<()> {
         match self {
             SetIpcCommand::Config(config) => {
-                let config = config.into_config(None, None, None, true)?;
+                let config = config.into_config(None, None, None, None, true)?;
                 Ok(event_tx.send(AppEvent::ConfigChanged { config, keep_old_theme: true })?)
             }
             SetIpcCommand::Theme(theme) => {
