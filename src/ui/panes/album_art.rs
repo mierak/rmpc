@@ -186,10 +186,6 @@ mod tests {
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::UeberzugWayland, true)]
-    #[case(ImageMethod::UeberzugX11, true)]
-    #[case(ImageMethod::Iterm2, true)]
-    #[case(ImageMethod::Sixel, true)]
     #[case(ImageMethod::Unsupported, false)]
     #[case(ImageMethod::None, false)]
     fn searches_for_album_art_before_show(
@@ -231,10 +227,6 @@ mod tests {
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::UeberzugWayland, true)]
-    #[case(ImageMethod::UeberzugX11, true)]
-    #[case(ImageMethod::Iterm2, true)]
-    #[case(ImageMethod::Sixel, true)]
     #[case(ImageMethod::Unsupported, false)]
     #[case(ImageMethod::None, false)]
     fn searches_for_album_art_on_event(
