@@ -57,17 +57,25 @@ impl FromStr for Lrc {
                             meta_or_time.split_once(':').with_context(|| {
                                 format!("Invalid lrc minutes format: '{meta_or_time}'")
                             })?;
-                        let (seconds, hundreths) = time_rest
+                        let (seconds, fractions_of_second) = time_rest
                             .split_once('.')
                             .or_else(|| time_rest.split_once(':'))
                             .with_context(|| {
-                                format!("Invalid lrc seconds and hundreths format: '{time_rest}'")
-                            })?;
+                                format!("Invalid lrc seconds and fractions of second format: '{time_rest}'")
+                            })
+                            // Truncation here is appropriate, since no display refreshes over 1000 times
+                            // per second, and even if it did, lyrics don't need that level of precision
+                            .map(|(seconds, frac)| (seconds, &frac[..3.min(frac.len())]))?;
 
                         let mut milis = 0;
                         milis += minutes.parse::<u64>()? * 60 * 1000;
                         milis += seconds.parse::<u64>()? * 1000;
-                        milis += hundreths.parse::<u64>()? * 10;
+                        milis += fractions_of_second.parse::<u64>()?
+                            * (10u64.pow(
+                                3 - u32::try_from(fractions_of_second.len()).context(
+                                    "Length of u64 is always less than u32 (u64::MAX is 20 characters long)",
+                                )?,
+                            ));
 
                         milis = match offset {
                             Some(offset) if offset > 0 => {
@@ -227,6 +235,32 @@ mod tests {
                 LrcLine { time: Duration::from_millis(6730), content: "line2".to_string() },
                 LrcLine { time: Duration::from_millis(7860), content: "line3".to_string() },
             ],
+        });
+    }
+
+    #[test]
+    fn lyrics_different_fractions_of_second() {
+        let input = r"
+[00:00.8]line1
+[00:10.73]line2
+[00:20.563]line3
+[00:30.2853]line4
+";
+
+        let result: Lrc = input.parse().unwrap();
+
+        assert_eq!(result, Lrc {
+            title: None,
+            artist: None,
+            album: None,
+            author: None,
+            length: None,
+            lines: vec![
+                LrcLine { time: Duration::from_millis(800), content: "line1".to_string() },
+                LrcLine { time: Duration::from_millis(10730), content: "line2".to_string() },
+                LrcLine { time: Duration::from_millis(20563), content: "line3".to_string() },
+                LrcLine { time: Duration::from_millis(30285), content: "line4".to_string() },
+            ]
         });
     }
 }

@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Lyrics with fractions of seconds which weren't to 2s.f. being
+  parsed incorrectly
+
 - Album art staying on the old one when in tmux and not visible
 
 ## [0.8.0] - 2025-02-16
