@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     ops::{Range, RangeInclusive},
     str::FromStr,
 };
@@ -896,7 +897,7 @@ pub enum FilterKind {
 #[derive(Debug)]
 pub struct Filter<'value> {
     pub tag: Tag,
-    pub value: &'value str,
+    pub value: Cow<'value, str>,
     pub kind: FilterKind,
 }
 
@@ -908,12 +909,16 @@ impl From<String> for Tag {
 
 #[allow(dead_code)]
 impl<'value> Filter<'value> {
-    pub fn new<T: Into<Tag>>(tag: T, value: &'value str) -> Self {
-        Self { tag: tag.into(), value, kind: FilterKind::Exact }
+    pub fn new<T: Into<Tag>, V: Into<Cow<'value, str>>>(tag: T, value: V) -> Self {
+        Self { tag: tag.into(), value: value.into(), kind: FilterKind::Exact }
     }
 
-    pub fn new_with_kind<T: Into<Tag>>(tag: T, value: &'value str, kind: FilterKind) -> Self {
-        Self { tag: tag.into(), value, kind }
+    pub fn new_with_kind<T: Into<Tag>, V: Into<Cow<'value, str>>>(
+        tag: T,
+        value: V,
+        kind: FilterKind,
+    ) -> Self {
+        Self { tag: tag.into(), value: value.into(), kind }
     }
 
     pub fn with_type(mut self, t: FilterKind) -> Self {
