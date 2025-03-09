@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect};
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneTypeDiscriminants,
+    config::tabs::PaneType,
     context::AppContext,
     mpd::{
         client::Client,
@@ -76,14 +76,12 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query().id(action_id).target(PaneTypeDiscriminants::Playlists).query(
-                    move |client| {
-                        Ok(MpdQueryResult::SongsList {
-                            data: client.list_playlist_info(&playlist, None)?,
-                            origin_path: Some(next_path),
-                        })
-                    },
-                );
+                context.query().id(action_id).target(PaneType::Playlists).query(move |client| {
+                    Ok(MpdQueryResult::SongsList {
+                        data: client.list_playlist_info(&playlist, None)?,
+                        origin_path: Some(next_path),
+                    })
+                });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
                 context.render()?;
@@ -115,12 +113,8 @@ impl Pane for PlaylistsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            context
-                .query()
-                .id(INIT)
-                .target(PaneTypeDiscriminants::Playlists)
-                .replace_id(INIT)
-                .query(move |client| {
+            context.query().id(INIT).target(PaneType::Playlists).replace_id(INIT).query(
+                move |client| {
                     let result: Vec<_> = client
                         .list_playlists()
                         .context("Cannot list playlists")?
@@ -132,7 +126,8 @@ impl Pane for PlaylistsPane {
                         .sorted()
                         .collect();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                });
+                },
+            );
 
             self.initialized = true;
         }
@@ -153,12 +148,8 @@ impl Pane for PlaylistsPane {
         match event {
             UiEvent::Database | UiEvent::StoredPlaylist => {
                 if let Some(id) = id {
-                    context
-                        .query()
-                        .id(id)
-                        .replace_id(id)
-                        .target(PaneTypeDiscriminants::Playlists)
-                        .query(move |client| {
+                    context.query().id(id).replace_id(id).target(PaneType::Playlists).query(
+                        move |client| {
                             let result: Vec<_> = client
                                 .list_playlists()
                                 .context("Cannot list playlists")?
@@ -170,7 +161,8 @@ impl Pane for PlaylistsPane {
                                 .sorted()
                                 .collect();
                             Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                        });
+                        },
+                    );
                 }
             }
             UiEvent::Reconnected => {
@@ -525,7 +517,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             .query()
             .id(PREVIEW)
             .replace_id("playlists_preview")
-            .target(PaneTypeDiscriminants::Playlists)
+            .target(PaneType::Playlists)
             .query(move |client| {
                 let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
                     let response = match current {

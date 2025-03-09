@@ -33,7 +33,7 @@ use crate::{
         Config,
         cli::Args,
         keys::GlobalAction,
-        tabs::{PaneType, PaneTypeDiscriminants, SizedPaneOrSplit, TabName},
+        tabs::{PaneType, SizedPaneOrSplit, TabName},
     },
     context::AppContext,
     core::command::{create_env, run_external},
@@ -121,7 +121,7 @@ impl<'ui> Ui<'ui> {
 
     fn change_tab(&mut self, new_tab: TabName, context: &mut AppContext) -> Result<()> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane, context) {
+            match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
                     active_tab_call!(self, on_hide(context))?;
                 }
@@ -134,7 +134,7 @@ impl<'ui> Ui<'ui> {
         self.on_event(UiEvent::TabChanged(new_tab), context)?;
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, context) {
+            match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
@@ -155,7 +155,7 @@ impl<'ui> Ui<'ui> {
             self.area,
             &mut *frame,
             &mut |pane, pane_area, block, block_area, frame| {
-                match self.panes.get_mut(&pane.pane, context) {
+                match self.panes.get_mut(&pane.pane, context)? {
                     Panes::TabContent => {
                         active_tab_call!(self, render(frame, pane_area, context))?;
                     }
@@ -201,7 +201,7 @@ impl<'ui> Ui<'ui> {
         }
 
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane, context) {
+            match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
                     active_tab_call!(self, handle_mouse_event(event, context))?;
                 }
@@ -415,7 +415,7 @@ impl<'ui> Ui<'ui> {
         self.calc_areas(area, context);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, context) {
+            match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
@@ -450,7 +450,7 @@ impl<'ui> Ui<'ui> {
         self.calc_areas(area, context);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, context) {
+            match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
                     active_tab_call!(self, resize(pane_area, context))?;
                 }
@@ -474,7 +474,7 @@ impl<'ui> Ui<'ui> {
                 // Call on_hide for all panes in the current tab and current layout because they
                 // might not be visible after the change
                 self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-                    match self.panes.get_mut(&pane.pane, context) {
+                    match self.panes.get_mut(&pane.pane, context)? {
                         Panes::TabContent => {
                             active_tab_call!(self, on_hide(context))?;
                         }
@@ -495,9 +495,17 @@ impl<'ui> Ui<'ui> {
                     .or(context.config.tabs.names.first())
                     .context("Expected at least one tab")?;
 
+                let mut old_other_panes = std::mem::take(&mut self.panes.others);
+                for (key, new_other_pane) in PaneContainer::init_other_panes(context) {
+                    let old = old_other_panes.remove(&key);
+                    self.panes.others.insert(key, old.unwrap_or(new_other_pane));
+                }
+                // We have to be careful about the order of operations here as they might cause
+                // a panic if done incorrectly
+                self.tabs = Self::init_tabs(context)?;
+                self.active_tab = new_active_tab.clone();
                 self.on_event(UiEvent::TabChanged(new_active_tab.clone()), context)?;
 
-                self.tabs = Self::init_tabs(context)?;
                 // Call before_show here, because we have "hidden" all the panes before and this
                 // will force them to reinitialize
                 self.before_show(self.area, context)?;
@@ -505,59 +513,33 @@ impl<'ui> Ui<'ui> {
             _ => {}
         }
 
-        let contains_pane = |p| {
-            self.tabs
+        for pane_type in &context.config.active_panes {
+            let visible = self
+                .tabs
                 .get(&self.active_tab)
-                .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == p))
-                || self.layout.panes_iter().any(|pane| pane.pane == p)
-        };
+                .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == *pane_type))
+                || self.layout.panes_iter().any(|pane| pane.pane == *pane_type);
 
-        for name in &context.config.active_panes {
-            let Some(pane) = self.panes.get_mut_by_discr(*name) else {
-                continue;
-            };
-
-            match pane {
+            match self.panes.get_mut(pane_type, context)? {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => p.on_event(&mut event, contains_pane(PaneType::Logs), context),
-                Panes::Queue(p) => p.on_event(&mut event, contains_pane(PaneType::Queue), context),
-                Panes::Directories(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Directories), context)
-                }
-                Panes::Albums(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Albums), context)
-                }
-                Panes::Artists(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Artists), context)
-                }
-                Panes::Playlists(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Playlists), context)
-                }
-                Panes::Search(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Search), context)
-                }
-                Panes::AlbumArtists(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::AlbumArtists), context)
-                }
-                Panes::AlbumArt(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::AlbumArt), context)
-                }
-                Panes::Lyrics(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Lyrics), context)
-                }
-                Panes::ProgressBar(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::ProgressBar), context)
-                }
-                Panes::Header(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Header), context)
-                }
-                Panes::Tabs(p) => p.on_event(&mut event, contains_pane(PaneType::Tabs), context),
-                Panes::TabContent => Ok(()),
+                Panes::Logs(p) => p.on_event(&mut event, visible, context),
+                Panes::Queue(p) => p.on_event(&mut event, visible, context),
+                Panes::Directories(p) => p.on_event(&mut event, visible, context),
+                Panes::Albums(p) => p.on_event(&mut event, visible, context),
+                Panes::Artists(p) => p.on_event(&mut event, visible, context),
+                Panes::Playlists(p) => p.on_event(&mut event, visible, context),
+                Panes::Search(p) => p.on_event(&mut event, visible, context),
+                Panes::AlbumArtists(p) => p.on_event(&mut event, visible, context),
+                Panes::AlbumArt(p) => p.on_event(&mut event, visible, context),
+                Panes::Lyrics(p) => p.on_event(&mut event, visible, context),
+                Panes::ProgressBar(p) => p.on_event(&mut event, visible, context),
+                Panes::Header(p) => p.on_event(&mut event, visible, context),
+                Panes::Tabs(p) => p.on_event(&mut event, visible, context),
                 #[cfg(debug_assertions)]
-                Panes::FrameCount(p) => {
-                    p.on_event(&mut event, contains_pane(PaneType::Tabs), context)
-                }
-                Panes::Property(_) => Ok(()), // Property panes do not need to receive events
+                Panes::FrameCount(p) => p.on_event(&mut event, visible, context),
+                Panes::Others(p) => p.on_event(&mut event, visible, context),
+                // Property and the dummy TabContent pane do not need to receive events
+                Panes::Property(_) | Panes::TabContent => Ok(()),
             }?;
         }
 
@@ -567,65 +549,40 @@ impl<'ui> Ui<'ui> {
     pub(crate) fn on_command_finished(
         &mut self,
         id: &'static str,
-        pane: Option<PaneTypeDiscriminants>,
+        pane: Option<PaneType>,
         data: MpdQueryResult,
         context: &mut AppContext,
     ) -> Result<()> {
-        let contains_pane = |p| {
-            self.tabs
-                .get(&self.active_tab)
-                .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == p))
-                || self.layout.panes_iter().any(|pane| pane.pane == p)
-        };
         match pane {
-            Some(pane) => match self.panes.get_mut_by_discr(pane) {
-                #[cfg(debug_assertions)]
-                Some(Panes::Logs(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Logs), context)
-                }
-                Some(Panes::Queue(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Queue), context)
-                }
-                Some(Panes::Directories(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Directories), context)
-                }
-                Some(Panes::Albums(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Albums), context)
-                }
-                Some(Panes::Artists(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Artists), context)
-                }
-                Some(Panes::Playlists(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Playlists), context)
-                }
-                Some(Panes::Search(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Search), context)
-                }
-                Some(Panes::AlbumArtists(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::AlbumArtists), context)
-                }
-                Some(Panes::AlbumArt(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::AlbumArt), context)
-                }
-                Some(Panes::Lyrics(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Lyrics), context)
-                }
-                Some(Panes::ProgressBar(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::ProgressBar), context)
-                }
-                Some(Panes::Header(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Header), context)
-                }
-                Some(Panes::Tabs(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::Tabs), context)
-                }
-                #[cfg(debug_assertions)]
-                Some(Panes::FrameCount(p)) => {
-                    p.on_query_finished(id, data, contains_pane(PaneType::FrameCount), context)
-                }
-                // Property panes do not need to receive command notifications
-                Some(Panes::Property(_)) | Some(Panes::TabContent) | None => Ok(()),
-            }?,
+            Some(pane_type) => {
+                let visible =
+                    self.tabs.get(&self.active_tab).is_some_and(|tab| {
+                        tab.panes.panes_iter().any(|pane| pane.pane == pane_type)
+                    }) || self.layout.panes_iter().any(|pane| pane.pane == pane_type);
+
+                match self.panes.get_mut(&pane_type, context)? {
+                    #[cfg(debug_assertions)]
+                    Panes::Logs(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Queue(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Directories(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Albums(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Artists(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Playlists(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Search(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::AlbumArtists(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::AlbumArt(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Lyrics(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::ProgressBar(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Header(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Tabs(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Others(p) => p.on_query_finished(id, data, visible, context),
+                    #[cfg(debug_assertions)]
+                    Panes::FrameCount(p) => p.on_query_finished(id, data, visible, context),
+                    // Property and the dummy TabContent pane do not need to receive command
+                    // notifications
+                    Panes::Property(_) | Panes::TabContent => Ok(()),
+                }?;
+            }
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {
                     modal!(context, OutputsModal::new(outputs));

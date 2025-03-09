@@ -4,7 +4,7 @@ use ratatui::{Frame, layout::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneTypeDiscriminants,
+    config::tabs::PaneType,
     context::AppContext,
     mpd::mpd_client::MpdClient,
     shared::{image::ImageProtocol, key_event::KeyEvent},
@@ -45,7 +45,7 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
-        context.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneTypeDiscriminants::AlbumArt).query(move |client| {
+        context.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneType::AlbumArt).query(move |client| {
             let start = std::time::Instant::now();
             log::debug!(file = song_uri.as_str(); "Searching for album art");
             let result = client.find_album_art(&song_uri)?;
@@ -171,7 +171,7 @@ mod tests {
 
     use super::AlbumArtPane;
     use crate::{
-        config::{Config, album_art::ImageMethod, tabs::PaneTypeDiscriminants},
+        config::{Config, album_art::ImageMethod, tabs::PaneType},
         mpd::commands::{Song, State},
         shared::{
             events::{ClientRequest, WorkRequest},
@@ -213,7 +213,7 @@ mod tests {
                 ClientRequest::Query(MpdQuery {
                     id: ALBUM_ART,
                     replace_id: Some(ALBUM_ART),
-                    target: Some(PaneTypeDiscriminants::AlbumArt),
+                    target: Some(PaneType::AlbumArt),
                     ..
                 })
             ));
@@ -254,7 +254,7 @@ mod tests {
                 ClientRequest::Query(MpdQuery {
                     id: ALBUM_ART,
                     replace_id: Some(ALBUM_ART),
-                    target: Some(PaneTypeDiscriminants::AlbumArt),
+                    target: Some(PaneType::AlbumArt),
                     ..
                 })
             ));

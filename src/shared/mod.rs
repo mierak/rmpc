@@ -13,5 +13,6 @@ pub mod macros;
 pub mod mouse_event;
 pub mod mpd_query;
 pub mod percent;
+pub mod string_util;
 pub mod tmux;
 pub mod ytdlp;

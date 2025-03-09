@@ -13,7 +13,7 @@ use ratatui::{
 use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
-    config::{Config, Search, keys::GlobalAction, tabs::PaneTypeDiscriminants},
+    config::{Config, Search, keys::GlobalAction, tabs::PaneType},
     context::AppContext,
     core::command::{create_env, run_external},
     mpd::{
@@ -163,14 +163,9 @@ impl SearchPane {
                     None,
                     self.songs_dir.to_list_items(&context.config),
                 )]);
-                context
-                    .query()
-                    .id(PREVIEW)
-                    .replace_id("preview")
-                    .target(PaneTypeDiscriminants::Search)
-                    .query(|_| {
-                        Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
-                    });
+                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
+                    |_| Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) }),
+                );
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
@@ -178,12 +173,8 @@ impl SearchPane {
                 };
                 let file = current.file.clone();
 
-                context
-                    .query()
-                    .id(PREVIEW)
-                    .replace_id("preview")
-                    .target(PaneTypeDiscriminants::Search)
-                    .query(move |client| {
+                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
+                    move |client| {
                         let data = Some(
                             client
                                 .find(&[Filter::new(Tag::File, &file)])?
@@ -192,7 +183,8 @@ impl SearchPane {
                                 .to_preview(),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
-                    });
+                    },
+                );
             }
         }
     }
@@ -380,7 +372,7 @@ impl SearchPane {
             return;
         }
 
-        context.query().id(SEARCH).replace_id(SEARCH).target(PaneTypeDiscriminants::Search).query(
+        context.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
             move |client| {
                 let filter = filter
                     .iter_mut()

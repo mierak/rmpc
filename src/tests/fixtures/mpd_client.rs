@@ -312,15 +312,17 @@ impl MpdClient for TestMpdClient {
 
                 for filter in filter {
                     let value = match filter.tag {
-                        Tag::Any => {
-                            values.iter().any(|a| a.is_some_and(|a| a.contains(filter.value)))
+                        Tag::Any => values
+                            .iter()
+                            .any(|a| a.is_some_and(|a| a.contains(filter.value.as_ref()))),
+                        Tag::Artist => values[0].is_some_and(|a| a.contains(filter.value.as_ref())),
+                        Tag::AlbumArtist => {
+                            values[1].is_some_and(|a| a.contains(filter.value.as_ref()))
                         }
-                        Tag::Artist => values[0].is_some_and(|a| a.contains(filter.value)),
-                        Tag::AlbumArtist => values[1].is_some_and(|a| a.contains(filter.value)),
-                        Tag::Album => values[2].is_some_and(|a| a.contains(filter.value)),
-                        Tag::Title => values[3].is_some_and(|a| a.contains(filter.value)),
-                        Tag::File => values[4].is_some_and(|a| a.contains(filter.value)),
-                        Tag::Genre => values[5].is_some_and(|a| a.contains(filter.value)),
+                        Tag::Album => values[2].is_some_and(|a| a.contains(filter.value.as_ref())),
+                        Tag::Title => values[3].is_some_and(|a| a.contains(filter.value.as_ref())),
+                        Tag::File => values[4].is_some_and(|a| a.contains(filter.value.as_ref())),
+                        Tag::Genre => values[5].is_some_and(|a| a.contains(filter.value.as_ref())),
                         Tag::Custom(_) => false,
                     };
                     if !value {
