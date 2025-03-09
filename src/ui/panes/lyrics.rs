@@ -31,14 +31,13 @@ impl Pane for LyricsPane {
         let Some(lrc) = &self.current_lyrics else { return Ok(()) };
 
         let elapsed = context.status.elapsed;
-        let current_line_idx = lrc
+        let (current_line_idx, first_line_reached) = lrc
             .lines
             .iter()
             .enumerate()
             .filter(|line| elapsed >= line.1.time)
             .min_by(|a, b| a.1.time.abs_diff(elapsed).cmp(&b.1.time.abs_diff(elapsed)))
-            .map(|result| result.0)
-            .unwrap_or_default();
+            .map_or((0, false), |result| (result.0, true));
 
         let rows = area.height;
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
@@ -53,7 +52,7 @@ impl Pane for LyricsPane {
                 continue;
             };
 
-            let darken = (middle_row as usize).abs_diff(i) > 0;
+            let darken = (middle_row as usize).abs_diff(i) > 0 || !first_line_reached;
 
             let p = Text::from(line.content.clone()).centered().style(if darken {
                 Style::default().fg(context.config.theme.text_color.unwrap_or_default())
