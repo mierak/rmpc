@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- The first lyrics will now only be highlighted once reached
+
 ### Fixed
 
 - Album art staying on the old one when in tmux and not visible
