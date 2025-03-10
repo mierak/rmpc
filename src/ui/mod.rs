@@ -257,13 +257,13 @@ impl<'ui> Ui<'ui> {
                             })
                     );
                 }
-                GlobalAction::NextTrack if context.status.state == State::Play => {
+                GlobalAction::NextTrack if context.status.state != State::Stop => {
                     context.command(move |client| {
                         client.next()?;
                         Ok(())
                     });
                 }
-                GlobalAction::PreviousTrack if context.status.state == State::Play => {
+                GlobalAction::PreviousTrack if context.status.state != State::Stop => {
                     context.command(move |client| {
                         client.prev()?;
                         Ok(())
