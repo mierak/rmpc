@@ -3,7 +3,6 @@ use std::{borrow::Cow, collections::HashMap};
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
 use anyhow::{Context, Result};
-use artists::ArtistsPane;
 use directories::DirectoriesPane;
 use either::Either;
 use header::HeaderPane;
@@ -22,6 +21,7 @@ use ratatui::{
 use search::SearchPane;
 use strum::Display;
 use tabs::TabsPane;
+use tag_browser::TagBrowserPane;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
@@ -53,7 +53,6 @@ use crate::{
 
 pub mod album_art;
 pub mod albums;
-pub mod artists;
 pub mod directories;
 #[cfg(debug_assertions)]
 pub mod frame_count;
@@ -67,6 +66,7 @@ pub mod property;
 pub mod queue;
 pub mod search;
 pub mod tabs;
+pub mod tag_browser;
 
 #[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'pane_ref, 'pane> {
@@ -74,8 +74,8 @@ pub enum Panes<'pane_ref, 'pane> {
     #[cfg(debug_assertions)]
     Logs(&'pane_ref mut LogsPane),
     Directories(&'pane_ref mut DirectoriesPane),
-    Artists(&'pane_ref mut ArtistsPane),
-    AlbumArtists(&'pane_ref mut ArtistsPane),
+    Artists(&'pane_ref mut TagBrowserPane),
+    AlbumArtists(&'pane_ref mut TagBrowserPane),
     Albums(&'pane_ref mut AlbumsPane),
     Playlists(&'pane_ref mut PlaylistsPane),
     Search(&'pane_ref mut SearchPane),
@@ -102,8 +102,8 @@ pub struct PaneContainer<'panes> {
     pub logs: LogsPane,
     pub directories: DirectoriesPane,
     pub albums: AlbumsPane,
-    pub artists: ArtistsPane,
-    pub album_artists: ArtistsPane,
+    pub artists: TagBrowserPane,
+    pub album_artists: TagBrowserPane,
     pub playlists: PlaylistsPane,
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
@@ -124,8 +124,8 @@ impl<'panes> PaneContainer<'panes> {
             logs: LogsPane::new(),
             directories: DirectoriesPane::new(context),
             albums: AlbumsPane::new(context),
-            artists: ArtistsPane::new(Tag::Artist, PaneType::Artists, None, context),
-            album_artists: ArtistsPane::new(
+            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, context),
+            album_artists: TagBrowserPane::new(
                 Tag::AlbumArtist,
                 PaneType::AlbumArtists,
                 None,
@@ -151,7 +151,7 @@ impl<'panes> PaneContainer<'panes> {
             tab.panes.panes_iter().filter_map(|pane| match &pane.pane {
                 PaneType::Browser { root_tag, separator } => Some((
                     pane.pane.clone(),
-                    Box::new(ArtistsPane::new(
+                    Box::new(TagBrowserPane::new(
                         Tag::Custom(root_tag.clone()),
                         pane.pane.clone(),
                         separator.clone(),
