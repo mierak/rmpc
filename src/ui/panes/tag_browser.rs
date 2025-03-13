@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
@@ -9,13 +9,13 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
-        tabs::PaneTypeDiscriminants,
+        tabs::PaneType,
     },
     context::AppContext,
     mpd::{
         client::Client,
         commands::Song,
-        mpd_client::{Filter, MpdClient, Tag},
+        mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
         ext::mpd_client::MpdClientExt,
@@ -23,6 +23,7 @@ use crate::{
         macros::status_info,
         mouse_event::MouseEvent,
         mpd_query::PreviewGroup,
+        string_util::StringExt,
     },
     ui::{
         UiEvent,
@@ -33,18 +34,16 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum ArtistsPaneMode {
-    AlbumArtist,
-    Artist,
-}
-#[derive(Debug)]
-pub struct ArtistsPane {
+pub struct TagBrowserPane {
     stack: DirStack<DirOrSong>,
     filter_input_mode: bool,
-    mode: ArtistsPaneMode,
+    root_tag: Tag,
+    separator: Option<Arc<str>>,
+    unescaped_separator: Option<String>,
+    target_pane: PaneType,
     browser: Browser<DirOrSong>,
     initialized: bool,
-    cache: ArtistsCache,
+    cache: TagBrowserCache,
 }
 
 const INIT: &str = "init";
@@ -52,10 +51,10 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 #[derive(Debug, Default)]
-struct ArtistsCache(HashMap<String, CachedArtist>);
+struct TagBrowserCache(HashMap<String, CachedRootTag>);
 
 #[derive(Debug, Default)]
-struct CachedArtist(Vec<CachedAlbum>);
+struct CachedRootTag(Vec<CachedAlbum>);
 
 #[derive(Debug, Default)]
 struct CachedAlbum {
@@ -64,29 +63,39 @@ struct CachedAlbum {
     songs: Vec<Song>,
 }
 
-impl ArtistsPane {
-    pub fn new(mode: ArtistsPaneMode, _context: &AppContext) -> Self {
+impl TagBrowserPane {
+    pub fn new(
+        root_tag: Tag,
+        target_pane: PaneType,
+        separator: Option<String>,
+        _context: &AppContext,
+    ) -> Self {
         Self {
-            mode,
+            root_tag,
+            target_pane,
+            separator: separator.as_ref().map(|sep| sep.escape_regex_chars().into()),
+            unescaped_separator: separator,
             stack: DirStack::default(),
             filter_input_mode: false,
             browser: Browser::new(),
             initialized: false,
-            cache: ArtistsCache::default(),
+            cache: TagBrowserCache::default(),
         }
     }
 
-    fn artist_tag(&self) -> Tag {
-        match self.mode {
-            ArtistsPaneMode::AlbumArtist => Tag::AlbumArtist,
-            ArtistsPaneMode::Artist => Tag::Artist,
-        }
-    }
-
-    fn target_pane(&self) -> PaneTypeDiscriminants {
-        match self.mode {
-            ArtistsPaneMode::AlbumArtist => PaneTypeDiscriminants::AlbumArtists,
-            ArtistsPaneMode::Artist => PaneTypeDiscriminants::Artists,
+    fn root_tag_filter(root_tag: Tag, separator: Option<Arc<str>>, value: &str) -> Filter<'_> {
+        match separator {
+            None => Filter::new(root_tag, value),
+            Some(_) if value.is_empty() => Filter::new(root_tag, value),
+            // Exact match search cannot be used when separator is present because a single item in
+            // the list might be only part of the whole tag value. Thus we search for the value
+            // prependend by either start of the line or *anything* followed by the separator and
+            // followed by either end of the line or *anything* followed by the separator again.
+            Some(separator) => Filter::new_with_kind(
+                root_tag,
+                format!("(^|.*{separator}){value}($|{separator}.*)"),
+                FilterKind::Regex,
+            ),
         }
     }
 
@@ -133,12 +142,14 @@ impl ArtistsPane {
                         .collect();
                     self.stack_mut().push(albums);
                 } else {
-                    let artist_tag = self.artist_tag();
-                    let target = self.target_pane();
+                    let root_tag = self.root_tag.clone();
+                    let separator = self.separator.clone();
+                    let target = self.target_pane.clone();
                     context.query().id(OPEN_OR_PLAY).replace_id(OPEN_OR_PLAY).target(target).query(
                         move |client| {
-                            let all_songs: Vec<Song> =
-                                client.find(&[Filter::new(artist_tag, &current)])?;
+                            let root_tag_filter =
+                                Self::root_tag_filter(root_tag, separator, &current);
+                            let all_songs: Vec<Song> = client.find(&[root_tag_filter])?;
                             Ok(MpdQueryResult::SongsList {
                                 data: all_songs,
                                 origin_path: Some(vec![current]),
@@ -163,7 +174,7 @@ impl ArtistsPane {
         artist: String,
         data: Vec<Song>,
         context: &AppContext,
-    ) -> &CachedArtist {
+    ) -> &CachedRootTag {
         let display_mode = context.config.artists.album_display_mode;
         let sort_mode = context.config.artists.album_sort_by;
 
@@ -218,7 +229,7 @@ impl ArtistsPane {
     }
 }
 
-impl Pane for ArtistsPane {
+impl Pane for TagBrowserPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
@@ -232,10 +243,10 @@ impl Pane for ArtistsPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            let target = self.target_pane();
-            let artist_tag = self.artist_tag();
+            let root_tag = self.root_tag.clone();
+            let target = self.target_pane.clone();
             context.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
-                let result = client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                 Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
             });
 
@@ -253,12 +264,11 @@ impl Pane for ArtistsPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                let target = self.target_pane();
-                let artist_tag = self.artist_tag();
-                self.cache = ArtistsCache::default();
+                let root_tag = self.root_tag.clone();
+                let target = self.target_pane.clone();
+                self.cache = TagBrowserCache::default();
                 context.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
-                    let result =
-                        client.list_tag(artist_tag, None).context("Cannot list artists")?;
+                    let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                     Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
                 });
             }
@@ -359,8 +369,17 @@ impl Pane for ArtistsPane {
                 context.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
-                self.stack =
-                    DirStack::new(data.into_iter().map(DirOrSong::name_only).collect_vec());
+                let data = if let Some(sep) = &self.unescaped_separator {
+                    data.into_iter()
+                        .flat_map(|item| item.split(sep.as_str()).map(str::to_string).collect_vec())
+                        .unique()
+                        .map(DirOrSong::name_only)
+                        .collect_vec()
+                } else {
+                    data.into_iter().map(DirOrSong::name_only).collect_vec()
+                };
+
+                self.stack = DirStack::new(data);
                 self.prepare_preview(context)?;
                 context.render()?;
             }
@@ -370,7 +389,7 @@ impl Pane for ArtistsPane {
     }
 }
 
-impl BrowserPane<DirOrSong> for ArtistsPane {
+impl BrowserPane<DirOrSong> for TagBrowserPane {
     fn stack(&self) -> &DirStack<DirOrSong> {
         &self.stack
     }
@@ -391,7 +410,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         &self,
         item: DirOrSong,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
-        let tag = self.artist_tag();
+        let root_tag = self.root_tag.clone();
+        let separator = self.separator.clone();
         let path = self.stack().path().to_owned();
         let album_name = match (self.stack().path(), &item) {
             ([artist], DirOrSong::Dir { name, .. }) => self
@@ -408,9 +428,11 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
         move |client| {
             Ok(match item {
                 DirOrSong::Dir { name, full_path: _ } => match path.as_slice() {
-                    [artist] => client
-                        .find(&[Filter::new(Tag::Album, &album_name), Filter::new(tag, artist)])?,
-                    [] => client.find(&[Filter::new(tag, &name)])?,
+                    [artist] => client.find(&[
+                        Filter::new(Tag::Album, &album_name),
+                        Self::root_tag_filter(root_tag, separator, artist),
+                    ])?,
+                    [] => client.find(&[Self::root_tag_filter(root_tag, separator, &name)])?,
                     _ => Vec::new(),
                 },
                 DirOrSong::Song(song) => vec![song.clone()],
@@ -421,7 +443,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
     fn add(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
         match self.stack.path() {
             [artist, album] => {
-                let artist_tag = self.artist_tag();
+                let root_tag = self.root_tag.clone();
+                let separator = self.separator.clone();
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
 
@@ -437,7 +460,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
 
                 context.command(move |client| {
                     client.find_add(&[
-                        Filter::new(artist_tag, artist.as_str()),
+                        Self::root_tag_filter(root_tag, separator, artist.as_str()),
                         Filter::new(Tag::Album, original_name.as_str()),
                         Filter::new(Tag::File, &name),
                     ])?;
@@ -449,7 +472,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             [artist] => {
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
-                let artist_tag = self.artist_tag();
+                let root_tag = self.root_tag.clone();
+                let separator = self.separator.clone();
 
                 let Some(albums) = self.cache.0.get(&artist) else {
                     return Ok(());
@@ -463,7 +487,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
 
                 context.command(move |client| {
                     client.find_add(&[
-                        Filter::new(artist_tag, artist.as_str()),
+                        Self::root_tag_filter(root_tag, separator, artist.as_str()),
                         Filter::new(Tag::Album, &original_name),
                     ])?;
 
@@ -473,9 +497,10 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             }
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
-                let artist_tag = self.artist_tag();
+                let root_tag = self.root_tag.clone();
+                let separator = self.separator.clone();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(artist_tag, &name)])?;
+                    client.find_add(&[Self::root_tag_filter(root_tag, separator, &name)])?;
 
                     status_info!("All songs by '{name}' added to queue");
                     Ok(())
@@ -488,7 +513,8 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
     }
 
     fn add_all(&self, context: &AppContext) -> Result<()> {
-        let artist_tag = self.artist_tag();
+        let root_tag = self.root_tag.clone();
+        let separator = self.separator.clone();
         match self.stack.path() {
             [artist, album] => {
                 let artist = artist.clone();
@@ -504,7 +530,7 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
 
                 context.command(move |client| {
                     client.find_add(&[
-                        Filter::new(artist_tag, artist.as_str()),
+                        Self::root_tag_filter(root_tag, separator, artist.as_str()),
                         Filter::new(Tag::Album, original_name.as_str()),
                     ])?;
                     status_info!("Album '{original_name}' by '{artist}' added to queue");
@@ -514,7 +540,11 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
             [artist] => {
                 let artist = artist.clone();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(artist_tag, artist.as_str())])?;
+                    client.find_add(&[Self::root_tag_filter(
+                        root_tag,
+                        separator,
+                        artist.as_str(),
+                    )])?;
                     status_info!("All albums by '{artist}' added to queue");
                     Ok(())
                 });
@@ -594,12 +624,13 @@ impl BrowserPane<DirOrSong> for ArtistsPane {
                     )]));
                     context.render()?;
                 } else {
-                    let artist_tag = self.artist_tag();
-                    let target = self.target_pane();
+                    let root_tag = self.root_tag.clone();
+                    let separator = self.separator.clone();
+                    let target = self.target_pane.clone();
                     context.query().id(PREVIEW).replace_id(PREVIEW).target(target).query(
                         move |client| {
-                            let all_songs: Vec<Song> =
-                                client.find(&[Filter::new(artist_tag, &current)])?;
+                            let all_songs: Vec<Song> = client
+                                .find(&[Self::root_tag_filter(root_tag, separator, &current)])?;
                             Ok(MpdQueryResult::SongsList {
                                 data: all_songs,
                                 origin_path: Some(vec![current]),
@@ -649,7 +680,7 @@ mod tests {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Name;
         app_context.config = std::sync::Arc::new(config);
-        let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -658,7 +689,7 @@ mod tests {
             song("album_b", "2022"),
         ];
 
-        let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].name, "album_a");
@@ -670,7 +701,7 @@ mod tests {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Name;
         app_context.config = std::sync::Arc::new(config);
-        let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -679,7 +710,7 @@ mod tests {
             song("album_b", "2022"),
         ];
 
-        let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
 
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].name, "(2020) album_a");
@@ -692,7 +723,7 @@ mod tests {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
         app_context.config = std::sync::Arc::new(config);
-        let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -701,7 +732,7 @@ mod tests {
             song("album_b", "2019"),
         ];
 
-        let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
 
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].name, "(2019) album_b");
@@ -714,7 +745,7 @@ mod tests {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Date;
         app_context.config = std::sync::Arc::new(config);
-        let mut pane = ArtistsPane::new(ArtistsPaneMode::Artist, &app_context);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -723,7 +754,7 @@ mod tests {
             song("album_b", "2025"),
         ];
 
-        let CachedArtist(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
         dbg!(&result);
 
         assert_eq!(result.len(), 2);

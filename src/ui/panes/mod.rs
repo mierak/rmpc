@@ -1,9 +1,8 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
-use anyhow::Result;
-use artists::{ArtistsPane, ArtistsPaneMode};
+use anyhow::{Context, Result};
 use directories::DirectoriesPane;
 use either::Either;
 use header::HeaderPane;
@@ -22,6 +21,7 @@ use ratatui::{
 use search::SearchPane;
 use strum::Display;
 use tabs::TabsPane;
+use tag_browser::TagBrowserPane;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
@@ -30,7 +30,7 @@ use crate::{
     MpdQueryResult,
     config::{
         keys::CommonAction,
-        tabs::{Pane as ConfigPane, PaneType, PaneTypeDiscriminants, SizedPaneOrSplit},
+        tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
         theme::{
             SymbolsConfig,
             properties::{
@@ -44,13 +44,15 @@ use crate::{
         },
     },
     context::AppContext,
-    mpd::commands::{Song, State, Status, status::OnOffOneshot, volume::Bound},
+    mpd::{
+        commands::{Song, State, Status, status::OnOffOneshot, volume::Bound},
+        mpd_client::Tag,
+    },
     shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
 };
 
 pub mod album_art;
 pub mod albums;
-pub mod artists;
 pub mod directories;
 #[cfg(debug_assertions)]
 pub mod frame_count;
@@ -64,6 +66,7 @@ pub mod property;
 pub mod queue;
 pub mod search;
 pub mod tabs;
+pub mod tag_browser;
 
 #[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'pane_ref, 'pane> {
@@ -71,8 +74,8 @@ pub enum Panes<'pane_ref, 'pane> {
     #[cfg(debug_assertions)]
     Logs(&'pane_ref mut LogsPane),
     Directories(&'pane_ref mut DirectoriesPane),
-    Artists(&'pane_ref mut ArtistsPane),
-    AlbumArtists(&'pane_ref mut ArtistsPane),
+    Artists(&'pane_ref mut TagBrowserPane),
+    AlbumArtists(&'pane_ref mut TagBrowserPane),
     Albums(&'pane_ref mut AlbumsPane),
     Playlists(&'pane_ref mut PlaylistsPane),
     Search(&'pane_ref mut SearchPane),
@@ -85,7 +88,12 @@ pub enum Panes<'pane_ref, 'pane> {
     FrameCount(&'pane_ref mut FrameCountPane),
     TabContent,
     Property(PropertyPane<'pane_ref>),
+    Others(&'pane_ref mut Box<dyn BoxedPane>),
 }
+
+pub trait BoxedPane: Pane + std::fmt::Debug {}
+
+impl<P: Pane + std::fmt::Debug> BoxedPane for P {}
 
 #[derive(Debug)]
 pub struct PaneContainer<'panes> {
@@ -94,8 +102,8 @@ pub struct PaneContainer<'panes> {
     pub logs: LogsPane,
     pub directories: DirectoriesPane,
     pub albums: AlbumsPane,
-    pub artists: ArtistsPane,
-    pub album_artists: ArtistsPane,
+    pub artists: TagBrowserPane,
+    pub album_artists: TagBrowserPane,
     pub playlists: PlaylistsPane,
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
@@ -105,6 +113,7 @@ pub struct PaneContainer<'panes> {
     pub tabs: TabsPane<'panes>,
     #[cfg(debug_assertions)]
     pub frame_count: FrameCountPane,
+    pub others: HashMap<PaneType, Box<dyn BoxedPane>>,
 }
 
 impl<'panes> PaneContainer<'panes> {
@@ -115,8 +124,13 @@ impl<'panes> PaneContainer<'panes> {
             logs: LogsPane::new(),
             directories: DirectoriesPane::new(context),
             albums: AlbumsPane::new(context),
-            artists: ArtistsPane::new(ArtistsPaneMode::Artist, context),
-            album_artists: ArtistsPane::new(ArtistsPaneMode::AlbumArtist, context),
+            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, context),
+            album_artists: TagBrowserPane::new(
+                Tag::AlbumArtist,
+                PaneType::AlbumArtists,
+                None,
+                context,
+            ),
             playlists: PlaylistsPane::new(context),
             search: SearchPane::new(context),
             album_art: AlbumArtPane::new(context),
@@ -126,63 +140,60 @@ impl<'panes> PaneContainer<'panes> {
             tabs: TabsPane::new(context)?,
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
+            others: Self::init_other_panes(context).collect(),
         })
     }
 
-    pub fn get_mut_by_discr<'pane_ref>(
-        &'pane_ref mut self,
-        pane: PaneTypeDiscriminants,
-    ) -> Option<Panes<'pane_ref, 'panes>> {
-        match pane {
-            PaneTypeDiscriminants::Queue => Some(Panes::Queue(&mut self.queue)),
-            #[cfg(debug_assertions)]
-            PaneTypeDiscriminants::Logs => Some(Panes::Logs(&mut self.logs)),
-            PaneTypeDiscriminants::Directories => Some(Panes::Directories(&mut self.directories)),
-            PaneTypeDiscriminants::Artists => Some(Panes::Artists(&mut self.artists)),
-            PaneTypeDiscriminants::AlbumArtists => {
-                Some(Panes::AlbumArtists(&mut self.album_artists))
-            }
-            PaneTypeDiscriminants::Albums => Some(Panes::Albums(&mut self.albums)),
-            PaneTypeDiscriminants::Playlists => Some(Panes::Playlists(&mut self.playlists)),
-            PaneTypeDiscriminants::Search => Some(Panes::Search(&mut self.search)),
-            PaneTypeDiscriminants::AlbumArt => Some(Panes::AlbumArt(&mut self.album_art)),
-            PaneTypeDiscriminants::Lyrics => Some(Panes::Lyrics(&mut self.lyrics)),
-            PaneTypeDiscriminants::ProgressBar => Some(Panes::ProgressBar(&mut self.progress_bar)),
-            PaneTypeDiscriminants::Header => Some(Panes::Header(&mut self.header)),
-            PaneTypeDiscriminants::Tabs => Some(Panes::Tabs(&mut self.tabs)),
-            PaneTypeDiscriminants::TabContent => Some(Panes::TabContent),
-            #[cfg(debug_assertions)]
-            PaneTypeDiscriminants::FrameCount => Some(Panes::FrameCount(&mut self.frame_count)),
-            PaneTypeDiscriminants::Property => None,
-        }
+    pub fn init_other_panes(
+        context: &AppContext,
+    ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
+        context.config.tabs.tabs.iter().flat_map(|(_name, tab)| {
+            tab.panes.panes_iter().filter_map(|pane| match &pane.pane {
+                PaneType::Browser { root_tag, separator } => Some((
+                    pane.pane.clone(),
+                    Box::new(TagBrowserPane::new(
+                        Tag::Custom(root_tag.clone()),
+                        pane.pane.clone(),
+                        separator.clone(),
+                        context,
+                    )) as Box<dyn BoxedPane>,
+                )),
+                _ => None,
+            })
+        })
     }
 
     pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
         &'pane_ref mut self,
         pane: &'pane_type_ref PaneType,
         context: &AppContext,
-    ) -> Panes<'pane_ref, 'panes> {
+    ) -> Result<Panes<'pane_ref, 'panes>> {
         match pane {
-            PaneType::Queue => Panes::Queue(&mut self.queue),
+            PaneType::Queue => Ok(Panes::Queue(&mut self.queue)),
             #[cfg(debug_assertions)]
-            PaneType::Logs => Panes::Logs(&mut self.logs),
-            PaneType::Directories => Panes::Directories(&mut self.directories),
-            PaneType::Artists => Panes::Artists(&mut self.artists),
-            PaneType::AlbumArtists => Panes::AlbumArtists(&mut self.album_artists),
-            PaneType::Albums => Panes::Albums(&mut self.albums),
-            PaneType::Playlists => Panes::Playlists(&mut self.playlists),
-            PaneType::Search => Panes::Search(&mut self.search),
-            PaneType::AlbumArt => Panes::AlbumArt(&mut self.album_art),
-            PaneType::Lyrics => Panes::Lyrics(&mut self.lyrics),
-            PaneType::ProgressBar => Panes::ProgressBar(&mut self.progress_bar),
-            PaneType::Header => Panes::Header(&mut self.header),
-            PaneType::Tabs => Panes::Tabs(&mut self.tabs),
-            PaneType::TabContent => Panes::TabContent,
+            PaneType::Logs => Ok(Panes::Logs(&mut self.logs)),
+            PaneType::Directories => Ok(Panes::Directories(&mut self.directories)),
+            PaneType::Artists => Ok(Panes::Artists(&mut self.artists)),
+            PaneType::AlbumArtists => Ok(Panes::AlbumArtists(&mut self.album_artists)),
+            PaneType::Albums => Ok(Panes::Albums(&mut self.albums)),
+            PaneType::Playlists => Ok(Panes::Playlists(&mut self.playlists)),
+            PaneType::Search => Ok(Panes::Search(&mut self.search)),
+            PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
+            PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
+            PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
+            PaneType::Header => Ok(Panes::Header(&mut self.header)),
+            PaneType::Tabs => Ok(Panes::Tabs(&mut self.tabs)),
+            PaneType::TabContent => Ok(Panes::TabContent),
             #[cfg(debug_assertions)]
-            PaneType::FrameCount => Panes::FrameCount(&mut self.frame_count),
+            PaneType::FrameCount => Ok(Panes::FrameCount(&mut self.frame_count)),
             PaneType::Property { content, align } => {
-                Panes::Property(PropertyPane::<'pane_type_ref>::new(content, *align, context))
+                Ok(Panes::Property(PropertyPane::<'pane_type_ref>::new(content, *align, context)))
             }
+            p @ PaneType::Browser { .. } => Ok(Panes::Others(
+                self.others
+                    .get_mut(pane)
+                    .with_context(|| format!("expected pane to be defined {p:?}"))?,
+            )),
         }
     }
 }
@@ -208,13 +219,14 @@ macro_rules! pane_call {
             #[cfg(debug_assertions)]
             Panes::FrameCount(ref mut s) => s.$fn($($param),+),
             Panes::Property(ref mut s) => s.$fn($($param),+),
+            Panes::Others(ref mut s) => s.$fn($($param),+),
         }
     }
 }
 pub(crate) use pane_call;
 
 #[allow(unused_variables)]
-pub(super) trait Pane {
+pub(crate) trait Pane {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides

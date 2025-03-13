@@ -17,7 +17,7 @@ use crate::{
     MpdQueryResult,
     config::{
         keys::{GlobalAction, QueueActions},
-        tabs::PaneTypeDiscriminants,
+        tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
     context::AppContext,
@@ -522,7 +522,7 @@ impl Pane for QueuePane {
                             .query()
                             .id(ADD_TO_PLAYLIST)
                             .replace_id(ADD_TO_PLAYLIST)
-                            .target(PaneTypeDiscriminants::Queue)
+                            .target(PaneType::Queue)
                             .query(move |client| {
                                 let playlists = client
                                     .list_playlists()?

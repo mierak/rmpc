@@ -15,7 +15,7 @@ use itertools::Itertools;
 use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
-use tabs::{PaneTypeDiscriminants, Tabs, TabsFile, validate_tabs};
+use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
 use utils::tilde_expand;
 
 pub mod address;
@@ -67,7 +67,7 @@ pub struct Config {
     pub search: Search,
     pub artists: Artists,
     pub tabs: Tabs,
-    pub active_panes: Vec<PaneTypeDiscriminants>,
+    pub active_panes: Vec<PaneType>,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -234,10 +234,8 @@ impl ConfigFile {
         let active_panes = tabs
             .tabs
             .iter()
-            .flat_map(|(_, tab)| {
-                tab.panes.panes_iter().map(|pane| PaneTypeDiscriminants::from(&pane.pane))
-            })
-            .chain(theme.layout.panes_iter().map(|pane| PaneTypeDiscriminants::from(&pane.pane)))
+            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane.clone()))
+            .chain(theme.layout.panes_iter().map(|pane| pane.pane.clone()))
             .unique()
             .collect_vec();
 

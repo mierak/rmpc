@@ -57,6 +57,10 @@ pub enum PaneTypeFile {
         #[serde(default)]
         align: super::theme::properties::Alignment,
     },
+    Browser {
+        root_tag: String,
+        separator: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
@@ -82,6 +86,10 @@ pub enum PaneType {
     Property {
         content: Vec<Property<PropertyKind>>,
         align: ratatui::layout::Alignment,
+    },
+    Browser {
+        root_tag: String,
+        separator: Option<String>,
     },
 }
 
@@ -144,6 +152,9 @@ impl From<PaneTypeFile> for PaneType {
                     .collect_vec(),
                 align: (align).into(),
             },
+            PaneTypeFile::Browser { root_tag: tag, separator } => {
+                PaneType::Browser { root_tag: tag, separator }
+            }
         }
     }
 }
