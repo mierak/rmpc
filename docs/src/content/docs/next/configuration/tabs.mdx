@@ -62,8 +62,10 @@ Rmpc has several pane_types which can be displayed. These are:
 - `AlbumArt` - The album art. Cannot be focused.
 - `Queue` - Table of the current song queue.
 - `Directories` - Browse music library by directory.
-- `Artists` - Browse music library by `artist` tag.
-- `AlbumArtists` - Browse music library by `albumartist` tag.
+- `Browser` - A music library browser. Allows you to specify a root tag and an optional separator. `Browser(root_tag: "<tag>", separator: ";")`.
+  Separator can be used to create multiple entries from one tag value, for example if a song has multiple `genre` values separated by `;`.
+- `Artists` - Browse music library by `artist` tag. Equivalent to `Browser(root_tag: "artist")`
+- `AlbumArtists` - Browse music library by `albumartist` tag. Equivalent to `Browser(root_tag: "albumartist")`
 - `Albums` - Browse music library by `album` tag.
 - `Playlists` - Browse saved playlists.
 - `Search` - Search music library.
