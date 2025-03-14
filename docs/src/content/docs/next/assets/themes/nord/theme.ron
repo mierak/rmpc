@@ -118,7 +118,7 @@
                 ],
                 center: [
                     (kind: Property(Song(Title)), style: (modifiers: "Bold"),
-                        default: (kind: Text("No Song"), style: (modifiers: "Bold"))
+                        default: (kind: Property(Song(Filename)), style: (modifiers: "Bold"))
                     )
                 ],
                 right: [
@@ -138,7 +138,7 @@
                 ],
                 center: [
                     (kind: Property(Song(Artist)), style: (fg: "cyan", modifiers: "Bold"),
-                        default: (kind: Text("Unknown"), style: (fg: "cyan", modifiers: "Bold"))
+                        default: (kind: Text("Unknown Artist"), style: (fg: "cyan", modifiers: "Bold"))
                     ),
                     (kind: Text(" - ")),
                     (kind: Property(Song(Album)),style: (fg: "blue" ),
