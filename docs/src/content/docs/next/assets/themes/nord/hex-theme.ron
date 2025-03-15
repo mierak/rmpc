@@ -13,7 +13,7 @@
     tab_bar: (
         enabled: true,
         active_style: (fg: "#2e3440", bg: "#81A1C1", modifiers: "Bold"),
-        inactive_style: (fg: "#d8dee9", bg: "#2e3440", modifiers: "Bold"),
+        inactive_style: (fg: "#d8dee9", bg: "#2e3440", modifiers: ""),
     ),
     highlighted_item_style: (fg: "#a3be8c", modifiers: "Bold"),
     current_item_style: (fg: "#2e3440", bg: "#81a1c1", modifiers: "Bold"),
