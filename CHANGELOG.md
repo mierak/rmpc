@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 - remote command to change theme
 - `on_resize` which is called whenever rmpc is resized
 - `--theme` cli argument to override theme in the config file
-- new `Browser` pane which
+- new `Browser` pane
 
 ### Changed
 
@@ -20,10 +20,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Lyrics with fractions of seconds which weren't to 2s.f. being
-  parsed incorrectly
-
+- Lyrics with fractions of seconds which weren't to 2s.f. being parsed incorrectly
 - Album art staying on the old one when in tmux and not visible
+- Fixed catpuccin theme not being up to date in the docs
 
 ## [0.8.0] - 2025-02-16
 
