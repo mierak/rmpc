@@ -6,6 +6,23 @@
     draw_borders: false,
     show_song_table_header: false,
     symbols: (song: "🎵", dir: "📁", marker: "\u{e0b0}"),
+    layout: Split(
+        direction: Vertical,
+        panes: [
+            (
+                pane: Pane(Header),
+                size: "1",
+            ),
+            (
+                pane: Pane(TabContent),
+                size: "100%",
+            ),
+            (
+                pane: Pane(ProgressBar),
+                size: "1",
+            ),
+        ],
+    ),
     progress_bar: (
         symbols: ["", "⭘", " "],
         track_style: (bg: "#1e2030"),
@@ -23,11 +40,7 @@
     background_color: "#24273a",
     header_background_color: "#1e2030",
     modal_background_color: None,
-    tab_bar: (
-        enabled: false,
-        active_style: (fg: "black", bg: "#c6a0f6", modifiers: "Bold"),
-        inactive_style: (),
-    ),
+    tab_bar: (active_style: (fg: "black", bg: "#c6a0f6", modifiers: "Bold"), inactive_style: ()),
     borders_style: (fg: "#6e738d"),
     highlighted_item_style: (fg: "#c6a0f6", modifiers: "Bold"),
     current_item_style: (fg: "black", bg: "#b7bdf8", modifiers: "Bold"),
