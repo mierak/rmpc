@@ -482,7 +482,7 @@ mod tests {
         for entry in WalkDir::new(path).follow_links(true).into_iter().filter_map(Result::ok) {
             let f_name = entry.file_name().to_string_lossy();
 
-            if f_name.ends_with(".ron") {
+            if f_name.ends_with("theme.ron") {
                 dbg!(entry.path());
                 ron::de::from_str::<UiConfigFile>(&std::fs::read_to_string(entry.path()).unwrap())
                     .unwrap();
