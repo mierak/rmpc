@@ -158,12 +158,16 @@ tabs: [
 
 <ConfigValue
     name="pane"
-    customText="Pane(Property(content: <property>[], align: Left | Right | Center))"
+    customText="Pane(Property(content: <property>[], align: Left | Right | Center, scroll_speed: <number>))"
     link={path("configuration/header/#header_property_kind")}
 />
 
 This config displays the `AlbumArt` and `Queue` panes and below them there are `Property` with pane with `StateV2`, `ProgressBar` pane and
 another `Property` pane with combination of `Elapsed` and `Duration` status properties next to each other in a line.
+
+The `Property` pane also scrolls around and cycles if the content is longer than its defined area when `scroll_speed` is set to a value higher
+than 0. The value determines how fast the `Property` pane cycles in columns per second. This is tied to the elapsed time of the currently playing
+song. This is disabled when set to 0 or not set at all.
 
 <details>
 

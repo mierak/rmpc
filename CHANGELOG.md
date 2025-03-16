@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - `on_resize` which is called whenever rmpc is resized
 - `--theme` cli argument to override theme in the config file
 - new `Browser` pane
+- Add ability to scroll and cycle `Property` panes when they do not fit their area
 
 ### Changed
 

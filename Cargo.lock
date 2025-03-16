@@ -1865,6 +1865,7 @@ dependencies = [
  "test-case",
  "textwrap",
  "time",
+ "unicode-width 0.2.0",
  "url",
  "vergen-gitcl",
  "walkdir",

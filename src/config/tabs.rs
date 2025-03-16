@@ -56,6 +56,8 @@ pub enum PaneTypeFile {
         content: Vec<PropertyFile<PropertyKindFile>>,
         #[serde(default)]
         align: super::theme::properties::Alignment,
+        #[serde(default)]
+        scroll_speed: u16,
     },
     Browser {
         root_tag: String,
@@ -86,6 +88,7 @@ pub enum PaneType {
     Property {
         content: Vec<Property<PropertyKind>>,
         align: ratatui::layout::Alignment,
+        scroll_speed: u16,
     },
     Browser {
         root_tag: String,
@@ -145,13 +148,16 @@ impl From<PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
-            PaneTypeFile::Property { content: properties, align } => PaneType::Property {
-                content: properties
-                    .into_iter()
-                    .map(|prop| prop.try_into().expect(""))
-                    .collect_vec(),
-                align: (align).into(),
-            },
+            PaneTypeFile::Property { content: properties, align, scroll_speed } => {
+                PaneType::Property {
+                    content: properties
+                        .into_iter()
+                        .map(|prop| prop.try_into().expect(""))
+                        .collect_vec(),
+                    align: align.into(),
+                    scroll_speed,
+                }
+            }
             PaneTypeFile::Browser { root_tag: tag, separator } => {
                 PaneType::Browser { root_tag: tag, separator }
             }

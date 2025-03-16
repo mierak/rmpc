@@ -11,6 +11,7 @@ pub mod button;
 pub mod header;
 pub mod input;
 pub mod progress_bar;
+pub mod scrolling_line;
 pub mod tabs;
 pub mod volume;
 
