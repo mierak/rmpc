@@ -11,27 +11,31 @@ use crate::{
     config::theme::properties::{Property, PropertyKind},
     context::AppContext,
     shared::key_event::KeyEvent,
+    ui::widgets::scrolling_line::ScrollingLine,
 };
 
 #[derive(Debug)]
 pub struct PropertyPane<'content> {
     content: &'content Vec<Property<PropertyKind>>,
     align: Alignment,
+    scroll_speed: u64,
 }
 
 impl<'content> PropertyPane<'content> {
     pub fn new(
         content: &'content Vec<Property<PropertyKind>>,
         align: Alignment,
+        scroll_speed: u64,
         _context: &AppContext,
     ) -> Self {
-        Self { content, align }
+        Self { content, align, scroll_speed }
     }
 }
 
 impl Pane for PropertyPane<'_> {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
         let song = context.find_current_song_in_queue().map(|(_, song)| song);
+
         let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(song, &context.status) {
                 Some(Either::Left(span)) => acc.push(span),
@@ -39,9 +43,16 @@ impl Pane for PropertyPane<'_> {
                 None => {}
             }
             acc
-        }))
-        .alignment(self.align);
-        frame.render_widget(line, area);
+        }));
+
+        let scrolling_line = ScrollingLine::builder()
+            .scroll_speed(self.scroll_speed)
+            .align(self.align)
+            .line(line)
+            .progress(context.status.elapsed)
+            .build();
+        frame.render_widget(scrolling_line, area);
+
         Ok(())
     }
 
