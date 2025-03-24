@@ -158,7 +158,7 @@ tabs: [
 
 <ConfigValue
     name="pane"
-    customText="Pane(Property(content: <property>[], align: Left | Right | Center, scroll_speed: <number>))"
+    customText="Pane(Property(content: <property>[], align: Left | Right | Center, scroll_speed: <number>, background_color: Option<String>))"
     link={path("configuration/header/#header_property_kind")}
 />
 
@@ -168,6 +168,9 @@ another `Property` pane with combination of `Elapsed` and `Duration` status prop
 The `Property` pane also scrolls around and cycles if the content is longer than its defined area when `scroll_speed` is set to a value higher
 than 0. The value determines how fast the `Property` pane cycles in columns per second. This is tied to the elapsed time of the currently playing
 song. This is disabled when set to 0 or not set at all.
+
+Additionally, `background_color` can also be configured for the whole pane. Falls back to theme's <a href={path("configuration/theme#background_color")}>background_color</a>
+if not specified.
 
 <details>
 

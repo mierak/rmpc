@@ -3,7 +3,9 @@ use either::Either;
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
+    style::{Color, Style},
     text::Line,
+    widgets::Block,
 };
 
 use super::Pane;
@@ -19,6 +21,7 @@ pub struct PropertyPane<'content> {
     content: &'content Vec<Property<PropertyKind>>,
     align: Alignment,
     scroll_speed: u64,
+    background_color: Option<Color>,
 }
 
 impl<'content> PropertyPane<'content> {
@@ -26,14 +29,18 @@ impl<'content> PropertyPane<'content> {
         content: &'content Vec<Property<PropertyKind>>,
         align: Alignment,
         scroll_speed: u64,
+        background_color: Option<Color>,
         _context: &AppContext,
     ) -> Self {
-        Self { content, align, scroll_speed }
+        Self { content, align, scroll_speed, background_color }
     }
 }
 
 impl Pane for PropertyPane<'_> {
     fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+        if let Some(bg_color) = self.background_color {
+            frame.render_widget(Block::default().style(Style::default().bg(bg_color)), area);
+        }
         let song = context.find_current_song_in_queue().map(|(_, song)| song);
 
         let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {

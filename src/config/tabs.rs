@@ -1,13 +1,14 @@
 #![allow(deprecated)] // TODO remove after cleanup
 use std::collections::HashMap;
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
-use ratatui::{layout::Direction, widgets::Borders};
+use ratatui::{layout::Direction, style::Color, widgets::Borders};
 use serde::{Deserialize, Serialize};
 
 use super::theme::{
+    ConfigColor,
     PercentOrLength,
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
 };
@@ -58,6 +59,8 @@ pub enum PaneTypeFile {
         align: super::theme::properties::Alignment,
         #[serde(default)]
         scroll_speed: u16,
+        #[serde(default)]
+        background_color: Option<String>,
     },
     Browser {
         root_tag: String,
@@ -89,6 +92,7 @@ pub enum PaneType {
         content: Vec<Property<PropertyKind>>,
         align: ratatui::layout::Alignment,
         scroll_speed: u16,
+        background_color: Option<Color>,
     },
     Browser {
         root_tag: String,
@@ -128,9 +132,11 @@ impl Pane {
     }
 }
 
-impl From<PaneTypeFile> for PaneType {
-    fn from(value: PaneTypeFile) -> Self {
-        match value {
+impl TryFrom<PaneTypeFile> for PaneType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PaneTypeFile) -> std::result::Result<Self, Self::Error> {
+        Ok(match value {
             PaneTypeFile::Queue => PaneType::Queue,
             #[cfg(debug_assertions)]
             PaneTypeFile::Logs => PaneType::Logs,
@@ -148,20 +154,30 @@ impl From<PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
-            PaneTypeFile::Property { content: properties, align, scroll_speed } => {
+            PaneTypeFile::Property { content, align, scroll_speed, background_color } => {
                 PaneType::Property {
-                    content: properties
+                    content: content
                         .into_iter()
                         .map(|prop| prop.try_into().expect(""))
                         .collect_vec(),
                     align: align.into(),
                     scroll_speed,
+                    background_color: background_color
+                        .as_ref()
+                        .map(|s| ConfigColor::try_from(s.as_bytes()))
+                        .transpose()
+                        .with_context(|| {
+                            format!(
+                                "Invalid property pane background color: '{background_color:?}'"
+                            )
+                        })?
+                        .map(|c| c.into()),
                 }
             }
             PaneTypeFile::Browser { root_tag: tag, separator } => {
                 PaneType::Browser { root_tag: tag, separator }
             }
-        }
+        })
     }
 }
 
@@ -342,7 +358,7 @@ impl PaneOrSplitFile {
     pub fn convert_recursive(&self, b: Borders) -> Result<SizedPaneOrSplit> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
-                pane: pane_type_file.clone().into(),
+                pane: pane_type_file.clone().try_into()?,
                 borders: b,
                 id: id::new(),
             }),

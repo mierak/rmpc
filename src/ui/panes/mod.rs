@@ -186,11 +186,12 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::TabContent => Ok(Panes::TabContent),
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Ok(Panes::FrameCount(&mut self.frame_count)),
-            PaneType::Property { content, align, scroll_speed } => {
+            PaneType::Property { content, align, scroll_speed, background_color } => {
                 Ok(Panes::Property(PropertyPane::<'pane_type_ref>::new(
                     content,
                     *align,
                     (*scroll_speed).into(),
+                    *background_color,
                     context,
                 )))
             }
