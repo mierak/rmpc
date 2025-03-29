@@ -15,6 +15,7 @@
     enable_config_hot_reload: true,
     status_update_interval_ms: 1000,
     select_current_song_on_change: false,
+    browser_song_sort: [Disc, Track, Artist, Title],
     album_art: (
         method: Auto,
         max_size_px: (width: 1200, height: 1200),

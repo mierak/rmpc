@@ -45,6 +45,7 @@ textwrap = "0.16.1"
 crossbeam = "0.8.4"
 notify-debouncer-full = "0.5.0"
 unicode-width = "0.2.0"
+unicase = "2.8.1"
 
 [build-dependencies]
 clap = { workspace = true }

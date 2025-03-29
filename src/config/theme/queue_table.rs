@@ -202,9 +202,7 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
-                PropertyKindFileOrText::Property(prop) => {
-                    PropertyKindOrText::Property(prop.try_into()?)
-                }
+                PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.into()),
                 PropertyKindFileOrText::Group(group) => {
                     let res: Vec<_> = group
                         .into_iter()

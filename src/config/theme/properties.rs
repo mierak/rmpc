@@ -17,6 +17,7 @@ pub enum SongPropertyFile {
     Album,
     Duration,
     Track,
+    Disc,
     Other(String),
 }
 
@@ -29,6 +30,7 @@ pub enum SongProperty {
     Album,
     Duration,
     Track,
+    Disc,
     Other(String),
 }
 
@@ -231,11 +233,9 @@ pub enum Alignment {
     Center,
 }
 
-impl TryFrom<SongPropertyFile> for SongProperty {
-    type Error = anyhow::Error;
-
-    fn try_from(value: SongPropertyFile) -> std::result::Result<Self, Self::Error> {
-        Ok(match value {
+impl From<SongPropertyFile> for SongProperty {
+    fn from(value: SongPropertyFile) -> Self {
+        match value {
             SongPropertyFile::Filename => SongProperty::Filename,
             SongPropertyFile::File => SongProperty::File,
             SongPropertyFile::Title => SongProperty::Title,
@@ -243,8 +243,9 @@ impl TryFrom<SongPropertyFile> for SongProperty {
             SongPropertyFile::Album => SongProperty::Album,
             SongPropertyFile::Duration => SongProperty::Duration,
             SongPropertyFile::Track => SongProperty::Track,
+            SongPropertyFile::Disc => SongProperty::Disc,
             SongPropertyFile::Other(name) => SongProperty::Other(name),
-        })
+        }
     }
 }
 
@@ -405,7 +406,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => {
                     PropertyKindOrText::Property(match prop {
-                        PropertyKindFile::Song(s) => PropertyKind::Song(s.try_into()?),
+                        PropertyKindFile::Song(s) => PropertyKind::Song(s.into()),
                         PropertyKindFile::Status(s) => PropertyKind::Status(s.try_into()?),
                         PropertyKindFile::Widget(WidgetPropertyFile::Volume) => {
                             PropertyKind::Widget(WidgetProperty::Volume)
@@ -439,7 +440,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongFormatFile(pub Vec<PropertyFile<SongPropertyFile>>);
 
 #[derive(Debug, Default, Clone)]

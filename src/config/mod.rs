@@ -16,6 +16,7 @@ use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
+use theme::properties::{SongProperty, SongPropertyFile};
 use utils::tilde_expand;
 
 pub mod address;
@@ -68,6 +69,7 @@ pub struct Config {
     pub artists: Artists,
     pub tabs: Tabs,
     pub active_panes: Vec<PaneType>,
+    pub browser_song_sort: Arc<Vec<SongProperty>>,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -121,6 +123,8 @@ pub struct ConfigFile {
     artists: ArtistsFile,
     #[serde(default)]
     tabs: TabsFile,
+    #[serde(default)]
+    pub browser_song_sort: Vec<SongPropertyFile>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -165,6 +169,7 @@ impl Default for ConfigFile {
             wrap_navigation: false,
             password: None,
             artists: ArtistsFile::default(),
+            browser_song_sort: defaults::default_song_sort(),
         }
     }
 }
@@ -243,6 +248,9 @@ impl ConfigFile {
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let album_art_method = self.album_art.method;
         let mut config = Config {
+            browser_song_sort: Arc::new(
+                self.browser_song_sort.into_iter().map(SongProperty::from).collect_vec(),
+            ),
             theme,
             theme_name: self.theme,
             cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),

@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect};
 use super::{Pane, browser::DirOrSong};
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{tabs::PaneType, theme::properties::SongProperty},
     context::AppContext,
     mpd::{
         client::Client,
@@ -70,13 +70,14 @@ impl AlbumsPane {
             }
             [] => {
                 let current = current.clone();
+                let sort_order = context.config.browser_song_sort.clone();
                 context
                     .query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let data = list_titles(client, current.as_path())?.collect();
+                        let data = list_titles(client, current.as_path(), &sort_order)?.collect();
                         Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
                     });
                 self.stack_mut().push(Vec::new());
@@ -201,15 +202,31 @@ impl Pane for AlbumsPane {
 fn list_titles(
     client: &mut impl MpdClient,
     album: &str,
+    sort_props: &[SongProperty],
 ) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
-    Ok(client.find(&[Filter::new(Tag::Album, album)])?.into_iter().map(DirOrSong::Song).sorted())
+    Ok(client
+        .find(&[Filter::new(Tag::Album, album)])?
+        .into_iter()
+        .sorted_by(|a, b| a.with_custom_sort(sort_props).cmp(&b.with_custom_sort(sort_props)))
+        .map(DirOrSong::Song))
 }
 
-fn find_songs(client: &mut impl MpdClient, album: &str, file: &str) -> Result<Vec<Song>, MpdError> {
-    client.find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)]).map(|mut v| {
-        v.sort();
-        v
-    })
+fn find_songs(
+    client: &mut impl MpdClient,
+    album: &str,
+    file: &str,
+    sort_props: &[SongProperty],
+) -> Result<Song, MpdError> {
+    Ok(client
+        .find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)])?
+        .into_iter()
+        .sorted_by(|a, b| a.with_custom_sort(sort_props).cmp(&b.with_custom_sort(sort_props)))
+        .next()
+        .context(anyhow!(
+            "Expected to find exactly one song: album: '{}', current: '{}'",
+            album,
+            file
+        ))?)
 }
 
 impl BrowserPane<DirOrSong> for AlbumsPane {
@@ -313,33 +330,27 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
+                let sort_order = context.config.browser_song_sort.clone();
                 context
                     .query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let data = Some(
-                            find_songs(client, &album, &current)?
-                                .first()
-                                .context(anyhow!(
-                                    "Expected to find exactly one song: album: '{}', current: '{}'",
-                                    album,
-                                    current
-                                ))?
-                                .to_preview(),
-                        );
+                        let data =
+                            Some(find_songs(client, &album, &current, &sort_order)?.to_preview());
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
             [] => {
+                let sort_order = context.config.browser_song_sort.clone();
                 context
                     .query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let data = list_titles(client, &current)?
+                        let data = list_titles(client, &current, &sort_order)?
                             .map(|v| v.to_list_item_simple(&config))
                             .collect_vec();
                         let data = PreviewGroup::from(None, data);
