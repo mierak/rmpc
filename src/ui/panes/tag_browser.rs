@@ -195,15 +195,22 @@ impl TagBrowserPane {
                 },
                 AlbumSortMode::Date => date_a.cmp(date_b),
             })
-            .map(|((album, date, original_name), songs)| CachedAlbum {
-                name: match display_mode {
-                    AlbumDisplayMode::SplitByDate => {
-                        format!("({date}) {album}")
-                    }
-                    AlbumDisplayMode::NameOnly => album.to_string(),
-                },
-                original_name: original_name.unwrap_or_else(String::new),
-                songs,
+            .map(|((album, date, original_name), mut songs)| {
+                songs.sort_by(|a, b| {
+                    a.with_custom_sort(context.config.browser_song_sort.as_slice())
+                        .cmp(&b.with_custom_sort(context.config.browser_song_sort.as_slice()))
+                });
+
+                CachedAlbum {
+                    name: match display_mode {
+                        AlbumDisplayMode::SplitByDate => {
+                            format!("({date}) {album}")
+                        }
+                        AlbumDisplayMode::NameOnly => album.to_string(),
+                    },
+                    original_name: original_name.unwrap_or_else(String::new),
+                    songs,
+                }
             })
             .fold(Vec::new(), |mut acc, album| {
                 match display_mode {
@@ -373,10 +380,11 @@ impl Pane for TagBrowserPane {
                     data.into_iter()
                         .flat_map(|item| item.split(sep.as_str()).map(str::to_string).collect_vec())
                         .unique()
+                        .sorted()
                         .map(DirOrSong::name_only)
                         .collect_vec()
                 } else {
-                    data.into_iter().map(DirOrSong::name_only).collect_vec()
+                    data.into_iter().sorted().map(DirOrSong::name_only).collect_vec()
                 };
 
                 self.stack = DirStack::new(data);

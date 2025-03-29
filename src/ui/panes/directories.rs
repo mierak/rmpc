@@ -59,6 +59,7 @@ impl DirectoriesPane {
             return Ok(());
         };
 
+        let sort_props = context.config.browser_song_sort.clone();
         match selected {
             DirOrSong::Dir { .. } => {
                 context
@@ -77,7 +78,10 @@ impl DirectoriesPane {
                                 LsInfoEntry::File(s) => Some(DirOrSong::Song(s)),
                                 LsInfoEntry::Playlist(_) => None,
                             })
-                            .sorted()
+                            .sorted_by(|a, b| {
+                                a.with_custom_sort(&sort_props)
+                                    .cmp(&b.with_custom_sort(&sort_props))
+                            })
                             .collect();
 
                         Ok(MpdQueryResult::DirOrSong { data: res, origin_path: Some(next_path) })
@@ -118,13 +122,16 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
+            let sort_props = context.config.browser_song_sort.clone();
             context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                 move |client| {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
                         .filter_map(Into::<Option<DirOrSong>>::into)
-                        .sorted()
+                        .sorted_by(|a, b| {
+                            a.with_custom_sort(&sort_props).cmp(&b.with_custom_sort(&sort_props))
+                        })
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                 },
@@ -143,13 +150,17 @@ impl Pane for DirectoriesPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
+                let sort_props = context.config.browser_song_sort.clone();
                 context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                     move |client| {
                         let result = client
                             .lsinfo(None)?
                             .into_iter()
                             .filter_map(Into::<Option<DirOrSong>>::into)
-                            .sorted()
+                            .sorted_by(|a, b| {
+                                a.with_custom_sort(&sort_props)
+                                    .cmp(&b.with_custom_sort(&sort_props))
+                            })
                             .collect::<Vec<_>>();
                         Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                     },
@@ -311,6 +322,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 };
                 let next_path = next_path.join("/").to_string();
                 let config = std::sync::Arc::clone(&context.config);
+                let sort_props = context.config.browser_song_sort.clone();
 
                 self.stack_mut().clear_preview();
                 context
@@ -338,7 +350,9 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
                             LsInfoEntry::Playlist(_) => None,
                         })
-                        .sorted()
+                        .sorted_by(|a, b| {
+                            a.with_custom_sort(&sort_props).cmp(&b.with_custom_sort(&sort_props))
+                        })
                         .map(|v| v.to_list_item_simple(&config))
                         .collect();
 

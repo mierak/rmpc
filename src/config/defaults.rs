@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+
+use super::theme::properties::SongPropertyFile;
 pub fn default_column_widths() -> Vec<u16> {
     vec![20, 38, 42]
 }
@@ -74,4 +76,13 @@ pub fn default_off_label() -> String {
 
 pub fn default_oneshot_label() -> String {
     "OS".to_string()
+}
+
+pub fn default_song_sort() -> Vec<SongPropertyFile> {
+    vec![
+        SongPropertyFile::Disc,
+        SongPropertyFile::Track,
+        SongPropertyFile::Artist,
+        SongPropertyFile::Title,
+    ]
 }

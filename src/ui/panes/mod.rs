@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, cmp::Ordering, collections::HashMap};
 
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
@@ -22,6 +22,7 @@ use search::SearchPane;
 use strum::Display;
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
+use unicase::UniCase;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
@@ -291,6 +292,7 @@ pub(crate) mod browser {
     };
 
     use crate::{
+        config::theme::properties::SongProperty,
         mpd::commands::{Song, lsinfo::LsInfoEntry},
         shared::mpd_query::PreviewGroup,
     };
@@ -413,37 +415,79 @@ pub(crate) mod browser {
         }
     }
 
-    impl std::cmp::Ord for DirOrSong {
+    impl Ord for DirOrSong {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             match (self, other) {
                 (DirOrSong::Dir { name: a, .. }, DirOrSong::Dir { name: b, .. }) => a.cmp(b),
                 (DirOrSong::Song(_), DirOrSong::Dir { .. }) => Ordering::Greater,
                 (DirOrSong::Dir { .. }, DirOrSong::Song(_)) => Ordering::Less,
-                (DirOrSong::Song(a), DirOrSong::Song(b)) => a.cmp(b),
+                (DirOrSong::Song(a), DirOrSong::Song(b)) => a.cmp_by_prop(b, &SongProperty::Title),
             }
         }
     }
 
-    impl std::cmp::PartialOrd for DirOrSong {
+    impl PartialOrd for DirOrSong {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
             Some(self.cmp(other))
         }
     }
 
-    impl std::cmp::Ord for Song {
+    #[derive(Debug, PartialEq, Eq)]
+    pub(crate) struct SongCustomSort<'a>(&'a Song, &'a [SongProperty]);
+
+    impl Song {
+        pub(crate) fn with_custom_sort<'a>(
+            &'a self,
+            sort_props: &'a [SongProperty],
+        ) -> SongCustomSort<'a> {
+            SongCustomSort(self, sort_props)
+        }
+    }
+
+    impl Ord for SongCustomSort<'_> {
+        fn cmp(&self, other: &Self) -> Ordering {
+            for prop in self.1 {
+                let ord = self.0.cmp_by_prop(other.0, prop);
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            Ordering::Equal
+        }
+    }
+
+    impl PartialOrd for SongCustomSort<'_> {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    pub(crate) struct DirOrSongCustomSort<'a>(&'a DirOrSong, &'a [SongProperty]);
+
+    impl DirOrSong {
+        pub(crate) fn with_custom_sort<'a>(
+            &'a self,
+            sort_props: &'a [SongProperty],
+        ) -> DirOrSongCustomSort<'a> {
+            DirOrSongCustomSort(self, sort_props)
+        }
+    }
+
+    impl Ord for DirOrSongCustomSort<'_> {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            let a_track = self.metadata.get("track").map(|v| v.parse::<u32>());
-            let b_track = other.metadata.get("track").map(|v| v.parse::<u32>());
-            match (a_track, b_track) {
-                (Some(Ok(a)), Some(Ok(b))) => a.cmp(&b),
-                (_, Some(Ok(_))) => Ordering::Greater,
-                (Some(Ok(_)), _) => Ordering::Less,
-                _ => self.title().cmp(&other.title()),
+            match (self.0, other.0) {
+                (DirOrSong::Dir { name: a, .. }, DirOrSong::Dir { name: b, .. }) => a.cmp(b),
+                (DirOrSong::Song(_), DirOrSong::Dir { .. }) => Ordering::Greater,
+                (DirOrSong::Dir { .. }, DirOrSong::Song(_)) => Ordering::Less,
+                (DirOrSong::Song(a), DirOrSong::Song(b)) => {
+                    a.with_custom_sort(self.1).cmp(&b.with_custom_sort(self.1))
+                }
             }
         }
     }
 
-    impl std::cmp::PartialOrd for Song {
+    impl PartialOrd for DirOrSongCustomSort<'_> {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
             Some(self.cmp(other))
         }
@@ -463,20 +507,9 @@ pub(crate) mod browser {
 
     #[cfg(test)]
     mod test {
-        use std::collections::HashMap;
 
         use super::DirOrSong;
         use crate::mpd::commands::Song;
-
-        fn song(title: &str, track: Option<&str>) -> Song {
-            Song {
-                metadata: HashMap::from([
-                    ("title".to_owned(), title.to_owned()),
-                    track.map(|v| ("track".to_owned(), v.to_owned())).into_iter().collect(),
-                ]),
-                ..Default::default()
-            }
-        }
 
         #[test]
         fn dir_before_song() {
@@ -496,73 +529,6 @@ pub(crate) mod browser {
                 DirOrSong::Song(Song::default()),
                 DirOrSong::Song(Song::default()),
                 DirOrSong::Song(Song::default()),
-            ]);
-        }
-
-        #[test]
-        fn all_by_track() {
-            let mut input = vec![
-                DirOrSong::Song(song("a", Some("8"))),
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("c", Some("5"))),
-            ];
-
-            input.sort();
-
-            assert_eq!(input, vec![
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Song(song("c", Some("5"))),
-                DirOrSong::Song(song("a", Some("8"))),
-            ]);
-        }
-
-        #[test]
-        fn by_track_then_title() {
-            let mut input = vec![
-                DirOrSong::Song(song("d", Some("10"))),
-                DirOrSong::Song(song("a", None)),
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("c", None)),
-            ];
-
-            input.sort();
-
-            assert_eq!(input, vec![
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Song(song("d", Some("10"))),
-                DirOrSong::Song(song("a", None)),
-                DirOrSong::Song(song("c", None)),
-            ]);
-        }
-
-        #[test]
-        fn by_track_then_title_with_unparsable_track() {
-            let mut input = vec![
-                DirOrSong::Song(song("d", Some("10"))),
-                DirOrSong::Song(song("a", Some("lol"))),
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("c", None)),
-            ];
-
-            input.sort();
-
-            assert_eq!(input, vec![
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(song("b", Some("3"))),
-                DirOrSong::Song(song("d", Some("10"))),
-                DirOrSong::Song(song("a", Some("lol"))),
-                DirOrSong::Song(song("c", None)),
             ]);
         }
     }
@@ -592,7 +558,84 @@ impl Song {
                 Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))
             }),
             SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
+            SongProperty::Disc => self.metadata.get("disc").map(|v| Cow::Borrowed(v.as_str())),
             SongProperty::Other(name) => self.metadata.get(name).map(|v| Cow::Borrowed(v.as_str())),
+        }
+    }
+
+    fn cmp_by_prop(&self, other: &Self, property: &SongProperty) -> Ordering {
+        match property {
+            SongProperty::Filename => match (self.file_name(), other.file_name()) {
+                (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
+                (_, Some(_)) => Ordering::Greater,
+                (Some(_), _) => Ordering::Less,
+                (None, None) => Ordering::Equal,
+            },
+            SongProperty::File => UniCase::new(&self.file).cmp(&UniCase::new(&other.file)),
+            SongProperty::Title => {
+                match (self.metadata.get("title"), other.metadata.get("title")) {
+                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Artist => {
+                match (self.metadata.get("artist"), other.metadata.get("artist")) {
+                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Album => {
+                match (self.metadata.get("album"), other.metadata.get("album")) {
+                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Track => {
+                let self_track = self.metadata.get("track");
+                let other_track = other.metadata.get("track");
+                match (self_track, other_track) {
+                    (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
+                        (Ok(a), Ok(b)) => a.cmp(&b),
+                        _ => UniCase::new(a).cmp(&UniCase::new(b)),
+                    },
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Disc => {
+                let self_disc = self.metadata.get("disc");
+                let other_disc = other.metadata.get("disc");
+                match (self_disc, other_disc) {
+                    (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
+                        (Ok(a), Ok(b)) => a.cmp(&b),
+                        _ => UniCase::new(a).cmp(&UniCase::new(b)),
+                    },
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Other(prop_name) => {
+                match (self.metadata.get(prop_name), other.metadata.get(prop_name)) {
+                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Duration => match (self.duration, other.duration) {
+                (Some(a), Some(b)) => a.as_millis().cmp(&b.as_millis()),
+                (_, Some(_)) => Ordering::Greater,
+                (Some(_), _) => Ordering::Less,
+                (None, None) => Ordering::Equal,
+            },
         }
     }
 

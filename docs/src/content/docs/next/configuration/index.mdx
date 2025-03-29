@@ -217,3 +217,10 @@ Can be one of the following:
 Rmpc does not do any processing on the `date` metadata tag on the song. It gets sorted lexicographically.
 
 :::
+
+### browser_song_sort
+
+<ConfigValue name="browser_song_sort" type="other" customText="SongPropertyKind[]" />
+
+Defines how the songs are sorted in the browser panes. This is a list of <a href={path("configuration/song-table/#property-1")}>song properties</a>.
+Defaults to `[Disc, Track, Artist, Title]` which means the songs are first sorted by their `Disc` and `Track` numbers, then by `Artist` and by `Title` last.
