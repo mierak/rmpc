@@ -55,7 +55,14 @@ jobs:
         run: cargo test --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
 
   lint:
-    name: Formatter
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        toolchain: [nightly]
+        profile: [dev, release]
+
+    name: Formatter (${{ matrix.os }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
 
     needs: build-test
 
@@ -67,13 +74,18 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update nightly
-          rustup default nightly
+          rustup update ${{ matrix.toolchain }}
+          rustup default ${{ matrix.toolchain }}
           rustup component add rustfmt
           rustup component add clippy
 
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: cargo +nightly fmt --all -- --check
 
-      - name: Check code for possible improvements
+      - name: Check code for possible improvements (dev profile)
+        if: matrix.profile == 'dev'
         run: cargo clippy -- -D warnings
+
+      - name: Check code for possible improvements (release profile)
+        if: matrix.profile == 'release'
+        run: cargo clippy --release -- -D warnings
