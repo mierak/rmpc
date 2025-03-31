@@ -20,7 +20,7 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
 
-    name: Build & Test (${{ matrix.target }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
+    name: Build & Test (${{ matrix.os }} - ${{ matrix.target }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
 
     env:
