@@ -44,6 +44,7 @@ pub struct Status {
                                     * explanation. */
     pub updating_db: Option<u32>, // job id
     pub error: Option<String>,    // if there is an error, returns message here
+    pub lastloadedplaylist: Option<String>, // last loaded stored playlist
 }
 
 impl FromMpd for Status {
@@ -78,7 +79,7 @@ impl FromMpd for Status {
             "updating_db" => self.updating_db = Some(value.parse().logerr(key, &value)?),
             "error" => self.error = Some(value),
             "bitrate" => self.bitrate = None,
-            "lastloadedplaylist" => {} // new in 0.24.0, not needed atm
+            "lastloadedplaylist" => self.lastloadedplaylist = Some(value),
             "time" => {}               // deprecated
             _ => return Ok(LineHandled::No { value }),
         }
