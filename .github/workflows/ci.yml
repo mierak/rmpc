@@ -10,23 +10,17 @@ jobs:
   build-test:
     strategy:
       fail-fast: false
-
       matrix:
+        os: [ubuntu-latest, macos-latest]
+        toolchain: [stable, nightly]
+        profile: [dev, release]
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            toolchain: stable
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            toolchain: nightly
           - os: macos-latest
             target: x86_64-apple-darwin
-            toolchain: stable
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            toolchain: nightly
 
-    name: Build & Test (${{ matrix.target }} - ${{ matrix.toolchain }})
+    name: Build & Test (${{ matrix.target }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
 
     env:
@@ -55,10 +49,10 @@ jobs:
           components: rust-src
 
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }}
+        run: cargo build --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
 
       - name: Run tests
-        run: cargo test --verbose --target ${{ matrix.target }}
+        run: cargo test --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
 
   lint:
     name: Formatter
@@ -73,8 +67,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update stable
-          rustup default stable
+          rustup update nightly
+          rustup default nightly
           rustup component add rustfmt
           rustup component add clippy
 
