@@ -42,8 +42,8 @@ pub struct Status {
                                     * bits:channels. See Global Audio Format for a
                                     * detailed
                                     * explanation. */
-    pub updating_db: Option<u32>, // job id
-    pub error: Option<String>,    // if there is an error, returns message here
+    pub updating_db: Option<u32>,           // job id
+    pub error: Option<String>,              // if there is an error, returns message here
     pub lastloadedplaylist: Option<String>, // last loaded stored playlist
 }
 
@@ -80,7 +80,7 @@ impl FromMpd for Status {
             "error" => self.error = Some(value),
             "bitrate" => self.bitrate = None,
             "lastloadedplaylist" => self.lastloadedplaylist = Some(value),
-            "time" => {}               // deprecated
+            "time" => {} // deprecated
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
