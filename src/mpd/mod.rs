@@ -18,7 +18,7 @@ where
         match self.next_internal(key.to_lowercase().as_str(), value)? {
             LineHandled::Yes => {}
             LineHandled::No { value } => {
-                log::warn!(key = key.as_str(), value = value.as_str(); "Encountered unknow key/value pair");
+                log::warn!(key = key.as_str(), value = value.as_str(); "Encountered unknown key/value pair");
             }
         }
         Ok(())
