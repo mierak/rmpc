@@ -44,6 +44,7 @@ mod ui;
 
 fn main() -> Result<()> {
     let mut args = Args::parse();
+    let config_path = args.config_path();
     match args.command {
         Some(Command::Config { current: false }) => {
             std::io::stdout().write_all(include_bytes!(
@@ -56,19 +57,19 @@ fn main() -> Result<()> {
             ))?;
         }
         Some(Command::Config { current: true }) => {
-            let mut file = std::fs::File::open(&args.config).with_context(|| {
-                format!("Config file was not found at '{}'", args.config.to_string_lossy())
+            let mut file = std::fs::File::open(&config_path).with_context(|| {
+                format!("Config file was not found at '{}'", config_path.to_string_lossy())
             })?;
             let mut config = String::new();
             file.read_to_string(&mut config)?;
             println!("{config}");
         }
         Some(Command::Theme { current: true }) => {
-            let config_file = ConfigFile::read(&args.config).with_context(|| {
-                format!("Config file was not found at '{}'", args.config.to_string_lossy())
+            let config_file = ConfigFile::read(&config_path).with_context(|| {
+                format!("Config file was not found at '{}'", config_path.to_string_lossy())
             })?;
-            let config_dir = args.config.parent().with_context(|| {
-                format!("Invalid config path '{}'", args.config.to_string_lossy())
+            let config_dir = config_path.parent().with_context(|| {
+                format!("Invalid config path '{}'", config_path.to_string_lossy())
             })?;
             let theme_path = config_file
                 .theme_path(config_dir)
@@ -81,9 +82,9 @@ fn main() -> Result<()> {
             println!("{theme}");
         }
         Some(Command::DebugInfo) => {
-            let config_file = ConfigFile::read(&args.config).unwrap_or_default();
+            let config_file = ConfigFile::read(&config_path).unwrap_or_default();
             let config = config_file.clone().into_config(
-                Some(&args.config),
+                Some(&config_path),
                 args.theme.as_deref(),
                 std::mem::take(&mut args.address),
                 std::mem::take(&mut args.password),
@@ -100,7 +101,7 @@ fn main() -> Result<()> {
                 env!("CARGO_PKG_VERSION"),
                 option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
             );
-            println!("\n{:<20} {}", "Config path", args.config.as_str()?);
+            println!("\n{:<20} {}", "Config path", config_path.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
 
             println!("\nMPD:");
@@ -147,7 +148,7 @@ fn main() -> Result<()> {
         }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");
-            let config: CliConfigFile = match CliConfigFile::read(&args.config) {
+            let config: CliConfigFile = match CliConfigFile::read(&config_path) {
                 Ok(cfg) => cfg,
                 Err(_err) => ConfigFile::default().into(),
             };
@@ -171,9 +172,9 @@ fn main() -> Result<()> {
                 .name("dependency_check".to_string())
                 .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
-            let config = match ConfigFile::read(&args.config) {
+            let config = match ConfigFile::read(&config_path) {
                 Ok(val) => val.into_config(
-                    Some(&args.config),
+                    Some(&config_path),
                     args.theme.as_deref(),
                     std::mem::take(&mut args.address),
                     std::mem::take(&mut args.password),
@@ -245,7 +246,7 @@ fn main() -> Result<()> {
                 .config
                 .enable_config_hot_reload
                 .then_some(core::config_watcher::init(
-                    args.config,
+                    config_path,
                     context.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
                     event_tx.clone(),
                 ))
