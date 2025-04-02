@@ -544,12 +544,17 @@ impl Song {
     }
 
     pub fn file_name(&self) -> Option<Cow<str>> {
-        std::path::Path::new(&self.file).file_name().map(|file_name| file_name.to_string_lossy())
+        std::path::Path::new(&self.file).file_stem().map(|file_name| file_name.to_string_lossy())
+    }
+
+    pub fn file_ext(&self) -> Option<Cow<str>> {
+        std::path::Path::new(&self.file).extension().map(|ext| ext.to_string_lossy())
     }
 
     fn format<'song>(&'song self, property: &SongProperty) -> Option<Cow<'song, str>> {
         match property {
             SongProperty::Filename => self.file_name(),
+            SongProperty::FileExtension => self.file_ext(),
             SongProperty::File => Some(Cow::Borrowed(self.file.as_str())),
             SongProperty::Title => self.title().map(|v| Cow::Borrowed(v.as_ref())),
             SongProperty::Artist => self.artist().map(|v| Cow::Borrowed(v.as_ref())),
@@ -566,6 +571,12 @@ impl Song {
     fn cmp_by_prop(&self, other: &Self, property: &SongProperty) -> Ordering {
         match property {
             SongProperty::Filename => match (self.file_name(), other.file_name()) {
+                (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
+                (_, Some(_)) => Ordering::Greater,
+                (Some(_), _) => Ordering::Less,
+                (None, None) => Ordering::Equal,
+            },
+            SongProperty::FileExtension => match (self.file_ext(), other.file_ext()) {
                 (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
                 (_, Some(_)) => Ordering::Greater,
                 (Some(_), _) => Ordering::Less,
