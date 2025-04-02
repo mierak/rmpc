@@ -15,11 +15,13 @@ All notable changes to this project will be documented in this file.
 - new `Browser` pane
 - Add ability to scroll and cycle `Property` panes when they do not fit their area
 - `browser_song_sort` which is a list of properties which defines how the songs are sorted in the browser panes
+- `FileExtension` property
 
 ### Changed
 
 - The first lyrics will now only be highlighted once reached
 - **Breaking**: Songs are no longer sorted by their `browser_song_format`. The new `browser_song_sort` is used instead
+- `Filename` property no longer includes file extension, use `FileExtension` if you want to keep it
 
 ### Fixed
 
