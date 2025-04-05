@@ -7,86 +7,83 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Test Debug Mode
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        toolchain: [stable, nightly]
+        profile: [dev, release]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+
+    name: Build & Test (${{ matrix.os }} - ${{ matrix.target }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
+    runs-on: ${{ matrix.os }}
+
+    env:
+      RA_TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+
+      - name: Install Rust library source
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+          components: rust-src
+
+      - name: Build
+        run: cargo build --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
+
+      - name: Run tests
+        run: cargo test --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
+
+  lint:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        profile: [dev, release]
+
+    name: Formatter (${{ matrix.os }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
+
+    needs: build-test
+
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Cargo test
-      run: |
-        cargo test
-  test-release:
-    name: Test Release Mode
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Cargo test
-      run: |
-        cargo test --release
-  test-macos:
-    name: macos - Test Debug Mode
-    runs-on: macos-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Cargo test
-      run: |
-        cargo test
-  test-macos-release:
-    name: macos - Test Release Mode
-    runs-on: macos-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Cargo test
-      run: |
-        cargo test --release
-  format:
-    name: Check Formatting
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Format check
-      run: |
-        rustup toolchain install nightly --profile minimal
-        rustup component add rustfmt --toolchain nightly
-        cargo +nightly fmt --check
-  clippy:
-    name: Clippy Debug Mode
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Run clippy
-      run: |
-        cargo clippy -- -D warnings
-  clippy_release:
-    name: Clippy Release Mode
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Run clippy
-      run: |
-        cargo clippy --release -- -D warnings
-  build:
-    name: Build Check Debug Mode
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Build check
-      run: |
-        cargo build
-  build-release:
-    name: Build Check Release Mode
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Build check
-      run: |
-        cargo build --release
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust components
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup component add rustfmt --toolchain nightly
+          rustup component add clippy
+
+      - name: Check formatting
+        run: cargo +nightly fmt --all -- --check
+
+      - name: Check code for possible improvements (dev profile)
+        if: matrix.profile == 'dev'
+        run: cargo clippy -- -D warnings
+
+      - name: Check code for possible improvements (release profile)
+        if: matrix.profile == 'release'
+        run: cargo clippy --release -- -D warnings
