@@ -12,6 +12,7 @@ use crate::config::{defaults, theme::StyleFile};
 pub enum SongPropertyFile {
     Filename,
     File,
+    FileExtension,
     Title,
     Artist,
     Album,
@@ -25,6 +26,7 @@ pub enum SongPropertyFile {
 pub enum SongProperty {
     Filename,
     File,
+    FileExtension,
     Title,
     Artist,
     Album,
@@ -237,6 +239,7 @@ impl From<SongPropertyFile> for SongProperty {
     fn from(value: SongPropertyFile) -> Self {
         match value {
             SongPropertyFile::Filename => SongProperty::Filename,
+            SongPropertyFile::FileExtension => SongProperty::FileExtension,
             SongPropertyFile::File => SongProperty::File,
             SongPropertyFile::Title => SongProperty::Title,
             SongPropertyFile::Artist => SongProperty::Artist,
