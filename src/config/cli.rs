@@ -4,8 +4,8 @@ use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 
 #[derive(Parser, Debug)]
 pub struct Args {
-    #[arg(short, long, value_hint = ValueHint::AnyPath, value_name = "FILE", default_value = get_default_config_path().into_os_string())]
-    pub config: PathBuf,
+    #[arg(short, long, value_hint = ValueHint::AnyPath, value_name = "FILE")]
+    pub config: Option<PathBuf>,
     #[arg(short, long, value_hint = ValueHint::AnyPath, value_name = "FILE")]
     pub theme: Option<PathBuf>,
     #[command(subcommand)]
@@ -292,20 +292,26 @@ pub enum OnOffOneshot {
     Oneshot,
 }
 
-fn get_default_config_path() -> PathBuf {
-    let mut path = PathBuf::new();
-    if let Ok(dir) = std::env::var("XDG_CONFIG_HOME") {
-        path.push(dir);
-    } else if let Ok(home) = std::env::var("HOME") {
-        path.push(home);
-        path.push(".config");
-    } else {
-        return path;
+impl Args {
+    #[must_use]
+    pub fn config_path(&self) -> PathBuf {
+        if let Some(path) = &self.config {
+            return path.to_owned();
+        }
+        let mut path = PathBuf::new();
+        if let Ok(dir) = std::env::var("XDG_CONFIG_HOME") {
+            path.push(dir);
+        } else if let Ok(home) = std::env::var("HOME") {
+            path.push(home);
+            path.push(".config");
+        } else {
+            return path;
+        }
+        path.push(env!("CARGO_CRATE_NAME"));
+        #[cfg(debug_assertions)]
+        path.push("config.debug.ron");
+        #[cfg(not(debug_assertions))]
+        path.push("config.ron");
+        path
     }
-    path.push(env!("CARGO_CRATE_NAME"));
-    #[cfg(debug_assertions)]
-    path.push("config.debug.ron");
-    #[cfg(not(debug_assertions))]
-    path.push("config.ron");
-    path
 }
