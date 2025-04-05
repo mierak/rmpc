@@ -80,7 +80,7 @@ impl PreviewGroup {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
+#[allow(unused, clippy::large_enum_variant)]
 pub(crate) enum MpdQueryResult {
     Preview { data: Option<Vec<PreviewGroup>>, origin_path: Option<Vec<String>> },
     SongsList { data: Vec<Song>, origin_path: Option<Vec<String>> },
