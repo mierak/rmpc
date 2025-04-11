@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Add ability to scroll and cycle `Property` panes when they do not fit their area
 - `browser_song_sort` which is a list of properties which defines how the songs are sorted in the browser panes
 - `FileExtension` property
+- Better error message inside a modal when reading of config fails
 
 ### Changed
 

@@ -129,7 +129,9 @@ impl Pane for AlbumArtPane {
                 self.before_show(context)?;
             }
             UiEvent::Displayed if is_visible => {
-                self.album_art.show_current()?;
+                if is_visible && !self.is_modal_open {
+                    self.album_art.show_current()?;
+                }
             }
             UiEvent::ModalOpened if is_visible => {
                 self.is_modal_open = true;

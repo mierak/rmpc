@@ -1,5 +1,6 @@
 use core::scheduler::Scheduler;
 use std::{
+    fs::File,
     io::{Read, Write},
     sync::Arc,
 };
@@ -11,7 +12,10 @@ use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
-use shared::ipc::{get_socket_path, list_all_socket_paths};
+use shared::{
+    ipc::{get_socket_path, list_all_socket_paths},
+    macros::try_skip,
+};
 
 use crate::{
     config::{
@@ -24,7 +28,6 @@ use crate::{
         env::ENV,
         events::{AppEvent, ClientRequest, WorkRequest},
         logging,
-        macros::status_warn,
         mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
         tmux,
     },
@@ -57,24 +60,21 @@ fn main() -> Result<()> {
             ))?;
         }
         Some(Command::Config { current: true }) => {
-            let mut file = std::fs::File::open(&config_path).with_context(|| {
-                format!("Config file was not found at '{}'", config_path.to_string_lossy())
-            })?;
+            let mut file = File::open(&config_path).context("Failed to read config file")?;
             let mut config = String::new();
             file.read_to_string(&mut config)?;
             println!("{config}");
         }
         Some(Command::Theme { current: true }) => {
-            let config_file = ConfigFile::read(&config_path).with_context(|| {
-                format!("Config file was not found at '{}'", config_path.to_string_lossy())
-            })?;
+            let config_file =
+                ConfigFile::read(&config_path).context("Failed to read config file")?;
             let config_dir = config_path.parent().with_context(|| {
                 format!("Invalid config path '{}'", config_path.to_string_lossy())
             })?;
             let theme_path = config_file
                 .theme_path(config_dir)
                 .context("No theme file specified in the config. Default theme is used.")?;
-            let mut file = std::fs::File::open(&theme_path).with_context(|| {
+            let mut file = File::open(&theme_path).with_context(|| {
                 format!("Theme file was not found at '{}'", theme_path.to_string_lossy())
             })?;
             let mut theme = String::new();
@@ -82,7 +82,9 @@ fn main() -> Result<()> {
             println!("{theme}");
         }
         Some(Command::DebugInfo) => {
-            let config_file = ConfigFile::read(&config_path).unwrap_or_default();
+            let config_file = ConfigFile::read(&config_path)
+                .context("Failed to read config file")
+                .unwrap_or_default();
             let config = config_file.clone().into_config(
                 Some(&config_path),
                 args.theme.as_deref(),
@@ -181,7 +183,14 @@ fn main() -> Result<()> {
                     false,
                 )?,
                 Err(err) => {
-                    status_warn!(err:?; "Failed to read config. Using default values. Check logs for more information");
+                    try_skip!(
+                        event_tx.send(AppEvent::InfoModal {
+                            message: vec![err.to_string()],
+                            title: None,
+                            size: None
+                        }),
+                        "Failed to send info modal request"
+                    );
                     ConfigFile::default().into_config(
                         None,
                         None,

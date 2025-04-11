@@ -460,14 +460,15 @@ impl Pane for QueuePane {
                 QueueActions::DeleteAll => {
                     modal!(
                         context,
-                        ConfirmModal::new(context)
+                        ConfirmModal::builder().context(context)
                             .message("Are you sure you want to clear the queue? This action cannot be undone.")
                             .on_confirm(|context| {
                                 context.command(|client| Ok(client.clear()?));
                                 Ok(())
                             })
                             .confirm_label("Clear")
-                            .size(45, 6)
+                            .size((45, 6))
+                            .build()
                     );
                 }
                 QueueActions::Play => {

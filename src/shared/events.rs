@@ -10,7 +10,7 @@ use super::{
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
 use crate::{
-    config::{Config, cli::Command, tabs::PaneType, theme::UiConfig},
+    config::{Config, Size, cli::Command, tabs::PaneType, theme::UiConfig},
     mpd::commands::IdleEvent,
     ui::UiAppEvent,
 };
@@ -50,6 +50,7 @@ pub(crate) enum AppEvent {
     UserKeyInput(KeyEvent),
     UserMouseInput(MouseEvent),
     Status(String, Level),
+    InfoModal { message: Vec<String>, title: Option<String>, size: Option<Size> },
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
     RequestRender,
