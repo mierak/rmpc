@@ -7,14 +7,14 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::cli_config::CliConfigFile;
+use config::{DeserError, cli_config::CliConfigFile};
 use context::AppContext;
 use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
 use shared::{
     ipc::{get_socket_path, list_all_socket_paths},
-    macros::try_skip,
+    macros::{status_warn, try_skip},
 };
 
 use crate::{
@@ -184,6 +184,16 @@ fn main() -> Result<()> {
                 )
             }) {
                 Ok(cfg) => cfg,
+                Err(DeserError::NotFound(err)) => {
+                    status_warn!(err:?; "No config or theme file was found. Using default values.");
+                    ConfigFile::default().into_config(
+                        None,
+                        None,
+                        std::mem::take(&mut args.address),
+                        std::mem::take(&mut args.password),
+                        false,
+                    )?
+                }
                 Err(err) => {
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {

@@ -189,6 +189,7 @@ impl Config {
 #[derive(Debug)]
 pub enum DeserError {
     Deserialization(serde_path_to_error::Error<ron::Error>),
+    NotFound(std::io::Error),
     Io(std::io::Error),
     Ron(ron::error::SpannedError),
     Generic(anyhow::Error),
@@ -206,6 +207,7 @@ impl std::fmt::Display for DeserError {
                     err.inner()
                 )
             }
+            DeserError::NotFound(err) => write!(f, "Failed to read config file. Error: '{err}'"),
             DeserError::Io(err) => write!(f, "Failed to read config file. Error: '{err}'"),
             DeserError::Ron(err) => {
                 write!(f, "Failed to parse config file. Error: '{err}'")
@@ -217,7 +219,11 @@ impl std::fmt::Display for DeserError {
 
 impl From<std::io::Error> for DeserError {
     fn from(value: std::io::Error) -> Self {
-        Self::Io(value)
+        if value.kind() == std::io::ErrorKind::NotFound {
+            Self::NotFound(value)
+        } else {
+            Self::Io(value)
+        }
     }
 }
 
