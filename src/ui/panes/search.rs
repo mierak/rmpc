@@ -269,7 +269,7 @@ impl SearchPane {
                 inp = inp
                     .set_label_style(config.theme.current_item_style)
                     .set_input_style(config.theme.current_item_style);
-            };
+            }
             frame.render_widget(inp, input_areas[idx]);
             idx += 1;
         }
@@ -308,7 +308,7 @@ impl SearchPane {
                 FilterInputVariant::SelectFilterCaseSensitive { value } => {
                     acc.1 = value;
                 }
-            };
+            }
             acc
         })
     }
@@ -428,7 +428,7 @@ impl SearchPane {
                 *value = !*value;
                 self.search(context);
             }
-        };
+        }
     }
 
     fn get_clicked_input(&self, event: MouseEvent) -> Option<FocusedInput> {
@@ -604,7 +604,7 @@ impl Pane for SearchPane {
                 context.render()?;
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 
@@ -748,7 +748,7 @@ impl Pane for SearchPane {
                 }
             },
             _ => {}
-        };
+        }
 
         Ok(())
     }
@@ -1054,7 +1054,7 @@ impl Pane for SearchPane {
                     }
                 }
             }
-        };
+        }
         Ok(())
     }
 }

@@ -121,13 +121,13 @@ impl Ueberzug {
                     ));
                     match action {
                         Action::Add(path, x, y, width, height) => {
-                            try_cont!(
+                            try_skip!(
                                 daemon.show_image(path, x, y, width, height),
                                 "Failed to send image to ueberzugpp"
                             );
                         }
                         Action::Remove => {
-                            try_cont!(
+                            try_skip!(
                                 daemon.remove_image(),
                                 "Failed to send remove request to ueberzugpp"
                             );
@@ -153,7 +153,7 @@ impl Ueberzug {
                                         "Failed to send SIGTERM to ueberzugpp pid file"
                                     );
                                 }
-                            };
+                            }
 
                             try_skip!(
                                 std::fs::remove_file(&daemon.pid_file),
@@ -218,7 +218,7 @@ impl UeberzugDaemon {
             if err.kind() != ErrorKind::NotFound {
                 log::warn!(err:?; "Failed to delete pid file");
             }
-        };
+        }
         cmd.args(["layer", "-so", self.layer.as_str(), "--no-stdin", "--pid-file", &self.pid_file]);
 
         let child = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn()?;

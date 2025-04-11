@@ -85,7 +85,7 @@ impl<T: ScrollingState> DirState<T> {
                     self.select(Some(item_count.saturating_sub(1)), scrolloff);
                 }
                 None => self.select(None, scrolloff),
-            };
+            }
         }
     }
 
@@ -100,7 +100,7 @@ impl<T: ScrollingState> DirState<T> {
                 }
                 None if item_count > 0 => self.select(Some(0), scrolloff),
                 None => self.select(None, scrolloff),
-            };
+            }
         }
     }
 

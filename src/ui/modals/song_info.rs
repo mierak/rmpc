@@ -102,7 +102,7 @@ impl Modal for SongInfoModal {
                 &file_name,
                 value_area.width,
             ));
-        };
+        }
         if let Some(title) = song.title() {
             rows.extend(SongInfoModal::row("Title", tag_area.width, title, value_area.width));
         }
@@ -204,7 +204,7 @@ impl Modal for SongInfoModal {
                 }
                 _ => {}
             }
-        };
+        }
 
         Ok(())
     }

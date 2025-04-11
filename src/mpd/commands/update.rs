@@ -10,7 +10,7 @@ impl FromMpd for Update {
         match key {
             "updating_db" => self.job_id = value.parse()?,
             _ => return Ok(LineHandled::No { value }),
-        };
+        }
         Ok(LineHandled::Yes)
     }
 }

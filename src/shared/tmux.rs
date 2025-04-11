@@ -30,7 +30,7 @@ impl Drop for TmuxHooks {
         }
 
         for command in &mut self.commands {
-            try_cont!(command.spawn(), "Failed to uninstall tmux hook");
+            try_skip!(command.spawn(), "Failed to uninstall tmux hook");
         }
     }
 }
@@ -188,4 +188,4 @@ macro_rules! tmux_write {
 }
 pub(crate) use tmux_write;
 
-use crate::shared::macros::try_cont;
+use crate::try_skip;

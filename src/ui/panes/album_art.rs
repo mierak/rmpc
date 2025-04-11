@@ -33,7 +33,7 @@ impl AlbumArtPane {
     fn fetch_album_art(context: &AppContext) -> Option<()> {
         if matches!(context.config.album_art.method.into(), ImageProtocol::None) {
             return None;
-        };
+        }
 
         let (_, current_song) = context.find_current_song_in_queue()?;
 
@@ -157,7 +157,7 @@ impl Pane for AlbumArtPane {
                 self.album_art.cleanup()?;
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }

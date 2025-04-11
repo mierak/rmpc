@@ -35,7 +35,7 @@ impl FromMpd for Stickers {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         if key != "sticker" {
             return Ok(LineHandled::No { value });
-        };
+        }
 
         let Some((key, value)) = value.split_once('=') else {
             return Err(MpdError::Parse(format!("Invalid sticker value: {value}")));

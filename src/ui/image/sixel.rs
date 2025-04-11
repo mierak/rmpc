@@ -27,6 +27,7 @@ use crate::{
         macros::{status_error, try_cont},
     },
     tmux,
+    try_skip,
     ui::image::{EncodeRequest, facade::IS_SHOWING, recv_data},
 };
 
@@ -110,7 +111,7 @@ impl Sixel {
                         clear_area(&mut w, config.colors, area),
                         "Failed to clear sixel image area"
                     );
-                    try_cont!(display(&mut w, &buf, resized_area), "Failed to display sixel image");
+                    try_skip!(display(&mut w, &buf, resized_area), "Failed to display sixel image");
                 }
             })
             .expect("sixel thread to be spawned");

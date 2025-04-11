@@ -431,7 +431,7 @@ fn main_task<B: Backend + std::io::Write>(
                 .draw(|frame| {
                     if let Err(err) = ui.render(frame, &mut context) {
                         log::error!(error:? = err; "Failed to render a frame");
-                    };
+                    }
                 })
                 .expect("Expected render to succeed");
 
@@ -491,7 +491,7 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
         | IdleEvent::Mount => {
             log::warn!(event:?; "Received unhandled event");
         }
-    };
+    }
 
     if let Ok(ev) = event.try_into() {
         result_ui_evs.insert(ev);

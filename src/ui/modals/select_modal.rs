@@ -259,7 +259,7 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
                 }
                 _ => {}
             }
-        };
+        }
 
         Ok(())
     }
@@ -297,7 +297,7 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
                         pop_modal!(context);
                     }
                     None => {}
-                };
+                }
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}

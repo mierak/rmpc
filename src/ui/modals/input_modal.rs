@@ -215,7 +215,7 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
                 }
                 _ => {}
             }
-        };
+        }
 
         Ok(())
     }
@@ -246,7 +246,7 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
                             context.render()?;
                         }
                     }
-                };
+                }
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}

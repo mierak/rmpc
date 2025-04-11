@@ -172,7 +172,7 @@ mod tests {
         ENV.set("HOME".to_string(), "/home/u123".to_string());
         if let Some(host) = host {
             ENV.set("MPD_HOST".to_string(), host.to_string());
-        };
+        }
         if let Some(port) = port {
             ENV.set("MPD_PORT".to_string(), port.to_string());
         }

@@ -87,7 +87,7 @@ impl YtDlp {
             log::error!(stderr = stderr.as_str().trim();"yt-dlp failed");
             if let Err(err) = id.delete_cached(&self.cache_dir) {
                 log::error!(err = err.to_string().as_str(); "Failed to cleanup after yt-dlp failed");
-            };
+            }
             bail!(
                 "yt-dlp failed with exit code: {}. Check logs for more details.",
                 exit_code.map_or_else(|| "None".to_string(), |c| c.to_string())

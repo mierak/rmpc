@@ -180,7 +180,7 @@ impl TabScreen {
                 let mut pane = panes.get_mut(&focused.pane, context)?;
                 pane_call!(pane, handle_action(event, context))?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -256,7 +256,7 @@ impl TabScreen {
                 self.set_focused(pane);
             }
             self.initialized = true;
-        };
+        }
 
         Ok(())
     }

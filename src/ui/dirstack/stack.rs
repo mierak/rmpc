@@ -93,7 +93,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
         let mut new_state = DirState::default();
         if !head.is_empty() {
             new_state.select(Some(0), 0);
-        };
+        }
         new_state.set_content_len(Some(head.len()));
 
         if let Some(current) = self.current().selected().map(DirStackItem::as_path) {

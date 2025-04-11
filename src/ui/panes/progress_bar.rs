@@ -116,7 +116,7 @@ impl Pane for ProgressBarPane {
                 context.render()?;
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }

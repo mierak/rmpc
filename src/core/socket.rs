@@ -16,6 +16,7 @@ use crate::{
         ipc::{SocketCommand, SocketCommandExecute, get_socket_path},
         macros::try_cont,
     },
+    try_skip,
 };
 
 pub(crate) fn init(
@@ -39,7 +40,7 @@ pub(crate) fn init(
                 try_cont!(serde_json::from_str(&buf), "Failed to parse socket command");
 
             log::debug!(command:?, addr:?; "Got command from unix socket");
-            try_cont!(
+            try_skip!(
                 command.execute(&event_tx, &work_tx, &config),
                 "Socket command execution failed"
             );

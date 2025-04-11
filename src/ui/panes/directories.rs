@@ -97,7 +97,7 @@ impl DirectoriesPane {
                     context.command(move |client| Ok(client.play_last(queue_len)?));
                 }
             }
-        };
+        }
 
         Ok(())
     }
@@ -221,7 +221,7 @@ impl Pane for DirectoriesPane {
                 context.render()?;
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 }
@@ -286,7 +286,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     Ok(())
                 });
             }
-        };
+        }
 
         context.render()?;
 
@@ -379,7 +379,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     });
             }
             None => {}
-        };
+        }
         Ok(())
     }
 

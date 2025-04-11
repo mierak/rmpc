@@ -154,7 +154,7 @@ pub mod mpd_client {
                     log::warn!("Failed to autoplay song");
                 }
                 Err(err) => return Err(err),
-            };
+            }
             Ok(())
         }
     }

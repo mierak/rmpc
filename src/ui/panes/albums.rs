@@ -88,7 +88,7 @@ impl AlbumsPane {
                 log::error!("Unexpected nesting in Artists dir structure");
                 context.render()?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -194,7 +194,7 @@ impl Pane for AlbumsPane {
                 context.render()?;
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 }
@@ -291,7 +291,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                 });
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }
@@ -314,7 +314,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                 });
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 
@@ -360,7 +360,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             }
 
             _ => {}
-        };
+        }
 
         Ok(())
     }

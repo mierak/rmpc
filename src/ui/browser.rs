@@ -83,7 +83,7 @@ where
                     _ => {}
                 }
             }
-        };
+        }
 
         Ok(())
     }
@@ -130,7 +130,7 @@ where
             _ => {
                 event.abandon();
             }
-        };
+        }
 
         Ok(())
     }
@@ -214,7 +214,7 @@ where
                 self.prepare_preview(context);
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }

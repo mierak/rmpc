@@ -126,7 +126,7 @@ impl<'ui> Ui<'ui> {
                     active_tab_call!(self, on_hide(context))?;
                 }
                 _ => {}
-            };
+            }
             Ok(())
         })?;
 
@@ -139,7 +139,7 @@ impl<'ui> Ui<'ui> {
                     active_tab_call!(self, before_show(pane_area, context))?;
                 }
                 _ => {}
-            };
+            }
             Ok(())
         })
     }
@@ -162,7 +162,7 @@ impl<'ui> Ui<'ui> {
                     mut pane_instance => {
                         pane_call!(pane_instance, render(frame, pane_area, context))?;
                     }
-                };
+                }
                 frame.render_widget(
                     block.border_style(context.config.as_border_style()),
                     block_area,
@@ -181,7 +181,7 @@ impl<'ui> Ui<'ui> {
         if context.config.theme.modal_backdrop && !self.modals.is_empty() {
             let buffer = frame.buffer_mut();
             buffer.set_style(*buffer.area(), Style::default().fg(Color::DarkGray));
-        };
+        }
 
         for modal in &mut self.modals {
             modal.render(frame, context)?;
@@ -208,7 +208,7 @@ impl<'ui> Ui<'ui> {
                 mut pane_instance => {
                     pane_call!(pane_instance, handle_mouse_event(event, context))?;
                 }
-            };
+            }
             Ok(())
         })
     }
@@ -252,7 +252,7 @@ impl<'ui> Ui<'ui> {
                                     {
                                         log::error!("Failed to send command");
                                     }
-                                };
+                                }
                                 Ok(())
                             })
                     );
@@ -406,7 +406,7 @@ impl<'ui> Ui<'ui> {
                     }
                 }
             }
-        };
+        }
 
         Ok(KeyHandleResult::None)
     }
@@ -423,7 +423,7 @@ impl<'ui> Ui<'ui> {
                     pane_call!(pane_instance, calculate_areas(pane_area, context))?;
                     pane_call!(pane_instance, before_show(context))?;
                 }
-            };
+            }
             Ok(())
         })
     }
@@ -458,7 +458,7 @@ impl<'ui> Ui<'ui> {
                     pane_call!(pane_instance, calculate_areas(pane_area, context))?;
                     pane_call!(pane_instance, resize(pane_area, context))?;
                 }
-            };
+            }
             Ok(())
         })
     }
@@ -481,7 +481,7 @@ impl<'ui> Ui<'ui> {
                         mut pane_instance => {
                             pane_call!(pane_instance, on_hide(context))?;
                         }
-                    };
+                    }
                     Ok(())
                 })?;
 

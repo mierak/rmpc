@@ -362,7 +362,7 @@ impl ConfigFile {
         let is_tmux = tmux::is_inside_tmux();
         if is_tmux && !tmux::is_passthrough_enabled()? {
             tmux::enable_passthrough()?;
-        };
+        }
 
         config.album_art.method = match self.image_method.unwrap_or(album_art_method) {
             ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
