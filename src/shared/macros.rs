@@ -56,9 +56,8 @@ macro_rules! status_warn {
 
 macro_rules! modal {
     ( $i:ident, $e:expr ) => {{
-        $i.app_event_sender.send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::Modal(
-            crate::ui::ModalWrapper(Box::new($e)),
-        )))?;
+        $i.app_event_sender
+            .send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::Modal(Box::new($e))))?;
     }};
 }
 

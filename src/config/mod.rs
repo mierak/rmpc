@@ -1,4 +1,5 @@
 use std::{
+    io::Read,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -12,7 +13,6 @@ use artists::{Artists, ArtistsFile};
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
-use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
@@ -139,6 +139,12 @@ impl Default for Size {
     }
 }
 
+impl From<(u16, u16)> for Size {
+    fn from(value: (u16, u16)) -> Self {
+        Self { width: value.0, height: value.1 }
+    }
+}
+
 impl Default for ConfigFile {
     fn default() -> Self {
         Self {
@@ -180,13 +186,75 @@ impl Config {
     }
 }
 
-impl ConfigFile {
-    pub fn read(path: &PathBuf) -> Result<Self> {
-        let file = std::fs::File::open(path)?;
-        let read = std::io::BufReader::new(file);
-        let config: ConfigFile = ron::de::from_reader(read)?;
+#[derive(Debug)]
+pub enum DeserError {
+    Deserialization(serde_path_to_error::Error<ron::Error>),
+    NotFound(std::io::Error),
+    Io(std::io::Error),
+    Ron(ron::error::SpannedError),
+    Generic(anyhow::Error),
+}
 
-        Ok(config)
+impl std::error::Error for DeserError {}
+impl std::fmt::Display for DeserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeserError::Deserialization(err) => {
+                write!(
+                    f,
+                    "Failed to deserialize config at path: '{}'.\nError: '{}'.",
+                    err.path(),
+                    err.inner()
+                )
+            }
+            DeserError::NotFound(err) => write!(f, "Failed to read config file. Error: '{err}'"),
+            DeserError::Io(err) => write!(f, "Failed to read config file. Error: '{err}'"),
+            DeserError::Ron(err) => {
+                write!(f, "Failed to parse config file. Error: '{err}'")
+            }
+            DeserError::Generic(err) => write!(f, "Failed to read config file. Error: '{err}'"),
+        }
+    }
+}
+
+impl From<std::io::Error> for DeserError {
+    fn from(value: std::io::Error) -> Self {
+        if value.kind() == std::io::ErrorKind::NotFound {
+            Self::NotFound(value)
+        } else {
+            Self::Io(value)
+        }
+    }
+}
+
+impl From<ron::error::SpannedError> for DeserError {
+    fn from(value: ron::error::SpannedError) -> Self {
+        Self::Ron(value)
+    }
+}
+
+impl From<serde_path_to_error::Error<ron::Error>> for DeserError {
+    fn from(value: serde_path_to_error::Error<ron::Error>) -> Self {
+        Self::Deserialization(value)
+    }
+}
+
+impl From<anyhow::Error> for DeserError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Generic(value)
+    }
+}
+
+impl ConfigFile {
+    pub fn read(path: &PathBuf) -> Result<Self, DeserError> {
+        let file = std::fs::File::open(path)?;
+        let mut read = std::io::BufReader::new(file);
+        let mut buf = Vec::new();
+        read.read_to_end(&mut buf)?;
+        let result: Result<ConfigFile, _> =
+            serde_path_to_error::deserialize(&mut ron::de::Deserializer::from_bytes(&buf)?);
+
+        Ok(result?)
     }
 
     pub fn theme_path(&self, config_dir: &Path) -> Option<PathBuf> {
@@ -195,15 +263,18 @@ impl ConfigFile {
         })
     }
 
-    fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile> {
+    fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile, DeserError> {
         self.theme_path(config_dir).map_or_else(
             || Ok(UiConfigFile::default()),
             |path| {
-                let file = std::fs::File::open(&path).with_context(|| {
-                    format!("Failed to open theme file {:?}", path.to_string_lossy())
-                })?;
-                let read = std::io::BufReader::new(file);
-                let theme: UiConfigFile = ron::de::from_reader(read)?;
+                let file = std::fs::File::open(&path)?;
+                let mut read = std::io::BufReader::new(file);
+                let mut buf = Vec::new();
+                read.read_to_end(&mut buf)?;
+                let theme: UiConfigFile = serde_path_to_error::deserialize(
+                    &mut ron::de::Deserializer::from_bytes(&buf)?,
+                )?;
+
                 Ok(theme)
             },
         )
@@ -216,7 +287,7 @@ impl ConfigFile {
         address_cli: Option<String>,
         password_cli: Option<String>,
         skip_album_art_check: bool,
-    ) -> Result<Config> {
+    ) -> Result<Config, DeserError> {
         let theme = if let Some(path) = theme_cli {
             let file = std::fs::File::open(path).with_context(|| {
                 format!("Failed to open theme file {:?}", path.to_string_lossy())

@@ -350,7 +350,8 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 let d = d.clone();
                 modal!(
                     context,
-                    ConfirmModal::new(context)
+                    ConfirmModal::builder()
+                    .context(context)
                         .message("Are you sure you want to delete this playlist? This action cannot be undone.")
                         .on_confirm(move |context| {
                             let d = d.clone();
@@ -362,7 +363,8 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                             Ok(())
                         })
                         .confirm_label("Delete")
-                        .size(45, 6)
+                        .size((45, 6))
+                        .build()
                 );
             }
             DirOrSong::Song(s) => {

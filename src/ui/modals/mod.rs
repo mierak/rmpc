@@ -12,6 +12,7 @@ use crate::{
 
 pub mod confirm_modal;
 pub mod decoders;
+pub mod info_modal;
 pub mod input_modal;
 pub mod keybinds;
 pub mod outputs;
@@ -19,7 +20,7 @@ pub mod select_modal;
 pub mod song_info;
 
 #[allow(unused)]
-pub(super) trait Modal: std::fmt::Debug {
+pub(crate) trait Modal: std::fmt::Debug {
     fn render(&mut self, frame: &mut Frame, app: &mut crate::context::AppContext) -> Result<()>;
 
     fn handle_key(&mut self, key: &mut KeyEvent, app: &mut AppContext) -> Result<()>;

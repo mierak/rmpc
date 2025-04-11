@@ -1,4 +1,7 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
+use bon::bon;
 use ratatui::{
     Frame,
     prelude::{Constraint, Layout},
@@ -9,7 +12,10 @@ use ratatui::{
 
 use super::{Modal, RectExt};
 use crate::{
-    config::keys::{CommonAction, GlobalAction},
+    config::{
+        Size,
+        keys::{CommonAction, GlobalAction},
+    },
     context::AppContext,
     shared::{
         key_event::KeyEvent,
@@ -26,11 +32,11 @@ const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
 };
 
 pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
-    message: &'a str,
+    message: Cow<'a, str>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
-    callback: Option<Callback>,
-    size: (u16, u16),
+    on_confirm: Callback,
+    size: Size,
 }
 
 impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
@@ -44,10 +50,22 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModa
 }
 
 #[allow(dead_code)]
+#[bon]
 impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
-    pub fn new(context: &AppContext) -> Self {
+    #[builder]
+    pub fn new(
+        context: &AppContext,
+        size: impl Into<Size>,
+        confirm_label: Option<&'a str>,
+        cancel_label: Option<&'a str>,
+        on_confirm: Callback,
+        message: impl Into<Cow<'a, str>>,
+    ) -> Self {
         let mut button_group_state = ButtonGroupState::default();
-        let buttons = vec![Button::default().label("Confirm"), Button::default().label("Cancel")];
+        let buttons = vec![
+            Button::default().label(confirm_label.unwrap_or("Confirm")),
+            Button::default().label(cancel_label.unwrap_or("Cancel")),
+        ];
         button_group_state.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
             .active_style(context.config.theme.current_item_style)
@@ -60,34 +78,19 @@ impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callb
                     .border_style(context.config.as_border_style()),
             );
 
-        Self { message: "", button_group_state, button_group, callback: None, size: (45, 6) }
-    }
-
-    pub fn size(mut self, cols: u16, rows: u16) -> Self {
-        self.size = (cols, rows);
-        self
-    }
-
-    pub fn confirm_label(mut self, label: &'a str) -> Self {
-        let buttons = vec![Button::default().label(label), Button::default().label("Cancel")];
-        self.button_group = self.button_group.buttons(buttons);
-        self
-    }
-
-    pub fn on_confirm(mut self, callback: Callback) -> Self {
-        self.callback = Some(callback);
-        self
-    }
-
-    pub fn message(mut self, message: &'a str) -> Self {
-        self.message = message;
-        self
+        Self {
+            message: message.into(),
+            button_group_state,
+            button_group,
+            on_confirm,
+            size: size.into(),
+        }
     }
 }
 
 impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
-        let popup_area = frame.area().centered_exact(self.size.0, self.size.1);
+        let popup_area = frame.area().centered_exact(self.size.width, self.size.height);
         frame.render_widget(Clear, popup_area);
 
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -100,7 +103,7 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
             .border_style(app.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
-        let paragraph = Paragraph::new(self.message)
+        let paragraph = Paragraph::new(self.message.as_ref())
             .style(app.config.as_text_style())
             .wrap(Wrap { trim: true })
             .block(block.clone())
@@ -138,9 +141,7 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
-                        if let Some(ref mut callback) = self.callback {
-                            (callback)(context)?;
-                        }
+                        (self.on_confirm)(context)?;
                     }
                     self.button_group_state = ButtonGroupState::default();
                     pop_modal!(context);
@@ -175,9 +176,7 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        if let Some(ref mut callback) = self.callback {
-                            (callback)(context)?;
-                        }
+                        (self.on_confirm)(context)?;
                         pop_modal!(context);
                     }
                     Some(_) => {

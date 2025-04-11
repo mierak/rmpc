@@ -431,7 +431,7 @@ impl<'ui> Ui<'ui> {
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
-                self.modals.push(modal.0);
+                self.modals.push(modal);
                 self.on_event(UiEvent::ModalOpened, context)?;
                 context.render()?;
             }
@@ -604,11 +604,8 @@ impl<'ui> Ui<'ui> {
 }
 
 #[derive(Debug)]
-pub struct ModalWrapper(Box<dyn Modal + Send + Sync>);
-
-#[derive(Debug)]
 pub enum UiAppEvent {
-    Modal(ModalWrapper),
+    Modal(Box<dyn Modal + Send + Sync>),
     PopModal,
     ChangeTab(TabName),
 }

@@ -15,7 +15,7 @@ use notify_debouncer_full::{
     },
 };
 
-use crate::{AppEvent, config::ConfigFile, status_warn};
+use crate::{AppEvent, config::ConfigFile, shared::macros::try_skip};
 
 #[must_use = "Returns a drop guard for the config directory watcher"]
 pub(crate) fn init(
@@ -57,20 +57,41 @@ pub(crate) fn init(
                 }
 
                 log::debug!(event:?; "File event");
-                if let Err(err) = ConfigFile::read(&config_path)
-                    .and_then(|config| {
-                        config.into_config(Some(&config_path), None, None, None, true)
+
+                let Ok(config) = ConfigFile::read(&config_path).inspect_err(|err| {
+                    try_skip!(
+                        event_tx.send(AppEvent::InfoModal {
+                            message: vec![err.to_string()],
+                            title: None,
+                            size: None,
+                        }),
+                        "Failed to send info modal request"
+                    );
+                }) else {
+                    continue;
+                };
+
+                let Ok(config) = config
+                    .into_config(Some(&config_path), None, None, None, true)
+                    .inspect_err(|err| {
+                        try_skip!(
+                            event_tx.send(AppEvent::InfoModal {
+                                message: vec![err.to_string()],
+                                title: None,
+                                size: None,
+                            }),
+                            "Failed to send info modal request"
+                        );
                     })
-                    .inspect(|config| {
-                        theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
-                    })
-                    .and_then(|config| {
-                        Ok(event_tx
-                            .send(AppEvent::ConfigChanged { config, keep_old_theme: false })?)
-                    })
-                {
-                    status_warn!(err:?, config_path:?; "Failed to read config. Keeping the current config. Check logs for more information");
-                }
+                else {
+                    continue;
+                };
+                theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
+
+                try_skip!(
+                    event_tx.send(AppEvent::ConfigChanged { config, keep_old_theme: false }),
+                    "Failed to send config changed event"
+                );
             }
         },
     )?;
