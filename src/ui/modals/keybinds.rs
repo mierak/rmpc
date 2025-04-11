@@ -222,7 +222,7 @@ impl Modal for KeybindsModal {
                 }
                 _ => {}
             }
-        };
+        }
 
         Ok(())
     }

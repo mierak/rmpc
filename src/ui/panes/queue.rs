@@ -165,7 +165,7 @@ impl Pane for QueuePane {
                             config.theme.highlighted_item_style,
                         );
                         line.spans.splice(..0, std::iter::once(marker_span));
-                    };
+                    }
 
                     line
                 });
@@ -391,7 +391,7 @@ impl Pane for QueuePane {
                 );
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 
@@ -415,7 +415,7 @@ impl Pane for QueuePane {
                         KeyCode::Char(c) => {
                             if let Some(ref mut f) = self.filter {
                                 f.push(c);
-                            };
+                            }
                             self.jump_first(&context.queue, context.config.scrolloff);
 
                             context.render()?;
@@ -423,7 +423,7 @@ impl Pane for QueuePane {
                         KeyCode::Backspace => {
                             if let Some(ref mut f) = self.filter {
                                 f.pop();
-                            };
+                            }
 
                             context.render()?;
                         }
@@ -507,7 +507,7 @@ impl Pane for QueuePane {
                                         Err(err) => {
                                             status_error!(err:?; "Failed to save playlist '{}'",value);
                                         }
-                                    };
+                                    }
                                     Ok(())
                                 });
                                 Ok(())
@@ -755,7 +755,7 @@ impl Pane for QueuePane {
                             .next(context.config.scrolloff, context.config.wrap_navigation);
 
                         context.render()?;
-                    };
+                    }
                 }
                 CommonAction::InvertSelection => {
                     self.scrolling_state.invert_marked();
@@ -789,7 +789,7 @@ impl Pane for QueuePane {
                     event.abandon();
                 }
             }
-        };
+        }
 
         Ok(())
     }

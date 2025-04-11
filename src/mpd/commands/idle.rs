@@ -45,7 +45,7 @@ impl FromMpd for Vec<IdleEvent> {
             "neighbor" => self.push(IdleEvent::Neighbor),
             "mount" => self.push(IdleEvent::Mount),
             _ => return Ok(LineHandled::No { value }),
-        };
+        }
         Ok(LineHandled::Yes)
     }
 }

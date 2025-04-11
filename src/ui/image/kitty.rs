@@ -33,6 +33,7 @@ use crate::{
         macros::{status_error, try_cont},
         tmux::tmux_write,
     },
+    try_skip,
     ui::image::recv_data,
 };
 
@@ -140,7 +141,7 @@ impl Kitty {
                                 "Failed to transfer image data"
                             );
 
-                            try_cont!(
+                            try_skip!(
                                 create_unicode_placeholder_grid(
                                     &mut w,
                                     config.colors,
@@ -155,7 +156,7 @@ impl Kitty {
                                 transfer_animation_data(&mut w, data),
                                 "Failed to transfer animation data"
                             );
-                            try_cont!(
+                            try_skip!(
                                 create_unicode_placeholder_grid(
                                     &mut w,
                                     config.colors,

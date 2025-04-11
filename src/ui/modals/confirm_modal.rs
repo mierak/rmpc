@@ -183,7 +183,7 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
                         pop_modal!(context);
                     }
                     None => {}
-                };
+                }
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}

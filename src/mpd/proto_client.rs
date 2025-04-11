@@ -115,7 +115,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                     }
                     return Err(e);
                 }
-            };
+            }
         }
     }
 
@@ -232,7 +232,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                             }
                         }
                     }
-                };
+                }
             }
         }
 

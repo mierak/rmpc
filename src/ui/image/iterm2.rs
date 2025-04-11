@@ -24,6 +24,7 @@ use crate::{
         macros::try_cont,
         tmux::tmux_write,
     },
+    try_skip,
     ui::image::{clear_area, facade::IS_SHOWING, recv_data},
 };
 
@@ -116,7 +117,7 @@ impl Iterm2 {
                         clear_area(&mut w, config.colors, area),
                         "Failed to clear iterm2 image area"
                     );
-                    try_cont!(display(&mut w, encoded), "Failed to display iterm2 image");
+                    try_skip!(display(&mut w, encoded), "Failed to display iterm2 image");
                 }
             })
             .expect("iterm2 thread to be spawned");

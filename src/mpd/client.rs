@@ -121,7 +121,7 @@ impl<'name> Client<'name> {
         rx.read_line(&mut buf)?;
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
-        };
+        }
         let Some(version): Option<Version> =
             buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok())
         else {
@@ -166,7 +166,7 @@ impl<'name> Client<'name> {
         rx.read_line(&mut buf)?;
         if !buf.starts_with("OK") {
             return Err(MpdError::Generic(format!("Handshake validation failed. '{buf}'")));
-        };
+        }
 
         let Some(version): Option<Version> =
             buf.strip_prefix("OK MPD ").and_then(|v| v.parse().ok())

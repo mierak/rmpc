@@ -36,7 +36,6 @@ fn input_poll_task(event_tx: &Sender<AppEvent>) {
                 }
                 Err(err) => {
                     log::warn!(error:? = err; "Failed to read input event");
-                    continue;
                 }
             },
             Ok(_) => {}

@@ -132,7 +132,7 @@ impl Pane for LogsPane {
                 context.render()?;
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }

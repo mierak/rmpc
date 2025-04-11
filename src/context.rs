@@ -193,7 +193,7 @@ impl AppContext {
 
         if let Ok(Some(lrc)) = self.lrc_index.find_lrc_for_song(song) {
             return Ok(Some(lrc));
-        };
+        }
 
         Ok(None)
     }

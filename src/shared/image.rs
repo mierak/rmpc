@@ -40,7 +40,7 @@ pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
         ImageProtocol::Kitty => return Ok(ImageProtocol::Kitty),
         ImageProtocol::Sixel => return Ok(ImageProtocol::Sixel),
         _ => {}
-    };
+    }
 
     if which::which("ueberzugpp").is_ok() {
         let session_type = std::env::var("XDG_SESSION_TYPE");
@@ -209,7 +209,7 @@ pub fn create_aligned_area(
     if window_size.width == 0 || window_size.height == 0 {
         log::warn!(available_area:?, max_size_px:?; "Terminal returned invalid size");
         return AlignedArea { area: available_area, size_px: max_size_px };
-    };
+    }
 
     let available_width = available_area.width as f64;
     let available_height = available_area.height as f64;

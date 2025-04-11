@@ -164,7 +164,7 @@ impl TagBrowserPane {
             _ => {
                 log::error!("Unexpected nesting in Artists dir structure");
             }
-        };
+        }
 
         Ok(())
     }
@@ -226,7 +226,7 @@ impl TagBrowserPane {
                             acc.push(album);
                         }
                     }
-                };
+                }
                 acc
             });
 
@@ -392,7 +392,7 @@ impl Pane for TagBrowserPane {
                 context.render()?;
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 }
@@ -515,7 +515,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 });
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }
@@ -565,7 +565,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 });
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 
@@ -648,7 +648,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 }
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 

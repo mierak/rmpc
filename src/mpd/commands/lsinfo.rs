@@ -35,7 +35,7 @@ impl FromMpd for Dir {
             "directory" => {
                 value
                     .split('/')
-                    .last()
+                    .next_back()
                     .context(anyhow!(
                         "Failed to parse dir name. Key: '{}' Value: '{}'",
                         key,

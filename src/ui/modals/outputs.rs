@@ -119,7 +119,7 @@ impl Modal for OutputsModal {
                 context.render()?;
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 

@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    fmt::Write as _,
     ops::{Range, RangeInclusive},
     str::FromStr,
 };
@@ -237,7 +238,7 @@ impl MpdClient for Client<'_> {
                 Err(error) => {
                     log::debug!(error:?; "Cannot get MPD config, most likely not using socket connection");
                 }
-            };
+            }
         }
 
         self.config.as_ref()
@@ -437,7 +438,7 @@ impl MpdClient for Client<'_> {
         if songs.len() != stickers.len() {
             log::error!(songs_len = songs.len(), stickers_len = stickers.len(); "Received different number of sticker responses than requested songs");
             return Ok(Some(songs));
-        };
+        }
 
         for (stickers, song) in stickers.iter_mut().zip(songs.iter_mut()) {
             song.stickers = Some(std::mem::take(&mut stickers.0));
@@ -700,7 +701,7 @@ impl MpdClient for Client<'_> {
 
         if let Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) = result {
             return Ok(None);
-        };
+        }
 
         result.map(Some)
     }
@@ -996,9 +997,9 @@ impl FilterExt for &[Filter<'_>] {
     fn to_query_str(&self) -> String {
         self.iter().enumerate().fold(String::new(), |mut acc, (idx, filter)| {
             if idx > 0 {
-                acc.push_str(&format!(" AND ({})", filter.to_query_str()));
+                let _ = write!(acc, " AND ({})", filter.to_query_str());
             } else {
-                acc.push_str(&format!("({})", filter.to_query_str()));
+                let _ = write!(acc, "({})", filter.to_query_str());
             }
             acc
         })

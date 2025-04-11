@@ -39,7 +39,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
             result.state.select(Some(0), 0);
             result.state.set_content_len(Some(root.len()));
             result.items = root;
-        };
+        }
 
         result
     }

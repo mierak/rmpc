@@ -53,7 +53,7 @@ impl Command {
                                 Some(current_id) if current_id > job_id => {
                                     break;
                                 }
-                                Some(_id) => continue,
+                                Some(_id) => {}
                                 None => break,
                             }
                         }

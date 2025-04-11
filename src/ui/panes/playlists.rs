@@ -93,7 +93,7 @@ impl PlaylistsPane {
                     context.command(move |client| Ok(client.play_last(queue_len)?));
                 }
             }
-        };
+        }
 
         Ok(())
     }
@@ -274,7 +274,7 @@ impl Pane for PlaylistsPane {
                                 .current_mut()
                                 .state
                                 .select(Some(idx_to_select), context.config.scrolloff);
-                        };
+                        }
                         self.stack_mut().clear_preview();
                         self.prepare_preview(context)?;
                         context.render()?;
@@ -310,7 +310,7 @@ impl Pane for PlaylistsPane {
                 }
             }
             _ => {}
-        };
+        }
         Ok(())
     }
 }
@@ -382,7 +382,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
 
                 context.render()?;
             }
-        };
+        }
         Ok(())
     }
 
@@ -403,7 +403,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 status_info!("All playlists added to queue");
             }
             _ => {}
-        };
+        }
 
         Ok(())
     }
@@ -432,7 +432,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     Ok(())
                 });
             }
-        };
+        }
 
         Ok(())
     }
@@ -467,7 +467,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 );
             }
             DirOrSong::Song(_) => {}
-        };
+        }
 
         Ok(())
     }
@@ -504,7 +504,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 self.stack_mut().current_mut().items.swap(idx, new_idx);
                 self.stack_mut().current_mut().select_idx(new_idx, context.config.scrolloff);
             }
-        };
+        }
         context.render()?;
 
         Ok(())

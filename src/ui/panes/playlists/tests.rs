@@ -205,9 +205,8 @@ mod on_idle_event {
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(initial_songs[2].clone()))
             );
-            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {
-                continue;
-            }
+
+            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {}
 
             // then
             let rx2 = rx.clone();
@@ -217,7 +216,7 @@ mod on_idle_event {
                 let req = rx2.recv().unwrap();
                 if let ClientRequest::QuerySync(qry) = req {
                     qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
-                };
+                }
             });
             screen
                 .on_query_finished(
@@ -272,9 +271,7 @@ mod on_idle_event {
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(initial_songs[2].clone()))
             );
-            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {
-                continue;
-            }
+            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {}
 
             // then
             let rx2 = rx.clone();
@@ -284,7 +281,7 @@ mod on_idle_event {
                 let req = rx2.recv().unwrap();
                 if let ClientRequest::QuerySync(qry) = req {
                     qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
-                };
+                }
             });
             screen
                 .on_query_finished(
@@ -340,9 +337,7 @@ mod on_idle_event {
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(initial_songs[2].clone()))
             );
-            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {
-                continue;
-            }
+            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {}
 
             // then
             let rx2 = rx.clone();
@@ -352,7 +347,7 @@ mod on_idle_event {
                 let req = rx2.recv().unwrap();
                 if let ClientRequest::QuerySync(qry) = req {
                     qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
-                };
+                }
             });
             screen
                 .on_query_finished(
@@ -407,9 +402,7 @@ mod on_idle_event {
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(initial_songs[1].clone()))
             );
-            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {
-                continue;
-            }
+            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {}
 
             // then
             let rx2 = rx.clone();
@@ -419,7 +412,7 @@ mod on_idle_event {
                 let req = rx2.recv().unwrap();
                 if let ClientRequest::QuerySync(qry) = req {
                     qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
-                };
+                }
             });
             screen
                 .on_query_finished(
@@ -472,9 +465,7 @@ mod on_idle_event {
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(initial_songs[1].clone()))
             );
-            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {
-                continue;
-            }
+            while rx.recv_timeout(Duration::from_millis(1)).is_ok() {}
 
             // then
             let rx2 = rx.clone();
@@ -484,7 +475,7 @@ mod on_idle_event {
                 let req = rx2.recv().unwrap();
                 if let ClientRequest::QuerySync(qry) = req {
                     qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
-                };
+                }
             });
             screen
                 .on_query_finished(
