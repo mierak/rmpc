@@ -13,7 +13,6 @@ use artists::{Artists, ArtistsFile};
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
-use rustix::path::Arg;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
@@ -192,6 +191,7 @@ pub enum DeserError {
     Deserialization(serde_path_to_error::Error<ron::Error>),
     Io(std::io::Error),
     Ron(ron::error::SpannedError),
+    Generic(anyhow::Error),
 }
 
 impl std::error::Error for DeserError {}
@@ -210,6 +210,7 @@ impl std::fmt::Display for DeserError {
             DeserError::Ron(err) => {
                 write!(f, "Failed to parse config file. Error: '{err}'")
             }
+            DeserError::Generic(err) => write!(f, "Failed to read config file. Error: '{err}'"),
         }
     }
 }
@@ -232,6 +233,12 @@ impl From<serde_path_to_error::Error<ron::Error>> for DeserError {
     }
 }
 
+impl From<anyhow::Error> for DeserError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Generic(value)
+    }
+}
+
 impl ConfigFile {
     pub fn read(path: &PathBuf) -> Result<Self, DeserError> {
         let file = std::fs::File::open(path)?;
@@ -250,13 +257,11 @@ impl ConfigFile {
         })
     }
 
-    fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile> {
+    fn read_theme(&self, config_dir: &Path) -> Result<UiConfigFile, DeserError> {
         self.theme_path(config_dir).map_or_else(
             || Ok(UiConfigFile::default()),
             |path| {
-                let file = std::fs::File::open(&path).with_context(|| {
-                    format!("Failed to open theme file {:?}", path.to_string_lossy())
-                })?;
+                let file = std::fs::File::open(&path)?;
                 let mut read = std::io::BufReader::new(file);
                 let mut buf = Vec::new();
                 read.read_to_end(&mut buf)?;
@@ -276,7 +281,7 @@ impl ConfigFile {
         address_cli: Option<String>,
         password_cli: Option<String>,
         skip_album_art_check: bool,
-    ) -> Result<Config> {
+    ) -> Result<Config, DeserError> {
         let theme = if let Some(path) = theme_cli {
             let file = std::fs::File::open(path).with_context(|| {
                 format!("Failed to open theme file {:?}", path.to_string_lossy())

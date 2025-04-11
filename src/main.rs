@@ -174,14 +174,16 @@ fn main() -> Result<()> {
                 .name("dependency_check".to_string())
                 .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
-            let config = match ConfigFile::read(&config_path) {
-                Ok(val) => val.into_config(
+            let config = match ConfigFile::read(&config_path).and_then(|val| {
+                val.into_config(
                     Some(&config_path),
                     args.theme.as_deref(),
                     std::mem::take(&mut args.address),
                     std::mem::take(&mut args.password),
                     false,
-                )?,
+                )
+            }) {
+                Ok(cfg) => cfg,
                 Err(err) => {
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
