@@ -11,7 +11,7 @@ use super::{
     errors::{MpdError, MpdFailureResponse},
     split_line,
 };
-use crate::mpd::errors::ErrorCode;
+use crate::{mpd::errors::ErrorCode, shared::string_util::StringExt};
 type MpdResult<T> = Result<T, MpdError>;
 
 pub struct ProtoClient<'cmd, 'client, C: SocketClient> {
@@ -246,9 +246,9 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     }
 
     fn read_line(read: &mut impl BufRead) -> Result<MpdLine, MpdError> {
-        let mut line = String::new();
+        let mut buf = Vec::new();
 
-        let bytes_read = match read.read_line(&mut line) {
+        let bytes_read = match read.read_until(b'\n', &mut buf) {
             Ok(v) => Ok(v),
             Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => {
                 log::error!(err:? = e; "Got broken pipe from mpd");
@@ -259,6 +259,8 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e.into())
             }
         }?;
+
+        let mut line = String::from_utf8_lossy_as_owned(buf);
 
         if bytes_read == 0 {
             log::error!("Got an empty line in MPD's response");

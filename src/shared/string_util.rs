@@ -4,6 +4,7 @@ pub(crate) trait CharExt {
 
 pub(crate) trait StringExt {
     fn escape_regex_chars(&self) -> String;
+    fn from_utf8_lossy_as_owned(v: Vec<u8>) -> String;
 }
 
 impl StringExt for String {
@@ -16,6 +17,16 @@ impl StringExt for String {
             buf.push(char);
         }
         buf
+    }
+
+    fn from_utf8_lossy_as_owned(v: Vec<u8>) -> String {
+        if let std::borrow::Cow::Owned(string) = String::from_utf8_lossy(&v) {
+            string
+        } else {
+            // SAFETY: `String::from_utf8_lossy`'s guaranteec valid utf8 when a borrowed
+            // variant is returned. Owned value, meaning invalid utf8, is handled above.
+            unsafe { String::from_utf8_unchecked(v) }
+        }
     }
 }
 
