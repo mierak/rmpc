@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - Lyrics with fractions of seconds which weren't to 2s.f. being parsed incorrectly
 - Album art staying on the old one when in tmux and not visible
 - Fixed catpuccin theme not being up to date in the docs
+- Handle invalid utf8 characters
 
 ## [0.8.0] - 2025-02-16
 
