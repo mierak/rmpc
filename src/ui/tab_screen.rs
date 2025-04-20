@@ -83,7 +83,7 @@ impl TabScreen {
                     context.config.as_border_style()
                 });
 
-                let pane_instance = &mut pane_container.get_mut(&pane.pane, context)?;
+                let mut pane_instance = pane_container.get_mut(&pane.pane, context)?;
                 pane_call!(pane_instance, render(frame, area, context))?;
                 frame.render_widget(block, block_area);
                 Ok(())
@@ -236,7 +236,7 @@ impl TabScreen {
                 self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
             pane_data.area = pane_area;
             pane_data.block_area = block_area;
-            let pane_instance = &mut pane_container.get_mut(&pane.pane, context)?;
+            let mut pane_instance = pane_container.get_mut(&pane.pane, context)?;
             pane_call!(pane_instance, calculate_areas(pane_area, context))?;
             pane_call!(pane_instance, before_show(context))?;
             Ok(())
@@ -272,7 +272,7 @@ impl TabScreen {
                 self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
             pane_data.area = area;
             pane_data.block_area = block_area;
-            let pane_instance = &mut pane_container.get_mut(&pane.pane, context)?;
+            let mut pane_instance = pane_container.get_mut(&pane.pane, context)?;
             pane_call!(pane_instance, calculate_areas(pane_area, context))?;
             pane_call!(pane_instance, resize(pane_area, context))?;
             Ok(())

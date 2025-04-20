@@ -229,7 +229,7 @@ impl<'ui> Ui<'ui> {
             match action {
                 GlobalAction::Command { command, .. } => {
                     let cmd = command.parse();
-                    log::debug!("executing {:?}", cmd);
+                    log::debug!("executing {cmd:?}");
 
                     if let Ok(Args { command: Some(cmd), .. }) = cmd {
                         if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
@@ -245,7 +245,7 @@ impl<'ui> Ui<'ui> {
                             .confirm_label("Execute")
                             .on_confirm(|context, value| {
                                 let cmd = value.parse();
-                                log::debug!("executing {:?}", cmd);
+                                log::debug!("executing {cmd:?}");
 
                                 if let Ok(Args { command: Some(cmd), .. }) = cmd {
                                     if context.work_sender.send(WorkRequest::Command(cmd)).is_err()
