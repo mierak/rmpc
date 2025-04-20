@@ -155,9 +155,13 @@ export default defineConfig({
             editLink: {
                 baseUrl: "https://github.com/mierak/rmpc/edit/master/docs/",
             },
-            social: {
-                github: "https://github.com/mierak/rmpc",
-            },
+            social: [
+                {
+                    icon: "github",
+                    label: "GitHub",
+                    href: "https://github.com/mierak/rmpc",
+                },
+            ],
             customCss: ["./src/styles/custom.css"],
             components: {
                 Hero: "./src/components/Hero.astro",
