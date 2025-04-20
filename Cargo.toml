@@ -1,6 +1,6 @@
 [package]
 name = "rmpc"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "A beautiful and configurable TUI client for MPD"

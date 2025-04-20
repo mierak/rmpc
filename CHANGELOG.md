@@ -26,6 +26,7 @@ lists they are listed as multiple entries.
 - **Breaking**: Some tags can now be arrays of values instead of a single value if multiple values are in the given id3 tag when listing song metadata via cli.
 - The first lyrics will now only be highlighted once reached
 - `Filename` property no longer includes file extension, use `FileExtension` if you want to keep it
+- Migrate to Rust 2024 and raise MSRV to 1.85
 
 ### Fixed
 
