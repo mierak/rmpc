@@ -206,26 +206,26 @@ impl<'panes> PaneContainer<'panes> {
 
 macro_rules! pane_call {
     ($screen:ident, $fn:ident($($param:expr),+)) => {
-        match $screen {
-            Panes::Queue(ref mut s) => s.$fn($($param),+),
+        match &mut $screen {
+            Panes::Queue(s) => s.$fn($($param),+),
             #[cfg(debug_assertions)]
-            Panes::Logs(ref mut s) => s.$fn($($param),+),
-            Panes::Directories(ref mut s) => s.$fn($($param),+),
-            Panes::Artists(ref mut s) => s.$fn($($param),+),
-            Panes::AlbumArtists(ref mut s) => s.$fn($($param),+),
-            Panes::Albums(ref mut s) => s.$fn($($param),+),
-            Panes::Playlists(ref mut s) => s.$fn($($param),+),
-            Panes::Search(ref mut s) => s.$fn($($param),+),
-            Panes::AlbumArt(ref mut s) => s.$fn($($param),+),
-            Panes::Lyrics(ref mut s) => s.$fn($($param),+),
-            Panes::ProgressBar(ref mut s) => s.$fn($($param),+),
-            Panes::Header(ref mut s) => s.$fn($($param),+),
-            Panes::Tabs(ref mut s) => s.$fn($($param),+),
+            Panes::Logs(s) => s.$fn($($param),+),
+            Panes::Directories(s) => s.$fn($($param),+),
+            Panes::Artists(s) => s.$fn($($param),+),
+            Panes::AlbumArtists(s) => s.$fn($($param),+),
+            Panes::Albums(s) => s.$fn($($param),+),
+            Panes::Playlists(s) => s.$fn($($param),+),
+            Panes::Search(s) => s.$fn($($param),+),
+            Panes::AlbumArt(s) => s.$fn($($param),+),
+            Panes::Lyrics(s) => s.$fn($($param),+),
+            Panes::ProgressBar(s) => s.$fn($($param),+),
+            Panes::Header(s) => s.$fn($($param),+),
+            Panes::Tabs(s) => s.$fn($($param),+),
             Panes::TabContent => Ok(()),
             #[cfg(debug_assertions)]
-            Panes::FrameCount(ref mut s) => s.$fn($($param),+),
-            Panes::Property(ref mut s) => s.$fn($($param),+),
-            Panes::Others(ref mut s) => s.$fn($($param),+),
+            Panes::FrameCount(s) => s.$fn($($param),+),
+            Panes::Property(s) => s.$fn($($param),+),
+            Panes::Others(s) => s.$fn($($param),+),
         }
     }
 }

@@ -81,7 +81,7 @@ impl Kitty {
                             Ok(Some(msg)) => msg,
                             Ok(None) => break,
                             Err(err) => {
-                                log::error!("Error receiving ImageBackendRequest message: {}", err);
+                                log::error!("Error receiving ImageBackendRequest message: {err}");
                                 break;
                             }
                         };

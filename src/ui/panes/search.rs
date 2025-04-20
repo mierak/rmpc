@@ -333,7 +333,7 @@ impl SearchPane {
                 client.find_add(
                     &filter
                         .iter_mut()
-                        .map(|(ref mut key, ref value, kind)| {
+                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
                             Filter::new(std::mem::take(key), value).with_type(*kind)
                         })
                         .collect_vec(),
@@ -345,7 +345,7 @@ impl SearchPane {
                 client.search_add(
                     &filter
                         .iter_mut()
-                        .map(|(ref mut key, ref value, kind)| {
+                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
                             Filter::new(std::mem::take(key), value).with_type(*kind)
                         })
                         .collect_vec(),
@@ -376,7 +376,7 @@ impl SearchPane {
             move |client| {
                 let filter = filter
                     .iter_mut()
-                    .map(|(ref mut key, ref value, kind)| {
+                    .map(|&mut (ref mut key, ref value, ref mut kind)| {
                         Filter::new(std::mem::take(key), value).with_type(*kind)
                     })
                     .collect_vec();
@@ -415,14 +415,14 @@ impl SearchPane {
                 self.prepare_preview(context);
             }
             FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::SelectFilterKind { ref mut value },
+                variant: FilterInputVariant::SelectFilterKind { value },
                 ..
             }) => {
                 value.cycle();
                 self.search(context);
             }
             FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::SelectFilterCaseSensitive { ref mut value },
+                variant: FilterInputVariant::SelectFilterCaseSensitive { value },
                 ..
             }) => {
                 *value = !*value;

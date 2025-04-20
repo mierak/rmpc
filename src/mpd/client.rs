@@ -155,8 +155,8 @@ impl<'name> Client<'name> {
     pub fn reconnect(&mut self) -> MpdResult<&Client> {
         debug!(name = self.name, addr:? = self.addr; "trying to reconnect");
         let mut stream = match &self.addr {
-            MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
-            MpdAddress::SocketPath(ref addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
+            MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
+            MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
         };
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;
