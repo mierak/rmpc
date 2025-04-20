@@ -22,8 +22,9 @@ lists they are listed as multiple entries.
 
 ### Changed
 
-- The first lyrics will now only be highlighted once reached
 - **Breaking**: Songs are no longer sorted by their `browser_song_format`. The new `browser_song_sort` is used instead
+- **Breaking**: Some tags can now be arrays of values instead of a single value if multiple values are in the given id3 tag when listing song metadata via cli.
+- The first lyrics will now only be highlighted once reached
 - `Filename` property no longer includes file extension, use `FileExtension` if you want to keep it
 
 ### Fixed
