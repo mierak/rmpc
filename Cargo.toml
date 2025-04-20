@@ -1,13 +1,13 @@
 [package]
 name = "rmpc"
 version = "0.8.0"
-edition = "2021"
+edition = "2024"
 license = "BSD-3-Clause"
 description = "A beautiful and configurable TUI client for MPD"
 homepage = "https://mierak.github.io/rmpc/"
 repository = "https://github.com/mierak/rmpc"
 readme = "README.md"
-rust-version = "1.82.0"
+rust-version = "1.85.0"
 exclude = ["/docs/**/*", "!/docs/src/content/docs/next/assets/example_theme.ron", "!/docs/src/content/docs/next/assets/example_config.ron"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -27,7 +27,7 @@ flate2 = { version = "1.0.35" }
 itertools = "0.14.0"
 ron = "0.8.1"
 derive_more = { version = "2.0.1", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref", "debug"] }
-rustix = { version = "0.38.44", features = ["termios", "stdio", "process"] }
+rustix = { version = "0.38.44", features = ["termios", "fs", "stdio", "process"] }
 bitflags = { version = "2.8.0", features = ["serde"] }
 log = { version = "0.4.25", features = ["kv"] }
 flexi_logger = "0.29.8"
