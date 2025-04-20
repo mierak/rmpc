@@ -86,3 +86,7 @@ pub fn default_song_sort() -> Vec<SongPropertyFile> {
         SongPropertyFile::Title,
     ]
 }
+
+pub fn default_tag_separator() -> String {
+    " | ".to_string()
+}

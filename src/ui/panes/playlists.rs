@@ -420,14 +420,14 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             }
             DirOrSong::Song(s) => {
                 let file = s.file.clone();
+                let artist_text =
+                    s.artist_str(&context.config.theme.format_tag_separator).into_owned();
+                let title_text =
+                    s.title_str(&context.config.theme.format_tag_separator).into_owned();
                 context.command(move |client| {
                     client.add(&file)?;
-                    if let Ok(Some(song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
-                        status_info!(
-                            "'{}' by '{}' added to queue",
-                            song.title_str(),
-                            song.artist_str()
-                        );
+                    if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
+                        status_info!("'{}' by '{}' added to queue", title_text, artist_text);
                     }
                     Ok(())
                 });

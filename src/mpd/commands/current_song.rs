@@ -2,6 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use serde::Serialize;
 
+use super::metadata_tag::MetadataTag;
 use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 #[derive(Default, Serialize, PartialEq, Eq, Clone)]
@@ -9,7 +10,7 @@ pub struct Song {
     pub id: u32,
     pub file: String,
     pub duration: Option<Duration>,
-    pub metadata: HashMap<String, String>,
+    pub metadata: HashMap<String, MetadataTag>,
     pub stickers: Option<HashMap<String, String>>,
 }
 
@@ -19,30 +20,16 @@ impl std::fmt::Debug for Song {
             f,
             "Song {{ file: {}, title: {:?}, artist: {:?}, id: {}, track: {:?} }}",
             self.file,
-            self.title(),
-            self.artist(),
+            self.metadata.get("title"),
+            self.metadata.get("artist"),
             self.id,
             self.metadata.get("track")
         )
     }
 }
 
-impl Song {
-    pub fn title(&self) -> Option<&String> {
-        self.metadata.get("title")
-    }
-
-    pub fn artist(&self) -> Option<&String> {
-        self.metadata.get("artist")
-    }
-
-    pub fn album(&self) -> Option<&String> {
-        self.metadata.get("album")
-    }
-}
-
 impl FromMpd for Song {
-    fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
+    fn next_internal(&mut self, key: &str, mut value: String) -> Result<LineHandled, MpdError> {
         match key {
             "file" => self.file = value,
             "id" => self.id = value.parse().logerr(key, &value)?,
@@ -51,7 +38,20 @@ impl FromMpd for Song {
             }
             "time" | "format" => {} // deprecated or ignored
             key => {
-                self.metadata.insert(key.to_owned(), value);
+                self.metadata
+                    .entry(key.to_owned())
+                    .and_modify(|present| match present {
+                        MetadataTag::Single(current) => {
+                            *present = MetadataTag::Multiple(vec![
+                                std::mem::take(current),
+                                std::mem::take(&mut value),
+                            ]);
+                        }
+                        MetadataTag::Multiple(items) => {
+                            items.push(std::mem::take(&mut value));
+                        }
+                    })
+                    .or_insert(MetadataTag::Single(value));
             }
         }
         Ok(LineHandled::Yes)

@@ -52,6 +52,7 @@ pub struct UiConfig {
     #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
     pub layout: SizedPaneOrSplit,
+    pub format_tag_separator: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -82,6 +83,8 @@ pub struct UiConfigFile {
     pub(super) default_album_art_path: Option<String>,
     #[serde(default)]
     pub(super) layout: PaneOrSplitFile,
+    #[serde(default = "defaults::default_tag_separator")]
+    pub(super) format_tag_separator: String,
 }
 
 impl Default for UiConfigFile {
@@ -137,6 +140,7 @@ impl Default for UiConfigFile {
             },
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
+            format_tag_separator: " | ".to_owned(),
         }
     }
 }
@@ -195,6 +199,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             layout: value.layout.convert()?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
+            format_tag_separator: value.format_tag_separator,
             modal_background_color: StringColor(value.modal_background_color)
                 .to_color()?
                 .or(bg_color),

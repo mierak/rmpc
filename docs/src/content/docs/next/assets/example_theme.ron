@@ -5,6 +5,7 @@
     default_album_art_path: None,
     show_song_table_header: true,
     draw_borders: true,
+    format_tag_separator: " | ",
     browser_column_widths: [20, 38, 42],
     background_color: None,
     text_color: None,

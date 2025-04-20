@@ -20,6 +20,7 @@ use crate::mpd::{
         Volume,
         list::MpdList,
         list_playlist::FileList,
+        metadata_tag::MetadataTagExt,
         mpd_config::MpdConfig,
         status::OnOffOneshot,
         stickers::Sticker,
@@ -47,9 +48,9 @@ pub fn client() -> TestMpdClient {
                 id: i,
                 file: format!("{}_{}_file_{i}", *artist, *album),
                 metadata: HashMap::from([
-                    ("artist".to_owned(), (*artist).to_string()),
-                    ("album".to_owned(), (*album).to_string()),
-                    ("title".to_owned(), format!("{}_{}_file_{i}", *artist, *album)),
+                    ("artist".to_owned(), (*artist).into()),
+                    ("album".to_owned(), (*album).into()),
+                    ("title".to_owned(), format!("{}_{}_file_{i}", *artist, *album).into()),
                 ]),
                 duration: Some(Duration::from_secs(i.into())),
                 stickers: None,
@@ -301,13 +302,18 @@ impl MpdClient for TestMpdClient {
             .iter()
             .filter(|s| {
                 let mut matches = true;
+                let albumartist = s.metadata.get("albumartist");
+                let genre = s.metadata.get("genre");
+                let album = s.metadata.get("album");
+                let artist = s.metadata.get("artist");
+                let title = s.metadata.get("title");
                 let values = [
-                    s.artist(),
-                    s.metadata.get("albumartist"),
-                    s.album(),
-                    s.title(),
+                    artist.last(),
+                    albumartist.last(),
+                    album.last(),
+                    title.last(),
                     Some(&s.file),
-                    s.metadata.get("genre"),
+                    genre.last(),
                 ];
 
                 for filter in filter {
@@ -342,13 +348,18 @@ impl MpdClient for TestMpdClient {
             .iter()
             .filter(|s| {
                 let mut matches = true;
+                let albumartist = s.metadata.get("albumartist");
+                let genre = s.metadata.get("genre");
+                let album = s.metadata.get("album");
+                let artist = s.metadata.get("artist");
+                let title = s.metadata.get("title");
                 let values = [
-                    s.artist(),
-                    s.metadata.get("albumartist"),
-                    s.album(),
-                    s.title(),
+                    artist.last(),
+                    albumartist.last(),
+                    album.last(),
+                    title.last(),
                     Some(&s.file),
-                    s.metadata.get("genre"),
+                    genre.last(),
                 ];
 
                 for filter in filter {

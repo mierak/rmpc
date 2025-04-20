@@ -71,11 +71,12 @@ impl DirStackItem for DirOrSong {
                 let spans =
                     [marker_span, Span::from(config.theme.symbols.song.clone()), Span::from(" ")]
                         .into_iter()
-                        .chain(
-                            config.theme.browser_song_format.0.iter().map(|prop| {
-                                Span::from(prop.as_string(Some(s)).unwrap_or_default())
-                            }),
-                        );
+                        .chain(config.theme.browser_song_format.0.iter().map(|prop| {
+                            Span::from(
+                                prop.as_string(Some(s), &config.theme.format_tag_separator)
+                                    .unwrap_or_default(),
+                            )
+                        }));
                 Line::from(spans.collect_vec())
             }
         };
@@ -112,8 +113,8 @@ impl DirStackItem for Song {
             Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
-        let title = self.title_str().to_owned();
-        let artist = self.artist_str().to_owned();
+        let title = self.title_str(&config.theme.format_tag_separator).into_owned();
+        let artist = self.artist_str(&config.theme.format_tag_separator).into_owned();
         let separator_span = Span::from(" - ");
         let icon_span = Span::from(format!("{} ", config.theme.symbols.song));
         let mut result =
