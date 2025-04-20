@@ -325,39 +325,45 @@ pub(crate) mod browser {
                 );
             }
 
-            if let Some(title) = self.title() {
-                info_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled("Title", key_style),
-                        separator.clone(),
-                        Span::from(title.clone()),
-                    ])
-                    .into(),
-                );
+            if let Some(title) = self.metadata.get("title") {
+                title.for_each(|item| {
+                    info_group.push(
+                        Line::from(vec![
+                            start_of_line_spacer.clone(),
+                            Span::styled("Title", key_style),
+                            separator.clone(),
+                            Span::from(item.to_owned()),
+                        ])
+                        .into(),
+                    );
+                });
             }
-            if let Some(artist) = self.artist() {
-                info_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled("Artist", key_style),
-                        separator.clone(),
-                        Span::from(artist.clone()),
-                    ])
-                    .into(),
-                );
+            if let Some(artist) = self.metadata.get("artist") {
+                artist.for_each(|item| {
+                    info_group.push(
+                        Line::from(vec![
+                            start_of_line_spacer.clone(),
+                            Span::styled("Artist", key_style),
+                            separator.clone(),
+                            Span::from(item.to_owned()),
+                        ])
+                        .into(),
+                    );
+                });
             }
 
-            if let Some(album) = self.album() {
-                info_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled("Album", key_style),
-                        separator.clone(),
-                        Span::from(album.clone()),
-                    ])
-                    .into(),
-                );
+            if let Some(album) = self.metadata.get("album") {
+                album.for_each(|item| {
+                    info_group.push(
+                        Line::from(vec![
+                            start_of_line_spacer.clone(),
+                            Span::styled("Album", key_style),
+                            separator.clone(),
+                            Span::from(item.to_owned()),
+                        ])
+                        .into(),
+                    );
+                });
             }
 
             if let Some(duration) = &self.duration {
@@ -381,15 +387,17 @@ pub(crate) mod browser {
                 })
                 .sorted_by_key(|(key, _)| *key)
             {
-                tags_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled(k.clone(), key_style),
-                        separator.clone(),
-                        Span::from(v.clone()),
-                    ])
-                    .into(),
-                );
+                v.for_each(|item| {
+                    tags_group.push(
+                        Line::from(vec![
+                            start_of_line_spacer.clone(),
+                            Span::styled(k.clone(), key_style),
+                            separator.clone(),
+                            Span::from(item.to_owned()),
+                        ])
+                        .into(),
+                    );
+                });
             }
 
             vec![info_group, tags_group]
@@ -535,12 +543,12 @@ pub(crate) mod browser {
 }
 
 impl Song {
-    pub fn title_str(&self) -> &str {
-        self.title().map_or("Untitled", |v| v.as_str())
+    pub fn title_str(&self, separator: &str) -> Cow<'_, str> {
+        self.metadata.get("title").map_or(Cow::Borrowed("Untitled"), |v| v.join(separator))
     }
 
-    pub fn artist_str(&self) -> &str {
-        self.artist().map_or("Untitled", |v| v.as_str())
+    pub fn artist_str(&self, separator: &str) -> Cow<'_, str> {
+        self.metadata.get("artist").map_or(Cow::Borrowed("Unknown"), |v| v.join(separator))
     }
 
     pub fn file_name(&self) -> Option<Cow<str>> {
@@ -551,20 +559,28 @@ impl Song {
         std::path::Path::new(&self.file).extension().map(|ext| ext.to_string_lossy())
     }
 
-    fn format<'song>(&'song self, property: &SongProperty) -> Option<Cow<'song, str>> {
+    fn format<'song>(
+        &'song self,
+        property: &SongProperty,
+        tag_separator: &str,
+    ) -> Option<Cow<'song, str>> {
         match property {
             SongProperty::Filename => self.file_name(),
             SongProperty::FileExtension => self.file_ext(),
             SongProperty::File => Some(Cow::Borrowed(self.file.as_str())),
-            SongProperty::Title => self.title().map(|v| Cow::Borrowed(v.as_ref())),
-            SongProperty::Artist => self.artist().map(|v| Cow::Borrowed(v.as_ref())),
-            SongProperty::Album => self.album().map(|v| Cow::Borrowed(v.as_ref())),
-            SongProperty::Track => self.metadata.get("track").map(|v| {
-                Cow::Owned(v.parse::<u32>().map_or_else(|_| v.clone(), |v| format!("{v:0>2}")))
-            }),
+            SongProperty::Title => self.metadata.get("title").map(|v| v.join(tag_separator)),
+            SongProperty::Artist => self.metadata.get("artist").map(|v| v.join(tag_separator)),
+            SongProperty::Album => self.metadata.get("album").map(|v| v.join(tag_separator)),
             SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
-            SongProperty::Disc => self.metadata.get("disc").map(|v| Cow::Borrowed(v.as_str())),
-            SongProperty::Other(name) => self.metadata.get(name).map(|v| Cow::Borrowed(v.as_str())),
+            SongProperty::Disc => self.metadata.get("disc").map(|v| Cow::Borrowed(v.last())),
+            SongProperty::Other(name) => self.metadata.get(name).map(|v| v.join(tag_separator)),
+            SongProperty::Track => self.metadata.get("track").map(|v| {
+                Cow::Owned(
+                    v.last()
+                        .parse::<u32>()
+                        .map_or_else(|_| v.last().to_owned(), |v| format!("{v:0>2}")),
+                )
+            }),
         }
     }
 
@@ -584,7 +600,10 @@ impl Song {
             },
             SongProperty::File => UniCase::new(&self.file).cmp(&UniCase::new(&other.file)),
             SongProperty::Title => {
-                match (self.metadata.get("title"), other.metadata.get("title")) {
+                match (
+                    self.metadata.get("title").map(|v| v.join("")),
+                    other.metadata.get("title").map(|v| v.join("")),
+                ) {
                     (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
                     (_, Some(_)) => Ordering::Greater,
                     (Some(_), _) => Ordering::Less,
@@ -592,7 +611,10 @@ impl Song {
                 }
             }
             SongProperty::Artist => {
-                match (self.metadata.get("artist"), other.metadata.get("artist")) {
+                match (
+                    self.metadata.get("artist").map(|v| v.join("")),
+                    other.metadata.get("artist").map(|v| v.join("")),
+                ) {
                     (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
                     (_, Some(_)) => Ordering::Greater,
                     (Some(_), _) => Ordering::Less,
@@ -600,7 +622,10 @@ impl Song {
                 }
             }
             SongProperty::Album => {
-                match (self.metadata.get("album"), other.metadata.get("album")) {
+                match (
+                    self.metadata.get("album").map(|v| v.join("")),
+                    other.metadata.get("album").map(|v| v.join("")),
+                ) {
                     (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
                     (_, Some(_)) => Ordering::Greater,
                     (Some(_), _) => Ordering::Less,
@@ -609,7 +634,9 @@ impl Song {
             }
             SongProperty::Track => {
                 let self_track = self.metadata.get("track");
+                let self_track = self_track.map(|v| v.join(""));
                 let other_track = other.metadata.get("track");
+                let other_track = other_track.map(|v| v.join(""));
                 match (self_track, other_track) {
                     (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
                         (Ok(a), Ok(b)) => a.cmp(&b),
@@ -622,7 +649,9 @@ impl Song {
             }
             SongProperty::Disc => {
                 let self_disc = self.metadata.get("disc");
+                let self_disc = self_disc.map(|v| v.join(""));
                 let other_disc = other.metadata.get("disc");
+                let other_disc = other_disc.map(|v| v.join(""));
                 match (self_disc, other_disc) {
                     (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
                         (Ok(a), Ok(b)) => a.cmp(&b),
@@ -634,7 +663,10 @@ impl Song {
                 }
             }
             SongProperty::Other(prop_name) => {
-                match (self.metadata.get(prop_name), other.metadata.get(prop_name)) {
+                match (
+                    self.metadata.get(prop_name).map(|v| v.join("")),
+                    other.metadata.get(prop_name).map(|v| v.join("")),
+                ) {
                     (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
                     (_, Some(_)) => Ordering::Greater,
                     (Some(_), _) => Ordering::Less,
@@ -674,7 +706,7 @@ impl Song {
                             .as_ref()
                             .map(|f| self.matches(std::iter::once(f.as_ref()), filter))
                     }),
-                PropertyKindOrText::Property(property) => self.format(property).map_or_else(
+                PropertyKindOrText::Property(property) => self.format(property, "").map_or_else(
                     || {
                         format
                             .default
@@ -684,7 +716,7 @@ impl Song {
                     |p| Some(p.to_lowercase().contains(&filter.to_lowercase())),
                 ),
                 PropertyKindOrText::Group(_) => format
-                    .as_string(Some(self))
+                    .as_string(Some(self), "")
                     .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
             };
             if match_found.is_some_and(|v| v) {
@@ -699,8 +731,12 @@ impl Song {
         format: &Property<SongProperty>,
         max_len: usize,
         symbols: &SymbolsConfig,
+        tag_separator: &str,
     ) -> Option<Line<'song>> {
-        format.default.as_ref().and_then(|f| self.as_line_ellipsized(f.as_ref(), max_len, symbols))
+        format
+            .default
+            .as_ref()
+            .and_then(|f| self.as_line_ellipsized(f.as_ref(), max_len, symbols, tag_separator))
     }
 
     pub fn as_line_ellipsized<'song>(
@@ -708,6 +744,7 @@ impl Song {
         format: &Property<SongProperty>,
         max_len: usize,
         symbols: &SymbolsConfig,
+        tag_separator: &str,
     ) -> Option<Line<'song>> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
@@ -721,25 +758,28 @@ impl Song {
                 .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style))
                 .or_else(|| {
                     format.default.as_ref().and_then(|format| {
-                        self.as_line_ellipsized(format.as_ref(), max_len, symbols)
+                        self.as_line_ellipsized(format.as_ref(), max_len, symbols, tag_separator)
                     })
                 }),
-            PropertyKindOrText::Property(property) => self.format(property).map_or_else(
-                || self.default_as_line_ellipsized(format, max_len, symbols),
-                |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
-            ),
+            PropertyKindOrText::Property(property) => {
+                self.format(property, tag_separator).map_or_else(
+                    || self.default_as_line_ellipsized(format, max_len, symbols, tag_separator),
+                    |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
+                )
+            }
             PropertyKindOrText::Group(group) => {
                 let mut buf = Line::default();
                 for grformat in group {
-                    if let Some(res) = self.as_line_ellipsized(grformat, max_len, symbols) {
+                    if let Some(res) =
+                        self.as_line_ellipsized(grformat, max_len, symbols, tag_separator)
+                    {
                         for span in res.spans {
                             buf.push_span(span);
                         }
                     } else {
-                        return format
-                            .default
-                            .as_ref()
-                            .and_then(|format| self.as_line_ellipsized(format, max_len, symbols));
+                        return format.default.as_ref().and_then(|format| {
+                            self.as_line_ellipsized(format, max_len, symbols, tag_separator)
+                        });
                     }
                 }
                 return Some(buf);
@@ -749,11 +789,11 @@ impl Song {
 }
 
 impl Property<SongProperty> {
-    fn default(&self, song: Option<&Song>) -> Option<String> {
-        self.default.as_ref().and_then(|p| p.as_string(song))
+    fn default(&self, song: Option<&Song>, tag_separator: &str) -> Option<String> {
+        self.default.as_ref().and_then(|p| p.as_string(song, tag_separator))
     }
 
-    pub fn as_string(&self, song: Option<&Song>) -> Option<String> {
+    pub fn as_string(&self, song: Option<&Song>, tag_separator: &str) -> Option<String> {
         match &self.kind {
             PropertyKindOrText::Text(value) => Some((*value).to_string()),
             PropertyKindOrText::Sticker(key) => {
@@ -762,24 +802,29 @@ impl Property<SongProperty> {
                 {
                     sticker.cloned()
                 } else {
-                    self.default(song)
+                    self.default(song, tag_separator)
                 }
             }
             PropertyKindOrText::Property(property) => {
                 if let Some(song) = song {
-                    song.format(property)
-                        .map_or_else(|| self.default(Some(song)), |v| Some(v.into_owned()))
+                    song.format(property, tag_separator).map_or_else(
+                        || self.default(Some(song), tag_separator),
+                        |v| Some(v.into_owned()),
+                    )
                 } else {
-                    self.default(song)
+                    self.default(song, tag_separator)
                 }
             }
             PropertyKindOrText::Group(group) => {
                 let mut buf = String::new();
                 for format in group {
-                    if let Some(res) = format.as_string(song) {
+                    if let Some(res) = format.as_string(song, tag_separator) {
                         buf.push_str(&res);
                     } else {
-                        return self.default.as_ref().and_then(|d| d.as_string(song));
+                        return self
+                            .default
+                            .as_ref()
+                            .and_then(|d| d.as_string(song, tag_separator));
                     }
                 }
                 return Some(buf);
@@ -793,14 +838,16 @@ impl Property<PropertyKind> {
         &'s self,
         song: Option<&'song Song>,
         status: &'song Status,
+        tag_separator: &str,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        self.default.as_ref().and_then(|p| p.as_span(song, status))
+        self.default.as_ref().and_then(|p| p.as_span(song, status, tag_separator))
     }
 
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
         status: &'song Status,
+        tag_separator: &str,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
         match &self.kind {
@@ -811,17 +858,17 @@ impl Property<PropertyKind> {
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
-                    self.default_as_span(song, status)
+                    self.default_as_span(song, status, tag_separator)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
-                    song.format(property).map_or_else(
-                        || self.default_as_span(Some(song), status),
+                    song.format(property, tag_separator).map_or_else(
+                        || self.default_as_span(Some(song), status, tag_separator),
                         |s| Some(Either::Left(Span::styled(s, style))),
                     )
                 } else {
-                    self.default_as_span(song, status)
+                    self.default_as_span(song, status, tag_separator)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
@@ -907,11 +954,11 @@ impl Property<PropertyKind> {
                     .unwrap_or(style),
                 ))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
+                    || self.default_as_span(song, status, tag_separator),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
-                    || self.default_as_span(song, status),
+                    || self.default_as_span(song, status, tag_separator),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
             },
@@ -943,7 +990,7 @@ impl Property<PropertyKind> {
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
                 for format in group {
-                    match format.as_span(song, status) {
+                    match format.as_span(song, status, tag_separator) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
                         None => return None,
@@ -1105,15 +1152,15 @@ mod format_tests {
                 file: "file".to_owned(),
                 duration: Some(Duration::from_secs(123)),
                 metadata: HashMap::from([
-                    ("title".to_string(), "title".to_owned()),
-                    ("album".to_string(), "album".to_owned()),
-                    ("track".to_string(), "123".to_string()),
-                    ("artist".to_string(), "artist".to_string()),
+                    ("title".to_string(), "title".into()),
+                    ("album".to_string(), "album".into()),
+                    ("track".to_string(), "123".into()),
+                    ("artist".to_string(), "artist".into()),
                 ]),
                 stickers: None,
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some(expected.to_string()));
         }
@@ -1135,10 +1182,10 @@ mod format_tests {
                 file: "file".to_owned(),
                 duration: Some(Duration::from_secs(123)),
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("album".to_string(), "album".to_owned()),
-                    ("title".to_string(), "title".to_owned()),
-                    ("track".to_string(), "123".to_string()),
+                    ("artist".to_string(), "artist".into()),
+                    ("album".to_string(), "album".into()),
+                    ("title".to_string(), "title".into()),
+                    ("track".to_string(), "123".into()),
                 ]),
                 stickers: None,
             };
@@ -1156,7 +1203,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_span(Some(&song), &status);
+            let result = format.as_span(Some(&song), &status, "");
 
             assert_eq!(
                 result,
@@ -1190,7 +1237,7 @@ mod format_tests {
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
             let status = Status { state, ..Default::default() };
 
-            let result = format.as_span(Some(&song), &status);
+            let result = format.as_span(Some(&song), &status, "");
 
             assert_eq!(
                 result,
@@ -1231,7 +1278,7 @@ mod format_tests {
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
 
-            let result = format.as_span(Some(&song), status);
+            let result = format.as_span(Some(&song), status, "");
 
             assert_eq!(result, Some(Either::Left(Span::raw(expected_label))));
         }
@@ -1257,7 +1304,7 @@ mod format_tests {
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
 
-            let result = format.as_span(Some(&song), status);
+            let result = format.as_span(Some(&song), status, "");
 
             dbg!(&result);
             assert_eq!(
@@ -1282,13 +1329,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("title".to_owned()));
         }
@@ -1310,13 +1357,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("fallback".to_owned()));
         }
@@ -1331,13 +1378,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, None);
         }
@@ -1358,13 +1405,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("test".to_owned()));
         }
@@ -1386,13 +1433,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("test".to_owned()));
         }
@@ -1424,13 +1471,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, None);
         }
@@ -1463,13 +1510,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("fallback".to_owned()));
         }
@@ -1502,13 +1549,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("titletext".to_owned()));
         }
@@ -1541,13 +1588,13 @@ mod format_tests {
 
             let song = Song {
                 metadata: HashMap::from([
-                    ("artist".to_string(), "artist".to_string()),
-                    ("title".to_string(), "title".to_owned()),
+                    ("artist".to_string(), "artist".into()),
+                    ("title".to_string(), "title".into()),
                 ]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("fallbacktext".to_owned()));
         }
@@ -1590,11 +1637,11 @@ mod format_tests {
             };
 
             let song = Song {
-                metadata: HashMap::from([("title".to_string(), "title".to_owned())]),
+                metadata: HashMap::from([("title".to_string(), "title".into())]),
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song));
+            let result = format.as_string(Some(&song), "");
 
             assert_eq!(result, Some("innerfallbackouter".to_owned()));
         }

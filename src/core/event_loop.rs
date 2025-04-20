@@ -289,9 +289,9 @@ fn main_task<B: Backend + std::io::Write>(
                                             .clone()
                                             .metadata
                                             .into_iter()
-                                            .map(|(mut k, v)| {
+                                            .map(|(mut k, mut v)| {
                                                 k.make_ascii_uppercase();
-                                                (k, v)
+                                                (k, std::mem::take(v.last_mut()))
                                             })
                                             .collect_vec();
 

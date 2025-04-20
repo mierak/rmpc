@@ -37,7 +37,7 @@ impl Pane for PropertyPane<'_> {
         let song = context.find_current_song_in_queue().map(|(_, song)| song);
 
         let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {
-            match val.as_span(song, &context.status) {
+            match val.as_span(song, &context.status, &context.config.theme.format_tag_separator) {
                 Some(Either::Left(span)) => acc.push(span),
                 Some(Either::Right(ref mut spans)) => acc.append(spans),
                 None => {}

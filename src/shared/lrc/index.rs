@@ -68,9 +68,16 @@ impl LrcIndex {
     }
 
     pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {
-        match (song.artist(), song.title(), song.album(), song.duration) {
+        match (
+            song.metadata.get("artist"),
+            song.metadata.get("artist"),
+            song.metadata.get("album"),
+            song.duration,
+        ) {
             (Some(artist), Some(title), Some(album), length) => {
-                self.find_lrc(artist, title, album, length)
+                // TODO xxx.last() is called here to not change existing behavior. Consider
+                // supporting all the tag entries
+                self.find_lrc(artist.last(), title.last(), album.last(), length)
             }
             _ => None,
         }

@@ -155,7 +155,12 @@ impl Pane for QueuePane {
                     }
 
                     let mut line = song
-                        .as_line_ellipsized(&formats[i].prop, max_len, &config.theme.symbols)
+                        .as_line_ellipsized(
+                            &formats[i].prop,
+                            max_len,
+                            &config.theme.symbols,
+                            &config.theme.format_tag_separator,
+                        )
                         .unwrap_or_default()
                         .alignment(formats[i].alignment.into());
 

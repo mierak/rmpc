@@ -14,7 +14,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::Song,
+        commands::{Song, metadata_tag::MetadataTagExt},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
@@ -183,9 +183,13 @@ impl TagBrowserPane {
         let albums = data
             .into_iter()
             .into_group_map_by(|song| {
-                let album = song.album().map_or("<no album>", |v| v.as_str());
-                let song_date = song.metadata.get("date").map_or("<no date>", |v| v.as_str());
-                (album.to_string(), song_date.to_string(), song.album().cloned())
+                let album = song.metadata.get("album").map_or("<no album>".to_string(), |v| {
+                    v.join(&context.config.theme.format_tag_separator).to_string()
+                });
+                let song_date = song.metadata.get("date").map_or("<no date>", |v| v.last());
+                let original_album = song.metadata.get("album").last().map(|v| v.to_owned());
+
+                (album, song_date.to_string(), original_album)
             })
             .into_iter()
             .sorted_by(|((album_a, date_a, _), _), ((album_b, date_b, _), _)| match sort_mode {
@@ -676,8 +680,8 @@ mod tests {
             file: format!("{date:?} {album:?}"),
             duration: None,
             metadata: HashMap::from([
-                ("album".to_string(), album.into()),
-                ("date".to_string(), date.into()),
+                ("album".to_string(), Into::<String>::into(album).into()),
+                ("date".to_string(), Into::<String>::into(date).into()),
             ]),
             stickers: None,
         }

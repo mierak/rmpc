@@ -103,15 +103,25 @@ impl Modal for SongInfoModal {
                 value_area.width,
             ));
         }
-        if let Some(title) = song.title() {
-            rows.extend(SongInfoModal::row("Title", tag_area.width, title, value_area.width));
+
+        if let Some(title) = song.metadata.get("title") {
+            rows.extend(title.iter().flat_map(|item| {
+                SongInfoModal::row("Title", tag_area.width, item, value_area.width)
+            }));
         }
-        if let Some(artist) = song.artist() {
-            rows.extend(SongInfoModal::row("Artist", tag_area.width, artist, value_area.width));
+
+        if let Some(artist) = song.metadata.get("artist") {
+            rows.extend(artist.iter().flat_map(|item| {
+                SongInfoModal::row("Artist", tag_area.width, item, value_area.width)
+            }));
         }
-        if let Some(album) = song.album() {
-            rows.extend(SongInfoModal::row("Album", tag_area.width, album, value_area.width));
+
+        if let Some(album) = song.metadata.get("album") {
+            rows.extend(album.iter().flat_map(|item| {
+                SongInfoModal::row("Album", tag_area.width, item, value_area.width)
+            }));
         }
+
         let duration = song.duration.as_ref().map(|d| d.as_secs().to_string()).unwrap_or_default();
         if !duration.is_empty() {
             rows.extend(SongInfoModal::row(
@@ -128,7 +138,11 @@ impl Modal for SongInfoModal {
                 .filter(|(key, _)| {
                     !["title", "album", "artist", "duration"].contains(&(*key).as_str())
                 })
-                .flat_map(|(k, v)| SongInfoModal::row(k, tag_area.width, v, value_area.width)),
+                .flat_map(|(k, v)| {
+                    v.iter().flat_map(|item| {
+                        SongInfoModal::row(k, tag_area.width, item, value_area.width)
+                    })
+                }),
         );
 
         self.scrolling_state.set_content_len(Some(rows.len()));

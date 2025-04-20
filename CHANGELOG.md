@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 - `browser_song_sort` which is a list of properties which defines how the songs are sorted in the browser panes
 - `FileExtension` property
 - Better error message inside a modal when reading of config fails
+- Support for multiple entries in one tag. In formats they get separated by `format_tag_separator` and in metadata
+lists they are listed as multiple entries.
 
 ### Changed
 
