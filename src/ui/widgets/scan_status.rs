@@ -8,7 +8,6 @@ use ratatui::{
 
 use super::get_line_offset;
 
-// TODO: merge with config loader
 const DEFAULT_LOADING_CHARS: [&str; 8] = ["⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿", "⢿"];
 
 #[derive(Debug)]
