@@ -26,7 +26,10 @@ use unicase::UniCase;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
-use super::{UiEvent, widgets::volume::Volume};
+use super::{
+    UiEvent,
+    widgets::{scan_status::ScanStatus, volume::Volume},
+};
 use crate::{
     MpdQueryResult,
     config::{
@@ -35,11 +38,7 @@ use crate::{
         theme::{
             SymbolsConfig,
             properties::{
-                Property,
-                PropertyKind,
-                PropertyKindOrText,
-                SongProperty,
-                StatusProperty,
+                Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty,
                 WidgetProperty,
             },
         },
@@ -531,13 +530,16 @@ pub(crate) mod browser {
 
             input.sort();
 
-            assert_eq!(input, vec![
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(Song::default()),
-                DirOrSong::Song(Song::default()),
-                DirOrSong::Song(Song::default()),
-            ]);
+            assert_eq!(
+                input,
+                vec![
+                    DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
+                    DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
+                    DirOrSong::Song(Song::default()),
+                    DirOrSong::Song(Song::default()),
+                    DirOrSong::Song(Song::default()),
+                ]
+            );
         }
     }
 }
@@ -986,6 +988,10 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
+                WidgetProperty::ScanStatus => Some(Either::Left(Span::styled(
+                    ScanStatus::get_str(status.updating_db.is_some()),
+                    style,
+                ))),
             },
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
