@@ -1,7 +1,8 @@
 #![allow(deprecated)] // TODO remove after cleanup
 use std::collections::HashMap;
 
-use anyhow::{Result, ensure};
+use anyhow::{Result, bail, ensure};
+use chumsky::Parser;
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
@@ -11,6 +12,7 @@ use unicase::UniCase;
 
 use super::theme::{
     PercentOrLength,
+    parser,
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
     queue_table::ParseSizeError,
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
@@ -76,7 +78,10 @@ pub enum PaneTypeFile {
     #[cfg(debug_assertions)]
     FrameCount,
     Property {
-        content: Vec<PropertyFile<PropertyKindFile>>,
+        #[serde(default)]
+        content: Option<Vec<PropertyFile<PropertyKindFile>>>,
+        #[serde(default)]
+        format: Option<String>,
         #[serde(default)]
         align: super::theme::properties::Alignment,
         #[serde(default)]
@@ -187,16 +192,30 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
-            PaneTypeFile::Property { content: properties, align, scroll_speed } => {
-                PaneType::Property {
-                    content: properties
-                        .into_iter()
-                        .map(|prop| prop.try_into().expect(""))
-                        .collect_vec(),
-                    align: align.into(),
-                    scroll_speed,
-                }
-            }
+            PaneTypeFile::Property { content, align, scroll_speed, format } => PaneType::Property {
+                content: {
+                    match (format, content) {
+                        (Some(format), Some(_)) | (Some(format), None) => parser::parser()
+                            .parse(&format)
+                            .into_result()
+                            .map_err(|e| {
+                                anyhow::anyhow!("Failed to parse property format: {:?}", e)
+                            })?
+                            .into_iter()
+                            .map(|prop| -> Result<_> { prop.try_into() })
+                            .try_collect()?,
+                        (None, Some(content)) => content
+                            .into_iter()
+                            .map(|prop| -> Result<_> { prop.try_into() })
+                            .try_collect()?,
+                        (None, None) => {
+                            bail!("One of config or format has to be specified for a Property pane")
+                        }
+                    }
+                },
+                align: align.into(),
+                scroll_speed,
+            },
             PaneTypeFile::Browser { root_tag: tag, separator } => {
                 PaneType::Browser { root_tag: tag, separator }
             }
