@@ -49,6 +49,8 @@
             "v":       ToggleSingle,
             "b":       SeekBack,
             "~":       ShowHelp,
+            "u":       Update,
+            "U":       Rescan,
             "I":       ShowCurrentSongInfo,
             "O":       ShowOutputs,
             "P":       ShowDecoders,
