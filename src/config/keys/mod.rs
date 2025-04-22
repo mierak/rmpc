@@ -95,6 +95,8 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('p'), modifiers: M::NONE  }, G::TogglePause),
                 (Key { key: K::Char('f'), modifiers: M::NONE  }, G::SeekForward),
                 (Key { key: K::Char('b'), modifiers: M::NONE  }, G::SeekBack),
+                (Key { key: K::Char('u'), modifiers: M::NONE  }, G::Update),
+                (Key { key: K::Char('U'), modifiers: M::NONE  }, G::Rescan),
                 (Key { key: K::Char(','), modifiers: M::NONE  }, G::VolumeDown),
                 (Key { key: K::Char('.'), modifiers: M::NONE  }, G::VolumeUp),
                 (Key { key: K::BackTab,   modifiers: M::SHIFT }, G::PreviousTab),

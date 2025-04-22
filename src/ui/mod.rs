@@ -352,6 +352,18 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
+                GlobalAction::Update => {
+                    context.command(move |client| {
+                        client.update(None)?;
+                        Ok(())
+                    });
+                }
+                GlobalAction::Rescan => {
+                    context.command(move |client| {
+                        client.rescan(None)?;
+                        Ok(())
+                    });
+                }
                 GlobalAction::NextTab => {
                     self.change_tab(context.config.next_screen(&self.active_tab), context)?;
                     context.render()?;
