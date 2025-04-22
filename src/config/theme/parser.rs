@@ -335,7 +335,7 @@ pub fn parser<'a>()
             just("name")
                 .ignored()
                 .then_ignore(just(':').padded())
-                .then(double_quoted_string.clone())
+                .then(string.clone())
                 .delimited_by(just('('), just(')')),
         )
         .labelled("sticker");
@@ -653,6 +653,24 @@ mod parser2 {
                     }
                 )),
                 style: None,
+                default: None,
+            },
+            result.unwrap().pop().unwrap()
+        );
+    }
+
+    #[test]
+    fn mutliple_modifiers() {
+        let result = parser().parse("$'sup'{mods: bold, underlined}");
+
+        assert_eq!(
+            PropertyFile {
+                kind: PropertyKindFileOrText::Text("sup".to_owned()),
+                style: Some(StyleFile {
+                    fg: None,
+                    bg: None,
+                    modifiers: Some(Modifiers::Bold | Modifiers::Underlined)
+                }),
                 default: None,
             },
             result.unwrap().pop().unwrap()
