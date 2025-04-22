@@ -22,6 +22,7 @@ pub mod cava;
 mod header;
 pub mod level_styles;
 mod lyrics;
+pub mod parser;
 mod progress_bar;
 pub mod properties;
 pub mod queue_table;
