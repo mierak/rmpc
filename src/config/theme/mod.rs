@@ -12,6 +12,7 @@ use self::{
 };
 
 mod header;
+pub mod parser;
 mod progress_bar;
 pub mod properties;
 mod queue_table;
