@@ -28,7 +28,10 @@ use unicase::UniCase;
 use self::{frame_count::FrameCountPane, logs::LogsPane};
 use super::{
     UiEvent,
-    widgets::{scan_status::ScanStatus, volume::Volume},
+    widgets::{
+        scan_status::{ScanStatus, ScanStatusState},
+        volume::Volume,
+    },
 };
 use crate::{
     MpdQueryResult,
@@ -988,10 +991,15 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
-                WidgetProperty::ScanStatus => Some(Either::Left(Span::styled(
-                    ScanStatus::get_str(status.updating_db.is_some()),
-                    style,
-                ))),
+                WidgetProperty::ScanStatus => {
+                    // FIXME: state not persisting, this is wrong and only here
+                    // to make compiler happy
+                    let mut state = ScanStatusState::new(status.updating_db);
+                    Some(Either::Left(Span::styled(
+                        ScanStatus::default().get_str(&mut state),
+                        style,
+                    )))
+                }
             },
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();

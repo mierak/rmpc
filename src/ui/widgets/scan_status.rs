@@ -1,14 +1,24 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use ratatui::{
     prelude::Alignment,
     style::Style,
-    widgets::{Block, Widget},
+    widgets::{Block, StatefulWidget, Widget},
 };
 
 use super::get_line_offset;
 
 const DEFAULT_LOADING_CHARS: [&str; 8] = ["⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿", "⢿"];
+
+#[derive(Default, Debug)]
+pub struct ScanStatusState {
+    pub updating: bool,
+    pub symbol_index: usize,
+}
+
+impl ScanStatusState {
+    pub fn new(updating: Option<u32>) -> Self {
+        Self { updating: updating.is_some(), symbol_index: 0 }
+    }
+}
 
 #[derive(Debug)]
 pub struct ScanStatus<'a> {
@@ -57,29 +67,27 @@ impl<'a> ScanStatus<'a> {
         self.alignment = alignment;
         self
     }
-}
 
-impl ScanStatus<'_> {
-    pub fn get_str(updating: bool) -> String {
-        if !updating {
+    pub fn get_str(&mut self, state: &mut ScanStatusState) -> String {
+        if !state.updating {
             return String::new();
         }
-
-        // TODO: figure out if we have a mechanism to track ticks instead of
-        // instant
-        let secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("travel to the past is not possible")
-            .as_secs();
-        let i = secs % DEFAULT_LOADING_CHARS.len() as u64;
         // SAFETY: module of len guarantees the index is always inbound
-        let t = unsafe { DEFAULT_LOADING_CHARS.get_unchecked(i as usize) };
+        let t = unsafe { DEFAULT_LOADING_CHARS.get_unchecked(state.symbol_index) };
+        state.symbol_index = (state.symbol_index + 1) & DEFAULT_LOADING_CHARS.len();
         format!(" {t} ")
     }
 }
 
-impl Widget for ScanStatus<'_> {
-    fn render(mut self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+impl StatefulWidget for &mut ScanStatus<'_> {
+    type State = ScanStatusState;
+
+    fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        state: &mut Self::State,
+    ) {
         let area = match self.block.take() {
             Some(b) => {
                 let inner_area = b.inner(area);
@@ -95,11 +103,6 @@ impl Widget for ScanStatus<'_> {
 
         let left_offset = get_line_offset(3, area.width, self.alignment);
 
-        buf.set_string(
-            area.left() + left_offset,
-            area.top(),
-            Self::get_str(self.value),
-            self.style,
-        );
+        buf.set_string(area.left() + left_offset, area.top(), self.get_str(state), self.style);
     }
 }

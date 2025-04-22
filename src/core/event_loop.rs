@@ -28,12 +28,8 @@ use crate::{
         lrc::get_lrc_path,
         macros::{status_error, status_warn},
         mpd_query::{
-            EXTERNAL_COMMAND,
-            GLOBAL_QUEUE_UPDATE,
-            GLOBAL_STATUS_UPDATE,
-            GLOBAL_VOLUME_UPDATE,
-            MpdQueryResult,
-            run_status_update,
+            EXTERNAL_COMMAND, GLOBAL_QUEUE_UPDATE, GLOBAL_STATUS_UPDATE, GLOBAL_VOLUME_UPDATE,
+            MpdQueryResult, run_status_update,
         },
     },
     ui::{KeyHandleResult, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
@@ -80,14 +76,12 @@ fn main_task<B: Backend + std::io::Write>(
         }
     };
 
-    // Check the playback status and start the periodic status update if needed
-    if context.status.state == State::Play {
-        _update_loop_guard = context
-            .config
-            .status_update_interval_ms
-            .map(Duration::from_millis)
-            .map(|interval| context.scheduler.repeated(interval, run_status_update));
-    }
+    // Start the periodic status update for playback and db status
+    _update_loop_guard = context
+        .config
+        .status_update_interval_ms
+        .map(Duration::from_millis)
+        .map(|interval| context.scheduler.repeated(interval, run_status_update));
 
     loop {
         let now = std::time::Instant::now();
@@ -261,11 +255,13 @@ fn main_task<B: Backend + std::io::Write>(
                                     }
                                 }
                                 State::Pause => {
-                                    _update_loop_guard = None;
+                                    // no longer dropping guard cause we want db tick
+                                    // _update_loop_guard = None;
                                 }
                                 State::Stop => {
                                     song_changed = true;
-                                    _update_loop_guard = None;
+                                    // no longer dropping guard cause we want db tick
+                                    // _update_loop_guard = None;
                                 }
                             }
 
