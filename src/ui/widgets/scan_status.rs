@@ -15,6 +15,12 @@ pub struct ScanStatusState {
 }
 
 impl ScanStatusState {
+    pub fn cycle_load_symbol(&mut self) {
+        self.symbol_index = (self.symbol_index + 1) % DEFAULT_LOADING_CHARS.len();
+    }
+}
+
+impl ScanStatusState {
     pub fn new(updating: Option<u32>) -> Self {
         Self { updating: updating.is_some(), symbol_index: 0 }
     }
@@ -22,8 +28,6 @@ impl ScanStatusState {
 
 #[derive(Debug)]
 pub struct ScanStatus<'a> {
-    value: bool,
-    symbol_index: usize,
     block: Option<Block<'a>>,
     alignment: Alignment,
     style: Style,
@@ -31,28 +35,12 @@ pub struct ScanStatus<'a> {
 
 impl Default for ScanStatus<'_> {
     fn default() -> Self {
-        Self {
-            value: false,
-            symbol_index: 0,
-            block: None,
-            alignment: Alignment::Left,
-            style: Style::default(),
-        }
+        Self { block: None, alignment: Alignment::Left, style: Style::default() }
     }
 }
 
 #[allow(dead_code)]
 impl<'a> ScanStatus<'a> {
-    pub fn value(mut self, value: bool) -> Self {
-        self.value = value;
-        self
-    }
-
-    pub fn cycle_load_symbol(mut self) -> Self {
-        self.symbol_index = (self.symbol_index + 1) % DEFAULT_LOADING_CHARS.len();
-        self
-    }
-
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self
@@ -68,13 +56,15 @@ impl<'a> ScanStatus<'a> {
         self
     }
 
+    /// get updating symbol, this symbol rotates in set inverval if the db is
+    /// scanning
     pub fn get_str(&mut self, state: &mut ScanStatusState) -> String {
         if !state.updating {
             return String::new();
         }
         // SAFETY: module of len guarantees the index is always inbound
         let t = unsafe { DEFAULT_LOADING_CHARS.get_unchecked(state.symbol_index) };
-        state.symbol_index = (state.symbol_index + 1) & DEFAULT_LOADING_CHARS.len();
+        state.cycle_load_symbol();
         format!(" {t} ")
     }
 }

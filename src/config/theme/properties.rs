@@ -217,8 +217,6 @@ pub struct Property<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WidgetPropertyFile {
-    // TODO: styling will probably be passing Vec<String> of loading characters
-    // like vim
     ScanStatus,
     States { active_style: Option<StyleFile>, separator_style: Option<StyleFile> },
     Volume,
