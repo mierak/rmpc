@@ -153,178 +153,102 @@ pub fn parser<'a>()
     let label = string.clone().map(|v: String| StyleOrLabel::Label(v));
     let style = style_file.map(StyleOrLabel::Style);
 
-    let status_property = choice((
-        just("volume").map(|_| PropertyKindFile::Status(StatusPropertyFile::Volume)),
-        just("repeat")
-            .ignored()
-            .then(
-                choice((
-                    just("onStyle").then_ignore(just(':').padded()).then(style),
-                    just("offStyle").then_ignore(just(':').padded()).then(style),
-                    just("onLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("offLabel").then_ignore(just(':').padded()).then(label.clone()),
-                ))
+    let generic_property = ident
+        .then(
+            ident
+                .then_ignore(just(':').padded())
+                .then(label.or(style))
                 .separated_by(just(',').padded())
                 .collect::<HashMap<_, _>>()
-                .delimited_by(just('('), just(')')),
-            )
-            .map(|((), mut val)| {
-                PropertyKindFile::Status(StatusPropertyFile::RepeatV2 {
-                    on_label: val.remove("onLabel").get_label("On"),
-                    off_label: val.remove("offLabel").get_label("Off"),
-                    on_style: val.remove("onStyle").get_style(),
-                    off_style: val.remove("offStyle").get_style(),
-                })
-            }),
-        just("random")
-            .ignored()
-            .then(
-                choice((
-                    just("onStyle").then_ignore(just(':').padded()).then(style),
-                    just("offStyle").then_ignore(just(':').padded()).then(style),
-                    just("onLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("offLabel").then_ignore(just(':').padded()).then(label.clone()),
-                ))
-                .separated_by(just(',').padded())
-                .collect::<HashMap<_, _>>()
-                .delimited_by(just('('), just(')')),
-            )
-            .map(|((), mut val)| {
-                PropertyKindFile::Status(StatusPropertyFile::RandomV2 {
-                    on_label: val.remove("onLabel").get_label("On"),
-                    off_label: val.remove("offLabel").get_label("Off"),
-                    on_style: val.remove("onStyle").get_style(),
-                    off_style: val.remove("offStyle").get_style(),
-                })
-            }),
-        just("single")
-            .ignored()
-            .then(
-                choice((
-                    just("onStyle").then_ignore(just(':').padded()).then(style),
-                    just("offStyle").then_ignore(just(':').padded()).then(style),
-                    just("oneshotStyle").then_ignore(just(':').padded()).then(style),
-                    just("onLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("offLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("oneshotLabel").then_ignore(just(':').padded()).then(label.clone()),
-                ))
-                .separated_by(just(',').padded())
-                .collect::<HashMap<_, _>>()
-                .delimited_by(just('('), just(')')),
-            )
-            .map(|((), mut val)| {
-                PropertyKindFile::Status(StatusPropertyFile::SingleV2 {
-                    on_label: val.remove("onLabel").get_label("On"),
-                    off_label: val.remove("offLabel").get_label("Off"),
-                    oneshot_label: val.remove("oneshotLabel").get_label("Oneshot"),
-                    on_style: val.remove("onStyle").get_style(),
-                    off_style: val.remove("offStyle").get_style(),
-                    oneshot_style: val.remove("oneshotStyle").get_style(),
-                })
-            }),
-        just("consume")
-            .ignored()
-            .then(
-                choice((
-                    just("onStyle").then_ignore(just(':').padded()).then(style),
-                    just("offStyle").then_ignore(just(':').padded()).then(style),
-                    just("oneshotStyle").then_ignore(just(':').padded()).then(style),
-                    just("onLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("offLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("oneshotLabel").then_ignore(just(':').padded()).then(label.clone()),
-                ))
-                .separated_by(just(',').padded())
-                .collect::<HashMap<_, _>>()
-                .delimited_by(just('('), just(')')),
-            )
-            .map(|((), mut val)| {
-                PropertyKindFile::Status(StatusPropertyFile::ConsumeV2 {
-                    on_label: val.remove("onLabel").get_label("On"),
-                    off_label: val.remove("offLabel").get_label("Off"),
-                    oneshot_label: val.remove("oneshotLabel").get_label("Oneshot"),
-                    on_style: val.remove("onStyle").get_style(),
-                    off_style: val.remove("offStyle").get_style(),
-                    oneshot_style: val.remove("oneshotStyle").get_style(),
-                })
-            }),
-        just("state")
-            .ignored()
-            .then(
-                choice((
-                    just("playingStyle").then_ignore(just(':').padded()).then(style),
-                    just("pausedStyle").then_ignore(just(':').padded()).then(style),
-                    just("stoppedStyle").then_ignore(just(':').padded()).then(style),
-                    just("playingLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("pausedLabel").then_ignore(just(':').padded()).then(label.clone()),
-                    just("stoppedLabel").then_ignore(just(':').padded()).then(label.clone()),
-                ))
-                .separated_by(just(',').padded())
-                .collect::<HashMap<_, _>>()
-                .delimited_by(just('('), just(')')),
-            )
-            .map(|((), mut val)| {
-                PropertyKindFile::Status(StatusPropertyFile::StateV2 {
-                    playing_label: val.remove("playingLabel").get_label("Playing"),
-                    paused_label: val.remove("pausedLabel").get_label("Paused"),
-                    stopped_label: val.remove("stoppedLabel").get_label("Stopped"),
-                    playing_style: val.remove("playingStyle").get_style(),
-                    paused_style: val.remove("pausedStyle").get_style(),
-                    stopped_style: val.remove("stoppedStyle").get_style(),
-                })
-            }),
-        just("elapsed").map(|_| PropertyKindFile::Status(StatusPropertyFile::Elapsed)),
-        just("duration").map(|_| PropertyKindFile::Status(StatusPropertyFile::Duration)),
-        just("crossfade").map(|_| PropertyKindFile::Status(StatusPropertyFile::Crossfade)),
-        just("bitrate").map(|_| PropertyKindFile::Status(StatusPropertyFile::Bitrate)),
-    ))
-    .boxed();
+                .delimited_by(just('('), just(')'))
+                .or_not(),
+        )
+        .boxed();
 
-    let song_property = choice((
-        just("filename").map(|_| PropertyKindFile::Song(SongPropertyFile::Filename)),
-        just("file").map(|_| PropertyKindFile::Song(SongPropertyFile::File)),
-        just("fileextension").map(|_| PropertyKindFile::Song(SongPropertyFile::FileExtension)),
-        just("title").map(|_| PropertyKindFile::Song(SongPropertyFile::Title)),
-        just("artist").map(|_| PropertyKindFile::Song(SongPropertyFile::Artist)),
-        just("album").map(|_| PropertyKindFile::Song(SongPropertyFile::Album)),
-        just("track").map(|_| PropertyKindFile::Song(SongPropertyFile::Track)),
-        just("disc").map(|_| PropertyKindFile::Song(SongPropertyFile::Disc)),
-        just("tag")
-            .ignored()
-            .then(
-                just("value")
-                    .ignored()
-                    .then_ignore(just(':').padded())
-                    .then(ident.delimited_by(just("\""), just("\"")))
-                    .delimited_by(just('('), just(')')),
-            )
-            .map(|((), ((), v)): (_, (_, &str))| {
-                PropertyKindFile::Song(SongPropertyFile::Other(v.to_owned()))
-            }),
-        // just("duration").map(|_| PropertyKind::Song(SongProperty::Duration)),
-    ))
-    .boxed();
+    let status_property = generic_property
+        .clone()
+        .try_map(|(key, mut properties), span| match key {
+            "volume" => Ok(PropertyKindFile::Status(StatusPropertyFile::Volume)),
+            "repeat" => Ok(PropertyKindFile::Status(StatusPropertyFile::RepeatV2 {
+                on_label: properties.get_label("onLabel", "On"),
+                off_label: properties.get_label("offLabel", "Off"),
+                on_style: properties.get_style("onStyle"),
+                off_style: properties.get_style("offStyle"),
+            })),
+            "random" => Ok(PropertyKindFile::Status(StatusPropertyFile::RandomV2 {
+                on_label: properties.get_label("onLabel", "On"),
+                off_label: properties.get_label("offLabel", "Off"),
+                on_style: properties.get_style("onStyle"),
+                off_style: properties.get_style("offStyle"),
+            })),
+            "single" => Ok(PropertyKindFile::Status(StatusPropertyFile::SingleV2 {
+                on_label: properties.get_label("onLabel", "On"),
+                off_label: properties.get_label("offLabel", "Off"),
+                oneshot_label: properties.get_label("oneshotLabel", "Oneshot"),
+                on_style: properties.get_style("onStyle"),
+                off_style: properties.get_style("offStyle"),
+                oneshot_style: properties.get_style("oneshotStyle"),
+            })),
+            "consume" => Ok(PropertyKindFile::Status(StatusPropertyFile::ConsumeV2 {
+                on_label: properties.get_label("onLabel", "On"),
+                off_label: properties.get_label("offLabel", "Off"),
+                oneshot_label: properties.get_label("oneshotLabel", "Oneshot"),
+                on_style: properties.get_style("onStyle"),
+                off_style: properties.get_style("offStyle"),
+                oneshot_style: properties.get_style("oneshotStyle"),
+            })),
+            "state" => Ok(PropertyKindFile::Status(StatusPropertyFile::StateV2 {
+                playing_label: properties.get_label("playingLabel", "Playing"),
+                paused_label: properties.get_label("pausedLabel", "Paused"),
+                stopped_label: properties.get_label("stoppedLabel", "Stopped"),
+                playing_style: properties.get_style("playingStyle"),
+                paused_style: properties.get_style("pausedStyle"),
+                stopped_style: properties.get_style("stoppedStyle"),
+            })),
+            "elapsed" => Ok(PropertyKindFile::Status(StatusPropertyFile::Elapsed)),
+            "duration" => Ok(PropertyKindFile::Status(StatusPropertyFile::Duration)),
+            "crossfade" => Ok(PropertyKindFile::Status(StatusPropertyFile::Crossfade)),
+            "bitrate" => Ok(PropertyKindFile::Status(StatusPropertyFile::Bitrate)),
+            _ => Err(Rich::custom(span, "invalid status property type")),
+        })
+        .boxed();
 
-    let widget_property = choice((
-        just("volume").map(|_| PropertyKindFile::Widget(WidgetPropertyFile::Volume)),
-        just("states")
-            .ignored()
-            .then(
-                choice((
-                    just("activeStyle").then_ignore(just(':').padded()).then(style),
-                    just("separatorStyle").then_ignore(just(':').padded()).then(style),
-                ))
-                .separated_by(just(',').padded())
-                .collect::<HashMap<_, _>>()
-                .delimited_by(just('('), just(')')),
-            )
-            .map(|((), mut val)| {
-                PropertyKindFile::Widget(WidgetPropertyFile::States {
-                    active_style: val.remove("activeStyle").get_style(),
-                    separator_style: val.remove("separatorStyle").get_style(),
-                })
-            }),
-    ))
-    .boxed();
+    let song_property = just("s:")
+        .ignore_then(generic_property.clone())
+        .try_map(|(prop_name, mut properties), span| match prop_name {
+            "filename" => Ok(PropertyKindFile::Song(SongPropertyFile::Filename)),
+            "fileextension" => Ok(PropertyKindFile::Song(SongPropertyFile::FileExtension)),
+            "file" => Ok(PropertyKindFile::Song(SongPropertyFile::File)),
+            "title" => Ok(PropertyKindFile::Song(SongPropertyFile::Title)),
+            "albumartist" => {
+                Ok(PropertyKindFile::Song(SongPropertyFile::Other("albumartist".to_owned())))
+            }
+            "artist" => Ok(PropertyKindFile::Song(SongPropertyFile::Artist)),
+            "album" => Ok(PropertyKindFile::Song(SongPropertyFile::Album)),
+            "track" => Ok(PropertyKindFile::Song(SongPropertyFile::Track)),
+            "disc" => Ok(PropertyKindFile::Song(SongPropertyFile::Disc)),
+            "duration" => Ok(PropertyKindFile::Song(SongPropertyFile::Duration)),
+            "tag" => {
+                let Some(value) = properties.get_label_opt("value") else {
+                    return Err(Rich::custom(span, "missing tag value"));
+                };
+                Ok(PropertyKindFile::Song(SongPropertyFile::Other(value)))
+            }
+            _ => Err(Rich::custom(span, "invalid song property type")),
+        })
+        .boxed();
+
+    let widget_property = just("w:")
+        .ignore_then(generic_property)
+        .try_map(|(prop_name, mut properties), span| match prop_name {
+            "volume" => Ok(PropertyKindFile::Widget(WidgetPropertyFile::Volume)),
+            "states" => Ok(PropertyKindFile::Widget(WidgetPropertyFile::States {
+                active_style: properties.get_style("activeStyle"),
+                separator_style: properties.get_style("separatorStyle"),
+            })),
+            _ => Err(Rich::custom(span, "invalid widget type")),
+        })
+        .boxed();
 
     let property =
         choice((status_property, song_property, widget_property)).labelled("property").boxed();
@@ -379,25 +303,45 @@ pub fn parser<'a>()
     .boxed()
 }
 
+trait StyleOrLabelMapExt {
+    fn get_label(&mut self, key: &str, default: impl Into<String>) -> String;
+    fn get_label_opt(&mut self, key: &str) -> Option<String>;
+    fn get_style(&mut self, key: &str) -> Option<StyleFile>;
+}
+
+impl StyleOrLabelMapExt for Option<HashMap<&str, StyleOrLabel>> {
+    fn get_label(&mut self, key: &str, default: impl Into<String>) -> String {
+        if let Some(m) = self {
+            if let Some(StyleOrLabel::Label(val)) = m.remove(key) {
+                return val;
+            }
+        }
+        default.into()
+    }
+
+    fn get_label_opt(&mut self, key: &str) -> Option<String> {
+        if let Some(m) = self {
+            if let Some(StyleOrLabel::Label(val)) = m.remove(key) {
+                return Some(val);
+            }
+        }
+        None
+    }
+
+    fn get_style(&mut self, key: &str) -> Option<StyleFile> {
+        if let Some(m) = self {
+            if let Some(StyleOrLabel::Style(val)) = m.remove(key) {
+                return Some(val);
+            }
+        }
+        None
+    }
+}
+
 #[derive(Debug)]
 enum StyleOrLabel {
     Style(StyleFile),
     Label(String),
-}
-
-trait StyleOrLabelExt {
-    fn get_label(self, default: impl Into<String>) -> String;
-    fn get_style(self) -> Option<StyleFile>;
-}
-
-impl StyleOrLabelExt for Option<StyleOrLabel> {
-    fn get_label(self, default: impl Into<String>) -> String {
-        if let Some(StyleOrLabel::Label(val)) = self { val } else { default.into() }
-    }
-
-    fn get_style(self) -> Option<StyleFile> {
-        if let Some(StyleOrLabel::Style(val)) = self { Some(val) } else { None }
-    }
 }
 
 #[derive(Debug)]
@@ -431,7 +375,7 @@ mod parser2 {
     #[test]
     fn group() {
         let result = parser().parse(
-            r#"$[ $filename{fg: black, bg: red, mods: bold} $" - " $file ]{fg: blue, bg: yellow, mods: crossedout}"#,
+            r#"$[ $s:filename{fg: black, bg: red, mods: bold} $" - " $s:file ]{fg: blue, bg: yellow, mods: crossedout}"#,
         );
 
         assert_eq!(
@@ -475,7 +419,7 @@ mod parser2 {
     #[test]
     fn filename_with_style_and_default() {
         let result = parser().parse(
-            "$filename{fg: black, bg: red, mods: bold}|$file{fg: black, bg: red, mods: bold}|$bitrate{fg: #FF0000, bg: 1, mods: underlined}",
+            "$s:filename{fg: black, bg: red, mods: bold}|$s:file{fg: black, bg: red, mods: bold}|$bitrate{fg: #FF0000, bg: 1, mods: underlined}",
         );
 
         assert_eq!(
@@ -534,7 +478,7 @@ mod parser2 {
 
     #[test]
     fn filename_with_style() {
-        let result = parser().parse("$filename{fg: black, bg: red, mods: bold}");
+        let result = parser().parse("$s:filename{fg: black, bg: red, mods: bold}");
 
         assert_eq!(
             PropertyFile {
@@ -554,7 +498,7 @@ mod parser2 {
 
     #[test]
     fn other_with_tag() {
-        let result = parser().parse(r#"$tag(value: "artist")"#);
+        let result = parser().parse(r#"$s:tag(value: "artist")"#);
 
         assert_eq!(
             PropertyFile {
@@ -570,7 +514,7 @@ mod parser2 {
 
     #[test]
     fn filename_simple() {
-        let result = parser().parse("$filename");
+        let result = parser().parse("$s:filename");
 
         assert_eq!(
             PropertyFile {
