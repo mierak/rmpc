@@ -1,6 +1,7 @@
 use std::num::{ParseFloatError, ParseIntError};
 
 use anyhow::{Context, Result, bail};
+use chumsky::Parser;
 use itertools::Itertools;
 use ratatui::layout::Constraint;
 use serde::{Deserialize, Serialize};
@@ -9,10 +10,12 @@ use thiserror::Error;
 
 use super::{
     StyleFile,
+    parser,
     properties::{
         Alignment,
         Property,
         PropertyFile,
+        PropertyKindFile,
         PropertyKindFileOrText,
         PropertyKindOrText,
         SongProperty,
@@ -70,7 +73,8 @@ pub struct SongTableColumnFile {
     /// Property to display in the column
     /// Can be one of: `Duration`, `Filename`, `Artist`, `AlbumArtist`, `Title`,
     /// `Album`, `Date`, `Genre` or `Comment`
-    pub(super) prop: PropertyFile<SongPropertyFile>,
+    pub(super) prop: Option<PropertyFile<SongPropertyFile>>,
+    pub(super) format: Option<String>,
     /// Label to display in the column header
     /// If not set, the property name will be used
     pub(super) label: Option<String>,
@@ -99,7 +103,7 @@ impl Default for QueueTableColumnsFile {
     fn default() -> Self {
         QueueTableColumnsFile(vec![
             SongTableColumnFile {
-                prop: PropertyFile {
+                prop: Some(PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Artist),
                     default: Some(Box::new(PropertyFile {
                         kind: PropertyKindFileOrText::Text("Unknown".to_string()),
@@ -107,14 +111,15 @@ impl Default for QueueTableColumnsFile {
                         default: None,
                     })),
                     style: None,
-                },
+                }),
+                format: None,
                 label: None,
                 width_percent: None,
                 width: Some("20%".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
-                prop: PropertyFile {
+                prop: Some(PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Title),
                     default: Some(Box::new(PropertyFile {
                         kind: PropertyKindFileOrText::Text("Unknown".to_string()),
@@ -122,14 +127,15 @@ impl Default for QueueTableColumnsFile {
                         default: None,
                     })),
                     style: None,
-                },
+                }),
+                format: None,
                 label: None,
                 width_percent: None,
                 width: Some("35%".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
-                prop: PropertyFile {
+                prop: Some(PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Album),
                     default: Some(Box::new(PropertyFile {
                         kind: PropertyKindFileOrText::Text("Unknown Album".to_string()),
@@ -145,14 +151,15 @@ impl Default for QueueTableColumnsFile {
                         bg: None,
                         modifiers: None,
                     }),
-                },
+                }),
+                format: None,
                 label: None,
                 width_percent: None,
                 width: Some("30%".to_string()),
                 alignment: None,
             },
             SongTableColumnFile {
-                prop: PropertyFile {
+                prop: Some(PropertyFile {
                     kind: PropertyKindFileOrText::Property(SongPropertyFile::Duration),
                     default: Some(Box::new(PropertyFile {
                         kind: PropertyKindFileOrText::Text("-".to_string()),
@@ -160,7 +167,8 @@ impl Default for QueueTableColumnsFile {
                         default: None,
                     })),
                     style: None,
-                },
+                }),
+                format: None,
                 label: None,
                 width_percent: None,
                 width: Some("15%".to_string()),
@@ -179,7 +187,20 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                 .0
                 .into_iter()
                 .map(|v| -> Result<_> {
-                    let prop: Property<SongProperty> = v.prop.try_into()?;
+                    let prop: Property<SongProperty> = match (v.format, v.prop) {
+                        (Some(format), Some(_)) | (Some(format), None) => parser::parser()
+                            .parse(&format)
+                            .into_result()
+                            .map_err(|e| {
+                                anyhow::anyhow!("Failed to parse property format: {:?}", e)
+                            })?
+                            .into_iter()
+                            .next()
+                            .context("A song property must be specified")?
+                            .try_into()?,
+                        (None, Some(prop)) => prop.try_into()?,
+                        (None, None) => panic!(""),
+                    };
                     let label = v.label.unwrap_or_else(|| match &prop.kind {
                         PropertyKindOrText::Text { .. } => String::new(),
                         PropertyKindOrText::Sticker { .. } => String::new(),
@@ -226,6 +247,39 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
     }
 }
 
+impl TryFrom<PropertyFile<PropertyKindFile>> for Property<SongProperty> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PropertyFile<PropertyKindFile>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            kind: match value.kind {
+                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
+                PropertyKindFileOrText::Property(PropertyKindFile::Song(prop)) => {
+                    PropertyKindOrText::Property(prop.into())
+                }
+                PropertyKindFileOrText::Property(_) => {
+                    bail!("Only song properties are allowed in the song table")
+                }
+                PropertyKindFileOrText::Group(group) => {
+                    let res: Vec<_> = group
+                        .into_iter()
+                        .map(|p| -> Result<Property<SongProperty>> { p.try_into() })
+                        .try_collect()?;
+                    PropertyKindOrText::Group(res)
+                }
+            },
+            style: Some(value.style.to_config_or(None, None)?),
+            default: value
+                .default
+                .map(|v| -> Result<_> {
+                    let s: Property<SongProperty> = (*v).try_into()?;
+                    Ok(Box::new(s))
+                })
+                .transpose()?,
+        })
+    }
+}
 impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
     type Error = anyhow::Error;
 
