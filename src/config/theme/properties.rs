@@ -6,12 +6,13 @@ use itertools::Itertools;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use strum::Display;
+use strum::{Display, EnumDiscriminants, EnumIter};
 
 use super::style::ToConfigOr;
 use crate::config::{defaults, theme::StyleFile};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
 pub enum SongPropertyFile {
     Filename,
     File,
@@ -41,7 +42,8 @@ pub enum SongProperty {
     Other(String),
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
 pub enum StatusPropertyFile {
     Volume,
     Repeat,
@@ -187,7 +189,8 @@ pub enum StatusProperty {
     ActiveTab,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
 pub enum PropertyKindFile {
     Song(SongPropertyFile),
     Status(StatusPropertyFile),
@@ -294,7 +297,8 @@ pub struct Property<T> {
     pub default: Option<Box<Property<T>>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, EnumDiscriminants)]
+#[strum_discriminants(derive(EnumIter))]
 pub enum WidgetPropertyFile {
     ScanStatus,
     States { active_style: Option<StyleFile>, separator_style: Option<StyleFile> },
