@@ -15,10 +15,7 @@ use super::{
     style::Modifiers,
 };
 
-pub fn parser<'a>()
--> impl Parser<'a, &'a str, Vec<PropertyFile<PropertyKindFile>>, extra::Err<Rich<'a, char>>> {
-    let ident = text::ascii::ident();
-
+pub fn string_parser<'a>() -> impl Parser<'a, &'a str, String, extra::Err<Rich<'a, char>>> + Clone {
     let escape_double_quoted_str = just('\\')
         .then(choice((
             just('\\'),
@@ -78,7 +75,7 @@ pub fn parser<'a>()
         .or(escape_double_quoted_str)
         .repeated()
         .to_slice()
-        .map(ToString::to_string)
+        .try_map(|v, span| unescape(v, '"', span))
         .delimited_by(just('"'), just('"'))
         .boxed();
 
@@ -87,11 +84,18 @@ pub fn parser<'a>()
         .or(escape_single_queoted_str)
         .repeated()
         .to_slice()
-        .map(ToString::to_string)
+        .try_map(|v, span| unescape(v, '\'', span))
         .delimited_by(just("'"), just("'"))
         .boxed();
 
-    let string = double_quoted_string.clone().or(single_quoted_string.clone()).labelled("string");
+    double_quoted_string.clone().or(single_quoted_string.clone()).labelled("string")
+}
+
+pub fn parser<'a>()
+-> impl Parser<'a, &'a str, Vec<PropertyFile<PropertyKindFile>>, extra::Err<Rich<'a, char>>> {
+    let ident = text::ascii::ident();
+
+    let string = string_parser();
 
     let modifiers = choice((
         just("bold"),
@@ -302,6 +306,30 @@ pub fn parser<'a>()
     .repeated()
     .collect::<Vec<_>>()
     .boxed()
+}
+
+fn unescape(input: &str, delim: char, span: SimpleSpan) -> Result<String, Rich<char>> {
+    let mut buf = String::with_capacity(input.len());
+    let mut chars = input.chars().enumerate();
+    while let Some((idx, c)) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                None => return Err(Rich::custom(span, "Invalid escape sequence at end of string")),
+                Some((_, '\\')) => buf.push('\\'),
+                Some((_, next)) if next == delim => buf.push(delim),
+                _ => {
+                    return Err(Rich::custom(
+                        span,
+                        format!("Invalid escape sequence at index {idx}"),
+                    ));
+                }
+            }
+        } else {
+            buf.push(c);
+        }
+    }
+
+    Ok(buf)
 }
 
 trait StyleOrLabelMapExt {
@@ -573,7 +601,7 @@ mod parser2 {
             PropertyFile {
                 kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
                     StatusPropertyFile::ConsumeV2 {
-                        on_label: r#"test \" test ' test $#    "#.to_owned(),
+                        on_label: r#"test " test ' test $#    "#.to_owned(),
                         off_label: "Off".to_owned(),
                         oneshot_label: "Oneshot".to_owned(),
                         on_style: None,
@@ -596,7 +624,7 @@ mod parser2 {
             PropertyFile {
                 kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
                     StatusPropertyFile::ConsumeV2 {
-                        on_label: r#"test " test \' test $#    "#.to_owned(),
+                        on_label: r#"test " test ' test $#    "#.to_owned(),
                         off_label: "Off".to_owned(),
                         oneshot_label: "Oneshot".to_owned(),
                         on_style: None,
@@ -823,5 +851,41 @@ mod parser2 {
         }
 
         Ok(())
+    }
+
+    #[allow(clippy::needless_raw_string_hashes)]
+    mod string {
+        use chumsky::Parser;
+        use test_case::test_case;
+
+        #[test_case(r#""hello world""#,                  "hello world";              "simple")]
+        #[test_case(r#""hello \" world""#,               r#"hello " world"#;         "quotes")]
+        #[test_case(r#""hello \" \"\" \"\"\"world""#,    r#"hello " "" """world"#;   "mutliple quotes")]
+        #[test_case(r#""^{()}$~#:-_;@`!+<>%/""#,         r#"^{()}$~#:-_;@`!+<>%/"#;  "random special chars")]
+        #[test_case(r#""\\ \\\\ \\\\\\ \\\\\\\\""#,      r#"\ \\ \\\ \\\\"#;         "backslashes")]
+        fn double_quoted_string(input: &str, expected: &str) {
+            let result = super::string_parser().parse(input);
+
+            assert_eq!(
+                result.clone().into_result(),
+                Ok(expected.to_owned()),
+                "expected '{input}' to be '{expected}' but got {result:?}"
+            );
+        }
+
+        #[test_case(r#"'hello world'"#,                 r#"hello world"#;            "simple")]
+        #[test_case(r#"'hello \' world'"#,              r#"hello ' world"#;          "quotes")]
+        #[test_case(r#"'hello \' \'\' \'\'\'world'"#,   r#"hello ' '' '''world"#;    "mutliple quotes")]
+        #[test_case(r#"'^{()}$~#:-_;@`!+<>%/'"#,        r#"^{()}$~#:-_;@`!+<>%/"#;   "random special chars")]
+        #[test_case(r#"'\\ \\\\ \\\\\\ \\\\\\\\'"#,     r#"\ \\ \\\ \\\\"#;          "backslashes")]
+        fn single_quoted_string(input: &str, expected: &str) {
+            let result = super::string_parser().parse(input);
+
+            assert_eq!(
+                result.clone().into_result(),
+                Ok(expected.to_owned()),
+                "expected '{input}' to be '{expected}' but got {result:?}"
+            );
+        }
     }
 }
