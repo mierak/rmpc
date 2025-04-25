@@ -148,10 +148,11 @@ pub fn parser<'a>()
         bg: m.remove("bg").get_string(),
         modifiers: m.remove("mods").get_modifiers(),
     })
-    .delimited_by(just('{'), just('}'));
+    .delimited_by(just('{'), just('}'))
+    .boxed();
 
     let label = string.clone().map(|v: String| StyleOrLabel::Label(v));
-    let style = style_file.map(StyleOrLabel::Style);
+    let style = style_file.clone().map(StyleOrLabel::Style);
 
     let generic_property = ident
         .then(
@@ -286,7 +287,7 @@ pub fn parser<'a>()
         just('$')
             .ignored()
             .then(prop_kind_or_text)
-            .then(style_file.or_not())
+            .then(style_file.clone().or_not())
             .then(just('|').ignored().then(prop).or_not())
             .map(
                 |((((), kind), style), default): (
