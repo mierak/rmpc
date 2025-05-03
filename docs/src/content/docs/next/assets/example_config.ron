@@ -16,6 +16,7 @@
     status_update_interval_ms: 1000,
     select_current_song_on_change: false,
     browser_song_sort: [Disc, Track, Artist, Title],
+    directories_sort: SortFormat(group_directories_first: true, reverse: false),
     album_art: (
         method: Auto,
         max_size_px: (width: 1200, height: 1200),

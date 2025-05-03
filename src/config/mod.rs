@@ -15,6 +15,7 @@ use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
+use sort_mode::{SortMode, SortModeFile, SortOptions};
 use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
 use theme::properties::{SongProperty, SongPropertyFile};
 use utils::tilde_expand;
@@ -27,6 +28,7 @@ pub mod cli_config;
 mod defaults;
 pub mod keys;
 mod search;
+pub mod sort_mode;
 pub mod tabs;
 pub mod theme;
 
@@ -69,7 +71,8 @@ pub struct Config {
     pub artists: Artists,
     pub tabs: Tabs,
     pub active_panes: Vec<PaneType>,
-    pub browser_song_sort: Arc<Vec<SongProperty>>,
+    pub browser_song_sort: Arc<SortOptions>,
+    pub directories_sort: Arc<SortOptions>,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -125,6 +128,8 @@ pub struct ConfigFile {
     tabs: TabsFile,
     #[serde(default)]
     pub browser_song_sort: Vec<SongPropertyFile>,
+    #[serde(default)]
+    pub directories_sort: SortModeFile,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -176,6 +181,10 @@ impl Default for ConfigFile {
             password: None,
             artists: ArtistsFile::default(),
             browser_song_sort: defaults::default_song_sort(),
+            directories_sort: SortModeFile::SortFormat {
+                group_directories_first: true,
+                reverse: false,
+            },
         }
     }
 }
@@ -319,10 +328,6 @@ impl ConfigFile {
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
         let album_art_method = self.album_art.method;
         let mut config = Config {
-            browser_song_sort: Arc::new(
-                self.browser_song_sort.into_iter().map(SongProperty::from).collect_vec(),
-            ),
-            theme,
             theme_name: self.theme,
             cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),
             lyrics_dir: self.lyrics_dir.map(|v| {
@@ -353,6 +358,38 @@ impl ConfigFile {
             on_resize: self.on_resize.map(|arr| {
                 Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
+            browser_song_sort: Arc::new(SortOptions {
+                mode: SortMode::Format(
+                    self.browser_song_sort.iter().cloned().map(SongProperty::from).collect_vec(),
+                ),
+                group_directories_first: true,
+                reverse: false,
+            }),
+            directories_sort: Arc::new(match self.directories_sort {
+                SortModeFile::Format { group_directories_first, reverse } => SortOptions {
+                    mode: SortMode::Format(
+                        theme
+                            .browser_song_format
+                            .0
+                            .iter()
+                            .flat_map(|prop| prop.kind.collect_properties())
+                            .collect_vec(),
+                    ),
+                    group_directories_first,
+                    reverse,
+                },
+                SortModeFile::SortFormat { group_directories_first, reverse } => SortOptions {
+                    mode: SortMode::Format(
+                        self.browser_song_sort.into_iter().map(SongProperty::from).collect_vec(),
+                    ),
+                    group_directories_first,
+                    reverse,
+                },
+                SortModeFile::ModifiedTime { group_directories_first, reverse } => {
+                    SortOptions { mode: SortMode::ModifiedTime, group_directories_first, reverse }
+                }
+            }),
+            theme,
         };
 
         if skip_album_art_check {
