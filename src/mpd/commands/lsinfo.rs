@@ -1,8 +1,9 @@
 use anyhow::{Context, anyhow};
+use chrono::{DateTime, Utc};
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
 
 use super::Song;
-use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
+use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 
 #[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct LsInfo(pub Vec<LsInfoEntry>);
@@ -20,13 +21,13 @@ pub struct Dir {
     pub path: String,
     /// this is the full path from mpd root
     pub full_path: String,
-    pub last_modified: String,
+    pub last_modified: DateTime<Utc>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Playlist {
     name: String,
-    last_modified: String,
+    last_modified: DateTime<Utc>,
 }
 
 impl FromMpd for Dir {
@@ -44,7 +45,10 @@ impl FromMpd for Dir {
                     .clone_into(&mut self.path);
                 self.full_path = value;
             }
-            "last-modified" => self.last_modified = value,
+            "last-modified" => {
+                self.last_modified =
+                    value.parse().context("failed to parse date").logerr(key, &value)?;
+            }
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
@@ -55,7 +59,10 @@ impl FromMpd for Playlist {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
             "playlist" => self.name = value,
-            "last-modified" => self.last_modified = value,
+            "last-modified" => {
+                self.last_modified =
+                    value.parse().context("failed to parse date").logerr(key, &value)?;
+            }
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
@@ -117,7 +124,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
             result[0],
             LsInfoEntry::Playlist(Playlist {
                 name: "autechre.m3u".to_owned(),
-                last_modified: "2024-10-30T00:04:26Z".to_string()
+                last_modified: "2024-10-30T00:04:26Z".to_string().parse().unwrap()
             })
         );
         assert_eq!(
@@ -125,7 +132,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
             LsInfoEntry::Dir(Dir {
                 path: ".cue".to_owned(),
                 full_path: ".cue".to_owned(),
-                last_modified: "2024-11-02T02:55:40Z".to_owned()
+                last_modified: "2024-11-02T02:55:40Z".to_owned().parse().unwrap()
             })
         );
         assert_eq!(
@@ -133,7 +140,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
             LsInfoEntry::Dir(Dir {
                 path: ".win".to_owned(),
                 full_path: ".win".to_owned(),
-                last_modified: "2024-09-15T19:39:47Z".to_owned()
+                last_modified: "2024-09-15T19:39:47Z".to_owned().parse().unwrap()
             })
         );
         assert_eq!(
@@ -141,7 +148,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
             LsInfoEntry::Dir(Dir {
                 path: "flac".to_owned(),
                 full_path: "flac".to_owned(),
-                last_modified: "2024-12-23T00:11:38Z".to_owned()
+                last_modified: "2024-12-23T00:11:38Z".to_owned().parse().unwrap()
             })
         );
         assert_eq!(
@@ -149,7 +156,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
             LsInfoEntry::Dir(Dir {
                 path: "wav".to_owned(),
                 full_path: "wav".to_owned(),
-                last_modified: "2024-08-12T03:03:40Z".to_owned()
+                last_modified: "2024-08-12T03:03:40Z".to_owned().parse().unwrap()
             })
         );
     }

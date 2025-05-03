@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - new `Browser` pane
 - Add ability to scroll and cycle `Property` panes when they do not fit their area
 - `browser_song_sort` which is a list of properties which defines how the songs are sorted in the browser panes
+- `directories_sort` to configure how the directories pane is sorted
 - `FileExtension` property
 - Better error message inside a modal when reading of config fails
 - Support for multiple entries in one tag. In formats they get separated by `format_tag_separator` and in metadata
@@ -24,6 +25,7 @@ lists they are listed as multiple entries.
 
 - **Breaking**: Songs are no longer sorted by their `browser_song_format`. The new `browser_song_sort` is used instead
 - **Breaking**: Some tags can now be arrays of values instead of a single value if multiple values are in the given id3 tag when listing song metadata via cli.
+- **Breaking**: For CLI which return song info: `last-modified` and `added` are no longer in songs' metadata, they are at the top level object instead now
 - The first lyrics will now only be highlighted once reached
 - `Filename` property no longer includes file extension, use `FileExtension` if you want to keep it
 - Migrate to Rust 2024 and raise MSRV to 1.85

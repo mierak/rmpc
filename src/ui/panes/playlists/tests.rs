@@ -2,7 +2,10 @@
 
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{
+        LazyLock,
+        atomic::{AtomicU32, Ordering},
+    },
     time::Duration,
 };
 
@@ -497,11 +500,8 @@ mod on_idle_event {
     }
 }
 
-fn dir(name: &str) -> DirOrSong {
-    DirOrSong::Dir { name: name.to_string(), full_path: name.to_string() }
-}
-
 static LAST_ID: AtomicU32 = AtomicU32::new(1);
+static NOW: LazyLock<chrono::DateTime<chrono::Utc>> = LazyLock::new(chrono::Utc::now);
 
 pub fn new_id() -> u32 {
     LAST_ID.fetch_add(1, Ordering::Relaxed)
@@ -513,7 +513,13 @@ fn song(name: &str) -> Song {
         duration: Some(Duration::from_secs(1)),
         metadata: HashMap::new(),
         stickers: None,
+        last_modified: *NOW,
+        added: None,
     }
+}
+
+fn dir(name: &str) -> DirOrSong {
+    DirOrSong::Dir { name: name.to_string(), full_path: name.to_string(), last_modified: *NOW }
 }
 
 #[fixture]

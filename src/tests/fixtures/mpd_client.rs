@@ -54,6 +54,8 @@ pub fn client() -> TestMpdClient {
                 ]),
                 duration: Some(Duration::from_secs(i.into())),
                 stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
             })
         })
         .collect();
@@ -479,6 +481,8 @@ impl MpdClient for TestMpdClient {
                         duration: None,
                         metadata: HashMap::default(),
                         stickers: None,
+                        last_modified: chrono::Utc::now(),
+                        added: None,
                     })
                     .collect())
             },

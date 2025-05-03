@@ -224,3 +224,16 @@ Rmpc does not do any processing on the `date` metadata tag on the song. It gets 
 
 Defines how the songs are sorted in the browser panes. This is a list of <a href={path("configuration/song-table/#property-1")}>song properties</a>.
 Defaults to `[Disc, Track, Artist, Title]` which means the songs are first sorted by their `Disc` and `Track` numbers, then by `Artist` and by `Title` last.
+
+### directories_sort
+
+<ConfigValue name="directories_sort" type={["ModifiedTime(..)", "Format(..)", "SongFormat(..)"]} />
+
+Determines how the entries are sorted in the directories pane. All of the properties below take additional config options:
+`group_directories_first` and `reverse` which make directories grouped before entries and reverse the ordering respectively.
+
+- `Format` - Songs are sorted by their displayed format.
+- `SortFormat` - Similar to `Format` but songs are sorted by <a href={path("configuration/#browser_song_sort")}>browser_song_sort</a>.
+- `ModifiedTime` - Entries are sorted by their last modified time.
+
+Defaults to `SortFormat(group_directories_first: true, reverse: false)`.
