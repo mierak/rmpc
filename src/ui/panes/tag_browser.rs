@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
-use super::{Pane, browser::DirOrSong};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{
@@ -28,6 +28,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::BrowserPane,
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
     },

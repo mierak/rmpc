@@ -14,7 +14,7 @@ use crate::{
         mpd_client::MpdClient,
     },
     shared::{events::ClientRequest, macros::try_skip},
-    ui::panes::browser::DirOrSong,
+    ui::dir_or_song::DirOrSong,
 };
 
 pub const EXTERNAL_COMMAND: &str = "external_command";

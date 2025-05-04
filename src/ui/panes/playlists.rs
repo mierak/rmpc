@@ -2,7 +2,7 @@ use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
-use super::{Pane, browser::DirOrSong};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::tabs::PaneType,
@@ -22,6 +22,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::{BrowserPane, MoveDirection},
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         modals::{confirm_modal::ConfirmModal, input_modal::InputModal},
         widgets::browser::Browser,
