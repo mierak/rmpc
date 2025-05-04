@@ -17,7 +17,8 @@ use crate::{
     tests::fixtures::app_context,
     ui::{
         browser::BrowserPane,
-        panes::{Pane, browser::DirOrSong, playlists::PlaylistsPane},
+        dir_or_song::DirOrSong,
+        panes::{Pane, playlists::PlaylistsPane},
     },
 };
 
