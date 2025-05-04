@@ -8,6 +8,16 @@ use crate::mpd::{FromMpd, LineHandled, ParseErrorExt, errors::MpdError};
 #[derive(Debug, Default, IntoIterator, AsRef, AsMut, Into)]
 pub struct LsInfo(pub Vec<LsInfoEntry>);
 
+impl LsInfo {
+    pub fn into_files(self) -> impl Iterator<Item = String> {
+        self.into_iter().filter_map(|item| match item {
+            LsInfoEntry::File(song) => Some(song.file),
+            LsInfoEntry::Dir(_) => None,
+            LsInfoEntry::Playlist(_) => None,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum LsInfoEntry {
     Dir(Dir),
