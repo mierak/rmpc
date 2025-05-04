@@ -21,7 +21,21 @@ pub struct Args {
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
+pub enum AddRandom {
+    Song { count: usize },
+    Artist { count: usize },
+    Album { count: usize },
+    AlbumArtist { count: usize },
+    Genre { count: usize },
+}
+
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
 pub enum Command {
+    AddRandom {
+        #[command(subcommand)]
+        command: AddRandom,
+    },
     /// Prints the default config. Can be used to bootstrap your config file.
     Config {
         /// If provided, print the current config instead of the default one.
