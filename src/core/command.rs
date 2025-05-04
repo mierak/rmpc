@@ -32,21 +32,21 @@ impl Command {
             Command::Version => bail!("Cannot use version command here."),
             Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::Remote { .. } => bail!("Cannot use remote command here."),
-            Command::AddRandom { command } => Ok(Box::new(move |client| {
-                match command {
-                    AddRandom::Song { count } => {
+            Command::AddRandom { tag, count } => Ok(Box::new(move |client| {
+                match tag {
+                    AddRandom::Song => {
                         client.add_random_songs(count, None)?;
                     }
-                    AddRandom::Artist { count } => {
+                    AddRandom::Artist => {
                         client.add_random_tag(count, Tag::Artist)?;
                     }
-                    AddRandom::Album { count } => {
+                    AddRandom::Album => {
                         client.add_random_tag(count, Tag::Album)?;
                     }
-                    AddRandom::AlbumArtist { count } => {
+                    AddRandom::AlbumArtist => {
                         client.add_random_tag(count, Tag::AlbumArtist)?;
                     }
-                    AddRandom::Genre { count } => {
+                    AddRandom::Genre => {
                         client.add_random_tag(count, Tag::Genre)?;
                     }
                 }
