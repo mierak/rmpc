@@ -188,7 +188,7 @@ pub enum PropertyKindOrText<T> {
     Group(Vec<Property<T>>),
 }
 
-impl<T> PropertyKindOrText<T> {
+impl<T: Clone> PropertyKindOrText<T> {
     pub fn contains_stickers(&self) -> bool {
         match self {
             PropertyKindOrText::Text(_) => false,
@@ -196,6 +196,25 @@ impl<T> PropertyKindOrText<T> {
             PropertyKindOrText::Property(_) => false,
             PropertyKindOrText::Group(group) => {
                 group.iter().any(|prop| prop.kind.contains_stickers())
+            }
+        }
+    }
+
+    pub fn collect_properties(&self) -> Vec<T> {
+        let mut buf = Vec::new();
+        Self::collect_properties_inner(self, &mut buf);
+        buf
+    }
+
+    fn collect_properties_inner(prop: &PropertyKindOrText<T>, buf: &mut Vec<T>) {
+        match prop {
+            PropertyKindOrText::Text(_) => {}
+            PropertyKindOrText::Sticker(_) => {}
+            PropertyKindOrText::Property(p) => buf.push(p.clone()),
+            PropertyKindOrText::Group(items) => {
+                for p in items {
+                    Self::collect_properties_inner(&p.kind, buf);
+                }
             }
         }
     }

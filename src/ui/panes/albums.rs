@@ -2,10 +2,10 @@ use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
-use super::{Pane, browser::DirOrSong};
+use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{tabs::PaneType, theme::properties::SongProperty},
+    config::{sort_mode::SortOptions, tabs::PaneType},
     context::AppContext,
     mpd::{
         client::Client,
@@ -23,6 +23,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::BrowserPane,
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
     },
@@ -175,11 +176,8 @@ impl Pane for AlbumsPane {
                 context.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
-                self.stack = DirStack::new(
-                    data.into_iter()
-                        .map(|v| DirOrSong::Dir { full_path: String::new(), name: v })
-                        .collect::<Vec<_>>(),
-                );
+                let root = data.into_iter().map(DirOrSong::name_only).collect_vec();
+                self.stack = DirStack::new(root);
                 self.prepare_preview(context)?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
@@ -202,12 +200,12 @@ impl Pane for AlbumsPane {
 fn list_titles(
     client: &mut impl MpdClient,
     album: &str,
-    sort_props: &[SongProperty],
+    sort_opts: &SortOptions,
 ) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
     Ok(client
         .find(&[Filter::new(Tag::Album, album)])?
         .into_iter()
-        .sorted_by(|a, b| a.with_custom_sort(sort_props).cmp(&b.with_custom_sort(sort_props)))
+        .sorted_by(|a, b| a.with_custom_sort(sort_opts).cmp(&b.with_custom_sort(sort_opts)))
         .map(DirOrSong::Song))
 }
 
@@ -215,12 +213,12 @@ fn find_songs(
     client: &mut impl MpdClient,
     album: &str,
     file: &str,
-    sort_props: &[SongProperty],
+    sort_opts: &SortOptions,
 ) -> Result<Song, MpdError> {
     Ok(client
         .find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)])?
         .into_iter()
-        .sorted_by(|a, b| a.with_custom_sort(sort_props).cmp(&b.with_custom_sort(sort_props)))
+        .sorted_by(|a, b| a.with_custom_sort(sort_opts).cmp(&b.with_custom_sort(sort_opts)))
         .next()
         .context(anyhow!(
             "Expected to find exactly one song: album: '{}', current: '{}'",
@@ -251,9 +249,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         item: DirOrSong,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
         move |client| match item {
-            DirOrSong::Dir { name, full_path: _ } => {
-                Ok(client.find(&[Filter::new(Tag::Album, &name)])?)
-            }
+            DirOrSong::Dir { name, .. } => Ok(client.find(&[Filter::new(Tag::Album, &name)])?),
             DirOrSong::Song(song) => Ok(vec![song.clone()]),
         }
     }

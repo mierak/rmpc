@@ -11,7 +11,8 @@ pub use dir::Dir;
 pub use stack::DirStack;
 pub use state::DirState;
 
-use crate::{config::Config, mpd::commands::Song, ui::panes::browser::DirOrSong};
+use super::dir_or_song::DirOrSong;
+use crate::{config::Config, mpd::commands::Song};
 
 pub trait DirStackItem {
     fn as_path(&self) -> &str;

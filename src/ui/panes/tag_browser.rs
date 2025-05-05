@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
-use super::{Pane, browser::DirOrSong};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{
@@ -28,6 +28,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::BrowserPane,
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
     },
@@ -201,8 +202,8 @@ impl TagBrowserPane {
             })
             .map(|((album, date, original_name), mut songs)| {
                 songs.sort_by(|a, b| {
-                    a.with_custom_sort(context.config.browser_song_sort.as_slice())
-                        .cmp(&b.with_custom_sort(context.config.browser_song_sort.as_slice()))
+                    a.with_custom_sort(&context.config.browser_song_sort)
+                        .cmp(&b.with_custom_sort(&context.config.browser_song_sort))
                 });
 
                 CachedAlbum {
@@ -439,7 +440,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
         move |client| {
             Ok(match item {
-                DirOrSong::Dir { name, full_path: _ } => match path.as_slice() {
+                DirOrSong::Dir { name, .. } => match path.as_slice() {
                     [artist] => client.find(&[
                         Filter::new(Tag::Album, &album_name),
                         Self::root_tag_filter(root_tag, separator, artist),
@@ -684,6 +685,8 @@ mod tests {
                 ("date".to_string(), Into::<String>::into(date).into()),
             ]),
             stickers: None,
+            last_modified: chrono::Utc::now(),
+            added: None,
         }
     }
 

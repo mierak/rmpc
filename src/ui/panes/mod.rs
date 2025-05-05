@@ -279,10 +279,7 @@ pub(crate) trait Pane {
     }
 }
 
-pub mod dirstack {}
-
 pub(crate) mod browser {
-    use std::{borrow::Cow, cmp::Ordering};
 
     use itertools::Itertools;
     use ratatui::{
@@ -290,11 +287,7 @@ pub(crate) mod browser {
         text::{Line, Span},
     };
 
-    use crate::{
-        config::theme::properties::SongProperty,
-        mpd::commands::{Song, lsinfo::LsInfoEntry},
-        shared::mpd_query::PreviewGroup,
-    };
+    use crate::{mpd::commands::Song, shared::mpd_query::PreviewGroup};
 
     impl Song {
         pub(crate) fn to_preview(&self) -> Vec<PreviewGroup> {
@@ -377,6 +370,28 @@ pub(crate) mod browser {
                 );
             }
 
+            info_group.push(
+                Line::from(vec![
+                    start_of_line_spacer.clone(),
+                    Span::styled("Last Modified", key_style),
+                    separator.clone(),
+                    Span::from(self.last_modified.to_string()),
+                ])
+                .into(),
+            );
+
+            if let Some(added) = &self.added {
+                info_group.push(
+                    Line::from(vec![
+                        start_of_line_spacer.clone(),
+                        Span::styled("Added", key_style),
+                        separator.clone(),
+                        Span::from(added.to_string()),
+                    ])
+                    .into(),
+                );
+            }
+
             let mut tags_group = PreviewGroup::new(Some(" --- [Tags]"));
             for (k, v) in self
                 .metadata
@@ -402,146 +417,6 @@ pub(crate) mod browser {
             vec![info_group, tags_group]
         }
     }
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub(crate) enum DirOrSong {
-        Dir { name: String, full_path: String },
-        Song(Song),
-    }
-
-    impl DirOrSong {
-        pub fn name_only(name: String) -> Self {
-            DirOrSong::Dir { name, full_path: String::new() }
-        }
-
-        pub fn dir_name_or_file_name(&self) -> Cow<str> {
-            match self {
-                DirOrSong::Dir { name, full_path: _ } => Cow::Borrowed(name),
-                DirOrSong::Song(song) => Cow::Borrowed(&song.file),
-            }
-        }
-    }
-
-    impl Ord for DirOrSong {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            match (self, other) {
-                (DirOrSong::Dir { name: a, .. }, DirOrSong::Dir { name: b, .. }) => a.cmp(b),
-                (DirOrSong::Song(_), DirOrSong::Dir { .. }) => Ordering::Greater,
-                (DirOrSong::Dir { .. }, DirOrSong::Song(_)) => Ordering::Less,
-                (DirOrSong::Song(a), DirOrSong::Song(b)) => a.cmp_by_prop(b, &SongProperty::Title),
-            }
-        }
-    }
-
-    impl PartialOrd for DirOrSong {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    pub(crate) struct SongCustomSort<'a>(&'a Song, &'a [SongProperty]);
-
-    impl Song {
-        pub(crate) fn with_custom_sort<'a>(
-            &'a self,
-            sort_props: &'a [SongProperty],
-        ) -> SongCustomSort<'a> {
-            SongCustomSort(self, sort_props)
-        }
-    }
-
-    impl Ord for SongCustomSort<'_> {
-        fn cmp(&self, other: &Self) -> Ordering {
-            for prop in self.1 {
-                let ord = self.0.cmp_by_prop(other.0, prop);
-                if ord != Ordering::Equal {
-                    return ord;
-                }
-            }
-            Ordering::Equal
-        }
-    }
-
-    impl PartialOrd for SongCustomSort<'_> {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    pub(crate) struct DirOrSongCustomSort<'a>(&'a DirOrSong, &'a [SongProperty]);
-
-    impl DirOrSong {
-        pub(crate) fn with_custom_sort<'a>(
-            &'a self,
-            sort_props: &'a [SongProperty],
-        ) -> DirOrSongCustomSort<'a> {
-            DirOrSongCustomSort(self, sort_props)
-        }
-    }
-
-    impl Ord for DirOrSongCustomSort<'_> {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            match (self.0, other.0) {
-                (DirOrSong::Dir { name: a, .. }, DirOrSong::Dir { name: b, .. }) => a.cmp(b),
-                (DirOrSong::Song(_), DirOrSong::Dir { .. }) => Ordering::Greater,
-                (DirOrSong::Dir { .. }, DirOrSong::Song(_)) => Ordering::Less,
-                (DirOrSong::Song(a), DirOrSong::Song(b)) => {
-                    a.with_custom_sort(self.1).cmp(&b.with_custom_sort(self.1))
-                }
-            }
-        }
-    }
-
-    impl PartialOrd for DirOrSongCustomSort<'_> {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    impl From<LsInfoEntry> for Option<DirOrSong> {
-        fn from(value: LsInfoEntry) -> Self {
-            match value {
-                LsInfoEntry::Dir(crate::mpd::commands::lsinfo::Dir { path, full_path, .. }) => {
-                    Some(DirOrSong::Dir { name: path, full_path })
-                }
-                LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
-                LsInfoEntry::Playlist(_) => None,
-            }
-        }
-    }
-
-    #[cfg(test)]
-    mod test {
-
-        use super::DirOrSong;
-        use crate::mpd::commands::Song;
-
-        #[test]
-        fn dir_before_song() {
-            let mut input = vec![
-                DirOrSong::Song(Song::default()),
-                DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                DirOrSong::Song(Song::default()),
-                DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                DirOrSong::Song(Song::default()),
-            ];
-
-            input.sort();
-
-            assert_eq!(
-                input,
-                vec![
-                    DirOrSong::Dir { name: "a".to_owned(), full_path: String::new() },
-                    DirOrSong::Dir { name: "z".to_owned(), full_path: String::new() },
-                    DirOrSong::Song(Song::default()),
-                    DirOrSong::Song(Song::default()),
-                    DirOrSong::Song(Song::default()),
-                ]
-            );
-        }
-    }
 }
 
 impl Song {
@@ -561,7 +436,7 @@ impl Song {
         std::path::Path::new(&self.file).extension().map(|ext| ext.to_string_lossy())
     }
 
-    fn format<'song>(
+    pub fn format<'song>(
         &'song self,
         property: &SongProperty,
         tag_separator: &str,
@@ -586,7 +461,7 @@ impl Song {
         }
     }
 
-    fn cmp_by_prop(&self, other: &Self, property: &SongProperty) -> Ordering {
+    pub fn cmp_by_prop(&self, other: &Self, property: &SongProperty) -> Ordering {
         match property {
             SongProperty::Filename => match (self.file_name(), other.file_name()) {
                 (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
@@ -1168,6 +1043,8 @@ mod format_tests {
                     ("artist".to_string(), "artist".into()),
                 ]),
                 stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
             };
 
             let result = format.as_string(Some(&song), "");
@@ -1203,6 +1080,8 @@ mod format_tests {
                     ("track".to_string(), "123".into()),
                 ]),
                 stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
             };
             app_context.status = Status {
                 volume: Volume::new(123),

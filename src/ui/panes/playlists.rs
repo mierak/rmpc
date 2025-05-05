@@ -2,7 +2,7 @@ use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
-use super::{Pane, browser::DirOrSong};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::tabs::PaneType,
@@ -22,6 +22,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::{BrowserPane, MoveDirection},
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         modals::{confirm_modal::ConfirmModal, input_modal::InputModal},
         widgets::browser::Browser,
@@ -119,11 +120,8 @@ impl Pane for PlaylistsPane {
                         .list_playlists()
                         .context("Cannot list playlists")?
                         .into_iter()
-                        .map(|playlist| DirOrSong::Dir {
-                            name: playlist.name,
-                            full_path: String::new(),
-                        })
-                        .sorted()
+                        .sorted_by(|a, b| a.name.cmp(&b.name))
+                        .map(|playlist| DirOrSong::name_only(playlist.name))
                         .collect();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                 },
@@ -154,11 +152,8 @@ impl Pane for PlaylistsPane {
                                 .list_playlists()
                                 .context("Cannot list playlists")?
                                 .into_iter()
-                                .map(|playlist| DirOrSong::Dir {
-                                    name: playlist.name,
-                                    full_path: String::new(),
-                                })
-                                .sorted()
+                                .sorted_by(|a, b| a.name.cmp(&b.name))
+                                .map(|playlist| DirOrSong::name_only(playlist.name))
                                 .collect();
                             Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                         },

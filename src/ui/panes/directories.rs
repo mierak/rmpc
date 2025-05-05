@@ -2,7 +2,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
-use super::{Pane, browser::DirOrSong};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::tabs::PaneType,
@@ -22,6 +22,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::BrowserPane,
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
     },
@@ -59,7 +60,7 @@ impl DirectoriesPane {
             return Ok(());
         };
 
-        let sort_props = context.config.browser_song_sort.clone();
+        let sort = context.config.directories_sort.clone();
         match selected {
             DirOrSong::Dir { .. } => {
                 context
@@ -72,15 +73,16 @@ impl DirectoriesPane {
                         let res = new_current
                             .into_iter()
                             .filter_map(|v| match v {
-                                LsInfoEntry::Dir(d) => {
-                                    Some(DirOrSong::Dir { name: d.path, full_path: d.full_path })
-                                }
+                                LsInfoEntry::Dir(d) => Some(DirOrSong::Dir {
+                                    name: d.path,
+                                    full_path: d.full_path,
+                                    last_modified: d.last_modified,
+                                }),
                                 LsInfoEntry::File(s) => Some(DirOrSong::Song(s)),
                                 LsInfoEntry::Playlist(_) => None,
                             })
                             .sorted_by(|a, b| {
-                                a.with_custom_sort(&sort_props)
-                                    .cmp(&b.with_custom_sort(&sort_props))
+                                a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
                             })
                             .collect();
 
@@ -122,16 +124,14 @@ impl Pane for DirectoriesPane {
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
-            let sort_props = context.config.browser_song_sort.clone();
+            let sort = context.config.directories_sort.clone();
             context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                 move |client| {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
                         .filter_map(Into::<Option<DirOrSong>>::into)
-                        .sorted_by(|a, b| {
-                            a.with_custom_sort(&sort_props).cmp(&b.with_custom_sort(&sort_props))
-                        })
+                        .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)))
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                 },
@@ -150,7 +150,7 @@ impl Pane for DirectoriesPane {
     ) -> Result<()> {
         match event {
             UiEvent::Database => {
-                let sort_props = context.config.browser_song_sort.clone();
+                let sort = context.config.directories_sort.clone();
                 context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                     move |client| {
                         let result = client
@@ -158,8 +158,7 @@ impl Pane for DirectoriesPane {
                             .into_iter()
                             .filter_map(Into::<Option<DirOrSong>>::into)
                             .sorted_by(|a, b| {
-                                a.with_custom_sort(&sort_props)
-                                    .cmp(&b.with_custom_sort(&sort_props))
+                                a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
                             })
                             .collect::<Vec<_>>();
                         Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
@@ -261,7 +260,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
 
     fn add(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
         match item {
-            DirOrSong::Dir { name: dirname, full_path: _ } => {
+            DirOrSong::Dir { name: dirname, .. } => {
                 let mut next_path = self.stack.path().to_vec();
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
@@ -322,7 +321,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 };
                 let next_path = next_path.join("/").to_string();
                 let config = std::sync::Arc::clone(&context.config);
-                let sort_props = context.config.browser_song_sort.clone();
+                let sort = context.config.directories_sort.clone();
 
                 self.stack_mut().clear_preview();
                 context
@@ -344,15 +343,15 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         .0
                         .into_iter()
                         .filter_map(|v| match v {
-                            LsInfoEntry::Dir(dir) => {
-                                Some(DirOrSong::Dir { name: dir.path, full_path: dir.full_path })
-                            }
+                            LsInfoEntry::Dir(dir) => Some(DirOrSong::Dir {
+                                name: dir.path,
+                                full_path: dir.full_path,
+                                last_modified: dir.last_modified,
+                            }),
                             LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
                             LsInfoEntry::Playlist(_) => None,
                         })
-                        .sorted_by(|a, b| {
-                            a.with_custom_sort(&sort_props).cmp(&b.with_custom_sort(&sort_props))
-                        })
+                        .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)))
                         .map(|v| v.to_list_item_simple(&config))
                         .collect();
 

@@ -51,6 +51,7 @@ use crate::{
 };
 
 pub mod browser;
+pub mod dir_or_song;
 pub mod dirstack;
 pub mod image;
 pub mod modals;
