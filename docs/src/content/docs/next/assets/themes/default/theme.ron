@@ -74,6 +74,7 @@
                     )
                 ],
                 right: [
+                    (kind: Property(Widget(ScanStatus)), style: (fg: "blue")),
                     (kind: Property(Widget(Volume)), style: (fg: "blue"))
                 ]
             ),
