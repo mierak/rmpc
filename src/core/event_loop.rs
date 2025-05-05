@@ -76,12 +76,14 @@ fn main_task<B: Backend + std::io::Write>(
         }
     };
 
-    // Start the periodic status update for playback and db status
-    _update_loop_guard = context
-        .config
-        .status_update_interval_ms
-        .map(Duration::from_millis)
-        .map(|interval| context.scheduler.repeated(interval, run_status_update));
+    // Check the playback status and start the periodic status update if needed
+    if context.status.state == State::Play {
+        _update_loop_guard = context
+            .config
+            .status_update_interval_ms
+            .map(Duration::from_millis)
+            .map(|interval| context.scheduler.repeated(interval, run_status_update));
+    }
 
     loop {
         let now = std::time::Instant::now();
@@ -255,13 +257,11 @@ fn main_task<B: Backend + std::io::Write>(
                                     }
                                 }
                                 State::Pause => {
-                                    // no longer dropping guard cause we want db tick
-                                    // _update_loop_guard = None;
+                                    _update_loop_guard = None;
                                 }
                                 State::Stop => {
                                     song_changed = true;
-                                    // no longer dropping guard cause we want db tick
-                                    // _update_loop_guard = None;
+                                    _update_loop_guard = None;
                                 }
                             }
 
