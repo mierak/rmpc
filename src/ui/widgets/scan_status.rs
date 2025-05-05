@@ -1,46 +1,28 @@
 use ratatui::{
     prelude::Alignment,
     style::Style,
-    widgets::{Block, StatefulWidget, Widget},
+    widgets::{Block, Widget},
 };
+use std::time::Instant;
 
 use super::get_line_offset;
 
 const DEFAULT_LOADING_CHARS: [&str; 8] = ["⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿", "⢿"];
-
-#[derive(Default, Debug)]
-pub struct ScanStatusState {
-    pub updating: bool,
-    pub symbol_index: usize,
-}
-
-impl ScanStatusState {
-    pub fn cycle_load_symbol(&mut self) {
-        self.symbol_index = (self.symbol_index + 1) % DEFAULT_LOADING_CHARS.len();
-    }
-}
-
-impl ScanStatusState {
-    pub fn new(updating: Option<u32>) -> Self {
-        Self { updating: updating.is_some(), symbol_index: 0 }
-    }
-}
 
 #[derive(Debug)]
 pub struct ScanStatus<'a> {
     block: Option<Block<'a>>,
     alignment: Alignment,
     style: Style,
-}
-
-impl Default for ScanStatus<'_> {
-    fn default() -> Self {
-        Self { block: None, alignment: Alignment::Left, style: Style::default() }
-    }
+    update_start: Option<Instant>,
 }
 
 #[allow(dead_code)]
 impl<'a> ScanStatus<'a> {
+    pub fn new(update_start: Option<Instant>) -> Self {
+        Self { block: None, alignment: Alignment::Left, style: Style::default(), update_start }
+    }
+
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self
@@ -58,26 +40,19 @@ impl<'a> ScanStatus<'a> {
 
     /// get updating symbol, this symbol rotates in set inverval if the db is
     /// scanning
-    pub fn get_str(&mut self, state: &mut ScanStatusState) -> String {
-        if !state.updating {
+    pub fn get_str(&mut self) -> String {
+        let Some(start) = self.update_start else {
             return String::new();
-        }
-        // SAFETY: module of len guarantees the index is always inbound
-        let t = unsafe { DEFAULT_LOADING_CHARS.get_unchecked(state.symbol_index) };
-        state.cycle_load_symbol();
+        };
+        let elapsed_secs = start.elapsed().as_millis() as usize / 1000;
+        let t =
+            DEFAULT_LOADING_CHARS.get(elapsed_secs % DEFAULT_LOADING_CHARS.len()).unwrap_or(&"");
         format!(" {t} ")
     }
 }
 
-impl StatefulWidget for &mut ScanStatus<'_> {
-    type State = ScanStatusState;
-
-    fn render(
-        self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-        state: &mut Self::State,
-    ) {
+impl Widget for &mut ScanStatus<'_> {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let area = match self.block.take() {
             Some(b) => {
                 let inner_area = b.inner(area);
@@ -93,6 +68,6 @@ impl StatefulWidget for &mut ScanStatus<'_> {
 
         let left_offset = get_line_offset(3, area.width, self.alignment);
 
-        buf.set_string(area.left() + left_offset, area.top(), self.get_str(state), self.style);
+        buf.set_string(area.left() + left_offset, area.top(), self.get_str(), self.style);
     }
 }

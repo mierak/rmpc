@@ -57,6 +57,7 @@ pub fn app_context(
         should_fetch_stickers: false,
         rendered_frames: 0,
         scheduler,
+        db_update_start: None,
     }
 }
 

@@ -239,8 +239,28 @@ fn main_task<B: Backend + std::io::Write>(
                             let current_song_id =
                                 context.find_current_song_in_queue().map(|(_, song)| song.id);
                             let current_status = context.status.state;
+                            let current_updating_db = context.status.updating_db;
                             context.status = status;
                             let mut song_changed = false;
+
+                            match (current_updating_db, context.status.updating_db) {
+                                (None, Some(_)) => {
+                                    // update of db started
+                                    context.db_update_start = Some(std::time::Instant::now());
+                                }
+                                (Some(_), None) => {
+                                    // update of db ended
+                                    context.db_update_start = None;
+                                }
+                                (Some(_), Some(_)) => {
+                                    // rmpc is opened after db being updated
+                                    // beforehand -> reassign
+                                    if context.db_update_start.is_none() {
+                                        context.db_update_start = Some(std::time::Instant::now());
+                                    }
+                                }
+                                _ => {}
+                            }
 
                             match context.status.state {
                                 State::Play => {
@@ -477,7 +497,13 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
             });
         }
         IdleEvent::StoredPlaylist => {}
-        IdleEvent::Database => {}
+        IdleEvent::Database => {
+            context
+                .query()
+                .id(GLOBAL_STATUS_UPDATE)
+                .replace_id("status")
+                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
+        }
         IdleEvent::Update => {}
         IdleEvent::Output
         | IdleEvent::Partition
