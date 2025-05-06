@@ -5,7 +5,11 @@ use bon::bon;
 use crossbeam::channel::{SendError, Sender, bounded};
 
 use crate::{
-    AppEvent, MpdCommand, MpdQuery, MpdQueryResult, WorkRequest,
+    AppEvent,
+    MpdCommand,
+    MpdQuery,
+    MpdQueryResult,
+    WorkRequest,
     config::{Config, album_art::ImageMethod, tabs::PaneType},
     core::scheduler::{Scheduler, time_provider::DefaultTimeProvider},
     mpd::{

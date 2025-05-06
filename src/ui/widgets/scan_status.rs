@@ -1,9 +1,10 @@
+use std::time::Instant;
+
 use ratatui::{
     prelude::Alignment,
     style::Style,
     widgets::{Block, Widget},
 };
-use std::time::Instant;
 
 use super::get_line_offset;
 

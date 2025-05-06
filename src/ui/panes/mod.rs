@@ -38,7 +38,11 @@ use crate::{
         theme::{
             SymbolsConfig,
             properties::{
-                Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty,
+                Property,
+                PropertyKind,
+                PropertyKindOrText,
+                SongProperty,
+                StatusProperty,
                 WidgetProperty,
             },
         },
