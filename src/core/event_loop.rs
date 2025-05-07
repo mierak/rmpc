@@ -28,12 +28,8 @@ use crate::{
         lrc::get_lrc_path,
         macros::{status_error, status_warn},
         mpd_query::{
-            EXTERNAL_COMMAND,
-            GLOBAL_QUEUE_UPDATE,
-            GLOBAL_STATUS_UPDATE,
-            GLOBAL_VOLUME_UPDATE,
-            MpdQueryResult,
-            run_status_update,
+            EXTERNAL_COMMAND, GLOBAL_QUEUE_UPDATE, GLOBAL_STATUS_UPDATE, GLOBAL_VOLUME_UPDATE,
+            MpdQueryResult, run_status_update,
         },
     },
     ui::{KeyHandleResult, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
@@ -68,6 +64,7 @@ fn main_task<B: Backend + std::io::Write>(
     let mut connected = true;
     ui.before_show(area, &mut context).expect("Initial render init to succeed");
     let mut _update_loop_guard = None;
+    let mut _update_db_loop_guard = None;
 
     // Tmux hooks have to be initialized after ui, because ueberzugpp replaces all
     // hooks on its init instead of simply appending and might break rmpc's hooks
@@ -247,14 +244,17 @@ fn main_task<B: Backend + std::io::Write>(
                             context.status = status;
                             let mut song_changed = false;
 
+                            _update_db_loop_guard = Some(context.scheduler.repeated(
+                                Duration::from_secs(1),
+                                |(tx, _)| {
+                                    tx.send(AppEvent::RequestRender)?;
+                                    Ok(())
+                                },
+                            ));
                             match (current_updating_db, context.status.updating_db) {
                                 (None, Some(_)) => {
                                     // update of db started
                                     context.db_update_start = Some(std::time::Instant::now());
-                                }
-                                (Some(_), None) => {
-                                    // update of db ended
-                                    context.db_update_start = None;
                                 }
                                 (Some(_), Some(_)) => {
                                     // rmpc is opened after db being updated
@@ -262,6 +262,11 @@ fn main_task<B: Backend + std::io::Write>(
                                     if context.db_update_start.is_none() {
                                         context.db_update_start = Some(std::time::Instant::now());
                                     }
+                                }
+                                (Some(_), None) => {
+                                    // update of db ended
+                                    context.db_update_start = None;
+                                    _update_db_loop_guard = None;
                                 }
                                 _ => {}
                             }

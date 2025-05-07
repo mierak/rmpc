@@ -38,11 +38,7 @@ use crate::{
         theme::{
             SymbolsConfig,
             properties::{
-                Property,
-                PropertyKind,
-                PropertyKindOrText,
-                SongProperty,
-                StatusProperty,
+                Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty,
                 WidgetProperty,
             },
         },
@@ -869,7 +865,7 @@ impl Property<PropertyKind> {
                     ]))
                 }
                 WidgetProperty::ScanStatus => Some(Either::Left(Span::styled(
-                    ScanStatus::new(context.db_update_start).get_str(),
+                    ScanStatus::new(context.db_update_start).get_str().unwrap_or_default(),
                     style,
                 ))),
             },
