@@ -112,6 +112,10 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn config(&mut self) -> Option<&MpdConfig> {
+        todo!("Not yet implemented")
+    }
+
     fn binary_limit(&mut self, _limit: u64) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
@@ -145,6 +149,23 @@ impl MpdClient for TestMpdClient {
 
     fn noidle(&mut self) -> MpdResult<()> {
         todo!()
+    }
+
+    fn start_cmd_list(&mut self) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn start_cmd_list_ok(&mut self) -> anyhow::Result<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn execute_cmd_list(
+        &mut self,
+    ) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
+    where
+        Self: SocketClient,
+    {
+        todo!("Not yet implemented")
     }
 
     fn get_volume(&mut self) -> MpdResult<Volume> {
@@ -431,6 +452,18 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn add_random_songs(&mut self, _: usize, _: Option<&[Filter<'_>]>) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn add_random_tag(&mut self, _: usize, _: Tag) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_all(&mut self, _: Option<&str>) -> MpdResult<LsInfo> {
+        todo!("Not yet implemented")
+    }
+
     fn lsinfo(&mut self, _path: Option<&str>) -> MpdResult<LsInfo> {
         todo!("Not yet implemented")
     }
@@ -576,27 +609,6 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn find_stickers(
-        &mut self,
-        _uri: &str,
-        _name: &str,
-    ) -> MpdResult<crate::mpd::commands::stickers::StickersWithFile> {
-        todo!("Not yet implemented")
-    }
-
-    fn start_cmd_list(&mut self) -> anyhow::Result<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn execute_cmd_list(
-        &mut self,
-    ) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
-    where
-        Self: SocketClient,
-    {
-        todo!("Not yet implemented")
-    }
-
     fn list_stickers_multiple(
         &mut self,
         _uris: &[&str],
@@ -604,7 +616,11 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn config(&mut self) -> Option<&MpdConfig> {
+    fn find_stickers(
+        &mut self,
+        _uri: &str,
+        _name: &str,
+    ) -> MpdResult<crate::mpd::commands::stickers::StickersWithFile> {
         todo!("Not yet implemented")
     }
 }
