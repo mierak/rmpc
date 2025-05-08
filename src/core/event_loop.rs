@@ -68,6 +68,7 @@ fn main_task<B: Backend + std::io::Write>(
     let mut connected = true;
     ui.before_show(area, &mut context).expect("Initial render init to succeed");
     let mut _update_loop_guard = None;
+    let mut _update_db_loop_guard = None;
 
     // Tmux hooks have to be initialized after ui, because ueberzugpp replaces all
     // hooks on its init instead of simply appending and might break rmpc's hooks
@@ -243,8 +244,38 @@ fn main_task<B: Backend + std::io::Write>(
                             let current_song_id =
                                 context.find_current_song_in_queue().map(|(_, song)| song.id);
                             let current_status = context.status.state;
+                            let current_updating_db = context.status.updating_db;
                             context.status = status;
                             let mut song_changed = false;
+
+                            let mut start_render_loop = || {
+                                _update_db_loop_guard = Some(context.scheduler.repeated(
+                                    Duration::from_secs(1),
+                                    |(tx, _)| {
+                                        tx.send(AppEvent::RequestRender)?;
+                                        Ok(())
+                                    },
+                                ));
+                            };
+                            match (current_updating_db, context.status.updating_db) {
+                                (None, Some(_)) => {
+                                    // update of db started
+                                    context.db_update_start = Some(std::time::Instant::now());
+                                    start_render_loop();
+                                }
+                                (Some(_), Some(_)) if context.db_update_start.is_none() => {
+                                    // rmpc is opened after db started updating
+                                    // beforehand so we reassign
+                                    context.db_update_start = Some(std::time::Instant::now());
+                                    start_render_loop();
+                                }
+                                (Some(_), None) => {
+                                    // update of db ended
+                                    context.db_update_start = None;
+                                    _update_db_loop_guard = None;
+                                }
+                                _ => {}
+                            }
 
                             match context.status.state {
                                 State::Play => {
@@ -481,7 +512,13 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
             });
         }
         IdleEvent::StoredPlaylist => {}
-        IdleEvent::Database => {}
+        IdleEvent::Database => {
+            context
+                .query()
+                .id(GLOBAL_STATUS_UPDATE)
+                .replace_id("status")
+                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
+        }
         IdleEvent::Update => {}
         IdleEvent::Output
         | IdleEvent::Partition

@@ -167,7 +167,7 @@ Similar to `StateV2`. Allows you to configure labels for on/off and one shot sta
 
 <ConfigValue
     name="Property"
-    type={["Property(Widget(Volume))", "Property(Widget(States(active_style: <style>, separator_style: <style>)))"]}
+    type={["Property(Widget(ScanStatus))", "Property(Widget(Volume))", "Property(Widget(States(active_style: <style>, separator_style: <style>)))"]}
 />
 These are predefined "widgets" which you can use in your header. They differ from regular properties in that they can
 have additional styling options or display options.
@@ -177,6 +177,11 @@ have additional styling options or display options.
 <ConfigValue name="kind" type="other" customText="Property(Widget(Volume))" />
 Shows volume with percentage and bars instead of just simple number. It looks something like this: `Volume: ▁▂▃▄▅▆▇
 100%`
+
+#### Scan status widget
+
+<ConfigValue name="kind" type="other" customText="Property(Widget(ScanStatus))" />
+Shows a loading spinner if the mpd database is being updated
 
 #### States widget
 
@@ -193,7 +198,7 @@ active states are highlighted with the active style and the inactive states are 
 
 This configuration displays a header with single row. On the left side there is player state (Playing/Paused/Stopped) in
 yellow color inside brackets, ie. `[Playing]`. In the center there is the title of the currently playing song in bold.
-If there is no song playing, the text "No Song" is displayed. And on the right side there is the volume widget in blue
+If there is no song playing, the text "No Song" is displayed. And on the right side there is the volume and update status widgets in blue
 color.
 
 ```rust
@@ -211,6 +216,7 @@ header: (
                 )
             ],
             right: [
+                (kind: Property(Widget(ScanStatus)), style: (fg: "blue")),
                 (kind: Property(Widget(Volume)), style: (fg: "blue"))
             ]
         )

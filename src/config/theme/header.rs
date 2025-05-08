@@ -105,17 +105,30 @@ impl Default for HeaderConfigFile {
                             modifiers: Some(Modifiers::Bold),
                         }),
                     }],
-                    right: vec![PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(
-                            WidgetPropertyFile::Volume,
-                        )),
-                        style: Some(StyleFile {
-                            fg: Some("blue".to_string()),
-                            bg: None,
-                            modifiers: None,
-                        }),
-                        default: None,
-                    }],
+                    right: vec![
+                        PropertyFile {
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(
+                                WidgetPropertyFile::ScanStatus,
+                            )),
+                            style: Some(StyleFile {
+                                fg: Some("blue".to_string()),
+                                bg: None,
+                                modifiers: None,
+                            }),
+                            default: None,
+                        },
+                        PropertyFile {
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Widget(
+                                WidgetPropertyFile::Volume,
+                            )),
+                            style: Some(StyleFile {
+                                fg: Some("blue".to_string()),
+                                bg: None,
+                                modifiers: None,
+                            }),
+                            default: None,
+                        },
+                    ],
                 },
                 HeaderConfigRowFile {
                     left: vec![

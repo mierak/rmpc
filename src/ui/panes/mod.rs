@@ -26,7 +26,10 @@ use unicase::UniCase;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
-use super::{UiEvent, widgets::volume::Volume};
+use super::{
+    UiEvent,
+    widgets::{scan_status::ScanStatus, volume::Volume},
+};
 use crate::{
     MpdQueryResult,
     config::{
@@ -46,7 +49,7 @@ use crate::{
     },
     context::AppContext,
     mpd::{
-        commands::{Song, State, Status, status::OnOffOneshot, volume::Bound},
+        commands::{Song, State, status::OnOffOneshot, volume::Bound},
         mpd_client::Tag,
     },
     shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
@@ -715,19 +718,20 @@ impl Property<PropertyKind> {
     fn default_as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        status: &'song Status,
+        context: &'song AppContext,
         tag_separator: &str,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        self.default.as_ref().and_then(|p| p.as_span(song, status, tag_separator))
+        self.default.as_ref().and_then(|p| p.as_span(song, context, tag_separator))
     }
 
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        status: &'song Status,
+        context: &'song AppContext,
         tag_separator: &str,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
+        let status = &context.status;
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),
             PropertyKindOrText::Sticker(key) => {
@@ -736,17 +740,17 @@ impl Property<PropertyKind> {
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
-                    self.default_as_span(song, status, tag_separator)
+                    self.default_as_span(song, context, tag_separator)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
                     song.format(property, tag_separator).map_or_else(
-                        || self.default_as_span(Some(song), status, tag_separator),
+                        || self.default_as_span(Some(song), context, tag_separator),
                         |s| Some(Either::Left(Span::styled(s, style))),
                     )
                 } else {
-                    self.default_as_span(song, status, tag_separator)
+                    self.default_as_span(song, context, tag_separator)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
@@ -832,11 +836,11 @@ impl Property<PropertyKind> {
                     .unwrap_or(style),
                 ))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
-                    || self.default_as_span(song, status, tag_separator),
+                    || self.default_as_span(song, context, tag_separator),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
-                    || self.default_as_span(song, status, tag_separator),
+                    || self.default_as_span(song, context, tag_separator),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
             },
@@ -864,11 +868,20 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
+                WidgetProperty::ScanStatus => context.db_update_start.map(|update_start| {
+                    Either::Left(Span::styled(
+                        ScanStatus::new(Some(update_start))
+                            .get_str()
+                            .unwrap_or_default()
+                            .to_string(),
+                        style,
+                    ))
+                }),
             },
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
                 for format in group {
-                    match format.as_span(song, status, tag_separator) {
+                    match format.as_span(song, context, tag_separator) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
                         None => return None,
@@ -1001,6 +1014,7 @@ mod format_tests {
             style::{Style, Stylize},
             text::Span,
         };
+        use rstest::rstest;
         use test_case::test_case;
 
         use super::*;
@@ -1009,7 +1023,9 @@ mod format_tests {
                 StyleFile,
                 properties::{PropertyKind, StatusProperty, StatusPropertyFile},
             },
+            context::AppContext,
             mpd::commands::{State, Status, Volume, status::OnOffOneshot},
+            tests::fixtures::app_context,
         };
 
         #[test_case(SongProperty::Title, "title")]
@@ -1045,12 +1061,17 @@ mod format_tests {
             assert_eq!(result, Some(expected.to_string()));
         }
 
-        #[test_case(StatusProperty::Volume, "100")]
-        #[test_case(StatusProperty::Elapsed, "2:03")]
-        #[test_case(StatusProperty::Duration, "2:03")]
-        #[test_case(StatusProperty::Crossfade, "3")]
-        #[test_case(StatusProperty::Bitrate, "123")]
-        fn status_property_resolves_correctly(prop: StatusProperty, expected: &str) {
+        #[rstest]
+        #[case(StatusProperty::Volume, "100")]
+        #[case(StatusProperty::Elapsed, "2:03")]
+        #[case(StatusProperty::Duration, "2:03")]
+        #[case(StatusProperty::Crossfade, "3")]
+        #[case(StatusProperty::Bitrate, "123")]
+        fn status_property_resolves_correctly(
+            mut app_context: AppContext,
+            #[case] prop: StatusProperty,
+            #[case] expected: &str,
+        ) {
             let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
                 style: None,
@@ -1071,7 +1092,7 @@ mod format_tests {
                 last_modified: chrono::Utc::now(),
                 added: None,
             };
-            let status = Status {
+            app_context.status = Status {
                 volume: Volume::new(123),
                 repeat: true,
                 random: true,
@@ -1085,7 +1106,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_span(Some(&song), &status, "");
+            let result = format.as_span(Some(&song), &app_context, "");
 
             assert_eq!(
                 result,
@@ -1093,15 +1114,17 @@ mod format_tests {
             );
         }
 
-        #[test_case("otherplay", "otherstopped", "otherpaused", State::Play, "otherplay")]
-        #[test_case("otherplay", "otherstopped", "otherpaused", State::Pause, "otherpaused")]
-        #[test_case("otherplay", "otherstopped", "otherpaused", State::Stop, "otherstopped")]
+        #[rstest]
+        #[case("otherplay", "otherstopped", "otherpaused", State::Play, "otherplay")]
+        #[case("otherplay", "otherstopped", "otherpaused", State::Pause, "otherpaused")]
+        #[case("otherplay", "otherstopped", "otherpaused", State::Stop, "otherstopped")]
         fn playback_state_label_is_correct(
-            playing_label: &'static str,
-            stopped_label: &'static str,
-            paused_label: &'static str,
-            state: State,
-            expected_label: &str,
+            mut app_context: AppContext,
+            #[case] playing_label: &'static str,
+            #[case] stopped_label: &'static str,
+            #[case] paused_label: &'static str,
+            #[case] state: State,
+            #[case] expected_label: &str,
         ) {
             let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(StatusProperty::State {
@@ -1117,9 +1140,9 @@ mod format_tests {
             };
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
-            let status = Status { state, ..Default::default() };
+            app_context.status = Status { state, ..Default::default() };
 
-            let result = format.as_span(Some(&song), &status, "");
+            let result = format.as_span(Some(&song), &app_context, "");
 
             assert_eq!(
                 result,
@@ -1127,30 +1150,32 @@ mod format_tests {
             );
         }
 
-        #[test_case(StatusPropertyFile::ConsumeV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, &Status { consume: OnOffOneshot::On, ..Default::default() }, "ye")]
-        #[test_case(StatusPropertyFile::ConsumeV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, &Status { consume: OnOffOneshot::Off, ..Default::default() }, "naw")]
-        #[test_case(StatusPropertyFile::ConsumeV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, &Status { consume: OnOffOneshot::Oneshot, ..Default::default() }, "1111")]
-        #[test_case(StatusPropertyFile::SingleV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, &Status { single: OnOffOneshot::On, ..Default::default() }, "ye")]
-        #[test_case(StatusPropertyFile::SingleV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, &Status { single: OnOffOneshot::Off, ..Default::default() }, "naw")]
-        #[test_case(StatusPropertyFile::SingleV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, &Status { single: OnOffOneshot::Oneshot, ..Default::default() }, "1111")]
-        #[test_case(StatusPropertyFile::RandomV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, &Status { random: true, ..Default::default() }, "ye")]
-        #[test_case(StatusPropertyFile::RandomV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, &Status { random: false, ..Default::default() }, "naw")]
-        #[test_case(StatusPropertyFile::RepeatV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, &Status { repeat: true, ..Default::default() }, "ye")]
-        #[test_case(StatusPropertyFile::RepeatV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, &Status { repeat: false, ..Default::default() }, "naw")]
-        #[test_case(StatusPropertyFile::Consume, &Status { consume: OnOffOneshot::On, ..Default::default() }, "On")]
-        #[test_case(StatusPropertyFile::Consume, &Status { consume: OnOffOneshot::Off, ..Default::default() }, "Off")]
-        #[test_case(StatusPropertyFile::Consume, &Status { consume: OnOffOneshot::Oneshot, ..Default::default() }, "OS")]
-        #[test_case(StatusPropertyFile::Repeat, &Status { repeat: true, ..Default::default() }, "On")]
-        #[test_case(StatusPropertyFile::Repeat, &Status { repeat: false, ..Default::default() }, "Off")]
-        #[test_case(StatusPropertyFile::Random, &Status { random: true, ..Default::default() }, "On")]
-        #[test_case(StatusPropertyFile::Random, &Status { random: false, ..Default::default() }, "Off")]
-        #[test_case(StatusPropertyFile::Single, &Status { single: OnOffOneshot::On, ..Default::default() }, "On")]
-        #[test_case(StatusPropertyFile::Single, &Status { single: OnOffOneshot::Off, ..Default::default() }, "Off")]
-        #[test_case(StatusPropertyFile::Single, &Status { single: OnOffOneshot::Oneshot, ..Default::default() }, "OS")]
+        #[rstest]
+        #[case(StatusPropertyFile::ConsumeV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, Status { consume: OnOffOneshot::On, ..Default::default() }, "ye")]
+        #[case(StatusPropertyFile::ConsumeV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, Status { consume: OnOffOneshot::Off, ..Default::default() }, "naw")]
+        #[case(StatusPropertyFile::ConsumeV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, Status { consume: OnOffOneshot::Oneshot, ..Default::default() }, "1111")]
+        #[case(StatusPropertyFile::SingleV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, Status { single: OnOffOneshot::On, ..Default::default() }, "ye")]
+        #[case(StatusPropertyFile::SingleV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, Status { single: OnOffOneshot::Off, ..Default::default() }, "naw")]
+        #[case(StatusPropertyFile::SingleV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), oneshot_label: "1111".to_string(), on_style: None, off_style: None, oneshot_style: None }, Status { single: OnOffOneshot::Oneshot, ..Default::default() }, "1111")]
+        #[case(StatusPropertyFile::RandomV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, Status { random: true, ..Default::default() }, "ye")]
+        #[case(StatusPropertyFile::RandomV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, Status { random: false, ..Default::default() }, "naw")]
+        #[case(StatusPropertyFile::RepeatV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, Status { repeat: true, ..Default::default() }, "ye")]
+        #[case(StatusPropertyFile::RepeatV2 { on_label: "ye".to_string(), off_label: "naw".to_string(), on_style: None, off_style: None }, Status { repeat: false, ..Default::default() }, "naw")]
+        #[case(StatusPropertyFile::Consume, Status { consume: OnOffOneshot::On, ..Default::default() }, "On")]
+        #[case(StatusPropertyFile::Consume, Status { consume: OnOffOneshot::Off, ..Default::default() }, "Off")]
+        #[case(StatusPropertyFile::Consume, Status { consume: OnOffOneshot::Oneshot, ..Default::default() }, "OS")]
+        #[case(StatusPropertyFile::Repeat, Status { repeat: true, ..Default::default() }, "On")]
+        #[case(StatusPropertyFile::Repeat, Status { repeat: false, ..Default::default() }, "Off")]
+        #[case(StatusPropertyFile::Random, Status { random: true, ..Default::default() }, "On")]
+        #[case(StatusPropertyFile::Random, Status { random: false, ..Default::default() }, "Off")]
+        #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::On, ..Default::default() }, "On")]
+        #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::Off, ..Default::default() }, "Off")]
+        #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::Oneshot, ..Default::default() }, "OS")]
         fn on_off_states_label_is_correct(
-            prop: StatusPropertyFile,
-            status: &Status,
-            expected_label: &str,
+            mut app_context: AppContext,
+            #[case] prop: StatusPropertyFile,
+            #[case] status: Status,
+            #[case] expected_label: &str,
         ) {
             let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(prop.try_into().unwrap())),
@@ -1160,23 +1185,27 @@ mod format_tests {
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
 
-            let result = format.as_span(Some(&song), status, "");
+            app_context.status = status;
+
+            let result = format.as_span(Some(&song), &app_context, "");
 
             assert_eq!(result, Some(Either::Left(Span::raw(expected_label))));
         }
 
-        #[test_case(StatusPropertyFile::ConsumeV2 { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), oneshot_style: Some(StyleFile::builder().fg("blue".to_string()).build()), on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, &Status { consume: OnOffOneshot::On, ..Default::default() }, Some(Style::default().red()))]
-        #[test_case(StatusPropertyFile::SingleV2  { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), oneshot_style: Some(StyleFile::builder().fg("blue".to_string()).build()),  on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, &Status { single: OnOffOneshot::On, ..Default::default() }, Some(Style::default().red()))]
-        #[test_case(StatusPropertyFile::RandomV2  { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), on_label: String::new(), off_label: String::new() }, &Status { random: true, ..Default::default() }, Some(Style::default().red()))]
-        #[test_case(StatusPropertyFile::RepeatV2  { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), on_label: String::new(), off_label: String::new() }, &Status { repeat: true, ..Default::default() }, Some(Style::default().red()))]
-        #[test_case(StatusPropertyFile::ConsumeV2 { on_style: None, off_style: None, oneshot_style: None, on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, &Status { consume: OnOffOneshot::On, ..Default::default() }, None)]
-        #[test_case(StatusPropertyFile::SingleV2  { on_style: None, off_style: None, oneshot_style: None, on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, &Status { single: OnOffOneshot::On, ..Default::default() }, None)]
-        #[test_case(StatusPropertyFile::RandomV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, &Status { random: true, ..Default::default() }, None)]
-        #[test_case(StatusPropertyFile::RepeatV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, &Status { repeat: true, ..Default::default() }, None)]
+        #[rstest]
+        #[case(StatusPropertyFile::ConsumeV2 { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), oneshot_style: Some(StyleFile::builder().fg("blue".to_string()).build()), on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, Status { consume: OnOffOneshot::On, ..Default::default() }, Some(Style::default().red()))]
+        #[case(StatusPropertyFile::SingleV2  { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), oneshot_style: Some(StyleFile::builder().fg("blue".to_string()).build()),  on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, Status { single: OnOffOneshot::On, ..Default::default() }, Some(Style::default().red()))]
+        #[case(StatusPropertyFile::RandomV2  { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), on_label: String::new(), off_label: String::new() }, Status { random: true, ..Default::default() }, Some(Style::default().red()))]
+        #[case(StatusPropertyFile::RepeatV2  { on_style: Some(StyleFile::builder().fg("red".to_string()).build()), off_style: Some(StyleFile::builder().fg("green".to_string()).build()), on_label: String::new(), off_label: String::new() }, Status { repeat: true, ..Default::default() }, Some(Style::default().red()))]
+        #[case(StatusPropertyFile::ConsumeV2 { on_style: None, off_style: None, oneshot_style: None, on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, Status { consume: OnOffOneshot::On, ..Default::default() }, None)]
+        #[case(StatusPropertyFile::SingleV2  { on_style: None, off_style: None, oneshot_style: None, on_label: String::new(), off_label: String::new(), oneshot_label: String::new() }, Status { single: OnOffOneshot::On, ..Default::default() }, None)]
+        #[case(StatusPropertyFile::RandomV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, Status { random: true, ..Default::default() }, None)]
+        #[case(StatusPropertyFile::RepeatV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, Status { repeat: true, ..Default::default() }, None)]
         fn on_off_oneshot_styles_are_correct(
-            prop: StatusPropertyFile,
-            status: &Status,
-            expected_style: Option<Style>,
+            mut app_context: AppContext,
+            #[case] prop: StatusPropertyFile,
+            #[case] status: Status,
+            #[case] expected_style: Option<Style>,
         ) {
             let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Property(PropertyKind::Status(prop.try_into().unwrap())),
@@ -1186,7 +1215,9 @@ mod format_tests {
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
 
-            let result = format.as_span(Some(&song), status, "");
+            app_context.status = status;
+
+            let result = format.as_span(Some(&song), &app_context, "");
 
             dbg!(&result);
             assert_eq!(

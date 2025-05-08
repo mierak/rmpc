@@ -236,12 +236,14 @@ pub struct Property<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WidgetPropertyFile {
+    ScanStatus,
     States { active_style: Option<StyleFile>, separator_style: Option<StyleFile> },
     Volume,
 }
 
 #[derive(Debug, Display, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum WidgetProperty {
+    ScanStatus,
     States { active_style: Style, separator_style: Style },
     Volume,
 }
@@ -441,6 +443,9 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
                             separator_style: separator_style
                                 .to_config_or(Some(Color::White), None)?,
                         }),
+                        PropertyKindFile::Widget(WidgetPropertyFile::ScanStatus) => {
+                            PropertyKind::Widget(WidgetProperty::ScanStatus)
+                        }
                     })
                 }
                 PropertyKindFileOrText::Group(group) => {

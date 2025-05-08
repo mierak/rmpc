@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet, ops::AddAssign};
+use std::{cell::Cell, collections::HashSet, ops::AddAssign, time::Instant};
 
 use anyhow::{Result, bail};
 use bon::bon;
@@ -31,6 +31,7 @@ pub struct AppContext {
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
     pub(crate) supported_commands: HashSet<String>,
+    pub(crate) db_update_start: Option<Instant>,
     #[debug(skip)]
     pub(crate) app_event_sender: Sender<AppEvent>,
     #[debug(skip)]
@@ -83,6 +84,7 @@ impl AppContext {
             status,
             queue,
             supported_commands,
+            db_update_start: None,
             app_event_sender,
             work_sender,
             scheduler,
