@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
     style::Style,
-    text::Text,
+    text::{Line, Text},
 };
 
 use super::Pane;
@@ -43,24 +43,36 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
-        for i in 0..rows {
-            let i = i as usize;
+        let mut i: usize = 0;
+        while i < (rows as usize) {
             let Some(idx) = (current_line_idx + i).checked_sub(middle_row as usize) else {
+                i += 1;
                 continue;
             };
             let Some(line) = lrc.lines.get(idx) else {
+                i += 1;
                 continue;
             };
 
+            let wrapped_line: Vec<Line> = textwrap::wrap(&line.content, area.width as usize)
+                .iter()
+                .map(|x| Line::from(x.to_string()))
+                .collect();
+
             let darken = (middle_row as usize).abs_diff(i) > 0 || !first_line_reached;
 
-            let p = Text::from(line.content.clone()).centered().style(if darken {
-                Style::default().fg(context.config.theme.text_color.unwrap_or_default())
-            } else {
-                context.config.theme.highlighted_item_style
-            });
-
-            frame.render_widget(p, areas[i]);
+            for l in wrapped_line {
+                let p = Text::from(l).centered().style(if darken {
+                    Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+                } else {
+                    context.config.theme.highlighted_item_style
+                });
+                frame.render_widget(p, areas[i]);
+                i += 1;
+                if i >= (rows as usize) {
+                    break;
+                }
+            }
         }
 
         // Try to schedule the next line to be displayed on time
