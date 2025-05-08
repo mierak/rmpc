@@ -38,7 +38,11 @@ use crate::{
         theme::{
             SymbolsConfig,
             properties::{
-                Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty,
+                Property,
+                PropertyKind,
+                PropertyKindOrText,
+                SongProperty,
+                StatusProperty,
                 WidgetProperty,
             },
         },
@@ -864,10 +868,15 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
-                WidgetProperty::ScanStatus => Some(Either::Left(Span::styled(
-                    ScanStatus::new(context.db_update_start).get_str().unwrap_or_default(),
-                    style,
-                ))),
+                WidgetProperty::ScanStatus => context.db_update_start.map(|update_start| {
+                    Either::Left(Span::styled(
+                        ScanStatus::new(Some(update_start))
+                            .get_str()
+                            .unwrap_or_default()
+                            .to_string(),
+                        style,
+                    ))
+                }),
             },
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();

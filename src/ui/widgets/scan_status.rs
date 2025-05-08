@@ -15,13 +15,11 @@ impl ScanStatus {
 
     /// get updating symbol, this symbol rotates in set inverval if the db is
     /// scanning
-    pub fn get_str(&mut self) -> Option<String> {
-        let Some(start) = self.update_start else {
-            return None;
-        };
+    pub fn get_str(&mut self) -> Option<&str> {
+        let start = self.update_start?;
         let elapsed_secs = start.elapsed().as_millis() as usize / 1000;
         let t =
             DEFAULT_LOADING_CHARS.get(elapsed_secs % DEFAULT_LOADING_CHARS.len()).unwrap_or(&"");
-        Some(format!(" {t} "))
+        Some(t)
     }
 }

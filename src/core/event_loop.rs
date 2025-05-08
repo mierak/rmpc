@@ -28,8 +28,12 @@ use crate::{
         lrc::get_lrc_path,
         macros::{status_error, status_warn},
         mpd_query::{
-            EXTERNAL_COMMAND, GLOBAL_QUEUE_UPDATE, GLOBAL_STATUS_UPDATE, GLOBAL_VOLUME_UPDATE,
-            MpdQueryResult, run_status_update,
+            EXTERNAL_COMMAND,
+            GLOBAL_QUEUE_UPDATE,
+            GLOBAL_STATUS_UPDATE,
+            GLOBAL_VOLUME_UPDATE,
+            MpdQueryResult,
+            run_status_update,
         },
     },
     ui::{KeyHandleResult, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
@@ -244,24 +248,26 @@ fn main_task<B: Backend + std::io::Write>(
                             context.status = status;
                             let mut song_changed = false;
 
-                            _update_db_loop_guard = Some(context.scheduler.repeated(
-                                Duration::from_secs(1),
-                                |(tx, _)| {
-                                    tx.send(AppEvent::RequestRender)?;
-                                    Ok(())
-                                },
-                            ));
+                            let mut start_render_loop = || {
+                                _update_db_loop_guard = Some(context.scheduler.repeated(
+                                    Duration::from_secs(1),
+                                    |(tx, _)| {
+                                        tx.send(AppEvent::RequestRender)?;
+                                        Ok(())
+                                    },
+                                ));
+                            };
                             match (current_updating_db, context.status.updating_db) {
                                 (None, Some(_)) => {
                                     // update of db started
                                     context.db_update_start = Some(std::time::Instant::now());
+                                    start_render_loop();
                                 }
-                                (Some(_), Some(_)) => {
-                                    // rmpc is opened after db being updated
-                                    // beforehand -> reassign
-                                    if context.db_update_start.is_none() {
-                                        context.db_update_start = Some(std::time::Instant::now());
-                                    }
+                                (Some(_), Some(_)) if context.db_update_start.is_none() => {
+                                    // rmpc is opened after db started updating
+                                    // beforehand so we reassign
+                                    context.db_update_start = Some(std::time::Instant::now());
+                                    start_render_loop();
                                 }
                                 (Some(_), None) => {
                                     // update of db ended
