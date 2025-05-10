@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
     style::Style,
-    text::{Line, Text},
+    text::Text,
 };
 
 use super::Pane;
@@ -45,13 +45,27 @@ impl Pane for LyricsPane {
 
         let mut area_idx: usize = 0;
         let mut lyrics_fetch_idx: usize = 0;
+
+        let cum_prev_line_wrap_count = if current_line_idx > 0 {
+            lrc.lines[..current_line_idx]
+                .iter()
+                .map(|line| textwrap::wrap(&line.content, area.width as usize).len() - 1)
+                .sum::<usize>()
+        } else {
+            0
+        };
+
         while area_idx < (rows as usize) {
-            if (current_line_idx + area_idx).checked_sub(middle_row as usize).is_none() {
+            if (current_line_idx + area_idx + cum_prev_line_wrap_count)
+                .checked_sub(middle_row as usize)
+                .is_none()
+            {
                 area_idx += 1;
                 continue;
             }
 
-            let Some(idx) = (current_line_idx + lyrics_fetch_idx).checked_sub(middle_row as usize) else {
+            let Some(idx) = (current_line_idx + lyrics_fetch_idx).checked_sub(middle_row as usize)
+            else {
                 lyrics_fetch_idx += 1;
                 continue;
             };
@@ -61,10 +75,7 @@ impl Pane for LyricsPane {
                 continue;
             };
 
-            let wrapped_line: Vec<Line> = textwrap::wrap(&line.content, area.width as usize)
-                .iter()
-                .map(|x| Line::from(x.to_string()))
-                .collect();
+            let wrapped_line = textwrap::wrap(&line.content, area.width as usize);
 
             let darken = (middle_row as usize).abs_diff(area_idx) > 0 || !first_line_reached;
 
