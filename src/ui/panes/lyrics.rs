@@ -43,56 +43,104 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
-        let mut area_idx: usize = 0;
-        let mut lyrics_fetch_idx: usize = 0;
+        let mut current_area_cursor = middle_row;
+        let current_line_wrapped =
+            textwrap::wrap(&lrc.lines[current_line_idx].content, area.width as usize);
+        for l in current_line_wrapped {
+            let p = Text::from(l).centered().style(context.config.theme.highlighted_item_style);
+            frame.render_widget(p, areas[current_area_cursor as usize]);
+            current_area_cursor += 1;
+        }
 
-        let cum_prev_line_wrap_count = if current_line_idx > 0 {
-            lrc.lines[..current_line_idx]
-                .iter()
-                .map(|line| textwrap::wrap(&line.content, area.width as usize).len() - 1)
-                .sum::<usize>()
-        } else {
-            0
-        };
-
-        while area_idx < (rows as usize) {
-            if (current_line_idx + area_idx + cum_prev_line_wrap_count)
-                .checked_sub(middle_row as usize)
-                .is_none()
-            {
-                area_idx += 1;
-                continue;
-            }
-
-            let Some(idx) = (current_line_idx + lyrics_fetch_idx).checked_sub(middle_row as usize)
-            else {
-                lyrics_fetch_idx += 1;
-                continue;
+        let mut before_lyrics_cursor = current_line_idx;
+        let mut before_area_cursor = middle_row as usize;
+        while before_lyrics_cursor > 0 && before_area_cursor > 0 {
+            before_lyrics_cursor -= 1;
+            let Some(line) = lrc.lines.get(before_lyrics_cursor) else {
+                break;
             };
-
-            let Some(line) = lrc.lines.get(idx) else {
-                lyrics_fetch_idx += 1;
-                continue;
-            };
-
             let wrapped_line = textwrap::wrap(&line.content, area.width as usize);
-
-            let darken = (middle_row as usize).abs_diff(area_idx) > 0 || !first_line_reached;
-
-            for l in wrapped_line {
-                let p = Text::from(l).centered().style(if darken {
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default())
-                } else {
-                    context.config.theme.highlighted_item_style
-                });
-                frame.render_widget(p, areas[area_idx]);
-                area_idx += 1;
-                if area_idx >= (rows as usize) {
+            for l in wrapped_line.iter().rev() {
+                let p = Text::from(l.clone()).centered().style(
+                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
+                );
+                if before_area_cursor == 0 {
                     break;
                 }
+                before_area_cursor -= 1;
+                frame.render_widget(p, areas[before_area_cursor]);
             }
-            lyrics_fetch_idx += 1;
         }
+        let mut after_lyrics_cursor = current_line_idx;
+        let mut after_area_cursor = (current_area_cursor - 1) as usize;
+
+        while after_lyrics_cursor < lrc.lines.len() - 1 && after_area_cursor < areas.len() - 1 {
+            after_lyrics_cursor += 1;
+            let Some(line) = lrc.lines.get(after_lyrics_cursor) else {
+                break;
+            };
+            let wrapped_line = textwrap::wrap(&line.content, area.width as usize);
+            for l in wrapped_line {
+                let p = Text::from(l).centered().style(
+                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
+                );
+                after_area_cursor += 1;
+                if after_area_cursor >= areas.len() {
+                    break;
+                }
+                frame.render_widget(p, areas[after_area_cursor]);
+            }
+        }
+
+        // let cum_prev_line_wrap_count = if current_line_idx > 0 {
+        //     lrc.lines[..current_line_idx]
+        //         .iter()
+        //         .map(|line| textwrap::wrap(&line.content, area.width as usize).len()
+        // - 1)         .sum::<usize>()
+        // } else {
+        //     0
+        // };
+        //
+        // while area_idx < (rows as usize) {
+        //     if (current_line_idx + area_idx + cum_prev_line_wrap_count)
+        //         .checked_sub(middle_row as usize)
+        //         .is_none()
+        //     {
+        //         area_idx += 1;
+        //         continue;
+        //     }
+        //
+        //     let Some(idx) = (current_line_idx +
+        // lyrics_fetch_idx).checked_sub(middle_row as usize)     else {
+        //         lyrics_fetch_idx += 1;
+        //         continue;
+        //     };
+        //
+        //     let Some(line) = lrc.lines.get(idx) else {
+        //         lyrics_fetch_idx += 1;
+        //         continue;
+        //     };
+        //
+        //     let wrapped_line = textwrap::wrap(&line.content, area.width as usize);
+        //
+        //     let darken = (middle_row as usize).abs_diff(area_idx) > 0 ||
+        // !first_line_reached;
+        //
+        //     for l in wrapped_line {
+        //         let p = Text::from(l).centered().style(if darken {
+        //
+        // Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+        //         } else {
+        //             context.config.theme.highlighted_item_style
+        //         });
+        //         frame.render_widget(p, areas[area_idx]);
+        //         area_idx += 1;
+        //         if area_idx >= (rows as usize) {
+        //             break;
+        //         }
+        //     }
+        //     lyrics_fetch_idx += 1;
+        // }
 
         // Try to schedule the next line to be displayed on time
         if self.last_requested_line_idx != current_line_idx + 1 {
