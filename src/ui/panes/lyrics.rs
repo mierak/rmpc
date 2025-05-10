@@ -43,14 +43,21 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
-        let mut i: usize = 0;
-        while i < (rows as usize) {
-            let Some(idx) = (current_line_idx + i).checked_sub(middle_row as usize) else {
-                i += 1;
+        let mut area_idx: usize = 0;
+        let mut lyrics_fetch_idx: usize = 0;
+        while area_idx < (rows as usize) {
+            if (current_line_idx + area_idx).checked_sub(middle_row as usize).is_none() {
+                area_idx += 1;
+                continue;
+            }
+
+            let Some(idx) = (current_line_idx + lyrics_fetch_idx).checked_sub(middle_row as usize) else {
+                lyrics_fetch_idx += 1;
                 continue;
             };
+
             let Some(line) = lrc.lines.get(idx) else {
-                i += 1;
+                lyrics_fetch_idx += 1;
                 continue;
             };
 
@@ -59,7 +66,7 @@ impl Pane for LyricsPane {
                 .map(|x| Line::from(x.to_string()))
                 .collect();
 
-            let darken = (middle_row as usize).abs_diff(i) > 0 || !first_line_reached;
+            let darken = (middle_row as usize).abs_diff(area_idx) > 0 || !first_line_reached;
 
             for l in wrapped_line {
                 let p = Text::from(l).centered().style(if darken {
@@ -67,12 +74,13 @@ impl Pane for LyricsPane {
                 } else {
                     context.config.theme.highlighted_item_style
                 });
-                frame.render_widget(p, areas[i]);
-                i += 1;
-                if i >= (rows as usize) {
+                frame.render_widget(p, areas[area_idx]);
+                area_idx += 1;
+                if area_idx >= (rows as usize) {
                     break;
                 }
             }
+            lyrics_fetch_idx += 1;
         }
 
         // Try to schedule the next line to be displayed on time
