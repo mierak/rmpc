@@ -54,10 +54,7 @@ impl Pane for LyricsPane {
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            frame.render_widget(
-                Text::from(line).centered().style(middle_style),
-                *area,
-            );
+            frame.render_widget(Text::from(line).centered().style(middle_style), *area);
             current_area += 1;
         }
 
@@ -84,9 +81,12 @@ impl Pane for LyricsPane {
             }
         }
         let mut after_lyrics_cursor = current_line_idx;
-        let mut after_area_cursor = current_area - 1;
+        let mut after_area_cursor = current_area.saturating_sub(1);
 
-        while after_lyrics_cursor < lrc.lines.len() - 1 && after_area_cursor < areas.len() - 1 {
+        while !areas.is_empty()
+            && after_lyrics_cursor < lrc.lines.len() - 1
+            && after_area_cursor < areas.len() - 1
+        {
             after_lyrics_cursor += 1;
             let Some(line) = lrc.lines.get(after_lyrics_cursor) else {
                 break;
