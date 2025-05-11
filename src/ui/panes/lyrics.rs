@@ -51,9 +51,12 @@ impl Pane for LyricsPane {
 
         let mut current_area = middle_row as usize;
         for line in textwrap::wrap(&lrc.lines[current_line_idx].content, area.width as usize) {
+            let Some(area) = areas.get(current_area) else {
+                break;
+            };
             frame.render_widget(
                 Text::from(line).centered().style(middle_style),
-                areas[current_area],
+                *area,
             );
             current_area += 1;
         }
