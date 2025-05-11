@@ -50,7 +50,10 @@ impl Pane for LyricsPane {
         };
 
         let mut current_area = middle_row as usize;
-        for line in textwrap::wrap(&lrc.lines[current_line_idx].content, area.width as usize) {
+        let Some(current_line) = lrc.lines.get(current_line_idx) else {
+            return Ok(());
+        };
+        for line in textwrap::wrap(&current_line.content, area.width as usize) {
             let Some(area) = areas.get(current_area) else {
                 break;
             };
@@ -65,8 +68,7 @@ impl Pane for LyricsPane {
             let Some(line) = lrc.lines.get(before_lyrics_cursor) else {
                 break;
             };
-            let wrapped_line = textwrap::wrap(&line.content, area.width as usize);
-            for l in wrapped_line.iter().rev() {
+            for l in textwrap::wrap(&line.content, area.width as usize).iter().rev() {
                 let p = Text::from(l.clone()).centered().style(
                     Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
                 );
@@ -91,8 +93,7 @@ impl Pane for LyricsPane {
             let Some(line) = lrc.lines.get(after_lyrics_cursor) else {
                 break;
             };
-            let wrapped_line = textwrap::wrap(&line.content, area.width as usize);
-            for l in wrapped_line {
+            for l in textwrap::wrap(&line.content, area.width as usize) {
                 let p = Text::from(l).centered().style(
                     Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
                 );
