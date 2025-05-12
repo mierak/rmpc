@@ -21,7 +21,7 @@ crossterm = { version = "0.28.1", features = ["serde"] }
 image = "0.25.5"
 ratatui = { version = "0.29.0", features = ["all-widgets"] }
 serde = { version = "1.0.217", features = ["derive"] }
-strum = { version = "0.27.1", features = ["derive"] }
+strum = { workspace = true }
 flate2 = { version = "1.0.35" }
 itertools = "0.14.0"
 ron = "0.8.1"
@@ -50,6 +50,7 @@ rand = "0.9.1"
 
 [build-dependencies]
 clap = { workspace = true }
+strum = { workspace = true }
 clap_complete = "4.5.45"
 clap_mangen = "0.2.26"
 vergen-gitcl = { version = "1.0.5", features = ["build"] }
@@ -60,6 +61,7 @@ test-case = "3.3.1"
 
 [workspace.dependencies]
 clap = { version = "4.5.30", features = ["derive", "cargo", "string" ] }
+strum = { version = "0.27.1", features = ["derive"] }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }

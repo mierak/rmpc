@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum, ValueHint};
+use strum::IntoStaticStr;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -19,7 +20,7 @@ pub struct Args {
     pub password: Option<String>,
 }
 
-#[derive(ValueEnum, Clone, Debug, PartialEq)]
+#[derive(ValueEnum, IntoStaticStr, strum::Display, Clone, Copy, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
 pub enum AddRandom {
     Song,

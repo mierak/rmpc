@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListState},
 };
 
-use super::{Modal, RectExt};
+use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
@@ -108,12 +108,6 @@ impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>>
         self
     }
 }
-
-const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
-    top_right: symbols::line::NORMAL.vertical_left,
-    top_left: symbols::line::NORMAL.vertical_right,
-    ..symbols::border::ROUNDED
-};
 
 impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
     for SelectModal<'_, V, Callback>

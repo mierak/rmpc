@@ -8,6 +8,7 @@ use crossterm::{
 };
 use itertools::Itertools;
 use modals::{
+    add_random_modal::AddRandomModal,
     decoders::DecodersModal,
     input_modal::InputModal,
     keybinds::KeybindsModal,
@@ -417,6 +418,9 @@ impl<'ui> Ui<'ui> {
                     } else {
                         status_info!("No song is currently playing");
                     }
+                }
+                GlobalAction::AddRandom => {
+                    modal!(context, AddRandomModal::new(context));
                 }
             }
         }

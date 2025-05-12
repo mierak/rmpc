@@ -35,6 +35,7 @@ pub enum GlobalAction {
     SwitchToTab(TabName),
     Command { command: String, description: Option<String> },
     ExternalCommand { command: Arc<Vec<String>>, description: Option<String> },
+    AddRandom,
 }
 
 #[derive(
@@ -72,6 +73,7 @@ pub enum GlobalActionFile {
     CommandMode,
     Command { command: String, description: Option<String> },
     ExternalCommand { command: Vec<String>, description: Option<String> },
+    AddRandom,
 }
 
 impl From<GlobalActionFile> for GlobalAction {
@@ -117,6 +119,7 @@ impl From<GlobalActionFile> for GlobalAction {
                     description,
                 }
             }
+            GlobalActionFile::AddRandom => GlobalAction::AddRandom,
         }
     }
 }
@@ -157,6 +160,7 @@ impl ToDescription for GlobalAction {
                 "Execute an external command".into()
             }
             GlobalAction::ExternalCommand { description: Some(desc), .. } => Cow::Owned(desc.to_string()),
+            GlobalAction::AddRandom => "Add random songs to the queue".into(),
         }
     }
 }
