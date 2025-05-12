@@ -32,6 +32,7 @@ lists they are listed as multiple entries.
 - `Filename` property no longer includes file extension, use `FileExtension` if you want to keep it
 - Migrate to Rust 2024 and raise MSRV to 1.85
 - refactor `DirOrSong` to a separate file
+- Lyrics will be wrapped if it is longer than the pane width
 
 ### Fixed
 
