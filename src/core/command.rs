@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 use crate::{
     config::{
-        cli::{Command, StickerCmd},
+        cli::{AddRandom, Command, StickerCmd},
         cli_config::CliConfig,
     },
     context::AppContext,
@@ -32,6 +32,26 @@ impl Command {
             Command::Version => bail!("Cannot use version command here."),
             Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::Remote { .. } => bail!("Cannot use remote command here."),
+            Command::AddRandom { tag, count } => Ok(Box::new(move |client| {
+                match tag {
+                    AddRandom::Song => {
+                        client.add_random_songs(count, None)?;
+                    }
+                    AddRandom::Artist => {
+                        client.add_random_tag(count, Tag::Artist)?;
+                    }
+                    AddRandom::Album => {
+                        client.add_random_tag(count, Tag::Album)?;
+                    }
+                    AddRandom::AlbumArtist => {
+                        client.add_random_tag(count, Tag::AlbumArtist)?;
+                    }
+                    AddRandom::Genre => {
+                        client.add_random_tag(count, Tag::Genre)?;
+                    }
+                }
+                Ok(())
+            })),
             Command::Update { ref mut path, wait } | Command::Rescan { ref mut path, wait } => {
                 let path = path.take();
                 Ok(Box::new(move |client| {

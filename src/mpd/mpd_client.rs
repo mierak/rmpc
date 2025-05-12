@@ -8,7 +8,8 @@ use std::{
 use anyhow::Result;
 use derive_more::Deref;
 use itertools::Itertools;
-use strum::AsRefStr;
+use rand::seq::SliceRandom;
+use strum::{AsRefStr, Display};
 
 use super::{
     FromMpd,
@@ -99,6 +100,7 @@ pub trait MpdClient: Sized {
     fn noidle(&mut self) -> MpdResult<()>;
 
     fn start_cmd_list(&mut self) -> Result<()>;
+    fn start_cmd_list_ok(&mut self) -> Result<()>;
     fn execute_cmd_list(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>>
     where
         Self: SocketClient;
@@ -143,6 +145,10 @@ pub trait MpdClient: Sized {
     fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
+    fn add_random_songs(&mut self, count: usize, filter: Option<&[Filter<'_>]>) -> MpdResult<()>;
+    fn add_random_tag(&mut self, count: usize, tag: Tag) -> MpdResult<()>;
+    /// Do not use this unless absolutely necessary
+    fn list_all(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
@@ -291,6 +297,20 @@ impl MpdClient for Client<'_> {
 
     fn noidle(&mut self) -> MpdResult<()> {
         self.send("noidle").and_then(read_ok)
+    }
+
+    fn start_cmd_list(&mut self) -> Result<()> {
+        self.send("command_list_begin")?;
+        Ok(())
+    }
+
+    fn start_cmd_list_ok(&mut self) -> Result<()> {
+        self.send("command_list_ok_begin")?;
+        Ok(())
+    }
+
+    fn execute_cmd_list(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>> {
+        self.send("command_list_end")
     }
 
     fn get_volume(&mut self) -> MpdResult<Volume> {
@@ -498,6 +518,62 @@ impl MpdClient for Client<'_> {
             format!("list {}", tag.as_str())
         })
         .and_then(read_response)
+    }
+
+    #[allow(clippy::needless_range_loop)]
+    fn add_random_songs(&mut self, count: usize, filter: Option<&[Filter<'_>]>) -> MpdResult<()> {
+        let mut result = if let Some(filter) = filter {
+            self.find(filter)?.into_iter().map(|song| song.file).collect_vec()
+        } else {
+            self.list_all(None)?.into_files().collect_vec()
+        };
+
+        if result.len() < count {
+            return Err(MpdError::Generic(format!(
+                "Cannot add {count} songs. The database contains only {} entries.",
+                result.len()
+            )));
+        }
+        result.shuffle(&mut rand::rng());
+
+        self.start_cmd_list()?;
+        for i in 0..count {
+            self.send(&format!("add {}", result[i].quote_and_escape()))?;
+        }
+        self.execute_cmd_list().and_then(read_ok)
+    }
+
+    #[allow(clippy::needless_range_loop)]
+    fn add_random_tag(&mut self, count: usize, tag: Tag) -> MpdResult<()> {
+        let mut tag_values = self.list_tag(tag.clone(), None)?.0;
+
+        if tag_values.len() < count {
+            return Err(MpdError::Generic(format!(
+                "Cannot add {count} {tag}s. The database contains only {} entries.",
+                tag_values.len()
+            )));
+        }
+
+        tag_values.shuffle(&mut rand::rng());
+
+        self.start_cmd_list()?;
+        for i in 0..count {
+            let filter = &[Filter::new_with_kind(
+                tag.clone(),
+                std::mem::take(&mut tag_values[i]),
+                FilterKind::Exact,
+            )] as &[_];
+            self.send(&format!("findadd \"({})\"", filter.to_query_str()))?;
+        }
+        self.execute_cmd_list().and_then(read_ok)
+    }
+
+    fn list_all(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
+        if let Some(path) = path {
+            self.send(&format!("listall {}", path.quote_and_escape())).and_then(read_response)
+        } else {
+            self.send("listall").and_then(read_response)
+        }
     }
 
     // Database
@@ -742,7 +818,7 @@ impl MpdClient for Client<'_> {
         let mut i = 0;
 
         while i < uris.len() {
-            self.start_cmd_list()?;
+            self.start_cmd_list_ok()?;
 
             for uri in &uris[i..] {
                 self.send(&format!("sticker list song {}", uri.quote_and_escape()))?;
@@ -783,15 +859,6 @@ impl MpdClient for Client<'_> {
             key.quote_and_escape()
         ))
         .and_then(read_response)
-    }
-
-    fn start_cmd_list(&mut self) -> Result<()> {
-        self.send("command_list_ok_begin")?;
-        Ok(())
-    }
-
-    fn execute_cmd_list(&mut self) -> MpdResult<ProtoClient<'static, '_, Self>> {
-        self.send("command_list_end")
     }
 }
 
@@ -857,7 +924,8 @@ impl SingleOrRange {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Display)]
+#[strum(serialize_all = "lowercase")]
 #[allow(unused)]
 pub enum Tag {
     Any,

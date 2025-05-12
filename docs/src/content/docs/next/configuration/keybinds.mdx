@@ -43,16 +43,16 @@ All song paths are listed as their path relative to MPD's music directory.
 
 #### Environment
 
--   `$CURRENT_SONG`: can be used to access the currently playing song.
--   `$STATE`: Can be one of `Playing`, `Paused` or `Stopped`
--   `$SELECTED_SONGS`: contains a list of songs that are selected in the various panes. Songs are separated by `\n`, their order is undefined
-    and should not be relied upon.
-    -   In `Browser`, `Albums`, `Playlists` and `Artists` it will list all songs contained in the currently highlighted item and all its subdirectories.
-        If the item is a single song, only that one song will be present. If you mark multiple directories/songs, all of them will be listed
-        in `$SELECTED_SONGS`.
-    -   In `Queue`, only the song under cursor will be listed.
-    -   In `Search`, While on the search stage, all the songs will be listed and while on the song list stage, only the song under cursor or
-        all marked songs will be listed.
+- `$CURRENT_SONG`: can be used to access the currently playing song.
+- `$STATE`: Can be one of `Playing`, `Paused` or `Stopped`
+- `$SELECTED_SONGS`: contains a list of songs that are selected in the various panes. Songs are separated by `\n`, their order is undefined
+  and should not be relied upon.
+    - In `Browser`, `Albums`, `Playlists` and `Artists` it will list all songs contained in the currently highlighted item and all its subdirectories.
+      If the item is a single song, only that one song will be present. If you mark multiple directories/songs, all of them will be listed
+      in `$SELECTED_SONGS`.
+    - In `Queue`, only the song under cursor will be listed.
+    - In `Search`, While on the search stage, all the songs will be listed and while on the song list stage, only the song under cursor or
+      all marked songs will be listed.
 
 ## Default keybinds
 
@@ -93,6 +93,7 @@ between different tabs and exiting rmpc.
 |        `4`         | SwitchToTab("Album")       | Switch directly to Albums tab                                                                                                |
 |        `5`         | SwitchToTab("Playlists")   | Switch directly to Playlists tab                                                                                             |
 |        `6`         | SwitchToTab("Search")      | Switch directly to Search tab                                                                                                |
+|        `R`         | AddRandom                  | Add random songs to the queue                                                                                                |
 
 ### Navigation
 

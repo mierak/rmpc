@@ -5,11 +5,11 @@ use ratatui::{
     layout::Rect,
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
-    symbols::{self, border},
+    symbols::border,
     widgets::{Block, Borders, Clear},
 };
 
-use super::{Modal, RectExt};
+use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
     context::AppContext,
@@ -22,12 +22,6 @@ use crate::{
         button::{Button, ButtonGroup, ButtonGroupState},
         input::Input,
     },
-};
-
-const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
-    top_right: symbols::line::NORMAL.vertical_left,
-    top_left: symbols::line::NORMAL.vertical_right,
-    ..symbols::border::ROUNDED
 };
 
 pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {

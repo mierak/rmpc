@@ -55,6 +55,7 @@
             "I":       ShowCurrentSongInfo,
             "O":       ShowOutputs,
             "P":       ShowDecoders,
+            "R":       AddRandom,
         },
         navigation: {
             "k":         Up,

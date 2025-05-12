@@ -6,11 +6,11 @@ use ratatui::{
     Frame,
     prelude::{Constraint, Layout},
     style::Style,
-    symbols::{self, border},
+    symbols::border,
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
-use super::{Modal, RectExt};
+use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::{
         Size,
@@ -23,12 +23,6 @@ use crate::{
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
-};
-
-const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
-    top_right: symbols::line::NORMAL.vertical_left,
-    top_left: symbols::line::NORMAL.vertical_right,
-    ..symbols::border::ROUNDED
 };
 
 pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {

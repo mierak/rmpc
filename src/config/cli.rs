@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum, ValueHint};
+use strum::IntoStaticStr;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -19,9 +20,23 @@ pub struct Args {
     pub password: Option<String>,
 }
 
+#[derive(ValueEnum, IntoStaticStr, strum::Display, Clone, Copy, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+pub enum AddRandom {
+    Song,
+    Artist,
+    Album,
+    AlbumArtist,
+    Genre,
+}
+
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
 pub enum Command {
+    AddRandom {
+        tag: AddRandom,
+        count: usize,
+    },
     /// Prints the default config. Can be used to bootstrap your config file.
     Config {
         /// If provided, print the current config instead of the default one.
@@ -95,13 +110,21 @@ pub enum Command {
         value: Option<String>,
     },
     /// On or off
-    Repeat { value: OnOff },
+    Repeat {
+        value: OnOff,
+    },
     /// On or off
-    Random { value: OnOff },
+    Random {
+        value: OnOff,
+    },
     /// On, off or oneshot
-    Single { value: OnOffOneshot },
+    Single {
+        value: OnOffOneshot,
+    },
     /// On, off or oneshot
-    Consume { value: OnOffOneshot },
+    Consume {
+        value: OnOffOneshot,
+    },
     /// Seeks current song(seconds), relative if prefixed by + or -
     Seek {
         #[arg(allow_negative_numbers(true))]
@@ -122,7 +145,9 @@ pub enum Command {
         skip_ext_check: bool,
     },
     /// Add a song from youtube to the current queue.
-    AddYt { url: String },
+    AddYt {
+        url: String,
+    },
     /// List MPD outputs
     Outputs,
     /// Toggle MPD output on or off
@@ -153,9 +178,14 @@ pub enum Command {
         path: Option<Vec<String>>,
     },
     /// Mounts supported storage to MPD
-    Mount { name: String, path: String },
+    Mount {
+        name: String,
+        path: String,
+    },
     /// Unmounts storage with given name
-    Unmount { name: String },
+    Unmount {
+        name: String,
+    },
     /// List currently mounted storages
     ListMounts,
     /// Manipulate and query song stickers

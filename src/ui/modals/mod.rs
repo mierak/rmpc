@@ -2,6 +2,7 @@ use anyhow::Result;
 use ratatui::{
     Frame,
     prelude::{Constraint, Layout, Rect},
+    symbols,
 };
 
 use crate::{
@@ -10,6 +11,7 @@ use crate::{
     shared::{key_event::KeyEvent, mouse_event::MouseEvent},
 };
 
+pub mod add_random_modal;
 pub mod confirm_modal;
 pub mod decoders;
 pub mod info_modal;
@@ -36,6 +38,12 @@ pub(crate) trait Modal: std::fmt::Debug {
         Ok(())
     }
 }
+
+const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {
+    top_right: symbols::line::NORMAL.vertical_left,
+    top_left: symbols::line::NORMAL.vertical_right,
+    ..symbols::border::ROUNDED
+};
 
 #[allow(dead_code)]
 pub trait RectExt {

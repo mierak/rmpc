@@ -101,6 +101,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('.'), modifiers: M::NONE  }, G::VolumeUp),
                 (Key { key: K::BackTab,   modifiers: M::SHIFT }, G::PreviousTab),
                 (Key { key: K::Tab,       modifiers: M::NONE  }, G::NextTab),
+                (Key { key: K::Char('R'), modifiers: M::SHIFT }, G::AddRandom),
                 (Key { key: K::Char('1'), modifiers: M::NONE  }, G::SwitchToTab("Queue".to_string())),
                 (Key { key: K::Char('2'), modifiers: M::NONE  }, G::SwitchToTab("Directories".to_string())),
                 (Key { key: K::Char('3'), modifiers: M::NONE  }, G::SwitchToTab("Artists".to_string())),
