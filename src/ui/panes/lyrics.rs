@@ -43,24 +43,66 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
-        for i in 0..rows {
-            let i = i as usize;
-            let Some(idx) = (current_line_idx + i).checked_sub(middle_row as usize) else {
-                continue;
+        let middle_style = if first_line_reached {
+            context.config.theme.highlighted_item_style
+        } else {
+            Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+        };
+
+        let mut current_area = middle_row as usize;
+        let Some(current_line) = lrc.lines.get(current_line_idx) else {
+            return Ok(());
+        };
+        for line in textwrap::wrap(&current_line.content, area.width as usize) {
+            let Some(area) = areas.get(current_area) else {
+                break;
             };
-            let Some(line) = lrc.lines.get(idx) else {
-                continue;
+            frame.render_widget(Text::from(line).centered().style(middle_style), *area);
+            current_area += 1;
+        }
+
+        let mut before_lyrics_cursor = current_line_idx;
+        let mut before_area_cursor = middle_row as usize;
+        while before_lyrics_cursor > 0 && before_area_cursor > 0 {
+            before_lyrics_cursor -= 1;
+            let Some(line) = lrc.lines.get(before_lyrics_cursor) else {
+                break;
             };
+            for l in textwrap::wrap(&line.content, area.width as usize).iter().rev() {
+                let p = Text::from(l.clone()).centered().style(
+                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
+                );
+                if before_area_cursor == 0 {
+                    break;
+                }
+                let Some(area) = areas.get(before_area_cursor - 1) else {
+                    break;
+                };
+                frame.render_widget(p, *area);
+                before_area_cursor -= 1;
+            }
+        }
+        let mut after_lyrics_cursor = current_line_idx;
+        let mut after_area_cursor = current_area.saturating_sub(1);
 
-            let darken = (middle_row as usize).abs_diff(i) > 0 || !first_line_reached;
-
-            let p = Text::from(line.content.clone()).centered().style(if darken {
-                Style::default().fg(context.config.theme.text_color.unwrap_or_default())
-            } else {
-                context.config.theme.highlighted_item_style
-            });
-
-            frame.render_widget(p, areas[i]);
+        while !areas.is_empty()
+            && after_lyrics_cursor < lrc.lines.len() - 1
+            && after_area_cursor < areas.len() - 1
+        {
+            after_lyrics_cursor += 1;
+            let Some(line) = lrc.lines.get(after_lyrics_cursor) else {
+                break;
+            };
+            for l in textwrap::wrap(&line.content, area.width as usize) {
+                let p = Text::from(l).centered().style(
+                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
+                );
+                let Some(area) = areas.get(after_area_cursor + 1) else {
+                    break;
+                };
+                frame.render_widget(p, *area);
+                after_area_cursor += 1;
+            }
         }
 
         // Try to schedule the next line to be displayed on time
