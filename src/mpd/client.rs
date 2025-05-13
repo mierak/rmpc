@@ -1,6 +1,6 @@
 use std::{
     io::{BufRead, BufReader, Write},
-    net::TcpStream,
+    net::{Shutdown, TcpStream},
     os::unix::net::UnixStream,
 };
 
@@ -74,6 +74,13 @@ impl TcpOrUnixStream {
             TcpOrUnixStream::Unix(s) => TcpOrUnixStream::Unix(s.try_clone()?),
             TcpOrUnixStream::Tcp(s) => TcpOrUnixStream::Tcp(s.try_clone()?),
         })
+    }
+
+    pub fn shutdown_both(&mut self) -> std::io::Result<()> {
+        match self {
+            TcpOrUnixStream::Unix(s) => s.shutdown(Shutdown::Both),
+            TcpOrUnixStream::Tcp(s) => s.shutdown(Shutdown::Both),
+        }
     }
 }
 

@@ -200,7 +200,8 @@ fn client_task(
                                 }
                             }
                         }
-                        log::trace!("work loop ended");
+                        log::debug!("Work loop ended. Shutting down MPD client.");
+                        try_skip!(client_write.shutdown_both(), "Failed to shutdown MPD client");
                     })
                     .expect("failed to spawn thread");
 

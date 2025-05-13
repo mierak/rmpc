@@ -41,6 +41,7 @@ lists they are listed as multiple entries.
 - Album art staying on the old one when in tmux and not visible
 - Fixed catpuccin theme not being up to date in the docs
 - Handle invalid utf8 characters
+- Improve reconnection behavior of MPD client
 
 ## [0.8.0] - 2025-02-16
 
