@@ -16,7 +16,11 @@ export default defineConfig({
         starlight({
             title: "rmpc",
             plugins: [
-                starlightLinksValidator(),
+                starlightLinksValidator({
+                    exclude: [
+                        "http://localhost:4321/rmpc", // a link to the local server in dev & contributing
+                    ],
+                }),
                 starlightSidebarTopics([
                     {
                         id: "next",
