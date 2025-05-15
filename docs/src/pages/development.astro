@@ -1,0 +1,14 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { Content, getHeadings } from "../../../CONTRIBUTING.md";
+---
+
+<StarlightPage
+    frontmatter={{ title: "Development and contributing", topic: "next" }}
+    hasSidebar={true}
+    headings={getHeadings()}
+>
+    <div class="container">
+        <Content />
+    </div>
+</StarlightPage>

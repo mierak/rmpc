@@ -19,6 +19,7 @@ export default defineConfig({
                 starlightLinksValidator(),
                 starlightSidebarTopics([
                     {
+                        id: "next",
                         label: "Latest git",
                         link: "next/overview",
                         icon: "seti:git",
@@ -35,6 +36,10 @@ export default defineConfig({
                             {
                                 label: "Try without installing",
                                 link: "next/try-without-install",
+                            },
+                            {
+                                label: "Development and contributing",
+                                link: "development",
                             },
                             {
                                 label: "Configuration",
