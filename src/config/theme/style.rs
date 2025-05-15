@@ -25,9 +25,9 @@ impl StringColor {
 #[skip_serializing_none]
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Builder)]
 pub struct StyleFile {
-    pub(super) fg: Option<String>,
-    pub(super) bg: Option<String>,
-    pub(super) modifiers: Option<Modifiers>,
+    pub fg: Option<String>,
+    pub bg: Option<String>,
+    pub modifiers: Option<Modifiers>,
 }
 
 impl std::fmt::Display for Modifiers {

@@ -356,13 +356,15 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         .collect();
 
                         Ok(MpdQueryResult::Preview {
-                            data: Some(vec![PreviewGroup::from(None, data)]),
+                            data: Some(vec![PreviewGroup::from(None, None, data)]),
                             origin_path,
                         })
                     });
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
+                let key_style = context.config.theme.preview_label_style;
+                let group_style = context.config.theme.preview_metadata_group_style;
                 context
                     .query()
                     .id(PREVIEW)
@@ -372,7 +374,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         Ok(MpdQueryResult::Preview {
                             data: client
                                 .find_one(&[Filter::new(Tag::File, &file)])?
-                                .map(|v| v.to_preview()),
+                                .map(|v| v.to_preview(key_style, group_style)),
                             origin_path,
                         })
                     });

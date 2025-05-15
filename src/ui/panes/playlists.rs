@@ -520,6 +520,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     let response = match current {
                         DirOrSong::Dir { name: d, .. } => Some(vec![PreviewGroup::from(
                             None,
+                            None,
                             client
                                 .list_playlist_info(d, None)?
                                 .into_iter()
@@ -535,7 +536,10 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .first()
                                 .context("Expected to find exactly one song for preview")?
                             {
-                                LsInfoEntry::File(song) => Some(song.to_preview()),
+                                LsInfoEntry::File(song) => Some(song.to_preview(
+                                    config.theme.preview_label_style,
+                                    config.theme.preview_metadata_group_style,
+                                )),
                                 _ => None,
                             }
                         }

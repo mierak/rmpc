@@ -334,7 +334,10 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     .target(PaneType::Albums)
                     .query(move |client| {
                         let data =
-                            Some(find_songs(client, &album, &current, &sort_order)?.to_preview());
+                            Some(find_songs(client, &album, &current, &sort_order)?.to_preview(
+                                config.theme.preview_label_style,
+                                config.theme.preview_metadata_group_style,
+                            ));
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });
             }
@@ -349,7 +352,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                         let data = list_titles(client, &current, &sort_order)?
                             .map(|v| v.to_list_item_simple(&config))
                             .collect_vec();
-                        let data = PreviewGroup::from(None, data);
+                        let data = PreviewGroup::from(None, None, data);
                         let data = Some(vec![data]);
                         Ok(MpdQueryResult::Preview { data, origin_path })
                     });

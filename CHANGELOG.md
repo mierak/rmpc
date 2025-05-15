@@ -23,6 +23,7 @@ lists they are listed as multiple entries.
 - Add new widget `ScanStatus` that indicates if the MPD database is being updated.
 - Add new global keybinds for Update and Rescan actions.
 - addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
+- introduced `preview_label_style` and `preview_metadata_group_style` in theme config
 
 ### Changed
 

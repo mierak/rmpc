@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use anyhow::Result;
 use bon::Builder;
 use crossbeam::channel::Sender;
-use ratatui::widgets::ListItem;
+use ratatui::{style::Style, widgets::ListItem};
 
 use super::events::AppEvent;
 use crate::{
@@ -63,15 +63,20 @@ impl MpdQuery {
 pub struct PreviewGroup {
     pub name: Option<&'static str>,
     pub items: Vec<ListItem<'static>>,
+    pub header_style: Option<Style>,
 }
 
 impl PreviewGroup {
-    pub fn new(name: Option<&'static str>) -> Self {
-        Self { name, items: Vec::new() }
+    pub fn new(name: Option<&'static str>, header_style: Option<Style>) -> Self {
+        Self { name, items: Vec::new(), header_style }
     }
 
-    pub fn from(name: Option<&'static str>, items: Vec<ListItem<'static>>) -> Self {
-        Self { name, items }
+    pub fn from(
+        name: Option<&'static str>,
+        header_style: Option<Style>,
+        items: Vec<ListItem<'static>>,
+    ) -> Self {
+        Self { name, items, header_style }
     }
 
     pub fn push(&mut self, item: ListItem<'static>) {
