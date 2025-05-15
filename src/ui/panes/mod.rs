@@ -287,19 +287,18 @@ pub(crate) mod browser {
 
     use itertools::Itertools;
     use ratatui::{
-        style::{Color, Style},
+        style::Style,
         text::{Line, Span},
     };
 
     use crate::{mpd::commands::Song, shared::mpd_query::PreviewGroup};
 
     impl Song {
-        pub(crate) fn to_preview(&self) -> Vec<PreviewGroup> {
-            let key_style = Style::default().fg(Color::Yellow);
+        pub(crate) fn to_preview(&self, key_style: Style, group_style: Style) -> Vec<PreviewGroup> {
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
 
-            let mut info_group = PreviewGroup::new(Some(" --- [Info]"));
+            let mut info_group = PreviewGroup::new(Some(" --- [Info]"), Some(group_style));
 
             let file = Line::from(vec![
                 start_of_line_spacer.clone(),
@@ -396,7 +395,7 @@ pub(crate) mod browser {
                 );
             }
 
-            let mut tags_group = PreviewGroup::new(Some(" --- [Tags]"));
+            let mut tags_group = PreviewGroup::new(Some(" --- [Tags]"), Some(group_style));
             for (k, v) in self
                 .metadata
                 .iter()

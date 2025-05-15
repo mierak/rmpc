@@ -337,6 +337,7 @@ impl Pane for TagBrowserPane {
 
                 let preview = vec![PreviewGroup::from(
                     None,
+                    None,
                     cached_artist
                         .0
                         .iter()
@@ -591,6 +592,8 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         self.stack_mut().clear_preview();
         match self.stack.path() {
             [artist, album] => {
+                let key_style = context.config.theme.preview_label_style;
+                let group_style = context.config.theme.preview_metadata_group_style;
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
@@ -598,8 +601,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 else {
                     return Ok(());
                 };
-                let song =
-                    songs.iter().find(|song| song.file == current).map(|song| song.to_preview());
+                let song = songs
+                    .iter()
+                    .find(|song| song.file == current)
+                    .map(|song| song.to_preview(key_style, group_style));
                 self.stack_mut().set_preview(song);
                 context.render()?;
             }
@@ -614,6 +619,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 };
                 let songs = vec![PreviewGroup::from(
                     None,
+                    None,
                     songs
                         .iter()
                         .map(|song| song.to_list_item_simple(&context.config))
@@ -625,6 +631,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
             [] => {
                 if let Some(albums) = self.cache.0.get(&current) {
                     self.stack.set_preview(Some(vec![PreviewGroup::from(
+                        None,
                         None,
                         albums
                             .0

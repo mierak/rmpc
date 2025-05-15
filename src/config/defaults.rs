@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use super::theme::properties::SongPropertyFile;
+use super::theme::{Modifiers, StyleFile, properties::SongPropertyFile};
 pub fn default_column_widths() -> Vec<u16> {
     vec![20, 38, 42]
 }
@@ -89,4 +89,12 @@ pub fn default_song_sort() -> Vec<SongPropertyFile> {
 
 pub fn default_tag_separator() -> String {
     " | ".to_string()
+}
+
+pub fn default_preview_label_style() -> StyleFile {
+    StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: None }
+}
+
+pub fn default_preview_metaga_group_heading_style() -> StyleFile {
+    StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: Some(Modifiers::Bold) }
 }

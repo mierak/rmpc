@@ -8,7 +8,7 @@ use self::{
     progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
     queue_table::{QueueTableColumns, QueueTableColumnsFile},
     scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
-    style::{Modifiers, StringColor, ToConfigOr},
+    style::{StringColor, ToConfigOr},
 };
 
 mod header;
@@ -18,7 +18,7 @@ mod queue_table;
 mod scrollbar;
 mod style;
 
-pub use style::{ConfigColor, StyleFile};
+pub use style::{ConfigColor, Modifiers, StyleFile};
 
 pub use self::queue_table::{PercentOrLength, SongTableColumn};
 use super::{
@@ -36,6 +36,8 @@ pub struct UiConfig {
     pub modal_background_color: Option<Color>,
     pub modal_backdrop: bool,
     pub text_color: Option<Color>,
+    pub preview_label_style: Style,
+    pub preview_metadata_group_style: Style,
     pub borders_style: Style,
     pub highlighted_item_style: Style,
     pub current_item_style: Style,
@@ -69,6 +71,10 @@ pub struct UiConfigFile {
     pub(super) browser_song_format: SongFormatFile,
     pub(super) background_color: Option<String>,
     pub(super) text_color: Option<String>,
+    #[serde(default = "defaults::default_preview_label_style")]
+    pub(super) preview_label_style: StyleFile,
+    #[serde(default = "defaults::default_preview_metaga_group_heading_style")]
+    pub(super) preview_metadata_group_style: StyleFile,
     pub(super) header_background_color: Option<String>,
     pub(super) modal_background_color: Option<String>,
     #[serde(default)]
@@ -141,6 +147,16 @@ impl Default for UiConfigFile {
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
             format_tag_separator: " | ".to_owned(),
+            preview_label_style: StyleFile {
+                fg: Some("yellow".to_string()),
+                bg: None,
+                modifiers: None,
+            },
+            preview_metadata_group_style: StyleFile {
+                fg: Some("yellow".to_string()),
+                bg: None,
+                modifiers: Some(Modifiers::Bold),
+            },
         }
     }
 }
@@ -240,6 +256,10 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     Ok(std::fs::read(path)?.leak())
                 })?,
             browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
+            preview_label_style: value.preview_label_style.to_config_or(None, None)?,
+            preview_metadata_group_style: value
+                .preview_metadata_group_style
+                .to_config_or(None, None)?,
         })
     }
 }

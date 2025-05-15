@@ -161,6 +161,7 @@ impl SearchPane {
             Phase::Search => {
                 let data = Some(vec![PreviewGroup::from(
                     None,
+                    None,
                     self.songs_dir.to_list_items(&context.config),
                 )]);
                 context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
@@ -172,6 +173,8 @@ impl SearchPane {
                     return;
                 };
                 let file = current.file.clone();
+                let key_style = context.config.theme.preview_label_style;
+                let group_style = context.config.theme.preview_metadata_group_style;
 
                 context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
                     move |client| {
@@ -180,7 +183,7 @@ impl SearchPane {
                                 .find(&[Filter::new(Tag::File, &file)])?
                                 .first()
                                 .context("Expected to find exactly one song")?
-                                .to_preview(),
+                                .to_preview(key_style, group_style),
                         );
                         Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
                     },
@@ -598,6 +601,7 @@ impl Pane for SearchPane {
             (SEARCH, MpdQueryResult::SongsList { data, origin_path: _ }) => {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(vec![PreviewGroup::from(
+                    None,
                     None,
                     self.songs_dir.to_list_items(&context.config),
                 )]);
