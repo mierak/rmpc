@@ -24,6 +24,7 @@ lists they are listed as multiple entries.
 - Add new global keybinds for Update and Rescan actions.
 - addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
 - introduced `preview_label_style` and `preview_metadata_group_style` in theme config
+- added support for soundcloud to `addyt`
 
 ### Changed
 
@@ -35,6 +36,7 @@ lists they are listed as multiple entries.
 - Migrate to Rust 2024 and raise MSRV to 1.85
 - refactor `DirOrSong` to a separate file
 - Lyrics will be wrapped if it is longer than the pane width
+- Refactored yt-dlp to make it easier to add support for more hosts
 
 ### Fixed
 

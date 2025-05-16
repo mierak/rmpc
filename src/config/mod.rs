@@ -49,7 +49,7 @@ use crate::{
 pub struct Config {
     pub address: MpdAddress,
     pub password: Option<MpdPassword>,
-    pub cache_dir: Option<String>,
+    pub cache_dir: Option<PathBuf>,
     pub lyrics_dir: Option<String>,
     pub volume_step: u8,
     pub max_fps: u32,
@@ -83,7 +83,7 @@ pub struct ConfigFile {
     #[serde(default)]
     password: Option<String>,
     #[serde(default)]
-    cache_dir: Option<String>,
+    cache_dir: Option<PathBuf>,
     #[serde(default)]
     lyrics_dir: Option<String>,
     #[serde(default)]
@@ -329,7 +329,7 @@ impl ConfigFile {
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme_name: self.theme,
-            cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),
+            cache_dir: self.cache_dir,
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
