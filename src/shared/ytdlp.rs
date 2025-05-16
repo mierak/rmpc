@@ -1,6 +1,12 @@
-use std::{os::unix::ffi::OsStrExt, path::PathBuf, process::Command, str::FromStr};
+use std::{
+    io::ErrorKind,
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+    process::Command,
+    str::FromStr,
+};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use itertools::Itertools;
 use rustix::path::Arg;
 
@@ -11,19 +17,17 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct YtDlp {
-    pub cache_dir: String,
+pub struct YtDlp<'a> {
+    pub cache_dir: &'a Path,
 }
 
-impl YtDlp {
-    pub fn new(cache_dir: &str) -> Result<Self> {
-        let cache_dir = format!("{cache_dir}youtube/");
-
+impl<'a> YtDlp<'a> {
+    fn new(cache_dir: &'a Path) -> Result<Self> {
         if which::which("yt-dlp").is_err() {
             bail!("yt-dlp was not found on PATH. Please install yt-dlp and try again.")
         }
 
-        std::fs::create_dir_all(&cache_dir)?;
+        std::fs::create_dir_all(cache_dir)?;
         Ok(Self { cache_dir })
     }
 
@@ -48,28 +52,28 @@ impl YtDlp {
     }
 
     pub fn download(&self, url: &str) -> Result<String> {
-        let id: VideoId = url.parse()?;
+        let id: YtDlpHost = url.parse()?;
 
-        if let Some(cached_file) = id.get_cached(&self.cache_dir)? {
+        if let Some(cached_file) = id.get_cached(self.cache_dir)? {
             log::debug!(file:? = cached_file.as_str(); "Youtube video already downloaded");
             return Ok(cached_file.as_str()?.to_string());
         }
 
-        let output = format!("{}%(id)s.%(ext)s", self.cache_dir);
+        let mut cache = id.cache_subdir(self.cache_dir);
+        std::fs::create_dir_all(&cache)?;
+        cache.push(format!("{}.%(ext)s", id.filename));
 
         let mut command = Command::new("yt-dlp");
-        command.args([
-            "-x",
-            "--embed-thumbnail",
-            "--embed-metadata",
-            "-f",
-            "bestaudio",
-            "--convert-thumbnails",
-            "jpg",
-            "--output",
-            &output,
-            &format!("https://www.youtube.com/watch?v={}", id.0),
-        ]);
+        command.arg("-x");
+        command.arg("--embed-thumbnail");
+        command.arg("--embed-metadata");
+        command.arg("-f");
+        command.arg("bestaudio");
+        command.arg("--convert-thumbnails");
+        command.arg("jpg");
+        command.arg("--output");
+        command.arg(cache);
+        command.arg(id.to_url());
         let args = command
             .get_args()
             .map(|arg| format!("\"{}\"", arg.to_string_lossy()))
@@ -85,7 +89,7 @@ impl YtDlp {
 
         if exit_code != Some(0) {
             log::error!(stderr = stderr.as_str().trim();"yt-dlp failed");
-            if let Err(err) = id.delete_cached(&self.cache_dir) {
+            if let Err(err) = id.delete_cached(self.cache_dir) {
                 log::error!(err = err.to_string().as_str(); "Failed to cleanup after yt-dlp failed");
             }
             bail!(
@@ -99,49 +103,80 @@ impl YtDlp {
         // having different extensions than the one specified so we work
         // around it by trying to find the file in the cache directory as that
         // should still be reliable.
-        id.get_cached(&self.cache_dir)?
+        id.get_cached(self.cache_dir)?
             .map(|v| -> Result<_> { Ok(v.as_str()?.to_string()) })
             .transpose()?
             .ok_or_else(|| anyhow!("yt-dlp failed to download video"))
     }
 }
 
-struct VideoId(String);
+struct YtDlpHost {
+    /// id of the video/audio, to be used in the url
+    id: String,
+    /// filename of the video/audio, will be used to cache the file
+    filename: String,
+    kind: YtDlpHostKind,
+}
 
-impl VideoId {
-    pub fn get_cached(&self, cache_dir: &str) -> Result<Option<PathBuf>> {
-        Ok(std::fs::read_dir(cache_dir)?
-            .filter_map(std::result::Result::ok)
-            .map(|v| v.path())
-            .find(|v| {
-                v.is_file()
-                    && v.file_name().as_ref().is_some_and(|v| {
-                        v.as_bytes()
-                            .windows(self.0.len())
-                            // NOTE this will likely be a problem if we ever
-                            // decide to support
-                            // windows at some point
-                            .any(|window| window == self.0.as_bytes())
-                    })
-            }))
+impl YtDlpHost {
+    fn to_url(&self) -> String {
+        match self.kind {
+            YtDlpHostKind::Youtube => format!("https://www.youtube.com/watch?v={}", self.id),
+            YtDlpHostKind::Soundcloud => format!("https://soundcloud.com/{}", self.id),
+        }
     }
 
-    pub fn delete_cached(&self, cache_dir: &str) -> Result<Vec<PathBuf>> {
-        let files = std::fs::read_dir(cache_dir)?
-            .filter_map(std::result::Result::ok)
-            .map(|v| v.path())
-            .filter(|v| {
-                v.is_file()
-                    && v.file_name().as_ref().is_some_and(|v| {
-                        v.as_bytes()
-                            .windows(self.0.len())
-                            // NOTE this will likely be a problem if we ever
-                            // decide to support
-                            // windows at some point
-                            .any(|window| window == self.0.as_bytes())
+    fn cache_subdir(&self, path: &Path) -> PathBuf {
+        path.join(match self.kind {
+            YtDlpHostKind::Youtube => "youtube",
+            YtDlpHostKind::Soundcloud => "soundcloud",
+        })
+    }
+
+    pub fn get_cached(&self, cache_dir: &Path) -> Result<Option<PathBuf>> {
+        Ok(match std::fs::read_dir(self.cache_subdir(cache_dir)) {
+            Ok(result) => {
+                result.filter_map(std::result::Result::ok).map(|v| v.path()).find(|v| {
+                    v.is_file()
+                        && v.file_name().as_ref().is_some_and(|v| {
+                            v.as_bytes()
+                                .windows(self.filename.len())
+                                // NOTE this will likely be a problem if we ever decide to support
+                                // windows at some point
+                                .any(|window| window == self.filename.as_bytes())
+                        })
+                })
+            }
+            Err(err) if matches!(err.kind(), ErrorKind::NotFound) => None,
+            Err(err) => {
+                Err(anyhow!("Encountered error when reading cached yt-dlp file. Error: {}", err))?
+            }
+        })
+    }
+
+    pub fn delete_cached(&self, cache_dir: &Path) -> Result<Vec<PathBuf>> {
+        let files = match std::fs::read_dir(self.cache_subdir(cache_dir)) {
+            Ok(result) => {
+                result
+                    .filter_map(std::result::Result::ok)
+                    .map(|v| v.path())
+                    .filter(|v| {
+                        v.is_file()
+                            && v.file_name().as_ref().is_some_and(|v| {
+                                v.as_bytes()
+                                    .windows(self.filename.len())
+                                    // NOTE this will likely be a problem if we ever decide to
+                                    // support windows at some point
+                                    .any(|window| window == self.filename.as_bytes())
+                            })
                     })
-            })
-            .collect();
+                    .collect()
+            }
+            Err(err) if matches!(err.kind(), ErrorKind::NotFound) => Vec::new(),
+            Err(err) => {
+                Err(anyhow!("Encountered error when deleting cached yt-dlp file. Error: {}", err))?
+            }
+        };
 
         for file in &files {
             std::fs::remove_file(file)?;
@@ -151,31 +186,56 @@ impl VideoId {
     }
 }
 
-impl FromStr for VideoId {
+enum YtDlpHostKind {
+    Youtube,
+    Soundcloud,
+}
+
+impl FromStr for YtDlpHost {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let url = url::Url::parse(s)?;
 
         let Some(host) = url.host_str() else {
-            bail!("Invalid youtube video url: '{}'. No hostname found.", s,);
+            bail!("Invalid yt-dlp url: '{}'. No hostname found.", s);
         };
 
-        if !host.contains("youtube.com") {
-            bail!("Invalid youtube video url: '{}'. Received hostname: '{}'", s, host);
+        match host {
+            "www.youtube.com" | "youtube.com" => {
+                let is_watch_url = url
+                    .path_segments()
+                    .with_context(|| format!("Invalid youtube video url: '{s}'"))?
+                    .contains("watch");
+
+                if !is_watch_url {
+                    bail!("Invalid youtube video url: '{}'", s);
+                }
+
+                url.query_pairs()
+                    .find(|(k, _)| k == "v")
+                    .map(|(_, v)| YtDlpHost {
+                        id: v.to_string(),
+                        filename: v.to_string(),
+                        kind: YtDlpHostKind::Youtube,
+                    })
+                    .ok_or_else(|| anyhow!("No video id found in url"))
+            }
+            "soundcloud.com" => {
+                let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
+                let Some(username) = path_segments.next() else {
+                    bail!("Invalid soundcloud url, no username: '{}'", s);
+                };
+                let Some(track_name) = path_segments.next() else {
+                    bail!("Invalid soundcloud url, no track name: '{}'", s);
+                };
+                Ok(YtDlpHost {
+                    id: format!("{username}/{track_name}"),
+                    filename: format!("{username}-{track_name}"),
+                    kind: YtDlpHostKind::Soundcloud,
+                })
+            }
+            _ => bail!("Invalid yt-dlp url: '{}'. Received hostname: '{}'", s, host),
         }
-
-        let Some(segments) = url.path_segments().map(Itertools::collect_vec) else {
-            bail!("Invalid youtube video url: '{}'", s);
-        };
-
-        if !segments.contains(&"watch") {
-            bail!("Invalid youtube video url: '{}'", s);
-        }
-
-        url.query_pairs()
-            .find(|(k, _)| k == "v")
-            .map(|(_, v)| Self(v.to_string()))
-            .ok_or_else(|| anyhow!("No video id found in url"))
     }
 }

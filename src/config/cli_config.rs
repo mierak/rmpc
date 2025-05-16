@@ -12,7 +12,7 @@ pub struct CliConfigFile {
     #[serde(default)]
     password: Option<String>,
     #[serde(default)]
-    cache_dir: Option<String>,
+    cache_dir: Option<PathBuf>,
     #[serde(default)]
     lyrics_dir: Option<String>,
 }
@@ -21,7 +21,7 @@ pub struct CliConfigFile {
 pub struct CliConfig {
     pub address: MpdAddress,
     pub password: Option<MpdPassword>,
-    pub cache_dir: Option<String>,
+    pub cache_dir: Option<PathBuf>,
     pub lyrics_dir: Option<String>,
 }
 
@@ -76,7 +76,7 @@ impl CliConfigFile {
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
 
         CliConfig {
-            cache_dir: self.cache_dir.map(|v| if v.ends_with('/') { v } else { format!("{v}/") }),
+            cache_dir: self.cache_dir,
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
