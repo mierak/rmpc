@@ -25,6 +25,7 @@ lists they are listed as multiple entries.
 - addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
 - introduced `preview_label_style` and `preview_metadata_group_style` in theme config
 - added support for soundcloud to `addyt`
+- added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
 
 ### Changed
 
