@@ -11,7 +11,7 @@ use crate::{
     MpdQueryResult,
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
-    mpd::{client::Client, commands::Song},
+    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -330,6 +330,35 @@ where
                 self.add_all(context)?;
             }
             CommonAction::AddAll => {}
+            CommonAction::AddReplace if !self.stack().current().marked().is_empty() => {
+                context.command(|client| {
+                    client.clear();
+                    Ok(())
+                });
+                for idx in self.stack().current().marked() {
+                    let item = &self.stack().current().items[*idx];
+                    self.add(item, context)?;
+                }
+
+                context.render()?;
+            }
+            CommonAction::AddReplace => {
+                context.command(|client| {
+                    client.clear();
+                    Ok(())
+                });
+                if let Some(item) = self.stack().current().selected() {
+                    self.add(item, context);
+                }
+            }
+            CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
+                context.command(|client| {
+                    client.clear()?;
+                    Ok(())
+                });
+                self.add_all(context)?;
+            }
+            CommonAction::AddAllReplace => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];

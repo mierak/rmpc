@@ -344,13 +344,15 @@ pub enum CommonActionFile {
     PreviousResult,
     Select,
     InvertSelection,
-    Add,
     Delete,
     Rename,
     Close,
     Confirm,
     FocusInput,
+    Add,
     AddAll,
+    AddReplace,
+    AddAllReplace,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
@@ -376,13 +378,15 @@ pub enum CommonAction {
     PreviousResult,
     Select,
     InvertSelection,
-    Add,
     Delete,
     Rename,
     Close,
     Confirm,
     FocusInput,
+    Add,
     AddAll,
+    AddReplace,
+    AddAllReplace,
 }
 
 impl ToDescription for CommonAction {
@@ -407,8 +411,6 @@ impl ToDescription for CommonAction {
                 "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist"
             }
             CommonAction::InvertSelection => "Inverts the current selected items",
-            CommonAction::Add => "Add item to queue",
-            CommonAction::AddAll => "Add all items to queue",
             CommonAction::Delete => {
                 "Delete. For example a playlist, song from a playlist or wipe the current queue"
             }
@@ -426,6 +428,10 @@ impl ToDescription for CommonAction {
             CommonAction::PaneUp => "Focus the pane above the current one",
             CommonAction::PaneRight => "Focus the pane to the right of the current one",
             CommonAction::PaneLeft => "Focus the pane to the left of the current one",
+            CommonAction::Add => "Add item to queue",
+            CommonAction::AddAll => "Add all items to queue",
+            CommonAction::AddReplace => "Replace current queue with the item",
+            CommonAction::AddAllReplace => "Replace current queue with all items",
         }.into()
     }
 }
@@ -461,6 +467,8 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::PaneDown => CommonAction::PaneDown,
             CommonActionFile::PaneLeft => CommonAction::PaneLeft,
             CommonActionFile::PaneRight => CommonAction::PaneRight,
+            CommonActionFile::AddReplace => CommonAction::AddReplace,
+            CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
         }
     }
 }

@@ -867,6 +867,7 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
+                        CommonAction::Add => {}
                         CommonAction::AddAll => {
                             self.search_add(context);
 
@@ -874,8 +875,19 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
+                        CommonAction::AddReplace => {}
+                        CommonAction::AddAllReplace => {
+                            context.command(|client| {
+                                client.clear()?;
+                                Ok(())
+                            });
+                            self.search_add(context);
+
+                            status_info!("All found songs added to queue");
+
+                            context.render()?;
+                        }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => {}
                         CommonAction::Delete => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
                                 textbox.value.clear();
@@ -1045,6 +1057,23 @@ impl Pane for SearchPane {
                         CommonAction::FocusInput => {}
                         CommonAction::Add => self.add_current(false, context)?,
                         CommonAction::AddAll => {
+                            self.search_add(context);
+                            status_info!("All found songs added to queue");
+
+                            context.render()?;
+                        }
+                        CommonAction::AddReplace => {
+                            context.command(|client| {
+                                client.clear()?;
+                                Ok(())
+                            });
+                            self.add_current(false, context)?;
+                        }
+                        CommonAction::AddAllReplace => {
+                            context.command(|client| {
+                                client.clear()?;
+                                Ok(())
+                            });
                             self.search_add(context);
                             status_info!("All found songs added to queue");
 
