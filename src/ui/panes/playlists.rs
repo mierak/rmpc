@@ -88,7 +88,7 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                self.add(selected, context)?;
+                self.add(selected, context, false)?;
                 let queue_len = context.queue.len();
                 if autoplay {
                     context.command(move |client| Ok(client.play_last(queue_len)?));
@@ -381,7 +381,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add_all(&self, context: &AppContext) -> Result<()> {
+    fn add_all(&self, context: &AppContext, insert: bool) -> Result<()> {
         match self.stack().path() {
             [playlist] => {
                 let playlist = playlist.clone();
@@ -393,7 +393,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             }
             [] => {
                 for playlist in &self.stack().current().items {
-                    self.add(playlist, context)?;
+                    self.add(playlist, context, insert)?;
                 }
                 status_info!("All playlists added to queue");
             }
@@ -403,7 +403,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
+    fn add(&self, item: &DirOrSong, context: &AppContext, insert: bool) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 let d = d.clone();
@@ -420,7 +420,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 let title_text =
                     s.title_str(&context.config.theme.format_tag_separator).into_owned();
                 context.command(move |client| {
-                    client.add(&file)?;
+                    client.add(&file, insert)?;
                     if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
                         status_info!("'{}' by '{}' added to queue", title_text, artist_text);
                     }

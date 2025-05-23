@@ -40,8 +40,8 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add(&self, item: &T, context: &AppContext) -> Result<()>;
-    fn add_all(&self, context: &AppContext) -> Result<()>;
+    fn add(&self, item: &T, context: &AppContext, insert: bool) -> Result<()>;
+    fn add_all(&self, context: &AppContext, insert: bool) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn delete(&self, item: &T, index: usize, context: &AppContext) -> Result<()> {
         Ok(())
@@ -171,7 +171,7 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        self.add(item, context)?;
+                        self.add(item, context, false)?;
                     }
 
                     self.prepare_preview(context);
@@ -315,19 +315,19 @@ where
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context)?;
+                    self.add(item, context, false)?;
                 }
 
                 context.render()?;
             }
             CommonAction::Add => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context);
+                    self.add(item, context, false);
                 }
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
                 log::debug!("add all");
-                self.add_all(context)?;
+                self.add_all(context, false)?;
             }
             CommonAction::AddAll => {}
             CommonAction::AddReplace if !self.stack().current().marked().is_empty() => {
@@ -337,7 +337,7 @@ where
                 });
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context)?;
+                    self.add(item, context, false)?;
                 }
 
                 context.render()?;
@@ -348,7 +348,7 @@ where
                     Ok(())
                 });
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context);
+                    self.add(item, context, false);
                 }
             }
             CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
@@ -356,9 +356,27 @@ where
                     client.clear()?;
                     Ok(())
                 });
-                self.add_all(context)?;
+                self.add_all(context, false)?;
             }
             CommonAction::AddAllReplace => {}
+            CommonAction::Insert if !self.stack().current().marked().is_empty() => {
+                for idx in self.stack().current().marked() {
+                    let item = &self.stack().current().items[*idx];
+                    self.add(item, context, true)?;
+                }
+
+                context.render()?;
+            }
+            CommonAction::Insert => {
+                if let Some(item) = self.stack().current().selected() {
+                    self.add(item, context, true);
+                }
+            }
+            CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
+                log::debug!("add all next");
+                self.add_all(context, true)?;
+            }
+            CommonAction::InsertAll => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];

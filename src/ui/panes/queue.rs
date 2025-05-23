@@ -769,6 +769,8 @@ impl Pane for QueuePane {
                 }
                 CommonAction::Add => {}
                 CommonAction::AddAll => {}
+                CommonAction::Insert => {}
+                CommonAction::InsertAll => {}
                 CommonAction::AddReplace => {}
                 CommonAction::AddAllReplace => {}
                 CommonAction::Delete => {}

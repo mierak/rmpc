@@ -131,7 +131,7 @@ pub trait MpdClient: Sized {
     fn unmount(&mut self, name: &str) -> MpdResult<()>;
     fn list_mounts(&mut self) -> MpdResult<Mounts>;
     // Current queue
-    fn add(&mut self, path: &str) -> MpdResult<()>;
+    fn add(&mut self, path: &str, insert: bool) -> MpdResult<()>;
     fn clear(&mut self) -> MpdResult<()>;
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
@@ -141,11 +141,16 @@ pub trait MpdClient: Sized {
     fn move_in_queue(&mut self, from: SingleOrRange, to: QueueMoveTarget) -> MpdResult<()>;
     fn move_id(&mut self, id: u32, to: QueueMoveTarget) -> MpdResult<()>;
     fn find_one(&mut self, filter: &[Filter<'_>]) -> MpdResult<Option<Song>>;
-    fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
-    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
+    fn find_add(&mut self, filter: &[Filter<'_>], insert: bool) -> MpdResult<()>;
+    fn search_add(&mut self, filter: &[Filter<'_>], insert: bool) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
     // Database
-    fn add_random_songs(&mut self, count: usize, filter: Option<&[Filter<'_>]>) -> MpdResult<()>;
+    fn add_random_songs(
+        &mut self,
+        count: usize,
+        filter: Option<&[Filter<'_>]>,
+        insert: bool,
+    ) -> MpdResult<()>;
     fn add_random_tag(&mut self, count: usize, tag: Tag) -> MpdResult<()>;
     /// Do not use this unless absolutely necessary
     fn list_all(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
@@ -418,8 +423,9 @@ impl MpdClient for Client<'_> {
     }
 
     // Current queue
-    fn add(&mut self, uri: &str) -> MpdResult<()> {
-        self.send(&format!("add {}", uri.quote_and_escape())).and_then(read_ok)
+    fn add(&mut self, uri: &str, insert: bool) -> MpdResult<()> {
+        let position_arg = if insert { " +0" } else { "" };
+        self.send(&format!("add {}{position_arg}", uri.quote_and_escape())).and_then(read_ok)
     }
 
     fn clear(&mut self) -> MpdResult<()> {
@@ -497,18 +503,21 @@ impl MpdClient for Client<'_> {
         Ok(songs.pop())
     }
 
-    fn find_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
-        self.send(&format!("findadd \"({})\"", filter.to_query_str())).and_then(read_ok)
+    fn find_add(&mut self, filter: &[Filter<'_>], insert: bool) -> MpdResult<()> {
+        let position_arg = if insert { " position +0" } else { "" };
+        self.send(&format!("findadd \"({})\"{position_arg}", filter.to_query_str()))
+            .and_then(read_ok)
     }
 
     /// Search the database for songs matching FILTER (see Filters) AND add them
     /// to queue. Parameters have the same meaning as for find, except that
     /// search is not case sensitive.
-    fn search_add(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {
+    fn search_add(&mut self, filter: &[Filter<'_>], insert: bool) -> MpdResult<()> {
         let query = filter.to_query_str();
         let query = query.as_str();
+        let position_arg = if insert { " position +0" } else { "" };
         log::debug!(query; "Searching for songs and adding them");
-        self.send(&format!("searchadd \"({query})\"")).and_then(read_ok)
+        self.send(&format!("searchadd \"({query})\"{position_arg}")).and_then(read_ok)
     }
 
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
@@ -521,7 +530,12 @@ impl MpdClient for Client<'_> {
     }
 
     #[allow(clippy::needless_range_loop)]
-    fn add_random_songs(&mut self, count: usize, filter: Option<&[Filter<'_>]>) -> MpdResult<()> {
+    fn add_random_songs(
+        &mut self,
+        count: usize,
+        filter: Option<&[Filter<'_>]>,
+        insert: bool,
+    ) -> MpdResult<()> {
         let mut result = if let Some(filter) = filter {
             self.find(filter)?.into_iter().map(|song| song.file).collect_vec()
         } else {
@@ -536,9 +550,11 @@ impl MpdClient for Client<'_> {
         }
         result.shuffle(&mut rand::rng());
 
+        let position_arg = if insert { " +0" } else { "" };
+
         self.start_cmd_list()?;
         for i in 0..count {
-            self.send(&format!("add {}", result[i].quote_and_escape()))?;
+            self.send(&format!("add {}{position_arg}", result[i].quote_and_escape()))?;
         }
         self.execute_cmd_list().and_then(read_ok)
     }

@@ -36,6 +36,8 @@ pub enum Command {
     AddRandom {
         tag: AddRandom,
         count: usize,
+        #[arg(short, long, default_value = "false")]
+        insert: bool,
     },
     /// Prints the default config. Can be used to bootstrap your config file.
     Config {
@@ -143,10 +145,14 @@ pub enum Command {
         /// this behaviour and rmpc will try to add all the files
         #[arg(long = "skip-ext-check", default_value = "false")]
         skip_ext_check: bool,
+        #[arg(short, long, default_value = "false")]
+        insert: bool,
     },
     /// Add a song from youtube to the current queue.
     AddYt {
         url: String,
+        #[arg(short, long, default_value = "false")]
+        insert: bool,
     },
     /// List MPD outputs
     Outputs,

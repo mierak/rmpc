@@ -32,10 +32,10 @@ impl Command {
             Command::Version => bail!("Cannot use version command here."),
             Command::DebugInfo => bail!("Cannot use debuginfo command here."),
             Command::Remote { .. } => bail!("Cannot use remote command here."),
-            Command::AddRandom { tag, count } => Ok(Box::new(move |client| {
+            Command::AddRandom { tag, count, insert } => Ok(Box::new(move |client| {
                 match tag {
                     AddRandom::Song => {
-                        client.add_random_songs(count, None)?;
+                        client.add_random_songs(count, None, insert)?;
                     }
                     AddRandom::Artist => {
                         client.add_random_tag(count, Tag::Artist)?;
@@ -127,7 +127,7 @@ impl Command {
                 Ok(Box::new(move |client| Ok(client.seek_current(value.parse()?)?)))
             }
             Command::Clear => Ok(Box::new(|client| Ok(client.clear()?))),
-            Command::Add { files, skip_ext_check }
+            Command::Add { files, skip_ext_check, insert }
                 if files.iter().any(|path| path.is_absolute()) =>
             {
                 Ok(Box::new(move |client| {
@@ -169,26 +169,27 @@ impl Command {
                                     .trim_start_matches(&dir)
                                     .trim_start_matches('/')
                                     .trim_end_matches('/'),
+                                insert,
                             )?;
                         } else {
-                            client.add(&file.to_string_lossy())?;
+                            client.add(&file.to_string_lossy(), insert)?;
                         }
                     }
 
                     Ok(())
                 }))
             }
-            Command::Add { files, .. } => Ok(Box::new(move |client| {
+            Command::Add { files, insert, .. } => Ok(Box::new(move |client| {
                 for file in &files {
-                    client.add(&file.to_string_lossy())?;
+                    client.add(&file.to_string_lossy(), insert)?;
                 }
 
                 Ok(())
             })),
-            Command::AddYt { url } => {
+            Command::AddYt { url, insert } => {
                 let file_path = YtDlp::init_and_download(config, &url)?;
                 status_info!("file path {file_path}");
-                Ok(Box::new(move |client| match client.add(&file_path) {
+                Ok(Box::new(move |client| match client.add(&file_path, insert) {
                     Ok(()) => {
                         status_info!("File '{file_path}' added to the queue");
                         Ok(())
