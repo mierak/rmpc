@@ -95,7 +95,7 @@
             name: "Browser",
             pane: Split(
                 direction: Horizontal,
-                panes: [(size: "100%", borders: "ALL", pane: Pane(Browser(root_tag: "4s4ski")))],
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Browser(root_tag: "Artist")))],
             ),
         ),
         (
