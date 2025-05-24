@@ -1,7 +1,13 @@
+// NOTE: This file is also included from build.rs. crate:: may mean any of
+// build.rs or main.rs, so remember to replicate the crate imports in build.rs,
+// by using the `#[path = ""]` attribute for `mod`.
+
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 use strum::IntoStaticStr;
+
+use crate::mpd::QueuePosition;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -143,10 +149,18 @@ pub enum Command {
         /// this behaviour and rmpc will try to add all the files
         #[arg(long = "skip-ext-check", default_value = "false")]
         skip_ext_check: bool,
+        /// If provided, queue the new item at this position. Possible positions
+        /// are <number> absolute +<number> and -<number> for relative positions
+        #[arg(short, long)]
+        position: Option<QueuePosition>,
     },
     /// Add a song from youtube to the current queue.
     AddYt {
         url: String,
+        /// If provided, queue the new item at this position. Possible positions
+        /// are <number> absolute +<number> and -<number> for relative positions
+        #[arg(short, long)]
+        position: Option<QueuePosition>,
     },
     /// List MPD outputs
     Outputs,

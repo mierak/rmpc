@@ -127,7 +127,7 @@ impl Command {
                 Ok(Box::new(move |client| Ok(client.seek_current(value.parse()?)?)))
             }
             Command::Clear => Ok(Box::new(|client| Ok(client.clear()?))),
-            Command::Add { files, skip_ext_check }
+            Command::Add { files, skip_ext_check, position }
                 if files.iter().any(|path| path.is_absolute()) =>
             {
                 Ok(Box::new(move |client| {
@@ -169,26 +169,27 @@ impl Command {
                                     .trim_start_matches(&dir)
                                     .trim_start_matches('/')
                                     .trim_end_matches('/'),
+                                position.clone(),
                             )?;
                         } else {
-                            client.add(&file.to_string_lossy())?;
+                            client.add(&file.to_string_lossy(), position.clone())?;
                         }
                     }
 
                     Ok(())
                 }))
             }
-            Command::Add { files, .. } => Ok(Box::new(move |client| {
+            Command::Add { files, position, .. } => Ok(Box::new(move |client| {
                 for file in &files {
-                    client.add(&file.to_string_lossy())?;
+                    client.add(&file.to_string_lossy(), position.clone())?;
                 }
 
                 Ok(())
             })),
-            Command::AddYt { url } => {
+            Command::AddYt { url, position } => {
                 let file_path = YtDlp::init_and_download(config, &url)?;
                 status_info!("file path {file_path}");
-                Ok(Box::new(move |client| match client.add(&file_path) {
+                Ok(Box::new(move |client| match client.add(&file_path, position) {
                     Ok(()) => {
                         status_info!("File '{file_path}' added to the queue");
                         Ok(())

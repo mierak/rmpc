@@ -17,6 +17,7 @@ use crate::{
     context::AppContext,
     core::command::{create_env, run_external},
     mpd::{
+        QueuePosition,
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
@@ -75,12 +76,18 @@ impl SearchPane {
         }
     }
 
-    fn add_current(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
+    fn add_current(
+        &mut self,
+        autoplay: bool,
+        context: &AppContext,
+        position: Option<QueuePosition>,
+    ) -> Result<()> {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
                 let item = self.songs_dir.items[*idx].file.clone();
+                let position = position.clone();
                 context.command(move |client| {
-                    client.add(&item)?;
+                    client.add(&item, position)?;
                     Ok(())
                 });
             }
@@ -90,7 +97,7 @@ impl SearchPane {
         } else if let Some(item) = self.songs_dir.selected() {
             let item = item.file.clone();
             context.command(move |client| {
-                client.add(&item)?;
+                client.add(&item, position)?;
                 status_info!("Added '{item}' to queue");
                 Ok(())
             });
@@ -316,7 +323,7 @@ impl SearchPane {
         })
     }
 
-    fn search_add(&mut self, context: &AppContext) {
+    fn search_add(&mut self, context: &AppContext, position: Option<QueuePosition>) {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
@@ -340,6 +347,7 @@ impl SearchPane {
                             Filter::new(std::mem::take(key), value).with_type(*kind)
                         })
                         .collect_vec(),
+                    position,
                 )?;
                 Ok(())
             });
@@ -352,6 +360,7 @@ impl SearchPane {
                             Filter::new(std::mem::take(key), value).with_type(*kind)
                         })
                         .collect_vec(),
+                    position,
                 )?;
                 Ok(())
             });
@@ -651,7 +660,7 @@ impl Pane for SearchPane {
                         }
                     }
                     Phase::BrowseResults { .. } => {
-                        self.add_current(false, context)?;
+                        self.add_current(false, context, None)?;
                     }
                 }
             }
@@ -689,7 +698,7 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(false, context)?;
+                    self.add_current(false, context, None)?;
                 }
             },
             MouseEventKind::MiddleClick if self.column_areas[1].contains(event.into()) => {
@@ -705,7 +714,7 @@ impl Pane for SearchPane {
                             if let Some(item) = self.songs_dir.selected() {
                                 let item = item.file.clone();
                                 context.command(move |client| {
-                                    client.add(&item)?;
+                                    client.add(&item, None)?;
                                     status_info!("Added '{item}' to queue");
                                     Ok(())
                                 });
@@ -869,7 +878,15 @@ impl Pane for SearchPane {
                         }
                         CommonAction::Add => {}
                         CommonAction::AddAll => {
-                            self.search_add(context);
+                            self.search_add(context, None);
+
+                            status_info!("All found songs added to queue");
+
+                            context.render()?;
+                        }
+                        CommonAction::Insert => {}
+                        CommonAction::InsertAll => {
+                            self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
 
                             status_info!("All found songs added to queue");
 
@@ -881,7 +898,7 @@ impl Pane for SearchPane {
                                 client.clear()?;
                                 Ok(())
                             });
-                            self.search_add(context);
+                            self.search_add(context, None);
 
                             status_info!("All found songs added to queue");
 
@@ -998,7 +1015,7 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Right => self.add_current(false, context)?,
+                        CommonAction::Right => self.add_current(false, context, None)?,
                         CommonAction::Left => {
                             self.phase = Phase::Search;
                             self.prepare_preview(context);
@@ -1050,14 +1067,21 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.add_current(true, context)?;
+                            self.add_current(true, context, None)?;
 
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => self.add_current(false, context)?,
+                        CommonAction::Add => self.add_current(false, context, None)?,
                         CommonAction::AddAll => {
-                            self.search_add(context);
+                            self.search_add(context, None);
+                            status_info!("All found songs added to queue");
+
+                            context.render()?;
+                        }
+                        CommonAction::Insert => self.add_current(false, context, None)?,
+                        CommonAction::InsertAll => {
+                            self.search_add(context, None);
                             status_info!("All found songs added to queue");
 
                             context.render()?;
@@ -1067,14 +1091,14 @@ impl Pane for SearchPane {
                                 client.clear()?;
                                 Ok(())
                             });
-                            self.add_current(false, context)?;
+                            self.add_current(false, context, None)?;
                         }
                         CommonAction::AddAllReplace => {
                             context.command(|client| {
                                 client.clear()?;
                                 Ok(())
                             });
-                            self.search_add(context);
+                            self.search_add(context, None);
                             status_info!("All found songs added to queue");
 
                             context.render()?;
