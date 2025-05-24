@@ -8,14 +8,18 @@ use crate::{
     config::{sort_mode::SortOptions, tabs::PaneType},
     context::AppContext,
     mpd::{
+        QueuePosition,
         client::Client,
         commands::Song,
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt, key_event::KeyEvent, macros::status_info,
-        mouse_event::MouseEvent, mpd_query::PreviewGroup,
+        ext::mpd_client::MpdClientExt,
+        key_event::KeyEvent,
+        macros::status_info,
+        mouse_event::MouseEvent,
+        mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
@@ -60,7 +64,7 @@ impl AlbumsPane {
 
         match self.stack.path() {
             [_album] => {
-                self.add(current, context, false)?;
+                self.add(current, context, None)?;
                 let queue_len = context.queue.len();
                 if autoplay {
                     context.command(move |client| Ok(client.play_last(queue_len)?));
@@ -259,7 +263,12 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn add(&self, item: &DirOrSong, context: &AppContext, insert: bool) -> Result<()> {
+    fn add(
+        &self,
+        item: &DirOrSong,
+        context: &AppContext,
+        position: Option<QueuePosition>,
+    ) -> Result<()> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
@@ -267,7 +276,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                 context.command(move |client| {
                     client.find_add(
                         &[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())],
-                        insert,
+                        position,
                     )?;
 
                     status_info!("'{name}' added to queue");
@@ -277,7 +286,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, &name)], insert)?;
+                    client.find_add(&[Filter::new(Tag::Album, &name)], position)?;
 
                     status_info!("Album '{name}' added to queue");
                     Ok(())
@@ -289,19 +298,19 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         Ok(())
     }
 
-    fn add_all(&self, context: &AppContext, insert: bool) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], insert)?;
+                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], position)?;
                     status_info!("Album '{}' added to queue", album);
                     Ok(())
                 });
             }
             [] => {
                 context.command(move |client| {
-                    client.add("/", insert)?; // add the whole library
+                    client.add("/", position)?; // add the whole library
                     status_info!("All albums added to queue");
                     Ok(())
                 });

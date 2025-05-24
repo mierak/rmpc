@@ -54,6 +54,7 @@ strum = { workspace = true }
 clap_complete = "4.5.45"
 clap_mangen = "0.2.26"
 vergen-gitcl = { version = "1.0.5", features = ["build"] }
+anyhow = "1.0.95"
 
 [dev-dependencies]
 rstest = "0.24.0"

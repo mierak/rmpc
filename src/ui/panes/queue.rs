@@ -22,10 +22,7 @@ use crate::{
     },
     context::AppContext,
     core::command::{create_env, run_external},
-    mpd::{
-        commands::Song,
-        mpd_client::{MpdClient, QueueMoveTarget},
-    },
+    mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         key_event::KeyEvent,
@@ -587,7 +584,7 @@ impl Pane for QueuePane {
                         context.command(move |client| {
                             client.move_in_queue(
                                 range.into(),
-                                QueueMoveTarget::Absolute(new_start_idx),
+                                QueuePosition::Absolute(new_start_idx),
                             )?;
                             Ok(())
                         });
@@ -626,7 +623,7 @@ impl Pane for QueuePane {
                         context.command(move |client| {
                             client.move_in_queue(
                                 range.into(),
-                                QueueMoveTarget::Absolute(new_start_idx),
+                                QueuePosition::Absolute(new_start_idx),
                             )?;
                             Ok(())
                         });
@@ -662,7 +659,7 @@ impl Pane for QueuePane {
                     let new_idx = idx.saturating_sub(1);
                     let id = selected.id;
                     context.command(move |client| {
-                        client.move_id(id, QueueMoveTarget::Absolute(new_idx))?;
+                        client.move_id(id, QueuePosition::Absolute(new_idx))?;
                         Ok(())
                     });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
@@ -686,7 +683,7 @@ impl Pane for QueuePane {
                     let new_idx = (idx + 1).min(context.queue.len() - 1);
                     let id = selected.id;
                     context.command(move |client| {
-                        client.move_id(id, QueueMoveTarget::Absolute(new_idx))?;
+                        client.move_id(id, QueuePosition::Absolute(new_idx))?;
                         Ok(())
                     });
                     self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
@@ -769,7 +766,18 @@ impl Pane for QueuePane {
                 }
                 CommonAction::Add => {}
                 CommonAction::AddAll => {}
-                CommonAction::Insert => {}
+                CommonAction::Insert => {
+                    let song_under_cursor =
+                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx));
+
+                    if let Some(song) = song_under_cursor {
+                        let file = song.file.clone();
+                        context.command(move |client| {
+                            client.add(&file, Some(QueuePosition::RelativeAdd(0)))?;
+                            Ok(())
+                        });
+                    }
+                }
                 CommonAction::InsertAll => {}
                 CommonAction::AddReplace => {}
                 CommonAction::AddAllReplace => {}

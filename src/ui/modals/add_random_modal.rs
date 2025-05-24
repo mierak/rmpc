@@ -94,12 +94,10 @@ impl AddRandomModal<'_> {
         }
     }
 
-    fn add_random(tag: AddRandom, count: &str, ctx: &AppContext, insert: bool) -> Result<()> {
-        Ok(ctx.work_sender.send(WorkRequest::Command(Command::AddRandom {
-            tag,
-            count: count.parse()?,
-            insert,
-        }))?)
+    fn add_random(tag: AddRandom, count: &str, ctx: &AppContext) -> Result<()> {
+        Ok(ctx
+            .work_sender
+            .send(WorkRequest::Command(Command::AddRandom { tag, count: count.parse()? }))?)
     }
 }
 
@@ -183,7 +181,7 @@ impl Modal for AddRandomModal<'_> {
                     context.render()?;
                     return Ok(());
                 } else if let Some(CommonAction::Confirm) = action {
-                    Self::add_random(self.selected_tag, &self.count, context, false)?;
+                    Self::add_random(self.selected_tag, &self.count, context)?;
                     pop_modal!(context);
                     return Ok(());
                 }
@@ -280,7 +278,7 @@ impl Modal for AddRandomModal<'_> {
                     }
                     CommonAction::Confirm => {
                         if state.selected == 0 {
-                            Self::add_random(self.selected_tag, &self.count, context, false)?;
+                            Self::add_random(self.selected_tag, &self.count, context)?;
                         }
                         pop_modal!(context);
                     }
@@ -329,7 +327,7 @@ impl Modal for AddRandomModal<'_> {
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        Self::add_random(self.selected_tag, &self.count, context, false)?;
+                        Self::add_random(self.selected_tag, &self.count, context)?;
                         pop_modal!(context);
                     }
                     Some(_) => {
