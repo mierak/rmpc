@@ -26,6 +26,7 @@ lists they are listed as multiple entries.
 - introduced `preview_label_style` and `preview_metadata_group_style` in theme config
 - added support for soundcloud to `addyt`
 - added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
+- Add Nord community theme
 
 ### Changed
 
