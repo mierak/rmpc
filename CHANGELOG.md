@@ -33,6 +33,7 @@ lists they are listed as multiple entries.
 - Add Nord community theme
 - Add `center_current_song_on_change` to center song in the queue when it changes
 - Added `togglerandom`, `togglesingle`, `togglerepeat` and `toggleconsume` CLI commands
+- Added `ToggleSingleOnOff` and `ToggleConsumeOnOff` global actions which skip oneshot for their respective mode
  
 ### Changed
 
