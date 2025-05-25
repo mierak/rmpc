@@ -151,7 +151,7 @@ pub enum Command {
         skip_ext_check: bool,
         /// If provided, queue the new item at this position. Possible positions
         /// are <number> absolute +<number> and -<number> for relative positions
-        #[arg(short, long)]
+        #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
     /// Add a song from youtube to the current queue.
@@ -159,7 +159,7 @@ pub enum Command {
         url: String,
         /// If provided, queue the new item at this position. Possible positions
         /// are <number> absolute +<number> and -<number> for relative positions
-        #[arg(short, long)]
+        #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
     /// List MPD outputs
