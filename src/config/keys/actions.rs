@@ -273,6 +273,7 @@ pub enum QueueActionsFile {
     AddToPlaylist,
     ShowInfo,
     JumpToCurrent,
+    Shuffle,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
@@ -284,6 +285,7 @@ pub enum QueueActions {
     AddToPlaylist,
     ShowInfo,
     JumpToCurrent,
+    Shuffle,
 }
 
 impl From<QueueActionsFile> for QueueActions {
@@ -296,6 +298,7 @@ impl From<QueueActionsFile> for QueueActions {
             QueueActionsFile::AddToPlaylist => QueueActions::AddToPlaylist,
             QueueActionsFile::ShowInfo => QueueActions::ShowInfo,
             QueueActionsFile::JumpToCurrent => QueueActions::JumpToCurrent,
+            QueueActionsFile::Shuffle => QueueActions::Shuffle,
         }
     }
 }
@@ -312,6 +315,7 @@ impl ToDescription for QueueActions {
             QueueActions::JumpToCurrent => {
                 "Moves the cursor in Queue table to the currently playing song"
             }
+            QueueActions::Shuffle => "Shuffles the current queue",
         }
         .into()
     }

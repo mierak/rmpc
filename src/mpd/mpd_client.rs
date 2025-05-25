@@ -150,6 +150,8 @@ pub trait MpdClient: Sized {
         position: Option<QueuePosition>,
     ) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
+    /// Shuffles the current queue.
+    fn shuffle(&mut self, range: Option<SingleOrRange>) -> MpdResult<()>;
     // Database
     fn add_random_songs(&mut self, count: usize, filter: Option<&[Filter<'_>]>) -> MpdResult<()>;
     fn add_random_tag(&mut self, count: usize, tag: Tag) -> MpdResult<()>;
@@ -539,6 +541,14 @@ impl MpdClient for Client<'_> {
             format!("list {}", tag.as_str())
         })
         .and_then(read_response)
+    }
+
+    fn shuffle(&mut self, range: Option<SingleOrRange>) -> MpdResult<()> {
+        if let Some(range) = range {
+            self.send(&format!("shuffle {}", range.as_mpd_range())).and_then(read_ok)
+        } else {
+            self.send("shuffle").and_then(read_ok)
+        }
     }
 
     #[allow(clippy::needless_range_loop)]
