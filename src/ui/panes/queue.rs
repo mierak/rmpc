@@ -137,6 +137,15 @@ impl Pane for QueuePane {
             .iter()
             .enumerate()
             .map(|(idx, song)| {
+                let offset = self.scrolling_state.as_render_state_ref().offset();
+                let viewport_len = self.scrolling_state.viewport_len();
+
+                // Supply default row to skip unnecessary work for rows that are either below or
+                // above the visible portion of the table
+                if idx < offset || viewport_len.is_some_and(|v| idx > v + offset) {
+                    return Row::default();
+                }
+
                 let is_current = context
                     .find_current_song_in_queue()
                     .map(|(_, song)| song.id)

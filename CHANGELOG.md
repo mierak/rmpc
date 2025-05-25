@@ -54,6 +54,7 @@ lists they are listed as multiple entries.
 - Fixed catpuccin theme not being up to date in the docs
 - Handle invalid utf8 characters
 - Improve reconnection behavior of MPD client
+- Improve performance of the queue table by not calculating rows that are not visible
 
 ## [0.8.0] - 2025-02-16
 
