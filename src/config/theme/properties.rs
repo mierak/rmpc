@@ -114,6 +114,14 @@ pub enum StatusPropertyFile {
         #[serde(default = "defaults::default_thousands_separator")]
         thousands_separator: String,
     },
+    QueueTimeTotal {
+        #[serde(default = "defaults::default_time_unit_separator")]
+        separator: String,
+    },
+    QueueTimeRemaining {
+        #[serde(default = "defaults::default_time_unit_separator")]
+        separator: String,
+    },
 }
 
 #[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
@@ -161,6 +169,12 @@ pub enum StatusProperty {
     Bitrate,
     QueueLength {
         thousands_separator: String,
+    },
+    QueueTimeTotal {
+        separator: String,
+    },
+    QueueTimeRemaining {
+        separator: String,
     },
 }
 
@@ -425,6 +439,12 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             },
             StatusPropertyFile::QueueLength { thousands_separator } => {
                 StatusProperty::QueueLength { thousands_separator }
+            }
+            StatusPropertyFile::QueueTimeTotal { separator } => {
+                StatusProperty::QueueTimeTotal { separator }
+            }
+            StatusPropertyFile::QueueTimeRemaining { separator } => {
+                StatusProperty::QueueTimeRemaining { separator }
             }
         })
     }
