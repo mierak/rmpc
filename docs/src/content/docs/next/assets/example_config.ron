@@ -98,7 +98,7 @@
             "d":       Delete,
             "i":       ShowInfo,
             "C":       JumpToCurrent,
-            "Z":       Shuffle,
+            "X":       Shuffle,
         },
     ),
     search: (
