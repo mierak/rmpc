@@ -549,6 +549,22 @@ impl Pane for QueuePane {
                         status_error!("No song selected");
                     }
                 }
+                QueueActions::Shuffle if !self.scrolling_state.marked.is_empty() => {
+                    for range in self.scrolling_state.marked.ranges().rev() {
+                        context.command(move |client| {
+                            client.shuffle(Some(range.into()))?;
+                            Ok(())
+                        });
+                    }
+                    status_info!("Shuffled selected songs");
+                }
+                QueueActions::Shuffle => {
+                    context.command(move |client| {
+                        client.shuffle(None)?;
+                        Ok(())
+                    });
+                    status_info!("Shuffled the queue");
+                }
             }
         } else if let Some(action) = event.as_common_action(context) {
             match action {
