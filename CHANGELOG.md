@@ -22,16 +22,17 @@ All notable changes to this project will be documented in this file.
 lists they are listed as multiple entries.
 - Add new widget `ScanStatus` that indicates if the MPD database is being updated.
 - Add new global keybinds for Update and Rescan actions.
-- addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
-- introduced `preview_label_style` and `preview_metadata_group_style` in theme config
-- added support for soundcloud to `addyt`
-- added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
-- added `Insert` and `InsertAll` actions which work similarly to `Add` and `AddAll` but insert after the playing song
-- added `Shuffle` queue action allowing you to shuffle the whole queue or selected range(s)
-- added `QueueLength` status property which displays number of songs in the current queue
-- added `QueueTimeTotal` and `QueueTimeRemaining` status properties which display sum of time of songs in your queue and of the remaining songs respectively
+- Addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
+- Introduced `preview_label_style` and `preview_metadata_group_style` in theme config
+- Added support for soundcloud to `addyt`
+- Added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
+- Added `Insert` and `InsertAll` actions which work similarly to `Add` and `AddAll` but insert after the playing song
+- Added `Shuffle` queue action allowing you to shuffle the whole queue or selected range(s)
+- Added `QueueLength` status property which displays number of songs in the current queue
+- Added `QueueTimeTotal` and `QueueTimeRemaining` status properties which display sum of time of songs in your queue and of the remaining songs respectively
 - Add Nord community theme
-- add `center_current_song_on_change` to center song in the queue when it changes
+- Add `center_current_song_on_change` to center song in the queue when it changes
+- Added `togglerandom`, `togglesingle`, `togglerepeat` and `toggleconsume` CLI commands
  
 ### Changed
 

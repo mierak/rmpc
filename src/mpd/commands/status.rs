@@ -115,7 +115,7 @@ impl OnOffOneshot {
         }
     }
 
-    pub fn cycle_pre_mpd_24(self) -> Self {
+    pub fn cycle_skip_oneshot(self) -> Self {
         match self {
             OnOffOneshot::On => OnOffOneshot::Off,
             OnOffOneshot::Off => OnOffOneshot::On,

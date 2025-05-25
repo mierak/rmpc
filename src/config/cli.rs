@@ -131,6 +131,22 @@ pub enum Command {
     Consume {
         value: OnOffOneshot,
     },
+    /// Toggles the repeat mode
+    ToggleRepeat,
+    /// Toggles the random mode
+    ToggleRandom,
+    /// Toggles the single mode
+    ToggleSingle {
+        /// Skip the oneshot mode, i.e. toggle between on and off
+        #[arg(short, long = "skip-oneshot")]
+        skip_oneshot: bool,
+    },
+    /// Toggles the consume mode
+    ToggleConsume {
+        /// Skip the oneshot mode, i.e. toggle between on and off
+        #[arg(short, long = "skip-oneshot")]
+        skip_oneshot: bool,
+    },
     /// Seeks current song(seconds), relative if prefixed by + or -
     Seek {
         #[arg(allow_negative_numbers(true))]

@@ -297,7 +297,7 @@ impl<'ui> Ui<'ui> {
                     let single = context.status.single;
                     context.command(move |client| {
                         if client.version() < Version::new(0, 21, 0) {
-                            client.single(single.cycle_pre_mpd_24())?;
+                            client.single(single.cycle_skip_oneshot())?;
                         } else {
                             client.single(single.cycle())?;
                         }
@@ -308,7 +308,7 @@ impl<'ui> Ui<'ui> {
                     let consume = context.status.consume;
                     context.command(move |client| {
                         if client.version() < Version::new(0, 24, 0) {
-                            client.consume(consume.cycle_pre_mpd_24())?;
+                            client.consume(consume.cycle_skip_oneshot())?;
                         } else {
                             client.consume(consume.cycle())?;
                         }
