@@ -98,6 +98,7 @@
             "d":       Delete,
             "i":       ShowInfo,
             "C":       JumpToCurrent,
+            "Z":       Shuffle,
         },
     ),
     search: (
