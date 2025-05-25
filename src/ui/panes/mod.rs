@@ -857,13 +857,17 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
-                    let (current_song_idx, _) = context.find_current_song_in_queue()?;
-                    let sum: Duration = context
-                        .queue
-                        .iter()
-                        .skip(current_song_idx)
-                        .filter_map(|s| s.duration)
-                        .sum();
+                    let sum = context.find_current_song_in_queue().map_or(
+                        Duration::default(),
+                        |(current_song_idx, _)| {
+                            context
+                                .queue
+                                .iter()
+                                .skip(current_song_idx)
+                                .filter_map(|s| s.duration)
+                                .sum()
+                        },
+                    );
                     Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
                 }
             },
