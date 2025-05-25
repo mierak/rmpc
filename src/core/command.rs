@@ -11,7 +11,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::{IdleEvent, mpd_config::MpdConfig, volume::Bound},
+        commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
         mpd_client::{Filter, MpdClient, Tag},
         version::Version,
     },
@@ -100,7 +100,15 @@ impl Command {
                 Ok(Box::new(move |client| Ok(client.play_pos(pos)?)))
             }
             Command::Pause => Ok(Box::new(|client| Ok(client.pause()?))),
-            Command::TogglePause => Ok(Box::new(|client| Ok(client.pause_toggle()?))),
+            Command::TogglePause => Ok(Box::new(|client| {
+                let status = client.get_status()?;
+                if matches!(status.state, State::Play | State::Pause) {
+                    client.pause_toggle()?;
+                } else {
+                    client.play()?;
+                }
+                Ok(())
+            })),
             Command::Unpause => Ok(Box::new(|client| Ok(client.unpause()?))),
             Command::Stop => Ok(Box::new(|client| Ok(client.stop()?))),
             Command::Volume { value: Some(value) } => {
