@@ -292,8 +292,6 @@ impl Pane for QueuePane {
             UiEvent::SongChanged => {
                 if let Some((idx, _)) = context.find_current_song_in_queue() {
                     if context.config.select_current_song_on_change {
-                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
-
                         match (is_visible, context.config.center_current_song_on_change) {
                             (true, true) => {
                                 self.scrolling_state.select(Some(idx), usize::MAX);
