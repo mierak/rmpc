@@ -336,3 +336,41 @@ pub mod vec {
         }
     }
 }
+
+pub mod num {
+    pub trait NumExt {
+        fn with_thousands_separator(self, separator: &str) -> String;
+    }
+
+    impl NumExt for usize {
+        fn with_thousands_separator(self, separator: &str) -> String {
+            let mut buf = String::new();
+            for (idx, c) in self.to_string().chars().rev().enumerate() {
+                if idx % 3 == 0 && idx != 0 {
+                    buf.insert_str(0, separator);
+                }
+                buf.insert(0, c);
+            }
+            buf
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use test_case::test_case;
+
+        use super::*;
+
+        #[test_case(123_456_789, "123,456,789")]
+        #[test_case(789, "789")]
+        #[test_case(6789, "6,789")]
+        #[test_case(1, "1")]
+        #[test_case(0, "0")]
+        #[test_case(99_999_999_999, "99,999,999,999")]
+        fn usize_format(input: usize, expected: &str) {
+            let result = input.with_thousands_separator(",");
+
+            assert_eq!(result, expected);
+        }
+    }
+}

@@ -98,3 +98,7 @@ pub fn default_preview_label_style() -> StyleFile {
 pub fn default_preview_metaga_group_heading_style() -> StyleFile {
     StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: Some(Modifiers::Bold) }
 }
+
+pub fn default_thousands_separator() -> String {
+    ",".to_string()
+}

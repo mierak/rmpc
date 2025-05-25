@@ -52,7 +52,11 @@ use crate::{
         commands::{Song, State, status::OnOffOneshot, volume::Bound},
         mpd_client::Tag,
     },
-    shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
+    shared::{
+        ext::{duration::DurationExt, num::NumExt},
+        key_event::KeyEvent,
+        mouse_event::MouseEvent,
+    },
 };
 
 pub mod album_art;
@@ -842,6 +846,12 @@ impl Property<PropertyKind> {
                     || self.default_as_span(song, context, tag_separator),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
+                StatusProperty::QueueLength { thousands_separator } => {
+                    Some(Either::Left(Span::styled(
+                        context.queue.len().with_thousands_separator(thousands_separator),
+                        style,
+                    )))
+                }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
                 WidgetProperty::Volume => {
