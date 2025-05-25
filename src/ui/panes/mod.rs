@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::Ordering, collections::HashMap};
+use std::{borrow::Cow, cmp::Ordering, collections::HashMap, time::Duration};
 
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
@@ -52,7 +52,11 @@ use crate::{
         commands::{Song, State, status::OnOffOneshot, volume::Bound},
         mpd_client::Tag,
     },
-    shared::{ext::duration::DurationExt, key_event::KeyEvent, mouse_event::MouseEvent},
+    shared::{
+        ext::{duration::DurationExt, num::NumExt},
+        key_event::KeyEvent,
+        mouse_event::MouseEvent,
+    },
 };
 
 pub mod album_art;
@@ -842,6 +846,30 @@ impl Property<PropertyKind> {
                     || self.default_as_span(song, context, tag_separator),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
+                StatusProperty::QueueLength { thousands_separator } => {
+                    Some(Either::Left(Span::styled(
+                        context.queue.len().with_thousands_separator(thousands_separator),
+                        style,
+                    )))
+                }
+                StatusProperty::QueueTimeTotal { separator } => {
+                    let sum: Duration = context.queue.iter().filter_map(|s| s.duration).sum();
+                    Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
+                }
+                StatusProperty::QueueTimeRemaining { separator } => {
+                    let sum = context.find_current_song_in_queue().map_or(
+                        Duration::default(),
+                        |(current_song_idx, _)| {
+                            context
+                                .queue
+                                .iter()
+                                .skip(current_song_idx)
+                                .filter_map(|s| s.duration)
+                                .sum()
+                        },
+                    );
+                    Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
+                }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
                 WidgetProperty::Volume => {

@@ -27,9 +27,10 @@ lists they are listed as multiple entries.
 - added support for soundcloud to `addyt`
 - added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
 - added `Shuffle` queue action allowing you to shuffle the whole queue or selected range(s)
+- added `QueueLength` status property which displays number of songs in the current queue
+- added `QueueTimeTotal` and `QueueTimeRemaining` status properties which display sum of time of songs in your queue and of the remaining songs respectively
 - Add Nord community theme
-
-
+ 
 ### Changed
 
 - **Breaking**: Songs are no longer sorted by their `browser_song_format`. The new `browser_song_sort` is used instead
