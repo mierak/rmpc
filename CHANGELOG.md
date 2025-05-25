@@ -31,6 +31,7 @@ lists they are listed as multiple entries.
 - added `QueueLength` status property which displays number of songs in the current queue
 - added `QueueTimeTotal` and `QueueTimeRemaining` status properties which display sum of time of songs in your queue and of the remaining songs respectively
 - Add Nord community theme
+- add `center_current_song_on_change` to center song in the queue when it changes
  
 ### Changed
 

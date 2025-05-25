@@ -60,6 +60,7 @@ pub struct Config {
     pub enable_config_hot_reload: bool,
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
+    pub center_current_song_on_change: bool,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
@@ -100,6 +101,8 @@ pub struct ConfigFile {
     status_update_interval_ms: Option<u64>,
     #[serde(default = "defaults::default_false")]
     select_current_song_on_change: bool,
+    #[serde(default = "defaults::default_false")]
+    center_current_song_on_change: bool,
     #[serde(default = "defaults::default_read_timeout")]
     mpd_read_timeout_ms: u64,
     #[serde(default = "defaults::default_write_timeout")]
@@ -166,6 +169,7 @@ impl Default for ConfigFile {
             lyrics_dir: None,
             image_method: None,
             select_current_song_on_change: false,
+            center_current_song_on_change: false,
             album_art_max_size_px: Size::default(),
             album_art: AlbumArtConfigFile {
                 disabled_protocols: defaults::disabled_album_art_protos(),
@@ -349,6 +353,7 @@ impl ConfigFile {
             enable_config_hot_reload: self.enable_config_hot_reload,
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
+            center_current_song_on_change: self.center_current_song_on_change,
             search: self.search.into(),
             artists: self.artists.into(),
             album_art: self.album_art.into(),

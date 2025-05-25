@@ -225,20 +225,24 @@ impl<T: ScrollingState> DirState<T> {
 
         // Always place cursor in the middle of the screen when scrolloff is too
         // big
-        if scrolloff * 2 >= vieport_len {
+        if scrolloff.saturating_mul(2) >= vieport_len {
             self.inner.set_offset(idx.saturating_sub(vieport_len / 2).min(max_offset));
             return;
         }
 
-        let scrolloff_start_down = (offset + vieport_len).saturating_sub(scrolloff + 1);
+        let scrolloff_start_down =
+            (offset.saturating_add(vieport_len)).saturating_sub(scrolloff.saturating_add(1));
         if idx > scrolloff_start_down {
-            let new_offset = (offset + (idx.saturating_sub(scrolloff_start_down))).min(max_offset);
+            let new_offset =
+                (offset.saturating_add(idx.saturating_sub(scrolloff_start_down))).min(max_offset);
             self.inner.set_offset(new_offset);
             return;
         }
 
-        if idx < offset + scrolloff {
-            self.inner.set_offset(offset.saturating_sub((offset + scrolloff).saturating_sub(idx)));
+        if idx < offset.saturating_add(scrolloff) {
+            self.inner.set_offset(
+                offset.saturating_sub((offset.saturating_add(scrolloff)).saturating_sub(idx)),
+            );
             return;
         }
     }

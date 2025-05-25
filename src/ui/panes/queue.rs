@@ -50,6 +50,7 @@ pub struct QueuePane {
     column_widths: Vec<Constraint>,
     column_formats: Vec<Property<SongProperty>>,
     areas: EnumMap<Areas, Rect>,
+    should_center_cursor_on_current: bool,
 }
 
 #[derive(Debug, Enum)]
@@ -76,6 +77,7 @@ impl QueuePane {
             areas: enum_map! {
                 _ => Rect::default(),
             },
+            should_center_cursor_on_current: false,
         }
     }
 
@@ -260,11 +262,22 @@ impl Pane for QueuePane {
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         self.scrolling_state.set_content_len(Some(context.queue.len()));
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
-        let to_select = self
-            .scrolling_state
-            .get_selected()
-            .or(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
-        self.scrolling_state.select(to_select, context.config.scrolloff);
+
+        if self.should_center_cursor_on_current {
+            let to_select = context
+                .find_current_song_in_queue()
+                .map(|(idx, _)| idx)
+                .or(self.scrolling_state.get_selected())
+                .or(Some(0));
+            self.scrolling_state.select(to_select, usize::MAX);
+            self.should_center_cursor_on_current = false;
+        } else {
+            let to_select = self
+                .scrolling_state
+                .get_selected()
+                .or(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
+            self.scrolling_state.select(to_select, context.config.scrolloff);
+        }
 
         Ok(())
     }
@@ -272,7 +285,7 @@ impl Pane for QueuePane {
     fn on_event(
         &mut self,
         event: &mut UiEvent,
-        _is_visible: bool,
+        is_visible: bool,
         context: &AppContext,
     ) -> Result<()> {
         match event {
@@ -280,6 +293,20 @@ impl Pane for QueuePane {
                 if let Some((idx, _)) = context.find_current_song_in_queue() {
                     if context.config.select_current_song_on_change {
                         self.scrolling_state.select(Some(idx), context.config.scrolloff);
+
+                        match (is_visible, context.config.center_current_song_on_change) {
+                            (true, true) => {
+                                self.scrolling_state.select(Some(idx), usize::MAX);
+                            }
+                            (false, true) => {
+                                self.scrolling_state.select(Some(idx), usize::MAX);
+                                self.should_center_cursor_on_current = true;
+                            }
+                            (true, false) | (false, false) => {
+                                self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                            }
+                        }
+
                         context.render()?;
                     }
                 }
