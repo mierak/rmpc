@@ -7,7 +7,7 @@ use self::{
     header::{HeaderConfig, HeaderConfigFile},
     progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
     queue_table::{QueueTableColumns, QueueTableColumnsFile},
-    scrollbar::{ScrollbarConfig, ScrollbarConfigFile},
+    scrollbar::ScrollbarConfig,
     style::{StringColor, ToConfigOr},
 };
 
@@ -20,7 +20,10 @@ mod style;
 
 pub use style::{ConfigColor, Modifiers, StyleFile};
 
-pub use self::queue_table::{PercentOrLength, SongTableColumn};
+pub use self::{
+    queue_table::{PercentOrLength, SongTableColumn},
+    scrollbar::ScrollbarConfigFile,
+};
 use super::{
     defaults,
     tabs::{PaneOrSplitFile, SizedPaneOrSplit},
@@ -48,7 +51,7 @@ pub struct UiConfig {
     pub symbols: SymbolsConfig,
     pub progress_bar: ProgressBarConfig,
     pub tab_bar: TabBar,
-    pub scrollbar: ScrollbarConfig,
+    pub scrollbar: Option<ScrollbarConfig>,
     pub show_song_table_header: bool,
     pub song_table_format: Vec<SongTableColumn>,
     pub header: HeaderConfig,
@@ -65,7 +68,8 @@ pub struct UiConfigFile {
     pub(super) symbols: SymbolsFile,
     pub(super) tab_bar: TabBarFile,
     pub(super) progress_bar: ProgressBarConfigFile,
-    pub(super) scrollbar: ScrollbarConfigFile,
+    #[serde(default = "defaults::default_scrollbar")]
+    pub(super) scrollbar: Option<ScrollbarConfigFile>,
     #[serde(default = "defaults::default_column_widths")]
     pub(super) browser_column_widths: Vec<u16>,
     #[serde(default)]
@@ -138,7 +142,7 @@ impl Default for UiConfigFile {
             },
             browser_column_widths: vec![20, 38, 42],
             progress_bar: ProgressBarConfigFile::default(),
-            scrollbar: ScrollbarConfigFile::default(),
+            scrollbar: Some(ScrollbarConfigFile::default()),
             symbols: SymbolsFile {
                 song: "S".to_owned(),
                 dir: "D".to_owned(),
@@ -232,7 +236,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .to_config_or(Some(Color::Blue), None)?,
             symbols: value.symbols.into(),
             show_song_table_header: value.show_song_table_header,
-            scrollbar: value.scrollbar.into_config(fallback_border_fg)?,
+            scrollbar: value.scrollbar.map(|sc| sc.into_config(fallback_border_fg)).transpose()?,
             progress_bar: value.progress_bar.into_config()?,
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
             header: value.header.try_into()?,

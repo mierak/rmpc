@@ -352,6 +352,7 @@ pub mod rect {
 
     pub trait RectExt {
         fn shrink_from_top(self, amount: u16) -> Rect;
+        fn shrink_horizontally(self, amount: u16) -> Rect;
         fn overlaps_in_y(&self, other: &Self) -> bool;
         fn overlaps_in_x(&self, other: &Self) -> bool;
     }
@@ -360,6 +361,12 @@ pub mod rect {
         fn shrink_from_top(mut self, amount: u16) -> Rect {
             self.height = self.height.saturating_sub(amount);
             self.y = self.y.saturating_add(amount);
+            self
+        }
+
+        fn shrink_horizontally(mut self, amount: u16) -> Rect {
+            self.width = self.width.saturating_sub(amount * 2);
+            self.x = self.x.saturating_add(amount);
             self
         }
 

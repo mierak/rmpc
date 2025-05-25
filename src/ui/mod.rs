@@ -810,17 +810,20 @@ impl Config {
             .track_char(&self.theme.progress_bar.symbols[2])
     }
 
-    fn as_styled_scrollbar(&self) -> ratatui::widgets::Scrollbar {
-        let symbols = &self.theme.scrollbar.symbols;
-        ratatui::widgets::Scrollbar::default()
-            .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
-            .track_symbol(if symbols[0].is_empty() { None } else { Some(&symbols[0]) })
-            .thumb_symbol(&self.theme.scrollbar.symbols[1])
-            .begin_symbol(if symbols[2].is_empty() { None } else { Some(&symbols[2]) })
-            .end_symbol(if symbols[3].is_empty() { None } else { Some(&symbols[3]) })
-            .track_style(self.theme.scrollbar.track_style)
-            .begin_style(self.theme.scrollbar.ends_style)
-            .end_style(self.theme.scrollbar.ends_style)
-            .thumb_style(self.theme.scrollbar.thumb_style)
+    fn as_styled_scrollbar(&self) -> Option<ratatui::widgets::Scrollbar> {
+        let scrollbar = self.theme.scrollbar.as_ref()?;
+        let symbols = &scrollbar.symbols;
+        Some(
+            ratatui::widgets::Scrollbar::default()
+                .orientation(ratatui::widgets::ScrollbarOrientation::VerticalRight)
+                .track_symbol(if symbols[0].is_empty() { None } else { Some(&symbols[0]) })
+                .thumb_symbol(&scrollbar.symbols[1])
+                .begin_symbol(if symbols[2].is_empty() { None } else { Some(&symbols[2]) })
+                .end_symbol(if symbols[3].is_empty() { None } else { Some(&symbols[3]) })
+                .track_style(scrollbar.track_style)
+                .begin_style(scrollbar.ends_style)
+                .end_style(scrollbar.ends_style)
+                .thumb_style(scrollbar.thumb_style),
+        )
     }
 }

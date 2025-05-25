@@ -1,6 +1,7 @@
 #![allow(dead_code)]
+#![allow(clippy::unnecessary_wraps)]
 
-use super::theme::{Modifiers, StyleFile, properties::SongPropertyFile};
+use super::theme::{Modifiers, ScrollbarConfigFile, StyleFile, properties::SongPropertyFile};
 pub fn default_column_widths() -> Vec<u16> {
     vec![20, 38, 42]
 }
@@ -33,7 +34,6 @@ pub fn default_write_timeout() -> u64 {
     5000
 }
 
-#[allow(clippy::unnecessary_wraps)]
 pub fn default_progress_update_interval_ms() -> Option<u64> {
     Some(1000)
 }
@@ -105,4 +105,8 @@ pub fn default_thousands_separator() -> String {
 
 pub fn default_time_unit_separator() -> String {
     ", ".to_string()
+}
+
+pub fn default_scrollbar() -> Option<ScrollbarConfigFile> {
+    Some(ScrollbarConfigFile::default())
 }

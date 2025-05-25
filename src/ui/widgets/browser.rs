@@ -53,12 +53,15 @@ where
         state: &mut DirStack<T>,
         config: &Config,
     ) {
-        let scrollbar_margin = if config.theme.draw_borders {
-            let scrollbar_track = &config.theme.scrollbar.symbols[0];
-            Margin { vertical: 0, horizontal: scrollbar_track.is_empty().into() }
-        } else {
-            Margin { vertical: 0, horizontal: 0 }
+        let scrollbar_margin = match config.theme.scrollbar.as_ref() {
+            Some(scrollbar) if config.theme.draw_borders => {
+                let scrollbar_track = &scrollbar.symbols[0];
+                Margin { vertical: 0, horizontal: scrollbar_track.is_empty().into() }
+            }
+            Some(_) | None => Margin { vertical: 0, horizontal: 0 },
         };
+        let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
+
         let previous = state.previous().to_list_items(config);
         let current = state.current().to_list_items(config);
         let preview = state.preview().cloned();
@@ -103,10 +106,10 @@ where
                 Block::default()
                     .borders(Borders::RIGHT)
                     .border_style(config.as_border_style())
-                    .padding(Padding::new(0, 1, 0, 0))
+                    .padding(Padding::new(0, column_right_padding, 0, 0))
                     .border_set(LEFT_COLUMN_SYMBOLS)
             } else {
-                Block::default().padding(Padding::new(1, 2, 0, 0))
+                Block::default().padding(Padding::new(1, column_right_padding, 0, 0))
             };
             if let Some(ref title) = title {
                 block = block.title(title.clone().set_style(config.theme.borders_style));
@@ -123,12 +126,14 @@ where
                 prev_state.as_render_state_ref(),
             );
             ratatui::widgets::Widget::render(block, previous_area, buf);
-            ratatui::widgets::StatefulWidget::render(
-                config.as_styled_scrollbar(),
-                previous_area.inner(scrollbar_margin),
-                buf,
-                prev_state.as_scrollbar_state_ref(),
-            );
+            if let Some(scrollbar) = config.as_styled_scrollbar() {
+                ratatui::widgets::StatefulWidget::render(
+                    scrollbar,
+                    previous_area.inner(scrollbar_margin),
+                    buf,
+                    prev_state.as_scrollbar_state_ref(),
+                );
+            }
         }
         if config.theme.column_widths[1] > 0 {
             let title = state.current().filter().as_ref().map(|v| {
@@ -149,7 +154,7 @@ where
                 if let Some(ref title) = title {
                     b = b.title(title.clone().set_style(config.theme.borders_style));
                 }
-                b.padding(Padding::new(0, 1, 0, 0))
+                b.padding(Padding::new(0, column_right_padding, 0, 0))
             };
             let current = List::new(current)
                 .highlight_style(config.theme.current_item_style)
@@ -164,12 +169,14 @@ where
             );
             self.areas[1] = inner_block;
             ratatui::widgets::Widget::render(block, current_area, buf);
-            ratatui::widgets::StatefulWidget::render(
-                config.as_styled_scrollbar(),
-                current_area.inner(scrollbar_margin),
-                buf,
-                state.as_scrollbar_state_ref(),
-            );
+            if let Some(scrollbar) = config.as_styled_scrollbar() {
+                ratatui::widgets::StatefulWidget::render(
+                    scrollbar,
+                    current_area.inner(scrollbar_margin),
+                    buf,
+                    state.as_scrollbar_state_ref(),
+                );
+            }
         }
     }
 }
