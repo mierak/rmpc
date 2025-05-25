@@ -34,6 +34,7 @@ lists they are listed as multiple entries.
 - Add `center_current_song_on_change` to center song in the queue when it changes
 - Added `togglerandom`, `togglesingle`, `togglerepeat` and `toggleconsume` CLI commands
 - Added `ToggleSingleOnOff` and `ToggleConsumeOnOff` global actions which skip oneshot for their respective mode
+- Added `ActiveTab` status property showing the name of currently active tab
  
 ### Changed
 
