@@ -24,6 +24,7 @@ pub use self::queue_table::{PercentOrLength, SongTableColumn};
 use super::{
     defaults,
     tabs::{PaneOrSplitFile, SizedPaneOrSplit},
+    utils::tilde_expand,
 };
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
@@ -250,11 +251,13 @@ impl TryFrom<UiConfigFile> for UiConfig {
             current_item_style: value
                 .current_item_style
                 .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-            default_album_art: value
-                .default_album_art_path
-                .map_or(Ok(DEFAULT_ART as &'static [u8]), |path| -> Result<_> {
-                    Ok(std::fs::read(path)?.leak())
-                })?,
+            default_album_art: value.default_album_art_path.map_or(
+                Ok(DEFAULT_ART as &'static [u8]),
+                |path| -> Result<_> {
+                    let path = tilde_expand(&path);
+                    Ok(std::fs::read(path.as_ref())?.leak())
+                },
+            )?,
             browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
             preview_label_style: value.preview_label_style.to_config_or(None, None)?,
             preview_metadata_group_style: value
