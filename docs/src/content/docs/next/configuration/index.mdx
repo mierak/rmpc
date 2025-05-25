@@ -157,6 +157,17 @@ Default is 1000ms.
 
 If set to true, the current song is selected in the queue table when it changes. Defaults to false if not present.
 
+### center_current_song_on_change
+
+<ConfigValue name="center_current_song_on_change" type="bool" />
+
+:::note
+`select_current_song_on_change` must also be set to true for this to work
+:::
+
+If set to true, the current song is centered in the queue when it changes while still allowing you to move in the
+queue table with your normal [scrolloff](#scrolloff). Defaults to false if not present.
+
 ### on_song_change
 
 <ConfigValue name="on_song_change" type="other" customText={'["notify-send", "song changed!"]'} />
