@@ -149,16 +149,18 @@ pub enum Command {
         /// this behaviour and rmpc will try to add all the files
         #[arg(long = "skip-ext-check", default_value = "false")]
         skip_ext_check: bool,
-        /// If provided, queue the new item at this position. Possible positions
-        /// are <number> absolute +<number> and -<number> for relative positions
+        /// If provided, queue the new item at this position instead of the end
+        /// of the queue. Allowed positions are <number> (absolute) and
+        /// +<number> or -<number> (relative)
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
     /// Add a song from youtube to the current queue.
     AddYt {
         url: String,
-        /// If provided, queue the new item at this position. Possible positions
-        /// are <number> absolute +<number> and -<number> for relative positions
+        /// If provided, queue the new item at this position instead of the end
+        /// of the queue. Allowed positions are <number> (absolute) and
+        /// +<number> or -<number> (relative)
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
