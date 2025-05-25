@@ -22,6 +22,8 @@ pub enum GlobalAction {
     ToggleSingle,
     ToggleRandom,
     ToggleConsume,
+    ToggleSingleOnOff,
+    ToggleConsumeOnOff,
     TogglePause,
     VolumeUp,
     VolumeDown,
@@ -54,6 +56,8 @@ pub enum GlobalActionFile {
     ToggleSingle,
     ToggleRandom,
     ToggleConsume,
+    ToggleSingleOnOff,
+    ToggleConsumeOnOff,
     TogglePause,
     VolumeUp,
     VolumeDown,
@@ -120,6 +124,8 @@ impl From<GlobalActionFile> for GlobalAction {
                 }
             }
             GlobalActionFile::AddRandom => GlobalAction::AddRandom,
+            GlobalActionFile::ToggleSingleOnOff => GlobalAction::ToggleSingleOnOff,
+            GlobalActionFile::ToggleConsumeOnOff => GlobalAction::ToggleConsumeOnOff,
         }
     }
 }
@@ -161,6 +167,8 @@ impl ToDescription for GlobalAction {
             }
             GlobalAction::ExternalCommand { description: Some(desc), .. } => Cow::Owned(desc.to_string()),
             GlobalAction::AddRandom => "Add random songs to the queue".into(),
+            GlobalAction::ToggleSingleOnOff => "Toggle single mode on or off, skipping oneshot".into(),
+            GlobalAction::ToggleConsumeOnOff => "Toggle consume mode on or off, skipping oneshot".into(),
         }
     }
 }

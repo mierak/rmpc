@@ -315,6 +315,20 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
+                GlobalAction::ToggleSingleOnOff => {
+                    let single = context.status.single;
+                    context.command(move |client| {
+                        client.single(single.cycle_skip_oneshot())?;
+                        Ok(())
+                    });
+                }
+                GlobalAction::ToggleConsumeOnOff => {
+                    let consume = context.status.consume;
+                    context.command(move |client| {
+                        client.consume(consume.cycle_skip_oneshot())?;
+                        Ok(())
+                    });
+                }
                 GlobalAction::TogglePause
                     if matches!(context.status.state, State::Play | State::Pause) =>
                 {
