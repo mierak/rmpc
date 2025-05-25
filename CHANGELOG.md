@@ -55,6 +55,7 @@ lists they are listed as multiple entries.
 - Handle invalid utf8 characters
 - Improve reconnection behavior of MPD client
 - Improve performance of the queue table by not calculating rows that are not visible
+- Tilde not being expanded in `default_album_art_path`
 
 ## [0.8.0] - 2025-02-16
 
