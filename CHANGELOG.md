@@ -47,6 +47,7 @@ lists they are listed as multiple entries.
 - refactor `DirOrSong` to a separate file
 - Lyrics will be wrapped if it is longer than the pane width
 - Refactored yt-dlp to make it easier to add support for more hosts
+- `scrollbar` theme option now also accepts `None` as a valid value to hide all scrollbars in rmpc
 
 ### Fixed
 

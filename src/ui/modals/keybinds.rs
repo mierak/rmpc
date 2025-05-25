@@ -173,11 +173,13 @@ impl Modal for KeybindsModal {
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        frame.render_stateful_widget(
-            app.config.as_styled_scrollbar(),
-            popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
-            self.scrolling_state.as_scrollbar_state_ref(),
-        );
+        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+            frame.render_stateful_widget(
+                scrollbar,
+                popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
+                self.scrolling_state.as_scrollbar_state_ref(),
+            );
+        }
 
         return Ok(());
     }

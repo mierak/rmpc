@@ -58,7 +58,6 @@ enum Areas {
     Table,
     TableHeader,
     Scrollbar,
-    TableBlock,
 }
 
 const ADD_TO_PLAYLIST: &str = "add_to_playlist";
@@ -217,19 +216,18 @@ impl Pane for QueuePane {
             .style(config.as_text_style())
             .row_highlight_style(config.theme.current_item_style);
 
-        frame.render_stateful_widget(
-            table,
-            self.areas[Areas::Table],
-            self.scrolling_state.as_render_state_ref(),
-        );
-        frame.render_widget(table_block, self.areas[Areas::TableBlock]);
+        let table_area = table_block.inner(self.areas[Areas::Table]);
+        frame.render_widget(table_block, self.areas[Areas::Table]);
+        frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
 
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height.into()));
-        frame.render_stateful_widget(
-            config.as_styled_scrollbar(),
-            self.areas[Areas::Scrollbar],
-            self.scrolling_state.as_scrollbar_state_ref(),
-        );
+        if let Some(scrollbar) = config.as_styled_scrollbar() {
+            frame.render_stateful_widget(
+                scrollbar,
+                self.areas[Areas::Scrollbar],
+                self.scrolling_state.as_scrollbar_state_ref(),
+            );
+        }
 
         Ok(())
     }
@@ -237,32 +235,31 @@ impl Pane for QueuePane {
     fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
         let AppContext { config, .. } = context;
 
-        let header_height = u16::from(config.theme.show_song_table_header);
-        let scrollbar_index = usize::from(config.theme.show_song_table_header);
+        let header_height: u16 = config.theme.show_song_table_header.into();
+        let scrollbar_area_width: u16 = config.theme.scrollbar.is_some().into();
 
-        let [data_area, scrollbar_area] =
-            Layout::horizontal([Constraint::Percentage(100), Constraint::Length(1)]).areas(area);
-        let [table_header_section, queue_section] =
-            Layout::vertical([Constraint::Length(header_height), Constraint::Min(0)])
-                .horizontal_margin(1)
-                .areas(data_area);
+        let [header_area, queue_area] =
+            Layout::vertical([Constraint::Length(header_height), Constraint::Min(0)]).areas(area);
+        let [header_area, _scrollbar_placeholder] = Layout::horizontal([
+            Constraint::Percentage(100),
+            Constraint::Length(scrollbar_area_width),
+        ])
+        .areas(header_area);
+        let [table_area, scrollbar_area] = Layout::horizontal([
+            Constraint::Percentage(100),
+            Constraint::Length(scrollbar_area_width),
+        ])
+        .areas(queue_area);
 
-        let constraints: &[Constraint] = if config.theme.show_song_table_header {
-            &[Constraint::Length(header_height + 1), Constraint::Min(0)]
-        } else {
-            &[Constraint::Min(0)]
-        };
-        let scrollbar_area = Layout::vertical(constraints).split(scrollbar_area)[scrollbar_index];
-
-        let table_area = if config.theme.show_song_table_header {
-            queue_section.shrink_from_top(1)
-        } else {
-            queue_section
-        };
+        // Aplly empty margin on left and right
+        let table_area = table_area.shrink_horizontally(1);
+        let header_area = header_area.shrink_horizontally(1);
+        // Make scrollbar not overlap header/table separator if separator is visible
+        let scrollbar_area =
+            scrollbar_area.shrink_from_top(config.theme.show_song_table_header.into());
 
         self.areas[Areas::Table] = table_area;
-        self.areas[Areas::TableHeader] = table_header_section;
-        self.areas[Areas::TableBlock] = queue_section;
+        self.areas[Areas::TableHeader] = header_area;
         self.areas[Areas::Scrollbar] = scrollbar_area;
 
         Ok(())

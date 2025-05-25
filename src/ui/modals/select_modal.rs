@@ -158,11 +158,13 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
             list_area,
             self.scrolling_state.as_render_state_ref(),
         );
-        frame.render_stateful_widget(
-            app.config.as_styled_scrollbar(),
-            scrollbar_area,
-            self.scrolling_state.as_scrollbar_state_ref(),
-        );
+        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+            frame.render_stateful_widget(
+                scrollbar,
+                scrollbar_area,
+                self.scrolling_state.as_scrollbar_state_ref(),
+            );
+        }
         frame.render_stateful_widget(
             &mut self.button_group,
             buttons_area,

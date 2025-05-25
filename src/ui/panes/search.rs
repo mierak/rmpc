@@ -118,6 +118,7 @@ impl SearchPane {
         area: ratatui::prelude::Rect,
         config: &Config,
     ) {
+        let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
         let title = self.songs_dir.filter().as_ref().map(|v| {
             format!(
                 "[FILTER]: {v}{} ",
@@ -134,7 +135,7 @@ impl SearchPane {
             if let Some(ref title) = title {
                 b = b.title(title.clone().set_style(config.theme.borders_style));
             }
-            b.padding(Padding::new(0, 2, 0, 0))
+            b.padding(Padding::new(0, column_right_padding, 0, 0))
         };
         let current = List::new(self.songs_dir.to_list_items(config))
             .highlight_style(config.theme.current_item_style);
@@ -145,17 +146,14 @@ impl SearchPane {
         if !directory.items.is_empty() && directory.state.get_selected().is_none() {
             directory.state.select(Some(0), 0);
         }
-        let area = Rect { x: area.x, y: area.y, width: area.width + 1, height: area.height };
         let inner_block = block.inner(area);
 
         self.column_areas[1] = inner_block;
         frame.render_widget(block, area);
         frame.render_stateful_widget(current, inner_block, directory.state.as_render_state_ref());
-        frame.render_stateful_widget(
-            config.as_styled_scrollbar(),
-            area,
-            directory.state.as_scrollbar_state_ref(),
-        );
+        if let Some(scrollbar) = config.as_styled_scrollbar() {
+            frame.render_stateful_widget(scrollbar, area, directory.state.as_scrollbar_state_ref());
+        }
     }
 
     fn prepare_preview(&mut self, context: &AppContext) {

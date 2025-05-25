@@ -4,6 +4,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
     Frame,
+    layout::{Constraint, Layout},
     prelude::Rect,
     widgets::{List, ListState},
 };
@@ -50,7 +51,15 @@ impl Pane for LogsPane {
         area: Rect,
         AppContext { config, .. }: &AppContext,
     ) -> anyhow::Result<()> {
-        let max_line_width = (area.width as usize).saturating_sub(INDENT_LEN + 3);
+        let scrollbar_area_width: u16 = config.theme.scrollbar.is_some().into();
+        let [logs_area, scrollbar_area] = Layout::horizontal([
+            Constraint::Percentage(100),
+            Constraint::Min(scrollbar_area_width),
+        ])
+        .areas(area);
+        self.logs_area = logs_area;
+
+        let max_line_width = (logs_area.width as usize).saturating_sub(INDENT_LEN + 3);
         let lines: Vec<_> = self.logs.iter().map(|l| String::from_utf8_lossy(l)).collect_vec();
         let lines: Vec<_> = lines
             .iter()
@@ -66,7 +75,7 @@ impl Pane for LogsPane {
 
         let content_len = lines.len();
         self.scrolling_state.set_content_len(Some(content_len));
-        self.scrolling_state.set_viewport_len(Some(area.height.into()));
+        self.scrolling_state.set_viewport_len(Some(logs_area.height.into()));
         if self.scroll_enabled
             && (self.scrolling_state.get_selected().is_none() || self.should_scroll_to_last)
         {
@@ -77,15 +86,18 @@ impl Pane for LogsPane {
         let logs_wg = List::new(lines)
             .style(config.as_text_style())
             .highlight_style(config.theme.current_item_style);
+        if let Some(scrollbar) = config.as_styled_scrollbar() {
+            frame.render_stateful_widget(
+                scrollbar,
+                scrollbar_area,
+                self.scrolling_state.as_scrollbar_state_ref(),
+            );
+        }
         frame.render_stateful_widget(
-            config.as_styled_scrollbar(),
-            area,
-            self.scrolling_state.as_scrollbar_state_ref(),
+            logs_wg,
+            logs_area,
+            self.scrolling_state.as_render_state_ref(),
         );
-        let mut area = area;
-        area.width = area.width.saturating_sub(1);
-        frame.render_stateful_widget(logs_wg, area, self.scrolling_state.as_render_state_ref());
-        self.logs_area = area;
 
         Ok(())
     }
