@@ -13,6 +13,7 @@ use crate::{
         client::Client,
         commands::{IdleEvent, mpd_config::MpdConfig, volume::Bound},
         mpd_client::{Filter, MpdClient, Tag},
+        version::Version,
     },
     shared::{
         lrc::LrcIndex,
@@ -123,6 +124,32 @@ impl Command {
             Command::Consume { value } => {
                 Ok(Box::new(move |client| Ok(client.consume((value).into())?)))
             }
+            Command::ToggleRepeat => Ok(Box::new(move |client| {
+                let status = client.get_status()?;
+                Ok(client.repeat(!status.repeat)?)
+            })),
+            Command::ToggleRandom => Ok(Box::new(move |client| {
+                let status = client.get_status()?;
+                Ok(client.random(!status.random)?)
+            })),
+            Command::ToggleSingle { skip_oneshot } => Ok(Box::new(move |client| {
+                let status = client.get_status()?;
+                if skip_oneshot || client.version() < Version::new(0, 21, 0) {
+                    client.single(status.single.cycle_skip_oneshot())?;
+                } else {
+                    client.single(status.single.cycle())?;
+                }
+                Ok(())
+            })),
+            Command::ToggleConsume { skip_oneshot } => Ok(Box::new(move |client| {
+                let status = client.get_status()?;
+                if skip_oneshot || client.version() < Version::new(0, 24, 0) {
+                    client.consume(status.consume.cycle_skip_oneshot())?;
+                } else {
+                    client.consume(status.consume.cycle())?;
+                }
+                Ok(())
+            })),
             Command::Seek { value } => {
                 Ok(Box::new(move |client| Ok(client.seek_current(value.parse()?)?)))
             }
