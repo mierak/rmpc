@@ -122,6 +122,7 @@ pub enum StatusPropertyFile {
         #[serde(default = "defaults::default_time_unit_separator")]
         separator: String,
     },
+    ActiveTab,
 }
 
 #[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
@@ -176,6 +177,7 @@ pub enum StatusProperty {
     QueueTimeRemaining {
         separator: String,
     },
+    ActiveTab,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -446,6 +448,7 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             StatusPropertyFile::QueueTimeRemaining { separator } => {
                 StatusProperty::QueueTimeRemaining { separator }
             }
+            StatusPropertyFile::ActiveTab => StatusProperty::ActiveTab,
         })
     }
 }

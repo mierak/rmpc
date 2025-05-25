@@ -870,6 +870,9 @@ impl Property<PropertyKind> {
                     );
                     Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
                 }
+                StatusProperty::ActiveTab => {
+                    Some(Either::Left(Span::styled(context.active_tab.0.as_ref(), style)))
+                }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
                 WidgetProperty::Volume => {

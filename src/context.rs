@@ -1,6 +1,6 @@
 use std::{cell::Cell, collections::HashSet, ops::AddAssign, time::Instant};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use bon::bon;
 use crossbeam::channel::{SendError, Sender, bounded};
 
@@ -10,7 +10,11 @@ use crate::{
     MpdQuery,
     MpdQueryResult,
     WorkRequest,
-    config::{Config, album_art::ImageMethod, tabs::PaneType},
+    config::{
+        Config,
+        album_art::ImageMethod,
+        tabs::{PaneType, TabName},
+    },
     core::scheduler::{Scheduler, time_provider::DefaultTimeProvider},
     mpd::{
         client::Client,
@@ -30,6 +34,7 @@ pub struct AppContext {
     pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
+    pub(crate) active_tab: TabName,
     pub(crate) supported_commands: HashSet<String>,
     pub(crate) db_update_start: Option<Instant>,
     #[debug(skip)]
@@ -77,12 +82,14 @@ impl AppContext {
 
         log::info!(config:? = config; "Resolved config");
 
+        let active_tab = config.tabs.names.first().context("Expected at least one tab")?.clone();
         scheduler.start();
         Ok(Self {
             lrc_index: LrcIndex::default(),
             config: std::sync::Arc::new(config),
             status,
             queue,
+            active_tab,
             supported_commands,
             db_update_start: None,
             app_event_sender,

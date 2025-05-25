@@ -71,7 +71,6 @@ pub struct StatusMessage {
 pub struct Ui<'ui> {
     panes: PaneContainer<'ui>,
     modals: Vec<Box<dyn Modal>>,
-    active_tab: TabName,
     tabs: HashMap<TabName, TabScreen>,
     layout: SizedPaneOrSplit,
     area: Rect,
@@ -81,10 +80,10 @@ const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
 const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
 
 macro_rules! active_tab_call {
-    ($self:ident, $fn:ident($($param:expr),+)) => {
+    ($self:ident, $ctx:ident, $fn:ident($($param:expr),+)) => {
         $self.tabs
-            .get_mut(&$self.active_tab)
-            .context(anyhow!("Expected tab '{}' to be defined. Please report this along with your config.", $self.active_tab))?
+            .get_mut(&$ctx.active_tab)
+            .context(anyhow!("Expected tab '{}' to be defined. Please report this along with your config.", $ctx.active_tab))?
             .$fn(&mut $self.panes, $($param),+)
     }
 }
@@ -92,17 +91,12 @@ macro_rules! active_tab_call {
 impl<'ui> Ui<'ui> {
     pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
         Ok(Self {
-            active_tab: Self::init_active_tab(context)?,
             panes: PaneContainer::new(context)?,
             layout: context.config.theme.layout.clone(),
             modals: Vec::default(),
             area: Rect::default(),
             tabs: Self::init_tabs(context)?,
         })
-    }
-
-    fn init_active_tab(context: &AppContext) -> Result<TabName> {
-        Ok(context.config.tabs.names.first().context("Expected at least one tab")?.clone())
     }
 
     fn init_tabs(context: &AppContext) -> Result<HashMap<TabName, TabScreen>> {
@@ -125,20 +119,20 @@ impl<'ui> Ui<'ui> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
             match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, on_hide(context))?;
+                    active_tab_call!(self, context, on_hide(context))?;
                 }
                 _ => {}
             }
             Ok(())
         })?;
 
-        self.active_tab = new_tab.clone();
+        context.active_tab = new_tab.clone();
         self.on_event(UiEvent::TabChanged(new_tab), context)?;
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
             match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, before_show(pane_area, context))?;
+                    active_tab_call!(self, context, before_show(pane_area, context))?;
                 }
                 _ => {}
             }
@@ -159,7 +153,7 @@ impl<'ui> Ui<'ui> {
             &mut |pane, pane_area, block, block_area, frame| {
                 match self.panes.get_mut(&pane.pane, context)? {
                     Panes::TabContent => {
-                        active_tab_call!(self, render(frame, pane_area, context))?;
+                        active_tab_call!(self, context, render(frame, pane_area, context))?;
                     }
                     mut pane_instance => {
                         pane_call!(pane_instance, render(frame, pane_area, context))?;
@@ -205,7 +199,7 @@ impl<'ui> Ui<'ui> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
             match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, handle_mouse_event(event, context))?;
+                    active_tab_call!(self, context, handle_mouse_event(event, context))?;
                 }
                 mut pane_instance => {
                     pane_call!(pane_instance, handle_mouse_event(event, context))?;
@@ -225,7 +219,7 @@ impl<'ui> Ui<'ui> {
             return Ok(KeyHandleResult::None);
         }
 
-        active_tab_call!(self, handle_action(key, context))?;
+        active_tab_call!(self, context, handle_action(key, context))?;
 
         if let Some(action) = key.as_global_action(context) {
             match action {
@@ -381,11 +375,11 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::NextTab => {
-                    self.change_tab(context.config.next_screen(&self.active_tab), context)?;
+                    self.change_tab(context.config.next_screen(&context.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::PreviousTab => {
-                    self.change_tab(context.config.prev_screen(&self.active_tab), context)?;
+                    self.change_tab(context.config.prev_screen(&context.active_tab), context)?;
                     context.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
@@ -448,7 +442,7 @@ impl<'ui> Ui<'ui> {
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
             match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, before_show(pane_area, context))?;
+                    active_tab_call!(self, context, before_show(pane_area, context))?;
                 }
                 mut pane_instance => {
                     pane_call!(pane_instance, calculate_areas(pane_area, context))?;
@@ -483,7 +477,7 @@ impl<'ui> Ui<'ui> {
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
             match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, resize(pane_area, context))?;
+                    active_tab_call!(self, context, resize(pane_area, context))?;
                 }
                 mut pane_instance => {
                     pane_call!(pane_instance, calculate_areas(pane_area, context))?;
@@ -507,7 +501,7 @@ impl<'ui> Ui<'ui> {
                 self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
                     match self.panes.get_mut(&pane.pane, context)? {
                         Panes::TabContent => {
-                            active_tab_call!(self, on_hide(context))?;
+                            active_tab_call!(self, context, on_hide(context))?;
                         }
                         mut pane_instance => {
                             pane_call!(pane_instance, on_hide(context))?;
@@ -522,7 +516,7 @@ impl<'ui> Ui<'ui> {
                     .tabs
                     .names
                     .iter()
-                    .find(|tab| tab == &&self.active_tab)
+                    .find(|tab| tab == &&context.active_tab)
                     .or(context.config.tabs.names.first())
                     .context("Expected at least one tab")?;
 
@@ -534,7 +528,7 @@ impl<'ui> Ui<'ui> {
                 // We have to be careful about the order of operations here as they might cause
                 // a panic if done incorrectly
                 self.tabs = Self::init_tabs(context)?;
-                self.active_tab = new_active_tab.clone();
+                context.active_tab = new_active_tab.clone();
                 self.on_event(UiEvent::TabChanged(new_active_tab.clone()), context)?;
 
                 // Call before_show here, because we have "hidden" all the panes before and this
@@ -547,7 +541,7 @@ impl<'ui> Ui<'ui> {
         for pane_type in &context.config.active_panes {
             let visible = self
                 .tabs
-                .get(&self.active_tab)
+                .get(&context.active_tab)
                 .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == *pane_type))
                 || self.layout.panes_iter().any(|pane| pane.pane == *pane_type);
 
@@ -587,7 +581,7 @@ impl<'ui> Ui<'ui> {
         match pane {
             Some(pane_type) => {
                 let visible =
-                    self.tabs.get(&self.active_tab).is_some_and(|tab| {
+                    self.tabs.get(&context.active_tab).is_some_and(|tab| {
                         tab.panes.panes_iter().any(|pane| pane.pane == pane_type)
                     }) || self.layout.panes_iter().any(|pane| pane.pane == pane_type);
 

@@ -5,7 +5,7 @@ use ratatui::{Terminal, backend::TestBackend};
 use rstest::fixture;
 
 use crate::{
-    config::{Config, ConfigFile},
+    config::{Config, ConfigFile, tabs::TabName},
     context::AppContext,
     core::scheduler::Scheduler,
     mpd::commands::Status,
@@ -48,6 +48,7 @@ pub fn app_context(
         status: Status::default(),
         config: std::sync::Arc::new(config),
         queue: Vec::default(),
+        active_tab: TabName::from("test_tab"),
         app_event_sender: chan1.0.clone(),
         work_sender: work_request_channel.0.clone(),
         client_request_sender: client_request_channel.0.clone(),
