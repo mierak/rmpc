@@ -103,6 +103,7 @@ currently playing. The `Other` variant can be used to display any tag, even thos
         "Property(Status(Duration))",
         "Property(Status(Crossfade))",
         "Property(Status(Bitrate))",
+        'Property(Status(QueueLength(thousands_separator: ",")))',
     ]}
 />
 These values display the current state of the player. For example, `Volume` will display the current volume, `Repeat`
@@ -163,11 +164,21 @@ from MPD version 0.24.0, with earlier versions it get silently ignored.
 
 Similar to `StateV2`. Allows you to configure labels for on/off and one shot states.
 
+#### QueueLength
+
+<ConfigValue name="kind" type="other" customText='Property(Status(QueueLength(thousands_separator: ",")))' />
+
+Shows the number of songs in the queue. `thousands_separator` is optional and defaults to `,`.
+
 ### Property(Widget)
 
 <ConfigValue
     name="Property"
-    type={["Property(Widget(ScanStatus))", "Property(Widget(Volume))", "Property(Widget(States(active_style: <style>, separator_style: <style>)))"]}
+    type={[
+        "Property(Widget(ScanStatus))",
+        "Property(Widget(Volume))",
+        "Property(Widget(States(active_style: <style>, separator_style: <style>)))",
+    ]}
 />
 These are predefined "widgets" which you can use in your header. They differ from regular properties in that they can
 have additional styling options or display options.

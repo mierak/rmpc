@@ -27,6 +27,7 @@ lists they are listed as multiple entries.
 - added support for soundcloud to `addyt`
 - added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
 - added `Shuffle` queue action allowing you to shuffle the whole queue or selected range(s)
+- added `QueueLength` status property which displays number of songs in the current queue
 
 ### Changed
 
