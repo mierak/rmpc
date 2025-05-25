@@ -323,15 +323,19 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
-                GlobalAction::TogglePause
-                    if matches!(context.status.state, State::Play | State::Pause) =>
-                {
-                    context.command(move |client| {
-                        client.pause_toggle()?;
-                        Ok(())
-                    });
+                GlobalAction::TogglePause => {
+                    if matches!(context.status.state, State::Play | State::Pause) {
+                        context.command(move |client| {
+                            client.pause_toggle()?;
+                            Ok(())
+                        });
+                    } else {
+                        context.command(move |client| {
+                            client.play()?;
+                            Ok(())
+                        });
+                    }
                 }
-                GlobalAction::TogglePause => {}
                 GlobalAction::VolumeUp => {
                     let step = context.config.volume_step;
                     context.command(move |client| {
