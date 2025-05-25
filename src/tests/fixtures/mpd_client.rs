@@ -452,6 +452,10 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn shuffle(&mut self, _range: Option<SingleOrRange>) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
     fn add_random_songs(&mut self, _: usize, _: Option<&[Filter<'_>]>) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
