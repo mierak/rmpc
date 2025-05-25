@@ -9,6 +9,7 @@ use itertools::Itertools;
 use rstest::fixture;
 
 use crate::mpd::{
+    QueuePosition,
     commands::{
         IdleEvent,
         ListFiles,
@@ -27,7 +28,7 @@ use crate::mpd::{
         volume::Bound,
     },
     errors::MpdError,
-    mpd_client::{Filter, MpdClient, QueueMoveTarget, SaveMode, SingleOrRange, Tag, ValueChange},
+    mpd_client::{Filter, MpdClient, SaveMode, SingleOrRange, Tag, ValueChange},
     proto_client::SocketClient,
 };
 
@@ -295,7 +296,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn add(&mut self, _path: &str) -> MpdResult<()> {
+    fn add(&mut self, _path: &str, _position: Option<QueuePosition>) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
@@ -423,11 +424,11 @@ impl MpdClient for TestMpdClient {
             .collect())
     }
 
-    fn move_in_queue(&mut self, _from: SingleOrRange, _to: QueueMoveTarget) -> MpdResult<()> {
+    fn move_in_queue(&mut self, _from: SingleOrRange, _to: QueuePosition) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
-    fn move_id(&mut self, _id: u32, _to: QueueMoveTarget) -> MpdResult<()> {
+    fn move_id(&mut self, _id: u32, _to: QueuePosition) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
@@ -440,11 +441,19 @@ impl MpdClient for TestMpdClient {
         }
     }
 
-    fn find_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
+    fn find_add(
+        &mut self,
+        _filter: &[Filter<'_>],
+        _position: Option<QueuePosition>,
+    ) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
-    fn search_add(&mut self, _filter: &[Filter<'_>]) -> MpdResult<()> {
+    fn search_add(
+        &mut self,
+        _filter: &[Filter<'_>],
+        _position: Option<QueuePosition>,
+    ) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 

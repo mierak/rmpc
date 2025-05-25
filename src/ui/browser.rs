@@ -11,7 +11,7 @@ use crate::{
     MpdQueryResult,
     config::keys::{CommonAction, GlobalAction},
     context::AppContext,
-    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -40,8 +40,8 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add(&self, item: &T, context: &AppContext) -> Result<()>;
-    fn add_all(&self, context: &AppContext) -> Result<()>;
+    fn add(&self, item: &T, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
+    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn delete(&self, item: &T, index: usize, context: &AppContext) -> Result<()> {
         Ok(())
@@ -171,7 +171,7 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        self.add(item, context)?;
+                        self.add(item, context, None)?;
                     }
 
                     self.prepare_preview(context);
@@ -315,19 +315,19 @@ where
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context)?;
+                    self.add(item, context, None)?;
                 }
 
                 context.render()?;
             }
             CommonAction::Add => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context);
+                    self.add(item, context, None);
                 }
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
                 log::debug!("add all");
-                self.add_all(context)?;
+                self.add_all(context, None)?;
             }
             CommonAction::AddAll => {}
             CommonAction::AddReplace if !self.stack().current().marked().is_empty() => {
@@ -337,7 +337,7 @@ where
                 });
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context)?;
+                    self.add(item, context, None)?;
                 }
 
                 context.render()?;
@@ -348,7 +348,7 @@ where
                     Ok(())
                 });
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context);
+                    self.add(item, context, None);
                 }
             }
             CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
@@ -356,9 +356,27 @@ where
                     client.clear()?;
                     Ok(())
                 });
-                self.add_all(context)?;
+                self.add_all(context, None)?;
             }
             CommonAction::AddAllReplace => {}
+            CommonAction::Insert if !self.stack().current().marked().is_empty() => {
+                for idx in self.stack().current().marked() {
+                    let item = &self.stack().current().items[*idx];
+                    self.add(item, context, Some(QueuePosition::RelativeAdd(0)))?;
+                }
+
+                context.render()?;
+            }
+            CommonAction::Insert => {
+                if let Some(item) = self.stack().current().selected() {
+                    self.add(item, context, Some(QueuePosition::RelativeAdd(0)));
+                }
+            }
+            CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
+                log::debug!("add all next");
+                self.add_all(context, Some(QueuePosition::RelativeAdd(0)))?;
+            }
+            CommonAction::InsertAll => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];

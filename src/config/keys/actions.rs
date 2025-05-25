@@ -357,6 +357,8 @@ pub enum CommonActionFile {
     AddAll,
     AddReplace,
     AddAllReplace,
+    Insert,
+    InsertAll,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
@@ -391,6 +393,8 @@ pub enum CommonAction {
     AddAll,
     AddReplace,
     AddAllReplace,
+    Insert,
+    InsertAll,
 }
 
 impl ToDescription for CommonAction {
@@ -436,6 +440,8 @@ impl ToDescription for CommonAction {
             CommonAction::AddAll => "Add all items to queue",
             CommonAction::AddReplace => "Replace current queue with the item",
             CommonAction::AddAllReplace => "Replace current queue with all items",
+            CommonAction::Insert => "Add item after current song",
+            CommonAction::InsertAll => "Add all items after current song",
         }.into()
     }
 }
@@ -473,6 +479,8 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::PaneRight => CommonAction::PaneRight,
             CommonActionFile::AddReplace => CommonAction::AddReplace,
             CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
+            CommonActionFile::Insert => CommonAction::Insert,
+            CommonActionFile::InsertAll => CommonAction::InsertAll,
         }
     }
 }

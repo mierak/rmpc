@@ -8,6 +8,7 @@ use crate::{
     config::tabs::PaneType,
     context::AppContext,
     mpd::{
+        QueuePosition,
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -93,7 +94,7 @@ impl DirectoriesPane {
                 context.render()?;
             }
             t @ DirOrSong::Song(_) => {
-                self.add(t, context)?;
+                self.add(t, context, None)?;
                 let queue_len = context.queue.len();
                 if autoplay {
                     context.command(move |client| Ok(client.play_last(queue_len)?));
@@ -258,7 +259,12 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn add(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
+    fn add(
+        &self,
+        item: &DirOrSong,
+        context: &AppContext,
+        position: Option<QueuePosition>,
+    ) -> Result<()> {
         match item {
             DirOrSong::Dir { name: dirname, .. } => {
                 let mut next_path = self.stack.path().to_vec();
@@ -266,7 +272,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
 
                 context.command(move |client| {
-                    client.add(&next_path)?;
+                    client.add(&next_path, position)?;
                     status_info!("Directory '{next_path}' added to queue");
                     Ok(())
                 });
@@ -278,7 +284,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let title_text =
                     song.title_str(&context.config.theme.format_tag_separator).into_owned();
                 context.command(move |client| {
-                    client.add(&file)?;
+                    client.add(&file, position)?;
                     if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
                         status_info!("'{}' by '{}' added to queue", title_text, artist_text);
                     }
@@ -292,10 +298,10 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         Ok(())
     }
 
-    fn add_all(&self, context: &AppContext) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
         context.command(move |client| {
-            client.add(&path)?;
+            client.add(&path, position)?;
             status_info!("Directory '{path}' added to queue");
             Ok(())
         });

@@ -10,6 +10,15 @@ use clap_complete::{
 use clap_mangen::Man;
 use vergen_gitcl::{Emitter, GitclBuilder};
 
+// Mock mpd::QueuePosition for cli.rs to be able to import it. Also see header
+// comment in cli.rs.
+#[path = "src/mpd/queue_position.rs"]
+mod queue_position;
+
+mod mpd {
+    pub use super::queue_position::QueuePosition;
+}
+
 static NAME: &str = "rmpc";
 
 fn generate_man_pages(cmd: ClapCommand) -> Result<(), Box<dyn Error>> {
