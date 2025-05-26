@@ -9,7 +9,7 @@ use ratatui::{
     prelude::{Constraint, Layout, Rect},
     style::Stylize,
     text::{Line, Span},
-    widgets::{Block, Borders, Row, Table, TableState},
+    widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
 
 use super::{CommonAction, Pane};
@@ -76,7 +76,7 @@ impl QueuePane {
             areas: enum_map! {
                 _ => Rect::default(),
             },
-            should_center_cursor_on_current: false,
+            should_center_cursor_on_current: context.config.center_current_song_on_change,
         }
     }
 
@@ -131,18 +131,18 @@ impl Pane for QueuePane {
 
         let formats = &config.theme.song_table_format;
 
+        let offset = self.scrolling_state.as_render_state_ref().offset();
+        let viewport_len = self.scrolling_state.viewport_len().unwrap_or_default();
+
         let marker_symbol_len = config.theme.symbols.marker.chars().count();
         let table_items = queue
             .iter()
             .enumerate()
             .map(|(idx, song)| {
-                let offset = self.scrolling_state.as_render_state_ref().offset();
-                let viewport_len = self.scrolling_state.viewport_len();
-
                 // Supply default row to skip unnecessary work for rows that are either below or
                 // above the visible portion of the table
-                if idx < offset || viewport_len.is_some_and(|v| idx > v + offset) {
-                    return Row::default();
+                if idx < offset || idx > viewport_len + offset {
+                    return Row::new((0..formats.len()).map(|_| Cell::default()));
                 }
 
                 let is_current = context
