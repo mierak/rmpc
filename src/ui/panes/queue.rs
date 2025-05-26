@@ -56,6 +56,7 @@ pub struct QueuePane {
 #[derive(Debug, Enum)]
 enum Areas {
     Table,
+    TableBlock,
     TableHeader,
     Scrollbar,
 }
@@ -216,9 +217,12 @@ impl Pane for QueuePane {
             .style(config.as_text_style())
             .row_highlight_style(config.theme.current_item_style);
 
-        let table_area = table_block.inner(self.areas[Areas::Table]);
-        frame.render_widget(table_block, self.areas[Areas::Table]);
-        frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
+        frame.render_widget(table_block, self.areas[Areas::TableBlock]);
+        frame.render_stateful_widget(
+            table,
+            self.areas[Areas::Table],
+            self.scrolling_state.as_render_state_ref(),
+        );
 
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height.into()));
         if let Some(scrollbar) = config.as_styled_scrollbar() {
@@ -245,20 +249,27 @@ impl Pane for QueuePane {
             Constraint::Length(scrollbar_area_width),
         ])
         .areas(header_area);
-        let [table_area, scrollbar_area] = Layout::horizontal([
+        let [table_block_area, scrollbar_area] = Layout::horizontal([
             Constraint::Percentage(100),
             Constraint::Length(scrollbar_area_width),
         ])
         .areas(queue_area);
 
         // Aplly empty margin on left and right
-        let table_area = table_area.shrink_horizontally(1);
+        let table_block_area = table_block_area.shrink_horizontally(1);
         let header_area = header_area.shrink_horizontally(1);
         // Make scrollbar not overlap header/table separator if separator is visible
         let scrollbar_area =
             scrollbar_area.shrink_from_top(config.theme.show_song_table_header.into());
 
+        let table_area = if config.theme.show_song_table_header {
+            table_block_area.shrink_from_top(1)
+        } else {
+            table_block_area
+        };
+
         self.areas[Areas::Table] = table_area;
+        self.areas[Areas::TableBlock] = table_block_area;
         self.areas[Areas::TableHeader] = header_area;
         self.areas[Areas::Scrollbar] = scrollbar_area;
 
@@ -285,6 +296,17 @@ impl Pane for QueuePane {
             self.scrolling_state.select(to_select, context.config.scrolloff);
         }
 
+        Ok(())
+    }
+
+    fn resize(&mut self, _area: Rect, context: &AppContext) -> Result<()> {
+        self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
+        let to_select = self
+            .scrolling_state
+            .get_selected()
+            .or(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
+        self.scrolling_state.select(to_select, context.config.scrolloff);
+        context.render()?;
         Ok(())
     }
 
