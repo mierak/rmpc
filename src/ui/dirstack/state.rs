@@ -213,10 +213,6 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     fn apply_scrolloff(&mut self, scrolloff: usize) {
-        if scrolloff == 0 {
-            return;
-        }
-
         let vieport_len = self.viewport_len.unwrap_or_default();
         let offset = self.inner.offset();
         let idx = self.get_selected().unwrap_or_default();
