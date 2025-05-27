@@ -10,7 +10,7 @@ import ConfigValue from "../../../../components/ConfigValue.tsx";
 import { path } from "../data.ts";
 
 <ConfigValue name="header" type="other" customText="<row[]>" link="#row" />
-Configuration of the header. Header is displayed at the top of te window. It can display info about current song, the
+Configuration of the header. Header is displayed at the top of the window. It can display info about current song, the
 player state and custom widgets. It is an array of `row` objects. The number of these rows determines how many rows are
 going to be displayed in the header. If left empty, the header is not displayed at all. Each row can have left, center
 and right configuration to display various information about the player state and currently playing song.
@@ -157,8 +157,7 @@ from MPD version 0.24.0, with earlier versions it get silently ignored.
 <ConfigValue
     name="kind"
     type="other"
-    customText='Property(Status(SingleV2(on_label: "<your label>", off_label: "<your label>", oneshot_label: "<your label>",
-    oneshot_label: "<your label>", on_style: <style>, off_style: <style>, oneshot_style: <style>)))'
+    customText='Property(Status(SingleV2(on_label: "<your label>", off_label: "<your label>", oneshot_label: "<your label>", on_style: <style>, off_style: <style>, oneshot_style: <style>)))'
 />
 
 Similar to `StateV2`. Allows you to configure labels for on/off and one shot states.
