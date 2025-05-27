@@ -108,7 +108,16 @@ pub enum Command {
     /// Plays the next song in the playlist
     Next,
     /// Plays the previous song in the playlist
-    Prev,
+    Prev {
+        /// Go back to the start of the song if more than 5 seconds elapsed
+        #[arg(
+            short,
+            long = "rewind-to-start",
+            default_missing_value = "5",
+            num_args = 0..=1
+        )]
+        rewind_to_start: Option<u64>,
+    },
     /// Sets volume, relative if prefixed by + or -. Prints current volume if no
     /// arguments is given.
     Volume {

@@ -12,7 +12,7 @@ use crate::{
     mpd::{
         client::Client,
         commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
-        mpd_client::{Filter, MpdClient, Tag},
+        mpd_client::{Filter, MpdClient, Tag, ValueChange},
         version::Version,
     },
     shared::{
@@ -119,7 +119,22 @@ impl Command {
                 Ok(())
             })),
             Command::Next => Ok(Box::new(|client| Ok(client.next()?))),
-            Command::Prev => Ok(Box::new(|client| Ok(client.prev()?))),
+            Command::Prev { rewind_to_start } => Ok(Box::new(move |client| {
+                match rewind_to_start {
+                    Some(value) => {
+                        let status = client.get_status()?;
+                        if status.elapsed.as_secs() >= value {
+                            client.seek_current(ValueChange::Set(0))?;
+                        } else {
+                            client.prev()?;
+                        }
+                    }
+                    None => {
+                        client.prev()?;
+                    }
+                }
+                Ok(())
+            })),
             Command::Repeat { value } => {
                 Ok(Box::new(move |client| Ok(client.repeat((value).into())?)))
             }
