@@ -260,8 +260,17 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::PreviousTrack if context.status.state != State::Stop => {
+                    let elapsed = context.status.elapsed;
                     context.command(move |client| {
-                        client.prev()?;
+                        if client.version() < Version::new(0, 25, 0) {
+                            if elapsed.as_secs() >= 5 {
+                                client.seek_current(ValueChange::Set(0))?;
+                            } else {
+                                client.prev()?;
+                            }
+                        } else {
+                            client.prev()?;
+                        }
                         Ok(())
                     });
                 }
