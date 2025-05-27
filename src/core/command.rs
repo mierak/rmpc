@@ -121,7 +121,7 @@ impl Command {
             Command::Next => Ok(Box::new(|client| Ok(client.next()?))),
             Command::Prev { rewind_to_start } => Ok(Box::new(move |client|  {
                 let status = client.get_status()?;
-                if rewind_to_start || client.version() < Version::new(0, 25, 0) {
+                if rewind_to_start {
                     if status.elapsed.as_secs() >= 5 {
                         client.seek_current(ValueChange::Set(0))?;
                     } else {
