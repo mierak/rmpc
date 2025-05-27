@@ -11,7 +11,7 @@ use crate::{
     context::AppContext,
     mpd::{
         client::Client,
-        commands::{mpd_config::MpdConfig, volume::Bound, IdleEvent, State},
+        commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
         mpd_client::{Filter, MpdClient, Tag, ValueChange},
         version::Version,
     },
@@ -119,7 +119,7 @@ impl Command {
                 Ok(())
             })),
             Command::Next => Ok(Box::new(|client| Ok(client.next()?))),
-                        Command::Prev { rewind_to_start } => Ok(Box::new(move |client| {
+            Command::Prev { rewind_to_start } => Ok(Box::new(move |client| {
                 match rewind_to_start {
                     Some(value) => {
                         let status = client.get_status()?;
