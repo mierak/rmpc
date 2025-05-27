@@ -110,7 +110,7 @@ pub enum Command {
     /// Plays the previous song in the playlist
     Prev {
         /// Go back to the start of the song if more than 5 seconds elapsed
-            #[arg(
+        #[arg(
             short,
             long = "rewind-to-start",
             default_missing_value = "5",
