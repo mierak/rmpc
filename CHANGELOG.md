@@ -38,7 +38,7 @@ lists they are listed as multiple entries.
 - Added `--rewind-to-start` CLI argument for the previous action, allowing
   users to rewind to the start of the currently playing song when
   navigating to the previous track.
-
+- Sort keybinds in the help modal alphabetically
  
 ### Changed
 
