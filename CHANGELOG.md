@@ -35,7 +35,10 @@ lists they are listed as multiple entries.
 - Added `togglerandom`, `togglesingle`, `togglerepeat` and `toggleconsume` CLI commands
 - Added `ToggleSingleOnOff` and `ToggleConsumeOnOff` global actions which skip oneshot for their respective mode
 - Added `ActiveTab` status property showing the name of currently active tab
-- sort keybinds in the help modal alphabetically
+- Added `--rewind-to-start` CLI argument for the previous action, allowing
+  users to rewind to the start of the currently playing song when
+  navigating to the previous track.
+- Sort keybinds in the help modal alphabetically
  
 ### Changed
 
