@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::{Style, Styled, Stylize},
+    style::{Style, Styled},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
