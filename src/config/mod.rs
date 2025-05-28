@@ -418,6 +418,7 @@ impl ConfigFile {
             }
             ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
             ImageMethodFile::Sixel => ImageMethod::Sixel,
+            ImageMethodFile::Block => ImageMethod::Block,
             ImageMethodFile::None => ImageMethod::None,
             ImageMethodFile::Auto => match image::determine_image_support(is_tmux)? {
                 ImageProtocol::Kitty => ImageMethod::Kitty,
@@ -425,6 +426,7 @@ impl ConfigFile {
                 ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
                 ImageProtocol::Iterm2 => ImageMethod::Iterm2,
                 ImageProtocol::Sixel => ImageMethod::Sixel,
+                ImageProtocol::Block => ImageMethod::Block,
                 ImageProtocol::None => ImageMethod::Unsupported,
             },
         };
@@ -440,7 +442,8 @@ impl ConfigFile {
             | ImageMethod::UeberzugWayland
             | ImageMethod::UeberzugX11
             | ImageMethod::Iterm2
-            | ImageMethod::Sixel => {
+            | ImageMethod::Sixel
+            | ImageMethod::Block => {
                 log::debug!(resolved:? = config.album_art.method, requested:? = album_art_method, is_tmux; "Image method resolved");
             }
         }

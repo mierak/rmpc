@@ -23,6 +23,7 @@ pub enum ImageProtocol {
     UeberzugX11,
     Iterm2,
     Sixel,
+    Block,
     #[default]
     None,
 }
