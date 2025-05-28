@@ -7,8 +7,8 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::Stylize,
-    text::{Line, Span},
+    style::{Style, Styled, Stylize},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
 
@@ -59,6 +59,7 @@ enum Areas {
     TableBlock,
     TableHeader,
     Scrollbar,
+    FilterArea,
 }
 
 const ADD_TO_PLAYLIST: &str = "add_to_playlist";
@@ -94,6 +95,12 @@ impl QueuePane {
             context.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
         )
     }
+
+    fn filter_text(&self) -> Option<String> {
+        self.filter
+            .as_ref()
+            .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }))
+    }
 }
 
 impl Pane for QueuePane {
@@ -107,18 +114,18 @@ impl Pane for QueuePane {
         let queue_len = queue.len();
         self.calculate_areas(area, context)?;
 
-        let title = self
-            .filter
-            .as_ref()
-            .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }));
+        let filter_text = self.filter_text();
 
         let table_block = {
-            let mut b = Block::default().border_style(config.as_border_style().bold());
+            let border_style = config.as_border_style();
+            let mut b = Block::default().border_style(border_style);
             if config.theme.show_song_table_header {
                 b = b.borders(Borders::TOP);
             }
-            if let Some(ref title) = title {
-                b = b.title(title.clone().blue());
+            if self.areas[Areas::FilterArea].height == 0 {
+                if let Some(ref title) = filter_text {
+                    b = b.title(title.clone().set_style(border_style));
+                }
             }
             b
         };
@@ -233,6 +240,17 @@ impl Pane for QueuePane {
             );
         }
 
+        if let Some(filter_text) = filter_text {
+            if self.areas[Areas::FilterArea].height > 0 {
+                frame.render_widget(
+                    Text::from(filter_text).style(
+                        config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+                    ),
+                    self.areas[Areas::FilterArea],
+                );
+            }
+        }
+
         Ok(())
     }
 
@@ -266,6 +284,15 @@ impl Pane for QueuePane {
             table_block_area.shrink_from_top(1)
         } else {
             table_block_area
+        };
+
+        let table_area = if self.filter.is_some() && !context.config.theme.show_song_table_header {
+            self.areas[Areas::FilterArea] =
+                Rect::new(table_area.x, table_area.y, table_area.width, 1);
+            table_area.shrink_from_top(1)
+        } else {
+            self.areas[Areas::FilterArea] = Rect::default();
+            table_area
         };
 
         self.areas[Areas::Table] = table_area;

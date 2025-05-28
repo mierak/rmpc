@@ -63,6 +63,7 @@ lists they are listed as multiple entries.
 - Improve reconnection behavior of MPD client
 - Improve performance of the queue table by not calculating rows that are not visible
 - Tilde not being expanded in `default_album_art_path`
+- Filter overlapping song table when `show_song_table_header` was set to false
 
 ## [0.8.0] - 2025-02-16
 
