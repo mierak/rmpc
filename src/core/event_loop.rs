@@ -7,7 +7,6 @@ use std::{
 };
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
-use itertools::Itertools;
 use ratatui::{
     Terminal,
     layout::Rect,
@@ -23,9 +22,8 @@ use crate::{
     },
     shared::{
         events::{AppEvent, WorkDone},
-        ext::{duration::DurationExt, error::ErrorExt},
+        ext::error::ErrorExt,
         id::{self, Id},
-        lrc::get_lrc_path,
         macros::{status_error, status_warn},
         mpd_query::{
             EXTERNAL_COMMAND,
@@ -303,38 +301,8 @@ fn main_task<B: Backend + std::io::Write>(
                             if let Some((_, song)) = context.find_current_song_in_queue() {
                                 if Some(song.id) != current_song_id {
                                     if let Some(command) = &context.config.on_song_change {
-                                        let lrc_path = context
-                                            .config
-                                            .lyrics_dir
-                                            .as_ref()
-                                            .and_then(|dir| get_lrc_path(dir, &song.file).ok())
-                                            .map(|path| path.to_string_lossy().into_owned())
-                                            .unwrap_or_default();
-                                        let lrc = context.find_lrc().ok().flatten();
-                                        let pid = std::process::id();
-                                        let duration = song
-                                            .duration
-                                            .map_or_else(String::new, |d| d.to_string());
+                                        let env = create_env(&context, std::iter::empty());
 
-                                        let mut env = song
-                                            .clone()
-                                            .metadata
-                                            .into_iter()
-                                            .map(|(mut k, mut v)| {
-                                                k.make_ascii_uppercase();
-                                                (k, std::mem::take(v.last_mut()))
-                                            })
-                                            .collect_vec();
-
-                                        env.push(("FILE".to_owned(), song.file.clone()));
-                                        env.push(("DURATION".to_owned(), duration));
-                                        env.push(("PID".to_owned(), pid.to_string()));
-                                        env.push(("HAS_LRC".to_owned(), lrc.is_some().to_string()));
-                                        env.push(("LRC_FILE".to_owned(), lrc_path));
-                                        env.push((
-                                            "VERSION".to_owned(),
-                                            env!("CARGO_PKG_VERSION").to_string(),
-                                        ));
                                         run_external(command.clone(), env);
                                     }
                                     song_changed = true;
@@ -394,8 +362,8 @@ fn main_task<B: Backend + std::io::Write>(
                     if let Some(cmd) = &context.config.on_resize {
                         let cmd = Arc::clone(cmd);
                         let mut env = create_env(&context, std::iter::empty::<&str>());
-                        env.push(("COLS", columns.to_string()));
-                        env.push(("ROWS", rows.to_string()));
+                        env.push(("COLS".to_owned(), columns.to_string()));
+                        env.push(("ROWS".to_owned(), rows.to_string()));
                         log::debug!("Executing on resize");
                         run_external(cmd, env);
                     }
