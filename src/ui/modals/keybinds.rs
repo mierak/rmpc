@@ -132,14 +132,14 @@ impl Modal for KeybindsModal {
         let mut search: Vec<_> = keybinds.search.to_str().collect();
         let mut queue: Vec<_> = keybinds.queue.to_str().collect();
 
-        global.sort_by_key(|(key, _, _)| key.to_lowercase());
-        navigation.sort_by_key(|(key, _, _)| key.to_lowercase());
-        albums.sort_by_key(|(key, _, _)| key.to_lowercase());
-        artists.sort_by_key(|(key, _, _)| key.to_lowercase());
-        directories.sort_by_key(|(key, _, _)| key.to_lowercase());
-        playlists.sort_by_key(|(key, _, _)| key.to_lowercase());
-        search.sort_by_key(|(key, _, _)| key.to_lowercase());
-        queue.sort_by_key(|(key, _, _)| key.to_lowercase());
+        global.sort_by_key(|(_, action, _)| action.to_lowercase());
+        navigation.sort_by_key(|(_, action, _)| action.to_lowercase());
+        albums.sort_by_key(|(_, action, _)| action.to_lowercase());
+        artists.sort_by_key(|(_, action, _)| action.to_lowercase());
+        directories.sort_by_key(|(_, action, _)| action.to_lowercase());
+        playlists.sort_by_key(|(_, action, _)| action.to_lowercase());
+        search.sort_by_key(|(_, action, _)| action.to_lowercase());
+        queue.sort_by_key(|(_, action, _)| action.to_lowercase());
 
         let rows = row_header(&global, "Global", header_style)
             .into_iter()
