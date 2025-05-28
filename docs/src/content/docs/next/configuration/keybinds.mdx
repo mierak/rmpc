@@ -45,6 +45,7 @@ All song paths are listed as their path relative to MPD's music directory.
 
 - `$CURRENT_SONG`: can be used to access the currently playing song.
 - `$STATE`: Can be one of `Playing`, `Paused` or `Stopped`
+- All metadata of the currently playing song (if any). For example `ARTIST`, `TITLE`, `DURATION`,
 - `$SELECTED_SONGS`: contains a list of songs that are selected in the various panes. Songs are separated by `\n`, their order is undefined
   and should not be relied upon.
     - In `Browser`, `Albums`, `Playlists` and `Artists` it will list all songs contained in the currently highlighted item and all its subdirectories.

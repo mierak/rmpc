@@ -16,7 +16,8 @@ use crate::{
         version::Version,
     },
     shared::{
-        lrc::LrcIndex,
+        ext::duration::DurationExt,
+        lrc::{LrcIndex, get_lrc_path},
         macros::{status_error, status_info},
         ytdlp::YtDlp,
     },
@@ -439,13 +440,29 @@ pub fn run_external<K: Into<String>, V: Into<String>>(
 pub fn create_env<'a>(
     context: &AppContext,
     selected_songs_paths: impl IntoIterator<Item = &'a str>,
-) -> Vec<(&'static str, String)> {
+) -> Vec<(String, String)> {
     let mut result = Vec::new();
 
     if let Some((_, current)) = context.find_current_song_in_queue() {
-        result.push(("CURRENT_SONG", current.file.clone()));
+        result.push(("CURRENT_SONG".to_owned(), current.file.clone()));
+        result.extend(
+            current.metadata.iter().map(|(k, v)| (k.to_ascii_uppercase(), v.last().to_owned())),
+        );
+        let lrc_path = context
+            .config
+            .lyrics_dir
+            .as_ref()
+            .and_then(|dir| get_lrc_path(dir, &current.file).ok())
+            .map(|path| path.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let lrc = context.find_lrc().ok().flatten();
+        let duration = current.duration.map_or_else(String::new, |d| d.to_string());
+        result.push(("DURATION".to_owned(), duration));
+        result.push(("HAS_LRC".to_owned(), lrc.is_some().to_string()));
+        result.push(("LRC_FILE".to_owned(), lrc_path));
+        result.push(("FILE".to_owned(), current.file.clone()));
     }
-    result.push(("PID", std::process::id().to_string()));
+    result.push(("PID".to_owned(), std::process::id().to_string()));
 
     let songs =
         selected_songs_paths.into_iter().enumerate().fold(String::new(), |mut acc, (idx, val)| {
@@ -457,11 +474,11 @@ pub fn create_env<'a>(
         });
 
     if !songs.is_empty() {
-        result.push(("SELECTED_SONGS", songs));
+        result.push(("SELECTED_SONGS".to_owned(), songs));
     }
-    result.push(("VERSION", env!("CARGO_PKG_VERSION").to_string()));
+    result.push(("VERSION".to_owned(), env!("CARGO_PKG_VERSION").to_string()));
 
-    result.push(("STATE", context.status.state.to_string()));
+    result.push(("STATE".to_owned(), context.status.state.to_string()));
 
     result
 }
