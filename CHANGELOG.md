@@ -35,6 +35,7 @@ lists they are listed as multiple entries.
 - Added `togglerandom`, `togglesingle`, `togglerepeat` and `toggleconsume` CLI commands
 - Added `ToggleSingleOnOff` and `ToggleConsumeOnOff` global actions which skip oneshot for their respective mode
 - Added `ActiveTab` status property showing the name of currently active tab
+- sort keybinds in the help modal alphabetically
  
 ### Changed
 
