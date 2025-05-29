@@ -1,4 +1,3 @@
-pub mod ansi_colors;
 pub mod dependencies;
 pub mod env;
 pub mod events;
