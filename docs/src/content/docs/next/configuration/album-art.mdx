@@ -21,6 +21,7 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 
 | Terminal  | Backend                   | Tmux    | Additional Info                                                                                                                                                      |
 | --------- | ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All       | Block                     | yes     | Only prints ANSI.                                                                                                                                                    |
 | Kitty     | Kitty                     | yes     | -                                                                                                                                                                    |
 | Ghostty   | Kitty                     | yes     | -                                                                                                                                                                    |
 | WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                    |
@@ -28,16 +29,17 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 | Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                             |
 | Foot      | Sixel                     | yes     | Limited image size [in tmux](#sixel)                                                                                                                                 |
 | Alacritty | Ueberzug                  | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                            |
-| Others    | Ueberzug/Sixel/Kitty/None | unknown | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other backends or disabling album_art altogether if you experience issues. |
+| Others    | Ueberzug/Sixel/Kitty      | yes     | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other backends or disabling album_art altogether if you experience issues. |
 
 ## Configuration
 
 ### method
 
-<ConfigValue name="method" type={["Kitty", "Iterm2", "Sixel", "UeberzugWayland", "UeberzugX11", "None", "Auto"]} />
+<ConfigValue name="method" type={["Kitty", "Iterm2", "Sixel", "UeberzugWayland", "UeberzugX11", "Block", "None", "Auto"]} />
 
 Rendering method used to display images. Currently Kitty, UeberzugWayland and UeberzugX11 are supported.
 Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is not available.
+For all terminals, `Block` is now supported. It will fall_back to ANSI if the terminal doesn't support truecolor.
 
 `None` completely disables album art display.
 

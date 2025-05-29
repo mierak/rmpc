@@ -39,7 +39,8 @@ lists they are listed as multiple entries.
   navigating to the previous track.
 - Sort keybinds in the help modal alphabetically
 - Include song metadata in `ExternalCommand` env
- 
+- Added `Block` AlbumArt Support
+
 ### Changed
 
 - **Breaking**: Songs are no longer sorted by their `browser_song_format`. The new `browser_song_sort` is used instead
