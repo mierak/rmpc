@@ -37,7 +37,7 @@ lists they are listed as multiple entries.
 - Added `ActiveTab` status property showing the name of currently active tab
 - Added `--rewind-to-start` CLI argument for the previous action, allowing users to rewind to the start of the currently playing song when
   navigating to the previous track.
-- Sort keybinds in the help modal alphabetically
+- Sort keybinds in the help modal
 - Include song metadata in `ExternalCommand` env
 - Added `Block` AlbumArt Support
 

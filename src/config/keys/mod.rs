@@ -27,7 +27,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use key::Key;
 use serde::{Deserialize, Serialize};
 
-mod actions;
+pub(crate) mod actions;
 mod key;
 
 #[derive(Debug, PartialEq, Default, Clone)]

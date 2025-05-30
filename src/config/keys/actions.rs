@@ -1,20 +1,22 @@
 use std::{borrow::Cow, sync::Arc};
 
 use itertools::Itertools;
-use strum::Display;
+use strum::{Display, EnumDiscriminants, VariantArray};
 
 use super::ToDescription;
 use crate::config::{tabs::TabName, utils::tilde_expand};
 
 // Global actions
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[strum_discriminants(derive(VariantArray))]
 pub enum GlobalAction {
     Quit,
     ShowHelp,
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
+    AddRandom,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -34,10 +36,16 @@ pub enum GlobalAction {
     CommandMode,
     NextTab,
     PreviousTab,
+    #[strum(to_string = "SwitchToTab({0})")]
     SwitchToTab(TabName),
-    Command { command: String, description: Option<String> },
-    ExternalCommand { command: Arc<Vec<String>>, description: Option<String> },
-    AddRandom,
+    Command {
+        command: String,
+        description: Option<String>,
+    },
+    ExternalCommand {
+        command: Arc<Vec<String>>,
+        description: Option<String>,
+    },
 }
 
 #[derive(
@@ -284,7 +292,8 @@ pub enum QueueActionsFile {
     Shuffle,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[strum_discriminants(derive(VariantArray))]
 pub enum QueueActions {
     Delete,
     DeleteAll,
@@ -369,7 +378,8 @@ pub enum CommonActionFile {
     InsertAll,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[strum_discriminants(derive(VariantArray))]
 pub enum CommonAction {
     Down,
     Up,
