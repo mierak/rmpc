@@ -18,6 +18,7 @@ use crate::{
     shared::macros::csi_move,
 };
 
+pub mod block;
 pub mod facade;
 pub mod iterm2;
 pub mod kitty;

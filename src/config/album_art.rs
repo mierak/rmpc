@@ -63,6 +63,7 @@ pub enum ImageMethodFile {
     UeberzugX11,
     Iterm2,
     Sixel,
+    Block,
     None,
     #[default]
     Auto,
@@ -76,6 +77,7 @@ pub enum ImageMethod {
     Iterm2,
     Sixel,
     None,
+    Block,
     #[default]
     Unsupported,
 }

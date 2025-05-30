@@ -23,6 +23,7 @@ pub enum ImageProtocol {
     UeberzugX11,
     Iterm2,
     Sixel,
+    Block,
     #[default]
     None,
 }
@@ -60,7 +61,7 @@ pub fn determine_image_support(is_tmux: bool) -> Result<ImageProtocol> {
         }
     }
 
-    return Ok(ImageProtocol::None);
+    return Ok(ImageProtocol::Block);
 }
 
 pub fn is_iterm2_supported(is_tmux: bool) -> bool {

@@ -8,6 +8,7 @@ use ratatui::layout::Rect;
 
 use super::{
     Backend,
+    block::Block,
     iterm2::Iterm2,
     kitty::Kitty,
     sixel::Sixel,
@@ -34,6 +35,7 @@ enum ImageState {
     Ueberzug(Ueberzug),
     Iterm2(Iterm2),
     Sixel(Sixel),
+    Block(Block),
     #[default]
     None,
 }
@@ -46,6 +48,7 @@ impl AlbumArtFacade {
             ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11)),
             ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(config.into())),
             ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(config.into())),
+            ImageProtocol::Block => ImageState::Block(Block::new(config.into())),
             ImageProtocol::None => ImageState::None,
         };
         Self {
@@ -77,6 +80,7 @@ impl AlbumArtFacade {
             ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
             ImageState::Iterm2(iterm2) => iterm2.show(data, self.last_size),
             ImageState::Sixel(s) => s.show(data, self.last_size),
+            ImageState::Block(s) => s.show(data, self.last_size),
             ImageState::None => Ok(()),
         }
     }
@@ -93,6 +97,7 @@ impl AlbumArtFacade {
             ImageState::Ueberzug(ueberzug) => ueberzug.show(data, self.last_size),
             ImageState::Iterm2(iterm2) => iterm2.show(data, self.last_size),
             ImageState::Sixel(s) => s.show(data, self.last_size),
+            ImageState::Block(s) => s.show(data, self.last_size),
             ImageState::None => Ok(()),
         }
     }
@@ -104,6 +109,7 @@ impl AlbumArtFacade {
             ImageState::Ueberzug(ueberzug) => ueberzug.hide(self.last_size)?,
             ImageState::Iterm2(iterm2) => iterm2.hide(self.last_size)?,
             ImageState::Sixel(s) => s.hide(self.last_size)?,
+            ImageState::Block(s) => s.hide(self.last_size)?,
             ImageState::None => {}
         }
         Ok(())
@@ -117,6 +123,7 @@ impl AlbumArtFacade {
             ImageState::Ueberzug(ueberzug) => Box::new(ueberzug).cleanup(self.last_size),
             ImageState::Iterm2(iterm2) => Box::new(iterm2).cleanup(self.last_size),
             ImageState::Sixel(s) => Box::new(s).cleanup(self.last_size),
+            ImageState::Block(s) => Box::new(s).cleanup(self.last_size),
             ImageState::None => Ok(()),
         }
     }
@@ -131,6 +138,7 @@ impl AlbumArtFacade {
             ImageState::Ueberzug(ueberzug) => ueberzug.set_config(config.into())?,
             ImageState::Iterm2(iterm2) => iterm2.set_config(config.into())?,
             ImageState::Sixel(sixel) => sixel.set_config(config.into())?,
+            ImageState::Block(block) => block.set_config(config.into())?,
             ImageState::None => {}
         }
         Ok(())
@@ -145,6 +153,7 @@ impl From<ImageMethod> for ImageProtocol {
             ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
             ImageMethod::Iterm2 => ImageProtocol::Iterm2,
             ImageMethod::Sixel => ImageProtocol::Sixel,
+            ImageMethod::Block => ImageProtocol::Block,
             ImageMethod::None | ImageMethod::Unsupported => ImageProtocol::None,
         }
     }
