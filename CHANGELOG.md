@@ -41,6 +41,7 @@ lists they are listed as multiple entries.
 - Include song metadata in `ExternalCommand` env
 - Added `Block` AlbumArt Support
 - Add `level_styles` config option for various status message levels
+- Add filtering to the keybinds modal
 
 ### Changed
 

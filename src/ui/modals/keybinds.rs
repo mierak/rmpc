@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use anyhow::Result;
+use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     Frame,
@@ -22,6 +23,7 @@ use crate::{
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    status_warn,
     ui::dirstack::DirState,
 };
 
@@ -29,6 +31,9 @@ use crate::{
 pub struct KeybindsModal {
     scrolling_state: DirState<TableState>,
     table_area: Rect,
+    filter: Option<String>,
+    filter_input_mode: bool,
+    filter_rows: Vec<Option<String>>,
 }
 
 trait KeybindsExt {
@@ -53,10 +58,74 @@ where
 }
 
 impl KeybindsModal {
-    pub fn new(_app: &mut AppContext) -> Self {
+    pub fn new(_ctx: &mut AppContext) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
-        Self { scrolling_state, table_area: Rect::default() }
+
+        Self {
+            scrolling_state,
+            table_area: Rect::default(),
+            filter: None,
+            filter_input_mode: false,
+            filter_rows: Vec::new(),
+        }
+    }
+
+    pub fn jump_forward(&mut self, scrolloff: usize) {
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+        let Some(selected) = self.scrolling_state.get_selected() else {
+            log::error!(state:? = self.scrolling_state; "No song selected");
+            return;
+        };
+
+        let length = self.filter_rows.len();
+        for i in selected + 1..length + selected {
+            let i = i % length;
+            if let Some(row) = &self.filter_rows[i] {
+                if !row.is_empty() && row.contains(filter) {
+                    self.scrolling_state.select(Some(i), scrolloff);
+                    break;
+                }
+            }
+        }
+    }
+
+    pub fn jump_back(&mut self, scrolloff: usize) {
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+        let Some(selected) = self.scrolling_state.get_selected() else {
+            log::error!(state:? = self.scrolling_state; "No song selected");
+            return;
+        };
+
+        let length = self.filter_rows.len();
+        for i in (0..length).rev() {
+            let i = (i + selected) % length;
+            if let Some(row) = &self.filter_rows[i] {
+                if !row.is_empty() && row.contains(filter) {
+                    self.scrolling_state.select(Some(i), scrolloff);
+                    break;
+                }
+            }
+        }
+    }
+
+    pub fn jump_first(&mut self, scrolloff: usize) {
+        let Some(filter) = self.filter.as_ref() else {
+            status_warn!("No filter set");
+            return;
+        };
+
+        self.filter_rows
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.as_ref().is_some_and(|item| item.contains(filter)))
+            .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx), scrolloff));
     }
 }
 fn row_header<'a>(
@@ -81,19 +150,54 @@ fn row<'a>(
     key_width: u16,
     action_width: u16,
     description_width: u16,
-) -> impl Iterator<Item = Row<'a>> {
+    filter: Option<&str>,
+    match_style: Style,
+) -> impl Iterator<Item = (String, Row<'a>)> {
     keys.iter().flat_map(move |(key, action, description)| {
+        let matches = if let Some(filter) = filter {
+            key.to_lowercase().contains(&filter.to_lowercase())
+                || action.to_lowercase().contains(&filter.to_lowercase())
+                || description.to_lowercase().contains(&filter.to_lowercase())
+        } else {
+            false
+        };
+
         let key = textwrap::wrap(key, key_width as usize);
         let action = textwrap::wrap(action, action_width as usize);
         let description = textwrap::wrap(description, description_width as usize);
 
-        key.into_iter().zip_longest2(action.into_iter(), description.into_iter()).map(
-            |(key, action, description)| {
-                Row::new([
-                    Cell::from(Text::from(key.unwrap_or_default())),
-                    Cell::from(Text::from(action.unwrap_or_default())),
-                    Cell::from(Text::from(description.unwrap_or_default())),
-                ])
+        key.into_iter().zip_longest2(action.into_iter(), description.into_iter()).enumerate().map(
+            move |(idx, (key, action, description))| {
+                let mut result = if idx == 0 && filter.is_some() {
+                    (
+                        [
+                            key.as_ref().map(|v| v.to_lowercase()).unwrap_or_default(),
+                            action.as_ref().map(|v| v.to_lowercase()).unwrap_or_default(),
+                            description.as_ref().map(|v| v.to_lowercase()).unwrap_or_default(),
+                        ]
+                        .join(""),
+                        Row::new([
+                            Cell::from(Text::from(key.unwrap_or_default())),
+                            Cell::from(Text::from(action.unwrap_or_default())),
+                            Cell::from(Text::from(description.unwrap_or_default())),
+                        ]),
+                    )
+                } else {
+                    (
+                        String::new(),
+                        Row::new([
+                            Cell::from(Text::from(key.unwrap_or_default())),
+                            Cell::from(Text::from(action.unwrap_or_default())),
+                            Cell::from(Text::from(description.unwrap_or_default())),
+                        ]),
+                    )
+                };
+
+                if matches {
+                    result.1 = result.1.style(match_style);
+                }
+
+                result
             },
         )
     })
@@ -107,12 +211,16 @@ impl Modal for KeybindsModal {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
-        let block = Block::default()
+        let mut block = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED)
             .border_style(app.config.as_border_style())
-            .title_alignment(ratatui::prelude::Alignment::Center)
-            .title("Keybinds");
+            .title_alignment(ratatui::prelude::Alignment::Center);
+        if let Some(filter) = &self.filter {
+            block = block.title(format!("Keybinds | [Filter]: {filter}"));
+        } else {
+            block = block.title("Keybinds");
+        }
 
         let margin = Margin { horizontal: 1, vertical: 0 };
         let [header_area, table_area] =
@@ -138,15 +246,50 @@ impl Modal for KeybindsModal {
         let global = keybinds.global.sort_by_action().collect_vec();
         let navigation = keybinds.navigation.sort_by_action().collect_vec();
         let queue = keybinds.queue.sort_by_action().collect_vec();
+        let global_rows: (Vec<_>, Vec<_>) = row(
+            &global,
+            key_area.width,
+            action_area.width,
+            desc_area.width,
+            self.filter.as_deref(),
+            app.config.theme.highlighted_item_style,
+        )
+        .unzip();
+        let nav_rows: (Vec<_>, Vec<_>) = row(
+            &navigation,
+            key_area.width,
+            action_area.width,
+            desc_area.width,
+            self.filter.as_deref(),
+            app.config.theme.highlighted_item_style,
+        )
+        .unzip();
+        let queue_rows: (Vec<_>, Vec<_>) = row(
+            &queue,
+            key_area.width,
+            action_area.width,
+            desc_area.width,
+            self.filter.as_deref(),
+            app.config.theme.highlighted_item_style,
+        )
+        .unzip();
 
         let rows = row_header(&global, "Global", header_style)
             .into_iter()
-            .chain(row(&global, key_area.width, action_area.width, desc_area.width))
+            .chain(global_rows.1)
             .chain(row_header(&navigation, "Navigation", header_style))
-            .chain(row(&navigation, key_area.width, action_area.width, desc_area.width))
+            .chain(nav_rows.1)
             .chain(row_header(&queue, "Queue", header_style))
-            .chain(row(&queue, key_area.width, action_area.width, desc_area.width))
+            .chain(queue_rows.1)
             .collect_vec();
+
+        self.filter_rows = Vec::new();
+        self.filter_rows.push(None);
+        self.filter_rows.extend(global_rows.0.into_iter().map(Some));
+        self.filter_rows.push(None);
+        self.filter_rows.extend(nav_rows.0.into_iter().map(Some));
+        self.filter_rows.push(None);
+        self.filter_rows.extend(queue_rows.0.into_iter().map(Some));
 
         self.scrolling_state.set_content_len(Some(rows.len()));
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
@@ -182,7 +325,44 @@ impl Modal for KeybindsModal {
     }
 
     fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+        if self.filter_input_mode {
+            match key.as_common_action(context) {
+                Some(CommonAction::Confirm) => {
+                    self.filter_input_mode = false;
+
+                    context.render()?;
+                }
+                Some(CommonAction::Close) => {
+                    self.filter_input_mode = false;
+                    self.filter = None;
+
+                    context.render()?;
+                }
+                _ => {
+                    key.stop_propagation();
+                    match key.code() {
+                        KeyCode::Char(c) => {
+                            if let Some(ref mut f) = self.filter {
+                                for c in c.to_lowercase() {
+                                    f.push(c);
+                                }
+                            }
+                            self.jump_first(context.config.scrolloff);
+
+                            context.render()?;
+                        }
+                        KeyCode::Backspace => {
+                            if let Some(ref mut f) = self.filter {
+                                f.pop();
+                            }
+
+                            context.render()?;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        } else if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(context.config.scrolloff);
@@ -218,6 +398,22 @@ impl Modal for KeybindsModal {
                 }
                 CommonAction::Close => {
                     pop_modal!(context);
+                }
+                CommonAction::EnterSearch => {
+                    self.filter_input_mode = true;
+                    self.filter = Some(String::new());
+
+                    context.render()?;
+                }
+                CommonAction::NextResult => {
+                    self.jump_forward(context.config.scrolloff);
+
+                    context.render()?;
+                }
+                CommonAction::PreviousResult => {
+                    self.jump_back(context.config.scrolloff);
+
+                    context.render()?;
                 }
                 _ => {}
             }
