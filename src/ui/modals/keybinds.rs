@@ -217,7 +217,7 @@ impl Modal for KeybindsModal {
             .border_style(app.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
         if let Some(filter) = &self.filter {
-            block = block.title(format!("Keybinds | [Filter]: {filter}"));
+            block = block.title(format!("Keybinds | [FILTER]: {filter}"));
         } else {
             block = block.title("Keybinds");
         }
