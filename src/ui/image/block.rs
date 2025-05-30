@@ -69,7 +69,10 @@ impl Block {
                             }
                         };
 
-                    let mut w = std::io::stdout().lock();
+                    let (img, resized_area) = try_cont!(
+                        resize_image(&data, area, config.max_size, config.halign, config.valign),
+                        "Failed to resize block image"
+                    );
 
                     // consume all pending messages, skipping older encode requests
                     for msg in receiver.try_iter() {
@@ -86,6 +89,8 @@ impl Block {
                         }
                     }
 
+                    let mut w = std::io::stdout().lock();
+
                     if !IS_SHOWING.load(Ordering::Relaxed) {
                         log::trace!(
                             "Not showing image because its not supposed to be displayed anymore"
@@ -96,11 +101,6 @@ impl Block {
                     try_cont!(
                         clear_area(&mut w, config.colors, area),
                         "Failed to clear image area"
-                    );
-
-                    let (img, resized_area) = try_cont!(
-                        resize_image(&data, area, config.max_size, config.halign, config.valign),
-                        "Failed to resize block image"
                     );
 
                     try_skip!(display(&mut w, &img, resized_area), "Failed to display block");

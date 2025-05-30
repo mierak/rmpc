@@ -4,7 +4,7 @@ use ratatui::{Frame, layout::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{album_art::ImageMethod, tabs::PaneType},
+    config::tabs::PaneType,
     context::AppContext,
     mpd::mpd_client::MpdClient,
     shared::{image::ImageProtocol, key_event::KeyEvent},
@@ -140,7 +140,7 @@ impl Pane for AlbumArtPane {
             UiEvent::ModalClosed if is_visible => {
                 self.is_modal_open = false;
 
-                if self.fetch_needed || context.config.album_art.method == ImageMethod::Block {
+                if self.fetch_needed {
                     self.fetch_needed = false;
                     self.before_show(context)?;
                     return Ok(());
