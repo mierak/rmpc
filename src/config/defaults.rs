@@ -110,3 +110,31 @@ pub fn default_time_unit_separator() -> String {
 pub fn default_scrollbar() -> Option<ScrollbarConfigFile> {
     Some(ScrollbarConfigFile::default())
 }
+
+pub fn default_trace_color() -> StyleFile {
+    StyleFile { fg: Some("magenta".to_string()), bg: Some("black".to_string()), modifiers: None }
+}
+
+pub fn default_debug_color() -> StyleFile {
+    StyleFile {
+        fg: Some("light_green".to_string()),
+        bg: Some("black".to_string()),
+        modifiers: None,
+    }
+}
+
+pub fn default_info_color() -> StyleFile {
+    StyleFile { fg: Some("blue".to_string()), bg: Some("black".to_string()), modifiers: None }
+}
+
+pub fn default_warn_color() -> StyleFile {
+    StyleFile { fg: Some("yellow".to_string()), bg: Some("black".to_string()), modifiers: None }
+}
+
+pub fn default_error_color() -> StyleFile {
+    StyleFile { fg: Some("red".to_string()), bg: Some("black".to_string()), modifiers: None }
+}
+
+pub fn default_status_bar_background_color() -> StyleFile {
+    StyleFile { fg: Some("black".to_string()), bg: Some("black".to_string()), modifiers: None }
+}

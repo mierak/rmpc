@@ -83,6 +83,24 @@ This symbol is used for selected items in the browser panes.
 Symbol used to indicate text truncation when content exceeds the available
 display space.
 
+### level_styles
+
+Configures style of various messages depending on their level, ie. info or error.
+
+<ConfigValue name="level_styles" type="other" customText="LevelStyles" />
+
+Defaults to:
+
+```rust
+level_styles: (
+    info: (fg: "blue", bg: "black"),
+    warn: (fg: "yellow", bg: "black"),
+    error: (fg: "red", bg: "black"),
+    debug: (fg: "light_green", bg: "black"),
+    trace: (fg: "magenta", bg: "black"),
+),
+```
+
 ### progress_bar
 
 Progress bar at the bottom of the window.

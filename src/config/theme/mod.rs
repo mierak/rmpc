@@ -1,5 +1,6 @@
 use ::serde::{Deserialize, Serialize};
 use anyhow::Result;
+use level_styles::{LevelStyles, LevelStylesFile};
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 
@@ -12,6 +13,7 @@ use self::{
 };
 
 mod header;
+pub mod level_styles;
 mod progress_bar;
 pub mod properties;
 mod queue_table;
@@ -59,6 +61,7 @@ pub struct UiConfig {
     pub default_album_art: &'static [u8],
     pub layout: SizedPaneOrSplit,
     pub format_tag_separator: String,
+    pub level_styles: LevelStyles,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -96,6 +99,8 @@ pub struct UiConfigFile {
     pub(super) layout: PaneOrSplitFile,
     #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
+    #[serde(default)]
+    pub(super) level_styles: LevelStylesFile,
 }
 
 impl Default for UiConfigFile {
@@ -162,6 +167,7 @@ impl Default for UiConfigFile {
                 bg: None,
                 modifiers: Some(Modifiers::Bold),
             },
+            level_styles: LevelStylesFile::default(),
         }
     }
 }
@@ -267,6 +273,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             preview_metadata_group_style: value
                 .preview_metadata_group_style
                 .to_config_or(None, None)?,
+            level_styles: value.level_styles.try_into()?,
         })
     }
 }

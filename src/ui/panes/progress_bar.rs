@@ -1,12 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use ratatui::{
-    Frame,
-    prelude::Rect,
-    style::{Color, Style},
-    widgets::Paragraph,
-};
+use ratatui::{Frame, prelude::Rect, widgets::Paragraph};
 
 use super::Pane;
 use crate::{
@@ -53,7 +48,7 @@ impl Pane for ProgressBarPane {
         if let Some(StatusMessage { message, level, .. }) = &self.status_message {
             let status_bar = Paragraph::new(message.to_owned())
                 .alignment(ratatui::prelude::Alignment::Center)
-                .style(Style::default().fg(level.into()).bg(Color::Black));
+                .style(level.into_style(&context.config.theme.level_styles));
             frame.render_widget(status_bar, self.area);
         } else {
             let elapsed_bar = context.config.as_styled_progress_bar();
