@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::min, collections::HashMap, env::var, fmt::Display, ops::Range};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -14,13 +14,7 @@ use strum::{IntoDiscriminant, VariantArray};
 
 use super::{Modal, RectExt};
 use crate::{
-    config::keys::{
-        CommonAction,
-        GlobalAction,
-        Key,
-        ToDescription,
-        actions::GlobalActionDiscriminants,
-    },
+    config::keys::{CommonAction, ToDescription},
     context::AppContext,
     shared::{
         ext::iter::IntoZipLongest2,
@@ -38,26 +32,23 @@ pub struct KeybindsModal {
 }
 
 trait KeybindsExt {
-    fn sort_by_action(&self) -> Vec<(String, String, Cow<'static, str>)>;
+    fn sort_by_action(&self) -> impl Iterator<Item = (String, String, Cow<'static, str>)>;
 }
 
 impl<K, ActionEnum, Discriminant> KeybindsExt for HashMap<K, ActionEnum>
 where
-    K: Display,
+    K: Display + std::cmp::PartialEq<K>,
     ActionEnum: Display + ToDescription + IntoDiscriminant<Discriminant = Discriminant>,
     Discriminant: VariantArray + std::cmp::PartialEq<Discriminant>,
 {
-    fn sort_by_action(&self) -> Vec<(String, String, Cow<'static, str>)> {
-        let variants = Discriminant::VARIANTS;
-        let mut res = Vec::new();
-        for variant in variants {
-            let result = self
-                .iter()
+    fn sort_by_action(&self) -> impl Iterator<Item = (String, String, Cow<'static, str>)> {
+        Discriminant::VARIANTS.iter().flat_map(|variant| {
+            self.iter()
                 .filter(|(_, v)| &v.discriminant() == variant)
-                .map(|(k, v)| (k.to_string(), v.to_string(), v.to_description()));
-            res.extend(result);
-        }
-        res
+                .map(|(k, v)| (k.to_string(), v))
+                .sorted_by(|a, b| a.0.cmp(&b.0))
+                .map(|(k, v)| (k, v.to_string(), v.to_description()))
+        })
     }
 }
 
@@ -144,30 +135,15 @@ impl Modal for KeybindsModal {
         let keybinds = &app.config.keybinds;
         let header_style = app.config.theme.current_item_style;
 
-        let mut global: Vec<_> = keybinds.global.sort_by_action();
-        let mut navigation: Vec<_> = keybinds.navigation.sort_by_action();
-        // let mut albums: Vec<_> = keybinds.albums.sort_enum();
-        // let mut artists: Vec<_> = keybinds.artists.sort_enum();
-        // let mut directories: Vec<_> = keybinds.directories.sort_enum();
-        // let mut playlists: Vec<_> = keybinds.playlists.sort_enum();
-        // let mut search: Vec<_> = keybinds.search.sort_enum();
-        let mut queue: Vec<_> = keybinds.queue.sort_by_action();
+        let global = keybinds.global.sort_by_action().collect_vec();
+        let navigation = keybinds.navigation.sort_by_action().collect_vec();
+        let queue = keybinds.queue.sort_by_action().collect_vec();
 
         let rows = row_header(&global, "Global", header_style)
             .into_iter()
             .chain(row(&global, key_area.width, action_area.width, desc_area.width))
             .chain(row_header(&navigation, "Navigation", header_style))
             .chain(row(&navigation, key_area.width, action_area.width, desc_area.width))
-            // .chain(row_header(&albums, "Albums", header_style))
-            // .chain(row(&albums, key_area.width, action_area.width, desc_area.width))
-            // .chain(row_header(&artists, "Artists", header_style))
-            // .chain(row(&artists, key_area.width, action_area.width, desc_area.width))
-            // .chain(row_header(&directories, "Directories", header_style))
-            // .chain(row(&directories, key_area.width, action_area.width, desc_area.width))
-            // .chain(row_header(&playlists, "Playlists", header_style))
-            // .chain(row(&playlists, key_area.width, action_area.width, desc_area.width))
-            // .chain(row_header(&search, "Search", header_style))
-            // .chain(row(&search, key_area.width, action_area.width, desc_area.width))
             .chain(row_header(&queue, "Queue", header_style))
             .chain(row(&queue, key_area.width, action_area.width, desc_area.width))
             .collect_vec();

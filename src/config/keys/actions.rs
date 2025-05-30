@@ -36,9 +36,16 @@ pub enum GlobalAction {
     CommandMode,
     NextTab,
     PreviousTab,
+    #[strum(to_string = "SwitchToTab({0})")]
     SwitchToTab(TabName),
-    Command { command: String, description: Option<String> },
-    ExternalCommand { command: Arc<Vec<String>>, description: Option<String> },
+    Command {
+        command: String,
+        description: Option<String>,
+    },
+    ExternalCommand {
+        command: Arc<Vec<String>>,
+        description: Option<String>,
+    },
 }
 
 #[derive(
