@@ -40,6 +40,7 @@ lists they are listed as multiple entries.
 - Sort keybinds in the help modal
 - Include song metadata in `ExternalCommand` env
 - Added `Block` AlbumArt Support
+- Add `level_styles` config option for various status message levels
 
 ### Changed
 

@@ -35,6 +35,7 @@ use crate::{
         cli::Args,
         keys::GlobalAction,
         tabs::{PaneType, SizedPaneOrSplit, TabName},
+        theme::level_styles::LevelStyles,
     },
     context::AppContext,
     core::command::{create_env, run_external},
@@ -709,6 +710,18 @@ impl From<&Level> for Color {
             Level::Error => Color::Red,
             Level::Debug => Color::LightGreen,
             Level::Trace => Color::Magenta,
+        }
+    }
+}
+
+impl Level {
+    pub fn into_style(self, config: &LevelStyles) -> Style {
+        match self {
+            Level::Trace => config.trace,
+            Level::Debug => config.debug,
+            Level::Warn => config.warn,
+            Level::Error => config.error,
+            Level::Info => config.info,
         }
     }
 }
