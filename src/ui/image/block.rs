@@ -1,3 +1,19 @@
+use std::{
+    io::Write,
+    sync::{Arc, atomic::Ordering},
+};
+
+use ansi_colours::ansi256_from_rgb;
+use anyhow::Result;
+use crossbeam::channel::{Sender, unbounded};
+use crossterm::{
+    cursor::{MoveTo, RestorePosition, SavePosition},
+    queue,
+    style::{Color, Colors, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
+};
+use image::DynamicImage;
+use ratatui::layout::Rect;
+
 use super::{AlbumArtConfig, Backend, ImageBackendRequest};
 use crate::{
     shared::{
@@ -7,19 +23,6 @@ use crate::{
     try_skip,
     ui::image::{EncodeRequest, clear_area, facade::IS_SHOWING, recv_data},
 };
-use ansi_colours::ansi256_from_rgb;
-use anyhow::Result;
-use crossbeam::channel::{Sender, unbounded};
-use crossterm::style::{ResetColor, SetBackgroundColor, SetForegroundColor};
-use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
-    queue,
-    style::{Color, Colors, Print},
-};
-use image::DynamicImage;
-use ratatui::layout::Rect;
-use std::io::Write;
-use std::sync::{Arc, atomic::Ordering};
 
 #[derive(Debug)]
 pub struct Block {

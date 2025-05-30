@@ -18,12 +18,12 @@ use crate::{
     shared::macros::csi_move,
 };
 
+pub mod block;
 pub mod facade;
 pub mod iterm2;
 pub mod kitty;
 pub mod sixel;
 pub mod ueberzug;
-pub mod block;
 
 #[allow(unused)]
 trait Backend {
