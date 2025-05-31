@@ -159,6 +159,8 @@ fn main() -> Result<()> {
                 std::mem::take(&mut config.address),
                 std::mem::take(&mut config.password),
                 "main",
+                args.partition.partition,
+                args.partition.autocreate,
             )?;
             client.set_read_timeout(None)?;
             (cmd.execute(&config)?)(&mut client)?;
@@ -222,9 +224,14 @@ fn main() -> Result<()> {
             }
             event_tx.send(AppEvent::RequestRender).context("Failed to render first frame")?;
 
-            let mut client =
-                Client::init(config.address.clone(), config.password.clone(), "command")
-                    .context("Failed to connect to MPD")?;
+            let mut client = Client::init(
+                config.address.clone(),
+                config.password.clone(),
+                "command",
+                args.partition.partition,
+                args.partition.autocreate,
+            )
+            .context("Failed to connect to MPD")?;
             client.set_read_timeout(Some(config.mpd_read_timeout))?;
             client.set_write_timeout(Some(config.mpd_write_timeout))?;
 
