@@ -77,7 +77,12 @@ impl LrcIndex {
             (Some(artist), Some(title), Some(album), length) => {
                 // TODO xxx.last() is called here to not change existing behavior. Consider
                 // supporting all the tag entries
-                self.find_lrc(artist.last(), title.last(), album.last(), length)
+                let lrc_opt = self.find_lrc(artist.last(), title.last(), album.last(), length);
+                match lrc_opt {
+                    None => log::trace!("No Lyrics found for {:?}", song.metadata),
+                    Some(lrc) => log::trace!("Lyrics found at {:?}", lrc.path),
+                };
+                lrc_opt
             }
             _ => None,
         }
@@ -91,6 +96,9 @@ impl LrcIndex {
         album: &str,
         length: Option<Duration>,
     ) -> Option<&LrcIndexEntry> {
+        log::trace!(
+            "Searching Lyrics for song: Title: '{title}', Artist: '{artist}', Album: '{album}', Length: {length:?}"
+        );
         self.index.iter().find(|entry| {
             log::trace!(entry:?; "searching entry");
 
@@ -123,14 +131,14 @@ impl LrcIndexEntry {
                 continue;
             }
 
-            let (metadata, rest) = buf
+            let metadata = buf
                 .trim()
                 .strip_prefix('[')
-                .and_then(|s| s.split_once(']'))
                 .with_context(|| format!("Invalid lrc line format: '{buf}'"))?;
-            if !rest.is_empty() {
+            if !metadata.ends_with(']') {
                 break;
             }
+            let metadata = &metadata[..metadata.len() - 1];
 
             match metadata.chars().next() {
                 Some(c) if c.is_numeric() => {
