@@ -43,6 +43,8 @@ lists they are listed as multiple entries.
 - Add `level_styles` config option for various status message levels
 - Add filtering to the keybinds modal
 - Added info modal to the playlist
+- Added initial partition support which allows you to connect to partition specified as a CLI argument
+- Added `listpartitions` CLI
 
 ### Changed
 

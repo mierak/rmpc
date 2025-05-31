@@ -636,6 +636,26 @@ impl MpdClient for TestMpdClient {
     ) -> MpdResult<crate::mpd::commands::stickers::StickersWithFile> {
         todo!("Not yet implemented")
     }
+
+    fn switch_to_partition(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn new_partition(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn delete_partition(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_partitions(&mut self) -> MpdResult<MpdList> {
+        todo!("Not yet implemented")
+    }
+
+    fn move_output(&mut self, _output_name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }
 
 impl SocketClient for TestMpdClient {

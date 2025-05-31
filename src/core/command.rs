@@ -314,6 +314,10 @@ impl Command {
                 println!("{}", serde_json::ser::to_string(&client.list_mounts()?)?);
                 Ok(())
             })),
+            Command::ListPartitions => Ok(Box::new(|client| {
+                println!("{}", serde_json::ser::to_string(&client.list_partitions()?.0)?);
+                Ok(())
+            })),
             Command::AlbumArt { output } => Ok(Box::new(move |client| {
                 let Some(song) = client.get_current_song()? else {
                     std::process::exit(3);

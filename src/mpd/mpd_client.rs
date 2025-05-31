@@ -216,6 +216,13 @@ pub trait MpdClient: Sized {
     // Searches the sticker database for stickers with the specified name, below
     // the specified directory (URI).
     fn find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<StickersWithFile>;
+
+    // Partitions
+    fn switch_to_partition(&mut self, name: &str) -> MpdResult<()>;
+    fn new_partition(&mut self, name: &str) -> MpdResult<()>;
+    fn delete_partition(&mut self, name: &str) -> MpdResult<()>;
+    fn list_partitions(&mut self) -> MpdResult<MpdList>;
+    fn move_output(&mut self, output_name: &str) -> MpdResult<()>;
 }
 
 fn read_response<T: Default + FromMpd, S: SocketClient>(
@@ -890,6 +897,26 @@ impl MpdClient for Client<'_> {
             key.quote_and_escape()
         ))
         .and_then(read_response)
+    }
+
+    fn switch_to_partition(&mut self, name: &str) -> MpdResult<()> {
+        self.send(&format!("partition {}", name.quote_and_escape())).and_then(read_ok)
+    }
+
+    fn new_partition(&mut self, name: &str) -> MpdResult<()> {
+        self.send(&format!("newpartition {}", name.quote_and_escape())).and_then(read_ok)
+    }
+
+    fn list_partitions(&mut self) -> MpdResult<MpdList> {
+        self.send("listpartitions").and_then(read_response)
+    }
+
+    fn delete_partition(&mut self, name: &str) -> MpdResult<()> {
+        self.send(&format!("delpartition {}", name.quote_and_escape())).and_then(read_ok)
+    }
+
+    fn move_output(&mut self, output_name: &str) -> MpdResult<()> {
+        self.send(&format!("moveoutput {}", output_name.quote_and_escape())).and_then(read_ok)
     }
 }
 
