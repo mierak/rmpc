@@ -25,7 +25,11 @@ use crate::{
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
-        modals::{confirm_modal::ConfirmModal, input_modal::InputModal},
+        modals::{
+            confirm_modal::ConfirmModal,
+            info_list_modal::InfoListModal,
+            input_modal::InputModal,
+        },
         widgets::browser::Browser,
     },
 };
@@ -46,6 +50,7 @@ const INIT: &str = "init";
 const REINIT: &str = "reinit";
 const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
+const PLAYLIST_INFO: &str = "preview";
 
 impl PlaylistsPane {
     pub fn new(_context: &AppContext) -> Self {
@@ -190,6 +195,18 @@ impl Pane for PlaylistsPane {
         context: &AppContext,
     ) -> Result<()> {
         match (id, mpd_command) {
+            (PLAYLIST_INFO, MpdQueryResult::SongsList { data, .. }) => {
+                modal!(
+                    context,
+                    InfoListModal::builder()
+                        .column_widths(&[30, 70])
+                        .title("Playlist info")
+                        .items(data)
+                        .size((40, 20))
+                        .build()
+                );
+                context.render()?;
+            }
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {
                     if origin_path != self.stack().path() {
@@ -326,6 +343,25 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
 
     fn is_filter_input_mode_active(&self) -> bool {
         self.filter_input_mode
+    }
+
+    fn show_info(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
+        match item {
+            DirOrSong::Dir { name, .. } => {
+                let playlist = name.clone();
+                context
+                    .query()
+                    .target(PaneType::Playlists)
+                    .replace_id(PLAYLIST_INFO)
+                    .id(PLAYLIST_INFO)
+                    .query(move |client| {
+                        let playlist = client.list_playlist_info(&playlist, None)?;
+                        Ok(MpdQueryResult::SongsList { data: playlist, origin_path: None })
+                    });
+            }
+            DirOrSong::Song(_) => {}
+        }
+        Ok(())
     }
 
     fn list_songs_in_item(

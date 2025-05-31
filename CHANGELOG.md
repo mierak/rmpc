@@ -42,12 +42,14 @@ lists they are listed as multiple entries.
 - Added `Block` AlbumArt Support
 - Add `level_styles` config option for various status message levels
 - Add filtering to the keybinds modal
+- Added info modal to the playlist
 
 ### Changed
 
 - **Breaking**: Songs are no longer sorted by their `browser_song_format`. The new `browser_song_sort` is used instead
 - **Breaking**: Some tags can now be arrays of values instead of a single value if multiple values are in the given id3 tag when listing song metadata via cli.
 - **Breaking**: For CLI which return song info: `last-modified` and `added` are no longer in songs' metadata, they are at the top level object instead now
+- **Breaking**: `ShowInfo` queue action has been moved to `navigation`. It is now more general and works in playlists as well.
 - The first lyrics will now only be highlighted once reached
 - `Filename` property no longer includes file extension, use `FileExtension` if you want to keep it
 - Migrate to Rust 2024 and raise MSRV to 1.85

@@ -43,6 +43,9 @@ where
     fn add(&self, item: &T, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
+    fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
+        Ok(())
+    }
     fn delete(&self, item: &T, index: usize, context: &AppContext) -> Result<()> {
         Ok(())
     }
@@ -401,6 +404,11 @@ where
             CommonAction::Confirm if self.stack().current().marked().is_empty() => {
                 self.open(context)?;
                 context.render()?;
+            }
+            CommonAction::ShowInfo => {
+                if let Some(item) = self.stack().current().selected() {
+                    self.show_info(item, context);
+                }
             }
             CommonAction::Confirm => {}
             CommonAction::PaneDown => {}

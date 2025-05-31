@@ -10,10 +10,10 @@ use itertools::Itertools;
 use modals::{
     add_random_modal::AddRandomModal,
     decoders::DecodersModal,
+    info_list_modal::InfoListModal,
     input_modal::InputModal,
     keybinds::KeybindsModal,
     outputs::OutputsModal,
-    song_info::SongInfoModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
@@ -427,7 +427,14 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::ShowCurrentSongInfo => {
                     if let Some((_, current_song)) = context.find_current_song_in_queue() {
-                        modal!(context, SongInfoModal::new(current_song.clone()));
+                        modal!(
+                            context,
+                            InfoListModal::builder()
+                                .items(current_song)
+                                .title("Song info")
+                                .column_widths(&[30, 70])
+                                .build()
+                        );
                     } else {
                         status_info!("No song is currently playing");
                     }

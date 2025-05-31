@@ -14,12 +14,12 @@ use crate::{
 pub mod add_random_modal;
 pub mod confirm_modal;
 pub mod decoders;
+pub mod info_list_modal;
 pub mod info_modal;
 pub mod input_modal;
 pub mod keybinds;
 pub mod outputs;
 pub mod select_modal;
-pub mod song_info;
 
 #[allow(unused)]
 pub(crate) trait Modal: std::fmt::Debug {

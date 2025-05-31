@@ -300,9 +300,9 @@ pub enum QueueActions {
     Play,
     Save,
     AddToPlaylist,
-    ShowInfo,
     JumpToCurrent,
     Shuffle,
+    Unused,
 }
 
 impl From<QueueActionsFile> for QueueActions {
@@ -313,7 +313,7 @@ impl From<QueueActionsFile> for QueueActions {
             QueueActionsFile::Play => QueueActions::Play,
             QueueActionsFile::Save => QueueActions::Save,
             QueueActionsFile::AddToPlaylist => QueueActions::AddToPlaylist,
-            QueueActionsFile::ShowInfo => QueueActions::ShowInfo,
+            QueueActionsFile::ShowInfo => QueueActions::Unused,
             QueueActionsFile::JumpToCurrent => QueueActions::JumpToCurrent,
             QueueActionsFile::Shuffle => QueueActions::Shuffle,
         }
@@ -328,7 +328,7 @@ impl ToDescription for QueueActions {
             QueueActions::Play => "Play song under cursor",
             QueueActions::Save => "Save current queue as a new playlist",
             QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist",
-            QueueActions::ShowInfo => "Show metadata of the song under cursor in a modal popup",
+            QueueActions::Unused => "unused",
             QueueActions::JumpToCurrent => {
                 "Moves the cursor in Queue table to the currently playing song"
             }
@@ -376,6 +376,7 @@ pub enum CommonActionFile {
     AddAllReplace,
     Insert,
     InsertAll,
+    ShowInfo,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
@@ -413,6 +414,7 @@ pub enum CommonAction {
     AddAllReplace,
     Insert,
     InsertAll,
+    ShowInfo,
 }
 
 impl ToDescription for CommonAction {
@@ -460,6 +462,7 @@ impl ToDescription for CommonAction {
             CommonAction::AddAllReplace => "Replace current queue with all items",
             CommonAction::Insert => "Add item after current song",
             CommonAction::InsertAll => "Add all items after current song",
+            CommonAction::ShowInfo => "Show info about item under cursor in a modal popup",
         }.into()
     }
 }
@@ -499,6 +502,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
             CommonActionFile::Insert => CommonAction::Insert,
             CommonActionFile::InsertAll => CommonAction::InsertAll,
+            CommonActionFile::ShowInfo => CommonAction::ShowInfo,
         }
     }
 }

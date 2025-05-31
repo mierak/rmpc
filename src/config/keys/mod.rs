@@ -10,7 +10,6 @@ pub use actions::{
     CommonAction,
     DirectoriesActions,
     GlobalAction,
-    PlaylistsActions,
     QueueActions,
     SearchActions,
 };
@@ -37,7 +36,6 @@ pub struct KeyConfig {
     pub albums: HashMap<Key, AlbumsActions>,
     pub artists: HashMap<Key, ArtistsActions>,
     pub directories: HashMap<Key, DirectoriesActions>,
-    pub playlists: HashMap<Key, PlaylistsActions>,
     pub search: HashMap<Key, SearchActions>,
     #[cfg(debug_assertions)]
     pub logs: HashMap<Key, LogsActions>,
@@ -50,11 +48,6 @@ pub struct KeyConfigFile {
     pub global: HashMap<Key, GlobalActionFile>,
     #[serde(default)]
     pub navigation: HashMap<Key, CommonActionFile>,
-    // pub albums: HashMap<AlbumsActions, Vec<Key>>,
-    // pub artists: HashMap<ArtistsActions, Vec<Key>>,
-    // pub directories: HashMap<DirectoriesActions, Vec<Key>>,
-    // pub playlists: HashMap<PlaylistsActions, Vec<Key>>,
-    // pub search: HashMap<SearchActions, Vec<Key>>,
     #[cfg(debug_assertions)]
     #[serde(default)]
     pub logs: HashMap<Key, LogsActionsFile>,
@@ -142,6 +135,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Esc,       modifiers: M::NONE    }, C::Close),
                 (Key { key: K::Enter,     modifiers: M::NONE    }, C::Confirm),
                 (Key { key: K::Char('i'), modifiers: M::NONE    }, C::FocusInput),
+                (Key { key: K::Char('B'), modifiers: M::SHIFT   }, C::ShowInfo),
             ]),
             // albums: HashMap::from([
             // ]),
@@ -162,7 +156,6 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Enter,     modifiers: M::NONE    }, Q::Play),
                 (Key { key: K::Char('s'), modifiers: M::CONTROL }, Q::Save),
                 (Key { key: K::Char('a'), modifiers: M::NONE    }, Q::AddToPlaylist),
-                (Key { key: K::Char('i'), modifiers: M::NONE    }, Q::ShowInfo),
                 (Key { key: K::Char('C'), modifiers: M::SHIFT   }, Q::JumpToCurrent),
                 (Key { key: K::Char('X'), modifiers: M::SHIFT   }, Q::Shuffle),
             ]),
@@ -175,14 +168,9 @@ impl From<KeyConfigFile> for KeyConfig {
         KeyConfig {
             global: value.global.into_iter().map(|(k, v)| (k, v.into())).collect(),
             navigation: value.navigation.into_iter().map(|(k, v)| (k, v.into())).collect(),
-            // albums: invert_map(value.albums),
-            // artists: invert_map(value.artists),
-            // directories: invert_map(value.directories),
-            // playlists: invert_map(value.playlists),
             albums: HashMap::new(),
             artists: HashMap::new(),
             directories: HashMap::new(),
-            playlists: HashMap::new(),
             search: HashMap::new(),
             #[cfg(debug_assertions)]
             logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
@@ -247,7 +235,6 @@ mod tests {
             albums: HashMap::from([]),
             artists: HashMap::from([]),
             directories: HashMap::from([]),
-            playlists: HashMap::from([]),
             search: HashMap::from([]),
             navigation: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL }, CommonAction::Up),
                                        (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up)]),

@@ -89,6 +89,7 @@
             "<Esc>":     Close,
             "K":         MoveUp,
             "D":         Delete,
+            "B":         ShowInfo,
         },
         queue: {
             "D":       DeleteAll,
@@ -96,7 +97,6 @@
             "<C-s>":   Save,
             "a":       AddToPlaylist,
             "d":       Delete,
-            "i":       ShowInfo,
             "C":       JumpToCurrent,
             "X":       Shuffle,
         },
