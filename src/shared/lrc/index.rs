@@ -81,7 +81,7 @@ impl LrcIndex {
                 match lrc_opt {
                     None => log::trace!("No Lyrics found for {:?}", song.metadata),
                     Some(lrc) => log::trace!("Lyrics found at {:?}", lrc.path),
-                };
+                }
                 lrc_opt
             }
             _ => None,
