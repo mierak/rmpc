@@ -70,7 +70,7 @@ impl LrcIndex {
     pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {
         match (
             song.metadata.get("artist"),
-            song.metadata.get("artist"),
+            song.metadata.get("title"),
             song.metadata.get("album"),
             song.duration,
         ) {
