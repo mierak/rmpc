@@ -15,7 +15,10 @@ use super::{
 };
 use crate::{
     config::{MpdAddress, address::MpdPassword},
-    mpd::mpd_client::MpdClient,
+    mpd::{
+        errors::{ErrorCode, MpdFailureResponse},
+        mpd_client::MpdClient,
+    },
     shared::macros::status_warn,
 };
 
@@ -31,6 +34,8 @@ pub struct Client<'name> {
     password: Option<MpdPassword>,
     pub version: Version,
     pub config: Option<MpdConfig>,
+    partition: Option<String>,
+    autocreate_partition: bool,
 }
 
 impl std::fmt::Debug for Client<'_> {
@@ -115,6 +120,8 @@ impl<'name> Client<'name> {
         addr: MpdAddress,
         password: Option<MpdPassword>,
         name: &'name str,
+        partition: Option<String>,
+        autocreate_partition: bool,
     ) -> MpdResult<Client<'name>> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
@@ -145,11 +152,35 @@ impl<'name> Client<'name> {
             );
         }
 
-        let mut client = Self { name, rx, stream, addr, password, version, config: None };
+        let mut client = Self {
+            name,
+            rx,
+            stream,
+            addr,
+            password,
+            version,
+            partition,
+            autocreate_partition,
+            config: None,
+        };
 
         if let Some(MpdPassword(ref password)) = client.password.clone() {
             debug!("Used password auth to MPD");
             client.password(password)?;
+        }
+
+        if let Some(partition) = client.partition.clone() {
+            debug!(partition = partition.as_str(); "Using partition");
+            match client.switch_to_partition(&partition) {
+                Ok(()) => {}
+                Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. }))
+                    if autocreate_partition =>
+                {
+                    client.new_partition(&partition)?;
+                    client.switch_to_partition(&partition)?;
+                }
+                err @ Err(_) => err?,
+            }
         }
 
         // 2^18 seems to be max limit supported by MPD and higher values dont
@@ -193,6 +224,20 @@ impl<'name> Client<'name> {
         if let Some(MpdPassword(password)) = &self.password.clone() {
             debug!("Used password auth to MPD");
             self.password(password)?;
+        }
+
+        if let Some(partition) = self.partition.clone() {
+            debug!(partition = partition.as_str(); "Using partition");
+            match self.switch_to_partition(&partition) {
+                Ok(()) => {}
+                Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. }))
+                    if self.autocreate_partition =>
+                {
+                    self.new_partition(&partition)?;
+                    self.switch_to_partition(&partition)?;
+                }
+                err @ Err(_) => err?,
+            }
         }
 
         self.binary_limit(1024 * 1024 * 5)?;

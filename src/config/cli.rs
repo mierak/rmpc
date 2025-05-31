@@ -24,6 +24,22 @@ pub struct Args {
     #[arg(short, long)]
     /// Override the MPD password
     pub password: Option<String>,
+
+    #[command(flatten)]
+    pub partition: Partition,
+}
+
+#[derive(Debug, clap::Args)]
+#[group(required = false, multiple = true)]
+pub struct Partition {
+    /// Partition to connect to at startup
+    #[clap(long)]
+    pub partition: Option<String>,
+
+    /// Automatically create the partition if it does not exist. Requires
+    /// partition to be set.
+    #[clap(long, requires = "partition")]
+    pub autocreate: bool,
 }
 
 #[derive(ValueEnum, IntoStaticStr, strum::Display, Clone, Copy, Debug, PartialEq)]
@@ -229,6 +245,8 @@ pub enum Command {
     },
     /// List currently mounted storages
     ListMounts,
+    /// List the currently existing partitions
+    ListPartitions,
     /// Manipulate and query song stickers
     Sticker {
         #[command(subcommand)]
