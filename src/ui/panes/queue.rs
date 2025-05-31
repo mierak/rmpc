@@ -34,9 +34,9 @@ use crate::{
         dirstack::DirState,
         modals::{
             confirm_modal::ConfirmModal,
+            info_list_modal::InfoListModal,
             input_modal::InputModal,
             select_modal::SelectModal,
-            song_info::SongInfoModal,
         },
     },
 };
@@ -617,15 +617,6 @@ impl Pane for QueuePane {
                             });
                     }
                 }
-                QueueActions::ShowInfo => {
-                    if let Some(selected_song) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
-                    {
-                        modal!(context, SongInfoModal::new(selected_song.clone()));
-                    } else {
-                        status_error!("No song selected");
-                    }
-                }
                 QueueActions::Shuffle if !self.scrolling_state.marked.is_empty() => {
                     for range in self.scrolling_state.marked.ranges().rev() {
                         context.command(move |client| {
@@ -642,6 +633,7 @@ impl Pane for QueuePane {
                     });
                     status_info!("Shuffled the queue");
                 }
+                QueueActions::Unused => {}
             }
         } else if let Some(action) = event.as_common_action(context) {
             match action {
@@ -872,6 +864,22 @@ impl Pane for QueuePane {
                             client.add(&file, Some(QueuePosition::RelativeAdd(0)))?;
                             Ok(())
                         });
+                    }
+                }
+                CommonAction::ShowInfo => {
+                    if let Some(selected_song) =
+                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                    {
+                        modal!(
+                            context,
+                            InfoListModal::builder()
+                                .items(selected_song)
+                                .title("Song info")
+                                .column_widths(&[30, 70])
+                                .build()
+                        );
+                    } else {
+                        status_error!("No song selected");
                     }
                 }
                 CommonAction::InsertAll => {}

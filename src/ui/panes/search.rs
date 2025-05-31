@@ -916,6 +916,7 @@ impl Pane for SearchPane {
                         CommonAction::PaneUp => {}
                         CommonAction::PaneRight => {}
                         CommonAction::PaneLeft => {}
+                        CommonAction::ShowInfo => {}
                     }
                 }
             }
@@ -1106,6 +1107,7 @@ impl Pane for SearchPane {
                         CommonAction::PaneUp => {}
                         CommonAction::PaneRight => {}
                         CommonAction::PaneLeft => {}
+                        CommonAction::ShowInfo => {}
                     }
                 }
             }
