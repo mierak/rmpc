@@ -64,6 +64,7 @@ lists they are listed as multiple entries.
 ### Fixed
 
 - Lyrics with fractions of seconds which weren't to 2s.f. being parsed incorrectly
+- Lyrics with metadata fields containing ']' not being indexed
 - Album art staying on the old one when in tmux and not visible
 - Fixed catpuccin theme not being up to date in the docs
 - Handle invalid utf8 characters

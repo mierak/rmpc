@@ -134,11 +134,8 @@ impl LrcIndexEntry {
             let metadata = buf
                 .trim()
                 .strip_prefix('[')
+                .and_then(|s| s.strip_suffix(']'))
                 .with_context(|| format!("Invalid lrc line format: '{buf}'"))?;
-            if !metadata.ends_with(']') {
-                break;
-            }
-            let metadata = &metadata[..metadata.len() - 1];
 
             match metadata.chars().next() {
                 Some(c) if c.is_numeric() => {
