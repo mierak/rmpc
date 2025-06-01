@@ -319,7 +319,7 @@ impl ConfigFile {
 
         let theme = UiConfig::try_from(theme)?;
 
-        let tabs: Tabs = self.tabs.try_into()?;
+        let tabs: Tabs = self.tabs.convert(&theme.components)?;
         let active_panes = tabs
             .tabs
             .iter()

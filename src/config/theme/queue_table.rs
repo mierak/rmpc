@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use anyhow::{Context, Result};
 use itertools::Itertools;
 use ratatui::layout::Constraint;
@@ -34,7 +36,7 @@ impl From<PercentOrLength> for Constraint {
 }
 
 impl std::str::FromStr for PercentOrLength {
-    type Err = anyhow::Error;
+    type Err = ParseIntError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         if s.ends_with('%') {
