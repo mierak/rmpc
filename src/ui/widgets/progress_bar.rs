@@ -97,17 +97,19 @@ impl Widget for ProgressBar<'_> {
             buf.set_string(left + elapsed_len as u16, top, self.thumb_char, self.thumb_style);
         }
 
-        if elapsed_len > 0 {
-            buf.set_string(left, top, self.start_char, self.elapsed_style);
-        } else {
-            buf.set_string(left, top, self.start_char, self.track_style);
-        }
+        buf.set_string(
+            left,
+            top,
+            self.start_char,
+            if elapsed_len > 0 { self.elapsed_style } else { self.track_style },
+        );
 
-        if elapsed_len < (len - 1) as usize {
-            buf.set_string(right - 1, top, self.end_char, self.track_style);
-        } else {
-            buf.set_string(right - 1, top, self.end_char, self.elapsed_style);
-        }
+        buf.set_string(
+            right - 1,
+            top,
+            self.end_char,
+            if elapsed_len < (len - 1) as usize { self.track_style } else { self.elapsed_style },
+        );
     }
 }
 
