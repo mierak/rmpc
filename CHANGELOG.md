@@ -61,6 +61,7 @@ lists they are listed as multiple entries.
 - Refactored yt-dlp to make it easier to add support for more hosts
 - `scrollbar` theme option now also accepts `None` as a valid value to hide all scrollbars in rmpc
 - `TogglePause` in both the keybind and CLI to issue play if the current state is stopped
+- Made lyrics index matching more lenient
 
 ### Fixed
 
