@@ -34,7 +34,13 @@ pub struct ProgressBarConfigFile {
 impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
-            symbols: vec!["[".to_owned(), "-".to_owned(), ">".to_owned(), " ".to_owned(), "]".to_owned()],
+            symbols: vec![
+                "[".to_owned(),
+                "-".to_owned(),
+                ">".to_owned(),
+                " ".to_owned(),
+                "]".to_owned(),
+            ],
             elapsed_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
@@ -87,13 +93,25 @@ mod tests {
     #[test]
     fn maps_symbols() {
         let input = ProgressBarConfigFile {
-            symbols: vec!["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned(), "e".to_owned()],
+            symbols: vec![
+                "a".to_owned(),
+                "b".to_owned(),
+                "c".to_owned(),
+                "d".to_owned(),
+                "e".to_owned(),
+            ],
             ..Default::default()
         };
 
         let result = input.into_config().unwrap().symbols;
 
-        assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned(), "e".to_owned()]);
+        assert_eq!(result, [
+            "a".to_owned(),
+            "b".to_owned(),
+            "c".to_owned(),
+            "d".to_owned(),
+            "e".to_owned()
+        ]);
     }
 
     #[test_case(None,         None,         Style::default().fg(RC::Blue)                ; "uses default colors")]

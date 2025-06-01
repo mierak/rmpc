@@ -40,7 +40,7 @@ impl<'a> ProgressBar<'a> {
         self.start_char = start;
         self
     }
-    
+
     pub fn elapsed_char(mut self, elapsed: &'a str) -> Self {
         self.elapsed_char = elapsed;
         self
@@ -65,12 +65,12 @@ impl<'a> ProgressBar<'a> {
         self.elapsed_style = style;
         self
     }
-    
+
     pub fn thumb_style(mut self, style: Style) -> Self {
         self.thumb_style = style;
         self
     }
-    
+
     pub fn track_style(mut self, style: Style) -> Self {
         self.track_style = style;
         self
@@ -89,59 +89,24 @@ impl Widget for ProgressBar<'_> {
 
         let len = right - left;
 
-        buf.set_string(
-            left,
-            top,
-            self.track_char.repeat(len as usize),
-            self.track_style,
-        );
+        buf.set_string(left, top, self.track_char.repeat(len as usize), self.track_style);
 
         let elapsed_len = (len as f32 * self.value) as usize;
-        buf.set_string(
-            left,
-            top,
-            self.elapsed_char.repeat(elapsed_len),
-            self.elapsed_style,
-        );
+        buf.set_string(left, top, self.elapsed_char.repeat(elapsed_len), self.elapsed_style);
         if elapsed_len < (len - 1) as usize && elapsed_len > 0 {
-            buf.set_string(
-                left + elapsed_len as u16,
-                top,
-                self.thumb_char,
-                self.thumb_style,
-            );
+            buf.set_string(left + elapsed_len as u16, top, self.thumb_char, self.thumb_style);
         }
 
         if elapsed_len > 0 {
-            buf.set_string(
-                left,
-                top,
-                self.start_char,
-                self.elapsed_style,
-            );
+            buf.set_string(left, top, self.start_char, self.elapsed_style);
         } else {
-            buf.set_string(
-                left,
-                top,
-                self.start_char,
-                self.track_style,
-            );
+            buf.set_string(left, top, self.start_char, self.track_style);
         }
 
         if elapsed_len < (len - 1) as usize {
-            buf.set_string(
-                right - 1,
-                top,
-                self.end_char,
-                self.track_style,
-            );
+            buf.set_string(right - 1, top, self.end_char, self.track_style);
         } else {
-            buf.set_string(
-                right - 1,
-                top,
-                self.end_char,
-                self.elapsed_style,
-            );
+            buf.set_string(right - 1, top, self.end_char, self.elapsed_style);
         }
     }
 }
@@ -233,7 +198,7 @@ mod tests {
         let mut buf = Buffer { area, content: vec![Cell::default(); 5] };
 
         wg.render(area, &mut buf);
-        
+
         assert_eq!(buf[(0, 0)].symbol(), "S");
         assert_eq!(buf[(1, 0)].symbol(), "E");
         assert_eq!(buf[(2, 0)].symbol(), "T");
