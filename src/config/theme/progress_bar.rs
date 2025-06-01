@@ -62,6 +62,13 @@ impl Default for ProgressBarConfigFile {
 
 impl ProgressBarConfigFile {
     pub(super) fn into_config(mut self) -> Result<ProgressBarConfig> {
+        if self.symbols.len() == 3 {
+            self.symbols.resize(5, String::new());
+            self.symbols[4] = self.symbols[2].clone();
+            self.symbols[3] = self.symbols[2].clone();
+            self.symbols[2] = self.symbols[1].clone();
+            self.symbols[1] = self.symbols[0].clone();
+        }
         let start = std::mem::take(&mut self.symbols[0]);
         let elapsed = std::mem::take(&mut self.symbols[1]);
         let thumb = std::mem::take(&mut self.symbols[2]);
