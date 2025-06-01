@@ -21,7 +21,7 @@
     highlight_border_style: (fg: "blue"),
     symbols: (song: "S", dir: "D", marker: "M", ellipsis: "..."),
     progress_bar: (
-        symbols: ["[", "-", ">", " ", "]"],
+        symbols: ["-", ">", " "],
         track_style: (fg: "#1e2030"),
         elapsed_style: (fg: "blue"),
         thumb_style: (fg: "blue", bg: "#1e2030"),
