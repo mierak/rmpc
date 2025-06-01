@@ -6,6 +6,7 @@ use ratatui::style::{Color, Style};
 
 use self::{
     header::{HeaderConfig, HeaderConfigFile},
+    lyrics::{LyricsConfig, LyricsConfigFile},
     progress_bar::{ProgressBarConfig, ProgressBarConfigFile},
     queue_table::{QueueTableColumns, QueueTableColumnsFile},
     scrollbar::ScrollbarConfig,
@@ -14,6 +15,7 @@ use self::{
 
 mod header;
 pub mod level_styles;
+mod lyrics;
 mod progress_bar;
 pub mod properties;
 mod queue_table;
@@ -62,6 +64,7 @@ pub struct UiConfig {
     pub layout: SizedPaneOrSplit,
     pub format_tag_separator: String,
     pub level_styles: LevelStyles,
+    pub lyrics: LyricsConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -101,6 +104,7 @@ pub struct UiConfigFile {
     pub(super) format_tag_separator: String,
     #[serde(default)]
     pub(super) level_styles: LevelStylesFile,
+    pub(super) lyrics: LyricsConfigFile,
 }
 
 impl Default for UiConfigFile {
@@ -168,6 +172,7 @@ impl Default for UiConfigFile {
                 modifiers: Some(Modifiers::Bold),
             },
             level_styles: LevelStylesFile::default(),
+            lyrics: LyricsConfigFile::default(),
         }
     }
 }
@@ -274,6 +279,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .preview_metadata_group_style
                 .to_config_or(None, None)?,
             level_styles: value.level_styles.try_into()?,
+            lyrics: value.lyrics.into_config()?,
         })
     }
 }

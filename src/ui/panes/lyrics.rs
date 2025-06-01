@@ -2,7 +2,6 @@ use anyhow::Result;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::Style,
     text::Text,
 };
 
@@ -43,10 +42,11 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
+        let default_style = context.config.theme.lyrics.line_style;
         let middle_style = if first_line_reached {
-            context.config.theme.highlighted_item_style
+            context.config.theme.lyrics.active_line_style
         } else {
-            Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+            default_style
         };
 
         let mut current_area = middle_row as usize;
@@ -54,10 +54,11 @@ impl Pane for LyricsPane {
             return Ok(());
         };
         for line in textwrap::wrap(&current_line.content, area.width as usize) {
+            let p = Text::from(line).centered().style(middle_style);
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            frame.render_widget(Text::from(line).centered().style(middle_style), *area);
+            frame.render_widget(p, *area);
             current_area += 1;
         }
 
@@ -69,9 +70,7 @@ impl Pane for LyricsPane {
                 break;
             };
             for l in textwrap::wrap(&line.content, area.width as usize).iter().rev() {
-                let p = Text::from(l.clone()).centered().style(
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
-                );
+                let p = Text::from(l.clone()).centered().style(default_style);
                 if before_area_cursor == 0 {
                     break;
                 }
@@ -94,9 +93,7 @@ impl Pane for LyricsPane {
                 break;
             };
             for l in textwrap::wrap(&line.content, area.width as usize) {
-                let p = Text::from(l).centered().style(
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
-                );
+                let p = Text::from(l).centered().style(default_style);
                 let Some(area) = areas.get(after_area_cursor + 1) else {
                     break;
                 };
