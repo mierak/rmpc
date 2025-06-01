@@ -83,6 +83,7 @@ This is just a small checklist to potentially reduce the amount of back and fort
 pull requests.
 
 * [Format](#formatting-the-code) the code
+* Run clippy (stable)
 * Ensure that all tests pass by running `cargo test`
 * Update the documentation if your feature changed or added behavior
 * Note your change in the changelog 
