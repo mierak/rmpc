@@ -7,11 +7,12 @@ use super::{StyleFile, style::ToConfigOr};
 #[derive(Debug, Default, Clone)]
 pub struct ProgressBarConfig {
     /// Symbols for the rogress bar at the bottom of the screen
-    /// First symbol is used for the elapsed part of the progress bar
-    /// Second symbol is used for the thumb
-    /// Third symbol is used for the remaining part of the progress bar
+    /// First symbol is used for the start boundary of the progress bar
+    /// Second symbol is used for the elapsed part of the progress bar
+    /// Third symbol is used for the thumb
+    /// Fourth symbol is used for the remaining part of the progress bar
+    /// Fifth symbol is used for the end boundary of the progress bar
     pub symbols: [String; 5],
-    pub start_style: Style,
     /// Fall sback to blue for foreground and black for background
     pub elapsed_style: Style,
     /// Thumb at the end of the elapsed part of the progress bar
@@ -20,28 +21,20 @@ pub struct ProgressBarConfig {
     /// Fall sback to black for foreground and default color for background
     /// For transparent track you should set the track symbol to empty string
     pub track_style: Style,
-    pub end_style: Style,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProgressBarConfigFile {
     pub(super) symbols: Vec<String>,
-    pub(super) start_style: Option<StyleFile>,
     pub(super) track_style: Option<StyleFile>,
     pub(super) elapsed_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
-    pub(super) end_style: Option<StyleFile>,
 }
 
 impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
             symbols: vec!["[".to_owned(), "-".to_owned(), ">".to_owned(), " ".to_owned(), "]".to_owned()],
-            start_style: Some(StyleFile {
-                fg: Some("blue".to_string()),
-                bg: None,
-                modifiers: None,
-            }),
             elapsed_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
@@ -53,11 +46,6 @@ impl Default for ProgressBarConfigFile {
                 modifiers: None,
             }),
             track_style: Some(StyleFile {
-                fg: Some("#1e2030".to_string()),
-                bg: None,
-                modifiers: None,
-            }),
-            end_style: Some(StyleFile {
                 fg: Some("#1e2030".to_string()),
                 bg: None,
                 modifiers: None,
@@ -76,11 +64,9 @@ impl ProgressBarConfigFile {
 
         Ok(ProgressBarConfig {
             symbols: [start, elapsed, thumb, track, end],
-            start_style: self.start_style.to_config_or(Some(Color::Blue), None)?,
             elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::Black), None)?,
-            end_style: self.end_style.to_config_or(Some(Color::Black), None)?,
         })
     }
 }

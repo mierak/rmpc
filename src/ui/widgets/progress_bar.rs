@@ -12,11 +12,9 @@ pub struct ProgressBar<'a> {
     thumb_char: &'a str,
     track_char: &'a str,
     end_char: &'a str,
-    start_style: Style,
     elapsed_style: Style,
     thumb_style: Style,
     track_style: Style,
-    end_style: Style,
 }
 
 #[allow(dead_code)]
@@ -27,7 +25,6 @@ impl<'a> ProgressBar<'a> {
     }
 
     pub fn fg(mut self, color: Color) -> Self {
-        self.start_style = self.start_style.fg(color);
         self.elapsed_style = self.elapsed_style.fg(color);
         self.thumb_style = self.thumb_style.fg(color);
         self
@@ -36,7 +33,6 @@ impl<'a> ProgressBar<'a> {
     pub fn bg(mut self, color: Color) -> Self {
         self.thumb_style = self.thumb_style.bg(color);
         self.track_style = self.track_style.fg(color);
-        self.start_style = self.start_style.fg(color);
         self
     }
 
@@ -65,11 +61,6 @@ impl<'a> ProgressBar<'a> {
         self
     }
 
-    pub fn start_style(mut self, style: Style) -> Self {
-        self.start_style = style;
-        self
-    }
-
     pub fn elapsed_style(mut self, style: Style) -> Self {
         self.elapsed_style = style;
         self
@@ -82,11 +73,6 @@ impl<'a> ProgressBar<'a> {
     
     pub fn track_style(mut self, style: Style) -> Self {
         self.track_style = style;
-        self
-    }
-
-    pub fn end_style(mut self, style: Style) -> Self {
-        self.end_style = style;
         self
     }
 }
@@ -131,7 +117,7 @@ impl Widget for ProgressBar<'_> {
                 left,
                 top,
                 self.start_char,
-                self.start_style,
+                self.elapsed_style,
             );
         } else {
             buf.set_string(
@@ -147,7 +133,7 @@ impl Widget for ProgressBar<'_> {
                 right - 1,
                 top,
                 self.end_char,
-                self.end_style,
+                self.track_style,
             );
         } else {
             buf.set_string(
@@ -169,11 +155,9 @@ impl Default for ProgressBar<'_> {
             thumb_char: "",
             track_char: " ",
             end_char: "═",
-            start_style: Style::default(),
             elapsed_style: Style::default().fg(Color::Blue),
             thumb_style: Style::default().bg(Color::Black).fg(Color::Blue),
             track_style: Style::default().bg(Color::Black),
-            end_style: Style::default(),
         }
     }
 }
