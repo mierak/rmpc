@@ -129,8 +129,17 @@ impl LrcIndex {
                         Some(without_length[0])
                     } else {
                         // Lrc with matching lenght was not found and there are no lrc without
-                        // length. Return the first result.
-                        with_length.iter().sorted_by_key(|x| x.length).next().copied()
+                        // length. Return the closest match by length.
+                        with_length
+                            .iter()
+                            .sorted_by(|a, b| {
+                                a.length
+                                    .unwrap_or_default()
+                                    .abs_diff(s_duration)
+                                    .cmp(&b.length.unwrap_or_default().abs_diff(s_duration))
+                            })
+                            .next()
+                            .copied()
                     }
                 } else {
                     // Song does not have a lenght information, not sure if this can ever happen,
@@ -417,29 +426,56 @@ mod tests {
                     .path("should not match")
                     .artist("123")
                     .title("asdf")
-                    .album("song does not have me")
                     .length(Duration::from_secs(103))
-                    .call(),
-                entry()
-                    .path("should not match")
-                    .artist("123")
-                    .title("asdf")
-                    .album("song does not have me")
-                    .length(Duration::from_secs(108))
                     .call(),
                 entry()
                     .path("should match")
                     .artist("123")
                     .title("asdf")
-                    .album("song does not have me")
                     .length(Duration::from_secs(99))
+                    .call(),
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(108))
                     .call(),
             ],
         };
 
         let result = index.find_entry(&song);
 
-        dbg!(&result);
+        assert!(result.unwrap().path.to_string_lossy() == "should match");
+    }
+
+    #[test]
+    fn multiple_matches_no_lrc_without_len_no_length_match() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(100)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(200))
+                    .call(),
+                entry()
+                    .path("should match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(199))
+                    .call(),
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(1))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
         assert!(result.unwrap().path.to_string_lossy() == "should match");
     }
 
@@ -473,7 +509,6 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        dbg!(&result);
         assert!(result.unwrap().path.to_string_lossy() == "no length");
     }
 }
