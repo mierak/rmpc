@@ -10,31 +10,35 @@ pub struct ProgressBarConfig {
     /// First symbol is used for the elapsed part of the progress bar
     /// Second symbol is used for the thumb
     /// Third symbol is used for the remaining part of the progress bar
-    pub symbols: [String; 3],
-    /// Fall sback to black for foreground and default color for background
-    /// For transparent track you should set the track symbol to empty string
-    pub track_style: Style,
+    pub symbols: [String; 5],
+    pub start_style: Style,
     /// Fall sback to blue for foreground and black for background
     pub elapsed_style: Style,
     /// Thumb at the end of the elapsed part of the progress bar
     /// Fall sback to blue for foreground and black for background
     pub thumb_style: Style,
+    /// Fall sback to black for foreground and default color for background
+    /// For transparent track you should set the track symbol to empty string
+    pub track_style: Style,
+    pub end_style: Style,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProgressBarConfigFile {
     pub(super) symbols: Vec<String>,
+    pub(super) start_style: Option<StyleFile>,
     pub(super) track_style: Option<StyleFile>,
     pub(super) elapsed_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
+    pub(super) end_style: Option<StyleFile>,
 }
 
 impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
-            symbols: vec!["-".to_owned(), ">".to_owned(), " ".to_owned()],
-            track_style: Some(StyleFile {
-                fg: Some("#1e2030".to_string()),
+            symbols: vec!["[".to_owned(), "-".to_owned(), ">".to_owned(), " ".to_owned(), "]".to_owned()],
+            start_style: Some(StyleFile {
+                fg: Some("blue".to_string()),
                 bg: None,
                 modifiers: None,
             }),
@@ -48,21 +52,35 @@ impl Default for ProgressBarConfigFile {
                 bg: Some("#1e2030".to_string()),
                 modifiers: None,
             }),
+            track_style: Some(StyleFile {
+                fg: Some("#1e2030".to_string()),
+                bg: None,
+                modifiers: None,
+            }),
+            end_style: Some(StyleFile {
+                fg: Some("#1e2030".to_string()),
+                bg: None,
+                modifiers: None,
+            }),
         }
     }
 }
 
 impl ProgressBarConfigFile {
     pub(super) fn into_config(mut self) -> Result<ProgressBarConfig> {
-        let elapsed = std::mem::take(&mut self.symbols[0]);
-        let thumb = std::mem::take(&mut self.symbols[1]);
-        let track = std::mem::take(&mut self.symbols[2]);
+        let start = std::mem::take(&mut self.symbols[0]);
+        let elapsed = std::mem::take(&mut self.symbols[1]);
+        let thumb = std::mem::take(&mut self.symbols[2]);
+        let track = std::mem::take(&mut self.symbols[3]);
+        let end = std::mem::take(&mut self.symbols[4]);
 
         Ok(ProgressBarConfig {
-            symbols: [elapsed, thumb, track],
+            symbols: [start, elapsed, thumb, track, end],
+            start_style: self.start_style.to_config_or(Some(Color::Blue), None)?,
             elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::Black), None)?,
+            end_style: self.end_style.to_config_or(Some(Color::Black), None)?,
         })
     }
 }
@@ -83,13 +101,13 @@ mod tests {
     #[test]
     fn maps_symbols() {
         let input = ProgressBarConfigFile {
-            symbols: vec!["a".to_owned(), "b".to_owned(), "c".to_owned()],
+            symbols: vec!["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned(), "e".to_owned()],
             ..Default::default()
         };
 
         let result = input.into_config().unwrap().symbols;
 
-        assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned()]);
+        assert_eq!(result, ["a".to_owned(), "b".to_owned(), "c".to_owned(), "d".to_owned(), "e".to_owned()]);
     }
 
     #[test_case(None,         None,         Style::default().fg(RC::Blue)                ; "uses default colors")]
