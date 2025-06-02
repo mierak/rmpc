@@ -175,6 +175,7 @@ impl Pane for QueuePane {
                             max_len,
                             &config.theme.symbols,
                             &config.theme.format_tag_separator,
+                            config.theme.mutliple_tag_resolution_strategy,
                         )
                         .unwrap_or_default()
                         .alignment(formats[i].alignment.into());
