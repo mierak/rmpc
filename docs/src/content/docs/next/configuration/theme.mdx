@@ -33,11 +33,18 @@ Below is a list of properties that can be changed.
 
 ### layout
 
-<ConfigValue name="layout" type="other" customText="layout: Pane | Split" />
+<ConfigValue name="layout" type="other" customText="Pane | Split | Component" />
 
 Base layout of the application, lets you configure where the various components are placed on the screen.
 
 <LinkCard title="layout" description="Configuration of rmpc's base layout" href={path("configuration/layout/")} />
+
+### components
+
+<ConfigValue name="components" type="other" customText="Map<string, Pane | Split | Component>" />
+
+Reusable components which can be used in tabs, layout or other components. Check
+out <a href={path("configuration/layout#components")}>components</a> section in the layout page for more information.
 
 ### default_album_art_path
 
