@@ -10,7 +10,7 @@ use crate::{
     config::tabs::PaneType,
     mpd::{
         client::Client,
-        commands::{Decoder, Output, Song, Status, Volume},
+        commands::{Decoder, IdleEvent, Output, Song, Status, Volume},
         mpd_client::MpdClient,
     },
     shared::{events::ClientRequest, macros::try_skip},
@@ -93,7 +93,7 @@ pub(crate) enum MpdQueryResult {
     DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },
     AddToPlaylist { playlists: Vec<String>, song_file: String },
     AlbumArt(Option<Vec<u8>>),
-    Status(Status),
+    Status { data: Status, source_event: Option<IdleEvent> },
     Queue(Option<Vec<Song>>),
     Volume(Volume),
     Outputs(Vec<Output>),
@@ -110,7 +110,10 @@ pub fn run_status_update((_, client_tx): &(Sender<AppEvent>, Sender<ClientReques
             id: GLOBAL_STATUS_UPDATE,
             target: None,
             replace_id: Some("status"),
-            callback: Box::new(move |client| Ok(MpdQueryResult::Status(client.get_status()?))),
+            callback: Box::new(move |client| Ok(MpdQueryResult::Status {
+                data: client.get_status()?,
+                source_event: None
+            })),
         })),
         "Failed to send status update query"
     );

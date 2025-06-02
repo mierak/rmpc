@@ -18,7 +18,7 @@ use crate::{
     context::AppContext,
     mpd::{
         commands::{IdleEvent, State},
-        mpd_client::MpdClient,
+        mpd_client::{MpdClient, SaveMode},
     },
     shared::{
         events::{AppEvent, WorkDone},
@@ -238,13 +238,40 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
-                        (GLOBAL_STATUS_UPDATE, None, MpdQueryResult::Status(status)) => {
+                        (
+                            GLOBAL_STATUS_UPDATE,
+                            None,
+                            MpdQueryResult::Status { data: status, source_event },
+                        ) => {
                             let current_song_id =
                                 context.find_current_song_in_queue().map(|(_, song)| song.id);
                             let current_status = context.status.state;
                             let current_updating_db = context.status.updating_db;
+                            let current_playlist = context.status.lastloadedplaylist.take();
                             context.status = status;
+                            let new_playlist = context.status.lastloadedplaylist.as_ref();
                             let mut song_changed = false;
+
+                            if context.config.reflect_changes_to_playlist
+                                && matches!(source_event, Some(IdleEvent::Playlist))
+                            {
+                                // Try to reflect changes to saved playlist if any was loaded both
+                                // before and after the update
+                                if let (Some(current_playlist), Some(new_playlist)) =
+                                    (current_playlist, new_playlist)
+                                {
+                                    if &current_playlist == new_playlist {
+                                        let playlist_name = current_playlist.clone();
+                                        context.command(move |client| {
+                                            client.save_queue_as_playlist(
+                                                &playlist_name,
+                                                Some(SaveMode::Replace),
+                                            )?;
+                                            Ok(())
+                                        });
+                                    }
+                                }
+                            }
 
                             let mut start_render_loop = || {
                                 _update_db_loop_guard = Some(context.scheduler.repeated(
@@ -453,27 +480,47 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
                 .query(move |client| Ok(MpdQueryResult::Volume(client.get_volume()?)));
         }
         IdleEvent::Mixer => {
-            context
-                .query()
-                .id(GLOBAL_STATUS_UPDATE)
-                .replace_id("status")
-                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
+            context.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                Ok(MpdQueryResult::Status {
+                    data: client.get_status()?,
+                    source_event: Some(IdleEvent::Mixer),
+                })
+            });
         }
         IdleEvent::Options => {
-            context
-                .query()
-                .id(GLOBAL_STATUS_UPDATE)
-                .replace_id("status")
-                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
+            context.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                Ok(MpdQueryResult::Status {
+                    data: client.get_status()?,
+                    source_event: Some(IdleEvent::Options),
+                })
+            });
         }
         IdleEvent::Player => {
-            context
-                .query()
-                .id(GLOBAL_STATUS_UPDATE)
-                .replace_id("status")
-                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
+            context.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                Ok(MpdQueryResult::Status {
+                    data: client.get_status()?,
+                    source_event: Some(IdleEvent::Player),
+                })
+            });
         }
-        IdleEvent::Playlist | IdleEvent::Sticker => {
+        IdleEvent::Playlist => {
+            let fetch_stickers = context.should_fetch_stickers;
+            context.query().id(GLOBAL_QUEUE_UPDATE).replace_id("playlist").query(move |client| {
+                Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?))
+            });
+            if context.config.reflect_changes_to_playlist {
+                // Do not replace because we want to update currently loaded playlist if any
+                context.query().id(GLOBAL_STATUS_UPDATE).replace_id("status_from_playlist").query(
+                    move |client| {
+                        Ok(MpdQueryResult::Status {
+                            data: client.get_status()?,
+                            source_event: Some(IdleEvent::Playlist),
+                        })
+                    },
+                );
+            }
+        }
+        IdleEvent::Sticker => {
             let fetch_stickers = context.should_fetch_stickers;
             context.query().id(GLOBAL_QUEUE_UPDATE).replace_id("playlist").query(move |client| {
                 Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?))
@@ -481,11 +528,12 @@ fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {
-            context
-                .query()
-                .id(GLOBAL_STATUS_UPDATE)
-                .replace_id("status")
-                .query(move |client| Ok(MpdQueryResult::Status(client.get_status()?)));
+            context.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                Ok(MpdQueryResult::Status {
+                    data: client.get_status()?,
+                    source_event: Some(IdleEvent::Database),
+                })
+            });
         }
         IdleEvent::Update => {}
         IdleEvent::Output
