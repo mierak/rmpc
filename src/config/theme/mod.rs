@@ -242,7 +242,10 @@ fn convert_components(
                     components.remove(i % components.len());
                 }
                 Err(PaneConversionError::MissingComponent(missing_name))
-                    if components.iter().any(|(n, _)| n == &missing_name) => {}
+                    if components.iter().any(|(n, _)| n == &missing_name) =>
+                {
+                    i += 1;
+                }
                 err @ Err(_) => {
                     err?;
                 }
@@ -265,7 +268,6 @@ fn convert_components(
         }
 
         last_size = remaining;
-        i += 1;
     }
 
     log::debug!(result:?; "Converted components");
