@@ -70,6 +70,7 @@
             alignment: Right,
         ),
     ],
+    components: {},
     layout: Split(
         direction: Vertical,
         panes: [

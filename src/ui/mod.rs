@@ -261,8 +261,21 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::PreviousTrack if context.status.state != State::Stop => {
+                    let rewind_to_start = context.config.rewind_to_start_sec;
+                    let elapsed_sec = context.status.elapsed.as_secs();
                     context.command(move |client| {
-                        client.prev()?;
+                        match rewind_to_start {
+                            Some(value) => {
+                                if elapsed_sec >= value {
+                                    client.seek_current(ValueChange::Set(0))?;
+                                } else {
+                                    client.prev()?;
+                                }
+                            }
+                            None => {
+                                client.prev()?;
+                            }
+                        }
                         Ok(())
                     });
                 }
