@@ -3,7 +3,10 @@ use std::{borrow::Cow, cmp::Ordering};
 use unicase::UniCase;
 
 use crate::{
-    config::sort_mode::{SortMode, SortOptions},
+    config::{
+        sort_mode::{SortMode, SortOptions},
+        theme::TagResolutionStrategy,
+    },
     mpd::commands::{Song, lsinfo::LsInfoEntry},
 };
 
@@ -122,7 +125,7 @@ impl Ord for DirOrSongCustomSort<'_, '_> {
                 }
                 (DirOrSong::Song(song), DirOrSong::Dir { name, .. }) => {
                     for prop in items {
-                        let s = song.format(prop, "");
+                        let s = song.format(prop, "", TagResolutionStrategy::All);
                         if let Some(s) = s {
                             let result = UniCase::new(s.as_ref()).cmp(&UniCase::new(name));
                             if result != Ordering::Equal {
@@ -134,7 +137,7 @@ impl Ord for DirOrSongCustomSort<'_, '_> {
                 }
                 (DirOrSong::Dir { name, .. }, DirOrSong::Song(song)) => {
                     for prop in items {
-                        let s = song.format(prop, "");
+                        let s = song.format(prop, "", TagResolutionStrategy::All);
                         if let Some(s) = s {
                             let result = UniCase::new(name.as_str()).cmp(&UniCase::new(s.as_ref()));
                             if result != Ordering::Equal {

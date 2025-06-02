@@ -64,7 +64,12 @@ impl<'a> PropertyTemplates<'a> {
         config: &Config,
     ) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
-            match val.as_span(song, context, &config.theme.format_tag_separator) {
+            match val.as_span(
+                song,
+                context,
+                &config.theme.format_tag_separator,
+                config.theme.mutliple_tag_resolution_strategy,
+            ) {
                 Some(Either::Left(span)) => acc.push(span),
                 Some(Either::Right(ref mut spans)) => acc.append(spans),
                 None => {}

@@ -74,8 +74,12 @@ impl DirStackItem for DirOrSong {
                         .into_iter()
                         .chain(config.theme.browser_song_format.0.iter().map(|prop| {
                             Span::from(
-                                prop.as_string(Some(s), &config.theme.format_tag_separator)
-                                    .unwrap_or_default(),
+                                prop.as_string(
+                                    Some(s),
+                                    &config.theme.format_tag_separator,
+                                    config.theme.mutliple_tag_resolution_strategy,
+                                )
+                                .unwrap_or_default(),
                             )
                         }));
                 Line::from(spans.collect_vec())

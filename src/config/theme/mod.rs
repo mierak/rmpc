@@ -14,6 +14,7 @@ use self::{
     scrollbar::ScrollbarConfig,
     style::{StringColor, ToConfigOr},
 };
+use crate::mpd::commands::metadata_tag::MetadataTag;
 
 mod header;
 pub mod level_styles;
@@ -65,6 +66,7 @@ pub struct UiConfig {
     pub layout: SizedPaneOrSplit,
     pub components: HashMap<String, SizedPaneOrSplit>,
     pub format_tag_separator: String,
+    pub mutliple_tag_resolution_strategy: TagResolutionStrategy,
     pub level_styles: LevelStyles,
 }
 
@@ -105,6 +107,8 @@ pub struct UiConfigFile {
     pub(super) components: HashMap<String, PaneOrSplitFile>,
     #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
+    #[serde(default)]
+    pub(super) mutliple_tag_resolution_strategy: TagResolutionStrategy,
     #[serde(default)]
     pub(super) level_styles: LevelStylesFile,
 }
@@ -163,6 +167,7 @@ impl Default for UiConfigFile {
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
             format_tag_separator: " | ".to_owned(),
+            mutliple_tag_resolution_strategy: TagResolutionStrategy::default(),
             preview_label_style: StyleFile {
                 fg: Some("yellow".to_string()),
                 bg: None,
@@ -216,6 +221,25 @@ impl From<SymbolsFile> for SymbolsConfig {
             dir: value.dir,
             marker: value.marker,
             ellipsis: value.ellipsis.unwrap_or_else(|| "...".to_string()),
+        }
+    }
+}
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TagResolutionStrategy {
+    First,
+    Last,
+    #[default]
+    All,
+    Nth(usize),
+}
+
+impl TagResolutionStrategy {
+    pub fn resolve<'a>(self, tag: &'a MetadataTag, separator: &str) -> std::borrow::Cow<'a, str> {
+        match self {
+            TagResolutionStrategy::First => tag.first().into(),
+            TagResolutionStrategy::Last => tag.last().into(),
+            TagResolutionStrategy::All => tag.join(separator),
+            TagResolutionStrategy::Nth(idx) => tag.nth(idx).into(),
         }
     }
 }
@@ -291,6 +315,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,
+            mutliple_tag_resolution_strategy: value.mutliple_tag_resolution_strategy,
             modal_background_color: StringColor(value.modal_background_color)
                 .to_color()?
                 .or(bg_color),

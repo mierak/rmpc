@@ -49,6 +49,7 @@ lists they are listed as multiple entries.
 - Added components to the theme. Components are user-defined reusable parts of TUI.
 - Added `rewind_to_start_sec` config option. If elapsed time is past the configured value, the song will be rewound to start instead.
 - Added `reflect_changes_to_playlist` config option. This makes changes to the queue reflect to the stored playlist if any.
+- Added `mutliple_tag_resolution_strategy` to choose which tag value to display when multiple values are present
 
 ### Changed
 
