@@ -75,6 +75,13 @@ How long to wait for response to MPD command before giving up and reconnecting. 
 
 How long to wait for write to MPD socket to finish before giving up and reconnecting. Defaults to `5_000` milliseconds.
 
+### rewind_to_start_sec
+
+<ConfigValue name="rewind_to_start_sec" optional type="number" />
+
+`PreviousTrack` will rewind to start if elapsed time is past the configured value. `PreviousTrack` will always switch to
+the previous track if not configured or set to `None`.
+
 ### theme
 
 <ConfigValue optional name="theme" type="string" />

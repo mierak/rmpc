@@ -61,6 +61,7 @@ pub struct Config {
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub center_current_song_on_change: bool,
+    pub rewind_to_start_sec: Option<u64>,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
@@ -103,6 +104,8 @@ pub struct ConfigFile {
     select_current_song_on_change: bool,
     #[serde(default = "defaults::default_false")]
     center_current_song_on_change: bool,
+    #[serde(default)]
+    rewind_to_start_sec: Option<u64>,
     #[serde(default = "defaults::default_read_timeout")]
     mpd_read_timeout_ms: u64,
     #[serde(default = "defaults::default_write_timeout")]
@@ -189,6 +192,7 @@ impl Default for ConfigFile {
                 group_directories_first: true,
                 reverse: false,
             },
+            rewind_to_start_sec: None,
         }
     }
 }
@@ -395,6 +399,7 @@ impl ConfigFile {
                 }
             }),
             theme,
+            rewind_to_start_sec: self.rewind_to_start_sec,
         };
 
         if skip_album_art_check {
