@@ -63,6 +63,7 @@ impl Default for ProgressBarConfigFile {
 impl ProgressBarConfigFile {
     pub(super) fn into_config(mut self) -> Result<ProgressBarConfig> {
         if self.symbols.len() == 3 {
+            self.symbols.resize(5, String::default());
             let s0 = self.symbols[0].clone();
             let s1 = self.symbols[1].clone();
             let s2 = self.symbols[2].clone();
