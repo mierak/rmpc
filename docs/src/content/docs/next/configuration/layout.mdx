@@ -13,10 +13,14 @@ import example_layout_album_art_in_header from "../assets/example_layout_album_a
 import example_layout_default from "../assets/example_layout_default.png";
 import example_layout_default_borders from "../assets/example_layout_default_borders.png";
 
-Layout controls the base layout of the application. This layout is similar to <a href={path("configuration/tabs#pane--split")}>tabs</a>
+Layout controls the base layout of the application. This layout is similar to <a href={path("configuration/tabs#pane--split--component")}>tabs</a>
 configuration except it contains a single `Pane` or `Split`. It is configured inside your <a href={path("configuration/theme#layout")}>theme.ron</a>.
 
-<ConfigValue name="layout" type={["Pane", "Split"]} link={path("configuration/tabs/#pane--split")} />
+<ConfigValue
+    name="layout"
+    type={["Pane", "Split", "Component"]}
+    link={path("configuration/tabs/#pane--split--component")}
+/>
 
 The layout can use any non-focusable `Pane` (these currently are `AlbumArt`, `Lyrics`, `ProgressBar`, `Header` and `Tabs`)
 and additionally must contain exactly one special `TabContent` pane which will display content of the
@@ -27,6 +31,90 @@ value ie. `"100%"` or size in terminal cells (rows or columns, depending on the 
 Panes displayed in the base layout cannot be in used in the tabs.
 For example you cannot display album art in the base layout and in the queue tab simultaneously.
 :::
+
+## Components
+
+<ConfigValue name="components" type="other" customText="Map<string, Pane | Split | Component>" />
+
+Components are reuseable blocks of panes. They can be used to define some part of UI once and reuse it in multiple tabs, layout
+and even included in other components without having to copy the definition to each tab separately. They can also be used to
+restructure your `layout` and `tabs` to make them more readable.
+
+For example, here we define three components: `state`, `title` and `volume`. They are then used in a fourth component called `header`.
+
+<details>
+
+<summary>Click to show components definition</summary>
+
+```rust
+components: {
+    "state": Pane(Property(
+        content: [
+            (kind: Text("["), style: (fg: "yellow", modifiers: "Bold")),
+            (kind: Property(Status(StateV2())), style: (fg: "yellow", modifiers: "Bold")),
+            (kind: Text("]"), style: (fg: "yellow", modifiers: "Bold")),
+        ], align: Left,
+    )),
+    "title": Pane(Property(
+        content: [
+            (kind: Property(Song(Title)), style: (modifiers: "Bold"),
+                default: (kind: Text("No Song"), style: (modifiers: "Bold")))
+        ], align: Center, scroll_speed: 1
+    )),
+    "volume": Pane(Property(
+        content: [
+            (kind: Property(Widget(Volume)), style: (fg: "blue", modifiers: "Bold")),
+        ], align: Right
+    )),
+    "header": Split(
+        direction: Horizontal,
+        panes: [
+            (size: "23", pane: Component("state")),
+            (size: "100%", borders: "LEFT | RIGHT", pane: Component("title")),
+            (size: "23", pane: Component("volume")),
+        ],
+    ),
+}
+```
+
+</details>
+
+The `header` component is then used in the layout.
+
+<details>
+
+<summary>Click to show layout definition</summary>
+
+```rust
+layout: Split(
+    direction: Vertical,
+    panes: [
+        (
+            size: "4",
+            borders: "ALL",
+            pane: Component("header"),
+        ),
+        (
+            size: "3",
+            borders: "ALL",
+            pane: Pane(Tabs),
+        ),
+        (
+            size: "100%",
+            borders: "ALL",
+            background_color: "red",
+            pane: Pane(TabContent),
+        ),
+        (
+            size: "3",
+            borders: "ALL",
+            pane: Component("progress_bar"),
+        ),
+    ]
+),
+```
+
+</details>
 
 ## Examples
 

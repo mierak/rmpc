@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use ::serde::{Deserialize, Serialize};
-use anyhow::Result;
+use anyhow::{Result, bail};
+use itertools::Itertools;
 use level_styles::{LevelStyles, LevelStylesFile};
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
@@ -28,7 +31,7 @@ pub use self::{
 };
 use super::{
     defaults,
-    tabs::{PaneOrSplitFile, SizedPaneOrSplit},
+    tabs::{PaneConversionError, PaneOrSplitFile, SizedPaneOrSplit},
     utils::tilde_expand,
 };
 
@@ -60,6 +63,7 @@ pub struct UiConfig {
     #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
     pub layout: SizedPaneOrSplit,
+    pub components: HashMap<String, SizedPaneOrSplit>,
     pub format_tag_separator: String,
     pub level_styles: LevelStyles,
 }
@@ -97,6 +101,8 @@ pub struct UiConfigFile {
     pub(super) default_album_art_path: Option<String>,
     #[serde(default)]
     pub(super) layout: PaneOrSplitFile,
+    #[serde(default)]
+    pub(super) components: HashMap<String, PaneOrSplitFile>,
     #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
     #[serde(default)]
@@ -168,6 +174,7 @@ impl Default for UiConfigFile {
                 modifiers: Some(Modifiers::Bold),
             },
             level_styles: LevelStylesFile::default(),
+            components: HashMap::default(),
         }
     }
 }
@@ -213,6 +220,61 @@ impl From<SymbolsFile> for SymbolsConfig {
     }
 }
 
+// Converts all components while also resolving dependencies between them. If a
+// component is missing but is present in the source map it will be skipped and
+// the resolution will be retried in the next loop over. Only when component is
+// truly missing or a different kind of error occurs will the conversion fail.
+fn convert_components(
+    value: HashMap<String, PaneOrSplitFile>,
+) -> Result<HashMap<String, SizedPaneOrSplit>> {
+    let mut result = HashMap::new();
+    let mut components = value.into_iter().collect_vec();
+
+    let mut i = 0usize;
+    let mut last_size = components.len();
+    let mut same_size_count = 0;
+    loop {
+        let current = components.get(i.checked_rem(components.len()).unwrap_or(0));
+        match current {
+            Some((name, pane)) => match pane.convert(&result) {
+                Ok(v) => {
+                    result.insert(name.to_owned(), v);
+                    components.remove(i % components.len());
+                }
+                Err(PaneConversionError::MissingComponent(missing_name))
+                    if components.iter().any(|(n, _)| n == &missing_name) =>
+                {
+                    i += 1;
+                }
+                err @ Err(_) => {
+                    err?;
+                }
+            },
+            None => break,
+        }
+
+        let remaining = components.len();
+        if last_size == remaining {
+            same_size_count += 1;
+        } else {
+            same_size_count = 0;
+        }
+
+        if same_size_count > remaining {
+            bail!(
+                "Failed to resolve components. Circular dependency detected. Components: {:?}",
+                components.iter().map(|(name, _)| name).collect::<Vec<_>>()
+            );
+        }
+
+        last_size = remaining;
+    }
+
+    log::debug!(result:?; "Converted components");
+
+    Ok(result)
+}
+
 impl TryFrom<UiConfigFile> for UiConfig {
     type Error = anyhow::Error;
 
@@ -221,9 +283,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let bg_color = StringColor(value.background_color).to_color()?;
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
         let fallback_border_fg = Color::White;
+        let components = convert_components(value.components)?;
 
         Ok(Self {
-            layout: value.layout.convert()?,
+            layout: value.layout.convert(&components)?,
+            components,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,

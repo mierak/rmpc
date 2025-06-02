@@ -19,7 +19,7 @@ Check out the <a href={path("reference/config/")}>default config</a> for referen
 
 ## tab
 
-<ConfigValue name="tab" customText='(name: "<string>", pane: Pane | Split)' />
+<ConfigValue name="tab" customText='(name: "<string>", pane: Pane | Split | Component)' />
 
 A single tab that will be shown by rmpc. Each tab has a name that is displayed in the tab bar and either a single or multiple `Pane`s.
 
@@ -31,16 +31,17 @@ Each tab has a name which will be displayed in the tab bar and can be used in th
 
 ### pane
 
-<ConfigValue name="pane" type={["Pane", "Split"]} link="#pane--split" />
+<ConfigValue name="pane" type={["Pane", "Split", "Component"]} link="#pane--split--component" />
 
 `pane_type` to display in the given Pane. Can be etither `Split` or `Pane`. `Split` means that given pane will be split
 into multiple sub panes. `Pane` simply displays the given `pane_type`.
 
-## Pane | Split
+## Pane | Split | Component
 
 - `Pane(<pane_type>)` - Displays the given pane type itself.
 - `Split(direction: Horizontal | Vertical, borders: <borders>, panes: <sub_panes[]>)` splits the pane into multiple sub panes. Each split has
   a direction and a list of sub panes. More info on borders in [their section](#borders).
+- `Component("<component_name>")` - Displays a <a href={path("configuration/layout#components")}>component</a>
 
 ### direction
 
