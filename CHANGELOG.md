@@ -47,7 +47,8 @@ lists they are listed as multiple entries.
 - Added `listpartitions` CLI
 - Added Start and End Boundaries to ProgressBar increasing its Customizability
 - Added components to the theme. Components are user-defined reusable parts of TUI.
-- Added `rewind_to_start_sec` config options. If elapsed time is past the configured value, the song will be rewound to start instead.
+- Added `rewind_to_start_sec` config option. If elapsed time is past the configured value, the song will be rewound to start instead.
+- Added `reflect_changes_to_playlist` config option. This makes changes to the queue reflect to the stored playlist if any.
 
 ### Changed
 

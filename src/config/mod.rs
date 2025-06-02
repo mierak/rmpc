@@ -61,6 +61,7 @@ pub struct Config {
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub center_current_song_on_change: bool,
+    pub reflect_changes_to_playlist: bool,
     pub rewind_to_start_sec: Option<u64>,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
@@ -104,6 +105,8 @@ pub struct ConfigFile {
     select_current_song_on_change: bool,
     #[serde(default = "defaults::default_false")]
     center_current_song_on_change: bool,
+    #[serde(default = "defaults::default_false")]
+    reflect_changes_to_playlist: bool,
     #[serde(default)]
     rewind_to_start_sec: Option<u64>,
     #[serde(default = "defaults::default_read_timeout")]
@@ -193,6 +196,7 @@ impl Default for ConfigFile {
                 reverse: false,
             },
             rewind_to_start_sec: None,
+            reflect_changes_to_playlist: false,
         }
     }
 }
@@ -400,6 +404,7 @@ impl ConfigFile {
             }),
             theme,
             rewind_to_start_sec: self.rewind_to_start_sec,
+            reflect_changes_to_playlist: self.reflect_changes_to_playlist,
         };
 
         if skip_album_art_check {
