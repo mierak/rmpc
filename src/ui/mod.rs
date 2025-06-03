@@ -14,6 +14,7 @@ use modals::{
     input_modal::InputModal,
     keybinds::KeybindsModal,
     outputs::OutputsModal,
+    select_modal::SelectModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
@@ -224,6 +225,30 @@ impl<'ui> Ui<'ui> {
 
         if let Some(action) = key.as_global_action(context) {
             match action {
+                GlobalAction::SwitchPartition => {
+                    // TODO make this async before finalizing the functionality
+                    let result = context.query_sync(move |client| {
+                        let partitions = client.list_partitions()?;
+                        Ok(partitions.0)
+                    })?;
+
+                    modal!(
+                        context,
+                        SelectModal::builder()
+                            .context(context)
+                            .title("Switch partition")
+                            .confirm_label("Switch")
+                            .options(result)
+                            .on_confirm(|ctx, value, _idx| {
+                                ctx.command(move |client| {
+                                    client.switch_to_partition(&value)?;
+                                    Ok(())
+                                });
+                                Ok(())
+                            })
+                            .build()
+                    );
+                }
                 GlobalAction::Command { command, .. } => {
                     let cmd = command.parse();
                     log::debug!("executing {cmd:?}");
