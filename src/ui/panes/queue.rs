@@ -449,12 +449,12 @@ impl Pane for QueuePane {
             (ADD_TO_PLAYLIST, MpdQueryResult::AddToPlaylist { playlists, song_file }) => {
                 modal!(
                     context,
-                    SelectModal::new(context)
+                    SelectModal::builder()
+                        .context(context)
                         .options(playlists)
                         .confirm_label("Add")
                         .title("Select a playlist")
-                        .on_confirm(move |context, selected: &String, _idx| {
-                            let selected = selected.to_owned();
+                        .on_confirm(move |context, selected, _idx| {
                             let song_file = song_file.clone();
                             context.command(move |client| {
                                 if song_file.starts_with('/') {
@@ -471,6 +471,7 @@ impl Pane for QueuePane {
                             });
                             Ok(())
                         })
+                        .build()
                 );
             }
             _ => {}

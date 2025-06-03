@@ -16,6 +16,7 @@ pub enum GlobalAction {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
+    SwitchPartition,
     AddRandom,
     NextTrack,
     PreviousTrack,
@@ -57,6 +58,7 @@ pub enum GlobalActionFile {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
+    SwitchPartition,
     NextTrack,
     PreviousTrack,
     Stop,
@@ -134,6 +136,7 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::AddRandom => GlobalAction::AddRandom,
             GlobalActionFile::ToggleSingleOnOff => GlobalAction::ToggleSingleOnOff,
             GlobalActionFile::ToggleConsumeOnOff => GlobalAction::ToggleConsumeOnOff,
+            GlobalActionFile::SwitchPartition => GlobalAction::SwitchPartition,
         }
     }
 }
@@ -177,6 +180,7 @@ impl ToDescription for GlobalAction {
             GlobalAction::AddRandom => "Add random songs to the queue".into(),
             GlobalAction::ToggleSingleOnOff => "Toggle single mode on or off, skipping oneshot".into(),
             GlobalAction::ToggleConsumeOnOff => "Toggle consume mode on or off, skipping oneshot".into(),
+            GlobalAction::SwitchPartition => "Switch to partition".into(),
         }
     }
 }
