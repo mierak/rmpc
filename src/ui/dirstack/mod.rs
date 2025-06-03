@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 use ratatui::{
     text::{Line, Span},
@@ -62,26 +64,37 @@ impl DirStackItem for DirOrSong {
         let mut value = match self {
             DirOrSong::Dir { name, .. } => Line::from(vec![
                 marker_span,
-                Span::from(format!(
-                    "{} {}",
-                    config.theme.symbols.dir,
-                    if name.is_empty() { "Untitled" } else { name.as_str() }
-                )),
+                Span::styled(
+                    config.theme.symbols.dir.clone(),
+                    config.theme.symbols.dir_style.unwrap_or_default(),
+                ),
+                Span::from(" "),
+                Span::from(if name.is_empty() {
+                    Cow::Borrowed("Untitled")
+                } else {
+                    Cow::Owned(name.to_owned())
+                }),
             ]),
             DirOrSong::Song(s) => {
-                let spans =
-                    [marker_span, Span::from(config.theme.symbols.song.clone()), Span::from(" ")]
-                        .into_iter()
-                        .chain(config.theme.browser_song_format.0.iter().map(|prop| {
-                            Span::from(
-                                prop.as_string(
-                                    Some(s),
-                                    &config.theme.format_tag_separator,
-                                    config.theme.mutliple_tag_resolution_strategy,
-                                )
-                                .unwrap_or_default(),
-                            )
-                        }));
+                let spans = [
+                    marker_span,
+                    Span::styled(
+                        config.theme.symbols.song.clone(),
+                        config.theme.symbols.song_style.unwrap_or_default(),
+                    ),
+                    Span::from(" "),
+                ]
+                .into_iter()
+                .chain(config.theme.browser_song_format.0.iter().map(|prop| {
+                    Span::from(
+                        prop.as_string(
+                            Some(s),
+                            &config.theme.format_tag_separator,
+                            config.theme.mutliple_tag_resolution_strategy,
+                        )
+                        .unwrap_or_default(),
+                    )
+                }));
                 Line::from(spans.collect_vec())
             }
         };
@@ -121,7 +134,10 @@ impl DirStackItem for Song {
         let title = self.title_str(&config.theme.format_tag_separator).into_owned();
         let artist = self.artist_str(&config.theme.format_tag_separator).into_owned();
         let separator_span = Span::from(" - ");
-        let icon_span = Span::from(format!("{} ", config.theme.symbols.song));
+        let icon_span = Span::styled(
+            format!("{} ", config.theme.symbols.song),
+            config.theme.symbols.song_style.unwrap_or_default(),
+        );
         let mut result =
             vec![marker_span, icon_span, Span::from(artist), separator_span, Span::from(title)];
         if let Some(content) = additional_content {

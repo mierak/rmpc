@@ -52,6 +52,7 @@ lists they are listed as multiple entries.
 - Added `mutliple_tag_resolution_strategy` to choose which tag value to display when multiple values are present
 - Added `maps_three_symbols` test for progress bar. This will help avoid any errors while changing progress bar code in future
 - Added `PopConfigErrorModal` so theat the config error modals are automatically removed when the config reloads and is found correct
+- Added style configuration for dir and song symbols in browsers
 
 ### Changed
 
