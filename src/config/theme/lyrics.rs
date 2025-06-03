@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 
-use super::{Modifiers, StyleFile, style::ToConfigOr};
+use super::{StyleFile, style::ToConfigOr};
 
 #[derive(Debug, Default, Clone)]
 pub struct LyricsConfig {
@@ -12,24 +12,13 @@ pub struct LyricsConfig {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LyricsConfigFile {
-    pub(super) active_line_style: Option<StyleFile>,
-    pub(super) line_style: Option<StyleFile>,
+    pub(super) active_line_style: StyleFile,
+    pub(super) line_style: StyleFile,
 }
 
 impl Default for LyricsConfigFile {
     fn default() -> Self {
-        Self {
-            active_line_style: Some(StyleFile {
-                fg: Some("blue".to_string()),
-                bg: None,
-                modifiers: Some(Modifiers::Bold),
-            }),
-            line_style: Some(StyleFile {
-                fg: Some("white".to_string()),
-                bg: None,
-                modifiers: Some(Modifiers::Dim),
-            }),
-        }
+        Self { active_line_style: StyleFile::default(), line_style: StyleFile::default() }
     }
 }
 

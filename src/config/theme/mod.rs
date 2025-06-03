@@ -104,6 +104,7 @@ pub struct UiConfigFile {
     pub(super) format_tag_separator: String,
     #[serde(default)]
     pub(super) level_styles: LevelStylesFile,
+    #[serde(default)]
     pub(super) lyrics: LyricsConfigFile,
 }
 
