@@ -103,6 +103,24 @@ mod tests {
     };
 
     #[test]
+    fn maps_three_symbols() {
+        let input = ProgressBarConfigFile {
+            symbols: vec!["a".to_owned(), "b".to_owned(), "c".to_owned()],
+            ..Default::default()
+        };
+
+        let result = input.into_config().unwrap().symbols;
+
+        assert_eq!(result, [
+            "a".to_owned(),
+            "a".to_owned(),
+            "b".to_owned(),
+            "c".to_owned(),
+            "c".to_owned()
+        ]);
+    }
+
+    #[test]
     fn maps_symbols() {
         let input = ProgressBarConfigFile {
             symbols: vec![
