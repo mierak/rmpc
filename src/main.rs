@@ -137,14 +137,14 @@ fn main() -> Result<()> {
             if let Some(pid) = pid {
                 let path = get_socket_path(pid);
                 command.write_to_socket(&path)?;
-                eprintln!("Successfully sent remote command to {path:?}");
+                eprintln!("Successfully sent remote command to {}", path.display());
             } else {
                 for path in list_all_socket_paths()? {
                     if let Err(err) = command.clone().write_to_socket(&path) {
                         eprintln!("Failed to send remote command. Error: '{err:?}'");
                         continue;
                     }
-                    eprintln!("Successfully sent remote command to {path:?}");
+                    eprintln!("Successfully sent remote command to {}", path.display());
                 }
             }
         }

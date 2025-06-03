@@ -25,11 +25,11 @@ pub(crate) fn init(
 ) -> Result<Debouncer<RecommendedWatcher, RecommendedCache>> {
     let config_file_name = config_path
         .file_name()
-        .with_context(|| format!("Invalid config path {config_path:?}"))?
+        .with_context(|| format!("Invalid config path {}", config_path.display()))?
         .to_owned();
     let config_directory = config_path
         .parent()
-        .with_context(|| format!("Invalid config directory {config_path:?}"))?
+        .with_context(|| format!("Invalid config directory {}", config_path.display()))?
         .to_owned();
 
     let mut theme_name = theme_name;
@@ -96,7 +96,10 @@ pub(crate) fn init(
                 );
 
                 try_skip!(
-                    event_tx.send(AppEvent::ConfigChanged { config, keep_old_theme: false }),
+                    event_tx.send(AppEvent::ConfigChanged {
+                        config: Box::new(config),
+                        keep_old_theme: false
+                    }),
                     "Failed to send config changed event"
                 );
             }

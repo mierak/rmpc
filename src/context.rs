@@ -102,6 +102,9 @@ impl AppContext {
         })
     }
 
+    // TODO: Error comes from crossebeam, try to remove later if it gets solved
+    // upstream
+    #[allow(clippy::result_large_err)]
     pub(crate) fn render(&self) -> Result<(), SendError<AppEvent>> {
         if self.needs_render.get() {
             return Ok(());

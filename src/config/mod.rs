@@ -317,7 +317,7 @@ impl ConfigFile {
             ron::de::from_reader(read)?
         } else if let Some(path) = config_path {
             let config_dir = path.parent().with_context(|| {
-                format!("Expected config path to have parent directory. Path: '{path:?}'")
+                format!("Expected config path to have parent directory. Path: '{}'", path.display())
             })?;
 
             self.read_theme(config_dir)?
