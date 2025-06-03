@@ -481,13 +481,23 @@ impl<'ui> Ui<'ui> {
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
-                self.modals.push(modal);
+                if let Some(id) = modal.get_id() {
+                    if let Some(existing) =
+                        self.modals.iter_mut().find(|m| m.get_id().as_ref() == Some(&id))
+                    {
+                        *existing = modal;
+                    } else {
+                        self.modals.push(modal);
+                    }
+                } else {
+                    self.modals.push(modal);
+                }
                 self.on_event(UiEvent::ModalOpened, context)?;
                 context.render()?;
             }
             UiAppEvent::PopConfigErrorModal => {
-                if let Some(last_modal) = self.modals.last() {
-                    if last_modal.get_id() == Some("config_error".into()) {
+                if let Some(config_modal) = self.modals.last() {
+                    if config_modal.get_id() == Some("config_error_modal".into()) {
                         let _ = self.on_ui_app_event(UiAppEvent::PopModal, context);
                     }
                 }

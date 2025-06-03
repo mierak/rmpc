@@ -30,7 +30,7 @@ pub struct InfoModal<'a> {
     message: Vec<String>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
-    id: Option<Cow<'a, str>>,
+    id: Option<Cow<'static, str>>,
     size: Option<Size>,
     title: Option<Cow<'a, str>>,
 }
@@ -44,7 +44,7 @@ impl<'a> InfoModal<'a> {
         size: Option<impl Into<Size>>,
         confirm_label: Option<&'a str>,
         message: Vec<String>,
-        id: Option<impl Into<Cow<'a, str>>>,
+        id: Option<impl Into<Cow<'static, str>>>,
         title: Option<impl Into<Cow<'a, str>>>,
     ) -> Self {
         let mut button_group_state = ButtonGroupState::default();
@@ -151,7 +151,7 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<String> {
-        self.id.as_ref().map(|s| s.to_string())
+    fn get_id(&self) -> Option<Cow<'static, str>> {
+        self.id.clone()
     }
 }
