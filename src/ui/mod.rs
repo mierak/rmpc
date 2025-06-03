@@ -485,6 +485,13 @@ impl<'ui> Ui<'ui> {
                 self.on_event(UiEvent::ModalOpened, context)?;
                 context.render()?;
             }
+            UiAppEvent::PopConfigErrorModal => {
+                if let Some(last_modal) = self.modals.last() {
+                    if last_modal.get_id() == Some("config_error".into()) {
+                        let _ = self.on_ui_app_event(UiAppEvent::PopModal, context);
+                    }
+                }
+            }
             UiAppEvent::PopModal => {
                 self.modals.pop();
                 self.on_event(UiEvent::ModalClosed, context)?;
@@ -657,6 +664,7 @@ impl<'ui> Ui<'ui> {
 pub enum UiAppEvent {
     Modal(Box<dyn Modal + Send + Sync>),
     PopModal,
+    PopConfigErrorModal,
     ChangeTab(TabName),
 }
 

@@ -37,6 +37,10 @@ pub(crate) trait Modal: std::fmt::Debug {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn get_id(&self) -> Option<String> {
+        None
+    }
 }
 
 const BUTTON_GROUP_SYMBOLS: symbols::border::Set = symbols::border::Set {

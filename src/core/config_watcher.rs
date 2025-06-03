@@ -62,6 +62,7 @@ pub(crate) fn init(
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
                             message: vec![err.to_string()],
+                            id: Some("config_error".into()),
                             title: None,
                             size: None,
                         }),
@@ -77,6 +78,7 @@ pub(crate) fn init(
                         try_skip!(
                             event_tx.send(AppEvent::InfoModal {
                                 message: vec![err.to_string()],
+                                id: Some("config_error".into()),
                                 title: None,
                                 size: None,
                             }),
@@ -87,6 +89,11 @@ pub(crate) fn init(
                     continue;
                 };
                 theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
+
+                try_skip!(
+                    event_tx.send(AppEvent::UiEvent(crate::ui::UiAppEvent::PopConfigErrorModal)),
+                    "Failed to pop config error modal"
+                );
 
                 try_skip!(
                     event_tx.send(AppEvent::ConfigChanged { config, keep_old_theme: false }),
