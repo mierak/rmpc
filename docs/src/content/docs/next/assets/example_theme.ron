@@ -23,7 +23,14 @@
     current_item_style: (fg: "black", bg: "blue", modifiers: "Bold"),
     borders_style: (fg: "blue"),
     highlight_border_style: (fg: "blue"),
-    symbols: (song: "S", dir: "D", marker: "M", ellipsis: "..."),
+    symbols: (
+        song: "S",
+        dir: "D",
+        marker: "M",
+        ellipsis: "...",
+        song_style: None,
+        dir_style: None,
+    ),
     level_styles: (
         info: (fg: "blue", bg: "black"),
         warn: (fg: "yellow", bg: "black"),
