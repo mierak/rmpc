@@ -200,6 +200,7 @@ fn main() -> Result<()> {
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
                             message: vec![err.to_string()],
+                            id: Some("config_error_modal".into()),
                             title: None,
                             size: None
                         }),

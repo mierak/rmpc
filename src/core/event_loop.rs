@@ -190,13 +190,14 @@ fn main_task<B: Backend + std::io::Write>(
                         Ok(tx.send(AppEvent::RequestRender)?)
                     });
                 }
-                AppEvent::InfoModal { message, title, size } => {
+                AppEvent::InfoModal { message, title, size, id } => {
                     if let Err(err) = ui.on_ui_app_event(
                         UiAppEvent::Modal(Box::new(
                             InfoModal::builder()
                                 .context(&context)
                                 .maybe_title(title)
                                 .maybe_size(size)
+                                .maybe_id(id)
                                 .message(message)
                                 .build(),
                         )),

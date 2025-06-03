@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
 use ratatui::{
     Frame,
@@ -36,6 +38,10 @@ pub(crate) trait Modal: std::fmt::Debug {
         context: &AppContext,
     ) -> Result<()> {
         Ok(())
+    }
+
+    fn get_id(&self) -> Option<Cow<'static, str>> {
+        None
     }
 }
 
