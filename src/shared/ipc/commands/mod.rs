@@ -38,24 +38,28 @@ impl TryFrom<RemoteCmd> for SocketCommand {
                 }))
             }
             RemoteCmd::Tmux { hook } => Ok(SocketCommand::TmuxHook(TmuxHookCommand { hook })),
-            RemoteCmd::Set { command: SetCommand::Config { path } } if path == "-" => Ok(
-                SocketCommand::Set(SetIpcCommand::Config(ron::de::from_reader(std::io::stdin())?)),
-            ),
+            RemoteCmd::Set { command: SetCommand::Config { path } } if path == "-" => {
+                Ok(SocketCommand::Set(Box::new(SetIpcCommand::Config(ron::de::from_reader(
+                    std::io::stdin(),
+                )?))))
+            }
             RemoteCmd::Set { command: SetCommand::Config { path } } => {
                 let file = ConfigFile::read(&PathBuf::from(&path))
                     .with_context(|| format!("Failed to open config file {path}"))?;
-                Ok(SocketCommand::Set(SetIpcCommand::Config(file)))
+                Ok(SocketCommand::Set(Box::new(SetIpcCommand::Config(file))))
             }
-            RemoteCmd::Set { command: SetCommand::Theme { path } } if path == "-" => Ok(
-                SocketCommand::Set(SetIpcCommand::Theme(ron::de::from_reader(std::io::stdin())?)),
-            ),
+            RemoteCmd::Set { command: SetCommand::Theme { path } } if path == "-" => {
+                Ok(SocketCommand::Set(Box::new(SetIpcCommand::Theme(ron::de::from_reader(
+                    std::io::stdin(),
+                )?))))
+            }
             RemoteCmd::Set { command: SetCommand::Theme { path } } => {
                 let pathbuf = PathBuf::from(&path);
                 let file = std::fs::File::open(&pathbuf)
                     .with_context(|| format!("Failed to open theme file {path}"))?;
                 let read = std::io::BufReader::new(file);
 
-                Ok(SocketCommand::Set(SetIpcCommand::Theme(ron::de::from_reader(read)?)))
+                Ok(SocketCommand::Set(Box::new(SetIpcCommand::Theme(ron::de::from_reader(read)?))))
             }
         }
     }

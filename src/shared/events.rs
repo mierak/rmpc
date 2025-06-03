@@ -45,6 +45,9 @@ pub(crate) enum WorkDone {
     None,
 }
 
+// The instances are short lived events, boxing would most likely only hurt
+// here.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum AppEvent {
     UserKeyInput(KeyEvent),
@@ -75,11 +78,11 @@ pub(crate) enum AppEvent {
         hook: String,
     },
     ConfigChanged {
-        config: Config,
+        config: Box<Config>,
         keep_old_theme: bool,
     },
     ThemeChanged {
-        theme: UiConfig,
+        theme: Box<UiConfig>,
     },
 }
 

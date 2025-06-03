@@ -120,7 +120,7 @@ fn main_task<B: Backend + std::io::Write>(
                         continue;
                     }
 
-                    context.config = Arc::new(new_config);
+                    context.config = Arc::new(*new_config);
                     let max_fps = f64::from(context.config.max_fps);
                     min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
 
@@ -140,7 +140,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::ThemeChanged { theme } => {
                     let mut config = context.config.as_ref().clone();
-                    config.theme = theme;
+                    config.theme = *theme;
                     if let Err(err) = config.validate() {
                         status_error!(error:? = err; "Cannot change theme, invalid config: '{err}'");
                         continue;
