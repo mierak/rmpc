@@ -64,8 +64,10 @@ impl Pane for LyricsPane {
         let Some(current_line) = lrc.lines.get(current_line_idx) else {
             return Ok(());
         };
-        for l in textwrap::wrap(&current_line.content, area.width as usize) {
-            let content = if show_timestamp && !l.is_empty() {
+        for (index, l) in
+            textwrap::wrap(&current_line.content, area.width as usize).into_iter().enumerate()
+        {
+            let content = if index == 0 && show_timestamp && !l.is_empty() {
                 format!("[{}] {}", current_line.time.to_string(), l)
             } else {
                 l.to_string()
@@ -85,8 +87,10 @@ impl Pane for LyricsPane {
             let Some(line) = lrc.lines.get(before_lyrics_cursor) else {
                 break;
             };
-            for l in textwrap::wrap(&line.content, area.width as usize).iter().rev() {
-                let content = if show_timestamp && !l.is_empty() {
+            for (index, l) in
+                textwrap::wrap(&line.content, area.width as usize).into_iter().enumerate().rev()
+            {
+                let content = if index == 0 && show_timestamp && !l.is_empty() {
                     format!("[{}] {}", line.time.to_string(), l)
                 } else {
                     l.to_string()
@@ -113,8 +117,10 @@ impl Pane for LyricsPane {
             let Some(line) = lrc.lines.get(after_lyrics_cursor) else {
                 break;
             };
-            for l in textwrap::wrap(&line.content, area.width as usize) {
-                let content = if show_timestamp && !l.is_empty() {
+            for (index, l) in
+                textwrap::wrap(&line.content, area.width as usize).into_iter().enumerate()
+            {
+                let content = if index == 0 && show_timestamp && !l.is_empty() {
                     format!("[{}] {}", line.time.to_string(), l)
                 } else {
                     l.to_string()
