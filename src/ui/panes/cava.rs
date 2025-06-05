@@ -65,7 +65,7 @@ impl CavaPane {
             area: Rect::default(),
             handle: None,
             is_modal_open: false,
-            command_channel: crossbeam::channel::unbounded(),
+            command_channel: crossbeam::channel::bounded(0),
         };
 
         res.spawn(
