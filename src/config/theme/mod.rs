@@ -280,7 +280,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .preview_metadata_group_style
                 .to_config_or(None, None)?,
             level_styles: value.level_styles.try_into()?,
-            lyrics: value.lyrics.into_config()?,
+            lyrics: value.lyrics.try_into()?,
         })
     }
 }
