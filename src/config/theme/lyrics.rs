@@ -1,20 +1,17 @@
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone)]
 pub struct LyricsConfig {
-    pub show_timestamp: bool,
+    pub timestamp: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct LyricsConfigFile {
-    pub(super) show_timestamp: bool,
+    pub(super) timestamp: bool,
 }
 
-impl TryFrom<LyricsConfigFile> for LyricsConfig {
-    type Error = anyhow::Error;
-
-    fn try_from(value: LyricsConfigFile) -> Result<Self> {
-        Ok(LyricsConfig { show_timestamp: value.show_timestamp })
+impl From<LyricsConfigFile> for LyricsConfig {
+    fn from(value: LyricsConfigFile) -> Self {
+        LyricsConfig { timestamp: value.timestamp }
     }
 }

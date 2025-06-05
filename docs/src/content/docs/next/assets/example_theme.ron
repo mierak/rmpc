@@ -156,6 +156,6 @@
         ),
     ],
     lyrics: (
-        show_timestamp: false
+        timestamp: false
     )
 )

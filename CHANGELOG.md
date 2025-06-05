@@ -45,7 +45,7 @@ lists they are listed as multiple entries.
 - Added info modal to the playlist
 - Added initial partition support which allows you to connect to partition specified as a CLI argument
 - Added `listpartitions` CLI
-- Added `lyrics` config option for showing line timestamp
+- Added `lyrics` config option `timestamp` for showing line timestamp
 
 ### Changed
 
