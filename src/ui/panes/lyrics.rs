@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
 use ratatui::{
     Frame,
@@ -49,13 +51,13 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
-        let default_stlye =
+        let default_style =
             Style::default().fg(context.config.theme.text_color.unwrap_or_default());
 
         let middle_style = if first_line_reached {
             context.config.theme.highlighted_item_style
         } else {
-            default_stlye
+            default_style
         };
 
         let show_timestamp = context.config.theme.lyrics.show_timestamp;
@@ -67,16 +69,17 @@ impl Pane for LyricsPane {
         for (index, l) in
             textwrap::wrap(&current_line.content, area.width as usize).into_iter().enumerate()
         {
-            let content = if index == 0 && show_timestamp && !l.is_empty() {
-                format!("[{}] {}", current_line.time.to_string(), l)
-            } else {
-                l.to_string()
-            };
-            let p = Text::from(content).centered().style(middle_style);
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            frame.render_widget(p, *area);
+            let text = Text::from(if index == 0 && show_timestamp && !l.is_empty() {
+                Cow::Owned(format!("[{}] {}", current_line.time.to_string(), l))
+            } else {
+                l
+            })
+            .centered()
+            .style(middle_style);
+            frame.render_widget(text, *area);
             current_area += 1;
         }
 
@@ -90,19 +93,21 @@ impl Pane for LyricsPane {
             for (index, l) in
                 textwrap::wrap(&line.content, area.width as usize).into_iter().enumerate().rev()
             {
-                let content = if index == 0 && show_timestamp && !l.is_empty() {
-                    format!("[{}] {}", line.time.to_string(), l)
-                } else {
-                    l.to_string()
-                };
-                let p = Text::from(content).centered().style(default_stlye);
-                if before_area_cursor == 0 {
-                    break;
-                }
                 let Some(area) = areas.get(before_area_cursor - 1) else {
                     break;
                 };
-                frame.render_widget(p, *area);
+                if before_area_cursor == 0 {
+                    break;
+                }
+                let text = Text::from(if index == 0 && show_timestamp && !l.is_empty() {
+                    Cow::Owned(format!("[{}] {}", line.time.to_string(), l))
+                } else {
+                    l
+                })
+                .centered()
+                .style(default_style);
+
+                frame.render_widget(text, *area);
                 before_area_cursor -= 1;
             }
         }
@@ -120,16 +125,17 @@ impl Pane for LyricsPane {
             for (index, l) in
                 textwrap::wrap(&line.content, area.width as usize).into_iter().enumerate()
             {
-                let content = if index == 0 && show_timestamp && !l.is_empty() {
-                    format!("[{}] {}", line.time.to_string(), l)
-                } else {
-                    l.to_string()
-                };
-                let p = Text::from(content).centered().style(default_stlye);
                 let Some(area) = areas.get(after_area_cursor + 1) else {
                     break;
                 };
-                frame.render_widget(p, *area);
+                let text = Text::from(if index == 0 && show_timestamp && !l.is_empty() {
+                    Cow::Owned(format!("[{}] {}", line.time.to_string(), l))
+                } else {
+                    l
+                })
+                .centered()
+                .style(default_style);
+                frame.render_widget(text, *area);
                 after_area_cursor += 1;
             }
         }
