@@ -155,5 +155,7 @@
             default: (kind: Property(Filename))
         ),
     ],
+    lyrics: (
+        show_timestamp: false
+    )
 )
-

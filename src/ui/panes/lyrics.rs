@@ -9,7 +9,13 @@ use ratatui::{
 use super::Pane;
 use crate::{
     context::AppContext,
-    shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error, mpd_query::run_status_update},
+    shared::{
+        ext::duration::DurationExt,
+        key_event::KeyEvent,
+        lrc::Lrc,
+        macros::status_error,
+        mpd_query::run_status_update,
+    },
     ui::UiEvent,
 };
 
@@ -43,21 +49,32 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
+        let default_stlye =
+            Style::default().fg(context.config.theme.text_color.unwrap_or_default());
+
         let middle_style = if first_line_reached {
             context.config.theme.highlighted_item_style
         } else {
-            Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+            default_stlye
         };
+
+        let show_timestamp = context.config.theme.lyrics.show_timestamp;
 
         let mut current_area = middle_row as usize;
         let Some(current_line) = lrc.lines.get(current_line_idx) else {
             return Ok(());
         };
-        for line in textwrap::wrap(&current_line.content, area.width as usize) {
+        for l in textwrap::wrap(&current_line.content, area.width as usize) {
+            let content = if show_timestamp && !l.is_empty() {
+                format!("[{}] {}", current_line.time.to_string(), l)
+            } else {
+                l.to_string()
+            };
+            let p = Text::from(content).centered().style(middle_style);
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            frame.render_widget(Text::from(line).centered().style(middle_style), *area);
+            frame.render_widget(p, *area);
             current_area += 1;
         }
 
@@ -69,9 +86,12 @@ impl Pane for LyricsPane {
                 break;
             };
             for l in textwrap::wrap(&line.content, area.width as usize).iter().rev() {
-                let p = Text::from(l.clone()).centered().style(
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
-                );
+                let content = if show_timestamp && !l.is_empty() {
+                    format!("[{}] {}", line.time.to_string(), l)
+                } else {
+                    l.to_string()
+                };
+                let p = Text::from(content).centered().style(default_stlye);
                 if before_area_cursor == 0 {
                     break;
                 }
@@ -94,9 +114,12 @@ impl Pane for LyricsPane {
                 break;
             };
             for l in textwrap::wrap(&line.content, area.width as usize) {
-                let p = Text::from(l).centered().style(
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
-                );
+                let content = if show_timestamp && !l.is_empty() {
+                    format!("[{}] {}", line.time.to_string(), l)
+                } else {
+                    l.to_string()
+                };
+                let p = Text::from(content).centered().style(default_stlye);
                 let Some(area) = areas.get(after_area_cursor + 1) else {
                     break;
                 };
