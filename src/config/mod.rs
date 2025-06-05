@@ -10,6 +10,7 @@ use address::MpdPassword;
 use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethod, ImageMethodFile};
 use anyhow::{Context, Result};
 use artists::{Artists, ArtistsFile};
+use cava::{Cava, CavaFile};
 use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
@@ -23,6 +24,7 @@ use utils::tilde_expand;
 pub mod address;
 pub mod album_art;
 pub mod artists;
+pub mod cava;
 pub mod cli;
 pub mod cli_config;
 mod defaults;
@@ -76,6 +78,7 @@ pub struct Config {
     pub active_panes: Vec<PaneType>,
     pub browser_song_sort: Arc<SortOptions>,
     pub directories_sort: Arc<SortOptions>,
+    pub cava: Cava,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -139,6 +142,8 @@ pub struct ConfigFile {
     pub browser_song_sort: Vec<SongPropertyFile>,
     #[serde(default)]
     pub directories_sort: SortModeFile,
+    #[serde(default)]
+    pub cava: CavaFile,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -197,6 +202,7 @@ impl Default for ConfigFile {
             },
             rewind_to_start_sec: None,
             reflect_changes_to_playlist: false,
+            cava: CavaFile::default(),
         }
     }
 }
@@ -405,6 +411,7 @@ impl ConfigFile {
             theme,
             rewind_to_start_sec: self.rewind_to_start_sec,
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
+            cava: self.cava.into(),
         };
 
         if skip_album_art_check {
