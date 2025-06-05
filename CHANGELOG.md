@@ -45,7 +45,6 @@ lists they are listed as multiple entries.
 - Added info modal to the playlist
 - Added initial partition support which allows you to connect to partition specified as a CLI argument
 - Added `listpartitions` CLI
-
 - Added Start and End Boundaries to ProgressBar increasing its Customizability
 - Added components to the theme. Components are user-defined reusable parts of TUI.
 - Added `rewind_to_start_sec` config option. If elapsed time is past the configured value, the song will be rewound to start instead.
