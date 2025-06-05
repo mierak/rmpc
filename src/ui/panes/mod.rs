@@ -3,6 +3,7 @@ use std::{borrow::Cow, cmp::Ordering, collections::HashMap, time::Duration};
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
 use anyhow::{Context, Result};
+use cava::CavaPane;
 use directories::DirectoriesPane;
 use either::Either;
 use header::HeaderPane;
@@ -62,6 +63,7 @@ use crate::{
 
 pub mod album_art;
 pub mod albums;
+pub mod cava;
 pub mod directories;
 #[cfg(debug_assertions)]
 pub mod frame_count;
@@ -98,6 +100,7 @@ pub enum Panes<'pane_ref, 'pane> {
     TabContent,
     Property(PropertyPane<'pane_ref>),
     Others(&'pane_ref mut Box<dyn BoxedPane>),
+    Cava(&'pane_ref mut CavaPane),
 }
 
 pub trait BoxedPane: Pane + std::fmt::Debug {}
@@ -120,6 +123,7 @@ pub struct PaneContainer<'panes> {
     pub progress_bar: ProgressBarPane,
     pub header: HeaderPane,
     pub tabs: TabsPane<'panes>,
+    pub cava: CavaPane,
     #[cfg(debug_assertions)]
     pub frame_count: FrameCountPane,
     pub others: HashMap<PaneType, Box<dyn BoxedPane>>,
@@ -147,6 +151,7 @@ impl<'panes> PaneContainer<'panes> {
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
             tabs: TabsPane::new(context)?,
+            cava: CavaPane::new(context)?,
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
             others: Self::init_other_panes(context).collect(),
@@ -208,6 +213,7 @@ impl<'panes> PaneContainer<'panes> {
                     .get_mut(pane)
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,
             )),
+            PaneType::Cava => Ok(Panes::Cava(&mut self.cava)),
         }
     }
 }
@@ -234,6 +240,7 @@ macro_rules! pane_call {
             Panes::FrameCount(s) => s.$fn($($param),+),
             Panes::Property(s) => s.$fn($($param),+),
             Panes::Others(s) => s.$fn($($param),+),
+            Panes::Cava(s) => s.$fn($($param),+),
         }
     }
 }

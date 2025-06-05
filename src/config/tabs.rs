@@ -64,6 +64,7 @@ pub enum PaneTypeFile {
         root_tag: String,
         separator: Option<String>,
     },
+    Cava,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
@@ -95,13 +96,14 @@ pub enum PaneType {
         root_tag: String,
         separator: Option<String>,
     },
+    Cava,
 }
 
 pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 1] =
     [PaneTypeDiscriminants::Property];
 
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 8] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -110,10 +112,11 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 8] = [
     PaneTypeDiscriminants::TabContent,
     PaneTypeDiscriminants::FrameCount,
     PaneTypeDiscriminants::Property,
+    PaneTypeDiscriminants::Cava,
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 7] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 8] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -121,6 +124,7 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 7] = [
     PaneTypeDiscriminants::Tabs,
     PaneTypeDiscriminants::TabContent,
     PaneTypeDiscriminants::Property,
+    PaneTypeDiscriminants::Cava,
 ];
 
 impl Pane {
@@ -162,6 +166,7 @@ impl From<PaneTypeFile> for PaneType {
             PaneTypeFile::Browser { root_tag: tag, separator } => {
                 PaneType::Browser { root_tag: tag, separator }
             }
+            PaneTypeFile::Cava => PaneType::Cava,
         }
     }
 }

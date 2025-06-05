@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Stdout};
+use std::collections::HashMap;
 
 use anyhow::{Context, Result, anyhow};
 use crossterm::{
@@ -50,6 +50,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
+        terminal::{TERMINAL, TtyWriter},
     },
 };
 
@@ -630,6 +631,7 @@ impl<'ui> Ui<'ui> {
                 #[cfg(debug_assertions)]
                 Panes::FrameCount(p) => p.on_event(&mut event, visible, context),
                 Panes::Others(p) => p.on_event(&mut event, visible, context),
+                Panes::Cava(p) => p.on_event(&mut event, visible, context),
                 // Property and the dummy TabContent pane do not need to receive events
                 Panes::Property(_) | Panes::TabContent => Ok(()),
             }?;
@@ -670,6 +672,7 @@ impl<'ui> Ui<'ui> {
                     Panes::Others(p) => p.on_query_finished(id, data, visible, context),
                     #[cfg(debug_assertions)]
                     Panes::FrameCount(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Cava(p) => p.on_query_finished(id, data, visible, context),
                     // Property and the dummy TabContent pane do not need to receive command
                     // notifications
                     Panes::Property(_) | Panes::TabContent => Ok(()),
@@ -721,6 +724,7 @@ pub enum UiEvent {
     Displayed,
     Hidden,
     ConfigChanged,
+    PlaybackStateChanged,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
@@ -748,14 +752,14 @@ pub fn restore_terminal<B: Backend + std::io::Write>(
     Ok(terminal.show_cursor()?)
 }
 
-pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<Stdout>>> {
-    let mut stdout = std::io::stdout();
+pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<TtyWriter>>> {
     enable_raw_mode()?;
-    execute!(stdout, EnterAlternateScreen)?;
+    let mut writer = TERMINAL.writer();
+    execute!(writer, EnterAlternateScreen)?;
     if enable_mouse {
-        execute!(stdout, EnableMouseCapture)?;
+        execute!(writer, EnableMouseCapture)?;
     }
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(writer))?;
     terminal.clear()?;
     Ok(terminal)
 }

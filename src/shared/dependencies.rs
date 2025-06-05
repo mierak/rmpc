@@ -15,9 +15,10 @@ pub static PYTHON3MUTAGEN: LazyLock<Dep> = LazyLock::new(|| {
         "try:\n\timport mutagen\n\tprint(\"PRESENT\")\nexcept ImportError:\n\tprint(\"NOT PRESENT\")",
     ])
 });
+pub static CAVA: LazyLock<Dep> = LazyLock::new(|| Dep::new("cava", "cava", &["-v"]));
 
-pub static DEPENDENCIES: [&std::sync::LazyLock<Dep>; 6] =
-    [&FFMPEG, &FFPROBE, &YTDLP, &UEBERZUGPP, &PYTHON3, &PYTHON3MUTAGEN];
+pub static DEPENDENCIES: [&std::sync::LazyLock<Dep>; 7] =
+    [&FFMPEG, &FFPROBE, &YTDLP, &UEBERZUGPP, &PYTHON3, &PYTHON3MUTAGEN, &CAVA];
 
 pub fn is_youtube_supported(mpd_address: &MpdAddress) -> Result<(), Vec<String>> {
     let mut unsupported = Vec::new();

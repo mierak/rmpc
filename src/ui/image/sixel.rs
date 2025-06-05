@@ -25,6 +25,7 @@ use crate::{
     shared::{
         image::resize_image,
         macros::{status_error, try_cont},
+        terminal::TERMINAL,
     },
     tmux,
     try_skip,
@@ -40,7 +41,9 @@ pub struct Sixel {
 
 impl Backend for Sixel {
     fn hide(&mut self, size: Rect) -> anyhow::Result<()> {
-        clear_area(&mut std::io::stdout().lock(), self.colors, size)
+        let writer = TERMINAL.writer();
+        let mut writer = writer.lock();
+        clear_area(writer.by_ref(), self.colors, size)
     }
 
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
@@ -99,7 +102,9 @@ impl Sixel {
                         }
                     }
 
-                    let mut w = std::io::stdout().lock();
+                    let writer = TERMINAL.writer();
+                    let mut writer = writer.lock();
+                    let mut w = writer.by_ref();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
                         log::trace!(
                             "Not showing image because its not supposed to be displayed anymore"
