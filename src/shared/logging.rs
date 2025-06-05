@@ -4,6 +4,15 @@ use flexi_logger::{FileSpec, FlexiLoggerError, LoggerHandle};
 use super::events::Level;
 use crate::AppEvent;
 
+pub fn get_uid() -> Option<String> {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()?
+        .lines()
+        .find(|line| line.starts_with("Uid:"))
+        .and_then(|line| line.split_whitespace().nth(1)) // first number is the real UID
+        .map(|s| s.to_string())
+}
+
 pub fn init(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
     #[cfg(debug_assertions)]
     return init_debug(tx);
@@ -23,11 +32,12 @@ pub fn init_console() -> Result<LoggerHandle, FlexiLoggerError> {
 
 #[allow(dead_code)]
 fn init_release(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    let uid = get_uid().unwrap_or_else(|| "unknown".to_string());
     flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file(
             FileSpec::default()
                 .directory(std::env::temp_dir())
-                .basename("rmpc")
+                .basename(format!("rmpc_{uid}"))
                 .suppress_timestamp(),
         )
         .add_writer("status_bar", Box::new(StatusBarWriter::new(tx)))
@@ -38,11 +48,12 @@ fn init_release(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> 
 
 #[allow(dead_code)]
 fn init_debug(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    let uid = get_uid().unwrap_or_else(|| "unknown".to_string());
     flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file_and_writer(
             FileSpec::default()
                 .directory(std::env::temp_dir())
-                .basename("rmpc")
+                .basename(format!("rmpc_{uid}"))
                 .suppress_timestamp(),
             Box::new(AppEventChannelWriter::new(tx.clone())),
         )

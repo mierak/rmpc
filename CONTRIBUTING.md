@@ -64,7 +64,7 @@ if you encounter an issue which is not yet solved in the current git version of 
 all information relevant to your issue.
 
 Sometimes you might be asked to provide `trace` level logs. You can obtain them by running rmpc
-with `RUST_LOG` environment variable set to trace. The log file is located at `/tmp/rmpc.log`.
+with `RUST_LOG` environment variable set to trace. The log file is located at `/tmp/rmpc_${UID}.log`.
 These logs can be very verbose so you might have to upload them somewhere and link them to the issue.
 ```bash
 RUST_LOG=trace rmpc

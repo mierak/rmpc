@@ -69,7 +69,7 @@ body:
     id: logs
     attributes:
       label: Relevant log output
-      description: Please copy and paste the contents of `/tmp/rmpc.log` here
+      description: Please copy and paste the contents of `/tmp/rmpc_${UID}.log` here
       value: |
         <details>
           <summary>rmpc log</summary>
