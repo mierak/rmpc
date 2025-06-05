@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
+use bon::bon;
 use ratatui::{
     Frame,
     layout::Rect,
@@ -31,38 +32,39 @@ enum FocusedComponent {
     Buttons,
 }
 
-pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> {
+#[derive(derive_more::Debug)]
+pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     scrolling_state: DirState<ListState>,
     focused: FocusedComponent,
     options_area: Rect,
     options: Vec<V>,
+    #[debug(skip)]
     callback: Option<Callback>,
     title: &'a str,
 }
 
-impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> std::fmt::Debug
-    for SelectModal<'_, V, Callback>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "SelectModal(title = {:?}, button_group = {:?}, button_group_state = {:?})",
-            self.title, self.button_group, self.button_group_state,
-        )
-    }
-}
-
-impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>>
+#[bon]
+impl<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>>
     SelectModal<'a, V, Callback>
 {
-    pub fn new(context: &AppContext) -> Self {
+    #[builder]
+    pub fn new(
+        context: &AppContext,
+        title: Option<&'a str>,
+        options: Vec<V>,
+        on_confirm: Callback,
+        confirm_label: Option<&'a str>,
+    ) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
 
         let mut button_group_state = ButtonGroupState::default();
-        let buttons = vec![Button::default().label("Confirm"), Button::default().label("Cancel")];
+        let buttons = vec![
+            Button::default().label(confirm_label.unwrap_or("Confirm")),
+            Button::default().label("Cancel"),
+        ];
         button_group_state.set_button_count(buttons.len());
 
         let button_group = ButtonGroup::default()
@@ -81,35 +83,14 @@ impl<'a, V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>>
             scrolling_state,
             focused: FocusedComponent::List,
             options_area: Rect::default(),
-            options: Vec::new(),
-            callback: None,
-            title: "",
+            options,
+            callback: Some(on_confirm),
+            title: title.unwrap_or_default(),
         }
-    }
-
-    pub fn options(mut self, options: Vec<V>) -> Self {
-        self.options = options;
-        self
-    }
-
-    pub fn on_confirm(mut self, callback: Callback) -> Self {
-        self.callback = Some(callback);
-        self
-    }
-
-    pub fn confirm_label(mut self, label: &'a str) -> Self {
-        let buttons = vec![Button::default().label(label), Button::default().label("Cancel")];
-        self.button_group = self.button_group.buttons(buttons);
-        self
-    }
-
-    pub fn title(mut self, title: &'a str) -> Self {
-        self.title = title;
-        self
     }
 }
 
-impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
+impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Result<()>> Modal
     for SelectModal<'_, V, Callback>
 {
     fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
@@ -236,7 +217,7 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
                     FocusedComponent::Buttons if self.button_group_state.selected == 0 => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
                             if let Some(ref mut callback) = self.callback {
-                                (callback)(context, &self.options[idx], idx)?;
+                                (callback)(context, self.options.remove(idx), idx)?;
                             }
                         }
                         pop_modal!(context);
@@ -283,7 +264,7 @@ impl<V: Display, Callback: FnMut(&AppContext, &V, usize) -> Result<()>> Modal
                     Some(0) => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
                             if let Some(ref mut callback) = self.callback {
-                                (callback)(context, &self.options[idx], idx)?;
+                                (callback)(context, self.options.remove(idx), idx)?;
                             }
                         }
                         pop_modal!(context);

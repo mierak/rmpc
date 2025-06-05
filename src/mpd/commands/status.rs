@@ -79,7 +79,11 @@ impl FromMpd for Status {
             "updating_db" => self.updating_db = Some(value.parse().logerr(key, &value)?),
             "error" => self.error = Some(value),
             "bitrate" => self.bitrate = None,
-            "lastloadedplaylist" => self.lastloadedplaylist = Some(value),
+            "lastloadedplaylist" => {
+                if !value.is_empty() {
+                    self.lastloadedplaylist = Some(value);
+                }
+            }
             "time" => {} // deprecated
             _ => return Ok(LineHandled::No { value }),
         }

@@ -45,6 +45,15 @@ lists they are listed as multiple entries.
 - Added info modal to the playlist
 - Added initial partition support which allows you to connect to partition specified as a CLI argument
 - Added `listpartitions` CLI
+
+- Added Start and End Boundaries to ProgressBar increasing its Customizability
+- Added components to the theme. Components are user-defined reusable parts of TUI.
+- Added `rewind_to_start_sec` config option. If elapsed time is past the configured value, the song will be rewound to start instead.
+- Added `reflect_changes_to_playlist` config option. This makes changes to the queue reflect to the stored playlist if any.
+- Added `mutliple_tag_resolution_strategy` to choose which tag value to display when multiple values are present
+- Added `maps_three_symbols` test for progress bar. This will help avoid any errors while changing progress bar code in future
+- Added `PopConfigErrorModal` so theat the config error modals are automatically removed when the config reloads and is found correct
+- Added style configuration for dir and song symbols in browsers
 - Added `lyrics` config option `timestamp` for showing line timestamp
 
 ### Changed
@@ -61,6 +70,7 @@ lists they are listed as multiple entries.
 - Refactored yt-dlp to make it easier to add support for more hosts
 - `scrollbar` theme option now also accepts `None` as a valid value to hide all scrollbars in rmpc
 - `TogglePause` in both the keybind and CLI to issue play if the current state is stopped
+- Made lyrics index matching more lenient
 
 ### Fixed
 

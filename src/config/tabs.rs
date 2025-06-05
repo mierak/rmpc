@@ -6,6 +6,7 @@ use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use super::theme::{
     PercentOrLength,
@@ -165,15 +166,13 @@ impl From<PaneTypeFile> for PaneType {
     }
 }
 
-impl TryFrom<TabsFile> for Tabs {
-    type Error = anyhow::Error;
-
-    fn try_from(value: TabsFile) -> Result<Self, Self::Error> {
-        let (names, tabs): (Vec<_>, HashMap<_, _>) = value
+impl TabsFile {
+    pub fn convert(self, library: &HashMap<String, SizedPaneOrSplit>) -> Result<Tabs> {
+        let (names, tabs): (Vec<_>, HashMap<_, _>) = self
             .0
             .into_iter()
             .map(|tab| -> Result<_> {
-                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert()? })
+                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert(library)? })
             })
             .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {
                 let tab = tab?;
@@ -184,7 +183,7 @@ impl TryFrom<TabsFile> for Tabs {
 
         ensure!(!tabs.is_empty(), "At least one tab is required");
 
-        Ok(Self { names, tabs })
+        Ok(Tabs { names, tabs })
     }
 }
 
@@ -247,6 +246,7 @@ impl From<&DirectionFile> for Direction {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PaneOrSplitFile {
     Pane(PaneTypeFile),
+    Component(String),
     Split {
         direction: DirectionFile,
         #[serde(default)]
@@ -338,23 +338,50 @@ pub struct SizedSubPane {
     pub pane: SizedPaneOrSplit,
 }
 
+#[derive(Error, Debug)]
+pub enum PaneConversionError {
+    #[error("Missing component: {0}")]
+    MissingComponent(String),
+    #[error("Failed to parse pane size: {0}")]
+    ParseError(#[from] core::num::ParseIntError),
+}
+
 impl PaneOrSplitFile {
-    pub fn convert_recursive(&self, b: Borders) -> Result<SizedPaneOrSplit> {
+    pub fn convert_recursive(
+        &self,
+        b: Borders,
+        library: &HashMap<String, SizedPaneOrSplit>,
+    ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
                 pane: pane_type_file.clone().into(),
                 borders: b,
                 id: id::new(),
             }),
+            PaneOrSplitFile::Component(name) => match library.get(name) {
+                Some(SizedPaneOrSplit::Pane(pane)) => {
+                    let mut v = pane.clone();
+                    v.borders = b;
+                    SizedPaneOrSplit::Pane(v)
+                }
+                Some(SizedPaneOrSplit::Split { borders, direction, panes }) => {
+                    SizedPaneOrSplit::Split {
+                        borders: *borders | b,
+                        direction: *direction,
+                        panes: panes.clone(),
+                    }
+                }
+                None => return Err(PaneConversionError::MissingComponent(name.clone())),
+            },
             PaneOrSplitFile::Split { direction, borders, panes } => SizedPaneOrSplit::Split {
                 direction: direction.into(),
                 borders: Into::<Borders>::into(*borders) | b,
                 panes: panes
                     .iter()
-                    .map(|sub_pane| -> Result<_> {
+                    .map(|sub_pane| -> Result<SizedSubPane, PaneConversionError> {
                         let borders: Borders = sub_pane.borders.into();
                         let size: PercentOrLength = sub_pane.size.parse()?;
-                        let pane = sub_pane.pane.convert_recursive(borders)?;
+                        let pane = sub_pane.pane.convert_recursive(borders, library)?;
 
                         Ok(SizedSubPane { size, pane })
                     })
@@ -363,8 +390,11 @@ impl PaneOrSplitFile {
         })
     }
 
-    pub fn convert(&self) -> Result<SizedPaneOrSplit> {
-        self.convert_recursive(Borders::NONE)
+    pub fn convert(
+        &self,
+        library: &HashMap<String, SizedPaneOrSplit>,
+    ) -> Result<SizedPaneOrSplit, PaneConversionError> {
+        self.convert_recursive(Borders::NONE, library)
     }
 }
 

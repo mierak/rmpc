@@ -37,6 +37,16 @@ pub trait MetadataTagExt<'s> {
 }
 
 impl MetadataTag {
+    pub fn first(&self) -> &str {
+        match self {
+            MetadataTag::Single(v) => v.as_str(),
+            MetadataTag::Multiple(items) => items
+                .first()
+                .map(|s| s.as_str())
+                .expect("Multiple tags to contain at least one value"),
+        }
+    }
+
     pub fn last(&self) -> &str {
         match self {
             MetadataTag::Single(v) => v.as_str(),
@@ -44,6 +54,17 @@ impl MetadataTag {
                 .last()
                 .map(|s| s.as_str())
                 .expect("Multiple tags to contain at least one value"),
+        }
+    }
+
+    pub fn nth(&self, idx: usize) -> &str {
+        match self {
+            MetadataTag::Single(v) => v.as_str(),
+            MetadataTag::Multiple(items) => {
+                if idx >= items.len() { items.last() } else { items.get(idx) }
+                    .map(|s| s.as_str())
+                    .expect("Multiple tags to contain at least one value")
+            }
         }
     }
 

@@ -15,15 +15,16 @@ must be on the client side.
 
 Lrc files are resolved by rmpc via two methods(in order):
 
--   Same path as the song file, except with the `.lrc` file extension
--   By indexing all the `.lrc` files in the `lyrics_dir`
+- Same path as the song file, except with the `.lrc` file extension
+- By indexing all the `.lrc` files in the `lyrics_dir`
 
 #### Lyrics index
 
 Rmpc will create an index of all `.lrc` files in your `lyrics_dir` on startup. Lrc files can contain metadata about
 the song which they belong to. These metadata can include artist(ar), title(ti) and album(al) as well as length.
-`Artist`, `title` and `album` have to exactly(case sensitive) match in song's and lrc's metadata for the song to match.
-If the lrc file contains `length`, it is matched to song's length plus or minus 2 seconds.
+`Artist`, `title` and `album` have to exactly(case insensitive) match in song's and lrc's metadata for the song to match.
+Album is not a strict requirement to match, if it is missing in either the lrc file or song metadata it will not be considered.
+If the lrc file contains `length`, it is matched to song's length plus or minus 5 seconds.
 
 #### Same path as the song file
 

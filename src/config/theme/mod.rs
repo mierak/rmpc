@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use ::serde::{Deserialize, Serialize};
-use anyhow::Result;
+use anyhow::{Result, bail};
+use itertools::Itertools;
 use level_styles::{LevelStyles, LevelStylesFile};
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
@@ -12,6 +15,7 @@ use self::{
     scrollbar::ScrollbarConfig,
     style::{StringColor, ToConfigOr},
 };
+use crate::mpd::commands::metadata_tag::MetadataTag;
 
 mod header;
 pub mod level_styles;
@@ -30,7 +34,7 @@ pub use self::{
 };
 use super::{
     defaults,
-    tabs::{PaneOrSplitFile, SizedPaneOrSplit},
+    tabs::{PaneConversionError, PaneOrSplitFile, SizedPaneOrSplit},
     utils::tilde_expand,
 };
 
@@ -62,7 +66,9 @@ pub struct UiConfig {
     #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
     pub layout: SizedPaneOrSplit,
+    pub components: HashMap<String, SizedPaneOrSplit>,
     pub format_tag_separator: String,
+    pub mutliple_tag_resolution_strategy: TagResolutionStrategy,
     pub level_styles: LevelStyles,
     pub lyrics: LyricsConfig,
 }
@@ -100,8 +106,12 @@ pub struct UiConfigFile {
     pub(super) default_album_art_path: Option<String>,
     #[serde(default)]
     pub(super) layout: PaneOrSplitFile,
+    #[serde(default)]
+    pub(super) components: HashMap<String, PaneOrSplitFile>,
     #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
+    #[serde(default)]
+    pub(super) mutliple_tag_resolution_strategy: TagResolutionStrategy,
     #[serde(default)]
     pub(super) level_styles: LevelStylesFile,
     #[serde(default)]
@@ -158,10 +168,13 @@ impl Default for UiConfigFile {
                 dir: "D".to_owned(),
                 marker: "M".to_owned(),
                 ellipsis: Some("...".to_owned()),
+                song_style: None,
+                dir_style: None,
             },
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
             format_tag_separator: " | ".to_owned(),
+            mutliple_tag_resolution_strategy: TagResolutionStrategy::default(),
             preview_label_style: StyleFile {
                 fg: Some("yellow".to_string()),
                 bg: None,
@@ -173,6 +186,7 @@ impl Default for UiConfigFile {
                 modifiers: Some(Modifiers::Bold),
             },
             level_styles: LevelStylesFile::default(),
+            components: HashMap::default(),
             lyrics: LyricsConfigFile::default(),
         }
     }
@@ -198,6 +212,8 @@ pub struct SymbolsFile {
     pub(super) dir: String,
     pub(super) marker: String,
     pub(super) ellipsis: Option<String>,
+    pub(super) song_style: Option<StyleFile>,
+    pub(super) dir_style: Option<StyleFile>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -206,6 +222,8 @@ pub struct SymbolsConfig {
     pub dir: String,
     pub marker: String,
     pub ellipsis: String,
+    pub song_style: Option<Style>,
+    pub dir_style: Option<Style>,
 }
 
 impl From<SymbolsFile> for SymbolsConfig {
@@ -215,8 +233,92 @@ impl From<SymbolsFile> for SymbolsConfig {
             dir: value.dir,
             marker: value.marker,
             ellipsis: value.ellipsis.unwrap_or_else(|| "...".to_string()),
+            song_style: value
+                .song_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            dir_style: value
+                .dir_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
         }
     }
+}
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TagResolutionStrategy {
+    First,
+    Last,
+    #[default]
+    All,
+    Nth(usize),
+}
+
+impl TagResolutionStrategy {
+    pub fn resolve<'a>(self, tag: &'a MetadataTag, separator: &str) -> std::borrow::Cow<'a, str> {
+        match self {
+            TagResolutionStrategy::First => tag.first().into(),
+            TagResolutionStrategy::Last => tag.last().into(),
+            TagResolutionStrategy::All => tag.join(separator),
+            TagResolutionStrategy::Nth(idx) => tag.nth(idx).into(),
+        }
+    }
+}
+
+// Converts all components while also resolving dependencies between them. If a
+// component is missing but is present in the source map it will be skipped and
+// the resolution will be retried in the next loop over. Only when component is
+// truly missing or a different kind of error occurs will the conversion fail.
+fn convert_components(
+    value: HashMap<String, PaneOrSplitFile>,
+) -> Result<HashMap<String, SizedPaneOrSplit>> {
+    let mut result = HashMap::new();
+    let mut components = value.into_iter().collect_vec();
+
+    let mut i = 0usize;
+    let mut last_size = components.len();
+    let mut same_size_count = 0;
+    loop {
+        let current = components.get(i.checked_rem(components.len()).unwrap_or(0));
+        match current {
+            Some((name, pane)) => match pane.convert(&result) {
+                Ok(v) => {
+                    result.insert(name.to_owned(), v);
+                    components.remove(i % components.len());
+                }
+                Err(PaneConversionError::MissingComponent(missing_name))
+                    if components.iter().any(|(n, _)| n == &missing_name) =>
+                {
+                    i += 1;
+                }
+                err @ Err(_) => {
+                    err?;
+                }
+            },
+            None => break,
+        }
+
+        let remaining = components.len();
+        if last_size == remaining {
+            same_size_count += 1;
+        } else {
+            same_size_count = 0;
+        }
+
+        if same_size_count > remaining {
+            bail!(
+                "Failed to resolve components. Circular dependency detected. Components: {:?}",
+                components.iter().map(|(name, _)| name).collect::<Vec<_>>()
+            );
+        }
+
+        last_size = remaining;
+    }
+
+    log::debug!(result:?; "Converted components");
+
+    Ok(result)
 }
 
 impl TryFrom<UiConfigFile> for UiConfig {
@@ -227,12 +329,15 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let bg_color = StringColor(value.background_color).to_color()?;
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
         let fallback_border_fg = Color::White;
+        let components = convert_components(value.components)?;
 
         Ok(Self {
-            layout: value.layout.convert()?,
+            layout: value.layout.convert(&components)?,
+            components,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,
+            mutliple_tag_resolution_strategy: value.mutliple_tag_resolution_strategy,
             modal_background_color: StringColor(value.modal_background_color)
                 .to_color()?
                 .or(bg_color),

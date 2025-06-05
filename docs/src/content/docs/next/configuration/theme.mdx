@@ -33,11 +33,18 @@ Below is a list of properties that can be changed.
 
 ### layout
 
-<ConfigValue name="layout" type="other" customText="layout: Pane | Split" />
+<ConfigValue name="layout" type="other" customText="Pane | Split | Component" />
 
 Base layout of the application, lets you configure where the various components are placed on the screen.
 
 <LinkCard title="layout" description="Configuration of rmpc's base layout" href={path("configuration/layout/")} />
+
+### components
+
+<ConfigValue name="components" type="other" customText="Map<string, Pane | Split | Component>" />
+
+Reusable components which can be used in tabs, layout or other components. Check
+out <a href={path("configuration/layout#components")}>components</a> section in the layout page for more information.
 
 ### default_album_art_path
 
@@ -83,6 +90,18 @@ This symbol is used for selected items in the browser panes.
 Symbol used to indicate text truncation when content exceeds the available
 display space.
 
+#### symbols.song_style
+
+<ConfigValue name="song_style" customText="<style>" />
+
+Style to use for the song symbol.
+
+#### symbols.dir_style
+
+<ConfigValue name="dir_style" customText="<style>" />
+
+Style to use for the dir symbol.
+
 ### level_styles
 
 Configures style of various messages depending on their level, ie. info or error.
@@ -109,10 +128,10 @@ Progress bar at the bottom of the window.
 
 #### progress_bar.symbols
 
-<ConfigValue name="track_style" type="string" customText="[elapsed, thumb, track]" />
+<ConfigValue name="symbols" type="string" customText="[start, elapsed, thumb, track, end]" />
 
-Array of three single character strings that determine the look of the progress bar. First value is the elapsed part of
-the progress bar, second is the thumb and the third is the empty track. Default is `["-", ">", " "]
+Array of five single character strings that determine the look of the progress bar. First value is the start character, second is the elapsed part of
+the progress bar, third is the thumb, fourth is the empty track and the fifth is the end character. Default is `["[", "-", ">", " ", "]"]
 
 #### progress_bar.track_style
 
@@ -249,6 +268,14 @@ Style for all tabs except the active one.
 
 Use this to separate entries when a song has multiple values for a tag. For example, a song with
 two values for `artist` and `|` as a separator will show `artist1 | artist2`. Default is `|`.
+
+### mutliple_tag_resolution_strategy
+
+<ConfigValue name="mutliple_tag_resolution_strategy" type={["All", "First", "Last", "Nth(<number>)"]} />
+
+What strategy to choose when a song has multiple values for a tag. `All` uses #format_tag_separator to join
+all values to one. `First` and `Last` choose the first and last value respectively and `Nth` chooses exactly
+which one to take. Last value is used when index given to `Nth` is larger than the count of available values.
 
 ### song_table_format
 

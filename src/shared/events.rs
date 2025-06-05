@@ -45,24 +45,45 @@ pub(crate) enum WorkDone {
     None,
 }
 
+// The instances are short lived events, boxing would most likely only hurt
+// here.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum AppEvent {
     UserKeyInput(KeyEvent),
     UserMouseInput(MouseEvent),
     Status(String, Level),
-    InfoModal { message: Vec<String>, title: Option<String>, size: Option<Size> },
+    InfoModal {
+        message: Vec<String>,
+        title: Option<String>,
+        size: Option<Size>,
+        id: Option<String>,
+    },
     Log(Vec<u8>),
     IdleEvent(IdleEvent),
     RequestRender,
-    Resized { columns: u16, rows: u16 },
-    ResizedDebounced { columns: u16, rows: u16 },
+    Resized {
+        columns: u16,
+        rows: u16,
+    },
+    ResizedDebounced {
+        columns: u16,
+        rows: u16,
+    },
     WorkDone(Result<WorkDone>),
     UiEvent(UiAppEvent),
     Reconnected,
     LostConnection,
-    TmuxHook { hook: String },
-    ConfigChanged { config: Config, keep_old_theme: bool },
-    ThemeChanged { theme: UiConfig },
+    TmuxHook {
+        hook: String,
+    },
+    ConfigChanged {
+        config: Box<Config>,
+        keep_old_theme: bool,
+    },
+    ThemeChanged {
+        theme: Box<UiConfig>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]

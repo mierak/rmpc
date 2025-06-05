@@ -61,6 +61,8 @@ pub struct Config {
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub center_current_song_on_change: bool,
+    pub reflect_changes_to_playlist: bool,
+    pub rewind_to_start_sec: Option<u64>,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
     pub theme: UiConfig,
@@ -103,6 +105,10 @@ pub struct ConfigFile {
     select_current_song_on_change: bool,
     #[serde(default = "defaults::default_false")]
     center_current_song_on_change: bool,
+    #[serde(default = "defaults::default_false")]
+    reflect_changes_to_playlist: bool,
+    #[serde(default)]
+    rewind_to_start_sec: Option<u64>,
     #[serde(default = "defaults::default_read_timeout")]
     mpd_read_timeout_ms: u64,
     #[serde(default = "defaults::default_write_timeout")]
@@ -189,6 +195,8 @@ impl Default for ConfigFile {
                 group_directories_first: true,
                 reverse: false,
             },
+            rewind_to_start_sec: None,
+            reflect_changes_to_playlist: false,
         }
     }
 }
@@ -309,7 +317,7 @@ impl ConfigFile {
             ron::de::from_reader(read)?
         } else if let Some(path) = config_path {
             let config_dir = path.parent().with_context(|| {
-                format!("Expected config path to have parent directory. Path: '{path:?}'")
+                format!("Expected config path to have parent directory. Path: '{}'", path.display())
             })?;
 
             self.read_theme(config_dir)?
@@ -319,7 +327,7 @@ impl ConfigFile {
 
         let theme = UiConfig::try_from(theme)?;
 
-        let tabs: Tabs = self.tabs.try_into()?;
+        let tabs: Tabs = self.tabs.convert(&theme.components)?;
         let active_panes = tabs
             .tabs
             .iter()
@@ -395,6 +403,8 @@ impl ConfigFile {
                 }
             }),
             theme,
+            rewind_to_start_sec: self.rewind_to_start_sec,
+            reflect_changes_to_playlist: self.reflect_changes_to_playlist,
         };
 
         if skip_album_art_check {

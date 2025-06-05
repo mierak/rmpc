@@ -14,6 +14,8 @@
     enable_mouse: true,
     enable_config_hot_reload: true,
     status_update_interval_ms: 1000,
+    rewind_to_start_sec: None,
+    reflect_changes_to_playlist: false,
     select_current_song_on_change: false,
     browser_song_sort: [Disc, Track, Artist, Title],
     directories_sort: SortFormat(group_directories_first: true, reverse: false),

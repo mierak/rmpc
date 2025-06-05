@@ -14,6 +14,7 @@ use modals::{
     input_modal::InputModal,
     keybinds::KeybindsModal,
     outputs::OutputsModal,
+    select_modal::SelectModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
@@ -224,6 +225,30 @@ impl<'ui> Ui<'ui> {
 
         if let Some(action) = key.as_global_action(context) {
             match action {
+                GlobalAction::SwitchPartition => {
+                    // TODO make this async before finalizing the functionality
+                    let result = context.query_sync(move |client| {
+                        let partitions = client.list_partitions()?;
+                        Ok(partitions.0)
+                    })?;
+
+                    modal!(
+                        context,
+                        SelectModal::builder()
+                            .context(context)
+                            .title("Switch partition")
+                            .confirm_label("Switch")
+                            .options(result)
+                            .on_confirm(|ctx, value, _idx| {
+                                ctx.command(move |client| {
+                                    client.switch_to_partition(&value)?;
+                                    Ok(())
+                                });
+                                Ok(())
+                            })
+                            .build()
+                    );
+                }
                 GlobalAction::Command { command, .. } => {
                     let cmd = command.parse();
                     log::debug!("executing {cmd:?}");
@@ -261,8 +286,21 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::PreviousTrack if context.status.state != State::Stop => {
+                    let rewind_to_start = context.config.rewind_to_start_sec;
+                    let elapsed_sec = context.status.elapsed.as_secs();
                     context.command(move |client| {
-                        client.prev()?;
+                        match rewind_to_start {
+                            Some(value) => {
+                                if elapsed_sec >= value {
+                                    client.seek_current(ValueChange::Set(0))?;
+                                } else {
+                                    client.prev()?;
+                                }
+                            }
+                            None => {
+                                client.prev()?;
+                            }
+                        }
                         Ok(())
                     });
                 }
@@ -468,9 +506,26 @@ impl<'ui> Ui<'ui> {
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut AppContext) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
-                self.modals.push(modal);
+                if let Some(id) = modal.get_id() {
+                    if let Some(existing) =
+                        self.modals.iter_mut().find(|m| m.get_id().as_ref() == Some(&id))
+                    {
+                        *existing = modal;
+                    } else {
+                        self.modals.push(modal);
+                    }
+                } else {
+                    self.modals.push(modal);
+                }
                 self.on_event(UiEvent::ModalOpened, context)?;
                 context.render()?;
+            }
+            UiAppEvent::PopConfigErrorModal => {
+                if let Some(config_modal) = self.modals.last() {
+                    if config_modal.get_id() == Some("config_error_modal".into()) {
+                        let _ = self.on_ui_app_event(UiAppEvent::PopModal, context);
+                    }
+                }
             }
             UiAppEvent::PopModal => {
                 self.modals.pop();
@@ -644,6 +699,7 @@ impl<'ui> Ui<'ui> {
 pub enum UiAppEvent {
     Modal(Box<dyn Modal + Send + Sync>),
     PopModal,
+    PopConfigErrorModal,
     ChangeTab(TabName),
 }
 
@@ -826,12 +882,14 @@ impl Config {
     fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {
         let progress_bar_colors = &self.theme.progress_bar;
         widgets::progress_bar::ProgressBar::default()
+            .elapsed_style(progress_bar_colors.elapsed_style)
             .thumb_style(progress_bar_colors.thumb_style)
             .track_style(progress_bar_colors.track_style)
-            .elapsed_style(progress_bar_colors.elapsed_style)
-            .elapsed_char(&self.theme.progress_bar.symbols[0])
-            .thumb_char(&self.theme.progress_bar.symbols[1])
-            .track_char(&self.theme.progress_bar.symbols[2])
+            .start_char(&self.theme.progress_bar.symbols[0])
+            .elapsed_char(&self.theme.progress_bar.symbols[1])
+            .thumb_char(&self.theme.progress_bar.symbols[2])
+            .track_char(&self.theme.progress_bar.symbols[3])
+            .end_char(&self.theme.progress_bar.symbols[4])
     }
 
     fn as_styled_scrollbar(&self) -> Option<ratatui::widgets::Scrollbar> {

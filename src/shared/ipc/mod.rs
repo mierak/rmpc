@@ -60,7 +60,7 @@ pub(crate) enum SocketCommand {
     IndexLrc(IndexLrcCommand),
     StatusMessage(StatusMessageCommand),
     TmuxHook(TmuxHookCommand),
-    Set(SetIpcCommand),
+    Set(Box<SetIpcCommand>),
 }
 
 impl SocketCommandExecute for SocketCommand {

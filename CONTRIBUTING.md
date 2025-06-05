@@ -10,6 +10,7 @@ debug the project.
 * [Formatting the code](#formatting-the-code)
 * [Reporting an issue](#reporting-an-issue)
 * [Requesting a feature](#requesting-a-feature)
+* [Submitting a pull request](#submitting-a-pull-request)
 * [Documentation](#documentation)
 
 ## Prerequisites
@@ -76,11 +77,26 @@ RUST_LOG=trace cargo run
 Similar to the bug report, please fill out the [Feature Request](https://github.com/mierak/rmpc/issues/new?template=feature.yml)
 template.
 
+## Submitting a pull request
+
+This is just a small checklist to potentially reduce the amount of back and forth when submitting
+pull requests.
+
+* [Format](#formatting-the-code) the code
+* Run clippy (stable)
+* Ensure that all tests pass by running `cargo test`
+* Update the documentation if your feature changed or added behavior
+* Note your change in the changelog 
+* Address all comments in the pull request
+
 ## Documentation
 
 The documentation lies in the `docs` directory in the repository root. The docs area created with
 [astro](https://astro.build/) javascript framework. All contributions and improvements to the
 documentation are welcome.
+
+There are multiple sections in the docs, primarily `src/content/docs/next` and `src/content/docs/release`
+which correspond to the current dev and release version respectively.
 
 To run the documentation locally:
 

@@ -91,7 +91,7 @@ impl flexi_logger::writers::LogWriter for StatusBarWriter {
     ) -> std::io::Result<()> {
         match self.tx.send(AppEvent::Status(format!("{}", record.args()), record.level().into())) {
             Ok(v) => Ok(v),
-            Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
+            Err(err) => Err(std::io::Error::other(err)),
         }
     }
 
@@ -117,7 +117,7 @@ impl flexi_logger::writers::LogWriter for AppEventChannelWriter {
 
         match self.tx.send(AppEvent::Log(buf)) {
             Ok(v) => Ok(v),
-            Err(err) => Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
+            Err(err) => Err(std::io::Error::other(err)),
         }
     }
 
@@ -151,7 +151,7 @@ pub fn console_format(
     match record.key_values().visit(&mut visitor) {
         Ok(()) => {}
         Err(err) => {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, err));
+            return Err(std::io::Error::other(err));
         }
     }
     let level = record.level();
@@ -174,7 +174,7 @@ pub fn structured_detailed_format(
     match record.key_values().visit(&mut visitor) {
         Ok(()) => {}
         Err(err) => {
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, err));
+            return Err(std::io::Error::other(err));
         }
     }
     write!(

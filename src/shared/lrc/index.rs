@@ -5,7 +5,9 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use itertools::Itertools;
 use serde::Serialize;
+use unicase::UniCase;
 use walkdir::WalkDir;
 
 use super::{Lrc, parse_length};
@@ -24,7 +26,7 @@ pub struct LrcIndexEntry {
     /// ar
     pub artist: String,
     /// al
-    pub album: String,
+    pub album: Option<String>,
     /// length
     pub length: Option<Duration>,
 }
@@ -68,49 +70,103 @@ impl LrcIndex {
     }
 
     pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {
-        match (
-            song.metadata.get("artist"),
-            song.metadata.get("title"),
-            song.metadata.get("album"),
-            song.duration,
-        ) {
-            (Some(artist), Some(title), Some(album), length) => {
-                // TODO xxx.last() is called here to not change existing behavior. Consider
-                // supporting all the tag entries
-                let lrc_opt = self.find_lrc(artist.last(), title.last(), album.last(), length);
-                match lrc_opt {
-                    None => log::trace!("No Lyrics found for {:?}", song.metadata),
-                    Some(lrc) => log::trace!("Lyrics found at {:?}", lrc.path),
-                }
-                lrc_opt
-            }
-            _ => None,
+        if let Some(entry) = self.find_entry(song) {
+            Ok(Some(std::fs::read_to_string(&entry.path)?.parse()?))
+        } else {
+            Ok(None)
         }
-        .map_or(Ok(None), |lrc| Ok(Some(std::fs::read_to_string(&lrc.path)?.parse()?)))
     }
 
-    fn find_lrc(
-        &self,
-        artist: &str,
-        title: &str,
-        album: &str,
-        length: Option<Duration>,
-    ) -> Option<&LrcIndexEntry> {
-        log::trace!(
-            "Searching Lyrics for song: Title: '{title}', Artist: '{artist}', Album: '{album}', Length: {length:?}"
-        );
-        self.index.iter().find(|entry| {
-            log::trace!(entry:?; "searching entry");
+    fn album_matches(entry: &LrcIndexEntry, song_album: Option<&str>) -> bool {
+        match (&entry.album, song_album) {
+            (Some(entry_album), Some(song_album)) => {
+                UniCase::new(entry_album) == UniCase::new(song_album)
+            }
+            _ => true,
+        }
+    }
 
-            let length_matches = match (entry.length, length) {
-                (Some(entry_length), Some(length)) => {
-                    entry_length.abs_diff(length) < Duration::from_secs(3)
+    fn album_matches_exactly(entry: &LrcIndexEntry, song_album: Option<&str>) -> bool {
+        match (&entry.album, song_album) {
+            (Some(entry_album), Some(song_album)) => {
+                UniCase::new(entry_album) == UniCase::new(song_album)
+            }
+            _ => false,
+        }
+    }
+
+    fn find_entry(&self, song: &Song) -> Option<&LrcIndexEntry> {
+        // TODO xxx.last() is called here to not change existing behavior. Consider
+        // supporting all the tag entries
+        let artist = song.metadata.get("artist").map(|v| v.last())?;
+        let title = song.metadata.get("title").map(|v| v.last())?;
+        let album = song.metadata.get("album").map(|v| v.last());
+
+        let mut results = self
+            .index
+            .iter()
+            .filter(|entry| {
+                return UniCase::new(&entry.artist) == UniCase::new(artist)
+                    && UniCase::new(&entry.title) == UniCase::new(title)
+                    && Self::album_matches(entry, album);
+            })
+            .collect_vec();
+
+        match results.len() {
+            0 => {
+                log::trace!(artist, title, album; "No Lyrics found for song");
+                return None;
+            }
+            1 => {
+                log::trace!(artist, title, album; "Found exactly one Lyrics entry for song");
+                Some(results[0])
+            }
+            _ => {
+                log::trace!(artist, title, album; "Found multiple Lyrics entries for song, getting closest match by length");
+                if let Some(s_duration) = song.duration {
+                    // Prioritize matches with album
+                    if results.iter().any(|entry| Self::album_matches_exactly(entry, album)) {
+                        results.retain(|entry| Self::album_matches_exactly(entry, album));
+                    }
+
+                    let (with_length, without_length): (Vec<_>, Vec<_>) =
+                        results.into_iter().partition(|e| e.length.is_some());
+                    let entry_with_low_len_diff = with_length
+                        .iter()
+                        .filter(|entry| {
+                            entry
+                                .length
+                                .is_some_and(|l| l.abs_diff(s_duration) < Duration::from_secs(5))
+                        })
+                        .min_by_key(|e| e.length);
+
+                    if let Some(entry) = entry_with_low_len_diff {
+                        // Lrc matching by length was found
+                        Some(entry)
+                    } else if !without_length.is_empty() {
+                        // Lrc matching by length was not found, but there are lrc without length
+                        Some(without_length[0])
+                    } else {
+                        // Lrc with matching lenght was not found and there are no lrc without
+                        // length. Return the closest match by length.
+                        with_length
+                            .iter()
+                            .sorted_by(|a, b| {
+                                a.length
+                                    .unwrap_or_default()
+                                    .abs_diff(s_duration)
+                                    .cmp(&b.length.unwrap_or_default().abs_diff(s_duration))
+                            })
+                            .next()
+                            .copied()
+                    }
+                } else {
+                    // Song does not have a lenght information, not sure if this can ever happen,
+                    // but better safe than sorry. Return the first result rather than nothing.
+                    Some(results[0])
                 }
-                _ => true,
-            };
-
-            length_matches && entry.artist == artist && entry.title == title && entry.album == album
-        })
+            }
+        }
     }
 
     pub(crate) fn add(&mut self, entry: LrcIndexEntry) {
@@ -165,13 +221,344 @@ impl LrcIndexEntry {
         let Some(artist) = artist else {
             return Ok(None);
         };
-        let Some(album) = album else {
-            return Ok(None);
-        };
         let Some(title) = title else {
             return Ok(None);
         };
 
         Ok(Some(Self { path, title, artist, album, length }))
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use std::{collections::HashMap, path::PathBuf, time::Duration};
+
+    use bon::builder;
+    use chrono::DateTime;
+
+    use super::{LrcIndex, LrcIndexEntry};
+    use crate::mpd::commands::{Song, metadata_tag::MetadataTag};
+
+    #[builder]
+    fn song(artist: &str, title: &str, album: Option<&str>, duration: Option<Duration>) -> Song {
+        let mut metadata = HashMap::new();
+        metadata.insert("artist".into(), MetadataTag::from(artist.to_owned()));
+        metadata.insert("title".into(), MetadataTag::from(title.to_owned()));
+        if let Some(album) = album {
+            metadata.insert("album".into(), MetadataTag::from(album.to_owned()));
+        }
+        Song {
+            id: 0,
+            file: String::new(),
+            duration,
+            metadata,
+            stickers: None,
+            last_modified: DateTime::default(),
+            added: Some(DateTime::default()),
+        }
+    }
+
+    #[builder]
+    fn entry(
+        artist: &str,
+        title: &str,
+        album: Option<&str>,
+        length: Option<Duration>,
+        path: Option<&str>,
+    ) -> LrcIndexEntry {
+        LrcIndexEntry {
+            path: path.map(PathBuf::from).unwrap_or_default(),
+            title: title.to_owned(),
+            artist: artist.to_owned(),
+            album: album.map(|v| v.to_owned()),
+            length,
+        }
+    }
+
+    #[test]
+    fn empty_index_matches_nothing() {
+        let song = song()
+            .artist("123")
+            .album("333")
+            .title("asdf")
+            .duration(Duration::from_secs(147))
+            .call();
+        let index = LrcIndex { index: vec![] };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn entry_matches_by_album_artist_title_len() {
+        let song = song()
+            .artist("123")
+            .album("333")
+            .title("asdf")
+            .duration(Duration::from_secs(147))
+            .call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .artist("123")
+                    .album("333")
+                    .title("asdf")
+                    .length(Duration::from_secs(143))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn entry_matches_by_album_artist_title_len_case_insensitive() {
+        let song = song()
+            .artist("AAA")
+            .album("BBB")
+            .title("CCC")
+            .duration(Duration::from_secs(147))
+            .call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .artist("aaa")
+                    .album("bbb")
+                    .title("CCC")
+                    .length(Duration::from_secs(143))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn song_without_album_matches_lrc_without_album() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(147)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry().artist("123").title("asdf").length(Duration::from_secs(143)).call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn song_without_album_matches_lrc_with_album() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(147)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .length(Duration::from_secs(143))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn song_with_album_matches_lrc_without_album() {
+        let song = song()
+            .artist("123")
+            .title("asdf")
+            .album("lrc does not have me")
+            .duration(Duration::from_secs(147))
+            .call();
+        let index = LrcIndex {
+            index: vec![
+                entry().artist("123").title("asdf").length(Duration::from_secs(143)).call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_some());
+    }
+    #[test]
+    fn length_is_ignored_when_single_match_is_found() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(999)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .length(Duration::from_secs(1))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn song_has_no_duration() {
+        let song = song().artist("123").title("asdf").call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .path("1")
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .length(Duration::from_secs(1))
+                    .call(),
+                entry()
+                    .path("2")
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .length(Duration::from_secs(1))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.unwrap().path.to_string_lossy() == "1");
+    }
+
+    #[test]
+    fn length_is_considered_with_multiple_matches() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(100)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(103))
+                    .call(),
+                entry()
+                    .path("should match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(99))
+                    .call(),
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(108))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.unwrap().path.to_string_lossy() == "should match");
+    }
+
+    #[test]
+    fn multiple_matches_no_lrc_without_len_no_length_match() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(100)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(200))
+                    .call(),
+                entry()
+                    .path("should match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(199))
+                    .call(),
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(1))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.unwrap().path.to_string_lossy() == "should match");
+    }
+
+    #[test]
+    fn both_lrc_with_and_without_len_fallback_to_no_length() {
+        let song = song().artist("123").title("asdf").duration(Duration::from_secs(999)).call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .length(Duration::from_secs(103))
+                    .call(),
+                entry()
+                    .path("no length")
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .call(),
+                entry()
+                    .path("should match")
+                    .artist("123")
+                    .title("asdf")
+                    .album("song does not have me")
+                    .length(Duration::from_secs(99))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.unwrap().path.to_string_lossy() == "no length");
+    }
+
+    #[test]
+    fn mutlitle_matches_prioritize_album_match() {
+        let song = song()
+            .artist("123")
+            .album("456")
+            .title("asdf")
+            .duration(Duration::from_secs(200))
+            .call();
+        let index = LrcIndex {
+            index: vec![
+                entry()
+                    .path("should not match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(200))
+                    .call(),
+                entry().path("no album").artist("123").title("asdf").album("456").call(),
+                entry()
+                    .path("should match")
+                    .artist("123")
+                    .title("asdf")
+                    .length(Duration::from_secs(201))
+                    .call(),
+            ],
+        };
+
+        let result = index.find_entry(&song);
+
+        assert!(result.unwrap().path.to_string_lossy() == "no album");
     }
 }

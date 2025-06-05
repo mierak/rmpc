@@ -75,6 +75,13 @@ How long to wait for response to MPD command before giving up and reconnecting. 
 
 How long to wait for write to MPD socket to finish before giving up and reconnecting. Defaults to `5_000` milliseconds.
 
+### rewind_to_start_sec
+
+<ConfigValue name="rewind_to_start_sec" optional type="number" />
+
+`PreviousTrack` will rewind to start if elapsed time is past the configured value. `PreviousTrack` will always switch to
+the previous track if not configured or set to `None`.
+
 ### theme
 
 <ConfigValue optional name="theme" type="string" />
@@ -248,3 +255,22 @@ Determines how the entries are sorted in the directories pane. All of the proper
 - `ModifiedTime` - Entries are sorted by their last modified time.
 
 Defaults to `SortFormat(group_directories_first: true, reverse: false)`.
+
+### reflect_changes_to_playlist
+
+<ConfigValue name="reflect_changes_to_playlist" type="bool" />
+
+Reflects the changes from queue to the last loaded playlist. Requires MPD 0.24.0 or newer. Defaults to false.
+
+:::caution
+The way this works is very simple. Playlist's name is stored by MPD when it is loaded into the queue, even when the queue is
+not currently empty! This name is cleared **ONLY** when the queue is completely cleared with the `DeleteAll` queue action.
+
+When any change is made to the queue while any playlist name is stored, the whole playlist is replaced with the current
+Queue's contents.
+
+For example you load playlist A, then load playlist B and then make any change to the queue. This will result in playlist
+B being equal to playlist A + B + the change you made.
+
+I do not take any responsibility for any unwanted changes to the playlist.
+:::
