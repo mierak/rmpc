@@ -54,6 +54,7 @@ lists they are listed as multiple entries.
 - Added `PopConfigErrorModal` so theat the config error modals are automatically removed when the config reloads and is found correct
 - Added style configuration for dir and song symbols in browsers
 - Added `lyrics` config option `timestamp` for showing line timestamp
+- Added new `Cava` pane
 
 ### Changed
 
@@ -84,6 +85,7 @@ lists they are listed as multiple entries.
 - Improve performance of the queue table by not calculating rows that are not visible
 - Tilde not being expanded in `default_album_art_path`
 - Filter overlapping song table when `show_song_table_header` was set to false
+- Remove extra space at the start of every lyrics line in case the lrc file had space between timestamp and content
 
 ## [0.8.0] - 2025-02-16
 

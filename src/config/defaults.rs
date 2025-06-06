@@ -30,6 +30,10 @@ pub fn default_u8<const VAL: u8>() -> u8 {
     VAL
 }
 
+pub fn default_bar_symbol() -> String {
+    "█".to_string()
+}
+
 pub fn default_scrolloff() -> usize {
     0
 }

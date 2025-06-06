@@ -15,10 +15,10 @@ pub struct Cava {
     pub higher_cutoff_freq: Option<u32>,
     pub input: CavaInput,
     pub smoothing: CavaSmoothing,
-    pub eq: Vec<u64>,
+    pub eq: Vec<f64>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CavaFile {
     #[serde(default = "defaults::default_u16::<60>")]
     framerate: u16,
@@ -34,7 +34,7 @@ pub struct CavaFile {
     #[serde(default)]
     smoothing: CavaSmoothingFile,
     #[serde(default)]
-    eq: Vec<u64>,
+    eq: Vec<f64>,
 }
 
 #[derive(Debug, Display, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]

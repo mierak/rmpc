@@ -82,7 +82,7 @@ pub struct Config {
 }
 
 #[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConfigFile {
     #[serde(default = "defaults::mpd_address")]
     pub address: String,

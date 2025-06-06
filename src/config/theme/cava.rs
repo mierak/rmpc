@@ -12,14 +12,16 @@ use itertools::Itertools;
 use ratatui::style::Color as RatatuiColor;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::ConfigColor;
+use super::{ConfigColor, defaults};
 use crate::shared::ext::vec::VecExt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CavaThemeFile {
+    #[serde(default = "defaults::default_bar_symbol")]
     pub bar_symbol: String,
     #[serde(default)]
     pub bg_color: Option<String>,
+    #[serde(default)]
     pub bar_color: CavaColorFile,
 }
 
@@ -124,6 +126,12 @@ impl CavaThemeFile {
 
                     cs.entry(0).or_insert(first_entry);
                     cs.entry(100).or_insert(last_entry);
+                    ensure!(
+                        !cs.keys().any(|k| *k > 100),
+                        "Gradient keys must be in the range 0-100, got: {:?}",
+                        cs.keys()
+                    );
+
                     let cs: HashMap<u8, (u8, u8, u8)> = cs
                         .into_iter()
                         .map(|(k, v)| -> Result<_> {
