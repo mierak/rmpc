@@ -71,6 +71,7 @@ lists they are listed as multiple entries.
 - `TogglePause` in both the keybind and CLI to issue play if the current state is stopped
 - Made lyrics index matching more lenient
 - Changed the logging path from `/tmp/rmpc.log` to `/tmp/rmpc_${UID}.log`
+- Allow spaces between values in RGB colors and improved error messages
 
 ### Fixed
 

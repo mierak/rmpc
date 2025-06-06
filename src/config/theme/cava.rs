@@ -18,8 +18,9 @@ use crate::shared::ext::vec::VecExt;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CavaThemeFile {
     pub bar_symbol: String,
+    #[serde(default)]
     pub bg_color: Option<String>,
-    pub colors: CavaColorFileOpt,
+    pub bar_color: CavaColorFile,
 }
 
 impl Default for CavaThemeFile {
@@ -27,7 +28,7 @@ impl Default for CavaThemeFile {
         Self {
             bar_symbol: "█".into(),
             bg_color: Some("black".to_owned()),
-            colors: CavaColorFileOpt::Single("blue".into()),
+            bar_color: CavaColorFile::Single("blue".into()),
         }
     }
 }
@@ -36,7 +37,7 @@ impl Default for CavaThemeFile {
 pub struct CavaTheme {
     pub bar_symbol: String,
     pub bg_color: CrosstermColor,
-    pub colors: CavaColorOpt,
+    pub bar_color: CavaColor,
 }
 
 impl Default for CavaTheme {
@@ -44,32 +45,32 @@ impl Default for CavaTheme {
         Self {
             bar_symbol: "█".into(),
             bg_color: CrosstermColor::Black,
-            colors: CavaColorOpt::Single(CrosstermColor::Blue),
+            bar_color: CavaColor::Single(CrosstermColor::Blue),
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum CavaColorFileOpt {
+pub enum CavaColorFile {
     Single(String),
     Rows(#[serde(deserialize_with = "vec_with_min_len_1")] Vec<String>),
-    Gradient(#[serde(deserialize_with = "map_with_min_2_elements")] HashMap<u8, (u8, u8, u8)>),
+    Gradient(#[serde(deserialize_with = "map_with_min_2_elements")] HashMap<u8, String>),
 }
 
 #[derive(Debug, Clone)]
-pub enum CavaColorOpt {
+pub enum CavaColor {
     Single(CrosstermColor),
     Rows(Vec<CrosstermColor>),
-    Gradient(Vec<(u8, u8, u8)>),
+    Gradient(Vec<CrosstermColor>),
 }
 
-impl Default for CavaColorOpt {
+impl Default for CavaColor {
     fn default() -> Self {
         Self::Single(CrosstermColor::Reset)
     }
 }
 
-impl Default for CavaColorFileOpt {
+impl Default for CavaColorFile {
     fn default() -> Self {
         Self::Single("blue".into())
     }
@@ -92,11 +93,11 @@ impl CavaThemeFile {
                 .transpose()?
                 .or(default_bg_color)
                 .map_or(CrosstermColor::Reset, CrosstermColor::from),
-            colors: match self.colors {
-                CavaColorFileOpt::Single(c) => CavaColorOpt::Single(
+            bar_color: match self.bar_color {
+                CavaColorFile::Single(c) => CavaColor::Single(
                     RatatuiColor::from(ConfigColor::try_from(c.as_bytes())?).into(),
                 ),
-                CavaColorFileOpt::Rows(cs) => CavaColorOpt::Rows(
+                CavaColorFile::Rows(cs) => CavaColor::Rows(
                     cs.into_iter()
                         .map(|c| -> Result<CrosstermColor> {
                             Ok(CrosstermColor::from(RatatuiColor::from(ConfigColor::try_from(
@@ -105,22 +106,36 @@ impl CavaThemeFile {
                         })
                         .try_collect()?,
                 ),
-                CavaColorFileOpt::Gradient(mut cs) => {
-                    let first_entry = *cs
+                CavaColorFile::Gradient(mut cs) => {
+                    let first_entry = cs
                         .iter()
                         .sorted_by_key(|x| x.0)
                         .next()
                         .context("at least 2 elements should be guaranteed by deserialization")?
-                        .1;
-                    let last_entry = *cs
+                        .1
+                        .clone();
+                    let last_entry = cs
                         .iter()
                         .sorted_by_key(|x| x.0)
                         .next_back()
                         .context("at least 2 elements should be guaranteed by deserialization")?
-                        .1;
+                        .1
+                        .clone();
 
                     cs.entry(0).or_insert(first_entry);
                     cs.entry(100).or_insert(last_entry);
+                    let cs: HashMap<u8, (u8, u8, u8)> = cs
+                        .into_iter()
+                        .map(|(k, v)| -> Result<_> {
+                            match ConfigColor::try_from(v.as_bytes())? {
+                                ConfigColor::Rgb(r, g, b) => Ok((k, (r, g, b))),
+                                result => Err(anyhow::anyhow!(
+                                    "Gradient colors must be RGB colors, got {:?}",
+                                    result
+                                )),
+                            }
+                        })
+                        .try_collect()?;
 
                     let cs = cs
                         .into_iter()
@@ -129,21 +144,26 @@ impl CavaThemeFile {
                         .fold(HashMap::new(), |mut acc, ((a_key, a_val), (b_key, b_val))| {
                             if b_key - a_key == 0 {
                                 // range only includes start and end, simply include them in the map
-                                acc.insert(a_key, a_val);
-                                acc.insert(b_key, b_val);
+                                acc.insert(a_key, CrosstermColor::Rgb {
+                                    r: a_val.0,
+                                    g: a_val.1,
+                                    b: a_val.2,
+                                });
+                                acc.insert(b_key, CrosstermColor::Rgb {
+                                    r: b_val.0,
+                                    g: b_val.1,
+                                    b: b_val.2,
+                                });
                             } else {
                                 // interpolate values between start and end
                                 let total = f64::from(b_key - a_key);
                                 for i in a_key..=b_key {
                                     let progress = f64::from(i - a_key) / total;
-                                    acc.insert(
-                                        i,
-                                        (
-                                            lerp_u8(a_val.0, b_val.0, progress),
-                                            lerp_u8(a_val.1, b_val.1, progress),
-                                            lerp_u8(a_val.2, b_val.2, progress),
-                                        ),
-                                    );
+                                    acc.insert(i, CrosstermColor::Rgb {
+                                        r: lerp_u8(a_val.0, b_val.0, progress),
+                                        g: lerp_u8(a_val.1, b_val.1, progress),
+                                        b: lerp_u8(a_val.2, b_val.2, progress),
+                                    });
                                 }
                             }
                             acc
@@ -159,28 +179,25 @@ impl CavaThemeFile {
                         "Something went wrong when precalculating gradient, expected at least 100 colors, got {}. Please report this issue along with your config.",
                         cs.len()
                     );
-                    CavaColorOpt::Gradient(cs)
+                    CavaColor::Gradient(cs)
                 }
             },
         })
     }
 }
 
-impl CavaColorOpt {
+impl CavaColor {
     #[inline]
     pub fn get_color(&self, y: usize, height: u16) -> CrosstermColor {
         // The invariants here are guaranteed by the deserialization process.
         match self {
-            CavaColorOpt::Single(c) => *c,
-            CavaColorOpt::Rows(cs) => {
+            CavaColor::Single(c) => *c,
+            CavaColor::Rows(cs) => {
                 *cs.get_or_last(y).expect("Rows should have at least one element")
             }
-            CavaColorOpt::Gradient(cs) => {
+            CavaColor::Gradient(cs) => {
                 let perc = (y as f64 / height as f64 * 100.0).round() as usize;
-                let (r, g, b) =
-                    *cs.get_or_last(perc).expect("Gradient should have at least 100 elements");
-
-                CrosstermColor::Rgb { r, g, b }
+                *cs.get_or_last(perc).expect("Gradient should have at least 100 elements")
             }
         }
     }

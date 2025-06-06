@@ -112,7 +112,7 @@ impl CavaPane {
         queue!(writer, BeginSynchronizedUpdate, SavePosition)?;
         for y in 0..height {
             let h = area.y + (height - 1) - y;
-            let color = theme.colors.get_color(y as usize, area.height);
+            let color = theme.bar_color.get_color(y as usize, area.height);
             queue!(writer, MoveTo(area.x, h))?;
             for column in columns.iter() {
                 if *column > y {
