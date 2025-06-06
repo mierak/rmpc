@@ -31,6 +31,7 @@ use crate::{
     shared::{
         image::{create_aligned_area, get_gif_frames, resize_image},
         macros::{status_error, try_cont},
+        terminal::TERMINAL,
         tmux::tmux_write,
     },
     try_skip,
@@ -46,7 +47,9 @@ pub struct Kitty {
 
 impl Backend for Kitty {
     fn hide(&mut self, area: Rect) -> Result<()> {
-        clear_area(&mut std::io::stdout().lock(), self.colors, area)
+        let writer = TERMINAL.writer();
+        let mut writer = writer.lock();
+        clear_area(writer.by_ref(), self.colors, area)
     }
 
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
@@ -54,7 +57,9 @@ impl Backend for Kitty {
     }
 
     fn cleanup(self: Box<Self>, area: Rect) -> Result<()> {
-        clear_area(&mut std::io::stdout().lock(), self.colors, area)?;
+        let writer = TERMINAL.writer();
+        let mut writer = writer.lock();
+        clear_area(writer.by_ref(), self.colors, area)?;
         self.sender.send(ImageBackendRequest::Stop)?;
         self.handle.join().expect("kitty thread to end gracefully");
         Ok(())
@@ -117,7 +122,9 @@ impl Kitty {
                         }
                     }
 
-                    let mut w = std::io::stdout().lock();
+                    let w = TERMINAL.writer();
+                    let mut w = w.lock();
+                    let mut w = w.by_ref();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
                         log::trace!(
                             "Not showing image because its not supposed to be displayed anymore"
@@ -230,8 +237,8 @@ fn create_data_to_transfer(
     }
 }
 
-fn clear_area(w: &mut impl Write, colors: Colors, area: Rect) -> Result<()> {
-    super::clear_area(w, colors, area)?;
+fn clear_area(mut w: impl Write, colors: Colors, area: Rect) -> Result<()> {
+    super::clear_area(&mut w, colors, area)?;
     tmux_write!(w, "\x1b_Ga=d,d=A,q=2\x1b\\")?;
     Ok(())
 }

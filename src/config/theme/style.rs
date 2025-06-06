@@ -175,9 +175,36 @@ impl TryFrom<&[u8]> for crate::config::ConfigColor {
                     s.strip_prefix(b"rgb(").context("")?.strip_suffix(b")").context("")?,
                 )?
                 .splitn(3, ',');
-                let r = colors.next().context("")?.parse::<u8>().context("")?;
-                let g = colors.next().context("")?.parse::<u8>().context("")?;
-                let b = colors.next().context("")?.parse::<u8>().context("")?;
+                let r = colors
+                    .next()
+                    .with_context(|| {
+                        format!("No red color present in {}", String::from_utf8_lossy(s))
+                    })?
+                    .trim()
+                    .parse::<u8>()
+                    .with_context(|| {
+                        format!("Failed to parse RGB color: {}", String::from_utf8_lossy(s))
+                    })?;
+                let g = colors
+                    .next()
+                    .with_context(|| {
+                        format!("No green color present in {}", String::from_utf8_lossy(s))
+                    })?
+                    .trim()
+                    .parse::<u8>()
+                    .with_context(|| {
+                        format!("Failed to parse RGB color: {}", String::from_utf8_lossy(s))
+                    })?;
+                let b = colors
+                    .next()
+                    .with_context(|| {
+                        format!("No blue color present in {}", String::from_utf8_lossy(s))
+                    })?
+                    .trim()
+                    .parse::<u8>()
+                    .with_context(|| {
+                        format!("Failed to parse RGB color: {}", String::from_utf8_lossy(s))
+                    })?;
                 Ok(Self::Rgb(r, g, b))
             }
             s => {

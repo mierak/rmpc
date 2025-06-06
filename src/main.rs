@@ -13,6 +13,7 @@ use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
 use shared::{
+    dependencies::CAVA,
     ipc::{get_socket_path, list_all_socket_paths},
     macros::{status_warn, try_skip},
 };
@@ -125,6 +126,9 @@ fn main() -> Result<()> {
             println!("{:<20} {}", "Resolved", config.album_art.method);
             println!("{:<20} {}", "TMUX", tmux::is_inside_tmux());
             println!("{}", UEBERZUGPP.display());
+
+            println!("\nVisualizer:");
+            println!("{}", CAVA.display());
         }
         Some(Command::Version) => {
             println!(

@@ -35,7 +35,7 @@ trait Backend {
     fn set_config(&self, config: AlbumArtConfig) -> Result<()>;
 }
 
-pub fn clear_area(w: &mut impl Write, colors: Colors, area: Rect) -> Result<()> {
+pub fn clear_area(mut w: impl Write, colors: Colors, area: Rect) -> Result<()> {
     queue!(w, SetColors(colors))?;
     queue!(w, SavePosition)?;
     let capacity: usize = 2usize * area.width as usize * area.height as usize;

@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    io::Stdout,
     ops::Sub,
     sync::{Arc, LazyLock},
     time::Duration,
@@ -33,6 +32,7 @@ use crate::{
             MpdQueryResult,
             run_status_update,
         },
+        terminal::TtyWriter,
     },
     ui::{KeyHandleResult, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
 };
@@ -42,8 +42,8 @@ static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
 pub fn init(
     context: AppContext,
     event_rx: Receiver<AppEvent>,
-    terminal: Terminal<CrosstermBackend<Stdout>>,
-) -> std::io::Result<std::thread::JoinHandle<Terminal<CrosstermBackend<Stdout>>>> {
+    terminal: Terminal<CrosstermBackend<TtyWriter>>,
+) -> std::io::Result<std::thread::JoinHandle<Terminal<CrosstermBackend<TtyWriter>>>> {
     std::thread::Builder::new()
         .name("main".to_owned())
         .spawn(move || main_task(context, event_rx, terminal))
@@ -104,7 +104,6 @@ fn main_task<B: Backend + std::io::Write>(
         };
 
         if let Some(event) = event {
-            let _lock = std::io::stdout().lock();
             match event {
                 AppEvent::ConfigChanged { config: mut new_config, keep_old_theme } => {
                     // Techical limitation. Keep the old image backend because it was not rechecked
@@ -246,7 +245,7 @@ fn main_task<B: Backend + std::io::Write>(
                         ) => {
                             let current_song_id =
                                 context.find_current_song_in_queue().map(|(_, song)| song.id);
-                            let current_status = context.status.state;
+                            let previous_state = context.status.state;
                             let current_updating_db = context.status.updating_db;
                             let current_playlist = context.status.lastloadedplaylist.take();
                             context.status = status;
@@ -303,9 +302,17 @@ fn main_task<B: Backend + std::io::Write>(
                                 _ => {}
                             }
 
+                            if previous_state != context.status.state {
+                                if let Err(err) =
+                                    ui.on_event(UiEvent::PlaybackStateChanged, &mut context)
+                                {
+                                    status_error!(error:? = err; "UI failed to handle playback state changed event, error: '{}'", err.to_status());
+                                }
+                            }
+
                             match context.status.state {
                                 State::Play => {
-                                    if current_status != context.status.state {
+                                    if previous_state != context.status.state {
                                         _update_loop_guard = context
                                             .config
                                             .status_update_interval_ms
@@ -394,6 +401,9 @@ fn main_task<B: Backend + std::io::Write>(
                         env.push(("ROWS".to_owned(), rows.to_string()));
                         log::debug!("Executing on resize");
                         run_external(cmd, env);
+                    }
+                    if let Err(err) = terminal.clear() {
+                        log::error!(error:? = err; "Failed to clear terminal after a resize");
                     }
                 }
                 AppEvent::UiEvent(event) => match ui.on_ui_app_event(event, &mut context) {

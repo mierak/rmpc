@@ -22,6 +22,18 @@ pub fn default_max_fps() -> u32 {
     30
 }
 
+pub fn default_u16<const VAL: u16>() -> u16 {
+    VAL
+}
+
+pub fn default_u8<const VAL: u8>() -> u8 {
+    VAL
+}
+
+pub fn default_bar_symbol() -> String {
+    "█".to_string()
+}
+
 pub fn default_scrolloff() -> usize {
     0
 }

@@ -19,6 +19,7 @@ use crate::{
     shared::{
         image::{AlignedArea, resize_image},
         macros::try_cont,
+        terminal::TERMINAL,
     },
     try_skip,
     ui::image::{EncodeRequest, clear_area, facade::IS_SHOWING, recv_data},
@@ -33,7 +34,9 @@ pub struct Block {
 
 impl Backend for Block {
     fn hide(&mut self, size: Rect) -> anyhow::Result<()> {
-        clear_area(&mut std::io::stdout().lock(), self.colors, size)
+        let writer = TERMINAL.writer();
+        let mut writer = writer.lock();
+        clear_area(writer.by_ref(), self.colors, size)
     }
 
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
@@ -92,7 +95,9 @@ impl Block {
                         }
                     }
 
-                    let mut w = std::io::stdout().lock();
+                    let writer = TERMINAL.writer();
+                    let mut writer = writer.lock();
+                    let mut w = writer.by_ref();
 
                     if !IS_SHOWING.load(Ordering::Relaxed) {
                         log::trace!(

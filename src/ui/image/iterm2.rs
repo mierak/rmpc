@@ -22,6 +22,7 @@ use crate::{
     shared::{
         image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
         macros::try_cont,
+        terminal::TERMINAL,
         tmux::tmux_write,
     },
     try_skip,
@@ -46,7 +47,9 @@ pub struct Iterm2 {
 
 impl Backend for Iterm2 {
     fn hide(&mut self, size: Rect) -> Result<()> {
-        clear_area(&mut std::io::stdout().lock(), self.colors, size)
+        let writer = TERMINAL.writer();
+        let mut writer = writer.lock();
+        clear_area(writer.by_ref(), self.colors, size)
     }
 
     fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
@@ -105,7 +108,9 @@ impl Iterm2 {
                         }
                     }
 
-                    let mut w = std::io::stdout().lock();
+                    let writer = TERMINAL.writer();
+                    let mut writer = writer.lock();
+                    let mut w = writer.by_ref();
                     if !IS_SHOWING.load(Ordering::Relaxed) {
                         log::trace!(
                             "Not showing image because its not supposed to be displayed anymore"

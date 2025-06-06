@@ -409,11 +409,16 @@ pub mod rect {
 pub mod vec {
     pub trait VecExt<T> {
         fn or_else_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T>;
+        fn get_or_last(&self, idx: usize) -> Option<&T>;
     }
 
     impl<T> VecExt<T> for Vec<T> {
         fn or_else_if_empty(self, cb: impl Fn() -> Vec<T>) -> Vec<T> {
             if self.is_empty() { cb() } else { self }
+        }
+
+        fn get_or_last(&self, idx: usize) -> Option<&T> {
+            self.get(idx).or_else(|| self.last())
         }
     }
 }

@@ -89,7 +89,7 @@ impl FromStr for Lrc {
 
                         result.lines.push(LrcLine {
                             time: Duration::from_millis(milis),
-                            content: line.to_owned(),
+                            content: line.trim().to_owned(),
                         });
                     }
                 }
