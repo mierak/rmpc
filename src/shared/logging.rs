@@ -23,11 +23,12 @@ pub fn init_console() -> Result<LoggerHandle, FlexiLoggerError> {
 
 #[allow(dead_code)]
 fn init_release(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    let uid = rustix::process::geteuid();
     flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file(
             FileSpec::default()
                 .directory(std::env::temp_dir())
-                .basename("rmpc")
+                .basename(format!("rmpc_{}", uid.as_raw()))
                 .suppress_timestamp(),
         )
         .add_writer("status_bar", Box::new(StatusBarWriter::new(tx)))
@@ -38,11 +39,12 @@ fn init_release(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> 
 
 #[allow(dead_code)]
 fn init_debug(tx: Sender<AppEvent>) -> Result<LoggerHandle, FlexiLoggerError> {
+    let uid = rustix::process::geteuid();
     flexi_logger::Logger::try_with_env_or_str("debug")?
         .log_to_file_and_writer(
             FileSpec::default()
                 .directory(std::env::temp_dir())
-                .basename("rmpc")
+                .basename(format!("rmpc_{}", uid.as_raw()))
                 .suppress_timestamp(),
             Box::new(AppEventChannelWriter::new(tx.clone())),
         )
