@@ -100,7 +100,6 @@ impl CavaPane {
         Ok(())
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_lossless)]
     pub fn render_cava(
         writer: &TtyWriter,
         area: Rect,
@@ -113,19 +112,20 @@ impl CavaPane {
         queue!(writer, BeginSynchronizedUpdate, SavePosition)?;
         for y in 0..height {
             let h = area.y + (height - 1) - y;
-            let perc = y as f64 / area.height as f64;
-            let color = theme.colors.get_color(y as usize, perc);
+            let color = theme.colors.get_color(y as usize, area.height);
             queue!(writer, MoveTo(area.x, h))?;
             for column in columns.iter() {
                 if *column > y {
                     queue!(
                         writer,
-                        PrintStyledContent(theme.bar_symbol.as_str().with(color.bar).on(color.bg))
+                        PrintStyledContent(
+                            theme.bar_symbol.as_str().with(color).on(theme.bg_color)
+                        )
                     )?;
                 } else {
-                    queue!(writer, PrintStyledContent(' '.on(color.bg)))?;
+                    queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
                 }
-                queue!(writer, PrintStyledContent(' '.on(color.bg)))?;
+                queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
             }
         }
         queue!(writer, RestorePosition, EndSynchronizedUpdate)?;

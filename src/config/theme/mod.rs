@@ -340,7 +340,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         Ok(Self {
             layout: value.layout.convert(&components)?,
             components,
-            cava: value.cava.try_into()?,
+            cava: value.cava.into_config(bg_color)?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,
