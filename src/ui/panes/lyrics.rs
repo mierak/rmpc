@@ -73,7 +73,7 @@ impl Pane for LyricsPane {
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            let text = Text::from(l.clone()).centered().style(middle_style);
+            let text = Text::from(l).centered().style(middle_style);
             frame.render_widget(text, *area);
             current_area += 1;
         }
@@ -123,7 +123,7 @@ impl Pane for LyricsPane {
                 let Some(area) = areas.get(after_area_cursor + 1) else {
                     break;
                 };
-                let text = Text::from(l.clone()).centered().style(default_style);
+                let text = Text::from(l).centered().style(default_style);
                 frame.render_widget(text, *area);
                 after_area_cursor += 1;
             }

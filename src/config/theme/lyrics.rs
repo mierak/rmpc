@@ -7,6 +7,7 @@ pub struct LyricsConfig {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct LyricsConfigFile {
+    #[serde(default)]
     pub(super) timestamp: bool,
 }
 
