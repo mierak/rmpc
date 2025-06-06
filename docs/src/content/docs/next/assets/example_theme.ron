@@ -163,5 +163,7 @@
             default: (kind: Property(Filename))
         ),
     ],
+    lyrics: (
+        timestamp: false
+    )
 )
-

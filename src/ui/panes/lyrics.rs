@@ -9,7 +9,13 @@ use ratatui::{
 use super::Pane;
 use crate::{
     context::AppContext,
-    shared::{key_event::KeyEvent, lrc::Lrc, macros::status_error, mpd_query::run_status_update},
+    shared::{
+        ext::duration::DurationExt,
+        key_event::KeyEvent,
+        lrc::Lrc,
+        macros::status_error,
+        mpd_query::run_status_update,
+    },
     ui::UiEvent,
 };
 
@@ -43,21 +49,32 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
+        let default_style =
+            Style::default().fg(context.config.theme.text_color.unwrap_or_default());
+
         let middle_style = if first_line_reached {
             context.config.theme.highlighted_item_style
         } else {
-            Style::default().fg(context.config.theme.text_color.unwrap_or_default())
+            default_style
         };
+
+        let timestamp = context.config.theme.lyrics.timestamp;
 
         let mut current_area = middle_row as usize;
         let Some(current_line) = lrc.lines.get(current_line_idx) else {
             return Ok(());
         };
-        for line in textwrap::wrap(&current_line.content, area.width as usize) {
+        let formatted_line = if timestamp && !current_line.content.is_empty() {
+            &format!("[{}] {}", current_line.time.to_string(), current_line.content)
+        } else {
+            &current_line.content
+        };
+        for l in textwrap::wrap(formatted_line, area.width as usize) {
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            frame.render_widget(Text::from(line).centered().style(middle_style), *area);
+            let text = Text::from(l).centered().style(middle_style);
+            frame.render_widget(text, *area);
             current_area += 1;
         }
 
@@ -68,17 +85,21 @@ impl Pane for LyricsPane {
             let Some(line) = lrc.lines.get(before_lyrics_cursor) else {
                 break;
             };
-            for l in textwrap::wrap(&line.content, area.width as usize).iter().rev() {
-                let p = Text::from(l.clone()).centered().style(
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
-                );
+            let formatted_line = if timestamp && !line.content.is_empty() {
+                &format!("[{}] {}", line.time.to_string(), line.content)
+            } else {
+                &line.content
+            };
+            for l in textwrap::wrap(formatted_line, area.width as usize).iter().rev() {
                 if before_area_cursor == 0 {
                     break;
                 }
                 let Some(area) = areas.get(before_area_cursor - 1) else {
                     break;
                 };
-                frame.render_widget(p, *area);
+                let text = Text::from(l.clone()).centered().style(default_style);
+
+                frame.render_widget(text, *area);
                 before_area_cursor -= 1;
             }
         }
@@ -93,14 +114,17 @@ impl Pane for LyricsPane {
             let Some(line) = lrc.lines.get(after_lyrics_cursor) else {
                 break;
             };
-            for l in textwrap::wrap(&line.content, area.width as usize) {
-                let p = Text::from(l).centered().style(
-                    Style::default().fg(context.config.theme.text_color.unwrap_or_default()),
-                );
+            let formatted_line = if timestamp && !line.content.is_empty() {
+                &format!("[{}] {}", line.time.to_string(), line.content)
+            } else {
+                &line.content
+            };
+            for l in textwrap::wrap(formatted_line, area.width as usize) {
                 let Some(area) = areas.get(after_area_cursor + 1) else {
                     break;
                 };
-                frame.render_widget(p, *area);
+                let text = Text::from(l).centered().style(default_style);
+                frame.render_widget(text, *area);
                 after_area_cursor += 1;
             }
         }
