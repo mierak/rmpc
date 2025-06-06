@@ -151,7 +151,7 @@ impl<'panes> PaneContainer<'panes> {
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
             tabs: TabsPane::new(context)?,
-            cava: CavaPane::new(context)?,
+            cava: CavaPane::new(context),
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
             others: Self::init_other_panes(context).collect(),

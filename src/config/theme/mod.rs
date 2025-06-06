@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use ::serde::{Deserialize, Serialize};
 use anyhow::{Result, bail};
+use cava::{CavaTheme, CavaThemeFile};
 use itertools::Itertools;
 use level_styles::{LevelStyles, LevelStylesFile};
 use properties::{SongFormat, SongFormatFile};
@@ -17,6 +18,7 @@ use self::{
 };
 use crate::mpd::commands::metadata_tag::MetadataTag;
 
+pub mod cava;
 mod header;
 pub mod level_styles;
 mod lyrics;
@@ -71,6 +73,7 @@ pub struct UiConfig {
     pub mutliple_tag_resolution_strategy: TagResolutionStrategy,
     pub level_styles: LevelStyles,
     pub lyrics: LyricsConfig,
+    pub cava: CavaTheme,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -116,6 +119,8 @@ pub struct UiConfigFile {
     pub(super) level_styles: LevelStylesFile,
     #[serde(default)]
     pub(super) lyrics: LyricsConfigFile,
+    #[serde(default)]
+    pub(super) cava: CavaThemeFile,
 }
 
 impl Default for UiConfigFile {
@@ -188,6 +193,7 @@ impl Default for UiConfigFile {
             level_styles: LevelStylesFile::default(),
             components: HashMap::default(),
             lyrics: LyricsConfigFile::default(),
+            cava: CavaThemeFile::default(),
         }
     }
 }
@@ -334,6 +340,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         Ok(Self {
             layout: value.layout.convert(&components)?,
             components,
+            cava: value.cava.try_into()?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,

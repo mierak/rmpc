@@ -9,6 +9,8 @@ use super::defaults;
 #[derive(Debug, Default, Clone)]
 pub struct Cava {
     pub framerate: u16,
+    pub autosens: bool,
+    pub sensitivity: u16,
     pub lower_cutoff_freq: Option<u16>,
     pub higher_cutoff_freq: Option<u32>,
     pub input: CavaInput,
@@ -20,6 +22,10 @@ pub struct Cava {
 pub struct CavaFile {
     #[serde(default = "defaults::default_u16::<60>")]
     framerate: u16,
+    #[serde(default = "defaults::default_true")]
+    pub autosens: bool,
+    #[serde(default = "defaults::default_u16::<100>")]
+    pub sensitivity: u16,
     #[serde(default)]
     lower_cutoff_freq: Option<u16>,
     #[serde(default)]
@@ -91,6 +97,8 @@ impl From<CavaFile> for Cava {
     fn from(value: CavaFile) -> Self {
         Cava {
             framerate: value.framerate,
+            autosens: value.autosens,
+            sensitivity: value.sensitivity,
             lower_cutoff_freq: value.lower_cutoff_freq,
             higher_cutoff_freq: value.higher_cutoff_freq,
             input: CavaInput {
@@ -118,6 +126,8 @@ impl Cava {
         writeln!(buf, "[general]")?;
         writeln!(buf, "framerate = {}", self.framerate)?;
         writeln!(buf, "bars = {bars}")?;
+        writeln!(buf, "autosens = {}", i8::from(self.autosens))?;
+        writeln!(buf, "sensitivity = {}", self.sensitivity)?;
         if let Some(val) = self.lower_cutoff_freq {
             writeln!(buf, "lower_cutoff_freq = {val}")?;
         }

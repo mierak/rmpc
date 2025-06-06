@@ -5,6 +5,7 @@ use std::{
 
 use parking_lot::{Mutex, MutexGuard};
 
+#[allow(dead_code)]
 pub struct Terminal {
     reader: TtyReader,
     writer: TtyWriter,
@@ -15,6 +16,7 @@ pub static TERMINAL: LazyLock<Terminal> = LazyLock::new(|| Terminal {
     writer: TtyWriter { stdout: Arc::new(Mutex::new(BufWriter::new(std::io::stdout()))) },
 });
 
+#[allow(dead_code)]
 impl Terminal {
     pub fn reader(&self) -> TtyReader {
         TtyReader { stdin: Arc::clone(&self.reader.stdin) }

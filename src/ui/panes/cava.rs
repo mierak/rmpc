@@ -2,6 +2,7 @@ use std::{
     io::{Read, Write},
     process::{Child, Stdio},
     thread::JoinHandle,
+    time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -9,21 +10,23 @@ use crossbeam::channel::{Receiver, RecvError, Sender, TryRecvError};
 use crossterm::{
     cursor::{MoveTo, RestorePosition, SavePosition},
     queue,
-    style::{Color, Colors, PrintStyledContent, Stylize},
+    style::{Colors, PrintStyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate},
 };
-use ratatui::layout::Rect;
+use ratatui::{Frame, layout::Rect};
 
 use super::Pane;
 use crate::{
-    config::cava::Cava,
+    config::{cava::Cava, theme::cava::CavaTheme},
     context::AppContext,
     mpd::commands::State,
     shared::{
         dependencies::CAVA,
+        key_event::KeyEvent,
         terminal::{TERMINAL, TtyWriter},
     },
     status_warn,
+    try_skip,
     ui::{UiEvent, image::clear_area},
 };
 
@@ -40,7 +43,7 @@ enum CavaCommand {
     Start { area: Rect },
     Stop,
     Pause,
-    ConfigChanged { config: Cava },
+    ConfigChanged { config: Cava, theme: CavaTheme },
 }
 
 struct ProcessGuard {
@@ -60,45 +63,37 @@ impl Drop for ProcessGuard {
 }
 
 impl CavaPane {
-    pub fn new(context: &AppContext) -> Result<Self> {
-        let mut res = Self {
+    pub fn new(_context: &AppContext) -> Self {
+        Self {
             area: Rect::default(),
             handle: None,
             is_modal_open: false,
             command_channel: crossbeam::channel::bounded(0),
-        };
-
-        res.spawn(
-            context.config.cava.clone(),
-            context.config.theme.background_color.map(Color::from),
-            context.config.theme.borders_style.fg.map_or_else(|| Color::White, Color::from),
-        )?;
-
-        Ok(res)
+        }
     }
 
     pub fn run(&mut self) -> Result<()> {
-        self.command_channel.0.send(CavaCommand::Start { area: self.area })?;
+        self.command(CavaCommand::Start { area: self.area })?;
         Ok(())
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_lossless)]
     pub fn read_cava_data(
         height: u16,
-        buf: &mut [u8],
+        read_buffer: &mut [u8],
         columns: &mut [u16],
         stdout: &mut impl Read,
         stderr: &mut impl Read,
     ) -> Result<()> {
-        if let Err(err) = stdout.read_exact(buf) {
-            let mut stderr_contents = String::new();
-            stderr.read_to_string(&mut stderr_contents)?;
-            log::error!(err:?, stderr_contents = stderr_contents.as_str(); "Cava failed");
+        if let Err(err) = stdout.read_exact(read_buffer) {
+            let mut buf = String::new();
+            stderr.read_to_string(&mut buf)?;
+            log::error!(err:?, stderr = buf.as_str(); "Cava failed");
             bail!("Cava failed {err}");
         }
 
         for x in 0..columns.len() {
-            let value = u16::from_le_bytes([buf[2 * x], buf[2 * x + 1]]);
+            let value = u16::from_le_bytes([read_buffer[2 * x], read_buffer[2 * x + 1]]);
             columns[x] = (value as u64 * height as u64 / 65535) as u16;
         }
 
@@ -110,8 +105,7 @@ impl CavaPane {
         writer: &TtyWriter,
         area: Rect,
         columns: &mut [u16],
-        bg_color: Color,
-        bar_color: Color,
+        theme: &CavaTheme,
     ) -> Result<()> {
         let height = area.height;
         let mut writer = writer.lock();
@@ -119,14 +113,19 @@ impl CavaPane {
         queue!(writer, BeginSynchronizedUpdate, SavePosition)?;
         for y in 0..height {
             let h = area.y + (height - 1) - y;
+            let perc = y as f64 / area.height as f64;
+            let color = theme.colors.get_color(y as usize, perc);
             queue!(writer, MoveTo(area.x, h))?;
             for column in columns.iter() {
                 if *column > y {
-                    queue!(writer, PrintStyledContent(" ".on(bar_color)))?;
+                    queue!(
+                        writer,
+                        PrintStyledContent(theme.bar_symbol.as_str().with(color.bar).on(color.bg))
+                    )?;
                 } else {
-                    queue!(writer, PrintStyledContent(" ".on(bg_color)))?;
+                    queue!(writer, PrintStyledContent(' '.on(color.bg)))?;
                 }
-                queue!(writer, PrintStyledContent(" ".on(bg_color)))?;
+                queue!(writer, PrintStyledContent(' '.on(color.bg)))?;
             }
         }
         queue!(writer, RestorePosition, EndSynchronizedUpdate)?;
@@ -136,10 +135,11 @@ impl CavaPane {
     }
 
     fn spawn_cava(bars: u16, config: &Cava) -> Result<ProcessGuard> {
-        let cfg_path = "/tmp/rmpc/cava.conf";
-        std::fs::create_dir_all("/tmp/rmpc")?;
+        let cfg_dir = std::env::temp_dir().join("rmpc");
+        std::fs::create_dir_all(&cfg_dir)?;
+        let cfg_path = cfg_dir.join(format!("cava-{}.conf", rustix::process::geteuid().as_raw()));
         let config = config.to_cava_config_file(bars)?;
-        std::fs::write(cfg_path, config)?;
+        std::fs::write(&cfg_path, config)?;
 
         Ok(ProcessGuard {
             handle: std::process::Command::new("cava")
@@ -152,110 +152,111 @@ impl CavaPane {
         })
     }
 
-    pub fn spawn(
-        &mut self,
+    fn run_cava_loop(
+        receiver: &Receiver<CavaCommand>,
+        writer: &TtyWriter,
         cava_config: Cava,
-        bg_color: Option<Color>,
-        bar_color: Color,
+        cava_theme: CavaTheme,
     ) -> Result<()> {
+        let mut prev_command: Option<Result<CavaCommand, RecvError>> = None;
+        let mut cava_config = cava_config;
+        let mut cava_theme = cava_theme;
+        let mut area: Rect;
+
+        'outer: loop {
+            log::trace!(prev_command:?; "Waiting for command");
+            let command = prev_command.take().unwrap_or_else(|| receiver.recv());
+            log::trace!(command:?; "Received command");
+            match command {
+                Ok(CavaCommand::Start { area: new_area }) => {
+                    area = new_area;
+                }
+                Ok(CavaCommand::Pause) => {
+                    continue 'outer;
+                }
+                Ok(CavaCommand::Stop) => {
+                    break 'outer;
+                }
+                Ok(CavaCommand::ConfigChanged { config, theme }) => {
+                    log::trace!("Cava config changed, updating");
+                    cava_config = config;
+                    cava_theme = theme;
+                    continue 'outer;
+                }
+                Err(RecvError) => {
+                    log::error!("Error when trying to receive CavaCommand");
+                    break 'outer;
+                }
+            }
+            let bars = area.width / 2;
+
+            let mut process = Self::spawn_cava(bars, &cava_config)?;
+            let stdout =
+                process.handle.stdout.as_mut().context("Failed to spawn cava. No stdout.")?;
+            let stderr =
+                process.handle.stderr.as_mut().context("Failed to spawn cava. No stderr.")?;
+
+            let mut columns = vec![0_u16; bars as usize];
+            let mut buf = vec![0_u8; 2 * bars as usize];
+
+            'inner: loop {
+                Self::read_cava_data(area.height, &mut buf, &mut columns, stdout, stderr)?;
+                Self::render_cava(writer, area, &mut columns, &cava_theme)?;
+
+                match receiver.try_recv() {
+                    Ok(CavaCommand::Stop) => {
+                        break 'outer;
+                    }
+                    Ok(CavaCommand::Pause) => {
+                        break 'inner;
+                    }
+                    Ok(CavaCommand::Start { area }) => {
+                        prev_command = Some(Ok(CavaCommand::Start { area }));
+                        break 'inner;
+                    }
+                    Ok(CavaCommand::ConfigChanged { config, theme }) => {
+                        prev_command = Some(Ok(CavaCommand::ConfigChanged { config, theme }));
+                        break 'inner;
+                    }
+                    Err(TryRecvError::Empty) => {}
+                    Err(TryRecvError::Disconnected) => {
+                        log::error!("CavaCommand channel disconnected. This should never happen.");
+                        break 'outer;
+                    }
+                }
+            }
+
+            log::debug!("Cava finished outer loop iteration");
+        }
+
+        log::debug!("Cava thread finished");
+
+        Ok(())
+    }
+
+    pub fn spawn(&mut self, cava_config: Cava, cava_theme: CavaTheme) -> Result<()> {
+        if self.handle.is_some() {
+            log::debug!("Cava already running, skipping spawn");
+            return Ok(());
+        }
         if !CAVA.installed {
             status_warn!(
                 "Cava has not been found on your system. Please install it to use the visualiser."
             );
             return Ok(());
         }
-        if self.handle.is_some() {
-            log::debug!("Cava already running, skipping spawn");
-            return Ok(());
-        }
 
         let writer = TERMINAL.writer();
         let receiver = self.command_channel.1.clone();
 
-        let bg_color = bg_color.unwrap_or(Color::Reset);
         self.handle = Some(
             std::thread::Builder::new()
                 .name("cava".to_owned())
                 .spawn(move || -> Result<_> {
-                    let mut prev_command: Option<Result<CavaCommand, RecvError>> = None;
-                    let mut cava_config = cava_config;
-                    let mut area: Rect;
-
-                    'outer: loop {
-                        log::trace!(prev_command:?; "Waiting for command");
-                        let command = prev_command.take().unwrap_or_else(|| receiver.recv());
-                        log::trace!(command:?; "Received command");
-                         match command {
-                            Ok(CavaCommand::Start { area: new_area }) => {
-                                area = new_area;
-                            },
-                            Ok(CavaCommand::Pause) => {
-                                continue 'outer;
-                            }
-                            Ok(CavaCommand::Stop) => {
-                                break 'outer;
-                            }
-                            Ok(CavaCommand::ConfigChanged { config }) => {
-                                log::trace!("Cava config changed, updating");
-                                cava_config = config;
-                                continue 'outer;
-                            }
-                            Err(RecvError) => {
-                                log::error!("Error when trying to receive CavaCommand");
-                                break 'outer;
-                            }
-                        }
-                        let bars = area.width / 2;
-
-                        let mut process = Self::spawn_cava(bars, &cava_config)?;
-                        let stdout = process
-                            .handle
-                            .stdout
-                            .as_mut()
-                            .context("Failed to spawn cava. No stdout.")?;
-                        let stderr = process
-                            .handle
-                            .stderr
-                            .as_mut()
-                            .context("Failed to spawn cava. No stderr.")?;
-
-                        let mut columns = vec![0_u16; bars as usize];
-                        let mut buf = vec![0_u8; 2 * bars as usize];
-
-                        'inner: loop {
-                            Self::read_cava_data(area.height, &mut buf, &mut columns, stdout, stderr)?;
-                            Self::render_cava(&writer, area, &mut columns, bg_color, bar_color)?;
-
-                            match receiver.try_recv() {
-                                Ok(CavaCommand::Stop) => {
-                                    break 'outer;
-                                }
-                                Ok(CavaCommand::Pause) => {
-                                    break 'inner;
-                                }
-                                Ok(CavaCommand::Start { area }) => {
-                                    prev_command = Some(Ok(CavaCommand::Start { area }));
-                                    break 'inner;
-                                }
-                                Ok(CavaCommand::ConfigChanged { config }) => {
-                                    prev_command = Some(Ok(CavaCommand::ConfigChanged { config  }));
-                                    break 'inner;
-                                }
-                                Err(TryRecvError::Empty) => {}
-                                Err(TryRecvError::Disconnected) => {
-                                    log::error!(
-                                        "CavaCommand channel disconnected. This should never happen."
-                                    );
-                                    break 'outer;
-                                }
-                            }
-                        }
-
-                        log::debug!("Cava finished outer loop iteration");
-                    }
-
-                    log::debug!("Cava thread finished");
-
+                    try_skip!(
+                        Self::run_cava_loop(&receiver, &writer, cava_config, cava_theme),
+                        "Cava thread encountered an error"
+                    );
                     Ok(())
                 })
                 .context("Failed to spawn cava thread")?,
@@ -266,11 +267,7 @@ impl CavaPane {
 
     fn pause_and_clear(&mut self, context: &AppContext) -> Result<()> {
         log::debug!("Stopping cava thread and clearing area");
-        self.command_channel
-            .0
-            .send(CavaCommand::Pause)
-            .map_err(|err| anyhow!("Failed to send pause command to cava thread: {}", err))?;
-
+        self.command(CavaCommand::Pause)?;
         log::debug!("Waiting for cava thread to finish");
         self.clear(context)?;
 
@@ -289,15 +286,28 @@ impl CavaPane {
 
         Ok(())
     }
+
+    fn command(&self, cmd: CavaCommand) -> Result<()> {
+        let Some(handle) = self.handle.as_ref() else {
+            log::trace!(cmd:?; "Cava thread is not running, not sending command");
+            return Ok(());
+        };
+
+        if handle.is_finished() {
+            log::debug!("Cava thread has finished, not sending command");
+            return Ok(());
+        }
+
+        log::trace!(cmd:?; "Sending CavaCommand");
+        self.command_channel
+            .0
+            .send_timeout(cmd, Duration::from_secs(3))
+            .map_err(|err| anyhow!("Failed to send command to cava thread: {}", err))
+    }
 }
 
 impl Pane for CavaPane {
-    fn render(
-        &mut self,
-        _frame: &mut ratatui::Frame,
-        area: Rect,
-        _context: &crate::context::AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, _frame: &mut Frame, area: Rect, _ctx: &AppContext) -> anyhow::Result<()> {
         self.area = area;
         Ok(())
     }
@@ -308,6 +318,8 @@ impl Pane for CavaPane {
     }
 
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
+        self.spawn(context.config.cava.clone(), context.config.theme.cava.clone())?;
+
         if matches!(context.status.state, State::Play) {
             self.run()?;
         }
@@ -315,11 +327,7 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn handle_action(
-        &mut self,
-        _event: &mut crate::shared::key_event::KeyEvent,
-        _context: &mut crate::context::AppContext,
-    ) -> anyhow::Result<()> {
+    fn handle_action(&mut self, _ev: &mut KeyEvent, _ctx: &mut AppContext) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -328,28 +336,19 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &AppContext) -> Result<()> {
         match event {
             UiEvent::Exit => {
+                self.command(CavaCommand::Stop)?;
                 if let Some(handle) = self.handle.take() {
-                    self.command_channel.0.send(CavaCommand::Stop).map_err(|err| {
-                        anyhow!("Failed to send stop command to cava thread: {}", err)
-                    })?;
                     handle.join().expect("Failed to join cava thread")?;
                 }
             }
             UiEvent::ConfigChanged => {
-                self.command_channel
-                    .0
-                    .send(CavaCommand::ConfigChanged { config: context.config.cava.clone() })
-                    .map_err(|err| {
-                        anyhow!("Failed to send ConfigChanged command to cava thread: {}", err)
-                    })?;
+                self.command(CavaCommand::ConfigChanged {
+                    config: ctx.config.cava.clone(),
+                    theme: ctx.config.theme.cava.clone(),
+                })?;
 
                 if is_visible && !self.is_modal_open {
                     self.run()?;
@@ -361,23 +360,23 @@ impl Pane for CavaPane {
                 }
             }
             UiEvent::Hidden if is_visible => {
-                self.pause_and_clear(context)?;
+                self.pause_and_clear(ctx)?;
             }
             UiEvent::ModalOpened if is_visible => {
                 self.is_modal_open = true;
-                self.pause_and_clear(context)?;
+                self.pause_and_clear(ctx)?;
             }
             UiEvent::ModalClosed if is_visible => {
                 self.is_modal_open = false;
                 self.run()?;
             }
-            UiEvent::PlaybackStateChanged => match context.status.state {
+            UiEvent::PlaybackStateChanged => match ctx.status.state {
                 State::Play => {
                     self.run()?;
                 }
                 State::Stop | State::Pause => {
                     log::debug!("CavaPane: Player event received, clearing cava area");
-                    self.pause_and_clear(context)?;
+                    self.pause_and_clear(ctx)?;
                 }
             },
             _ => {}
