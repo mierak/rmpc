@@ -1,7 +1,10 @@
 use std::{
     collections::VecDeque,
     io::{self, Write},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread::Builder,
 };
 
@@ -32,6 +35,8 @@ pub fn init(
         .spawn(move || client_task(&client_rx, &event_tx, client, &config))
 }
 
+static HEALTHY: AtomicBool = AtomicBool::new(true);
+
 fn client_task(
     client_rx: &Receiver<ClientRequest>,
     event_tx: &Sender<AppEvent>,
@@ -50,6 +55,8 @@ fn client_task(
         let mut first_loop = true;
         loop {
             log::trace!(first_loop; "Starting worker threads");
+
+            HEALTHY.store(true, Ordering::Relaxed);
 
             let _ = req2idle_rx.try_iter().collect::<Vec<_>>();
             let _ = idle2req_rx.try_iter().collect::<Vec<_>>();
@@ -93,11 +100,25 @@ fn client_task(
 
                                     log::trace!("Trying to acquire client lock for idle");
 
-                                    try_break!(client.set_read_timeout(None), "Failed to set read timeout");
+                                    try_break!(client.set_read_timeout(config.mpd_idle_read_timeout_ms), "Failed to set read timeout");
                                     let mut idle_client = try_break!(client.enter_idle(), "Failed to enter idle state");
                                     try_break!(idle_entered_tx.send(()), "Failed to send idle confirmation");
-                                    let events: Vec<IdleEvent> = try_break!(idle_client.read_response(), "Failed to read idle events");
 
+                                    let events: Result<Vec<IdleEvent>, MpdError> = loop {
+                                        match idle_client.read_response() {
+                                            Ok(events) => break Ok(events),
+                                            Err(MpdError::TimedOut(err)) => {
+                                                if !HEALTHY.load(Ordering::Relaxed) {
+                                                    log::warn!(err:?; "Not healthy. Reading idle events timed out");
+                                                    try_skip!(idle2req_tx.send(client.consume()), "Failed to return client to request thread");
+                                                    break 'outer;
+                                                }
+                                            }
+                                            err @ Err(_) => break err
+                                        }
+                                    };
+
+                                    let events = try_break!(events, "Failed to read idle events");
                                     log::trace!(events:?; "Got idle events");
                                     for ev in events {
                                         if let Err(err) = event_tx.send(AppEvent::IdleEvent(ev)) {
@@ -201,6 +222,7 @@ fn client_task(
                             }
                         }
                         log::debug!("Work loop ended. Shutting down MPD client.");
+                        HEALTHY.store(false, Ordering::Relaxed);
                         try_skip!(client_write.shutdown_both(), "Failed to shutdown MPD client");
                     })
                     .expect("failed to spawn thread");

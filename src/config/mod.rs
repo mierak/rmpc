@@ -67,6 +67,7 @@ pub struct Config {
     pub rewind_to_start_sec: Option<u64>,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
+    pub mpd_idle_read_timeout_ms: Option<Duration>,
     pub theme: UiConfig,
     pub theme_name: Option<String>,
     pub album_art: AlbumArtConfig,
@@ -116,6 +117,8 @@ pub struct ConfigFile {
     mpd_read_timeout_ms: u64,
     #[serde(default = "defaults::u64::<5_000>")]
     mpd_write_timeout_ms: u64,
+    #[serde(default)]
+    mpd_idle_read_timeout_ms: Option<u64>,
     #[serde(default = "defaults::bool::<true>")]
     enable_mouse: bool,
     #[serde(default = "defaults::bool::<true>")]
@@ -172,8 +175,9 @@ impl Default for ConfigFile {
             volume_step: 5,
             scrolloff: 0,
             status_update_interval_ms: Some(1000),
-            mpd_write_timeout_ms: 5000,
+            mpd_write_timeout_ms: 5_000,
             mpd_read_timeout_ms: 10_000,
+            mpd_idle_read_timeout_ms: None,
             max_fps: 30,
             theme: None,
             cache_dir: None,
@@ -363,6 +367,7 @@ impl ConfigFile {
             status_update_interval_ms: self.status_update_interval_ms.map(|v| v.max(100)),
             mpd_read_timeout: Duration::from_millis(self.mpd_read_timeout_ms),
             mpd_write_timeout: Duration::from_millis(self.mpd_write_timeout_ms),
+            mpd_idle_read_timeout_ms: self.mpd_idle_read_timeout_ms.map(Duration::from_millis),
             enable_mouse: self.enable_mouse,
             enable_config_hot_reload: self.enable_config_hot_reload,
             keybinds: self.keybinds.into(),
