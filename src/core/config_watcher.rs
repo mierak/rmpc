@@ -23,6 +23,13 @@ pub(crate) fn init(
     theme_name: Option<String>,
     event_tx: Sender<AppEvent>,
 ) -> Result<Debouncer<RecommendedWatcher, RecommendedCache>> {
+    if !config_path.exists() {
+        return Err(anyhow::Error::msg(format!(
+            "Config path {} does not exist",
+            config_path.display()
+        )));
+    }
+
     let config_file_name = config_path
         .file_name()
         .with_context(|| format!("Invalid config path {}", config_path.display()))?

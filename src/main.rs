@@ -60,25 +60,29 @@ fn main() -> Result<()> {
                 "../docs/src/content/docs/next/assets/example_theme.ron"
             ))?;
         }
-        Some(Command::Config { current: true }) => {
-            match File::open(&config_path) {
-                Ok(mut file) => {
-                    let mut config = String::new();
-                    file.read_to_string(&mut config)?;
-                    println!("{config}");
-                }
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    eprintln!("Config file not found at '{}'. Use 'rmpc config' to see the default config.", config_path.display());
-                    std::process::exit(1);
-                }
-                Err(err) => return Err(err.into()),
+        Some(Command::Config { current: true }) => match File::open(&config_path) {
+            Ok(mut file) => {
+                let mut config = String::new();
+                file.read_to_string(&mut config)?;
+                println!("{config}");
             }
-        }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!(
+                    "Config file not found at '{}'. Use 'rmpc config' to see the default config.",
+                    config_path.display()
+                );
+                std::process::exit(1);
+            }
+            Err(err) => return Err(err.into()),
+        },
         Some(Command::Theme { current: true }) => {
             let config_file = match ConfigFile::read(&config_path) {
                 Ok(config) => config,
                 Err(DeserError::NotFound(_)) => {
-                    eprintln!("Config file not found at '{}'. No theme file specified. Use 'rmpc theme' to see the default theme.", config_path.display());
+                    eprintln!(
+                        "Config file not found at '{}'. No theme file specified. Use 'rmpc theme' to see the default theme.",
+                        config_path.display()
+                    );
                     std::process::exit(1);
                 }
                 Err(err) => return Err(err.into()),
@@ -171,7 +175,11 @@ fn main() -> Result<()> {
             let config: CliConfigFile = match CliConfigFile::read(&config_path) {
                 Ok(cfg) => cfg,
                 Err(err) => {
-                    log::warn!("Failed to read config file at '{}': {}. Using default values.", config_path.display(), err);
+                    log::warn!(
+                        "Failed to read config file at '{}': {}. Using default values.",
+                        config_path.display(),
+                        err
+                    );
                     ConfigFile::default().into()
                 }
             };
@@ -292,15 +300,14 @@ fn main() -> Result<()> {
             )
             .context("Failed to initialize socket listener")?;
 
-            let _config_watcher_guard = context
-                .config
-                .enable_config_hot_reload
-                .then_some(core::config_watcher::init(
+            let _config_watcher_guard = context.config.enable_config_hot_reload.then_some(
+                core::config_watcher::init(
                     config_path,
                     context.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
                     event_tx.clone(),
-                ))
-                .transpose()?;
+                )
+                .inspect_err(|_| status_warn!("Failed to initialize config watcher")),
+            );
 
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
