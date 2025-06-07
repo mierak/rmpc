@@ -20,11 +20,11 @@ pub struct Cava {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CavaFile {
-    #[serde(default = "defaults::default_u16::<60>")]
+    #[serde(default = "defaults::u16::<60>")]
     framerate: u16,
-    #[serde(default = "defaults::default_true")]
+    #[serde(default = "defaults::bool::<true>")]
     pub autosens: bool,
-    #[serde(default = "defaults::default_u16::<100>")]
+    #[serde(default = "defaults::u16::<100>")]
     pub sensitivity: u16,
     #[serde(default)]
     lower_cutoff_freq: Option<u16>,
@@ -58,7 +58,7 @@ pub struct CavaSmoothingFile {
     monstercat: bool,
     #[serde(default)]
     waves: bool,
-    #[serde(default = "defaults::default_u8::<10>")]
+    #[serde(default = "defaults::u8::<10>")]
     noise_reduction: u8,
 }
 
