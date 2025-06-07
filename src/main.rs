@@ -61,14 +61,28 @@ fn main() -> Result<()> {
             ))?;
         }
         Some(Command::Config { current: true }) => {
-            let mut file = File::open(&config_path).context("Failed to read config file")?;
-            let mut config = String::new();
-            file.read_to_string(&mut config)?;
-            println!("{config}");
+            match File::open(&config_path) {
+                Ok(mut file) => {
+                    let mut config = String::new();
+                    file.read_to_string(&mut config)?;
+                    println!("{config}");
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    eprintln!("Config file not found at '{}'. Use 'rmpc config' to see the default config.", config_path.display());
+                    std::process::exit(1);
+                }
+                Err(err) => return Err(err.into()),
+            }
         }
         Some(Command::Theme { current: true }) => {
-            let config_file =
-                ConfigFile::read(&config_path).context("Failed to read config file")?;
+            let config_file = match ConfigFile::read(&config_path) {
+                Ok(config) => config,
+                Err(DeserError::NotFound(_)) => {
+                    eprintln!("Config file not found at '{}'. No theme file specified. Use 'rmpc theme' to see the default theme.", config_path.display());
+                    std::process::exit(1);
+                }
+                Err(err) => return Err(err.into()),
+            };
             let config_dir = config_path.parent().with_context(|| {
                 format!("Invalid config path '{}'", config_path.to_string_lossy())
             })?;
@@ -156,7 +170,10 @@ fn main() -> Result<()> {
             logging::init_console().expect("Logger to initialize");
             let config: CliConfigFile = match CliConfigFile::read(&config_path) {
                 Ok(cfg) => cfg,
-                Err(_err) => ConfigFile::default().into(),
+                Err(err) => {
+                    log::warn!("Failed to read config file at '{}': {}. Using default values.", config_path.display(), err);
+                    ConfigFile::default().into()
+                }
             };
             let mut config = config.into_config(args.address, args.password);
             let mut client = Client::init(
