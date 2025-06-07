@@ -101,7 +101,7 @@ fn client_task(
                                         match idle_client.read_response() {
                                             Ok(events) => break Ok(events),
                                             Err(MpdError::TimedOut(err)) => {
-                                                log::debug!("timed out reading idle events: {err:?}, trying again");
+                                                log::trace!("timed out reading idle events: {err:?}, trying again");
                                             }
                                             Err(err) => {
                                                 break Err(err);
