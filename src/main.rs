@@ -309,6 +309,9 @@ fn main() -> Result<()> {
                 .inspect_err(|_| status_warn!("Failed to initialize config watcher")),
             );
 
+            let enable_mouse = context.config.enable_mouse;
+            let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
+
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();
