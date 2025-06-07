@@ -60,15 +60,33 @@ fn main() -> Result<()> {
                 "../docs/src/content/docs/next/assets/example_theme.ron"
             ))?;
         }
-        Some(Command::Config { current: true }) => {
-            let mut file = File::open(&config_path).context("Failed to read config file")?;
-            let mut config = String::new();
-            file.read_to_string(&mut config)?;
-            println!("{config}");
-        }
+        Some(Command::Config { current: true }) => match File::open(&config_path) {
+            Ok(mut file) => {
+                let mut config = String::new();
+                file.read_to_string(&mut config)?;
+                println!("{config}");
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!(
+                    "Config file not found at '{}'. Use 'rmpc config' to see the default config.",
+                    config_path.display()
+                );
+                std::process::exit(1);
+            }
+            Err(err) => return Err(err.into()),
+        },
         Some(Command::Theme { current: true }) => {
-            let config_file =
-                ConfigFile::read(&config_path).context("Failed to read config file")?;
+            let config_file = match ConfigFile::read(&config_path) {
+                Ok(config) => config,
+                Err(DeserError::NotFound(_)) => {
+                    eprintln!(
+                        "Config file not found at '{}'. No theme file specified. Use 'rmpc theme' to see the default theme.",
+                        config_path.display()
+                    );
+                    std::process::exit(1);
+                }
+                Err(err) => return Err(err.into()),
+            };
             let config_dir = config_path.parent().with_context(|| {
                 format!("Invalid config path '{}'", config_path.to_string_lossy())
             })?;
@@ -156,7 +174,14 @@ fn main() -> Result<()> {
             logging::init_console().expect("Logger to initialize");
             let config: CliConfigFile = match CliConfigFile::read(&config_path) {
                 Ok(cfg) => cfg,
-                Err(_err) => ConfigFile::default().into(),
+                Err(err) => {
+                    log::warn!(
+                        "Failed to read config file at '{}': {}. Using default values.",
+                        config_path.display(),
+                        err
+                    );
+                    ConfigFile::default().into()
+                }
             };
             let mut config = config.into_config(args.address, args.password);
             let mut client = Client::init(
@@ -252,9 +277,6 @@ fn main() -> Result<()> {
             )
             .context("Failed to create app context")?;
 
-            let enable_mouse = context.config.enable_mouse;
-            let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
-
             core::client::init(
                 client_rx.clone(),
                 event_tx.clone(),
@@ -275,15 +297,17 @@ fn main() -> Result<()> {
             )
             .context("Failed to initialize socket listener")?;
 
-            let _config_watcher_guard = context
-                .config
-                .enable_config_hot_reload
-                .then_some(core::config_watcher::init(
+            let _config_watcher_guard = context.config.enable_config_hot_reload.then_some(
+                core::config_watcher::init(
                     config_path,
                     context.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
                     event_tx.clone(),
-                ))
-                .transpose()?;
+                )
+                .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}")),
+            );
+
+            let enable_mouse = context.config.enable_mouse;
+            let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
 
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
