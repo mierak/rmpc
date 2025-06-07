@@ -535,7 +535,7 @@ impl MpdClient for TestMpdClient {
         )
     }
 
-    fn load_playlist(&mut self, _name: &str) -> MpdResult<()> {
+    fn load_playlist(&mut self, _name: &str, _position: Option<QueuePosition>) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 

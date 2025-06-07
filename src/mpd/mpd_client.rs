@@ -169,7 +169,7 @@ pub trait MpdClient: Sized {
         playlist: &str,
         range: Option<SingleOrRange>,
     ) -> MpdResult<Vec<Song>>;
-    fn load_playlist(&mut self, name: &str) -> MpdResult<()>;
+    fn load_playlist(&mut self, name: &str, position: Option<QueuePosition>) -> MpdResult<()>;
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
     fn delete_from_playlist(&mut self, playlist_name: &str, songs: &SingleOrRange)
@@ -675,8 +675,10 @@ impl MpdClient for Client<'_> {
         }
     }
 
-    fn load_playlist(&mut self, name: &str) -> MpdResult<()> {
-        self.send(&format!("load {}", name.quote_and_escape())).and_then(read_ok)
+    fn load_playlist(&mut self, name: &str, position: Option<QueuePosition>) -> MpdResult<()> {
+        let position_arg: String =
+            position.map_or(String::new(), |v| format!(" {}", v.as_mpd_str()));
+        self.send(&format!("load {} 0:{position_arg}", name.quote_and_escape())).and_then(read_ok)
     }
 
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()> {

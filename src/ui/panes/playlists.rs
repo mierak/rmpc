@@ -423,7 +423,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             [playlist] => {
                 let playlist = playlist.clone();
                 context.command(move |client| {
-                    client.load_playlist(&playlist)?;
+                    client.load_playlist(&playlist, position)?;
                     status_info!("Playlist '{playlist}' added to queue");
                     Ok(())
                 });
@@ -450,7 +450,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             DirOrSong::Dir { name: d, .. } => {
                 let d = d.clone();
                 context.command(move |client| {
-                    client.load_playlist(&d)?;
+                    client.load_playlist(&d, position)?;
                     status_info!("Playlist '{d}' added to queue");
                     Ok(())
                 });
