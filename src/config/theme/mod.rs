@@ -78,7 +78,7 @@ pub struct UiConfig {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UiConfigFile {
-    #[serde(default = "defaults::default_true")]
+    #[serde(default = "defaults::bool::<true>")]
     pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
     pub(super) tab_bar: TabBarFile,

@@ -370,7 +370,7 @@ impl Pane for CavaPane {
                 self.is_modal_open = false;
                 self.run()?;
             }
-            UiEvent::PlaybackStateChanged => match ctx.status.state {
+            UiEvent::PlaybackStateChanged if is_visible => match ctx.status.state {
                 State::Play => {
                     self.run()?;
                 }

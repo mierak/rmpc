@@ -33,21 +33,21 @@ impl Default for SortMode {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy)]
 pub enum SortModeFile {
     Format {
-        #[serde(default = "defaults::default_true")]
+        #[serde(default = "defaults::bool::<true>")]
         group_directories_first: bool,
-        #[serde(default = "defaults::default_false")]
+        #[serde(default = "defaults::bool::<false>")]
         reverse: bool,
     },
     SortFormat {
-        #[serde(default = "defaults::default_true")]
+        #[serde(default = "defaults::bool::<true>")]
         group_directories_first: bool,
-        #[serde(default = "defaults::default_false")]
+        #[serde(default = "defaults::bool::<false>")]
         reverse: bool,
     },
     ModifiedTime {
-        #[serde(default = "defaults::default_true")]
+        #[serde(default = "defaults::bool::<true>")]
         group_directories_first: bool,
-        #[serde(default = "defaults::default_false")]
+        #[serde(default = "defaults::bool::<false>")]
         reverse: bool,
     },
 }

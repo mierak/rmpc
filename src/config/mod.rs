@@ -94,31 +94,31 @@ pub struct ConfigFile {
     lyrics_dir: Option<String>,
     #[serde(default)]
     pub theme: Option<String>,
-    #[serde(default = "defaults::default_volume_step")]
+    #[serde(default = "defaults::u8::<5>")]
     volume_step: u8,
-    #[serde(default = "defaults::default_max_fps")]
+    #[serde(default = "defaults::u32::<30>")]
     pub max_fps: u32,
-    #[serde(default = "defaults::default_scrolloff")]
+    #[serde(default = "defaults::usize::<0>")]
     scrolloff: usize,
-    #[serde(default = "defaults::default_false")]
+    #[serde(default = "defaults::bool::<false>")]
     wrap_navigation: bool,
     #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
-    #[serde(default = "defaults::default_false")]
+    #[serde(default = "defaults::bool::<false>")]
     select_current_song_on_change: bool,
-    #[serde(default = "defaults::default_false")]
+    #[serde(default = "defaults::bool::<false>")]
     center_current_song_on_change: bool,
-    #[serde(default = "defaults::default_false")]
+    #[serde(default = "defaults::bool::<false>")]
     reflect_changes_to_playlist: bool,
     #[serde(default)]
     rewind_to_start_sec: Option<u64>,
-    #[serde(default = "defaults::default_read_timeout")]
+    #[serde(default = "defaults::u64::<10_000>")]
     mpd_read_timeout_ms: u64,
-    #[serde(default = "defaults::default_write_timeout")]
+    #[serde(default = "defaults::u64::<5_000>")]
     mpd_write_timeout_ms: u64,
-    #[serde(default = "defaults::default_true")]
+    #[serde(default = "defaults::bool::<true>")]
     enable_mouse: bool,
-    #[serde(default = "defaults::default_true")]
+    #[serde(default = "defaults::bool::<true>")]
     pub enable_config_hot_reload: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,

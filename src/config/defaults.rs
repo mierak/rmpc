@@ -6,44 +6,32 @@ pub fn default_column_widths() -> Vec<u16> {
     vec![20, 38, 42]
 }
 
-pub fn default_false() -> bool {
-    false
+pub fn bool<const V: bool>() -> bool {
+    V
 }
 
-pub fn default_true() -> bool {
-    true
+pub fn u8<const V: u8>() -> u8 {
+    V
 }
 
-pub fn default_volume_step() -> u8 {
-    5
+pub fn u16<const V: u16>() -> u16 {
+    V
 }
 
-pub fn default_max_fps() -> u32 {
-    30
+pub fn u32<const V: u32>() -> u32 {
+    V
 }
 
-pub fn default_u16<const VAL: u16>() -> u16 {
-    VAL
+pub fn u64<const V: u64>() -> u64 {
+    V
 }
 
-pub fn default_u8<const VAL: u8>() -> u8 {
-    VAL
+pub fn usize<const V: usize>() -> usize {
+    V
 }
 
 pub fn default_bar_symbol() -> String {
     "█".to_string()
-}
-
-pub fn default_scrolloff() -> usize {
-    0
-}
-
-pub fn default_read_timeout() -> u64 {
-    10_000
-}
-
-pub fn default_write_timeout() -> u64 {
-    5000
 }
 
 pub fn default_progress_update_interval_ms() -> Option<u64> {
