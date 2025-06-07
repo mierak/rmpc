@@ -1,7 +1,10 @@
 use std::{
     collections::VecDeque,
     io::{self, Write},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread::Builder,
 };
 
@@ -32,6 +35,8 @@ pub fn init(
         .spawn(move || client_task(&client_rx, &event_tx, client, &config))
 }
 
+static HEALTHY: AtomicBool = AtomicBool::new(true);
+
 fn client_task(
     client_rx: &Receiver<ClientRequest>,
     event_tx: &Sender<AppEvent>,
@@ -50,6 +55,8 @@ fn client_task(
         let mut first_loop = true;
         loop {
             log::trace!(first_loop; "Starting worker threads");
+
+            HEALTHY.store(true, Ordering::Relaxed);
 
             let _ = req2idle_rx.try_iter().collect::<Vec<_>>();
             let _ = idle2req_rx.try_iter().collect::<Vec<_>>();
@@ -101,11 +108,13 @@ fn client_task(
                                         match idle_client.read_response() {
                                             Ok(events) => break Ok(events),
                                             Err(MpdError::TimedOut(err)) => {
-                                                log::trace!("timed out reading idle events: {err:?}, trying again");
+                                                if !HEALTHY.load(Ordering::Relaxed) {
+                                                    log::warn!(err:?; "Not healthy. Reading idle events timed out");
+                                                    try_skip!(idle2req_tx.send(client.consume()), "Failed to return client to request thread");
+                                                    break 'outer;
+                                                }
                                             }
-                                            Err(err) => {
-                                                break Err(err);
-                                            }
+                                            err @ Err(_) => break err
                                         }
                                     };
 
@@ -213,6 +222,7 @@ fn client_task(
                             }
                         }
                         log::debug!("Work loop ended. Shutting down MPD client.");
+                        HEALTHY.store(false, Ordering::Relaxed);
                         try_skip!(client_write.shutdown_both(), "Failed to shutdown MPD client");
                     })
                     .expect("failed to spawn thread");
