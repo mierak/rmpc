@@ -93,11 +93,23 @@ fn client_task(
 
                                     log::trace!("Trying to acquire client lock for idle");
 
-                                    try_break!(client.set_read_timeout(None), "Failed to set read timeout");
+                                    try_break!(client.set_read_timeout(config.mpd_idle_read_timeout_ms), "Failed to set read timeout");
                                     let mut idle_client = try_break!(client.enter_idle(), "Failed to enter idle state");
                                     try_break!(idle_entered_tx.send(()), "Failed to send idle confirmation");
-                                    let events: Vec<IdleEvent> = try_break!(idle_client.read_response(), "Failed to read idle events");
 
+                                    let events: Result<Vec<IdleEvent>, MpdError> = loop {
+                                        match idle_client.read_response() {
+                                            Ok(events) => break Ok(events),
+                                            Err(MpdError::TimedOut(err)) => {
+                                                log::debug!("timed out reading idle events: {err:?}, trying again");
+                                            }
+                                            Err(err) => {
+                                                break Err(err);
+                                            }
+                                        }
+                                    };
+
+                                    let events = try_break!(events, "Failed to read idle events");
                                     log::trace!(events:?; "Got idle events");
                                     for ev in events {
                                         if let Err(err) = event_tx.send(AppEvent::IdleEvent(ev)) {

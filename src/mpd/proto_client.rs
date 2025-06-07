@@ -51,6 +51,23 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         Ok(res)
     }
 
+    fn should_reinit_buffer(err: &MpdError) -> bool {
+        !matches!(
+            err,
+            MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
+                | MpdError::TimedOut(_)
+        )
+    }
+
+    fn reinit_buffer_if_needed(&mut self, err: &MpdError) -> Result<()> {
+        if Self::should_reinit_buffer(err) {
+            log::error!(err:?; "read buffer was reinitialized");
+            self.client.clear_read_buf()?;
+        }
+
+        Ok(())
+    }
+
     pub fn new_read_only(client: &'client mut C) -> Self {
         Self { command: "<read_only>", client }
     }
@@ -67,16 +84,12 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         match Self::read_line(read) {
             Ok(MpdLine::Ok) => Ok(()),
             Ok(MpdLine::Value(val)) => {
-                log::error!(val = val.as_str(); "read buffer was reinitialized because we got a value when receiving ok");
+                log::error!(val = val.as_str(); "read buffer was reinitialized because we got a value when expecting ok");
                 self.client.clear_read_buf()?;
                 Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'")))
             }
             Err(e) => {
-                if !matches!(e, MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. }))
-                {
-                    log::error!(e:?; "read buffer was reinitialized");
-                    self.client.clear_read_buf()?;
-                }
+                self.reinit_buffer_if_needed(&e)?;
                 Err(e)
             }
         }
@@ -95,24 +108,12 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Ok(MpdLine::Ok) => return Ok(result),
                 Ok(MpdLine::Value(val)) => {
                     if let Err(e) = result.next(val) {
-                        if !matches!(
-                            e,
-                            MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
-                        ) {
-                            log::error!(e:?; "read buffer was reinitialized");
-                            self.client.clear_read_buf()?;
-                        }
+                        self.reinit_buffer_if_needed(&e)?;
                         return Err(e);
                     }
                 }
                 Err(e) => {
-                    if !matches!(
-                        e,
-                        MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
-                    ) {
-                        log::error!(e:?; "read buffer was reinitialized");
-                        self.client.clear_read_buf()?;
-                    }
+                    self.reinit_buffer_if_needed(&e)?;
                     return Err(e);
                 }
             }
@@ -135,24 +136,12 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Ok(MpdLine::Value(val)) => {
                     found_any = true;
                     if let Err(e) = result.next(val) {
-                        if !matches!(
-                            e,
-                            MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
-                        ) {
-                            log::error!(e:?; "read buffer was reinitialized");
-                            self.client.clear_read_buf()?;
-                        }
+                        self.reinit_buffer_if_needed(&e)?;
                         return Err(e);
                     }
                 }
                 Err(e) => {
-                    if !matches!(
-                        e,
-                        MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
-                    ) {
-                        log::error!(e:?; "read buffer was reinitialized");
-                        self.client.clear_read_buf()?;
-                    }
+                    self.reinit_buffer_if_needed(&e)?;
                     return Err(e);
                 }
             }
@@ -168,11 +157,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) => return Ok(None),
             Err(e) => {
-                if !matches!(e, MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. }))
-                {
-                    log::error!(e:?; "read buffer was reinitialized");
-                    self.client.clear_read_buf()?;
-                }
+                self.reinit_buffer_if_needed(&e)?;
                 Err(e)
             }
         };
@@ -189,13 +174,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 }
                 Ok(None) => return Ok(None),
                 Err(e) => {
-                    if !matches!(
-                        e,
-                        MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })
-                    ) {
-                        log::error!(e:?; "read buffer was reinitialized");
-                        self.client.clear_read_buf()?;
-                    }
+                    self.reinit_buffer_if_needed(&e)?;
                     return Err(e);
                 }
             }
@@ -254,8 +233,15 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 log::error!(err:? = e; "Got broken pipe from mpd");
                 Err(MpdError::ClientClosed)
             }
+            Err(e)
+                if e.kind() == std::io::ErrorKind::TimedOut
+                    || e.kind() == std::io::ErrorKind::WouldBlock =>
+            {
+                log::trace!(err:? = e; "Reading line from MPD timed out");
+                Err(e.into())
+            }
             Err(e) => {
-                log::error!(err:? = e; "Encountered unexpected error whe reading a response  line from MPD");
+                log::error!(err:? = e; "Encountered unexpected error whe reading a response line from MPD");
                 Err(e.into())
             }
         }?;
