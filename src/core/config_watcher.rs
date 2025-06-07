@@ -1,6 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use crossbeam::channel::Sender;
 use notify_debouncer_full::{
     DebounceEventResult,
@@ -24,10 +24,7 @@ pub(crate) fn init(
     event_tx: Sender<AppEvent>,
 ) -> Result<Debouncer<RecommendedWatcher, RecommendedCache>> {
     if !config_path.exists() {
-        return Err(anyhow::Error::msg(format!(
-            "Config path {} does not exist",
-            config_path.display()
-        )));
+        bail!("Config path {} does not exist", config_path.display());
     }
 
     let config_file_name = config_path

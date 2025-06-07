@@ -277,9 +277,6 @@ fn main() -> Result<()> {
             )
             .context("Failed to create app context")?;
 
-            let enable_mouse = context.config.enable_mouse;
-            let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
-
             core::client::init(
                 client_rx.clone(),
                 event_tx.clone(),
@@ -306,7 +303,7 @@ fn main() -> Result<()> {
                     context.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
                     event_tx.clone(),
                 )
-                .inspect_err(|_| status_warn!("Failed to initialize config watcher")),
+                .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}")),
             );
 
             let enable_mouse = context.config.enable_mouse;
