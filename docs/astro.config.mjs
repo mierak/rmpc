@@ -46,6 +46,10 @@ export default defineConfig({
                                 link: "development",
                             },
                             {
+                                label: "FAQ",
+                                link: "next/faq",
+                            },
+                            {
                                 label: "Configuration",
                                 autogenerate: {
                                     directory: "next/configuration",
