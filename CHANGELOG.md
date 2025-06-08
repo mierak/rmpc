@@ -55,6 +55,7 @@ lists they are listed as multiple entries.
 - Added style configuration for dir and song symbols in browsers
 - Added `lyrics` config option `timestamp` for showing line timestamp
 - Added new `Cava` pane
+- Added `mpd_idle_read_timeout_ms`
 
 ### Changed
 

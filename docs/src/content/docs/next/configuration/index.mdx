@@ -75,6 +75,17 @@ How long to wait for response to MPD command before giving up and reconnecting. 
 
 How long to wait for write to MPD socket to finish before giving up and reconnecting. Defaults to `5_000` milliseconds.
 
+### mpd_idle_read_timeout_ms
+
+<ConfigValue name="mpd_write_timeout_ms" optional type="number" />
+
+By default the client will wait forever for data from MPD to appear while being idle. This makes it timeout after the
+specified tiemout and try again. Defaults to None.
+
+:::caution
+Do not set this option. Only reason to use this is if you are experiencing connection issues and rmpc hanging after a disconnect.
+:::
+
 ### rewind_to_start_sec
 
 <ConfigValue name="rewind_to_start_sec" optional type="number" />
