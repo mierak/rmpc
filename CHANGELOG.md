@@ -86,6 +86,7 @@ lists they are listed as multiple entries.
 - Tilde not being expanded in `default_album_art_path`
 - Filter overlapping song table when `show_song_table_header` was set to false
 - Remove extra space at the start of every lyrics line in case the lrc file had space between timestamp and content
+- Styles for `Group` not working in the queue table
 
 ## [0.8.0] - 2025-02-16
 
