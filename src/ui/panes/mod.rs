@@ -686,13 +686,14 @@ impl Song {
                 )
             }
             PropertyKindOrText::Group(group) => {
-                let mut buf = Line::default();
+                let mut buf = Line::default().style(style);
                 for grformat in group {
                     if let Some(res) =
                         self.as_line_ellipsized(grformat, max_len, symbols, tag_separator, strategy)
                     {
                         for span in res.spans {
-                            buf.push_span(span);
+                            let span_style = span.style;
+                            buf.push_span(span.style(res.style).patch_style(span_style));
                         }
                     } else {
                         return format.default.as_ref().and_then(|format| {
