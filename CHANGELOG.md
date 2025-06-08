@@ -56,6 +56,7 @@ lists they are listed as multiple entries.
 - Added `lyrics` config option `timestamp` for showing line timestamp
 - Added new `Cava` pane
 - Added `mpd_idle_read_timeout_ms`
+- Added FAQ section to the docs
 
 ### Changed
 
