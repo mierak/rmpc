@@ -1078,9 +1078,11 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Insert => self.add_current(false, context, None)?,
+                        CommonAction::Insert => {
+                            self.add_current(false, context, Some(QueuePosition::RelativeAdd(0)))?;
+                        }
                         CommonAction::InsertAll => {
-                            self.search_add(context, None);
+                            self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
                             status_info!("All found songs added to queue");
 
                             context.render()?;
