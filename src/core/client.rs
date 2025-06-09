@@ -10,7 +10,10 @@ use std::{
 };
 
 use anyhow::Result;
-use crossbeam::channel::{Receiver, Sender, bounded};
+use crossbeam::{
+    channel::{Receiver, Sender, bounded},
+    select,
+};
 use drop_guard::ClientDropGuard;
 
 use crate::{
@@ -165,7 +168,17 @@ fn client_task(
 
                         loop {
                             log::trace!("Waiting for client requests");
-                            let msg = health!(request_rx.recv(), "Failed to receive client request");
+                            let msg = select! {
+                                recv(request_rx) -> msg => {
+                                    health!(msg, "Failed to receive client request")
+                                }
+                                recv(client_return_rx) -> client => {
+                                    // TODO
+                                    let client = health!(client, "Failed to receive client request");
+                                    ClientDropGuard::new(client_return_tx, client);
+                                    break;
+                                }
+                            };
                             buffer.push_back(msg);
 
                             log::trace!(buffer:?; "Got requests. Trying to receive client from idle thread");
