@@ -176,7 +176,7 @@ fn client_task(
                                     // TODO
                                     let client = health!(client, "Failed to receive client request");
                                     ClientDropGuard::new(client_return_tx, client);
-                                    break;
+                                    continue;
                                 }
                             };
                             buffer.push_back(msg);
