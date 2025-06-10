@@ -81,7 +81,7 @@ impl CavaPane {
     pub fn read_cava_data(
         height: u16,
         read_buffer: &mut [u8],
-        columns: &mut [u16],
+        columns: &mut [f32],
         stdout: &mut impl Read,
         stderr: &mut impl Read,
     ) -> Result<()> {
@@ -94,16 +94,17 @@ impl CavaPane {
 
         for x in 0..columns.len() {
             let value = u16::from_le_bytes([read_buffer[2 * x], read_buffer[2 * x + 1]]);
-            columns[x] = (value as u64 * height as u64 / 65535) as u16;
+            columns[x] = value as f32 * height as f32 / 65535.0f32;
         }
 
         Ok(())
     }
 
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn render_cava(
         writer: &TtyWriter,
         area: Rect,
-        columns: &mut [u16],
+        columns: &mut [f32],
         theme: &CavaTheme,
     ) -> Result<()> {
         let height = area.height;
@@ -115,15 +116,18 @@ impl CavaPane {
             let color = theme.bar_color.get_color(y as usize, area.height);
             queue!(writer, MoveTo(area.x, h))?;
             for column in columns.iter() {
-                if *column > y {
+                let fill_amount = (*column - f32::from(y)).clamp(0.0, 0.99);
+                if fill_amount < 0.01 {
+                    queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
+                } else {
+                    let char_index = (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
+                    let fill_char = theme.bar_symbols.get(char_index).unwrap_or(&' ');
                     queue!(
                         writer,
                         PrintStyledContent(
-                            theme.bar_symbol.as_str().with(color).on(theme.bg_color)
+                            fill_char.with(color).on(theme.bg_color)
                         )
                     )?;
-                } else {
-                    queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
                 }
                 queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
             }
@@ -196,7 +200,7 @@ impl CavaPane {
             let stderr =
                 process.handle.stderr.as_mut().context("Failed to spawn cava. No stderr.")?;
 
-            let mut columns = vec![0_u16; bars as usize];
+            let mut columns = vec![0_f32; bars as usize];
             let mut buf = vec![0_u8; 2 * bars as usize];
 
             'inner: loop {

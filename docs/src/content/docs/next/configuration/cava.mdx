@@ -73,7 +73,10 @@ carefully as the example does not work copy/paste out of the box.
 
 ```rust
 cava: (
-    bar_symbol: "█", // symbol that will be used as a bar in the visualiser
+    // symbols that will be used to draw the bar in the visualiser, in ascending order of
+    // fill fraction
+    bar_symbols: ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"],
+
     bg_color: "black", // background color, defaults to rmpc's bg color if not provided
 
     // Colors can be configured in three different ways: a single color, different colors
