@@ -68,6 +68,7 @@ fn should_skip_request(buffer: &VecDeque<ClientRequest>, request: &ClientRequest
     })
 }
 
+#[allow(clippy::single_match_else)]
 fn client_task(
     request_rx: &Receiver<ClientRequest>,
     event_tx: &Sender<AppEvent>,
@@ -135,6 +136,7 @@ fn client_task(
                                     }
                                     Err(err) => {
                                         log::error!(err:?; "Encountered error while reading idle events");
+                                        HEALTHY.store(false, Ordering::Relaxed);
                                         break 'outer
                                     }
                                 }
@@ -173,9 +175,21 @@ fn client_task(
                                     health!(msg, "Failed to receive client request")
                                 }
                                 recv(client_return_rx) -> client => {
-                                    // TODO
-                                    let client = health!(client, "Failed to receive client request");
-                                    ClientDropGuard::new(client_return_tx, client);
+                                    let client = match client {
+                                        Ok(client) => ClientDropGuard::new(client_return_tx, client),
+                                        Err(err) => {
+                                            log::error!(err:?; "Failed to receive client from idle thread");
+                                            HEALTHY.store(false, Ordering::Relaxed);
+                                            break;
+                                        }
+                                    };
+
+                                    if !HEALTHY.load(Ordering::Relaxed) {
+                                        log::error!("Received client from idle thread while not healthy. Breaking the loop.");
+                                        break;
+                                    }
+
+                                    log::trace!(client:?; "Received client from idle. No work to do. Sending it back.");
                                     continue;
                                 }
                             };
@@ -207,27 +221,26 @@ fn client_task(
 
                                 match handle_client_request(&mut client, request) {
                                     Ok(result) => {
-                                        try_break!(
+                                        health!(
                                             event_tx.send(AppEvent::WorkDone(Ok(result))),
                                             "Failed to send work done success event"
                                         );
                                     }
-                                    Err(err) => {
-                                        match err.downcast_ref::<MpdError>() {
-                                            Some(MpdError::TimedOut(err)) => {
-                                                status_error!(err:?; "Reading response from MPD timed out, will try to reconnect");
-                                                health!(client.reconnect(), "Failed to reconnect");
-                                                health!(client.set_write_timeout(Some(config.mpd_write_timeout)), "Failed to set write timeout");
-                                                client_write = health!(client.stream.try_clone(), "Client write clone to succeed");
-                                            },
-                                            _ => {
-                                                try_break!(
-                                                    event_tx.send(AppEvent::WorkDone(Err(err))),
-                                                    "Failed to send work done error event"
-                                                );
-                                            },
-                                        }
-                                    }
+                                    Err(err) => match err.downcast_ref::<MpdError>() {
+                                        Some(MpdError::TimedOut(err)) => {
+                                            status_error!(err:?; "Reading response from MPD timed out, will try to reconnect");
+                                            health!(client.reconnect(), "Failed to reconnect");
+                                            health!(client.set_write_timeout(Some(config.mpd_write_timeout)), "Failed to set write timeout");
+                                            client_write = health!(client.stream.try_clone(), "Client write clone to succeed");
+                                        },
+                                        _ => {
+                                            HEALTHY.store(false, Ordering::Relaxed);
+                                            try_break!(
+                                                event_tx.send(AppEvent::WorkDone(Err(err))),
+                                                "Failed to send work done error event"
+                                            );
+                                        },
+                                    },
                                 }
                             }
 
@@ -236,7 +249,8 @@ fn client_task(
                             log::trace!("Client returned to idle thread. Waiting for confirmation");
                             health!(client_received_rx.recv_timeout(Duration::from_secs(3)), "Did not receive confirmation from idle thread");
                         }
-                        log::debug!("Work loop ended. Shutting down MPD client.");
+
+                        log::error!("Work loop ended. Shutting down MPD client.");
                         HEALTHY.store(false, Ordering::Relaxed);
                         try_skip!(client_write.shutdown_both(), "Failed to shutdown MPD client");
                     })
@@ -266,6 +280,7 @@ mod drop_guard {
 
     use crate::mpd::client::Client;
 
+    #[derive(Debug)]
     pub struct ClientDropGuard<'sender, 'client> {
         tx: &'sender Sender<Client<'client>>,
         client: Option<Client<'client>>,
@@ -280,9 +295,9 @@ mod drop_guard {
     impl Drop for ClientDropGuard<'_, '_> {
         fn drop(&mut self) {
             if let Some(client) = self.client.take() {
-                log::warn!("Sending back client on drop");
+                log::trace!("Sending back client on drop");
                 if let Err(err) = self.tx.send(client) {
-                    log::error!(error:? = err; "ERROR DOPYCE, Failed to send client back on drop");
+                    log::error!(error:? = err; "Failed to send client back on drop");
                 }
             }
         }
@@ -299,18 +314,6 @@ mod drop_guard {
     impl DerefMut for ClientDropGuard<'_, '_> {
         fn deref_mut(&mut self) -> &mut Self::Target {
             self.client.as_mut().expect("Cannot deref_mut because client was None")
-        }
-    }
-
-    pub struct DropGuard<'a> {
-        pub tx: &'a Sender<()>,
-        pub name: &'a str,
-    }
-
-    impl Drop for DropGuard<'_> {
-        fn drop(&mut self) {
-            log::warn!(name = self.name; "sending drop notification");
-            self.tx.send(()).expect("send to succeed");
         }
     }
 }
