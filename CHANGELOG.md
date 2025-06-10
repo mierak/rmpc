@@ -24,7 +24,7 @@ lists they are listed as multiple entries.
 - Add new global keybinds for Update and Rescan actions.
 - Addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
 - Introduced `preview_label_style` and `preview_metadata_group_style` in theme config
-- Added support for soundcloud to `addyt`
+- Added support for soundcloud and nicovideo to `addyt`
 - Added `AddReplace` and `AddAllReplace` actions which work smimilarly to `Add` and `AddAll` but replace the current queue instead of appending
 - Added `Insert` and `InsertAll` actions which work similarly to `Add` and `AddAll` but insert after the playing song
 - Added `Shuffle` queue action allowing you to shuffle the whole queue or selected range(s)
