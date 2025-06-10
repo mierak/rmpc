@@ -30,8 +30,8 @@ pub fn usize<const V: usize>() -> usize {
     V
 }
 
-pub fn default_bar_symbol() -> String {
-    "▁▂▃▄▅▆▇█".to_string()
+pub fn default_bar_symbols() -> Vec<char> {
+    "▁▂▃▄▅▆▇█".chars().collect()
 }
 
 pub fn default_progress_update_interval_ms() -> Option<u64> {

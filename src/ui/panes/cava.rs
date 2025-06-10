@@ -120,8 +120,8 @@ impl CavaPane {
                 if fill_amount < 0.01 {
                     queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
                 } else {
-                    let char_index = (fill_amount * theme.bar_symbol.chars().count() as f32).floor() as usize;
-                    let fill_char = theme.bar_symbol.chars().nth(char_index).unwrap_or(' ');
+                    let char_index = (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
+                    let fill_char = theme.bar_symbols.get(char_index).unwrap_or(&' ');
                     queue!(
                         writer,
                         PrintStyledContent(

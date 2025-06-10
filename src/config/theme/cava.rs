@@ -17,8 +17,8 @@ use crate::shared::ext::vec::VecExt;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CavaThemeFile {
-    #[serde(default = "defaults::default_bar_symbol")]
-    pub bar_symbol: String,
+    #[serde(default = "defaults::default_bar_symbols")]
+    pub bar_symbols: Vec<char>,
     #[serde(default)]
     pub bg_color: Option<String>,
     #[serde(default)]
@@ -28,7 +28,7 @@ pub struct CavaThemeFile {
 impl Default for CavaThemeFile {
     fn default() -> Self {
         Self {
-            bar_symbol: "▁▂▃▄▅▆▇█".into(),
+            bar_symbols: "▁▂▃▄▅▆▇█".chars().collect(),
             bg_color: Some("black".to_owned()),
             bar_color: CavaColorFile::Single("blue".into()),
         }
@@ -37,7 +37,8 @@ impl Default for CavaThemeFile {
 
 #[derive(Debug, Clone)]
 pub struct CavaTheme {
-    pub bar_symbol: String,
+    pub bar_symbols: Vec<char>,
+    pub bar_symbols_count: usize,
     pub bg_color: CrosstermColor,
     pub bar_color: CavaColor,
 }
@@ -45,7 +46,8 @@ pub struct CavaTheme {
 impl Default for CavaTheme {
     fn default() -> Self {
         Self {
-            bar_symbol: "▁▂▃▄▅▆▇█".into(),
+            bar_symbols_count: 8,
+            bar_symbols: "▁▂▃▄▅▆▇█".chars().collect(),
             bg_color: CrosstermColor::Black,
             bar_color: CavaColor::Single(CrosstermColor::Blue),
         }
@@ -86,7 +88,8 @@ fn lerp_u8(a: u8, b: u8, t: f64) -> u8 {
 impl CavaThemeFile {
     pub fn into_config(self, default_bg_color: Option<RatatuiColor>) -> Result<CavaTheme> {
         Ok(CavaTheme {
-            bar_symbol: self.bar_symbol,
+            bar_symbols_count: self.bar_symbols.len(),
+            bar_symbols: self.bar_symbols,
             bg_color: self
                 .bg_color
                 .map(|c| -> Result<RatatuiColor> {
