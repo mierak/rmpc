@@ -28,7 +28,7 @@ pub struct CavaThemeFile {
 impl Default for CavaThemeFile {
     fn default() -> Self {
         Self {
-            bar_symbol: "█".into(),
+            bar_symbol: "▁▂▃▄▅▆▇█".into(),
             bg_color: Some("black".to_owned()),
             bar_color: CavaColorFile::Single("blue".into()),
         }
@@ -45,7 +45,7 @@ pub struct CavaTheme {
 impl Default for CavaTheme {
     fn default() -> Self {
         Self {
-            bar_symbol: "█".into(),
+            bar_symbol: "▁▂▃▄▅▆▇█".into(),
             bg_color: CrosstermColor::Black,
             bar_color: CavaColor::Single(CrosstermColor::Blue),
         }
