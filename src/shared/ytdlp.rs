@@ -123,6 +123,7 @@ impl YtDlpHost {
         match self.kind {
             YtDlpHostKind::Youtube => format!("https://www.youtube.com/watch?v={}", self.id),
             YtDlpHostKind::Soundcloud => format!("https://soundcloud.com/{}", self.id),
+            YtDlpHostKind::NicoVideo => format!("https://www.nicovideo.jp/watch/{}", self.id),
         }
     }
 
@@ -130,6 +131,7 @@ impl YtDlpHost {
         path.join(match self.kind {
             YtDlpHostKind::Youtube => "youtube",
             YtDlpHostKind::Soundcloud => "soundcloud",
+            YtDlpHostKind::NicoVideo => "nicovideo",
         })
     }
 
@@ -189,6 +191,7 @@ impl YtDlpHost {
 enum YtDlpHostKind {
     Youtube,
     Soundcloud,
+    NicoVideo,
 }
 
 impl FromStr for YtDlpHost {
@@ -201,8 +204,8 @@ impl FromStr for YtDlpHost {
             bail!("Invalid yt-dlp url: '{}'. No hostname found.", s);
         };
 
-        match host {
-            "www.youtube.com" | "youtube.com" => {
+        match host.strip_prefix("www.").unwrap_or(host) {
+            "youtube.com" => {
                 let is_watch_url = url
                     .path_segments()
                     .with_context(|| format!("Invalid youtube video url: '{s}'"))?
@@ -233,6 +236,20 @@ impl FromStr for YtDlpHost {
                     id: format!("{username}/{track_name}"),
                     filename: format!("{username}-{track_name}"),
                     kind: YtDlpHostKind::Soundcloud,
+                })
+            }
+            "nicovideo.jp" => {
+                let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
+                let Some(_watch_segment) = path_segments.next() else {
+                    bail!("Invalid nicovideo url, no watch segment: '{}'", s);
+                };
+                let Some(id) = path_segments.next() else {
+                    bail!("Invalid nicovideo url, no video id: '{}'", s);
+                };
+                Ok(YtDlpHost {
+                    id: id.to_string(),
+                    filename: id.to_string(),
+                    kind: YtDlpHostKind::NicoVideo,
                 })
             }
             _ => bail!("Invalid yt-dlp url: '{}'. Received hostname: '{}'", s, host),
