@@ -100,6 +100,7 @@ impl CavaPane {
         Ok(())
     }
 
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn render_cava(
         writer: &TtyWriter,
         area: Rect,
@@ -115,12 +116,12 @@ impl CavaPane {
             let color = theme.bar_color.get_color(y as usize, area.height);
             queue!(writer, MoveTo(area.x, h))?;
             for column in columns.iter() {
-                let fill_amount = (*column - (y as f32)).clamp(0.0, 0.99);
+                let fill_amount = (*column - f32::from(y)).clamp(0.0, 0.99);
                 if fill_amount < 0.01 {
                     queue!(writer, PrintStyledContent(' '.on(theme.bg_color)))?;
                 } else {
-                    let char_index = (fill_amount * (theme.bar_symbol.chars().count()) as f32).floor() as usize;
-                    let fill_char = theme.bar_symbol.chars().nth(char_index).unwrap();
+                    let char_index = (fill_amount * theme.bar_symbol.chars().count() as f32).floor() as usize;
+                    let fill_char = theme.bar_symbol.chars().nth(char_index).unwrap_or(' ');
                     queue!(
                         writer,
                         PrintStyledContent(
