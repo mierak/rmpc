@@ -58,7 +58,7 @@ pub struct CavaSmoothingFile {
     monstercat: bool,
     #[serde(default)]
     waves: bool,
-    #[serde(default = "defaults::u8::<10>")]
+    #[serde(default = "defaults::u8::<77>")]
     noise_reduction: u8,
 }
 
