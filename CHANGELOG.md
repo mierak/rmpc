@@ -89,6 +89,7 @@ lists they are listed as multiple entries.
 - Filter overlapping song table when `show_song_table_header` was set to false
 - Remove extra space at the start of every lyrics line in case the lrc file had space between timestamp and content
 - Styles for `Group` not working in the queue table
+- Allow playlist with no metadata for preview. Happens in entries from http for example.
 
 ## [0.8.0] - 2025-02-16
 

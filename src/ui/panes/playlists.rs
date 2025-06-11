@@ -576,9 +576,8 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                                 .context(anyhow!("File '{}' was listed but not found", song.file))?
                                 .0
                                 .first()
-                                .context("Expected to find exactly one song for preview")?
                             {
-                                LsInfoEntry::File(song) => Some(song.to_preview(
+                                Some(LsInfoEntry::File(song)) => Some(song.to_preview(
                                     config.theme.preview_label_style,
                                     config.theme.preview_metadata_group_style,
                                 )),
