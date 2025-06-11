@@ -190,6 +190,10 @@ fn client_task(
                                     }
 
                                     log::trace!(client:?; "Received client from idle. No work to do. Sending it back.");
+                                    health!(client_received_tx.send_timeout((), Duration::from_secs(3)), "Failed to send client received confirmation");
+                                    drop(client);
+                                    log::trace!("Waiting for confirmation from idle thread");
+                                    health!(client_received_rx.recv_timeout(Duration::from_secs(3)), "Did not receive confirmation from idle thread");
                                     continue;
                                 }
                             };
@@ -234,6 +238,7 @@ fn client_task(
                                             client_write = health!(client.stream.try_clone(), "Client write clone to succeed");
                                         },
                                         _ => {
+                                            log::error!(error:? = err; "Failed to handle client request");
                                             HEALTHY.store(false, Ordering::Relaxed);
                                             try_break!(
                                                 event_tx.send(AppEvent::WorkDone(Err(err))),
