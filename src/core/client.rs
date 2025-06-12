@@ -239,8 +239,7 @@ fn client_task(
                                         },
                                         _ => {
                                             log::error!(error:? = err; "Failed to handle client request");
-                                            HEALTHY.store(false, Ordering::Relaxed);
-                                            try_break!(
+                                            health!(
                                                 event_tx.send(AppEvent::WorkDone(Err(err))),
                                                 "Failed to send work done error event"
                                             );
