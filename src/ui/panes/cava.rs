@@ -101,12 +101,7 @@ impl CavaPane {
         Ok(())
     }
 
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        clippy::too_many_arguments
-    )]
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[inline]
     pub fn render_cava(
         writer: &TtyWriter,
@@ -114,8 +109,6 @@ impl CavaPane {
         columns: &mut [f32],
         x_offset: u16,
         empty_bar_symbol: &str,
-        bar_width: u16,
-        bar_spacing: u16,
         theme: &CavaTheme,
     ) -> Result<()> {
         let height = area.height;
@@ -125,7 +118,7 @@ impl CavaPane {
 
         for (col_idx, column) in columns.iter().enumerate() {
             let col_idx = col_idx as u16;
-            let x = area.x + x_offset + col_idx * bar_width + col_idx * bar_spacing;
+            let x = area.x + x_offset + col_idx * theme.bar_width + col_idx * theme.bar_spacing;
 
             for y in 0..height {
                 let h = area.y + (height - 1) - y;
@@ -233,8 +226,6 @@ impl CavaPane {
                     &mut columns,
                     x_offset,
                     &empty_bar_symbol,
-                    bar_width,
-                    bar_spacing,
                     &cava_theme,
                 )?;
 
