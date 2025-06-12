@@ -78,6 +78,8 @@ cava: (
     bar_symbols: ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'],
 
     bg_color: "black", // background color, defaults to rmpc's bg color if not provided
+    bar_width: 1, // width of a single bar in columns
+    bar_spacing: 1, // free space between bars in columns
 
     // Colors can be configured in three different ways: a single color, different colors
     // per row and a gradient. You can use the same colors as everywhere else. Only specify
@@ -102,8 +104,8 @@ cava: (
     // In this example, the color will start at green for the lowest amplitudes, go towards
     // blue at half amplitudes and finishing as red for the highest values. Keys must be between
     // 0 and 100 and if the first or last key are not 0 and 100 respectively, the lowest and highest
-    // value will be used as 0 and 100. Only RGB colors are supported here and your terminal must
-    // support them as well!
+    // value will be used as 0 and 100. Only hex and RGB colors are supported here and your terminal
+    // must support them as well!
     bar_color: Gradient({
           0: "rgb(  0, 255,   0)",
          50: "rgb(  0,   0, 255)",

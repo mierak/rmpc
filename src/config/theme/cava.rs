@@ -23,6 +23,10 @@ pub struct CavaThemeFile {
     pub bg_color: Option<String>,
     #[serde(default)]
     pub bar_color: CavaColorFile,
+    #[serde(default = "defaults::u16::<1>")]
+    pub bar_spacing: u16,
+    #[serde(default = "defaults::u16::<1>")]
+    pub bar_width: u16,
 }
 
 impl Default for CavaThemeFile {
@@ -31,25 +35,31 @@ impl Default for CavaThemeFile {
             bar_symbols: "▁▂▃▄▅▆▇█".chars().collect(),
             bg_color: Some("black".to_owned()),
             bar_color: CavaColorFile::Single("blue".into()),
+            bar_spacing: 1,
+            bar_width: 1,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct CavaTheme {
-    pub bar_symbols: Vec<char>,
+    pub bar_symbols: Vec<String>,
     pub bar_symbols_count: usize,
     pub bg_color: CrosstermColor,
     pub bar_color: CavaColor,
+    pub bar_spacing: u16,
+    pub bar_width: u16,
 }
 
 impl Default for CavaTheme {
     fn default() -> Self {
         Self {
             bar_symbols_count: 8,
-            bar_symbols: "▁▂▃▄▅▆▇█".chars().collect(),
+            bar_symbols: "▁▂▃▄▅▆▇█".chars().map(|c| c.to_string()).collect(),
             bg_color: CrosstermColor::Black,
             bar_color: CavaColor::Single(CrosstermColor::Blue),
+            bar_spacing: 1,
+            bar_width: 1,
         }
     }
 }
@@ -89,7 +99,13 @@ impl CavaThemeFile {
     pub fn into_config(self, default_bg_color: Option<RatatuiColor>) -> Result<CavaTheme> {
         Ok(CavaTheme {
             bar_symbols_count: self.bar_symbols.len(),
-            bar_symbols: self.bar_symbols,
+            bar_symbols: self
+                .bar_symbols
+                .into_iter()
+                .map(|c| c.to_string().repeat(self.bar_width as usize))
+                .collect(),
+            bar_spacing: self.bar_spacing,
+            bar_width: self.bar_width,
             bg_color: self
                 .bg_color
                 .map(|c| -> Result<RatatuiColor> {
@@ -140,8 +156,14 @@ impl CavaThemeFile {
                         .map(|(k, v)| -> Result<_> {
                             match ConfigColor::try_from(v.as_bytes())? {
                                 ConfigColor::Rgb(r, g, b) => Ok((k, (r, g, b))),
+                                ConfigColor::Hex(u) => {
+                                    let r = (u >> 16) as u8;
+                                    let g = (u >> 8) as u8;
+                                    let b = u as u8;
+                                    Ok((k, (r, g, b)))
+                                }
                                 result => Err(anyhow::anyhow!(
-                                    "Gradient colors must be RGB colors, got {:?}",
+                                    "Gradient colors must be hex or RGB colors, got {:?}",
                                     result
                                 )),
                             }
