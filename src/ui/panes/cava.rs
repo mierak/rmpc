@@ -2,7 +2,7 @@ use std::{
     io::{Read, Write},
     process::{Child, Stdio},
     thread::JoinHandle,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -149,16 +149,11 @@ impl CavaPane {
         Ok(())
     }
 
-    fn spawn_cava(
-        bars: u16,
-        bar_width: u16,
-        bar_height: u16,
-        config: &Cava,
-    ) -> Result<ProcessGuard> {
+    fn spawn_cava(bars: u16, config: &Cava) -> Result<ProcessGuard> {
         let cfg_dir = std::env::temp_dir().join("rmpc");
         std::fs::create_dir_all(&cfg_dir)?;
         let cfg_path = cfg_dir.join(format!("cava-{}.conf", rustix::process::geteuid().as_raw()));
-        let config = config.to_cava_config_file(bars, bar_width, bar_height)?;
+        let config = config.to_cava_config_file(bars)?;
         std::fs::write(&cfg_path, config)?;
 
         Ok(ProcessGuard {
@@ -221,7 +216,7 @@ impl CavaPane {
 
             log::debug!(cava_theme:?; "theme");
 
-            let mut process = Self::spawn_cava(bars, bar_width, bar_spacing, &cava_config)?;
+            let mut process = Self::spawn_cava(bars, &cava_config)?;
             let stdout =
                 process.handle.stdout.as_mut().context("Failed to spawn cava. No stdout.")?;
             let stderr =

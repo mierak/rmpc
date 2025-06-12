@@ -120,19 +120,12 @@ impl From<CavaFile> for Cava {
 }
 
 impl Cava {
-    pub fn to_cava_config_file(
-        &self,
-        bars: u16,
-        bar_width: u16,
-        bar_height: u16,
-    ) -> Result<String> {
+    pub fn to_cava_config_file(&self, bars: u16) -> Result<String> {
         let mut buf = String::new();
 
         writeln!(buf, "[general]")?;
         writeln!(buf, "framerate = {}", self.framerate)?;
         writeln!(buf, "bars = {bars}")?;
-        writeln!(buf, "bar_width = {bar_width}")?;
-        writeln!(buf, "bar_height = {bar_height}")?;
         writeln!(buf, "autosens = {}", i8::from(self.autosens))?;
         writeln!(buf, "sensitivity = {}", self.sensitivity)?;
         if let Some(val) = self.lower_cutoff_freq {
