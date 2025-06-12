@@ -121,7 +121,6 @@ impl CavaPane {
         let height = area.height;
         let mut writer = writer.lock();
 
-        let start = Instant::now();
         queue!(writer, BeginSynchronizedUpdate, SavePosition)?;
 
         for (col_idx, column) in columns.iter().enumerate() {
@@ -146,7 +145,6 @@ impl CavaPane {
 
         queue!(writer, RestorePosition, EndSynchronizedUpdate)?;
         writer.flush()?;
-        log::debug!("Cava rendered in {:?} ms", start.elapsed());
 
         Ok(())
     }
