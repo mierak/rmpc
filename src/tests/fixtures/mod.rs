@@ -12,6 +12,7 @@ use crate::{
     shared::{
         events::{ClientRequest, WorkRequest},
         lrc::LrcIndex,
+        ring_vec::RingVec,
     },
 };
 
@@ -59,6 +60,7 @@ pub fn app_context(
         rendered_frames: 0,
         scheduler,
         db_update_start: None,
+        messages: RingVec::default(),
     }
 }
 

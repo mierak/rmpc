@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use index_lrc::IndexLrcCommand;
@@ -27,7 +27,7 @@ impl TryFrom<RemoteCmd> for SocketCommand {
             RemoteCmd::IndexLrc { ref path } => {
                 Ok(SocketCommand::IndexLrc(IndexLrcCommand { path: path.clone() }))
             }
-            RemoteCmd::Status { ref message, level } => {
+            RemoteCmd::Status { ref message, level, timeout } => {
                 Ok(SocketCommand::StatusMessage(StatusMessageCommand {
                     level: match level {
                         crate::config::cli::Level::Info => crate::shared::events::Level::Info,
@@ -35,6 +35,7 @@ impl TryFrom<RemoteCmd> for SocketCommand {
                         crate::config::cli::Level::Warn => crate::shared::events::Level::Warn,
                     },
                     message: message.clone(),
+                    timeout: Duration::from_millis(timeout),
                 }))
             }
             RemoteCmd::Tmux { hook } => Ok(SocketCommand::TmuxHook(TmuxHookCommand { hook })),

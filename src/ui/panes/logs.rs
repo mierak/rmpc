@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
@@ -16,13 +14,14 @@ use crate::{
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
+        ring_vec::RingVec,
     },
     ui::{UiEvent, dirstack::DirState},
 };
 
 #[derive(Debug)]
 pub struct LogsPane {
-    logs: VecDeque<Vec<u8>>,
+    logs: RingVec<1000, Vec<u8>>,
     scrolling_state: DirState<ListState>,
     logs_area: Rect,
     should_scroll_to_last: bool,
@@ -33,7 +32,7 @@ impl LogsPane {
     pub fn new() -> Self {
         Self {
             scroll_enabled: true,
-            logs: VecDeque::new(),
+            logs: RingVec::default(),
             scrolling_state: DirState::default(),
             logs_area: Rect::default(),
             should_scroll_to_last: false,
@@ -114,10 +113,7 @@ impl Pane for LogsPane {
         context: &AppContext,
     ) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
-            self.logs.push_back(std::mem::take(msg));
-            if self.logs.len() > 1000 {
-                self.logs.pop_front();
-            }
+            self.logs.push(std::mem::take(msg));
             self.should_scroll_to_last = true;
             if is_visible {
                 context.render()?;

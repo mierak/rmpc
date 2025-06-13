@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use crossbeam::channel::Sender;
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,7 @@ use crate::{
 pub(crate) struct StatusMessageCommand {
     pub(crate) message: String,
     pub(crate) level: Level,
+    pub(crate) timeout: Duration,
 }
 
 impl SocketCommandExecute for StatusMessageCommand {
@@ -22,7 +25,7 @@ impl SocketCommandExecute for StatusMessageCommand {
         _work_tx: &Sender<WorkRequest>,
         _config: &Config,
     ) -> Result<()> {
-        event_tx.send(AppEvent::Status(self.message, self.level))?;
+        event_tx.send(AppEvent::Status(self.message, self.level, self.timeout))?;
         Ok(())
     }
 }

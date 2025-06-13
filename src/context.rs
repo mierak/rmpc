@@ -26,7 +26,9 @@ use crate::{
         lrc::{Lrc, LrcIndex, get_lrc_path},
         macros::status_warn,
         mpd_query::MpdQuerySync,
+        ring_vec::RingVec,
     },
+    ui::StatusMessage,
 };
 
 #[derive(derive_more::Debug)]
@@ -50,6 +52,7 @@ pub struct AppContext {
     pub(crate) should_fetch_stickers: bool,
     #[debug(skip)]
     pub(crate) scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
+    pub(crate) messages: RingVec<10, StatusMessage>,
 }
 
 #[bon]
@@ -99,6 +102,7 @@ impl AppContext {
             needs_render: Cell::new(false),
             should_fetch_stickers: sticker_support_needed,
             rendered_frames: 0,
+            messages: RingVec::default(),
         })
     }
 
