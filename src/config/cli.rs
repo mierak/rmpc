@@ -280,6 +280,9 @@ pub enum RemoteCmd {
         #[arg(short, long)]
         #[clap(value_enum, default_value_t = Level::Info)]
         level: Level,
+        /// How long should the message be displayed for in milliseconds
+        #[arg(short, long = "timeout", default_value_t = 5000)]
+        timeout: u64,
     },
     #[clap(hide = true)]
     Tmux { hook: String },

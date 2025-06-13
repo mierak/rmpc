@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crossbeam::channel::Sender;
 use flexi_logger::{FileSpec, FlexiLoggerError, LoggerHandle};
 
@@ -91,7 +93,11 @@ impl flexi_logger::writers::LogWriter for StatusBarWriter {
         _now: &mut flexi_logger::DeferredNow,
         record: &log::Record,
     ) -> std::io::Result<()> {
-        match self.tx.send(AppEvent::Status(format!("{}", record.args()), record.level().into())) {
+        match self.tx.send(AppEvent::Status(
+            format!("{}", record.args()),
+            record.level().into(),
+            Duration::from_secs(5),
+        )) {
             Ok(v) => Ok(v),
             Err(err) => Err(std::io::Error::other(err)),
         }

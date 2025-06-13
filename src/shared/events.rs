@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use crossterm::event::KeyEvent;
@@ -52,7 +52,7 @@ pub(crate) enum WorkDone {
 pub(crate) enum AppEvent {
     UserKeyInput(KeyEvent),
     UserMouseInput(MouseEvent),
-    Status(String, Level),
+    Status(String, Level, Duration),
     InfoModal {
         message: Vec<String>,
         title: Option<String>,

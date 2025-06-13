@@ -68,6 +68,7 @@ pub struct StatusMessage {
     pub message: String,
     pub level: Level,
     pub created: std::time::Instant,
+    pub timeout: std::time::Duration,
 }
 
 #[derive(Debug)]
@@ -719,7 +720,6 @@ pub enum UiEvent {
     LyricsIndexed,
     SongChanged,
     Reconnected,
-    Status(String, Level),
     TabChanged(TabName),
     Displayed,
     Hidden,

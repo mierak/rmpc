@@ -34,7 +34,7 @@ use crate::{
         },
         terminal::TtyWriter,
     },
-    ui::{KeyHandleResult, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
+    ui::{KeyHandleResult, StatusMessage, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
 };
 
 static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
@@ -178,16 +178,20 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                 },
-                AppEvent::Status(message, level) => {
-                    if let Err(err) = ui.on_event(UiEvent::Status(message, level), &mut context) {
-                        log::error!(error:? = err; "UI failed to handle status message event");
-                    }
+                AppEvent::Status(mut message, level, timeout) => {
+                    context.messages.push(StatusMessage {
+                        level,
+                        timeout,
+                        message: std::mem::take(&mut message),
+                        created: std::time::Instant::now(),
+                    });
+
                     render_wanted = true;
                     // Send delayed render event to make the status message
                     // disappear
-                    context.scheduler.schedule(Duration::from_secs(5), |(tx, _)| {
-                        Ok(tx.send(AppEvent::RequestRender)?)
-                    });
+                    context
+                        .scheduler
+                        .schedule(timeout, |(tx, _)| Ok(tx.send(AppEvent::RequestRender)?));
                 }
                 AppEvent::InfoModal { message, title, size, id } => {
                     if let Err(err) = ui.on_ui_app_event(
