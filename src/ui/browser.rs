@@ -363,7 +363,7 @@ where
             }
             CommonAction::AddAllReplace => {}
             CommonAction::Insert if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked() {
+                for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
                     self.add(item, context, Some(QueuePosition::RelativeAdd(0)))?;
                 }
