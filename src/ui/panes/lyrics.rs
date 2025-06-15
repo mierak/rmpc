@@ -97,7 +97,7 @@ impl Pane for LyricsPane {
                 let Some(area) = areas.get(before_area_cursor - 1) else {
                     break;
                 };
-                let text = Text::from(l.clone()).centered().style(default_style);
+                let text = Text::from(l.as_ref()).centered().style(default_style);
 
                 frame.render_widget(text, *area);
                 before_area_cursor -= 1;
