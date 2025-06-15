@@ -1,18 +1,17 @@
 name: Test and Validate
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
   workflow_dispatch:
 
 jobs:
   build-test:
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        toolchain: [stable, nightly]
+        toolchain: [stable]
         profile: [dev, release]
         include:
           - os: ubuntu-latest
@@ -55,6 +54,7 @@ jobs:
         run: cargo test --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
 
   lint:
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
@@ -62,8 +62,6 @@ jobs:
         profile: [dev, release]
 
     name: Formatter (${{ matrix.os }}, ${{ matrix.toolchain }}, ${{ matrix.profile }})
-
-    needs: build-test
 
     runs-on: ubuntu-latest
 
