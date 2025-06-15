@@ -57,6 +57,18 @@ rustup component add rustfmt --toolchain nightly
 cargo +nightly fmt --all
 ```
 
+### Checking for typos
+
+Rmpc uses [typos](https://github.com/crate-ci/typos/tree/master)
+1. [Install typos](https://github.com/crate-ci/typos/tree/master?tab=readme-ov-file#install)
+```bash
+cargo install typos-cli
+```
+2. Run `typos` to check for typos in the code
+```bash
+typos
+```
+
 ## Reporting an issue
 
 Please fill the [Bug Report](https://github.com/mierak/rmpc/issues/new?template=bug.yml) template
