@@ -53,7 +53,16 @@ Determines which direction the pane will be split into.
 
 <ConfigValue name="panes" customText="(size: '50%', borders: <borders>, pane: Split() | Pane(<pane_type>)" />
 
-Sub panes for the given split. The size can be either percent (`50%`) or exact value(`3`). Exact value will reserve exactly that many rows/columns.
+Sub panes for the given split. The size can be either percent (`50%`), exact value(`3`) or a
+ratio (`0.4r`).
+
+- Exact value will reserve exactly that many rows/columns
+- Percent value will reserve that portion of available space
+- Ratio will take parent container's other size (if you are splitting horizontally it will take
+  parent's height and if vertically then it will take parent's width) and multiply it with this number.
+  The result is then rounded and used as an exact size. Useful to for example keep `AlbumArt` as
+  square size at all times. Note that the sizes here are in terminal cell width/height and not pixels.
+
 Each sub pane can be either a `Pane` or another `Split`. Sub pane can also have borders, more info in [their section](#borders).
 
 ## pane_type

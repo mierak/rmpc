@@ -59,6 +59,7 @@ lists they are listed as multiple entries.
 - Added FAQ section to the docs
 - Directories pane now displays playlists located in your music directory. Also added `show_playlists_in_browser`
 to hide them.
+- Added ratio size. This size is relative to its parent size.
 
 ### Changed
 
