@@ -241,7 +241,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e.into())
             }
             Err(e) => {
-                log::error!(err:? = e; "Encountered unexpected error whe reading a response line from MPD");
+                log::error!(err:? = e; "Encountered unexpected error when reading a response line from MPD");
                 Err(e.into())
             }
         }?;
