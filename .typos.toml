@@ -1,0 +1,8 @@
+[default]
+extend-ignore-re = [
+	"(?i)iterm",
+	"(?i)ratatui",
+	"2DED\\b",	# false positive on \u{2DED} (Unicode character)
+	"\\bnumer_denom_ms\\b",	# method from `ratatui` `Frame`
+	"\\bseeked\\b", # copied from MPD's docs and seek is a term used with media players
+]
