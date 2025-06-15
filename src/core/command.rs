@@ -213,7 +213,7 @@ impl Command {
                             .collect_vec();
                     }
 
-                    for file in files {
+                    for file in files.into_iter().rev() {
                         if file.starts_with(&dir) {
                             client.add(
                                 file.to_string_lossy()
@@ -231,7 +231,7 @@ impl Command {
                 }))
             }
             Command::Add { files, position, .. } => Ok(Box::new(move |client| {
-                for file in &files {
+                for file in files.into_iter().rev() {
                     client.add(&file.to_string_lossy(), position.clone())?;
                 }
 
