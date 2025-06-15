@@ -1,10 +1,11 @@
-use std::num::ParseIntError;
+use std::num::{ParseFloatError, ParseIntError};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use itertools::Itertools;
 use ratatui::layout::Constraint;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use thiserror::Error;
 
 use super::{
     StyleFile,
@@ -24,40 +25,36 @@ use super::{
 pub enum PercentOrLength {
     Percent(u16),
     Length(u16),
-    Min(u16),
-    Max(u16),
-    Ratio(u32, u32),
-    Parent(f64),
+    Ratio(f64),
 }
 
 impl PercentOrLength {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn into_constraint(self, parent_size: u16) -> Constraint {
         match self {
             PercentOrLength::Percent(val) => Constraint::Percentage(val),
             PercentOrLength::Length(val) => Constraint::Length(val),
-            PercentOrLength::Min(val) => Constraint::Min(val),
-            PercentOrLength::Max(val) => Constraint::Max(val),
-            PercentOrLength::Ratio(a, b) => Constraint::Ratio(a, b),
-            PercentOrLength::Parent(val) => {
-                Constraint::Length((parent_size as f64 * val).round() as u16)
+            PercentOrLength::Ratio(val) => {
+                Constraint::Length((f64::from(parent_size) * val).round() as u16)
             }
         }
     }
 }
 
+#[derive(Error, Debug)]
+pub enum ParseSizeError {
+    #[error("Invalid size format: '{0}'")]
+    ParseIntError(#[from] ParseIntError),
+    #[error("Invalid size format: '{0}'")]
+    ParseFloatError(#[from] ParseFloatError),
+}
+
 impl std::str::FromStr for PercentOrLength {
-    type Err = ParseIntError;
+    type Err = ParseSizeError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        if s.starts_with("parent") {
-            Ok(PercentOrLength::Parent(s.trim_start_matches("parent").parse().unwrap()))
-        } else if s.starts_with("min") {
-            Ok(PercentOrLength::Min(s.trim_start_matches("min").parse()?))
-        } else if s.starts_with("max") {
-            Ok(PercentOrLength::Max(s.trim_start_matches("max").parse()?))
-        } else if s.starts_with("ratio") {
-            let (a, b) = s.trim_start_matches("ratio").split_once(',').unwrap();
-            Ok(PercentOrLength::Ratio(a.parse()?, b.parse()?))
+        if s.ends_with('r') {
+            Ok(PercentOrLength::Ratio(s.trim_end_matches('r').parse()?))
         } else if s.ends_with('%') {
             Ok(PercentOrLength::Percent(s.trim_end_matches('%').parse()?))
         } else {
@@ -200,12 +197,24 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                                     Ok(v.width_percent.map(PercentOrLength::Percent))
                                 },
                                 |width| -> Result<Option<PercentOrLength>> {
-                                    Ok(Some(width.parse()?))
+                                    match width.parse() {
+                                        Ok(PercentOrLength::Ratio(_)) => {
+                                            bail!("song_table_format cannot contain ratio widths.")
+                                        }
+                                        Ok(val) => Ok(Some(val)),
+                                        Err(err) => {
+                                            bail!(
+                                                "Invalid width format: '{}'. Error: {}",
+                                                width,
+                                                err
+                                            )
+                                        }
+                                    }
                                 },
                             )
-                            .context("Failed to parse width in song table column width.")?
+                            .context("Failed to parse width in song table column width")?
                             .context(
-                                "Invalid width config. Song table column width must be specified.",
+                                "Invalid width config. Song table column width must be specified",
                             )?,
                         alignment: v.alignment.unwrap_or(Alignment::Left),
                     })

@@ -252,7 +252,7 @@ impl std::fmt::Display for DeserError {
             DeserError::Ron(err) => {
                 write!(f, "Failed to parse config file. Error: '{err}'")
             }
-            DeserError::Generic(err) => write!(f, "Failed to read config file. Error: '{err}'"),
+            DeserError::Generic(err) => write!(f, "Failed to read config file. Error: '{err:#}'"),
         }
     }
 }

@@ -11,6 +11,7 @@ use thiserror::Error;
 use super::theme::{
     PercentOrLength,
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
+    queue_table::ParseSizeError,
 };
 use crate::shared::id::{self, Id};
 
@@ -348,7 +349,7 @@ pub enum PaneConversionError {
     #[error("Missing component: {0}")]
     MissingComponent(String),
     #[error("Failed to parse pane size: {0}")]
-    ParseError(#[from] core::num::ParseIntError),
+    ParseError(#[from] ParseSizeError),
 }
 
 impl PaneOrSplitFile {

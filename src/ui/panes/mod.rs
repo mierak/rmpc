@@ -14,7 +14,7 @@ use property::PropertyPane;
 use queue::QueuePane;
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout},
+    layout::Layout,
     prelude::Rect,
     text::{Line, Span},
     widgets::Block,

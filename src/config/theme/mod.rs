@@ -24,7 +24,7 @@ pub mod level_styles;
 mod lyrics;
 mod progress_bar;
 pub mod properties;
-mod queue_table;
+pub mod queue_table;
 mod scrollbar;
 mod style;
 
