@@ -87,3 +87,6 @@ jobs:
       - name: Check code for possible improvements (release profile)
         if: matrix.profile == 'release'
         run: cargo clippy --release -- -D warnings
+
+      - name: Check for typos
+        uses: crate-ci/typos@master
