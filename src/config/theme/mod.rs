@@ -171,10 +171,12 @@ impl Default for UiConfigFile {
             symbols: SymbolsFile {
                 song: "S".to_owned(),
                 dir: "D".to_owned(),
+                playlist: defaults::playlist_symbol(),
                 marker: "M".to_owned(),
                 ellipsis: Some("...".to_owned()),
                 song_style: None,
                 dir_style: None,
+                playlist_style: None,
             },
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
@@ -216,20 +218,25 @@ pub struct TabBar {
 pub struct SymbolsFile {
     pub(super) song: String,
     pub(super) dir: String,
+    #[serde(default = "defaults::playlist_symbol")]
+    pub(super) playlist: String,
     pub(super) marker: String,
     pub(super) ellipsis: Option<String>,
     pub(super) song_style: Option<StyleFile>,
     pub(super) dir_style: Option<StyleFile>,
+    pub(super) playlist_style: Option<StyleFile>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct SymbolsConfig {
     pub song: String,
     pub dir: String,
+    pub playlist: String,
     pub marker: String,
     pub ellipsis: String,
     pub song_style: Option<Style>,
     pub dir_style: Option<Style>,
+    pub playlist_style: Option<Style>,
 }
 
 impl From<SymbolsFile> for SymbolsConfig {
@@ -237,6 +244,7 @@ impl From<SymbolsFile> for SymbolsConfig {
         Self {
             song: value.song,
             dir: value.dir,
+            playlist: value.playlist,
             marker: value.marker,
             ellipsis: value.ellipsis.unwrap_or_else(|| "...".to_string()),
             song_style: value
@@ -246,6 +254,11 @@ impl From<SymbolsFile> for SymbolsConfig {
                 .unwrap_or_default(),
             dir_style: value
                 .dir_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            playlist_style: value
+                .playlist_style
                 .map(|s| s.to_config_or(None, None))
                 .transpose()
                 .unwrap_or_default(),

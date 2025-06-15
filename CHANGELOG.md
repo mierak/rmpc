@@ -57,6 +57,8 @@ lists they are listed as multiple entries.
 - Added new `Cava` pane
 - Added `mpd_idle_read_timeout_ms`
 - Added FAQ section to the docs
+- Directories pane now displays playlists located in your music directory. Also added `show_playlists_in_browser`
+to hide them.
 
 ### Changed
 

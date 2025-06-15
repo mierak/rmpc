@@ -85,7 +85,6 @@ impl SearchPane {
         if !self.songs_dir.marked().is_empty() {
             for idx in self.songs_dir.marked() {
                 let item = self.songs_dir.items[*idx].file.clone();
-                let position = position.clone();
                 context.command(move |client| {
                     client.add(&item, position)?;
                     Ok(())

@@ -10,7 +10,7 @@ use crate::{
     mpd::{
         QueuePosition,
         client::Client,
-        commands::{Song, lsinfo::LsInfoEntry},
+        commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
@@ -63,31 +63,36 @@ impl DirectoriesPane {
 
         let sort = context.config.directories_sort.clone();
         match selected {
-            DirOrSong::Dir { .. } => {
+            DirOrSong::Dir { playlist: is_playlist, .. } => {
+                let is_playlist = *is_playlist;
+                let playlist_display_mode = context.config.show_playlists_in_browser;
                 context
                     .query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
                     .target(PaneType::Directories)
                     .query(move |client| {
-                        let new_current = client.lsinfo(Some(&next_path.join("/").to_string()))?;
-                        let res = new_current
-                            .into_iter()
-                            .filter_map(|v| match v {
-                                LsInfoEntry::Dir(d) => Some(DirOrSong::Dir {
-                                    name: d.path,
-                                    full_path: d.full_path,
-                                    last_modified: d.last_modified,
-                                }),
-                                LsInfoEntry::File(s) => Some(DirOrSong::Song(s)),
-                                LsInfoEntry::Playlist(_) => None,
-                            })
-                            .sorted_by(|a, b| {
-                                a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
-                            })
-                            .collect();
+                        let data = if is_playlist {
+                            client
+                                .list_playlist_info(&next_path.join("/").to_string(), None)?
+                                .into_iter()
+                                .map(DirOrSong::Song)
+                                .sorted_by(|a, b| {
+                                    a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
+                                })
+                                .collect()
+                        } else {
+                            client
+                                .lsinfo(Some(&next_path.join("/").to_string()))?
+                                .into_iter()
+                                .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
+                                .sorted_by(|a, b| {
+                                    a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
+                                })
+                                .collect()
+                        };
 
-                        Ok(MpdQueryResult::DirOrSong { data: res, origin_path: Some(next_path) })
+                        Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
@@ -126,12 +131,13 @@ impl Pane for DirectoriesPane {
     fn before_show(&mut self, context: &AppContext) -> Result<()> {
         if !self.initialized {
             let sort = context.config.directories_sort.clone();
+            let playlist_display_mode = context.config.show_playlists_in_browser;
             context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                 move |client| {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
-                        .filter_map(Into::<Option<DirOrSong>>::into)
+                        .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
                         .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)))
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
@@ -152,12 +158,13 @@ impl Pane for DirectoriesPane {
         match event {
             UiEvent::Database => {
                 let sort = context.config.directories_sort.clone();
+                let playlist_display_mode = context.config.show_playlists_in_browser;
                 context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                     move |client| {
                         let result = client
                             .lsinfo(None)?
                             .into_iter()
-                            .filter_map(Into::<Option<DirOrSong>>::into)
+                            .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
                             .sorted_by(|a, b| {
                                 a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
                             })
@@ -266,14 +273,20 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         position: Option<QueuePosition>,
     ) -> Result<()> {
         match item {
-            DirOrSong::Dir { name: dirname, .. } => {
+            DirOrSong::Dir { name: dirname, playlist: is_playlist, .. } => {
+                let is_playlist = *is_playlist;
                 let mut next_path = self.stack.path().to_vec();
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
 
                 context.command(move |client| {
-                    client.add(&next_path, position)?;
-                    status_info!("Directory '{next_path}' added to queue");
+                    if is_playlist {
+                        client.load_playlist(&next_path, position)?;
+                        status_info!("Playlist '{next_path}' loaded");
+                    } else {
+                        client.add(&next_path, position)?;
+                        status_info!("Directory '{next_path}' added to queue");
+                    }
                     Ok(())
                 });
             }
@@ -320,7 +333,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
         let origin_path = Some(self.stack().path().to_vec());
         match &self.stack.current().selected() {
-            Some(DirOrSong::Dir { .. }) => {
+            Some(DirOrSong::Dir { playlist: is_playlist, .. }) => {
                 let Some(next_path) = self.stack.next_path() else {
                     log::error!("Failed to move deeper inside dir. Next path is None");
                     return Ok(());
@@ -328,6 +341,8 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let next_path = next_path.join("/").to_string();
                 let config = std::sync::Arc::clone(&context.config);
                 let sort = context.config.directories_sort.clone();
+                let is_playlist = *is_playlist;
+                let playlist_display_mode = context.config.show_playlists_in_browser;
 
                 self.stack_mut().clear_preview();
                 context
@@ -336,30 +351,36 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     .replace_id("directories_preview")
                     .target(PaneType::Directories)
                     .query(move |client| {
-                        let data: Vec<_> = match client.lsinfo(Some(&next_path)) {
-                            Ok(val) => val,
-                            Err(err) => {
-                                log::error!(error:? = err; "Failed to get lsinfo for dir",);
-                                return Ok(MpdQueryResult::Preview {
-                                    data: None,
-                                    origin_path: None,
-                                });
+                        let data: Vec<_> = if is_playlist {
+                            client
+                                .list_playlist_info(&next_path, None)?
+                                .into_iter()
+                                .map(DirOrSong::Song)
+                                .sorted_by(|a, b| {
+                                    a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
+                                })
+                                .map(|v| v.to_list_item_simple(&config))
+                                .collect()
+                        } else {
+                            match client.lsinfo(Some(&next_path)) {
+                                Ok(val) => val,
+                                Err(err) => {
+                                    log::error!(error:? = err; "Failed to get lsinfo for dir",);
+                                    return Ok(MpdQueryResult::Preview {
+                                        data: None,
+                                        origin_path: None,
+                                    });
+                                }
                             }
-                        }
-                        .0
-                        .into_iter()
-                        .filter_map(|v| match v {
-                            LsInfoEntry::Dir(dir) => Some(DirOrSong::Dir {
-                                name: dir.path,
-                                full_path: dir.full_path,
-                                last_modified: dir.last_modified,
-                            }),
-                            LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
-                            LsInfoEntry::Playlist(_) => None,
-                        })
-                        .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)))
-                        .map(|v| v.to_list_item_simple(&config))
-                        .collect();
+                            .0
+                            .into_iter()
+                            .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
+                            .sorted_by(|a, b| {
+                                a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
+                            })
+                            .map(|v| v.to_list_item_simple(&config))
+                            .collect()
+                        };
 
                         Ok(MpdQueryResult::Preview {
                             data: Some(vec![PreviewGroup::from(None, None, data)]),

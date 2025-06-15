@@ -87,6 +87,10 @@ pub fn default_song_sort() -> Vec<SongPropertyFile> {
     ]
 }
 
+pub fn playlist_symbol() -> String {
+    "P".to_owned()
+}
+
 pub fn default_tag_separator() -> String {
     " | ".to_string()
 }

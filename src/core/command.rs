@@ -220,10 +220,10 @@ impl Command {
                                     .trim_start_matches(&dir)
                                     .trim_start_matches('/')
                                     .trim_end_matches('/'),
-                                position.clone(),
+                                position,
                             )?;
                         } else {
-                            client.add(&file.to_string_lossy(), position.clone())?;
+                            client.add(&file.to_string_lossy(), position)?;
                         }
                     }
 
@@ -232,7 +232,7 @@ impl Command {
             }
             Command::Add { files, position, .. } => Ok(Box::new(move |client| {
                 for file in &files {
-                    client.add(&file.to_string_lossy(), position.clone())?;
+                    client.add(&file.to_string_lossy(), position)?;
                 }
 
                 Ok(())
