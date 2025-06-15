@@ -106,7 +106,7 @@ fn main_task<B: Backend + std::io::Write>(
         if let Some(event) = event {
             match event {
                 AppEvent::ConfigChanged { config: mut new_config, keep_old_theme } => {
-                    // Techical limitation. Keep the old image backend because it was not rechecked
+                    // Technical limitation. Keep the old image backend because it was not rechecked
                     // anyway. Sending the escape sequences to determine image support would mess up
                     // the terminal output at this point.
                     new_config.album_art.method = context.config.album_art.method;

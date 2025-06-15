@@ -175,7 +175,7 @@ impl Pane for QueuePane {
                             max_len,
                             &config.theme.symbols,
                             &config.theme.format_tag_separator,
-                            config.theme.mutliple_tag_resolution_strategy,
+                            config.theme.multiple_tag_resolution_strategy,
                         )
                         .unwrap_or_default()
                         .alignment(formats[i].alignment.into());
@@ -274,7 +274,7 @@ impl Pane for QueuePane {
         ])
         .areas(queue_area);
 
-        // Aplly empty margin on left and right
+        // Apply empty margin on left and right
         let table_block_area = table_block_area.shrink_horizontally(1);
         let header_area = header_area.shrink_horizontally(1);
         // Make scrollbar not overlap header/table separator if separator is visible

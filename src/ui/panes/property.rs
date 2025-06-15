@@ -41,7 +41,7 @@ impl Pane for PropertyPane<'_> {
                 song,
                 context,
                 &context.config.theme.format_tag_separator,
-                context.config.theme.mutliple_tag_resolution_strategy,
+                context.config.theme.multiple_tag_resolution_strategy,
             ) {
                 Some(Either::Left(span)) => acc.push(span),
                 Some(Either::Right(ref mut spans)) => acc.append(spans),

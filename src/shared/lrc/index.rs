@@ -147,7 +147,7 @@ impl LrcIndex {
                         // Lrc matching by length was not found, but there are lrc without length
                         Some(without_length[0])
                     } else {
-                        // Lrc with matching lenght was not found and there are no lrc without
+                        // Lrc with matching length was not found and there are no lrc without
                         // length. Return the closest match by length.
                         with_length
                             .iter()
@@ -161,7 +161,7 @@ impl LrcIndex {
                             .copied()
                     }
                 } else {
-                    // Song does not have a lenght information, not sure if this can ever happen,
+                    // Song does not have a length information, not sure if this can ever happen,
                     // but better safe than sorry. Return the first result rather than nothing.
                     Some(results[0])
                 }

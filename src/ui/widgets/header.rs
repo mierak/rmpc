@@ -68,7 +68,7 @@ impl<'a> PropertyTemplates<'a> {
                 song,
                 context,
                 &config.theme.format_tag_separator,
-                config.theme.mutliple_tag_resolution_strategy,
+                config.theme.multiple_tag_resolution_strategy,
             ) {
                 Some(Either::Left(span)) => acc.push(span),
                 Some(Either::Right(ref mut spans)) => acc.append(spans),

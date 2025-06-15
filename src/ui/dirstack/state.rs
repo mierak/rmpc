@@ -213,21 +213,21 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     fn apply_scrolloff(&mut self, scrolloff: usize) {
-        let vieport_len = self.viewport_len.unwrap_or_default();
+        let viewport_len = self.viewport_len.unwrap_or_default();
         let offset = self.inner.offset();
         let idx = self.get_selected().unwrap_or_default();
         let content_len = self.content_len.unwrap_or_default();
-        let max_offset = content_len.saturating_sub(vieport_len);
+        let max_offset = content_len.saturating_sub(viewport_len);
 
         // Always place cursor in the middle of the screen when scrolloff is too
         // big
-        if scrolloff.saturating_mul(2) >= vieport_len {
-            self.inner.set_offset(idx.saturating_sub(vieport_len / 2).min(max_offset));
+        if scrolloff.saturating_mul(2) >= viewport_len {
+            self.inner.set_offset(idx.saturating_sub(viewport_len / 2).min(max_offset));
             return;
         }
 
         let scrolloff_start_down =
-            (offset.saturating_add(vieport_len)).saturating_sub(scrolloff.saturating_add(1));
+            (offset.saturating_add(viewport_len)).saturating_sub(scrolloff.saturating_add(1));
         if idx > scrolloff_start_down {
             let new_offset =
                 (offset.saturating_add(idx.saturating_sub(scrolloff_start_down))).min(max_offset);
@@ -288,7 +288,7 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn invert_marked(&mut self) {
         let Some(content_len) = self.content_len else {
-            log::warn!("Failed to invert marked items because content lenght is None");
+            log::warn!("Failed to invert marked items because content length is None");
             return;
         };
         let all = (0..content_len).collect::<BTreeSet<usize>>();

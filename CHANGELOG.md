@@ -49,7 +49,7 @@ lists they are listed as multiple entries.
 - Added components to the theme. Components are user-defined reusable parts of TUI.
 - Added `rewind_to_start_sec` config option. If elapsed time is past the configured value, the song will be rewound to start instead.
 - Added `reflect_changes_to_playlist` config option. This makes changes to the queue reflect to the stored playlist if any.
-- Added `mutliple_tag_resolution_strategy` to choose which tag value to display when multiple values are present
+- Added `multiple_tag_resolution_strategy` to choose which tag value to display when multiple values are present
 - Added `maps_three_symbols` test for progress bar. This will help avoid any errors while changing progress bar code in future
 - Added `PopConfigErrorModal` so theat the config error modals are automatically removed when the config reloads and is found correct
 - Added style configuration for dir and song symbols in browsers
@@ -109,9 +109,9 @@ lists they are listed as multiple entries.
 - `remote` command to cli which allows for IPC with running rmpc instances
 - Example script to automatically download lyrics from [https://lrclib.net/](https://lrclib.net/)
 - Added `max_fps` to config
-- Introduced `StateV2` property as a replacement for `State`. It has additional config properties compared to its predecesor.
+- Introduced `StateV2` property as a replacement for `State`. It has additional config properties compared to its predecessor.
 - Introduced `RandomV2`, `ConsumeV2`, `RepeatV2` and `SingleV2` properties as a replacement for their respective earlier versions.
-They have additional config properties compared to their predecesors.
+They have additional config properties compared to their predecessors.
 - `borders` configuration in the tabs configuration
 - A new `Property` pane
 
@@ -136,7 +136,7 @@ They have additional config properties compared to their predecesors.
 - Properly escape strings in mpd protocol
 - Preview for songs outside of the music database not working in playlists
 - AddToPlaylist not working for local songs
-- rmpc waiting potentionally forever for MPD's response
+- rmpc waiting potentially forever for MPD's response
 - Adding songs which do not belong to any album not working in `Artists` and `AlbumArtists` panes not working
 - Songs metadata not being sorted in preview column
 - Prevent album art rendering when modal is open
@@ -282,7 +282,7 @@ They have additional config properties compared to their predecesors.
 
 ### Fixed
 
-- Fixed filename property behavior in proprty formatters
+- Fixed filename property behavior in property formatters
 - Added missing text color to default theme
 
 ### Removed
@@ -326,7 +326,7 @@ They have additional config properties compared to their predecesors.
 - Implement command mode/cli
 - Added outputs config modal/cli
 - Added get volume, status info, song info commands
-- Added inital youtube playback support
+- Added initial youtube playback support
 - Introduced worker queue
 
 ### Fixed

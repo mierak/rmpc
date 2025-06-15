@@ -188,7 +188,7 @@ pub trait MpdClient: Sized {
     ) -> MpdResult<()>;
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
     /// This function first invokes [`Self::albumart`].
-    /// If no album art is fonud it invokes [`Self::read_picture`].
+    /// If no album art is found it invokes [`Self::read_picture`].
     /// If no art is still found, but no errors were encountered, None is
     /// returned.
     fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
@@ -874,7 +874,7 @@ impl MpdClient for Client<'_> {
                         result.push(v);
                     }
                     Err(error) => {
-                        log::warn!(error:?, uri; "Tried to find stickers but unexpected error occured");
+                        log::warn!(error:?, uri; "Tried to find stickers but unexpected error occurred");
                         result.push(Stickers::default());
                         list_ended_with_err = true;
                         break;

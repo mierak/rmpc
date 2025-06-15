@@ -9,7 +9,7 @@ use crate::{
     shared::ipc::SocketCommandExecute,
 };
 
-// Enum values only exist for the short time and are not contstructed often, so
+// Enum values only exist for the short time and are not constructed often, so
 // the large difference should be negligible
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize)]

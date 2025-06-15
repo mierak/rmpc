@@ -7,7 +7,7 @@ use crossterm::event::{
 };
 use ratatui::layout::Position;
 
-// maybe make the timout configurable?
+// maybe make the timeout configurable?
 const DOUBLE_CLICK_TIMEOUT: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Default, Clone, Copy)]

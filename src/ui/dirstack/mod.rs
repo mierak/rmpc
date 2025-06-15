@@ -90,7 +90,7 @@ impl DirStackItem for DirOrSong {
                         prop.as_string(
                             Some(s),
                             &config.theme.format_tag_separator,
-                            config.theme.mutliple_tag_resolution_strategy,
+                            config.theme.multiple_tag_resolution_strategy,
                         )
                         .unwrap_or_default(),
                     )
