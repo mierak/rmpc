@@ -1,6 +1,6 @@
 # Contributing to rmpc
 
-Thank you for taking interest in helping rmpc! Hopefully this short guide will help you run and 
+Thank you for taking interest in helping rmpc! Hopefully this short guide will help you run and
 debug the project.
 
 ## Table of contents
@@ -16,7 +16,7 @@ debug the project.
 ## Prerequisites
 
 * This guide assumes you are reasonably familiar with git and github.
-* You will also need to have rust installed on your system. You can install it from the official 
+* You will also need to have rust installed on your system. You can install it from the official
 website https://www.rust-lang.org/tools/install
 
 ## Dev setup and running rmpc from the source code
@@ -31,7 +31,7 @@ git clone https://github.com/mierak/rmpc.git
 cd rmpc
 ```
 
-3. Run rmpc 
+3. Run rmpc
 ```bash
 # in debug mode
 cargo run
@@ -41,7 +41,7 @@ cargo run --release
 
 4. Setup your config file for debug mode
 
-Rmpc will search for `config.debug.ron` instead of `config.ron` in debug mode. This means you do 
+Rmpc will search for `config.debug.ron` instead of `config.ron` in debug mode. This means you do
 not have to change your usual config file to develop and debug rmpc.
 You can also use a special `Logs` pane your debug config which displays logs directly in rmpc.
 
@@ -86,7 +86,7 @@ pull requests.
 * Run clippy (stable)
 * Ensure that all tests pass by running `cargo test`
 * Update the documentation if your feature changed or added behavior
-* Note your change in the changelog 
+* Note your change in the changelog
 * Address all comments in the pull request
 
 ## Documentation
