@@ -270,7 +270,7 @@ pub fn create_aligned_area(
 
 pub fn resize_image(
     image_data: &[u8],
-    availabe_area: Rect,
+    available_area: Rect,
     max_size_px: Size,
     halign: HorizontalAlign,
     valign: VerticalAlign,
@@ -282,7 +282,7 @@ pub fn resize_image(
         .context("Unable to decode image")?;
 
     let result_area = create_aligned_area(
-        availabe_area,
+        available_area,
         (image.width(), image.height()),
         max_size_px,
         halign,

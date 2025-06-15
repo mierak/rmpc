@@ -16,7 +16,7 @@ pub mod error {
         fn to_status(&self) -> String {
             match self {
                 MpdError::Parse(e) => format!("Failed to parse: {e}"),
-                MpdError::UnknownCode(e) => format!("Unkown code: {e}"),
+                MpdError::UnknownCode(e) => format!("Unknown code: {e}"),
                 MpdError::Generic(e) => format!("Generic error: {e}"),
                 MpdError::ClientClosed => "Client closed".to_string(),
                 MpdError::Mpd(e) => format!("MPD Error: {e}"),
@@ -24,7 +24,7 @@ pub mod error {
                     format!("Expected Value but got '{e}'")
                 }
                 MpdError::UnsupportedMpdVersion(e) => {
-                    format!("Unsuported MPD version: {e}")
+                    format!("Unsupported MPD version: {e}")
                 }
                 MpdError::TimedOut(_) => "Request to MPD timed out".to_string(),
             }

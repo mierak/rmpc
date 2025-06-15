@@ -510,8 +510,8 @@ impl TryFrom<SongFormatFile> for SongFormat {
     type Error = anyhow::Error;
 
     fn try_from(value: SongFormatFile) -> Result<Self, Self::Error> {
-        let properites: Vec<_> = value.0.into_iter().map(|v| v.try_into()).try_collect()?;
-        Ok(SongFormat(properites))
+        let properties: Vec<_> = value.0.into_iter().map(|v| v.try_into()).try_collect()?;
+        Ok(SongFormat(properties))
     }
 }
 

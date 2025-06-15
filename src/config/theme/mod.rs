@@ -70,7 +70,7 @@ pub struct UiConfig {
     pub layout: SizedPaneOrSplit,
     pub components: HashMap<String, SizedPaneOrSplit>,
     pub format_tag_separator: String,
-    pub mutliple_tag_resolution_strategy: TagResolutionStrategy,
+    pub multiple_tag_resolution_strategy: TagResolutionStrategy,
     pub level_styles: LevelStyles,
     pub lyrics: LyricsConfig,
     pub cava: CavaTheme,
@@ -114,7 +114,7 @@ pub struct UiConfigFile {
     #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
     #[serde(default)]
-    pub(super) mutliple_tag_resolution_strategy: TagResolutionStrategy,
+    pub(super) multiple_tag_resolution_strategy: TagResolutionStrategy,
     #[serde(default)]
     pub(super) level_styles: LevelStylesFile,
     #[serde(default)]
@@ -179,7 +179,7 @@ impl Default for UiConfigFile {
             song_table_format: QueueTableColumnsFile::default(),
             browser_song_format: SongFormatFile::default(),
             format_tag_separator: " | ".to_owned(),
-            mutliple_tag_resolution_strategy: TagResolutionStrategy::default(),
+            multiple_tag_resolution_strategy: TagResolutionStrategy::default(),
             preview_label_style: StyleFile {
                 fg: Some("yellow".to_string()),
                 bg: None,
@@ -344,7 +344,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,
-            mutliple_tag_resolution_strategy: value.mutliple_tag_resolution_strategy,
+            multiple_tag_resolution_strategy: value.multiple_tag_resolution_strategy,
             modal_background_color: StringColor(value.modal_background_color)
                 .to_color()?
                 .or(bg_color),

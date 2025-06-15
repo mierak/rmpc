@@ -168,7 +168,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
             match self.read_bin_inner(&mut buf) {
                 Ok(Some(response)) => {
                     if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
-                        trace!( len = buf.len();"Finshed reading binary response");
+                        trace!( len = buf.len();"Finished reading binary response");
                         break;
                     }
                 }
@@ -241,7 +241,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e.into())
             }
             Err(e) => {
-                log::error!(err:? = e; "Encountered unexpected error whe reading a response line from MPD");
+                log::error!(err:? = e; "Encountered unexpected error when reading a response line from MPD");
                 Err(e.into())
             }
         }?;

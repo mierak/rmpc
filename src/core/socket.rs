@@ -54,7 +54,7 @@ pub(crate) fn init(
 pub struct SocketGuard(PathBuf);
 impl Drop for SocketGuard {
     fn drop(&mut self) {
-        // Ingore, the app is exiting, theres nothing else we can do
+        // Ignore, the app is exiting, theres nothing else we can do
         _ = std::fs::remove_file(&self.0);
     }
 }

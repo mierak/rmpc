@@ -13,7 +13,7 @@ impl ScanStatus {
         Self { update_start }
     }
 
-    /// get updating symbol, this symbol rotates in set inverval if the db is
+    /// get updating symbol, this symbol rotates in set interval if the db is
     /// scanning
     pub fn get_str(&mut self) -> Option<&str> {
         let start = self.update_start?;

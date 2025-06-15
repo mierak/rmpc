@@ -34,7 +34,7 @@ struct UeberzugDaemon {
 }
 
 const IDENTIFIER: &str = "rmpc-albumart";
-const PID_FILE_TIMOUT: Duration = Duration::from_secs(5);
+const PID_FILE_TIMEOUT: Duration = Duration::from_secs(5);
 const UEBERZUG_ALBUM_ART_PATH: &str = "/tmp/rmpc/albumart";
 const UEBERZUG_ALBUM_ART_DIR: &str = "/tmp/rmpc";
 
@@ -200,7 +200,7 @@ impl UeberzugDaemon {
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn is_deamon_running(pid: Pid) -> bool {
+    fn is_daemon_running(pid: Pid) -> bool {
         let mut system = System::new();
         let infopid = sysinfo::Pid::from_u32(pid.0 as u32);
         system.refresh_processes_specifics(
@@ -234,7 +234,7 @@ impl UeberzugDaemon {
             self.ueberzug_process = Some(child);
             return Ok(pid);
         };
-        if Self::is_deamon_running(pid) {
+        if Self::is_daemon_running(pid) {
             Ok(pid)
         } else {
             let (pid, child) = self.spawn_daemon()?;
@@ -247,7 +247,7 @@ impl UeberzugDaemon {
         let start = std::time::Instant::now();
 
         while let Err(err) = std::fs::read_to_string(&self.pid_file) {
-            if err.kind() == ErrorKind::NotFound && start.elapsed() < PID_FILE_TIMOUT {
+            if err.kind() == ErrorKind::NotFound && start.elapsed() < PID_FILE_TIMEOUT {
                 std::thread::sleep(Duration::from_millis(100));
             } else {
                 return Err(err.into());

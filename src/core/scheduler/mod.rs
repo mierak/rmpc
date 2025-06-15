@@ -209,7 +209,7 @@ where
     }
 }
 
-/// Cancels the taks when dropped
+/// Cancels the task when dropped
 pub(crate) struct TaskGuard<T> {
     id: Id,
     job_tx: Sender<SchedulerCommand<T>>,

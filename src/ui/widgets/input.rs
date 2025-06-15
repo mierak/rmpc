@@ -34,7 +34,7 @@ impl Widget for Input<'_> {
             if self.focused { self.focused_style } else { self.unfocused_style };
 
         let label = Paragraph::new(self.label).wrap(Wrap { trim: false }).style(self.label_style);
-        let mut input = Paragraph::new(self.trimed_text(input_area)).style(self.input_style);
+        let mut input = Paragraph::new(self.trimmed_text(input_area)).style(self.input_style);
 
         if !self.borderless {
             input = input.block(
@@ -57,7 +57,7 @@ impl Widget for Input<'_> {
 
 #[allow(unused)]
 impl<'a> Input<'a> {
-    fn trimed_text(&self, input_area: ratatui::layout::Rect) -> Cow<'a, str> {
+    fn trimmed_text(&self, input_area: ratatui::layout::Rect) -> Cow<'a, str> {
         if self.text.is_empty() && !self.focused {
             return Cow::Borrowed(self.placeholder.unwrap_or(""));
         }

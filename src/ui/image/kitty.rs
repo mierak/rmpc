@@ -222,10 +222,11 @@ fn create_data_to_transfer(
 
         let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
         e.write_all(image.to_rgba8().as_raw())
-            .context("Error occured when writing image bytes to zlib encoder")?;
+            .context("Error occurred when writing image bytes to zlib encoder")?;
 
-        let content = base64::engine::general_purpose::STANDARD
-            .encode(e.finish().context("Error occured when flushing image bytes to zlib encoder")?);
+        let content = base64::engine::general_purpose::STANDARD.encode(
+            e.finish().context("Error occurred when flushing image bytes to zlib encoder")?,
+        );
 
         log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
         Ok(Data::ImageData(ImageData {
