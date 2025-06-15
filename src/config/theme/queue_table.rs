@@ -24,6 +24,9 @@ use super::{
 pub enum PercentOrLength {
     Percent(u16),
     Length(u16),
+    Min(u16),
+    Max(u16),
+    Ratio(u32, u32),
 }
 
 impl From<PercentOrLength> for Constraint {
@@ -31,6 +34,9 @@ impl From<PercentOrLength> for Constraint {
         match value {
             PercentOrLength::Percent(val) => Constraint::Percentage(val),
             PercentOrLength::Length(val) => Constraint::Length(val),
+            PercentOrLength::Min(val) => Constraint::Min(val),
+            PercentOrLength::Max(val) => Constraint::Max(val),
+            PercentOrLength::Ratio(a, b) => Constraint::Ratio(a, b),
         }
     }
 }
@@ -39,7 +45,14 @@ impl std::str::FromStr for PercentOrLength {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        if s.ends_with('%') {
+        if s.starts_with("min") {
+            Ok(PercentOrLength::Min(s.trim_start_matches("min").parse()?))
+        } else if s.starts_with("max") {
+            Ok(PercentOrLength::Max(s.trim_start_matches("max").parse()?))
+        } else if s.starts_with("ratio") {
+            let (a, b) = s.trim_start_matches("ratio").split_once(',').unwrap();
+            Ok(PercentOrLength::Ratio(a.parse()?, b.parse()?))
+        } else if s.ends_with('%') {
             Ok(PercentOrLength::Percent(s.trim_end_matches('%').parse()?))
         } else {
             Ok(PercentOrLength::Length(s.parse()?))
