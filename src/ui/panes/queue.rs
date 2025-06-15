@@ -90,7 +90,7 @@ impl QueuePane {
                 .theme
                 .song_table_format
                 .iter()
-                .map(|v| Into::<Constraint>::into(v.width))
+                .map(|v| v.width.into_constraint(0))
                 .collect_vec(),
             context.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
         )

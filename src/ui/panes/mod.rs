@@ -1011,7 +1011,12 @@ impl SizedPaneOrSplit {
                     pane_callback(pane, pane_area, block, area, &mut custom_data)?;
                 }
                 SizedPaneOrSplit::Split { direction, panes, borders } => {
-                    let constraints = panes.iter().map(|pane| Into::<Constraint>::into(pane.size));
+                    let parent_other_size = match direction {
+                        ratatui::layout::Direction::Horizontal => area.height,
+                        ratatui::layout::Direction::Vertical => area.width,
+                    };
+                    let constraints =
+                        panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
                     let block = Block::default().borders(*borders);
                     let pane_areas = block.inner(area);
                     let areas = Layout::new(*direction, constraints).split(pane_areas);

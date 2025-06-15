@@ -27,16 +27,20 @@ pub enum PercentOrLength {
     Min(u16),
     Max(u16),
     Ratio(u32, u32),
+    Parent(f64),
 }
 
-impl From<PercentOrLength> for Constraint {
-    fn from(value: PercentOrLength) -> Self {
-        match value {
+impl PercentOrLength {
+    pub fn into_constraint(self, parent_size: u16) -> Constraint {
+        match self {
             PercentOrLength::Percent(val) => Constraint::Percentage(val),
             PercentOrLength::Length(val) => Constraint::Length(val),
             PercentOrLength::Min(val) => Constraint::Min(val),
             PercentOrLength::Max(val) => Constraint::Max(val),
             PercentOrLength::Ratio(a, b) => Constraint::Ratio(a, b),
+            PercentOrLength::Parent(val) => {
+                Constraint::Length((parent_size as f64 * val).round() as u16)
+            }
         }
     }
 }
@@ -45,7 +49,9 @@ impl std::str::FromStr for PercentOrLength {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        if s.starts_with("min") {
+        if s.starts_with("parent") {
+            Ok(PercentOrLength::Parent(s.trim_start_matches("parent").parse().unwrap()))
+        } else if s.starts_with("min") {
             Ok(PercentOrLength::Min(s.trim_start_matches("min").parse()?))
         } else if s.starts_with("max") {
             Ok(PercentOrLength::Max(s.trim_start_matches("max").parse()?))
