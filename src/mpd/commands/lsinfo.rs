@@ -27,8 +27,8 @@ pub enum LsInfoEntry {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Dir {
-    /// Last segment of the part, the dir name
-    pub path: String,
+    /// Last segment of the path, the dir name
+    pub name: String,
     /// this is the full path from mpd root
     pub full_path: String,
     pub last_modified: DateTime<Utc>,
@@ -36,8 +36,11 @@ pub struct Dir {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Playlist {
-    name: String,
-    last_modified: DateTime<Utc>,
+    /// Last segment of the path, the playlist name
+    pub name: String,
+    /// this is the full path from mpd root
+    pub full_path: String,
+    pub last_modified: DateTime<Utc>,
 }
 
 impl FromMpd for Dir {
@@ -52,7 +55,7 @@ impl FromMpd for Dir {
                         key,
                         value
                     ))?
-                    .clone_into(&mut self.path);
+                    .clone_into(&mut self.name);
                 self.full_path = value;
             }
             "last-modified" => {
@@ -68,7 +71,18 @@ impl FromMpd for Dir {
 impl FromMpd for Playlist {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {
-            "playlist" => self.name = value,
+            "playlist" => {
+                value
+                    .split('/')
+                    .next_back()
+                    .context(anyhow!(
+                        "Failed to parse playlist name. Key: '{}' Value: '{}'",
+                        key,
+                        value
+                    ))?
+                    .clone_into(&mut self.name);
+                self.full_path = value;
+            }
             "last-modified" => {
                 self.last_modified =
                     value.parse().context("failed to parse date").logerr(key, &value)?;
@@ -134,13 +148,14 @@ Last-Modified: 2024-08-12T03:03:40Z";
             result[0],
             LsInfoEntry::Playlist(Playlist {
                 name: "autechre.m3u".to_owned(),
+                full_path: "autechre.m3u".to_owned(),
                 last_modified: "2024-10-30T00:04:26Z".to_string().parse().unwrap()
             })
         );
         assert_eq!(
             result[1],
             LsInfoEntry::Dir(Dir {
-                path: ".cue".to_owned(),
+                name: ".cue".to_owned(),
                 full_path: ".cue".to_owned(),
                 last_modified: "2024-11-02T02:55:40Z".to_owned().parse().unwrap()
             })
@@ -148,7 +163,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
         assert_eq!(
             result[2],
             LsInfoEntry::Dir(Dir {
-                path: ".win".to_owned(),
+                name: ".win".to_owned(),
                 full_path: ".win".to_owned(),
                 last_modified: "2024-09-15T19:39:47Z".to_owned().parse().unwrap()
             })
@@ -156,7 +171,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
         assert_eq!(
             result[3],
             LsInfoEntry::Dir(Dir {
-                path: "flac".to_owned(),
+                name: "flac".to_owned(),
                 full_path: "flac".to_owned(),
                 last_modified: "2024-12-23T00:11:38Z".to_owned().parse().unwrap()
             })
@@ -164,7 +179,7 @@ Last-Modified: 2024-08-12T03:03:40Z";
         assert_eq!(
             result[4],
             LsInfoEntry::Dir(Dir {
-                path: "wav".to_owned(),
+                name: "wav".to_owned(),
                 full_path: "wav".to_owned(),
                 last_modified: "2024-08-12T03:03:40Z".to_owned().parse().unwrap()
             })

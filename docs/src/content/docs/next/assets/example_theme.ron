@@ -26,10 +26,12 @@
     symbols: (
         song: "S",
         dir: "D",
+        playlist: "P",
         marker: "M",
         ellipsis: "...",
         song_style: None,
         dir_style: None,
+        playlist_style: None,
     ),
     level_styles: (
         info: (fg: "blue", bg: "black"),

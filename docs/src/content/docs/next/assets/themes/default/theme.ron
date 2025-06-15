@@ -22,7 +22,7 @@
     current_item_style: (fg: "black", bg: "blue", modifiers: "Bold"),
     borders_style: (fg: "blue"),
     highlight_border_style: (fg: "blue"),
-    symbols: (song: "S", dir: "D", marker: "M", ellipsis: "..."),
+    symbols: (song: "S", dir: "D", playlist: "P", marker: "M", ellipsis: "..."),
     progress_bar: (
         symbols: ["[", "-", ">", " ", "]"],
         track_style: (fg: "#1e2030"),

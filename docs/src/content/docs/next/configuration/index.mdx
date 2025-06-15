@@ -265,14 +265,28 @@ Defaults to `[Disc, Track, Artist, Title]` which means the songs are first sorte
 
 <ConfigValue name="directories_sort" type={["ModifiedTime(..)", "Format(..)", "SongFormat(..)"]} />
 
-Determines how the entries are sorted in the directories pane. All of the properties below take additional config options:
-`group_directories_first` and `reverse` which make directories grouped before entries and reverse the ordering respectively.
+Determines how the entries are sorted in the directories pane. All of the properties below take
+additional config options: `group_by_type` and `reverse` which groups the entries by directories,
+songs and playlists and reverse the ordering respectively.
 
 - `Format` - Songs are sorted by their displayed format.
 - `SortFormat` - Similar to `Format` but songs are sorted by <a href={path("configuration/#browser_song_sort")}>browser_song_sort</a>.
 - `ModifiedTime` - Entries are sorted by their last modified time.
 
-Defaults to `SortFormat(group_directories_first: true, reverse: false)`.
+Defaults to `SortFormat(group_by_type: true, reverse: false)`.
+
+### show_playlists_in_browser
+
+<ConfigValue name="show_playlists_in_browser" type={["All", "None", "NonRoot"]} />
+
+Whether to show playlists in browser or not. Possible values:
+
+- `All` - Show all playlists
+- `None` - Do not show playlists
+- `NonRoot` - Show playlists everywhere except the root directory. This option exists because MPD
+  lists all of its playlists as being inside the root directory.
+
+Defaults to `NonRoot`.
 
 ### reflect_changes_to_playlist
 

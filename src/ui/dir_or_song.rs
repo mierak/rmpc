@@ -4,21 +4,35 @@ use unicase::UniCase;
 
 use crate::{
     config::{
+        ShowPlaylistsMode,
         sort_mode::{SortMode, SortOptions},
         theme::TagResolutionStrategy,
     },
-    mpd::commands::{Song, lsinfo::LsInfoEntry},
+    mpd::commands::{
+        Song,
+        lsinfo::{Dir, LsInfoEntry},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DirOrSong {
-    Dir { name: String, full_path: String, last_modified: chrono::DateTime<chrono::Utc> },
+    Dir {
+        name: String,
+        full_path: String,
+        last_modified: chrono::DateTime<chrono::Utc>,
+        playlist: bool,
+    },
     Song(Song),
 }
 
 impl DirOrSong {
     pub fn name_only(name: String) -> Self {
-        DirOrSong::Dir { name, full_path: String::new(), last_modified: chrono::Utc::now() }
+        DirOrSong::Dir {
+            name,
+            full_path: String::new(),
+            last_modified: chrono::Utc::now(),
+            playlist: false,
+        }
     }
 
     pub fn dir_name_or_file_name(&self) -> Cow<str> {
@@ -94,11 +108,26 @@ impl DirOrSong {
 
 impl Ord for DirOrSongCustomSort<'_, '_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // dirs go first if group_directories_first is true
-        if self.opts.group_directories_first {
+        // If grouping is enabled, we group first group dirs, then songs and then
+        // playlists
+        if self.opts.group_by_type {
             let type_order = match (self.dir_or_song, other.dir_or_song) {
-                (DirOrSong::Song(_), DirOrSong::Dir { .. }) => Some(Ordering::Greater),
-                (DirOrSong::Dir { .. }, DirOrSong::Song(_)) => Some(Ordering::Less),
+                (DirOrSong::Song(_), DirOrSong::Dir { playlist: true, .. }) => Some(Ordering::Less),
+                (DirOrSong::Song(_), DirOrSong::Dir { playlist: false, .. }) => {
+                    Some(Ordering::Greater)
+                }
+                (DirOrSong::Dir { playlist: true, .. }, DirOrSong::Song(_)) => {
+                    Some(Ordering::Greater)
+                }
+                (DirOrSong::Dir { playlist: false, .. }, DirOrSong::Song(_)) => {
+                    Some(Ordering::Less)
+                }
+                (DirOrSong::Dir { playlist: true, .. }, DirOrSong::Dir { playlist: false, .. }) => {
+                    Some(Ordering::Greater)
+                }
+                (DirOrSong::Dir { playlist: false, .. }, DirOrSong::Dir { playlist: true, .. }) => {
+                    Some(Ordering::Less)
+                }
                 _ => None,
             };
 
@@ -159,16 +188,32 @@ impl PartialOrd for DirOrSongCustomSort<'_, '_> {
     }
 }
 
-impl From<LsInfoEntry> for Option<DirOrSong> {
-    fn from(value: LsInfoEntry) -> Self {
-        match value {
-            LsInfoEntry::Dir(crate::mpd::commands::lsinfo::Dir {
-                path,
-                full_path,
-                last_modified,
-            }) => Some(DirOrSong::Dir { name: path, full_path, last_modified }),
+impl LsInfoEntry {
+    pub(crate) fn into_dir_or_song(
+        self,
+        show_playlists_mode: ShowPlaylistsMode,
+    ) -> Option<DirOrSong> {
+        match self {
             LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
-            LsInfoEntry::Playlist(_) => None,
+            LsInfoEntry::Dir(Dir { name, full_path, last_modified }) => {
+                Some(DirOrSong::Dir { name, full_path, last_modified, playlist: false })
+            }
+            LsInfoEntry::Playlist(playlist) => match show_playlists_mode {
+                ShowPlaylistsMode::All => Some(DirOrSong::Dir {
+                    name: playlist.name,
+                    full_path: playlist.full_path,
+                    last_modified: playlist.last_modified,
+                    playlist: true,
+                }),
+                ShowPlaylistsMode::None => None,
+                ShowPlaylistsMode::NonRoot if playlist.name == playlist.full_path => None,
+                ShowPlaylistsMode::NonRoot => Some(DirOrSong::Dir {
+                    name: playlist.name,
+                    full_path: playlist.full_path,
+                    last_modified: playlist.last_modified,
+                    playlist: true,
+                }),
+            },
         }
     }
 }
@@ -225,6 +270,7 @@ mod ordtest {
             name: name.to_string(),
             full_path: name.to_string(),
             last_modified: mtime.parse().unwrap(),
+            playlist: false,
         }
     }
 
@@ -239,7 +285,7 @@ mod ordtest {
     fn group_dirs_first() {
         let sort = SortOptions {
             mode: SortMode::Format(vec![SongProperty::Title]),
-            group_directories_first: true,
+            group_by_type: true,
             reverse: false,
         };
         let input = [
@@ -271,7 +317,7 @@ mod ordtest {
     fn group_dirs_first_reversed() {
         let sort = SortOptions {
             mode: SortMode::Format(vec![SongProperty::Title]),
-            group_directories_first: true,
+            group_by_type: true,
             reverse: true,
         };
         let input = [
@@ -303,7 +349,7 @@ mod ordtest {
     fn no_grouping() {
         let sort = SortOptions {
             mode: SortMode::Format(vec![SongProperty::Title]),
-            group_directories_first: false,
+            group_by_type: false,
             reverse: false,
         };
         let input = [
@@ -335,7 +381,7 @@ mod ordtest {
     fn no_grouping_reversed() {
         let sort = SortOptions {
             mode: SortMode::Format(vec![SongProperty::Title]),
-            group_directories_first: false,
+            group_by_type: false,
             reverse: true,
         };
         let input = [
@@ -365,11 +411,8 @@ mod ordtest {
 
     #[test]
     fn group_dirs_mtime() {
-        let sort = SortOptions {
-            mode: SortMode::ModifiedTime,
-            group_directories_first: true,
-            reverse: false,
-        };
+        let sort =
+            SortOptions { mode: SortMode::ModifiedTime, group_by_type: true, reverse: false };
         let input = [
             song_mtime("e", &[], "2025-04-02T14:52:05Z"),
             song_mtime("c", &[], "2025-04-02T14:52:03Z"),
@@ -397,11 +440,7 @@ mod ordtest {
 
     #[test]
     fn group_dirs_mtime_reversed() {
-        let sort = SortOptions {
-            mode: SortMode::ModifiedTime,
-            group_directories_first: true,
-            reverse: true,
-        };
+        let sort = SortOptions { mode: SortMode::ModifiedTime, group_by_type: true, reverse: true };
         let input = [
             song_mtime("e", &[], "2025-04-02T14:52:05Z"),
             song_mtime("c", &[], "2025-04-02T14:52:03Z"),
@@ -429,11 +468,8 @@ mod ordtest {
 
     #[test]
     fn no_grouping_dirs_mtime() {
-        let sort = SortOptions {
-            mode: SortMode::ModifiedTime,
-            group_directories_first: false,
-            reverse: false,
-        };
+        let sort =
+            SortOptions { mode: SortMode::ModifiedTime, group_by_type: false, reverse: false };
         let input = [
             song_mtime("e", &[], "2025-04-02T14:52:05Z"),
             song_mtime("c", &[], "2025-04-02T14:52:03Z"),
@@ -461,11 +497,8 @@ mod ordtest {
 
     #[test]
     fn no_grouping_dirs_mtime_reversed() {
-        let sort = SortOptions {
-            mode: SortMode::ModifiedTime,
-            group_directories_first: false,
-            reverse: false,
-        };
+        let sort =
+            SortOptions { mode: SortMode::ModifiedTime, group_by_type: false, reverse: false };
         let input = [
             song_mtime("e", &[], "2025-04-02T14:52:05Z"),
             song_mtime("c", &[], "2025-04-02T14:52:03Z"),

@@ -62,12 +62,19 @@ impl DirStackItem for DirOrSong {
         };
 
         let mut value = match self {
-            DirOrSong::Dir { name, .. } => Line::from(vec![
+            DirOrSong::Dir { name, playlist: is_playlist, .. } => Line::from(vec![
                 marker_span,
-                Span::styled(
-                    config.theme.symbols.dir.clone(),
-                    config.theme.symbols.dir_style.unwrap_or_default(),
-                ),
+                if *is_playlist {
+                    Span::styled(
+                        config.theme.symbols.playlist.clone(),
+                        config.theme.symbols.playlist_style.unwrap_or_default(),
+                    )
+                } else {
+                    Span::styled(
+                        config.theme.symbols.dir.clone(),
+                        config.theme.symbols.dir_style.unwrap_or_default(),
+                    )
+                },
                 Span::from(" "),
                 Span::from(if name.is_empty() {
                     Cow::Borrowed("Untitled")

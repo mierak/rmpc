@@ -12,13 +12,13 @@ pub enum SortMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SortOptions {
     pub mode: SortMode,
-    pub group_directories_first: bool,
+    pub group_by_type: bool,
     pub reverse: bool,
 }
 
 impl Default for SortOptions {
     fn default() -> Self {
-        Self { mode: SortMode::default(), group_directories_first: true, reverse: false }
+        Self { mode: SortMode::default(), group_by_type: true, reverse: false }
     }
 }
 
@@ -34,19 +34,19 @@ impl Default for SortMode {
 pub enum SortModeFile {
     Format {
         #[serde(default = "defaults::bool::<true>")]
-        group_directories_first: bool,
+        group_by_type: bool,
         #[serde(default = "defaults::bool::<false>")]
         reverse: bool,
     },
     SortFormat {
         #[serde(default = "defaults::bool::<true>")]
-        group_directories_first: bool,
+        group_by_type: bool,
         #[serde(default = "defaults::bool::<false>")]
         reverse: bool,
     },
     ModifiedTime {
         #[serde(default = "defaults::bool::<true>")]
-        group_directories_first: bool,
+        group_by_type: bool,
         #[serde(default = "defaults::bool::<false>")]
         reverse: bool,
     },
@@ -54,6 +54,6 @@ pub enum SortModeFile {
 
 impl Default for SortModeFile {
     fn default() -> Self {
-        Self::SortFormat { group_directories_first: true, reverse: false }
+        Self::SortFormat { group_by_type: true, reverse: false }
     }
 }

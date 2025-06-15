@@ -78,8 +78,17 @@ pub struct Config {
     pub tabs: Tabs,
     pub active_panes: Vec<PaneType>,
     pub browser_song_sort: Arc<SortOptions>,
+    pub show_playlists_in_browser: ShowPlaylistsMode,
     pub directories_sort: Arc<SortOptions>,
     pub cava: Cava,
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum ShowPlaylistsMode {
+    All,
+    None,
+    #[default]
+    NonRoot,
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -144,6 +153,8 @@ pub struct ConfigFile {
     #[serde(default)]
     pub browser_song_sort: Vec<SongPropertyFile>,
     #[serde(default)]
+    pub show_playlists_in_browser: ShowPlaylistsMode,
+    #[serde(default)]
     pub directories_sort: SortModeFile,
     #[serde(default)]
     pub cava: CavaFile,
@@ -200,13 +211,11 @@ impl Default for ConfigFile {
             password: None,
             artists: ArtistsFile::default(),
             browser_song_sort: defaults::default_song_sort(),
-            directories_sort: SortModeFile::SortFormat {
-                group_directories_first: true,
-                reverse: false,
-            },
+            directories_sort: SortModeFile::SortFormat { group_by_type: true, reverse: false },
             rewind_to_start_sec: None,
             reflect_changes_to_playlist: false,
             cava: CavaFile::default(),
+            show_playlists_in_browser: ShowPlaylistsMode::default(),
         }
     }
 }
@@ -386,11 +395,12 @@ impl ConfigFile {
                 mode: SortMode::Format(
                     self.browser_song_sort.iter().cloned().map(SongProperty::from).collect_vec(),
                 ),
-                group_directories_first: true,
+                group_by_type: true,
                 reverse: false,
             }),
+            show_playlists_in_browser: self.show_playlists_in_browser,
             directories_sort: Arc::new(match self.directories_sort {
-                SortModeFile::Format { group_directories_first, reverse } => SortOptions {
+                SortModeFile::Format { group_by_type, reverse } => SortOptions {
                     mode: SortMode::Format(
                         theme
                             .browser_song_format
@@ -399,18 +409,18 @@ impl ConfigFile {
                             .flat_map(|prop| prop.kind.collect_properties())
                             .collect_vec(),
                     ),
-                    group_directories_first,
+                    group_by_type,
                     reverse,
                 },
-                SortModeFile::SortFormat { group_directories_first, reverse } => SortOptions {
+                SortModeFile::SortFormat { group_by_type, reverse } => SortOptions {
                     mode: SortMode::Format(
                         self.browser_song_sort.into_iter().map(SongProperty::from).collect_vec(),
                     ),
-                    group_directories_first,
+                    group_by_type,
                     reverse,
                 },
-                SortModeFile::ModifiedTime { group_directories_first, reverse } => {
-                    SortOptions { mode: SortMode::ModifiedTime, group_directories_first, reverse }
+                SortModeFile::ModifiedTime { group_by_type, reverse } => {
+                    SortOptions { mode: SortMode::ModifiedTime, group_by_type, reverse }
                 }
             }),
             theme,

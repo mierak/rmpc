@@ -18,7 +18,7 @@
     reflect_changes_to_playlist: false,
     select_current_song_on_change: false,
     browser_song_sort: [Disc, Track, Artist, Title],
-    directories_sort: SortFormat(group_directories_first: true, reverse: false),
+    directories_sort: SortFormat(group_by_type: true, reverse: false),
     album_art: (
         method: Auto,
         max_size_px: (width: 1200, height: 1200),

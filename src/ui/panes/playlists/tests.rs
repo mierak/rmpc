@@ -520,7 +520,12 @@ fn song(name: &str) -> Song {
 }
 
 fn dir(name: &str) -> DirOrSong {
-    DirOrSong::Dir { name: name.to_string(), full_path: name.to_string(), last_modified: *NOW }
+    DirOrSong::Dir {
+        name: name.to_string(),
+        full_path: name.to_string(),
+        last_modified: *NOW,
+        playlist: false,
+    }
 }
 
 #[fixture]
