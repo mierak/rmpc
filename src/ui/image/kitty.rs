@@ -198,7 +198,7 @@ fn create_data_to_transfer(
 
         let frames: Vec<AnimationFrame> = frames
             .map_ok(|frame| {
-                let delay = frame.delay().number_denom_ms();
+                let delay = frame.delay().numer_denom_ms();
 
                 AnimationFrame {
                     delay: delay.0 / delay.1,
