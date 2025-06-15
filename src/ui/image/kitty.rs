@@ -224,8 +224,9 @@ fn create_data_to_transfer(
         e.write_all(image.to_rgba8().as_raw())
             .context("Error occurred when writing image bytes to zlib encoder")?;
 
-        let content = base64::engine::general_purpose::STANDARD
-            .encode(e.finish().context("Error occurred when flushing image bytes to zlib encoder")?);
+        let content = base64::engine::general_purpose::STANDARD.encode(
+            e.finish().context("Error occurred when flushing image bytes to zlib encoder")?,
+        );
 
         log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
         Ok(Data::ImageData(ImageData {
