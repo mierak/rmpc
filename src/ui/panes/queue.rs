@@ -90,7 +90,7 @@ impl QueuePane {
                 .theme
                 .song_table_format
                 .iter()
-                // This 0 is fine - song_table_format should never have the Ratio constaint
+                // This 0 is fine - song_table_format should never have the Ratio constraint
                 .map(|v| v.width.into_constraint(0))
                 .collect_vec(),
             context.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
