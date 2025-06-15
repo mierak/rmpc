@@ -108,7 +108,7 @@ impl DirOrSong {
 
 impl Ord for DirOrSongCustomSort<'_, '_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // If grouping is enabled, we group first group dirs, then songs and then
+        // If grouping is enabled, we group dirs first, then songs and then
         // playlists
         if self.opts.group_by_type {
             let type_order = match (self.dir_or_song, other.dir_or_song) {
