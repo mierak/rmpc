@@ -183,10 +183,10 @@ fn main() -> Result<()> {
                     ConfigFile::default().into()
                 }
             };
-            let mut config = config.into_config(args.address, args.password);
+            let config = config.into_config(args.address, args.password);
             let mut client = Client::init(
-                std::mem::take(&mut config.address),
-                std::mem::take(&mut config.password),
+                config.address.clone(),
+                config.password.clone(),
                 "main",
                 args.partition.partition,
                 args.partition.autocreate,
