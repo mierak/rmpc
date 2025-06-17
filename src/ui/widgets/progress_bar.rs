@@ -87,13 +87,13 @@ impl Widget for ProgressBar<'_> {
         let right = area.right();
         let top = area.top();
 
-        let len = right - left;
+        let len = right.saturating_sub(left);
 
         buf.set_string(left, top, self.track_char.repeat(len as usize), self.track_style);
 
         let elapsed_len = (len as f32 * self.value) as usize;
         buf.set_string(left, top, self.elapsed_char.repeat(elapsed_len), self.elapsed_style);
-        if elapsed_len < (len - 1) as usize && elapsed_len > 0 {
+        if elapsed_len < (len.saturating_sub(1)) as usize && elapsed_len > 0 {
             buf.set_string(left + elapsed_len as u16, top, self.thumb_char, self.thumb_style);
         }
 
@@ -105,10 +105,14 @@ impl Widget for ProgressBar<'_> {
         );
 
         buf.set_string(
-            right - 1,
+            right.saturating_sub(1),
             top,
             self.end_char,
-            if elapsed_len < (len - 1) as usize { self.track_style } else { self.elapsed_style },
+            if elapsed_len < (len.saturating_sub(1)) as usize {
+                self.track_style
+            } else {
+                self.elapsed_style
+            },
         );
     }
 }
