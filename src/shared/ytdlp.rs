@@ -224,6 +224,16 @@ impl FromStr for YtDlpHost {
                     })
                     .ok_or_else(|| anyhow!("No video id found in url"))
             }
+            "youtu.be" => url
+                .path_segments()
+                .with_context(|| format!("Invalid youtube video url: '{s}'"))?
+                .next()
+                .map(|x| YtDlpHost {
+                    id: x.to_string(),
+                    filename: x.to_string(),
+                    kind: YtDlpHostKind::Youtube,
+                })
+                .ok_or_else(|| anyhow!("No video id foun in url")),
             "soundcloud.com" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
                 let Some(username) = path_segments.next() else {
