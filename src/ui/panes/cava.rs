@@ -131,7 +131,7 @@ impl CavaPane {
                 let fill_amount = (*column - f32::from(y)).clamp(0.0, 0.99);
 
                 // render from bottom to top
-                if matches!(theme.orientation, Orientation::Horizontal | Orientation::Top) {
+                if matches!(theme.orientation, Orientation::Horizontal | Orientation::Bottom) {
                     let y = area.y + (height - 1) - y;
                     queue!(writer, MoveTo(x, y))?;
                     if fill_amount < 0.01 {
@@ -149,9 +149,9 @@ impl CavaPane {
 
                 // render from top to bottom with inverted characters
                 let y = match theme.orientation {
-                    Orientation::Bottom => Some(area.y + y),
+                    Orientation::Top => Some(area.y + y),
                     Orientation::Horizontal => Some(area.y + height + y),
-                    Orientation::Top => None,
+                    Orientation::Bottom => None,
                 };
                 if let Some(y) = y {
                     queue!(writer, MoveTo(x, y))?;
