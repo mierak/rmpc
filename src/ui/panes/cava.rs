@@ -129,6 +129,7 @@ impl CavaPane {
             for y in 0..height {
                 let color = theme.bar_color.get_color(y as usize, height);
                 let fill_amount = (*column - f32::from(y)).clamp(0.0, 0.99);
+                let char_index = (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
 
                 // render from bottom to top
                 if matches!(theme.orientation, Orientation::Horizontal | Orientation::Bottom) {
@@ -137,8 +138,6 @@ impl CavaPane {
                     if fill_amount < 0.01 {
                         queue!(writer, PrintStyledContent(empty_bar_symbol.on(theme.bg_color)))?;
                     } else {
-                        let char_index =
-                            (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
                         let fill_char = theme.bar_symbols[char_index].as_str();
                         queue!(
                             writer,
@@ -158,10 +157,8 @@ impl CavaPane {
                     if fill_amount > 0.98 {
                         queue!(writer, PrintStyledContent(empty_bar_symbol.on(color)))?;
                     } else {
-                        let char_index =
-                            (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
                         let fill_char =
-                            theme.bar_symbols[theme.bar_symbols.len() - 1 - char_index].as_str();
+                            theme.bar_symbols[theme.bar_symbols_count - 1 - char_index].as_str();
                         queue!(
                             writer,
                             PrintStyledContent(fill_char.with(theme.bg_color).on(color))
