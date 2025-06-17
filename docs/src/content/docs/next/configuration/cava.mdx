@@ -81,6 +81,12 @@ cava: (
     bar_width: 1, // width of a single bar in columns
     bar_spacing: 1, // free space between bars in columns
 
+    // Possible values are "Top", "Bottom" and "Horizontal". Top makes the bars go from top to
+    // bottom, "Bottom" is from bottom up, and "Horizontal" is split in the middle with bars going
+    // both down and up from there.
+    // Using non-default bar_symbols with "Top" and "Horizontal" will produce undesired output.
+    orientation: Bottom,
+
     // Colors can be configured in three different ways: a single color, different colors
     // per row and a gradient. You can use the same colors as everywhere else. Only specify
     // one of these:

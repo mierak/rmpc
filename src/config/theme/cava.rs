@@ -27,6 +27,8 @@ pub struct CavaThemeFile {
     pub bar_spacing: u16,
     #[serde(default = "defaults::u16::<1>")]
     pub bar_width: u16,
+    #[serde(default)]
+    pub orientation: Orientation,
 }
 
 impl Default for CavaThemeFile {
@@ -37,6 +39,7 @@ impl Default for CavaThemeFile {
             bar_color: CavaColorFile::Single("blue".into()),
             bar_spacing: 1,
             bar_width: 1,
+            orientation: Orientation::default(),
         }
     }
 }
@@ -49,6 +52,7 @@ pub struct CavaTheme {
     pub bar_color: CavaColor,
     pub bar_spacing: u16,
     pub bar_width: u16,
+    pub orientation: Orientation,
 }
 
 impl Default for CavaTheme {
@@ -60,8 +64,17 @@ impl Default for CavaTheme {
             bar_color: CavaColor::Single(CrosstermColor::Blue),
             bar_spacing: 1,
             bar_width: 1,
+            orientation: Orientation::default(),
         }
     }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Orientation {
+    Top,
+    #[default]
+    Bottom,
+    Horizontal,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -106,6 +119,7 @@ impl CavaThemeFile {
                 .collect(),
             bar_spacing: self.bar_spacing,
             bar_width: self.bar_width,
+            orientation: self.orientation,
             bg_color: self
                 .bg_color
                 .map(|c| -> Result<RatatuiColor> {
