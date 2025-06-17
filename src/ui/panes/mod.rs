@@ -475,6 +475,12 @@ impl Song {
                 self.metadata.get(name).map(|v| strategy.resolve(v, tag_separator))
             }
             SongProperty::Disc => self.metadata.get("disc").map(|v| Cow::Borrowed(v.last())),
+            SongProperty::Position => self.metadata.get("pos").map(|v| {
+                v.last()
+                    .parse::<usize>()
+                    .map(|v| Cow::Owned((v + 1).to_string()))
+                    .unwrap_or_default()
+            }),
             SongProperty::Track => self.metadata.get("track").map(|v| {
                 Cow::Owned(
                     v.last()
@@ -540,6 +546,20 @@ impl Song {
                 let other_track = other_track.map(|v| v.join(""));
                 match (self_track, other_track) {
                     (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
+                        (Ok(a), Ok(b)) => a.cmp(&b),
+                        _ => UniCase::new(a).cmp(&UniCase::new(b)),
+                    },
+                    (_, Some(_)) => Ordering::Greater,
+                    (Some(_), _) => Ordering::Less,
+                    (None, None) => Ordering::Equal,
+                }
+            }
+            SongProperty::Position => {
+                // last() is fine because position should never have multiple values
+                let self_pos = self.metadata.get("pos").map(|v| v.last());
+                let other_pos = other.metadata.get("pos").map(|v| v.last());
+                match (self_pos, other_pos) {
+                    (Some(a), Some(b)) => match (a.parse::<usize>(), b.parse::<usize>()) {
                         (Ok(a), Ok(b)) => a.cmp(&b),
                         _ => UniCase::new(a).cmp(&UniCase::new(b)),
                     },

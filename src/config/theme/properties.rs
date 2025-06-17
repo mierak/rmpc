@@ -19,6 +19,7 @@ pub enum SongPropertyFile {
     Duration,
     Track,
     Disc,
+    Position,
     Other(String),
 }
 
@@ -33,6 +34,7 @@ pub enum SongProperty {
     Duration,
     Track,
     Disc,
+    Position,
     Other(String),
 }
 
@@ -292,6 +294,7 @@ impl From<SongPropertyFile> for SongProperty {
             SongPropertyFile::Track => SongProperty::Track,
             SongPropertyFile::Disc => SongProperty::Disc,
             SongPropertyFile::Other(name) => SongProperty::Other(name),
+            SongPropertyFile::Position => SongProperty::Position,
         }
     }
 }
