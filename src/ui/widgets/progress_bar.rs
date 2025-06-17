@@ -79,7 +79,7 @@ impl<'a> ProgressBar<'a> {
 
 impl Widget for ProgressBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.height < 1 {
+        if area.height < 1 || area.width < 1 {
             return;
         }
 
