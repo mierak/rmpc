@@ -235,11 +235,13 @@ impl Pane for QueuePane {
 
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height.into()));
         if let Some(scrollbar) = config.as_styled_scrollbar() {
-            frame.render_stateful_widget(
-                scrollbar,
-                self.areas[Areas::Scrollbar],
-                self.scrolling_state.as_scrollbar_state_ref(),
-            );
+            if self.areas[Areas::Scrollbar].width > 0 {
+                frame.render_stateful_widget(
+                    scrollbar,
+                    self.areas[Areas::Scrollbar],
+                    self.scrolling_state.as_scrollbar_state_ref(),
+                );
+            }
         }
 
         if let Some(filter_text) = filter_text {
