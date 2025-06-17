@@ -77,6 +77,7 @@ impl Modal for OutputsModal {
             Row::new([
                 Cell::from(output.id.to_string()),
                 Cell::from(output.name.clone()),
+                Cell::from(output.plugin.clone()),
                 Cell::from(if output.enabled { "yes" } else { "no" }),
             ])
         });
@@ -85,12 +86,13 @@ impl Modal for OutputsModal {
 
         let table = Table::new(rows, [
             Constraint::Length(3),
-            Constraint::Percentage(100),
+            Constraint::Percentage(80),
+            Constraint::Percentage(20),
             Constraint::Length(10),
         ])
         .column_spacing(0)
         .style(app.config.as_text_style())
-        .header(Row::new(["Id", "Name", "Enabled"]))
+        .header(Row::new(["Id", "Name", "Plugin", "Enabled"]))
         .row_highlight_style(app.config.theme.current_item_style);
 
         let table_area = table_area.inner(Margin { horizontal: 1, vertical: 0 });

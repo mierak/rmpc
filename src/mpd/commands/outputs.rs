@@ -12,6 +12,7 @@ pub struct Output {
     pub id: u32,
     pub name: String,
     pub enabled: bool,
+    pub plugin: String,
 }
 
 impl FromMpd for Outputs {
@@ -41,6 +42,7 @@ impl FromMpd for Output {
                 "1" => self.enabled = true,
                 _ => return Ok(LineHandled::No { value }),
             },
+            "plugin" => self.plugin = value,
             _ => return Ok(LineHandled::No { value }),
         }
         Ok(LineHandled::Yes)
