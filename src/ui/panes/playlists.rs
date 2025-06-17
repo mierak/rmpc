@@ -429,7 +429,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 });
             }
             [] => {
-                for playlist in &self.stack().current().items {
+                for playlist in self.stack().current().items.iter().rev() {
                     self.add(playlist, context, position)?;
                 }
                 status_info!("All playlists added to queue");
