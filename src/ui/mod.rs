@@ -6,6 +6,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use crossterm_locking_backend::CrosstermLocking;
 use itertools::Itertools;
 use modals::{
     add_random_modal::AddRandomModal,
@@ -21,7 +22,7 @@ use ratatui::{
     Frame,
     Terminal,
     layout::Rect,
-    prelude::{Backend, CrosstermBackend},
+    prelude::Backend,
     style::{Color, Style},
     symbols::border,
     widgets::{Block, Borders},
@@ -50,11 +51,12 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
-        terminal::{TERMINAL, TtyWriter},
+        terminal::TERMINAL,
     },
 };
 
 pub mod browser;
+pub mod crossterm_locking_backend;
 pub mod dir_or_song;
 pub mod dirstack;
 pub mod image;
@@ -752,14 +754,14 @@ pub fn restore_terminal<B: Backend + std::io::Write>(
     Ok(terminal.show_cursor()?)
 }
 
-pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<TtyWriter>>> {
+pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermLocking>> {
     enable_raw_mode()?;
     let mut writer = TERMINAL.writer();
     execute!(writer, EnterAlternateScreen)?;
     if enable_mouse {
         execute!(writer, EnableMouseCapture)?;
     }
-    let mut terminal = Terminal::new(CrosstermBackend::new(writer))?;
+    let mut terminal = Terminal::new(CrosstermLocking::new(writer))?;
     terminal.clear()?;
     Ok(terminal)
 }

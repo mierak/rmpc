@@ -34,16 +34,24 @@ use crate::{
         },
         terminal::TtyWriter,
     },
-    ui::{KeyHandleResult, StatusMessage, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
+    ui::{
+        KeyHandleResult,
+        StatusMessage,
+        Ui,
+        UiAppEvent,
+        UiEvent,
+        crossterm_locking_backend::CrosstermLocking,
+        modals::info_modal::InfoModal,
+    },
 };
 
 static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
 
-pub fn init(
+pub fn init<B: Backend + std::io::Write + Send + 'static>(
     context: AppContext,
     event_rx: Receiver<AppEvent>,
-    terminal: Terminal<CrosstermBackend<TtyWriter>>,
-) -> std::io::Result<std::thread::JoinHandle<Terminal<CrosstermBackend<TtyWriter>>>> {
+    terminal: Terminal<B>,
+) -> std::io::Result<std::thread::JoinHandle<Terminal<B>>> {
     std::thread::Builder::new()
         .name("main".to_owned())
         .spawn(move || main_task(context, event_rx, terminal))
