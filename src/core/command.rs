@@ -10,6 +10,7 @@ use crate::{
     },
     context::AppContext,
     mpd::{
+        QueuePosition,
         client::Client,
         commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
         mpd_client::{Filter, MpdClient, Tag, ValueChange},
@@ -213,6 +214,11 @@ impl Command {
                             .collect_vec();
                     }
 
+                    if let Some(QueuePosition::Absolute(_) | QueuePosition::RelativeAdd(_)) =
+                        position
+                    {
+                        files.reverse();
+                    }
                     for file in files {
                         if file.starts_with(&dir) {
                             client.add(
@@ -230,8 +236,11 @@ impl Command {
                     Ok(())
                 }))
             }
-            Command::Add { files, position, .. } => Ok(Box::new(move |client| {
-                for file in &files {
+            Command::Add { mut files, position, .. } => Ok(Box::new(move |client| {
+                if let Some(QueuePosition::Absolute(_) | QueuePosition::RelativeAdd(_)) = position {
+                    files.reverse();
+                }
+                for file in files {
                     client.add(&file.to_string_lossy(), position)?;
                 }
 

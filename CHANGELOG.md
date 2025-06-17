@@ -2,7 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-
 ## [Unreleased]
 
 ### Added
@@ -19,7 +18,7 @@ All notable changes to this project will be documented in this file.
 - `FileExtension` property
 - Better error message inside a modal when reading of config fails
 - Support for multiple entries in one tag. In formats they get separated by `format_tag_separator` and in metadata
-lists they are listed as multiple entries.
+  lists they are listed as multiple entries.
 - Add new widget `ScanStatus` that indicates if the MPD database is being updated.
 - Add new global keybinds for Update and Rescan actions.
 - Addrandom CLI command and `AddRandom` action which displays a modal allowing you to add random songs to the queue
@@ -58,9 +57,10 @@ lists they are listed as multiple entries.
 - Added `mpd_idle_read_timeout_ms`
 - Added FAQ section to the docs
 - Directories pane now displays playlists located in your music directory. Also added `show_playlists_in_browser`
-to hide them.
+  to hide them.
 - Added ratio size. This size is relative to its parent size.
 - Added `plugin` field to Outputs modal and command
+- Fixed order when adding multiple items with `Insert` and `InsertAll`
 
 ### Changed
 
@@ -115,7 +115,7 @@ to hide them.
 - Added `max_fps` to config
 - Introduced `StateV2` property as a replacement for `State`. It has additional config properties compared to its predecessor.
 - Introduced `RandomV2`, `ConsumeV2`, `RepeatV2` and `SingleV2` properties as a replacement for their respective earlier versions.
-They have additional config properties compared to their predecessors.
+  They have additional config properties compared to their predecessors.
 - `borders` configuration in the tabs configuration
 - A new `Property` pane
 

@@ -83,7 +83,7 @@ impl SearchPane {
         position: Option<QueuePosition>,
     ) -> Result<()> {
         if !self.songs_dir.marked().is_empty() {
-            for idx in self.songs_dir.marked() {
+            for idx in self.songs_dir.marked().iter().rev() {
                 let item = self.songs_dir.items[*idx].file.clone();
                 context.command(move |client| {
                     client.add(&item, position)?;
