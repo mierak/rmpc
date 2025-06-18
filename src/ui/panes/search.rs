@@ -1062,6 +1062,10 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
+                        CommonAction::Close if !self.songs_dir.marked().is_empty() => {
+                            self.songs_dir.marked_mut().clear();
+                            context.render()?;
+                        }
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {

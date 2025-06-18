@@ -857,6 +857,10 @@ impl Pane for QueuePane {
 
                     context.render()?;
                 }
+                CommonAction::Close if !self.scrolling_state.marked.is_empty() => {
+                    self.scrolling_state.marked.clear();
+                    context.render()?;
+                }
                 CommonAction::Add => {}
                 CommonAction::AddAll => {}
                 CommonAction::Insert => {

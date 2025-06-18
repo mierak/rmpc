@@ -315,6 +315,10 @@ where
                 self.prepare_preview(context);
                 context.render()?;
             }
+            CommonAction::Close if !self.stack().current().marked().is_empty() => {
+                self.stack_mut().current_mut().marked_mut().clear();
+                context.render()?;
+            }
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
