@@ -307,7 +307,8 @@ fn main() -> Result<()> {
             );
 
             let enable_mouse = context.config.enable_mouse;
-            let terminal = ui::setup_terminal(enable_mouse).context("Failed to setup terminal")?;
+            let terminal =
+                shared::terminal::setup(enable_mouse).context("Failed to setup terminal")?;
 
             let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
 
@@ -323,7 +324,7 @@ fn main() -> Result<()> {
 
             let mut terminal = event_loop_handle.join().expect("event loop to not panic");
 
-            ui::restore_terminal(&mut terminal, enable_mouse)
+            shared::terminal::restore(&mut terminal, enable_mouse)
                 .context("Terminal restore to succeed")?;
         }
     }

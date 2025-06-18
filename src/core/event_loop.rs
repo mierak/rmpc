@@ -6,11 +6,7 @@ use std::{
 };
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
-use ratatui::{
-    Terminal,
-    layout::Rect,
-    prelude::{Backend, CrosstermBackend},
-};
+use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
@@ -32,18 +28,17 @@ use crate::{
             MpdQueryResult,
             run_status_update,
         },
-        terminal::TtyWriter,
     },
     ui::{KeyHandleResult, StatusMessage, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
 };
 
 static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
 
-pub fn init(
+pub fn init<B: Backend + std::io::Write + Send + 'static>(
     context: AppContext,
     event_rx: Receiver<AppEvent>,
-    terminal: Terminal<CrosstermBackend<TtyWriter>>,
-) -> std::io::Result<std::thread::JoinHandle<Terminal<CrosstermBackend<TtyWriter>>>> {
+    terminal: Terminal<B>,
+) -> std::io::Result<std::thread::JoinHandle<Terminal<B>>> {
     std::thread::Builder::new()
         .name("main".to_owned())
         .spawn(move || main_task(context, event_rx, terminal))

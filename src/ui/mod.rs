@@ -1,11 +1,6 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result, anyhow};
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-};
 use itertools::Itertools;
 use modals::{
     add_random_modal::AddRandomModal,
@@ -19,9 +14,7 @@ use modals::{
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
     Frame,
-    Terminal,
     layout::Rect,
-    prelude::{Backend, CrosstermBackend},
     style::{Color, Style},
     symbols::border,
     widgets::{Block, Borders},
@@ -50,7 +43,6 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
-        terminal::{TERMINAL, TtyWriter},
     },
 };
 
@@ -738,30 +730,6 @@ impl TryFrom<IdleEvent> for UiEvent {
             _ => return Err(()),
         })
     }
-}
-
-pub fn restore_terminal<B: Backend + std::io::Write>(
-    terminal: &mut Terminal<B>,
-    enable_mouse: bool,
-) -> Result<()> {
-    if enable_mouse {
-        execute!(std::io::stdout(), DisableMouseCapture)?;
-    }
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    Ok(terminal.show_cursor()?)
-}
-
-pub fn setup_terminal(enable_mouse: bool) -> Result<Terminal<CrosstermBackend<TtyWriter>>> {
-    enable_raw_mode()?;
-    let mut writer = TERMINAL.writer();
-    execute!(writer, EnterAlternateScreen)?;
-    if enable_mouse {
-        execute!(writer, EnableMouseCapture)?;
-    }
-    let mut terminal = Terminal::new(CrosstermBackend::new(writer))?;
-    terminal.clear()?;
-    Ok(terminal)
 }
 
 pub enum KeyHandleResult {
