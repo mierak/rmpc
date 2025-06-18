@@ -17,7 +17,10 @@ use ratatui::{Frame, layout::Rect};
 
 use super::Pane;
 use crate::{
-    config::{cava::Cava, theme::cava::CavaTheme},
+    config::{
+        cava::Cava,
+        theme::cava::{CavaTheme, Orientation},
+    },
     context::AppContext,
     mpd::commands::State,
     shared::{
@@ -111,8 +114,11 @@ impl CavaPane {
         empty_bar_symbol: &str,
         theme: &CavaTheme,
     ) -> Result<()> {
-        let height = area.height;
         let mut writer = writer.lock();
+        let height = match theme.orientation {
+            Orientation::Top | Orientation::Bottom => area.height,
+            Orientation::Horizontal => area.height / 2,
+        };
 
         queue!(writer, BeginSynchronizedUpdate, SavePosition)?;
 
@@ -121,17 +127,43 @@ impl CavaPane {
             let x = area.x + x_offset + col_idx * theme.bar_width + col_idx * theme.bar_spacing;
 
             for y in 0..height {
-                let h = area.y + (height - 1) - y;
-                let color = theme.bar_color.get_color(y as usize, area.height);
+                let color = theme.bar_color.get_color(y as usize, height);
                 let fill_amount = (*column - f32::from(y)).clamp(0.0, 0.99);
-                queue!(writer, MoveTo(x, h))?;
-                if fill_amount < 0.01 {
-                    queue!(writer, PrintStyledContent(empty_bar_symbol.on(theme.bg_color)))?;
-                } else {
-                    let char_index =
-                        (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
-                    let fill_char = theme.bar_symbols[char_index].as_str();
-                    queue!(writer, PrintStyledContent(fill_char.with(color).on(theme.bg_color)))?;
+                let char_index = (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
+
+                // render from bottom to top
+                if matches!(theme.orientation, Orientation::Horizontal | Orientation::Bottom) {
+                    let y = area.y + (height - 1) - y;
+                    queue!(writer, MoveTo(x, y))?;
+                    if fill_amount < 0.01 {
+                        queue!(writer, PrintStyledContent(empty_bar_symbol.on(theme.bg_color)))?;
+                    } else {
+                        let fill_char = theme.bar_symbols[char_index].as_str();
+                        queue!(
+                            writer,
+                            PrintStyledContent(fill_char.with(color).on(theme.bg_color))
+                        )?;
+                    }
+                }
+
+                // render from top to bottom with inverted characters
+                let y = match theme.orientation {
+                    Orientation::Top => Some(area.y + y),
+                    Orientation::Horizontal => Some(area.y + height + y),
+                    Orientation::Bottom => None,
+                };
+                if let Some(y) = y {
+                    queue!(writer, MoveTo(x, y))?;
+                    if fill_amount > 0.98 {
+                        queue!(writer, PrintStyledContent(empty_bar_symbol.on(color)))?;
+                    } else {
+                        let fill_char =
+                            theme.bar_symbols[theme.bar_symbols_count - 1 - char_index].as_str();
+                        queue!(
+                            writer,
+                            PrintStyledContent(fill_char.with(theme.bg_color).on(color))
+                        )?;
+                    }
                 }
             }
         }
@@ -218,8 +250,13 @@ impl CavaPane {
             let mut columns = vec![0_f32; bars as usize];
             let mut buf = vec![0_u8; 2 * bars as usize];
 
+            let bar_height = match cava_theme.orientation {
+                Orientation::Top | Orientation::Bottom => area.height,
+                Orientation::Horizontal => area.height / 2,
+            };
+
             'inner: loop {
-                Self::read_cava_data(area.height, &mut buf, &mut columns, stdout, stderr)?;
+                Self::read_cava_data(bar_height, &mut buf, &mut columns, stdout, stderr)?;
                 Self::render_cava(
                     writer,
                     area,
