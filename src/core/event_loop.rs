@@ -6,11 +6,7 @@ use std::{
 };
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
-use ratatui::{
-    Terminal,
-    layout::Rect,
-    prelude::{Backend, CrosstermBackend},
-};
+use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
@@ -32,17 +28,8 @@ use crate::{
             MpdQueryResult,
             run_status_update,
         },
-        terminal::TtyWriter,
     },
-    ui::{
-        KeyHandleResult,
-        StatusMessage,
-        Ui,
-        UiAppEvent,
-        UiEvent,
-        crossterm_locking_backend::CrosstermLocking,
-        modals::info_modal::InfoModal,
-    },
+    ui::{KeyHandleResult, StatusMessage, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
 };
 
 static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
