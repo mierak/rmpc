@@ -62,6 +62,7 @@ All notable changes to this project will be documented in this file.
 - Added `plugin` field to Outputs modal and command
 - Fixed order when adding multiple items with `Insert` and `InsertAll`
 - Added `Position` property which shows song's position in the Queue
+- `Close` action now clears marked items
 
 ### Changed
 
