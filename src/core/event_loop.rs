@@ -404,6 +404,7 @@ fn main_task<B: Backend + std::io::Write>(
                     if let Err(err) = terminal.clear() {
                         log::error!(error:? = err; "Failed to clear terminal after a resize");
                     }
+                    render_wanted = true;
                 }
                 AppEvent::UiEvent(event) => match ui.on_ui_app_event(event, &mut context) {
                     Ok(()) => {}

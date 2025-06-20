@@ -76,6 +76,9 @@ cava: (
     // symbols that will be used to draw the bar in the visualiser, in ascending order of
     // fill fraction
     bar_symbols: ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'],
+    // similar to bar_symbols but these are used for the top-down rendering, meaning for orientation
+    // "Horizontal" and "Top"
+    inverted_bar_symbols: ['▔', '🮂', '🮃', '▀', '🮄', '🮅', '🮆', '█'],
 
     bg_color: "black", // background color, defaults to rmpc's bg color if not provided
     bar_width: 1, // width of a single bar in columns
@@ -84,7 +87,7 @@ cava: (
     // Possible values are "Top", "Bottom" and "Horizontal". Top makes the bars go from top to
     // bottom, "Bottom" is from bottom up, and "Horizontal" is split in the middle with bars going
     // both down and up from there.
-    // Using non-default bar_symbols with "Top" and "Horizontal" will produce undesired output.
+    // Using non-default symbols with "Top" and "Horizontal" may produce undesired output.
     orientation: Bottom,
 
     // Colors can be configured in three different ways: a single color, different colors

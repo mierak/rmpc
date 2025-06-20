@@ -19,6 +19,8 @@ use crate::shared::ext::vec::VecExt;
 pub struct CavaThemeFile {
     #[serde(default = "defaults::default_bar_symbols")]
     pub bar_symbols: Vec<char>,
+    #[serde(default = "defaults::default_inverted_bar_symbols")]
+    pub inverted_bar_symbols: Vec<char>,
     #[serde(default)]
     pub bg_color: Option<String>,
     #[serde(default)]
@@ -35,7 +37,8 @@ impl Default for CavaThemeFile {
     fn default() -> Self {
         Self {
             bar_symbols: "▁▂▃▄▅▆▇█".chars().collect(),
-            bg_color: Some("black".to_owned()),
+            inverted_bar_symbols: "▔🮂🮃▀🮄🮅🮆█".chars().collect(),
+            bg_color: None,
             bar_color: CavaColorFile::Single("blue".into()),
             bar_spacing: 1,
             bar_width: 1,
@@ -47,7 +50,9 @@ impl Default for CavaThemeFile {
 #[derive(Debug, Clone)]
 pub struct CavaTheme {
     pub bar_symbols: Vec<String>,
+    pub inverted_bar_symbols: Vec<String>,
     pub bar_symbols_count: usize,
+    pub inverted_bar_symbols_count: usize,
     pub bg_color: CrosstermColor,
     pub bar_color: CavaColor,
     pub bar_spacing: u16,
@@ -59,7 +64,9 @@ impl Default for CavaTheme {
     fn default() -> Self {
         Self {
             bar_symbols_count: 8,
+            inverted_bar_symbols_count: 8,
             bar_symbols: "▁▂▃▄▅▆▇█".chars().map(|c| c.to_string()).collect(),
+            inverted_bar_symbols: "▔🮂🮃▀🮄🮅🮆█".chars().map(|c| c.to_string()).collect(),
             bg_color: CrosstermColor::Black,
             bar_color: CavaColor::Single(CrosstermColor::Blue),
             bar_spacing: 1,
@@ -112,8 +119,14 @@ impl CavaThemeFile {
     pub fn into_config(self, default_bg_color: Option<RatatuiColor>) -> Result<CavaTheme> {
         Ok(CavaTheme {
             bar_symbols_count: self.bar_symbols.len(),
+            inverted_bar_symbols_count: self.inverted_bar_symbols.len(),
             bar_symbols: self
                 .bar_symbols
+                .into_iter()
+                .map(|c| c.to_string().repeat(self.bar_width as usize))
+                .collect(),
+            inverted_bar_symbols: self
+                .inverted_bar_symbols
                 .into_iter()
                 .map(|c| c.to_string().repeat(self.bar_width as usize))
                 .collect(),
