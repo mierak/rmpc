@@ -34,6 +34,10 @@ pub fn default_bar_symbols() -> Vec<char> {
     "▁▂▃▄▅▆▇█".chars().collect()
 }
 
+pub fn default_inverted_bar_symbols() -> Vec<char> {
+    "▔🮂🮃▀🮄🮅🮆█".chars().collect()
+}
+
 pub fn default_progress_update_interval_ms() -> Option<u64> {
     Some(1000)
 }

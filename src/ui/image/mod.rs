@@ -5,7 +5,7 @@ use crossbeam::channel::Receiver;
 use crossterm::{
     cursor::{RestorePosition, SavePosition},
     queue,
-    style::{Colors, SetColors},
+    style::{Colors, ResetColor, SetColors},
 };
 use ratatui::layout::Rect;
 
@@ -50,6 +50,7 @@ pub fn clear_area(mut w: impl Write, colors: Colors, area: Rect) -> Result<()> {
     w.write_all(&buf)?;
     w.flush()?;
     queue!(w, RestorePosition)?;
+    queue!(w, ResetColor)?;
 
     Ok(())
 }

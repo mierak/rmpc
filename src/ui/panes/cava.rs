@@ -13,7 +13,7 @@ use crossterm::{
     style::{Colors, PrintStyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate},
 };
-use ratatui::{Frame, layout::Rect};
+use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use super::Pane;
 use crate::{
@@ -42,6 +42,7 @@ pub struct CavaPane {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum CavaCommand {
     Start { area: Rect },
     Stop,
@@ -75,7 +76,8 @@ impl CavaPane {
         }
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self, ctx: &AppContext) -> Result<()> {
+        self.clear(ctx)?;
         self.command(CavaCommand::Start { area: self.area })?;
         Ok(())
     }
@@ -129,7 +131,6 @@ impl CavaPane {
             for y in 0..height {
                 let color = theme.bar_color.get_color(y as usize, height);
                 let fill_amount = (*column - f32::from(y)).clamp(0.0, 0.99);
-                let char_index = (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
 
                 // render from bottom to top
                 if matches!(theme.orientation, Orientation::Horizontal | Orientation::Bottom) {
@@ -138,6 +139,8 @@ impl CavaPane {
                     if fill_amount < 0.01 {
                         queue!(writer, PrintStyledContent(empty_bar_symbol.on(theme.bg_color)))?;
                     } else {
+                        let char_index =
+                            (fill_amount * theme.bar_symbols_count as f32).floor() as usize;
                         let fill_char = theme.bar_symbols[char_index].as_str();
                         queue!(
                             writer,
@@ -154,14 +157,15 @@ impl CavaPane {
                 };
                 if let Some(y) = y {
                     queue!(writer, MoveTo(x, y))?;
-                    if fill_amount > 0.98 {
-                        queue!(writer, PrintStyledContent(empty_bar_symbol.on(color)))?;
+                    if fill_amount < 0.01 {
+                        queue!(writer, PrintStyledContent(empty_bar_symbol.on(theme.bg_color)))?;
                     } else {
-                        let fill_char =
-                            theme.bar_symbols[theme.bar_symbols_count - 1 - char_index].as_str();
+                        let char_index = (fill_amount * theme.inverted_bar_symbols_count as f32)
+                            .floor() as usize;
+                        let fill_char = theme.inverted_bar_symbols[char_index].as_str();
                         queue!(
                             writer,
-                            PrintStyledContent(fill_char.with(theme.bg_color).on(color))
+                            PrintStyledContent(fill_char.with(color).on(theme.bg_color))
                         )?;
                     }
                 }
@@ -341,10 +345,8 @@ impl CavaPane {
         let writer = TERMINAL.writer();
         let mut w = writer.lock();
 
-        let colors = Colors {
-            background: context.config.theme.background_color.map(Into::into),
-            foreground: None,
-        };
+        let colors =
+            Colors { background: Some(context.config.theme.cava.bg_color), foreground: None };
         clear_area(w.by_ref(), colors, self.area)?;
 
         Ok(())
@@ -370,8 +372,13 @@ impl CavaPane {
 }
 
 impl Pane for CavaPane {
-    fn render(&mut self, _frame: &mut Frame, area: Rect, _ctx: &AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &AppContext) -> anyhow::Result<()> {
         self.area = area;
+        frame.render_widget(
+            Block::default().style(Style::default().bg(ctx.config.theme.cava.bg_color.into())),
+            area,
+        );
+
         Ok(())
     }
 
@@ -384,7 +391,7 @@ impl Pane for CavaPane {
         self.spawn(context.config.cava.clone(), context.config.theme.cava.clone())?;
 
         if matches!(context.status.state, State::Play) {
-            self.run()?;
+            self.run(context)?;
         }
 
         Ok(())
@@ -414,12 +421,12 @@ impl Pane for CavaPane {
                 })?;
 
                 if is_visible && !self.is_modal_open && matches!(ctx.status.state, State::Play) {
-                    self.run()?;
+                    self.run(ctx)?;
                 }
             }
             UiEvent::Displayed if is_visible => {
                 if is_visible && !self.is_modal_open && matches!(ctx.status.state, State::Play) {
-                    self.run()?;
+                    self.run(ctx)?;
                 }
             }
             UiEvent::Hidden if is_visible => {
@@ -431,11 +438,11 @@ impl Pane for CavaPane {
             }
             UiEvent::ModalClosed if is_visible && matches!(ctx.status.state, State::Play) => {
                 self.is_modal_open = false;
-                self.run()?;
+                self.run(ctx)?;
             }
             UiEvent::PlaybackStateChanged if is_visible => match ctx.status.state {
                 State::Play => {
-                    self.run()?;
+                    self.run(ctx)?;
                 }
                 State::Stop | State::Pause => {
                     log::debug!("CavaPane: Player event received, clearing cava area");
@@ -456,7 +463,7 @@ impl Pane for CavaPane {
         self.pause_and_clear(context)?;
 
         if matches!(context.status.state, State::Play) {
-            self.run()?;
+            self.run(context)?;
         }
         Ok(())
     }
