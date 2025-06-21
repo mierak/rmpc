@@ -179,6 +179,7 @@ export default defineConfig({
             components: {
                 Hero: "./src/components/Hero.astro",
                 Header: "./src/components/Header.astro",
+                Banner: "./src/components/Banner.astro",
             },
         }),
         react(),
