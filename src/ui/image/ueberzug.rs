@@ -148,7 +148,7 @@ impl Ueberzug {
                                     try_skip!(
                                         rustix::process::kill_process(
                                             pid,
-                                            rustix::process::Signal::Term
+                                            rustix::process::Signal::TERM
                                         ),
                                         "Failed to send SIGTERM to ueberzugpp pid file"
                                     );
