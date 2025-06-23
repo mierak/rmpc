@@ -1,0 +1,112 @@
+---
+title: Album Art
+description: Album Art configuration
+sidebar:
+    order: 20
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../../components/ConfigValue.tsx";
+
+Currently there are three methods which rmpc can use to display images. Each of these methods functions
+differently from the other and have their own advantages, disadvantages and quirks. The preferred and
+default method is `Kitty`. Special thanks to yazi for some inspirtion on detecting different kinds of terminals.
+
+The method can be overridden in the config file. Please refer to the [Configuration](#method) for more information.
+
+## Supported terminals
+
+If your terminal is not listed here and you experience issues. Please disable the image method in the [config file](#method).
+Some of the terminals do not correctly report their size, thus some tweaking is needed. For those you need to set [max_size_px](#max_size_px).
+
+| Terminal  | Backend                   | Tmux    | Additional Info                                                                                                                                                      |
+| --------- | ------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All       | Block                     | yes     | Only prints ANSI.                                                                                                                                                    |
+| Kitty     | Kitty                     | yes     | -                                                                                                                                                                    |
+| Ghostty   | Kitty                     | yes     | -                                                                                                                                                                    |
+| WezTerm   | ITerm2                    | yes     | -                                                                                                                                                                    |
+| vscode    | ITerm2                    | yes     | Needs to set max_size_px. Needs to be enabled in vscode.                                                                                                             |
+| Tabby     | ITerm2                    | yes     | Needs to set max_size_px                                                                                                                                             |
+| Foot      | Sixel                     | yes     | Limited image size [in tmux](#sixel)                                                                                                                                 |
+| Alacritty | Ueberzug                  | yes     | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                            |
+| Others    | Ueberzug/Sixel/Kitty      | yes     | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other backends or disabling album_art altogether if you experience issues. |
+
+## Configuration
+
+### method
+
+<ConfigValue name="method" type={["Kitty", "Iterm2", "Sixel", "UeberzugWayland", "UeberzugX11", "Block", "None", "Auto"]} />
+
+Rendering method used to display images. Currently Kitty, UeberzugWayland and UeberzugX11 are supported.
+Defaults to `Auto` which tries to use Kitty first and then Ueberzug if Kitty is not available.
+For all terminals, `Block` is now supported. It will fall_back to ANSI if the terminal doesn't support truecolor.
+
+`None` completely disables album art display.
+
+### max_size_px
+
+<ConfigValue name="max_size_px" type="other" customText="(<width>, <height>)" />
+
+Sets limit for the album art size. If the album art is larger than this, it will be resized to fit the limit.
+
+You can set this to `(0, 0)` (no limit) if you use terminal emulator which properly reports its size and rmpc will figure
+out the maximum size itself. This is needed only for terminals which do not report their size correctly.
+Default is `(1200, 1200)`. Ueberzug backend is not influenced by this setting.
+
+### disabled_protocols
+
+<ConfigValue name="disabled_protocols" type="other" customText="string[]" />
+
+Album art will NOT be fetched and displayed for songs with path starting with any of the given protocols. Set to empty array
+to enable all protocols. Defaults to `["http://", "https://]`
+
+### vertical_align
+
+<ConfigValue name="vertical_align" type={["Top", "Center", "Bottom"]} />
+
+Where to align album art vertically. Not supported by ueberzugpp backend.
+
+### horizontal_align
+
+<ConfigValue name="horizontal_align" type={["Left", "Center", "Right"]} />
+
+Where to align album art horizontally. Not supported by ueberzugpp backend.
+
+## Backends
+
+### Kitty
+
+This method should work out of the box if your terminal supports it. It is a reliable but a little bit slower method.
+Supports animated gifs.
+
+Cons:
+
+-   Image does not change when using tmux and possibly other methods of multiplexing if the change occurs while the tab is not currently active.
+
+### Ueberzugpp
+
+Requires [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Art is aligned to the top of and its position cannot be changed.
+
+Pros:
+
+-   In my testing a bit faster than Kitty
+
+Cons:
+
+-   Requires third party dependency
+-   Is a separate window on top of the terminal. This might require some additional configuration to make it look good in your environment.
+-   Album art has to be hidden completely when modal windows are shown
+
+### Iterm2 Inline image protocol
+
+Supported only in select few terminals and some of them need additional configuration. Works best in WezTerm. Supports animated gifs, but suffers
+from the same issues as Sixel in Tmux, [more info here](https://github.com/tmux/tmux/issues/1502#issuecomment-429710887).
+
+### Sixel
+
+Cons:
+
+-   Has lower color depth than the alternatives.
+-   Much lower image size can be transmitted through tmux due to sixel being a very size inefficient protocol.
+    Tmux supports only 1MB of data due to its internal buffering limitations. See [more info here](https://github.com/tmux/tmux/issues/1502#issuecomment-429710887).
+    You can limit your image size with [max_size_px](#max_size_px).

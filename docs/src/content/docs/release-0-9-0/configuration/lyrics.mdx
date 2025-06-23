@@ -1,0 +1,37 @@
+---
+title: Lyrics
+description: Configuration of lyrics for rmpc
+sidebar:
+    order: 90
+---
+
+## Lyrics
+
+Rmpc supports displaying [synchronized lyrics](<https://en.wikipedia.org/wiki/LRC_(file_format)>) in the `Lyrics` pane.
+Other lyrics formats are not supported. The `lyrics_dir` must be configured for the resolution to work. All `lrc` files
+must be on the client side.
+
+### Lrc file resolution
+
+Lrc files are resolved by rmpc via two methods(in order):
+
+- Same path as the song file, except with the `.lrc` file extension
+- By indexing all the `.lrc` files in the `lyrics_dir`
+
+#### Lyrics index
+
+Rmpc will create an index of all `.lrc` files in your `lyrics_dir` on startup. Lrc files can contain metadata about
+the song which they belong to. These metadata can include artist(ar), title(ti) and album(al) as well as length.
+`Artist`, `title` and `album` have to exactly(case insensitive) match in song's and lrc's metadata for the song to match.
+Album is not a strict requirement to match, if it is missing in either the lrc file or song metadata it will not be considered.
+If the lrc file contains `length`, it is matched to song's length plus or minus 5 seconds.
+
+#### Same path as the song file
+
+Following examples assume that your MPD's music directory is set to `/home/user/Music`.
+
+1. If your `lyrics_dir` is set to the same path as MPD's music directory
+   `/home/user/Music/artist/album/song.flac` will try to resolve `/home/user/Music/artist/album/song.lrc`
+
+2. If your `lyrics_dir` is set to a different path, ie. `/home/user/.lyrics`
+   `/home/user/Music/artist/album/song.flac` will try to resolve `/home/user/.lyrics/artist/album/song.lrc`

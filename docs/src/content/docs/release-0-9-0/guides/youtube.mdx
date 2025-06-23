@@ -1,0 +1,49 @@
+---
+title: Youtube playback
+description: Play music from youtube with rmpc
+sidebar:
+    order: 4
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { path } from "../data.ts";
+
+Rmpc can play videos from youtube, soundcloud and nicovideo, but needs a little setup before it
+can do that. Only single songs can be added at a time.
+
+<Steps>
+
+    1. Install [yt-dlp](https://github.com/yt-dlp/yt-dlp) and have it available in your PATH.
+    2. Install [yt-dlp's dependencies](https://github.com/yt-dlp/yt-dlp?tab=readme-ov-file#dependencies): ffmpeg, ffprobe, python3 and python's mutagen library.
+    3. Configure rmpc's cache directory <a href={path("configuration/#cache_dir")}>in your config file</a>
+    4. Connect to MPD with a local socket and not IP address.
+    5. Execute `rmpc addyt <youtube-url>` or in tui `addyt <youtube-url>` to add a song to the queue.
+
+</Steps>
+
+:::caution
+MPD will not be able to add songs from outside its music directory if not connected through local socket.
+:::
+
+:::note
+Tested with:
+
+- yt-dlp 2024.07.25
+- ffmpeg 7.0.1
+
+:::
+
+### Example
+
+```bash title=mpd.conf frame=terminal
+bind_to_address "/tmp/mpd_socket"
+```
+
+```rust title=rmpc/config.ron frame=terminal
+(
+    address: "/tmp/mpd_socket",
+    cache_dir: Some("/tmp/rmpc/cache"),
+    ...
+)
+
+```

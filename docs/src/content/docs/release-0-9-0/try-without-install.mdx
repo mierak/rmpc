@@ -1,0 +1,53 @@
+---
+title: Try without installing
+description: Try rmpc now. Without installing.
+sidebar:
+    order: 1
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { Code } from "@astrojs/starlight/components";
+
+export const site = import.meta.env.SITE;
+export const base = import.meta.env.BASE_URL;
+export const url = `${site}${base}/run-rmpc`;
+export const cmd = `bash <(curl -sL ${url})`;
+import runrmpc from "../../../../public/run-rmpc?raw";
+
+You can try rmpc without installing. Simply run the command below in your terminal.
+Credits to zellij for this idea!
+
+A working [MPD](https://www.musicpd.org/) installation is required to run rmpc.
+
+<div style={{}}>
+    <Code code={cmd} lang="bash" frame="none" showLineNumbers={false} />
+</div>
+
+:::caution
+Do not run unknown commands from the internet. Always check the source code yourself.
+You can find the source code of the script that will be executed <a href={url} >here</a>.
+
+<details>
+    <summary>Or in this section</summary>
+    <Code code={runrmpc} lang="bash" title="run-rmpc" />
+</details>
+:::
+
+## Nix
+
+[`rmpc`](https://search.nixos.org/packages?channel=unstable&query=rmpc) is available in the `unstable` channel.
+If you have [Nix](https://nixos.org/) installed, you can start it like so:
+
+```bash frame=none showLineNumbers=false
+nix run nixpkgs#rmpc
+```
+
+[//]: <> ( this will be useless very very soon, as 24.11 rolls out,
+but it might be worth mentioning for people who won't yet update to
+24.11 right when it drops )
+
+###### Try on NixOS 24.05:
+
+```bash frame=none showLineNumbers=false
+nix run github:nixos/nixpkgs/nixpkgs-unstable#rmpc
+```

@@ -1,0 +1,108 @@
+    tabs: [
+        (
+            name: "Queue",
+            pane: Split(
+                direction: Vertical,
+                panes: [
+                    (
+                        size: "100%",
+                        borders: "NONE",
+                        pane: Split(
+                            borders: "NONE",
+                            direction: Horizontal,
+                            panes: [
+                                (
+                                    size: "70%",
+                                    borders: "ALL",
+                                    pane: Pane(Queue),
+                                ),
+                                (
+                                    size: "30%",
+                                    borders: "NONE",
+                                    pane: Split(
+                                        direction: Vertical,
+                                        panes: [
+                                            (
+                                                size: "75%",
+                                                borders: "ALL",
+                                                pane: Pane(AlbumArt),
+                                            ),
+                                            (
+                                                size: "25%",
+                                                borders: "NONE",
+                                                pane: Split(
+                                                    direction: Vertical,
+                                                    panes: [
+                                                        (
+                                                            size: "100%",
+                                                            pane: Pane(Lyrics),
+                                                        ),
+                                                    ]
+                                                ),
+                                            ),
+                                        ]
+                                    ),
+                                ),
+                            ]
+                        ),
+                    ),
+                ],
+            ),
+        ),
+        (
+            name: "Directories",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Directories))],
+            ),
+        ),
+        (
+            name: "Artists",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Artists))],
+            ),
+        ),
+        (
+            name: "Album Artists",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(AlbumArtists))],
+            ),
+        ),
+        (
+            name: "Albums",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Albums))],
+            ),
+        ),
+        (
+            name: "Playlists",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Playlists))],
+            ),
+        ),
+        (
+            name: "Search",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Search))],
+            ),
+        ),
+        (
+            name: "Browser",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Browser(root_tag: "Artist")))],
+            ),
+        ),
+        (
+            name: "Lyrics",
+            pane: Split(
+                direction: Horizontal,
+                panes: [(size: "100%", borders: "ALL", pane: Pane(Lyrics))],
+            ),
+        ),
+    ],

@@ -1,0 +1,93 @@
+---
+title: Installation
+description: Rusty Music Player Client installation guide
+sidebar:
+    order: 1
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import { path } from "./data.ts";
+
+Currently only linux is officially supported. Precompiled binary is provided on Github and an AUR package is available for Arch.
+To build rmpc yourself you will need to have [rust toolchain](https://www.rust-lang.org/tools/install) installed. More installation
+methods will come in the future.
+
+## Steps
+
+<Steps>
+
+1. Install and setup [MPD](https://www.musicpd.org/)
+2. Install rmpc using one of the [provided methods](#installation-methods)
+3. Setup your config file
+
+    <LinkCard
+        title="Configuring rmpc"
+        description="Generate sample config file for rmpc and customize it to your liking."
+        href={path("configuration")}
+    />
+
+4. Run rmpc
+    ```bash frame=none showLineNumbers=false
+    rmpc
+    # or if you want to check out the CLI
+    rmpc --help
+    ```
+
+</Steps>
+
+:::note
+Minimum supported MPD version is 0.23.5. Other versions may work, but you are on your own.
+:::
+
+## Packaging status
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/rmpc.svg)](https://repology.org/project/rmpc/versions)
+
+## Installation methods
+
+### Arch Linux
+
+```bash frame=none showLineNumbers=false
+pacman -S rmpc
+# or
+yay -S rmpc-git
+```
+
+### openSUSE Tumbleweed
+
+```bash frame=none showLineNumbers=false
+zypper install rmpc
+```
+
+### NixOS
+
+Add [`rmpc`](https://search.nixos.org/packages?channel=unstable&query=rmpc) (available in `nixos-unstable` and `nixos-24.11`) to your `systemPackages` and rebuild.
+
+```nix
+{ pkgs, ... }:
+
+{
+  environment.systemPackages = with pkgs; [
+    rmpc
+  ];
+}
+```
+
+### Precompiled binaries
+
+[//]: <> ( This needs major reworking, but I think it's good enough for now )
+
+Download the precompiled binaries from the github [releases page](https://github.com/mierak/rmpc/releases/latest/).
+After it's done downloading, untar the archive, set execute permission and run rmpc.
+
+### Using cargo
+
+```bash frame=none showLineNumbers=false
+# compile the latest version from source
+cargo install rmpc --locked
+# or download precompiled binary with cargo binstall
+cargo binstall rmpc
+# or compile the latest work in progress version from git
+cargo install --git https://github.com/mierak/rmpc --locked
+```

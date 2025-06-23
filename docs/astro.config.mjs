@@ -76,45 +76,89 @@ export default defineConfig({
                         ],
                     },
                     {
-                        label: "Release (v0.8.0)",
-                        link: "release/overview",
-                        badge: { text: "Stable", variant: "default" },
+                        label: "Release (v0.9.0)",
+                        link: "release-0-9-0/overview",
                         icon: "seti:todo",
+                        badge: { text: "Stable", variant: "default" },
                         items: [
                             {
                                 label: "Overview",
-                                link: "release/overview",
+                                link: "release-0-9-0/overview",
                             },
                             {
                                 label: "Installation",
-                                link: "release/installation",
+                                link: "release-0-9-0/installation",
                             },
                             {
                                 label: "Try without installing",
-                                link: "release/try-without-install",
+                                link: "release-0-9-0/try-without-install",
                             },
                             {
                                 label: "Configuration",
                                 autogenerate: {
-                                    directory: "release/configuration",
+                                    directory: "release-0-9-0/configuration",
                                 },
                             },
                             {
                                 label: "Guides",
                                 autogenerate: {
-                                    directory: "release/guides",
+                                    directory: "release-0-9-0/guides",
                                 },
                             },
                             {
                                 label: "Reference",
                                 autogenerate: {
-                                    directory: "release/reference",
+                                    directory: "release-0-9-0/reference",
                                 },
                             },
                             {
                                 label: "Theme gallery",
                                 autogenerate: {
-                                    directory: "release/themes",
+                                    directory: "release-0-9-0/themes",
+                                },
+                            },
+                        ],
+                    },
+                    {
+                        label: "Release (v0.8.0)",
+                        link: "release-0-8-0/overview",
+                        badge: { text: "Stable", variant: "default" },
+                        icon: "seti:todo",
+                        items: [
+                            {
+                                label: "Overview",
+                                link: "release-0-8-0/overview",
+                            },
+                            {
+                                label: "Installation",
+                                link: "release-0-8-0/installation",
+                            },
+                            {
+                                label: "Try without installing",
+                                link: "release-0-8-0/try-without-install",
+                            },
+                            {
+                                label: "Configuration",
+                                autogenerate: {
+                                    directory: "release-0-8-0/configuration",
+                                },
+                            },
+                            {
+                                label: "Guides",
+                                autogenerate: {
+                                    directory: "release-0-8-0/guides",
+                                },
+                            },
+                            {
+                                label: "Reference",
+                                autogenerate: {
+                                    directory: "release-0-8-0/reference",
+                                },
+                            },
+                            {
+                                label: "Theme gallery",
+                                autogenerate: {
+                                    directory: "release-0-8-0/themes",
                                 },
                             },
                         ],
