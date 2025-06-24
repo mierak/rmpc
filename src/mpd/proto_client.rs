@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     io::{BufRead, Read},
     str::FromStr,
 };
@@ -15,7 +16,7 @@ use crate::{mpd::errors::ErrorCode, shared::string_util::StringExt};
 type MpdResult<T> = Result<T, MpdError>;
 
 pub struct ProtoClient<'cmd, 'client, C: SocketClient> {
-    command: &'cmd str,
+    command: Cow<'cmd, str>,
     client: &'client mut C,
 }
 
@@ -45,9 +46,13 @@ pub trait SocketClient {
 }
 
 impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
-    pub fn new(input: &'cmd str, client: &'client mut C) -> Result<Self, MpdError> {
-        let mut res = Self { command: input, client };
-        res.execute(input)?;
+    pub fn new(
+        command: impl Into<Cow<'cmd, str>>,
+        client: &'client mut C,
+    ) -> Result<Self, MpdError> {
+        let command = command.into();
+        let mut res = Self { command, client };
+        res.execute_self()?;
         Ok(res)
     }
 
@@ -69,16 +74,21 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     }
 
     pub fn new_read_only(client: &'client mut C) -> Self {
-        Self { command: "<read_only>", client }
+        Self { command: "<read_only>".into(), client }
+    }
+
+    fn execute_self(&mut self) -> Result<&mut Self, MpdError> {
+        trace!(command = self.command.as_ref(); "Executing command");
+        Ok(self.client.write([self.command.as_ref(), "\n"].concat().as_bytes()).map(|()| self)?)
     }
 
     fn execute(&mut self, command: &str) -> Result<&mut Self, MpdError> {
-        trace!(command = self.command; "Executing command");
+        trace!(command = self.command.as_ref(); "Executing command");
         Ok(self.client.write([command, "\n"].concat().as_bytes()).map(|()| self)?)
     }
 
     pub(super) fn read_ok(&mut self) -> Result<(), MpdError> {
-        trace!(command = self.command; "Reading command");
+        trace!(command = self.command.as_ref(); "Reading command");
         let read = self.client.read();
 
         match Self::read_line(read) {
@@ -99,7 +109,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     where
         V: FromMpd + Default,
     {
-        trace!(command = self.command; "Reading command");
+        trace!(command = self.command.as_ref(); "Reading command");
         let mut result = V::default();
         let read = self.client.read();
 
@@ -124,7 +134,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
     where
         V: FromMpd + Default,
     {
-        trace!(command = self.command; "Reading command");
+        trace!(command = self.command.as_ref(); "Reading command");
         let mut result = V::default();
         let mut found_any = false;
         let read = self.client.read();
@@ -152,7 +162,6 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         let mut buf = Vec::new();
         // trim the 0 offset from the initial command because we substitute
         // an actual value here
-        let command = self.command.trim_end_matches(" 0");
         let _ = match self.read_bin_inner(&mut buf) {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) => return Ok(None),
@@ -161,10 +170,12 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
                 Err(e)
             }
         };
+
         loop {
+            let command = self.command.as_ref().trim_end_matches(" 0");
             let command = format!("{} {}", command, buf.len());
             log::trace!(len = buf.len(), command = command.as_str(); "Requesting more binary data");
-            self.execute(&command)?;
+            self.execute(command.as_ref())?;
             match self.read_bin_inner(&mut buf) {
                 Ok(Some(response)) => {
                     if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
