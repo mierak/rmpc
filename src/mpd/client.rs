@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
     os::unix::net::UnixStream,
@@ -261,7 +262,7 @@ impl<'name> Client<'name> {
 
     pub fn send<'cmd>(
         &mut self,
-        command: &'cmd str,
+        command: impl Into<Cow<'cmd, str>>,
     ) -> Result<ProtoClient<'cmd, '_, Self>, MpdError> {
         ProtoClient::new(command, self)
     }

@@ -152,23 +152,6 @@ impl MpdClient for TestMpdClient {
         todo!()
     }
 
-    fn start_cmd_list(&mut self) -> anyhow::Result<()> {
-        todo!()
-    }
-
-    fn start_cmd_list_ok(&mut self) -> anyhow::Result<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn execute_cmd_list(
-        &mut self,
-    ) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
-    where
-        Self: SocketClient,
-    {
-        todo!("Not yet implemented")
-    }
-
     fn get_volume(&mut self) -> MpdResult<Volume> {
         Ok(self.volume)
     }
