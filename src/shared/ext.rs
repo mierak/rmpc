@@ -452,7 +452,7 @@ pub mod num {
         #[test_case(6789, "6,789")]
         #[test_case(1, "1")]
         #[test_case(0, "0")]
-        #[test_case(99_999_999_999, "99,999,999,999")]
+        #[test_case(4_294_967_295, "4,294,967,295")] // equivalent to u32::MAX, as not to break 32 bit architectures
         fn usize_format(input: usize, expected: &str) {
             let result = input.with_thousands_separator(",");
 
