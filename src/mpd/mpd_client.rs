@@ -169,16 +169,6 @@ pub trait MpdCommand<C: SocketClient> {
         &mut self,
         range: Option<SingleOrRange>,
     ) -> MpdCommandSubmitResult<'cmd, '_, C>;
-    fn send_add_random_songs<'cmd>(
-        &mut self,
-        count: usize,
-        filter: Option<&[Filter<'_>]>,
-    ) -> MpdCommandSubmitResult<'cmd, '_, C>;
-    fn send_add_random_tag<'cmd>(
-        &mut self,
-        count: usize,
-        tag: Tag,
-    ) -> MpdCommandSubmitResult<'cmd, '_, C>;
     fn send_list_all<'cmd>(&mut self, path: Option<&str>) -> MpdCommandSubmitResult<'cmd, '_, C>;
     fn send_lsinfo<'cmd>(&mut self, path: Option<&str>) -> MpdCommandSubmitResult<'cmd, '_, C>;
     fn send_list_files<'cmd>(&mut self, path: Option<&str>) -> MpdCommandSubmitResult<'cmd, '_, C>;
@@ -1197,62 +1187,6 @@ impl MpdCommand<Self> for Client<'_> {
         } else {
             self.send("shuffle")
         }
-    }
-
-    #[allow(clippy::needless_range_loop)]
-    fn send_add_random_songs<'cmd>(
-        &mut self,
-        count: usize,
-        filter: Option<&[Filter<'_>]>,
-    ) -> MpdCommandSubmitResult<'cmd, '_, Self> {
-        let mut result = if let Some(filter) = filter {
-            self.find(filter)?.into_iter().map(|song| song.file).collect_vec()
-        } else {
-            self.list_all(None)?.into_files().collect_vec()
-        };
-
-        if result.len() < count {
-            return Err(MpdError::Generic(format!(
-                "Cannot add {count} songs. The database contains only {} entries.",
-                result.len()
-            )));
-        }
-        result.shuffle(&mut rand::rng());
-
-        self.send_start_cmd_list()?;
-        for i in 0..count {
-            self.send(format!("add {}", result[i].quote_and_escape()))?;
-        }
-        self.send_execute_cmd_list()
-    }
-
-    #[allow(clippy::needless_range_loop)]
-    fn send_add_random_tag<'cmd>(
-        &mut self,
-        count: usize,
-        tag: Tag,
-    ) -> MpdCommandSubmitResult<'cmd, '_, Self> {
-        let mut tag_values = self.list_tag(tag.clone(), None)?.0;
-
-        if tag_values.len() < count {
-            return Err(MpdError::Generic(format!(
-                "Cannot add {count} {tag}s. The database contains only {} entries.",
-                tag_values.len()
-            )));
-        }
-
-        tag_values.shuffle(&mut rand::rng());
-
-        self.send_start_cmd_list()?;
-        for i in 0..count {
-            let filter = &[Filter::new_with_kind(
-                tag.clone(),
-                std::mem::take(&mut tag_values[i]),
-                FilterKind::Exact,
-            )] as &[_];
-            self.send(format!("findadd \"({})\"", filter.to_query_str()))?;
-        }
-        self.send_execute_cmd_list()
     }
 
     fn send_list_all<'cmd>(
