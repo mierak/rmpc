@@ -13,10 +13,19 @@ use rand::seq::SliceRandom;
 use strum::{AsRefStr, Display};
 
 use super::{
-    FromMpd, QueuePosition,
+    FromMpd,
+    QueuePosition,
     client::Client,
     commands::{
-        IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
+        IdleEvent,
+        ListFiles,
+        LsInfo,
+        Mounts,
+        Playlist,
+        Song,
+        Status,
+        Update,
+        Volume,
         decoders::Decoders,
         list::MpdList,
         list_playlist::FileList,
@@ -1231,8 +1240,9 @@ mod filter_tests {
 
     #[cfg(test)]
     mod filter_diacritics_tests {
-        use super::{Filter, FilterExt, FilterKind, Tag};
         use test_case::test_case;
+
+        use super::{Filter, FilterExt, FilterKind, Tag};
 
         #[test]
         fn exact_with_ignore_diacritics() {
