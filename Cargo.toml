@@ -8,7 +8,11 @@ homepage = "https://mierak.github.io/rmpc/"
 repository = "https://github.com/mierak/rmpc"
 readme = "README.md"
 rust-version = "1.85.0"
-exclude = ["/docs/**/*", "!/docs/src/content/docs/next/assets/example_theme.ron", "!/docs/src/content/docs/next/assets/example_config.ron"]
+exclude = [
+    "/docs/**/*",
+    "!/docs/src/content/docs/next/assets/example_theme.ron",
+    "!/docs/src/content/docs/next/assets/example_config.ron",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -25,7 +29,15 @@ strum = { workspace = true }
 flate2 = { version = "1.1.2" }
 itertools = "0.14.0"
 ron = "0.10.1"
-derive_more = { version = "2.0.1", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref", "debug"] }
+derive_more = { version = "2.0.1", features = [
+    "into_iterator",
+    "into",
+    "as_ref",
+    "into_iterator",
+    "display",
+    "deref",
+    "debug",
+] }
 rustix = { version = "1.0.7", features = ["termios", "fs", "stdio", "process"] }
 bitflags = { version = "2.9.1", features = ["serde"] }
 log = { version = "0.4.27", features = ["kv"] }
@@ -50,6 +62,7 @@ rand = "0.9.1"
 ansi_colours = "1"
 thiserror = "2.0.12"
 parking_lot = { version = "0.12.4", features = [] }
+unicode-normalization = "0.1.23"
 
 [build-dependencies]
 clap = { workspace = true }
@@ -64,7 +77,7 @@ rstest = "0.25.0"
 test-case = "3.3.1"
 
 [workspace.dependencies]
-clap = { version = "4.5.40", features = ["derive", "cargo", "string" ] }
+clap = { version = "4.5.40", features = ["derive", "cargo", "string"] }
 strum = { version = "0.27.1", features = ["derive"] }
 
 [lints.clippy]
