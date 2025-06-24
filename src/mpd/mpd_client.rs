@@ -10,21 +10,13 @@ use derive_more::Deref;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use strum::{AsRefStr, Display};
+use unicode_normalization::UnicodeNormalization;
 
 use super::{
-    FromMpd,
-    QueuePosition,
+    FromMpd, QueuePosition,
     client::Client,
     commands::{
-        IdleEvent,
-        ListFiles,
-        LsInfo,
-        Mounts,
-        Playlist,
-        Song,
-        Status,
-        Update,
-        Volume,
+        IdleEvent, ListFiles, LsInfo, Mounts, Playlist, Song, Status, Update, Volume,
         decoders::Decoders,
         list::MpdList,
         list_playlist::FileList,
@@ -1006,6 +998,7 @@ pub struct Filter<'value> {
     pub tag: Tag,
     pub value: Cow<'value, str>,
     pub kind: FilterKind,
+    pub ignore_diacritics: bool,
 }
 
 impl From<String> for Tag {
@@ -1017,7 +1010,12 @@ impl From<String> for Tag {
 #[allow(dead_code)]
 impl<'value> Filter<'value> {
     pub fn new<T: Into<Tag>, V: Into<Cow<'value, str>>>(tag: T, value: V) -> Self {
-        Self { tag: tag.into(), value: value.into(), kind: FilterKind::Exact }
+        Self {
+            tag: tag.into(),
+            value: value.into(),
+            kind: FilterKind::Exact,
+            ignore_diacritics: false,
+        }
     }
 
     pub fn new_with_kind<T: Into<Tag>, V: Into<Cow<'value, str>>>(
@@ -1025,7 +1023,7 @@ impl<'value> Filter<'value> {
         value: V,
         kind: FilterKind,
     ) -> Self {
-        Self { tag: tag.into(), value: value.into(), kind }
+        Self { tag: tag.into(), value: value.into(), kind, ignore_diacritics: false }
     }
 
     pub fn with_type(mut self, t: FilterKind) -> Self {
@@ -1033,19 +1031,72 @@ impl<'value> Filter<'value> {
         self
     }
 
+    pub fn with_ignore_diacritics(mut self, ignore: bool) -> Self {
+        self.ignore_diacritics = ignore;
+        self
+    }
+
+    pub fn normalize_for_diacritics_unicode(&self) -> String {
+        if !self.ignore_diacritics {
+            return self.value.to_string();
+        }
+
+        let normalized: String = self
+            .value
+            .nfd()
+            .filter(|&c| !unicode_normalization::char::is_combining_mark(c))
+            .collect();
+
+        return normalized;
+    }
+
     pub fn to_query_str(&self) -> String {
-        match self.kind {
-            FilterKind::Exact => {
-                format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter())
+        if self.ignore_diacritics {
+            let normalized_value = self.normalize_for_diacritics_unicode();
+
+            match self.kind {
+                FilterKind::Exact => {
+                    let original_escaped = self.value.escape_filter();
+                    let normalized_escaped = normalized_value.escape_filter();
+
+                    if original_escaped == normalized_escaped {
+                        format!("{} == '{}'", self.tag.as_str(), original_escaped)
+                    } else {
+                        let pattern = format!("(?i)^({normalized_escaped})$");
+                        format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                    }
+                }
+                FilterKind::StartsWith => {
+                    let pattern = format!("(?i)^{}", normalized_value.escape_filter());
+                    format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                }
+                FilterKind::Contains => {
+                    let pattern = format!("(?i).*{}.*", normalized_value.escape_filter());
+                    format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                }
+                FilterKind::Regex => {
+                    let pattern = if normalized_value.starts_with("(?i)") {
+                        normalized_value.escape_filter()
+                    } else {
+                        format!("(?i){}", normalized_value.escape_filter())
+                    };
+                    format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                }
             }
-            FilterKind::StartsWith => {
-                format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter())
-            }
-            FilterKind::Contains => {
-                format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter())
-            }
-            FilterKind::Regex => {
-                format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter())
+        } else {
+            match self.kind {
+                FilterKind::Exact => {
+                    format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter())
+                }
+                FilterKind::StartsWith => {
+                    format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter())
+                }
+                FilterKind::Contains => {
+                    format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter())
+                }
+                FilterKind::Regex => {
+                    format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter())
+                }
             }
         }
     }

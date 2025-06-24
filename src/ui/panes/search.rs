@@ -37,7 +37,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct SearchPane {
-    inputs: InputGroups<2, 1>,
+    inputs: InputGroups<3, 1>,
     phase: Phase,
     preview: Option<Vec<PreviewGroup>>,
     songs_dir: Dir<Song>,
@@ -66,6 +66,12 @@ impl SearchPane {
                         label: " Case sensitive  :".to_string(),
                         variant: FilterInputVariant::SelectFilterCaseSensitive {
                             value: config.search.case_sensitive,
+                        },
+                    },
+                    FilterInput {
+                        label: " Ignore diacritics :".to_string(),
+                        variant: FilterInputVariant::SelectFilterIgnoreDiacritics {
+                            value: config.search.ignore_diacritics,
                         },
                     },
                 ],
@@ -267,6 +273,12 @@ impl SearchPane {
                     .set_input_style(config.as_text_style())
                     .set_label(&input.label)
                     .set_text(if value { "Yes" } else { "No" }),
+                FilterInputVariant::SelectFilterIgnoreDiacritics { value } => Input::default()
+                    .set_borderless(true)
+                    .set_label_style(config.as_text_style())
+                    .set_input_style(config.as_text_style())
+                    .set_label(&input.label)
+                    .set_text(if value { "Yes" } else { "No" }),
             };
 
             let is_focused = matches!(self.inputs.focused(),
@@ -306,66 +318,66 @@ impl SearchPane {
         }
     }
 
-    fn filter_type(&self) -> (FilterKind, bool) {
-        self.inputs.filter_inputs.iter().fold((FilterKind::Contains, false), |mut acc, val| {
-            match val.variant {
-                FilterInputVariant::SelectFilterKind { value } => {
-                    acc.0 = value;
+    fn filter_type(&self) -> (FilterKind, bool, bool) {
+        self.inputs.filter_inputs.iter().fold(
+            (FilterKind::Contains, false, false),
+            |mut acc, val| {
+                match val.variant {
+                    FilterInputVariant::SelectFilterKind { value } => {
+                        acc.0 = value;
+                    }
+                    FilterInputVariant::SelectFilterCaseSensitive { value } => {
+                        acc.1 = value;
+                    }
+                    FilterInputVariant::SelectFilterIgnoreDiacritics { value } => {
+                        acc.2 = value;
+                    }
                 }
-                FilterInputVariant::SelectFilterCaseSensitive { value } => {
-                    acc.1 = value;
-                }
-            }
-            acc
-        })
+                acc
+            },
+        )
     }
 
     fn search_add(&mut self, context: &AppContext, position: Option<QueuePosition>) {
-        let (filter_kind, case_sensitive) = self.filter_type();
-        let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
-            Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
-            }
-            _ => None,
-        });
+        let (filter_kind, case_sensitive, ignore_diacritics) = self.filter_type();
+        let filters: Vec<Filter> = self
+            .inputs
+            .textbox_inputs
+            .iter()
+            .filter_map(|input| match input {
+                Textbox { value, filter_key, .. } if !value.is_empty() => {
+                    Some((filter_key.clone(), value.clone()))
+                }
+                _ => None,
+            })
+            .map(|(key, value)| {
+                let mut f = Filter::new(key, value).with_type(filter_kind);
+                if ignore_diacritics {
+                    f = f.with_ignore_diacritics(true);
+                }
+                f
+            })
+            .collect();
 
-        let mut filter = filter.collect_vec();
-
-        if filter.is_empty() {
+        if filters.is_empty() {
             return;
         }
 
         if case_sensitive {
             context.command(move |client| {
-                client.find_add(
-                    &filter
-                        .iter_mut()
-                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                            Filter::new(std::mem::take(key), value).with_type(*kind)
-                        })
-                        .collect_vec(),
-                    position,
-                )?;
+                client.find_add(&filters, position)?;
                 Ok(())
             });
         } else {
             context.command(move |client| {
-                client.search_add(
-                    &filter
-                        .iter_mut()
-                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                            Filter::new(std::mem::take(key), value).with_type(*kind)
-                        })
-                        .collect_vec(),
-                    position,
-                )?;
+                client.search_add(&filters, position)?;
                 Ok(())
             });
         }
     }
 
     fn search(&mut self, context: &AppContext) {
-        let (filter_kind, case_sensitive) = self.filter_type();
+        let (filter_kind, case_sensitive, ignore_diacritics) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
                 Some((filter_key.to_owned(), value.to_owned(), filter_kind))
@@ -383,14 +395,19 @@ impl SearchPane {
 
         context.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
             move |client| {
-                let filter = filter
+                let filters: Vec<Filter> = filter
                     .iter_mut()
                     .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                        Filter::new(std::mem::take(key), value).with_type(*kind)
+                        let mut f = Filter::new(std::mem::take(key), value).with_type(*kind);
+                        if ignore_diacritics {
+                            f = f.with_ignore_diacritics(true);
+                        }
+                        f
                     })
                     .collect_vec();
+
                 let result =
-                    if case_sensitive { client.find(&filter) } else { client.search(&filter) }?;
+                    if case_sensitive { client.find(&filters) } else { client.search(&filters) }?;
 
                 Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
             },
@@ -409,6 +426,9 @@ impl SearchPane {
                 }
                 FilterInputVariant::SelectFilterCaseSensitive { ref mut value } => {
                     *value = search_config.case_sensitive;
+                }
+                FilterInputVariant::SelectFilterIgnoreDiacritics { ref mut value } => {
+                    *value = search_config.ignore_diacritics;
                 }
             }
         }
@@ -432,6 +452,13 @@ impl SearchPane {
             }
             FocusedInputGroup::Filters(FilterInput {
                 variant: FilterInputVariant::SelectFilterCaseSensitive { value },
+                ..
+            }) => {
+                *value = !*value;
+                self.search(context);
+            }
+            FocusedInputGroup::Filters(FilterInput {
+                variant: FilterInputVariant::SelectFilterIgnoreDiacritics { value },
                 ..
             }) => {
                 *value = !*value;
@@ -1305,6 +1332,7 @@ struct FilterInput {
 enum FilterInputVariant {
     SelectFilterKind { value: FilterKind },
     SelectFilterCaseSensitive { value: bool },
+    SelectFilterIgnoreDiacritics { value: bool },
 }
 
 #[derive(Debug)]

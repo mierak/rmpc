@@ -8,11 +8,13 @@ pub struct Search {
     pub case_sensitive: bool,
     pub mode: FilterKind,
     pub tags: Vec<SearchableTag>,
+    pub ignore_diacritics: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchFile {
     case_sensitive: bool,
+    ignore_diacritics: bool,
     mode: FilterKindFile,
     tags: Vec<SearchableTagFile>,
 }
@@ -33,6 +35,7 @@ impl From<SearchFile> for Search {
     fn from(value: SearchFile) -> Self {
         Self {
             case_sensitive: value.case_sensitive,
+            ignore_diacritics: value.ignore_diacritics,
             mode: value.mode.into(),
             tags: if value.tags.is_empty() {
                 vec![SearchableTag { label: "Any Tag".to_string(), value: "any".to_string() }]
@@ -51,6 +54,7 @@ impl Default for SearchFile {
     fn default() -> Self {
         Self {
             case_sensitive: false,
+            ignore_diacritics: false,
             mode: FilterKindFile::Contains,
             tags: [
                 SearchableTagFile { value: "any".to_string(), label: "Any Tag".to_string() },
