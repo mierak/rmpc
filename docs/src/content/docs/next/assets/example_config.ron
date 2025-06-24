@@ -105,6 +105,7 @@
     ),
     search: (
         case_sensitive: false,
+        ignore_diacritics: false,
         mode: Contains,
         tags: [
             (value: "any",         label: "Any Tag"),
@@ -154,4 +155,3 @@
         ),
     ],
 )
-
