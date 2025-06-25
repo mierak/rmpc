@@ -18,7 +18,13 @@ use drop_guard::ClientDropGuard;
 
 use crate::{
     config::Config,
-    mpd::{client::Client, commands::idle::IdleEvent, errors::MpdError, mpd_client::MpdClient},
+    mpd::{
+        client::Client,
+        commands::idle::IdleEvent,
+        errors::MpdError,
+        mpd_client::MpdClient,
+        proto_client::ProtoClient,
+    },
     shared::{
         events::{AppEvent, ClientRequest, WorkDone},
         macros::{status_error, try_break, try_skip},
@@ -119,14 +125,14 @@ fn client_task(
                             health!(client.set_read_timeout(config.mpd_idle_read_timeout_ms), "Failed to set read timeout for idle client");
 
                             log::trace!("Read timeout set, entering idle state");
-                            let mut idle_client = health!(client.enter_idle(), "Failed to enter idle state");
+                            health!(client.enter_idle(), "Failed to enter idle state");
 
                             log::trace!("Sending client received confirmation");
                             health!(client_received_tx.send_timeout((), Duration::from_secs(3)), "Failed to send client received confirmation");
 
                             log::trace!("Idle confirmation sent, waiting for events");
                             let events: Vec<IdleEvent> = loop {
-                                match idle_client.read_response() {
+                                match client.read_response() {
                                     Ok(events) => break events,
                                     Err(MpdError::TimedOut(err)) => {
                                         if !HEALTHY.load(Ordering::Relaxed) {
