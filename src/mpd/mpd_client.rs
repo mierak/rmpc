@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::Result;
 use derive_more::Deref;
+use deunicode::deunicode;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use strum::{AsRefStr, Display};
@@ -1376,6 +1377,7 @@ pub struct Filter<'value> {
     pub tag: Tag,
     pub value: Cow<'value, str>,
     pub kind: FilterKind,
+    pub ignore_diacritics: bool,
 }
 
 impl From<String> for Tag {
@@ -1387,7 +1389,12 @@ impl From<String> for Tag {
 #[allow(dead_code)]
 impl<'value> Filter<'value> {
     pub fn new<T: Into<Tag>, V: Into<Cow<'value, str>>>(tag: T, value: V) -> Self {
-        Self { tag: tag.into(), value: value.into(), kind: FilterKind::Exact }
+        Self {
+            tag: tag.into(),
+            value: value.into(),
+            kind: FilterKind::Exact,
+            ignore_diacritics: false,
+        }
     }
 
     pub fn new_with_kind<T: Into<Tag>, V: Into<Cow<'value, str>>>(
@@ -1395,7 +1402,7 @@ impl<'value> Filter<'value> {
         value: V,
         kind: FilterKind,
     ) -> Self {
-        Self { tag: tag.into(), value: value.into(), kind }
+        Self { tag: tag.into(), value: value.into(), kind, ignore_diacritics: false }
     }
 
     pub fn with_type(mut self, t: FilterKind) -> Self {
@@ -1403,19 +1410,66 @@ impl<'value> Filter<'value> {
         self
     }
 
+    pub fn with_ignore_diacritics(mut self, ignore: bool) -> Self {
+        self.ignore_diacritics = ignore;
+        self
+    }
+
+    pub fn normalize_for_diacritics_unicode(&self) -> String {
+        if !self.ignore_diacritics {
+            return self.value.to_string();
+        }
+
+        deunicode(&self.value)
+    }
+
     pub fn to_query_str(&self) -> String {
-        match self.kind {
-            FilterKind::Exact => {
-                format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter())
+        if self.ignore_diacritics {
+            let normalized_value = self.normalize_for_diacritics_unicode();
+
+            match self.kind {
+                FilterKind::Exact => {
+                    let original_escaped = self.value.escape_filter();
+                    let normalized_escaped = normalized_value.escape_filter();
+
+                    if original_escaped == normalized_escaped {
+                        format!("{} == '{}'", self.tag.as_str(), original_escaped)
+                    } else {
+                        let pattern = format!("(?i)^({normalized_escaped})$");
+                        format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                    }
+                }
+                FilterKind::StartsWith => {
+                    let pattern = format!("(?i)^{}", normalized_value.escape_filter());
+                    format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                }
+                FilterKind::Contains => {
+                    let pattern = format!("(?i).*{}.*", normalized_value.escape_filter());
+                    format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                }
+                FilterKind::Regex => {
+                    let pattern = if normalized_value.starts_with("(?i)") {
+                        normalized_value.escape_filter()
+                    } else {
+                        format!("(?i){}", normalized_value.escape_filter())
+                    };
+                    format!("{} =~ '{}'", self.tag.as_str(), pattern)
+                }
             }
-            FilterKind::StartsWith => {
-                format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter())
-            }
-            FilterKind::Contains => {
-                format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter())
-            }
-            FilterKind::Regex => {
-                format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter())
+        } else {
+            match self.kind {
+                FilterKind::Exact => {
+                    format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter())
+                }
+                FilterKind::StartsWith => {
+                    format!("{} =~ '^{}'", self.tag.as_str(), self.value.escape_filter())
+                }
+                FilterKind::Contains => {
+                    format!("{} =~ '.*{}.*'", self.tag.as_str(), self.value.escape_filter())
+                }
+                FilterKind::Regex => {
+                    format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter())
+                }
             }
         }
     }
@@ -1552,5 +1606,149 @@ mod filter_tests {
             &[Filter::new(Tag::Album, "the greatest"), Filter::new(Tag::Artist, "mrs singer")];
 
         assert_eq!(input.to_query_str(), "(Album == 'the greatest') AND (Artist == 'mrs singer')");
+    }
+
+    #[cfg(test)]
+    mod filter_diacritics_tests {
+        use test_case::test_case;
+
+        use super::{Filter, FilterExt, FilterKind, Tag};
+
+        #[test]
+        fn exact_with_ignore_diacritics() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Artist, "Beyoncé", FilterKind::Exact)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+
+            assert!(query_str.contains("(?i)^(Beyonce)$"));
+            assert!(query_str.contains("=~"));
+            assert!(!query_str.contains("Beyoncé"));
+        }
+
+        #[test]
+        fn starts_with_ignore_diacritics() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Artist, "Café", FilterKind::StartsWith)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("(?i)^Cafe"));
+            assert!(query_str.contains("=~"));
+            assert!(!query_str.contains("Café"));
+        }
+
+        #[test]
+        fn contains_with_ignore_diacritics() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Title, "résumé", FilterKind::Contains)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("(?i).*resume.*"));
+            assert!(query_str.contains("=~"));
+            assert!(!query_str.contains("résumé"));
+        }
+
+        #[test]
+        fn regex_with_ignore_diacritics() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Title, "résumé.*test", FilterKind::Regex)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("(?i)resume.*test"));
+            assert!(query_str.contains("=~"));
+            assert!(!query_str.contains("résumé"));
+        }
+
+        #[test]
+        fn regex_with_existing_case_insensitive_flag() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Title, "résumé.*", FilterKind::Regex)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("resume.*"));
+        }
+
+        #[test_case("café", "cafe"; "french_e_acute")]
+        #[test_case("naïve", "naive"; "french_i_diaeresis")]
+        #[test_case("piñata", "pinata"; "spanish_n_tilde")]
+        #[test_case("Zürich", "Zurich"; "german_u_umlaut")]
+        #[test_case("François", "Francois"; "french_c_cedilla")]
+        #[test_case("Bjørk", "Bjork"; "norwegian_o_slash")]
+        #[test_case("Åsa", "Asa"; "swedish_a_ring")]
+        fn various_diacritics_normalized(input: &str, expected: &str) {
+            let filter = Filter::new_with_kind(Tag::Artist, input, FilterKind::Exact)
+                .with_ignore_diacritics(true);
+            let query_str = filter.to_query_str();
+
+            if input == expected {
+                assert!(query_str.contains(expected));
+            } else {
+                assert!(query_str.contains(expected));
+                assert!(!query_str.contains(input));
+            }
+        }
+
+        #[test]
+        fn normalize_for_diacritics_unicode_works() {
+            let filter = Filter::new(Tag::Artist, "Beyoncé").with_ignore_diacritics(true);
+            assert_eq!(filter.normalize_for_diacritics_unicode(), "Beyonce");
+
+            let filter_no_normalize =
+                Filter::new(Tag::Artist, "Beyoncé").with_ignore_diacritics(false);
+            assert_eq!(filter_no_normalize.normalize_for_diacritics_unicode(), "Beyoncé");
+        }
+
+        #[test]
+        fn normalize_no_diacritics() {
+            let filter = Filter::new(Tag::Artist, "Beatles").with_ignore_diacritics(true);
+            assert_eq!(filter.normalize_for_diacritics_unicode(), "Beatles");
+        }
+
+        #[test]
+        fn empty_string_with_diacritics_ignore() {
+            let input: &[Filter<'_>] = &[Filter::new_with_kind(Tag::Artist, "", FilterKind::Exact)
+                .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("== ''"));
+        }
+
+        #[test]
+        fn only_diacritics_string() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Artist, "éàü", FilterKind::Exact)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("eau"));
+            assert!(!query_str.contains("éàü"));
+        }
+
+        #[test]
+        fn diacritics_with_regex_special_chars() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Title, "café[test]", FilterKind::Exact)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("cafe[test]"));
+            assert!(!query_str.contains("café"));
+        }
+
+        #[test]
+        fn diacritics_with_quotes_and_backslashes() {
+            let input: &[Filter<'_>] =
+                &[Filter::new_with_kind(Tag::Title, "café\"test\\", FilterKind::Contains)
+                    .with_ignore_diacritics(true)];
+
+            let query_str = input.to_query_str();
+            assert!(query_str.contains("cafe\\\"test\\\\\\\\"));
+            assert!(!query_str.contains("café"));
+        }
     }
 }
