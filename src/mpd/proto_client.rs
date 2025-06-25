@@ -1,27 +1,21 @@
 use std::{
-    borrow::Cow,
     io::{BufRead, Read},
     str::FromStr,
 };
 
 use anyhow::Result;
-use log::trace;
 
 use super::{
     FromMpd,
     errors::{MpdError, MpdFailureResponse},
     split_line,
+    version::Version,
 };
 use crate::{mpd::errors::ErrorCode, shared::string_util::StringExt};
 type MpdResult<T> = Result<T, MpdError>;
 
-pub struct ProtoClient<'cmd, 'client, C: SocketClient> {
-    command: Cow<'cmd, str>,
-    client: &'client mut C,
-}
-
 #[derive(Debug, Default, PartialEq)]
-struct BinaryMpdResponse {
+pub struct BinaryMpdResponse {
     pub bytes_read: u64,
     pub size_total: u32,
     pub mime_type: Option<String>,
@@ -33,29 +27,14 @@ pub enum MpdLine {
     Value(String),
 }
 
-impl<C: SocketClient> std::fmt::Debug for ProtoClient<'_, '_, C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.command)
-    }
-}
-
 pub trait SocketClient {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<()>;
     fn read(&mut self) -> &mut impl BufRead;
+    fn version(&self) -> Version;
     fn clear_read_buf(&mut self) -> Result<()>;
 }
 
-impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
-    pub fn new(
-        command: impl Into<Cow<'cmd, str>>,
-        client: &'client mut C,
-    ) -> Result<Self, MpdError> {
-        let command = command.into();
-        let mut res = Self { command, client };
-        res.execute_self()?;
-        Ok(res)
-    }
-
+pub trait ProtoClient {
     fn should_reinit_buffer(err: &MpdError) -> bool {
         !matches!(
             err,
@@ -64,38 +43,53 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         )
     }
 
+    fn reinit_buffer_if_needed(&mut self, err: &MpdError) -> Result<()>;
+
+    fn execute(&mut self, command: &str) -> Result<(), MpdError>;
+
+    fn read_ok(&mut self) -> Result<(), MpdError>;
+
+    fn read_response<V>(&mut self) -> Result<V, MpdError>
+    where
+        V: FromMpd + Default;
+
+    fn read_opt_response<V>(&mut self) -> Result<Option<V>, MpdError>
+    where
+        V: FromMpd + Default;
+
+    fn read_bin(&mut self, command: &str) -> MpdResult<Option<Vec<u8>>>;
+
+    fn read_bin_inner(
+        &mut self,
+        binary_buf: &mut Vec<u8>,
+    ) -> Result<Option<BinaryMpdResponse>, MpdError>;
+
+    fn read_line(read: &mut impl BufRead) -> Result<MpdLine, MpdError>;
+}
+
+impl<T: SocketClient> ProtoClient for T {
     fn reinit_buffer_if_needed(&mut self, err: &MpdError) -> Result<()> {
         if Self::should_reinit_buffer(err) {
             log::error!(err:?; "read buffer was reinitialized");
-            self.client.clear_read_buf()?;
+            self.clear_read_buf()?;
         }
 
         Ok(())
     }
 
-    pub fn new_read_only(client: &'client mut C) -> Self {
-        Self { command: "<read_only>".into(), client }
+    fn execute(&mut self, command: &str) -> Result<(), MpdError> {
+        log::trace!(command; "Executing MPD command");
+        Ok(self.write([command, "\n"].concat().as_bytes())?)
     }
 
-    fn execute_self(&mut self) -> Result<&mut Self, MpdError> {
-        trace!(command = self.command.as_ref(); "Executing command");
-        Ok(self.client.write([self.command.as_ref(), "\n"].concat().as_bytes()).map(|()| self)?)
-    }
-
-    fn execute(&mut self, command: &str) -> Result<&mut Self, MpdError> {
-        trace!(command = self.command.as_ref(); "Executing command");
-        Ok(self.client.write([command, "\n"].concat().as_bytes()).map(|()| self)?)
-    }
-
-    pub(super) fn read_ok(&mut self) -> Result<(), MpdError> {
-        trace!(command = self.command.as_ref(); "Reading command");
-        let read = self.client.read();
+    fn read_ok(&mut self) -> Result<(), MpdError> {
+        let read = self.read();
 
         match Self::read_line(read) {
             Ok(MpdLine::Ok) => Ok(()),
             Ok(MpdLine::Value(val)) => {
                 log::error!(val = val.as_str(); "read buffer was reinitialized because we got a value when expecting ok");
-                self.client.clear_read_buf()?;
+                self.clear_read_buf()?;
                 Err(MpdError::Generic(format!("Expected 'OK' but got '{val}'")))
             }
             Err(e) => {
@@ -105,13 +99,12 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(crate) fn read_response<V>(&mut self) -> Result<V, MpdError>
+    fn read_response<V>(&mut self) -> Result<V, MpdError>
     where
         V: FromMpd + Default,
     {
-        trace!(command = self.command.as_ref(); "Reading command");
         let mut result = V::default();
-        let read = self.client.read();
+        let read = self.read();
 
         loop {
             match Self::read_line(read) {
@@ -130,14 +123,13 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(super) fn read_opt_response<V>(&mut self) -> Result<Option<V>, MpdError>
+    fn read_opt_response<V>(&mut self) -> Result<Option<V>, MpdError>
     where
         V: FromMpd + Default,
     {
-        trace!(command = self.command.as_ref(); "Reading command");
         let mut result = V::default();
         let mut found_any = false;
-        let read = self.client.read();
+        let read = self.read();
         loop {
             match Self::read_line(read) {
                 Ok(MpdLine::Ok) => {
@@ -158,7 +150,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         }
     }
 
-    pub(super) fn read_bin(&mut self) -> MpdResult<Option<Vec<u8>>> {
+    fn read_bin(&mut self, command: &str) -> MpdResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
         // trim the 0 offset from the initial command because we substitute
         // an actual value here
@@ -172,14 +164,13 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         };
 
         loop {
-            let command = self.command.as_ref().trim_end_matches(" 0");
+            let command = command.trim_end_matches(" 0");
             let command = format!("{} {}", command, buf.len());
-            log::trace!(len = buf.len(), command = command.as_str(); "Requesting more binary data");
             self.execute(command.as_ref())?;
             match self.read_bin_inner(&mut buf) {
                 Ok(Some(response)) => {
                     if buf.len() >= response.size_total as usize || response.bytes_read == 0 {
-                        trace!( len = buf.len();"Finished reading binary response");
+                        log::trace!(len = buf.len(); "Finished reading binary response");
                         break;
                     }
                 }
@@ -198,7 +189,7 @@ impl<'cmd, 'client, C: SocketClient> ProtoClient<'cmd, 'client, C> {
         binary_buf: &mut Vec<u8>,
     ) -> Result<Option<BinaryMpdResponse>, MpdError> {
         let mut result = BinaryMpdResponse::default();
-        let read = self.client.read();
+        let read = self.read();
         {
             loop {
                 match Self::read_line(read)? {
@@ -283,7 +274,7 @@ mod tests {
     use std::io::{BufReader, Cursor};
 
     use super::SocketClient;
-    use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
+    use crate::mpd::{FromMpd, LineHandled, errors::MpdError, version::Version};
 
     #[derive(Default, Debug, PartialEq, Eq)]
     struct TestMpdObject {
@@ -326,6 +317,10 @@ mod tests {
         fn clear_read_buf(&mut self) -> anyhow::Result<()> {
             Ok(())
         }
+
+        fn version(&self) -> Version {
+            Version::new(0, 25, 0)
+        }
     }
 
     mod read_mpd_line {
@@ -345,7 +340,7 @@ mod tests {
         #[rstest]
         fn returns_ok(mut client: TestMpdClient) {
             client.set_read_content(Box::new(Cursor::new(b"OK enenene")));
-            let result = ProtoClient::<'_, '_, TestMpdClient>::read_line(client.read());
+            let result = TestMpdClient::read_line(client.read());
 
             assert_eq!(Ok(MpdLine::Ok), result);
         }
@@ -353,7 +348,7 @@ mod tests {
         #[rstest]
         fn returns_ok_for_list_ok(mut client: TestMpdClient) {
             client.set_read_content(Box::new(Cursor::new(b"list_OK enenene")));
-            let result = ProtoClient::<'_, '_, TestMpdClient>::read_line(client.read());
+            let result = TestMpdClient::read_line(client.read());
 
             assert_eq!(Ok(MpdLine::Ok), result);
         }
@@ -370,7 +365,7 @@ mod tests {
             client.set_read_content(Box::new(Cursor::new(
                 b"ACK [55@2] {some_cmd} error message boi",
             )));
-            let result = ProtoClient::<'_, '_, TestMpdClient>::read_line(client.read());
+            let result = TestMpdClient::read_line(client.read());
 
             assert_eq!(Err(MpdError::Mpd(err)), result);
         }
@@ -392,7 +387,7 @@ mod tests {
             }
 
             client.set_read(BufReader::new(Box::new(Mock)));
-            let result = ProtoClient::<'_, '_, TestMpdClient>::read_line(client.read());
+            let result = TestMpdClient::read_line(client.read());
 
             assert_eq!(Err(MpdError::ClientClosed), result);
         }
@@ -410,9 +405,7 @@ mod tests {
         fn parses_correct_response() {
             let buf: &[u8] = b"val_b: a\nval_a: 5\nOK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_response::<TestMpdObject>();
 
             assert_eq!(result, Ok(TestMpdObject { val_a: "5".to_owned(), val_b: "a".to_owned() }));
         }
@@ -421,9 +414,7 @@ mod tests {
         fn returns_parse_error() {
             let buf: &[u8] = b"fail: lol\nOK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_response::<TestMpdObject>();
 
             assert_eq!(result, Err(MpdError::Generic(String::from("intentional fail"))));
         }
@@ -438,9 +429,7 @@ mod tests {
                 message: "error message boi".to_string(),
             };
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_response::<TestMpdObject>();
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -456,9 +445,7 @@ mod tests {
         fn parses_correct_response() {
             let buf: &[u8] = b"val_b: a\nval_a: 5\nOK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_opt_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_opt_response::<TestMpdObject>();
 
             assert_eq!(
                 result,
@@ -470,9 +457,7 @@ mod tests {
         fn returns_none() {
             let buf: &[u8] = b"OK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_opt_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_opt_response::<TestMpdObject>();
 
             assert_eq!(result, Ok(None));
         }
@@ -481,9 +466,7 @@ mod tests {
         fn returns_parse_error() {
             let buf: &[u8] = b"fail: lol\nOK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_opt_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_opt_response::<TestMpdObject>();
 
             assert_eq!(result, Err(MpdError::Generic(String::from("intentional fail"))));
         }
@@ -498,9 +481,7 @@ mod tests {
                 message: "error message boi".to_string(),
             };
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_opt_response::<TestMpdObject>();
+            let result = TestClient::new(buf).read_opt_response::<TestMpdObject>();
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -517,7 +498,7 @@ mod tests {
         fn parses_correct_response() {
             let buf: &[u8] = b"OK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf)).unwrap().read_ok();
+            let result = TestClient::new(buf).read_ok();
 
             assert_eq!(result, Ok(()));
         }
@@ -532,7 +513,7 @@ mod tests {
                 message: "error message boi".to_string(),
             };
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf)).unwrap().read_ok();
+            let result = TestClient::new(buf).read_ok();
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -541,7 +522,7 @@ mod tests {
         fn returns_error_when_receiving_value() {
             let buf: &[u8] = b"idc\nOK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf)).unwrap().read_ok();
+            let result = TestClient::new(buf).read_ok();
 
             assert_eq!(result, Err(MpdError::Generic(String::from("Expected 'OK' but got 'idc'"))));
         }
@@ -563,9 +544,7 @@ mod tests {
                 message: "error message boi".to_string(),
             };
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_bin_inner(&mut Vec::new());
+            let result = TestClient::new(buf).read_bin_inner(&mut Vec::new());
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
         }
@@ -574,9 +553,7 @@ mod tests {
         fn returns_error_when_unknown_receiving_value() {
             let buf: &[u8] = b"idc: value\nOK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_bin_inner(&mut Vec::new());
+            let result = TestClient::new(buf).read_bin_inner(&mut Vec::new());
 
             assert_eq!(
                 result,
@@ -590,9 +567,7 @@ mod tests {
         fn returns_none_when_unknown_receiving_unexpected_ok() {
             let buf: &[u8] = b"OK\n";
 
-            let result = ProtoClient::new("", &mut TestClient::new(buf))
-                .unwrap()
-                .read_bin_inner(&mut Vec::new());
+            let result = TestClient::new(buf).read_bin_inner(&mut Vec::new());
 
             assert_eq!(result, Ok(None));
         }
@@ -604,10 +579,9 @@ mod tests {
             let buf_end: &[u8] = b"\nOK\n";
             let c = [buf, bytes, buf_end].concat();
             let mut client = TestClient::new(&c);
-            let mut command = ProtoClient::new("", &mut client).unwrap();
 
             let mut buf = Vec::new();
-            let result = command.read_bin_inner(&mut buf);
+            let result = client.read_bin_inner(&mut buf);
 
             assert_eq!(buf, bytes);
             assert_eq!(
