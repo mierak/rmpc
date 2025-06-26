@@ -1,4 +1,5 @@
 use anyhow::Result;
+use bon::Builder;
 use itertools::Itertools;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
@@ -195,6 +196,7 @@ pub enum PropertyKindFileOrText<T: Clone> {
     Sticker(String),
     Property(T),
     Group(Vec<PropertyFile<T>>),
+    Transform(TransformFile<T>),
 }
 
 #[skip_serializing_none]
@@ -211,12 +213,14 @@ pub enum PropertyKindOrText<T> {
     Sticker(String),
     Property(T),
     Group(Vec<Property<T>>),
+    Transform(Transform<T>),
 }
 
 impl<T: Clone> PropertyKindOrText<T> {
     pub fn contains_stickers(&self) -> bool {
         match self {
             PropertyKindOrText::Text(_) => false,
+            PropertyKindOrText::Transform(_) => false,
             PropertyKindOrText::Sticker(_) => true,
             PropertyKindOrText::Property(_) => false,
             PropertyKindOrText::Group(group) => {
@@ -235,6 +239,7 @@ impl<T: Clone> PropertyKindOrText<T> {
         match prop {
             PropertyKindOrText::Text(_) => {}
             PropertyKindOrText::Sticker(_) => {}
+            PropertyKindOrText::Transform(_) => {}
             PropertyKindOrText::Property(p) => buf.push(p.clone()),
             PropertyKindOrText::Group(items) => {
                 for p in items {
@@ -245,6 +250,21 @@ impl<T: Clone> PropertyKindOrText<T> {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TransformFile<T: Clone> {
+    Truncate {
+        content: Box<PropertyFile<T>>,
+        length: usize,
+        #[serde(default = "defaults::bool::<false>")]
+        from_start: bool,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Transform<T> {
+    Truncate { content: Box<Property<T>>, length: usize, from_start: bool },
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum PropertyKind {
     Song(SongProperty),
@@ -252,7 +272,7 @@ pub enum PropertyKind {
     Widget(WidgetProperty),
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Builder)]
 pub struct Property<T> {
     pub kind: PropertyKindOrText<T>,
     pub style: Option<Style>,
@@ -463,6 +483,15 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
         Ok(Self {
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Transform(TransformFile::Truncate {
+                    content,
+                    length,
+                    from_start,
+                }) => PropertyKindOrText::Transform(Transform::Truncate {
+                    content: Box::new((*content).try_into()?),
+                    length,
+                    from_start,
+                }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => {
                     PropertyKindOrText::Property(match prop {
