@@ -17,6 +17,8 @@ use super::{
         PropertyKindOrText,
         SongProperty,
         SongPropertyFile,
+        Transform,
+        TransformFile,
     },
     style::ToConfigOr,
 };
@@ -182,6 +184,7 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                     let label = v.label.unwrap_or_else(|| match &prop.kind {
                         PropertyKindOrText::Text { .. } => String::new(),
                         PropertyKindOrText::Sticker { .. } => String::new(),
+                        PropertyKindOrText::Transform { .. } => String::new(),
                         PropertyKindOrText::Property(prop) => prop.to_string(),
                         PropertyKindOrText::Group(_) => String::new(),
                     });
@@ -231,6 +234,15 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
         Ok(Self {
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Transform(TransformFile::Truncate {
+                    content,
+                    length,
+                    from_start,
+                }) => PropertyKindOrText::Transform(Transform::Truncate {
+                    content: Box::new((*content).try_into()?),
+                    length,
+                    from_start,
+                }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.into()),
                 PropertyKindFileOrText::Group(group) => {
