@@ -27,6 +27,7 @@ pub mod properties;
 pub mod queue_table;
 mod scrollbar;
 mod style;
+pub mod volume_slider;
 
 pub use style::{ConfigColor, Modifiers, StyleFile};
 

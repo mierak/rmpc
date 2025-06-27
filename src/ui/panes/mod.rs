@@ -29,6 +29,7 @@ use strum::Display;
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
 use unicase::UniCase;
+use volume::VolumePane;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
@@ -84,6 +85,7 @@ pub mod queue;
 pub mod search;
 pub mod tabs;
 pub mod tag_browser;
+pub mod volume;
 
 #[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'pane_ref, 'pane> {
@@ -167,8 +169,14 @@ impl<'panes> PaneContainer<'panes> {
     pub fn init_other_panes(
         context: &AppContext,
     ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
-        context.config.tabs.tabs.iter().flat_map(|(_name, tab)| {
-            tab.panes.panes_iter().filter_map(|pane| match &pane.pane {
+        context
+            .config
+            .tabs
+            .tabs
+            .iter()
+            .flat_map(|(_name, tab)| tab.panes.panes_iter())
+            .chain(context.config.theme.layout.panes_iter())
+            .filter_map(|pane| match &pane.pane {
                 PaneType::Browser { root_tag, separator } => Some((
                     pane.pane.clone(),
                     Box::new(TagBrowserPane::new(
@@ -178,9 +186,12 @@ impl<'panes> PaneContainer<'panes> {
                         context,
                     )) as Box<dyn BoxedPane>,
                 )),
+                PaneType::Volume { kind } => Some((
+                    pane.pane.clone(),
+                    Box::new(VolumePane::new(kind.clone())) as Box<dyn BoxedPane>,
+                )),
                 _ => None,
             })
-        })
     }
 
     pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
@@ -214,6 +225,11 @@ impl<'panes> PaneContainer<'panes> {
                     context,
                 )))
             }
+            p @ PaneType::Volume { .. } => Ok(Panes::Others(
+                self.others
+                    .get_mut(pane)
+                    .with_context(|| format!("expected pane to be defined {p:?}"))?,
+            )),
             p @ PaneType::Browser { .. } => Ok(Panes::Others(
                 self.others
                     .get_mut(pane)

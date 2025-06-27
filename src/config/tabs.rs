@@ -12,6 +12,7 @@ use super::theme::{
     PercentOrLength,
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
     queue_table::ParseSizeError,
+    volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
 };
 use crate::shared::id::{self, Id};
 
@@ -49,6 +50,10 @@ pub enum PaneTypeFile {
     AlbumArt,
     Lyrics,
     ProgressBar,
+    Volume {
+        #[serde(default)]
+        kind: VolumeTypeFile,
+    },
     Header,
     Tabs,
     TabContent,
@@ -83,6 +88,9 @@ pub enum PaneType {
     AlbumArt,
     Lyrics,
     ProgressBar,
+    Volume {
+        kind: VolumeType,
+    },
     Header,
     Tabs,
     TabContent,
@@ -104,10 +112,11 @@ pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 1] =
     [PaneTypeDiscriminants::Property];
 
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 10] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
+    PaneTypeDiscriminants::Volume,
     PaneTypeDiscriminants::Header,
     PaneTypeDiscriminants::Tabs,
     PaneTypeDiscriminants::TabContent,
@@ -117,10 +126,11 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 8] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
+    PaneTypeDiscriminants::Volume,
     PaneTypeDiscriminants::Header,
     PaneTypeDiscriminants::Tabs,
     PaneTypeDiscriminants::TabContent,
@@ -134,9 +144,11 @@ impl Pane {
     }
 }
 
-impl From<PaneTypeFile> for PaneType {
-    fn from(value: PaneTypeFile) -> Self {
-        match value {
+impl TryFrom<PaneTypeFile> for PaneType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PaneTypeFile) -> Result<PaneType, Self::Error> {
+        Ok(match value {
             PaneTypeFile::Queue => PaneType::Queue,
             #[cfg(debug_assertions)]
             PaneTypeFile::Logs => PaneType::Logs,
@@ -149,6 +161,11 @@ impl From<PaneTypeFile> for PaneType {
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
             PaneTypeFile::ProgressBar => PaneType::ProgressBar,
+            PaneTypeFile::Volume { kind } => PaneType::Volume {
+                kind: match kind {
+                    VolumeTypeFile::Slider(cfg) => VolumeType::Slider(cfg.into_config()?),
+                },
+            },
             PaneTypeFile::Header => PaneType::Header,
             PaneTypeFile::Tabs => PaneType::Tabs,
             PaneTypeFile::TabContent => PaneType::TabContent,
@@ -168,7 +185,7 @@ impl From<PaneTypeFile> for PaneType {
                 PaneType::Browser { root_tag: tag, separator }
             }
             PaneTypeFile::Cava => PaneType::Cava,
-        }
+        })
     }
 }
 
@@ -350,6 +367,8 @@ pub enum PaneConversionError {
     MissingComponent(String),
     #[error("Failed to parse pane size: {0}")]
     ParseError(#[from] ParseSizeError),
+    #[error("Failed to parse pane: {0}")]
+    Generic(#[from] anyhow::Error),
 }
 
 impl PaneOrSplitFile {
@@ -360,7 +379,7 @@ impl PaneOrSplitFile {
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
-                pane: pane_type_file.clone().into(),
+                pane: pane_type_file.clone().try_into()?,
                 borders: b,
                 id: id::new(),
             }),
@@ -498,6 +517,22 @@ impl Default for TabsFile {
             },
         ])
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VolumeTypeFile {
+    Slider(VolumeSliderConfigFile),
+}
+
+impl Default for VolumeTypeFile {
+    fn default() -> Self {
+        Self::Slider(VolumeSliderConfigFile::default())
+    }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
+pub enum VolumeType {
+    Slider(VolumeSliderConfig),
 }
 
 pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()> {
