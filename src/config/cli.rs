@@ -261,6 +261,11 @@ pub enum Command {
         #[command(subcommand)]
         command: RemoteCmd,
     },
+    /// Sends a message to given channel for inter client communication.
+    SendMessage {
+        channel: String,
+        content: String,
+    },
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
