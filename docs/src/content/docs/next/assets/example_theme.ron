@@ -46,12 +46,6 @@
         elapsed_style: (fg: "blue"),
         thumb_style: (fg: "blue", bg: "#1e2030"),
     ),
-    volume_slider: (
-        symbols: ["♪", "─", "●", "─", "♫"],
-        track_style: (fg: "dark_gray"),
-        filled_style: (fg: "blue"),
-        thumb_style: (fg: "blue"),
-    ),
     scrollbar: (
         symbols: ["│", "█", "▲", "▼"],
         track_style: (),
@@ -110,7 +104,14 @@
                             size: "50%",
                         ),
                         (
-                            pane: Pane(Volume),
+                            pane: Pane(Volume(
+                                kind: Slider(
+                                    symbols: ["♪", "─", "●", "─", "♫"],
+                                    track_style: (fg: "dark_gray"),
+                                    filled_style: (fg: "blue"),
+                                    thumb_style: (fg: "blue"),
+                                )
+                            )),
                             size: "50%",
                         ),
                     ],
