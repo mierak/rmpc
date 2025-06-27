@@ -6,7 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added new `Volume` pane with mouse control support.
+
 ### Changed
+
+- Moved Volume configuration into `VolumeKind` enum to allow future extensions.
 
 ### Fixed
 
