@@ -640,6 +640,10 @@ impl MpdClient for TestMpdClient {
     fn move_output(&mut self, _output_name: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
+
+    fn send_message(&mut self, channel: &str, content: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }
 
 impl SocketClient for TestMpdClient {
