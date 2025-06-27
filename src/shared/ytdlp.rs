@@ -13,7 +13,7 @@ use rustix::path::Arg;
 use super::dependencies;
 use crate::{
     config::cli_config::CliConfig,
-    shared::macros::{status_info, status_warn},
+    shared::macros::{status_error, status_info, status_warn},
 };
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl<'a> YtDlp<'a> {
         Ok(Self { cache_dir })
     }
 
-    pub fn init_and_download(config: &CliConfig, url: &str) -> Result<String> {
+    pub fn init_and_download(config: &CliConfig, url: &str) -> Result<Vec<String>> {
         let Some(cache_dir) = &config.cache_dir else {
             bail!("Youtube support requires 'cache_dir' to be configured")
         };
@@ -51,13 +51,65 @@ impl<'a> YtDlp<'a> {
         Ok(file_path)
     }
 
-    pub fn download(&self, url: &str) -> Result<String> {
-        let id: YtDlpHost = url.parse()?;
+    pub fn download(&self, url: &str) -> Result<Vec<String>> {
+        let id: YtDlpPlaylistOrHost = url.parse()?;
+        match id {
+            YtDlpPlaylistOrHost::Single(id) => Ok(vec![self.download_single(&id)?]),
+            YtDlpPlaylistOrHost::Playlist(playlist) => {
+                let mut command = Command::new("yt-dlp");
+                command.arg("--print");
+                command.arg("%(id)s");
+                command.arg("--flat-playlist");
+                command.arg("--compat-options");
+                command.arg("no-youtube-unavailable-videos");
+                command.arg(playlist.id);
+                let args = command
+                    .get_args()
+                    .map(|arg| format!("\"{}\"", arg.to_string_lossy()))
+                    .join(" ")
+                    .to_string();
+                log::debug!(args = args.as_str(); "Executing yt-dlp");
 
+                let out = command.output()?;
+                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                let exit_code = out.status.code();
+                log::trace!(stdout = stdout.as_str().trim(), stderr = stderr.as_str().trim(), exit_code:?; "yt-dlp finished");
+
+                if exit_code != Some(0) {
+                    log::error!(stderr = stderr.as_str().trim();"yt-dlp failed");
+                    bail!(
+                        "yt-dlp failed with exit code: {}. Check logs for more details.",
+                        exit_code.map_or_else(|| "None".to_string(), |c| c.to_string())
+                    );
+                }
+
+                let (success, error): (Vec<_>, Vec<_>) = stdout
+                    .lines()
+                    .map(|line| YtDlpHost {
+                        id: line.to_owned(),
+                        filename: line.to_owned(),
+                        kind: playlist.kind,
+                    })
+                    .map(|id| self.download_single(&id))
+                    .partition_result();
+
+                for err in error {
+                    status_error!("Failed to download video: {err}");
+                }
+
+                Ok(success)
+            }
+        }
+    }
+
+    fn download_single(&self, id: &YtDlpHost) -> Result<String> {
         if let Some(cached_file) = id.get_cached(self.cache_dir)? {
             log::debug!(file:? = cached_file.as_str(); "Youtube video already downloaded");
             return Ok(cached_file.as_str()?.to_string());
         }
+
+        status_info!("Downloading video with id: {}", id.id);
 
         let mut cache = id.cache_subdir(self.cache_dir);
         std::fs::create_dir_all(&cache)?;
@@ -108,6 +160,16 @@ impl<'a> YtDlp<'a> {
             .transpose()?
             .ok_or_else(|| anyhow!("yt-dlp failed to download video"))
     }
+}
+
+struct YtDlpPlaylist {
+    kind: YtDlpHostKind,
+    id: String,
+}
+
+enum YtDlpPlaylistOrHost {
+    Single(YtDlpHost),
+    Playlist(YtDlpPlaylist),
 }
 
 struct YtDlpHost {
@@ -188,13 +250,14 @@ impl YtDlpHost {
     }
 }
 
+#[derive(Clone, Copy)]
 enum YtDlpHostKind {
     Youtube,
     Soundcloud,
     NicoVideo,
 }
 
-impl FromStr for YtDlpHost {
+impl FromStr for YtDlpPlaylistOrHost {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -206,23 +269,37 @@ impl FromStr for YtDlpHost {
 
         match host.strip_prefix("www.").unwrap_or(host) {
             "youtube.com" => {
-                let is_watch_url = url
+                let segments = url
                     .path_segments()
                     .with_context(|| format!("Invalid youtube video url: '{s}'"))?
-                    .contains("watch");
+                    .collect_vec();
 
-                if !is_watch_url {
+                let is_watch_url = segments.contains(&"watch");
+                let is_playlist_url = segments.contains(&"playlist")
+                    || url.query_pairs().any(|(key, _)| key == "list");
+
+                if is_playlist_url {
+                    url.query_pairs()
+                        .find(|(k, _)| k == "list")
+                        .map(|(_, v)| YtDlpPlaylist {
+                            id: v.to_string(),
+                            kind: YtDlpHostKind::Youtube,
+                        })
+                        .ok_or_else(|| anyhow!("No playlist id found in url"))
+                        .map(YtDlpPlaylistOrHost::Playlist)
+                } else if is_watch_url {
+                    url.query_pairs()
+                        .find(|(k, _)| k == "v")
+                        .map(|(_, v)| YtDlpHost {
+                            id: v.to_string(),
+                            filename: v.to_string(),
+                            kind: YtDlpHostKind::Youtube,
+                        })
+                        .ok_or_else(|| anyhow!("No video id found in url"))
+                        .map(YtDlpPlaylistOrHost::Single)
+                } else {
                     bail!("Invalid youtube video url: '{}'", s);
                 }
-
-                url.query_pairs()
-                    .find(|(k, _)| k == "v")
-                    .map(|(_, v)| YtDlpHost {
-                        id: v.to_string(),
-                        filename: v.to_string(),
-                        kind: YtDlpHostKind::Youtube,
-                    })
-                    .ok_or_else(|| anyhow!("No video id found in url"))
             }
             "youtu.be" => url
                 .path_segments()
@@ -233,7 +310,8 @@ impl FromStr for YtDlpHost {
                     filename: x.to_string(),
                     kind: YtDlpHostKind::Youtube,
                 })
-                .ok_or_else(|| anyhow!("No video id foun in url")),
+                .ok_or_else(|| anyhow!("No video id found in url"))
+                .map(YtDlpPlaylistOrHost::Single),
             "soundcloud.com" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
                 let Some(username) = path_segments.next() else {
@@ -242,11 +320,11 @@ impl FromStr for YtDlpHost {
                 let Some(track_name) = path_segments.next() else {
                     bail!("Invalid soundcloud url, no track name: '{}'", s);
                 };
-                Ok(YtDlpHost {
+                Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
                     id: format!("{username}/{track_name}"),
                     filename: format!("{username}-{track_name}"),
                     kind: YtDlpHostKind::Soundcloud,
-                })
+                }))
             }
             "nicovideo.jp" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
@@ -256,11 +334,11 @@ impl FromStr for YtDlpHost {
                 let Some(id) = path_segments.next() else {
                     bail!("Invalid nicovideo url, no video id: '{}'", s);
                 };
-                Ok(YtDlpHost {
+                Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
                     id: id.to_string(),
                     filename: id.to_string(),
                     kind: YtDlpHostKind::NicoVideo,
-                })
+                }))
             }
             _ => bail!("Invalid yt-dlp url: '{}'. Received hostname: '{}'", s, host),
         }
