@@ -169,7 +169,6 @@ impl<'panes> PaneContainer<'panes> {
     pub fn init_other_panes(
         context: &AppContext,
     ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
-        log::debug!("Initializing other panes");
         context
             .config
             .tabs

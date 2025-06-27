@@ -12,8 +12,6 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Moved Volume configuration into `VolumeKind` enum to allow future extensions.
-
 ### Fixed
 
 ## [0.9.0] - 2025-06-23

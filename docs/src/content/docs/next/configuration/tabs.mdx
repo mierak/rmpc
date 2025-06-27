@@ -86,6 +86,7 @@ Rmpc has several pane_types which can be displayed. These are:
 - `Tabs` - Displays a simple tab bar showing what tabs are available and which one is active
 - `Property` - A special pane which can display any property as described in the <a href={path("configuration/header/#header_property")}>Header config</a>
   including styling, default values etc. Check the [Example](#property-pane) for more info.
+- `Volume` - Interactive volume slider with mouse support. Supports `Volume(kind: Slider(<config>))` configuration.
 
 ## borders
 
@@ -251,3 +252,41 @@ tabs: [
 </details>
 
 <Image src={example_property_pane} width={800} alt="Example property pane" />
+
+### Volume Pane
+
+<ConfigValue name="Volume" customText="Volume(kind: Slider(<config>))" />
+
+The Volume pane provides an interactive volume slider with mouse support. You can click to set volume directly or use scroll wheel to adjust volume in steps.
+
+Currently, only the `Slider` kind is supported.
+
+<ConfigValue name="kind" customText="Slider(symbols: <symbols[]>, track_style: <style>, filled_style: <style>, thumb_style: <style>)" />
+
+Configure the appearance of the volume slider:
+
+- `symbols` - Array of 5 strings defining the visual elements: `[start, filled, thumb, empty, end]`
+  - `start` - Symbol at the beginning of the slider (default: "♪")
+  - `filled` - Symbol for the filled portion (default: "─")
+  - `thumb` - Symbol for the current position indicator (default: "●") 
+  - `empty` - Symbol for the empty portion (default: "─")
+  - `end` - Symbol at the end of the slider (default: "♫")
+
+- `filled_style` - Style for the filled portion of the slider (default: blue foreground)
+- `thumb_style` - Style for the thumb/position indicator (default: blue foreground)
+- `track_style` - Style for the empty portion of the slider (default: dark gray foreground)
+
+#### Example
+
+```rust
+Volume(
+    kind: Slider(
+        symbols: ["🔈", "━", "●", "━", "🔊"],
+        track_style: (fg: "gray"),
+        filled_style: (fg: "green"),
+        thumb_style: (fg: "white", bg: "green"),
+    )
+)
+```
+
+This creates a volume slider with speaker icons at the ends, using green for the filled portion and a white thumb with green background.
