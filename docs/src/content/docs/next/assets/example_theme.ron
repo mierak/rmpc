@@ -46,6 +46,12 @@
         elapsed_style: (fg: "blue"),
         thumb_style: (fg: "blue", bg: "#1e2030"),
     ),
+    volume_slider: (
+        symbols: ["♪", "─", "●", "─", "♫"],
+        track_style: (fg: "dark_gray"),
+        filled_style: (fg: "blue"),
+        thumb_style: (fg: "blue"),
+    ),
     scrollbar: (
         symbols: ["│", "█", "▲", "▼"],
         track_style: (),
@@ -96,7 +102,19 @@
                 size: "100%",
             ),
             (
-                pane: Pane(ProgressBar),
+                pane: Split(
+                    direction: Horizontal,
+                    panes: [
+                        (
+                            pane: Pane(ProgressBar),
+                            size: "50%",
+                        ),
+                        (
+                            pane: Pane(Volume),
+                            size: "50%",
+                        ),
+                    ],
+                ),
                 size: "1",
             ),
         ],
