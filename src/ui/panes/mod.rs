@@ -12,7 +12,6 @@ use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use property::PropertyPane;
 use queue::QueuePane;
-use volume::VolumePane;
 use ratatui::{
     Frame,
     layout::Layout,
@@ -25,6 +24,7 @@ use strum::Display;
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
 use unicase::UniCase;
+use volume::VolumePane;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
