@@ -627,6 +627,7 @@ impl<'ui> Ui<'ui> {
                 Panes::Cava(p) => p.on_event(&mut event, visible, context),
                 // Property and the dummy TabContent pane do not need to receive events
                 Panes::Property(_) | Panes::TabContent => Ok(()),
+                Panes::Volume(p) => p.on_event(&mut event, visible, context),
             }?;
         }
 
@@ -669,6 +670,7 @@ impl<'ui> Ui<'ui> {
                     // Property and the dummy TabContent pane do not need to receive command
                     // notifications
                     Panes::Property(_) | Panes::TabContent => Ok(()),
+                    Panes::Volume(p) => p.on_query_finished(id, data, visible, context),
                 }?;
             }
             None => match (id, data) {
@@ -862,6 +864,19 @@ impl Config {
             .thumb_char(&self.theme.progress_bar.symbols[2])
             .track_char(&self.theme.progress_bar.symbols[3])
             .end_char(&self.theme.progress_bar.symbols[4])
+    }
+
+    fn as_styled_volume_slider(&self) -> widgets::volume_slider::VolumeSlider {
+        let volume_slider_colors = &self.theme.volume_slider;
+        widgets::volume_slider::VolumeSlider::default()
+            .filled_style(volume_slider_colors.filled_style)
+            .thumb_style(volume_slider_colors.thumb_style)
+            .empty_style(volume_slider_colors.track_style)
+            .start_char(&self.theme.volume_slider.symbols[0])
+            .filled_char(&self.theme.volume_slider.symbols[1])
+            .thumb_char(&self.theme.volume_slider.symbols[2])
+            .empty_char(&self.theme.volume_slider.symbols[3])
+            .end_char(&self.theme.volume_slider.symbols[4])
     }
 
     fn as_styled_scrollbar(&self) -> Option<ratatui::widgets::Scrollbar> {

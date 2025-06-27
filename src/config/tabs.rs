@@ -49,6 +49,7 @@ pub enum PaneTypeFile {
     AlbumArt,
     Lyrics,
     ProgressBar,
+    Volume,
     Header,
     Tabs,
     TabContent,
@@ -83,6 +84,7 @@ pub enum PaneType {
     AlbumArt,
     Lyrics,
     ProgressBar,
+    Volume,
     Header,
     Tabs,
     TabContent,
@@ -104,10 +106,11 @@ pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 1] =
     [PaneTypeDiscriminants::Property];
 
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 10] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
+    PaneTypeDiscriminants::Volume,
     PaneTypeDiscriminants::Header,
     PaneTypeDiscriminants::Tabs,
     PaneTypeDiscriminants::TabContent,
@@ -117,10 +120,11 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 8] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 9] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
+    PaneTypeDiscriminants::Volume,
     PaneTypeDiscriminants::Header,
     PaneTypeDiscriminants::Tabs,
     PaneTypeDiscriminants::TabContent,
@@ -149,6 +153,7 @@ impl From<PaneTypeFile> for PaneType {
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
             PaneTypeFile::ProgressBar => PaneType::ProgressBar,
+            PaneTypeFile::Volume => PaneType::Volume,
             PaneTypeFile::Header => PaneType::Header,
             PaneTypeFile::Tabs => PaneType::Tabs,
             PaneTypeFile::TabContent => PaneType::TabContent,
@@ -285,7 +290,22 @@ impl Default for PaneOrSplitFile {
                 SubPaneFile {
                     size: "1".to_string(),
                     borders: BordersFile::NONE,
-                    pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
+                    pane: PaneOrSplitFile::Split {
+                        direction: DirectionFile::Horizontal,
+                        borders: BordersFile::NONE,
+                        panes: vec![
+                            SubPaneFile {
+                                size: "50%".to_string(),
+                                borders: BordersFile::NONE,
+                                pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
+                            },
+                            SubPaneFile {
+                                size: "50%".to_string(),
+                                borders: BordersFile::NONE,
+                                pane: PaneOrSplitFile::Pane(PaneTypeFile::Volume),
+                            },
+                        ],
+                    },
                 },
             ],
         }

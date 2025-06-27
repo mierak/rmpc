@@ -12,6 +12,7 @@ use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use property::PropertyPane;
 use queue::QueuePane;
+use volume::VolumePane;
 use ratatui::{
     Frame,
     layout::Layout,
@@ -78,6 +79,7 @@ pub mod queue;
 pub mod search;
 pub mod tabs;
 pub mod tag_browser;
+pub mod volume;
 
 #[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'pane_ref, 'pane> {
@@ -93,6 +95,7 @@ pub enum Panes<'pane_ref, 'pane> {
     AlbumArt(&'pane_ref mut AlbumArtPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
+    Volume(&'pane_ref mut VolumePane),
     Header(&'pane_ref mut HeaderPane),
     Tabs(&'pane_ref mut TabsPane<'pane>),
     #[cfg(debug_assertions)]
@@ -121,6 +124,7 @@ pub struct PaneContainer<'panes> {
     pub album_art: AlbumArtPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
+    pub volume: VolumePane,
     pub header: HeaderPane,
     pub tabs: TabsPane<'panes>,
     pub cava: CavaPane,
@@ -149,6 +153,7 @@ impl<'panes> PaneContainer<'panes> {
             album_art: AlbumArtPane::new(context),
             lyrics: LyricsPane::new(context),
             progress_bar: ProgressBarPane::new(),
+            volume: VolumePane::new(),
             header: HeaderPane::new(),
             tabs: TabsPane::new(context)?,
             cava: CavaPane::new(context),
@@ -195,6 +200,7 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
+            PaneType::Volume => Ok(Panes::Volume(&mut self.volume)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
             PaneType::Tabs => Ok(Panes::Tabs(&mut self.tabs)),
             PaneType::TabContent => Ok(Panes::TabContent),
@@ -233,6 +239,7 @@ macro_rules! pane_call {
             Panes::AlbumArt(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
+            Panes::Volume(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),
             Panes::Tabs(s) => s.$fn($($param),+),
             Panes::TabContent => Ok(()),

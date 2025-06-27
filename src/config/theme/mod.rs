@@ -15,6 +15,7 @@ use self::{
     queue_table::{QueueTableColumns, QueueTableColumnsFile},
     scrollbar::ScrollbarConfig,
     style::{StringColor, ToConfigOr},
+    volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
 };
 use crate::mpd::commands::metadata_tag::MetadataTag;
 
@@ -27,6 +28,7 @@ pub mod properties;
 pub mod queue_table;
 mod scrollbar;
 mod style;
+mod volume_slider;
 
 pub use style::{ConfigColor, Modifiers, StyleFile};
 
@@ -74,6 +76,7 @@ pub struct UiConfig {
     pub level_styles: LevelStyles,
     pub lyrics: LyricsConfig,
     pub cava: CavaTheme,
+    pub volume_slider: VolumeSliderConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -121,6 +124,8 @@ pub struct UiConfigFile {
     pub(super) lyrics: LyricsConfigFile,
     #[serde(default)]
     pub(super) cava: CavaThemeFile,
+    #[serde(default)]
+    pub(super) volume_slider: VolumeSliderConfigFile,
 }
 
 impl Default for UiConfigFile {
@@ -196,6 +201,7 @@ impl Default for UiConfigFile {
             components: HashMap::default(),
             lyrics: LyricsConfigFile::default(),
             cava: CavaThemeFile::default(),
+            volume_slider: VolumeSliderConfigFile::default(),
         }
     }
 }
@@ -406,6 +412,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .to_config_or(None, None)?,
             level_styles: value.level_styles.try_into()?,
             lyrics: value.lyrics.into(),
+            volume_slider: value.volume_slider.into_config()?,
         })
     }
 }

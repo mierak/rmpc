@@ -15,6 +15,7 @@ pub mod scan_status;
 pub mod scrolling_line;
 pub mod tabs;
 pub mod volume;
+pub mod volume_slider;
 
 fn get_line_offset(line_width: u16, text_area_width: u16, alignment: Alignment) -> u16 {
     match alignment {
