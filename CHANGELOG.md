@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Added new `Volume` pane with mouse control support.
 - Added `Transform` properties and `Truncate` transformation
 - Added `sendmessage` cli command for inter client communication
+- Support for youtube playlists
 
 ### Changed
 
