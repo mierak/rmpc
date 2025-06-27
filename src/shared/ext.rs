@@ -1,3 +1,176 @@
+pub mod span {
+    use std::borrow::Cow;
+
+    use ratatui::text::Span;
+    use unicode_segmentation::UnicodeSegmentation;
+
+    pub trait SpanExt {
+        /// Truncate the end of the span's content to the specified number of
+        /// characters. Returns how many characters were consumed form
+        /// the specified remaining length.
+        fn truncate_end(&mut self, remaining_length: usize) -> usize;
+
+        /// Truncate the start of the span's content to the specified number of
+        /// characters. Returns how many characters were consumed form
+        /// the specified remaining length.
+        fn truncate_start(&mut self, remaining_length: usize) -> usize;
+    }
+
+    impl SpanExt for String {
+        fn truncate_end(&mut self, remaining_length: usize) -> usize {
+            if remaining_length == 0 {
+                self.clear();
+                return 0;
+            }
+
+            if let Some((idx, s)) =
+                self.grapheme_indices(true).nth(remaining_length.saturating_sub(1))
+            {
+                self.drain(idx + s.len()..);
+            }
+            remaining_length
+        }
+
+        fn truncate_start(&mut self, remaining_length: usize) -> usize {
+            if remaining_length == 0 {
+                self.clear();
+                return 0;
+            }
+
+            if let Some((idx, _)) =
+                self.grapheme_indices(true).rev().nth(remaining_length.saturating_sub(1))
+            {
+                self.drain(0..idx);
+            }
+            remaining_length
+        }
+    }
+
+    impl SpanExt for Span<'_> {
+        fn truncate_end(&mut self, remaining_length: usize) -> usize {
+            let chars = self.content.graphemes(true).count();
+            if chars <= remaining_length {
+                return chars;
+            }
+
+            if remaining_length == 0 {
+                self.content = Cow::Borrowed("");
+                return 0;
+            }
+
+            match &mut self.content {
+                Cow::Borrowed(content) => {
+                    let mut strbuf = String::new();
+                    for (i, c) in content.graphemes(true).enumerate() {
+                        if i >= remaining_length {
+                            break;
+                        }
+                        strbuf.push_str(c);
+                    }
+
+                    self.content = strbuf.into();
+                    remaining_length
+                }
+                cow @ Cow::Owned(_) => {
+                    cow.to_mut().truncate_end(remaining_length);
+                    remaining_length
+                }
+            }
+        }
+
+        fn truncate_start(&mut self, remaining_length: usize) -> usize {
+            let chars = self.content.graphemes(true).count();
+            if chars <= remaining_length {
+                return chars;
+            }
+
+            if remaining_length == 0 {
+                self.content = Cow::Borrowed("");
+                return 0;
+            }
+
+            match &mut self.content {
+                Cow::Borrowed(content) => {
+                    let mut strbuf = String::new();
+                    for (i, c) in content.graphemes(true).rev().enumerate() {
+                        if i >= remaining_length {
+                            break;
+                        }
+                        strbuf.insert_str(0, c);
+                    }
+
+                    self.content = strbuf.into();
+                    remaining_length
+                }
+                cow @ Cow::Owned(_) => {
+                    cow.to_mut().truncate_start(remaining_length);
+                    remaining_length
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use std::borrow::Cow;
+
+        use ratatui::{
+            style::{Color, Style},
+            text::Span,
+        };
+
+        use super::SpanExt;
+
+        #[test]
+        fn with_borrowed_content() {
+            let content = Cow::Borrowed("Hello, world!");
+            let mut input = Span::styled(content, Style::default().fg(Color::Red));
+
+            let result = input.truncate_start(5);
+
+            assert_eq!(result, 5);
+            assert_eq!(input.content, "orld!");
+            assert_eq!(input.style.fg, Some(Color::Red));
+        }
+
+        #[test]
+        fn with_owned_content() {
+            let content = Cow::Owned("Hello, world!".into());
+            let mut input = Span::styled(content, Style::default().fg(Color::Red));
+
+            let result = input.truncate_start(5);
+
+            assert_eq!(result, 5);
+            assert_eq!(input.content, "orld!");
+            assert_eq!(input.style.fg, Some(Color::Red));
+        }
+
+        #[test]
+        fn shorter_than_remaining() {
+            let content = Cow::Owned("Hello, world!".into());
+            let mut input = Span::styled(content, Style::default().fg(Color::Red));
+
+            let result = input.truncate_start(99);
+
+            assert_eq!(result, 13);
+            assert_eq!(input.content, "Hello, world!");
+            assert_eq!(input.style.fg, Some(Color::Red));
+        }
+
+        #[test]
+        fn remaining_zero() {
+            let content = Cow::Owned("Hello, world!".into());
+            let mut input = Span::styled(content, Style::default().fg(Color::Red));
+
+            let result = input.truncate_start(0);
+
+            assert_eq!(result, 0);
+            assert_eq!(input.content, "");
+            assert_eq!(input.style.fg, Some(Color::Red));
+        }
+    }
+}
+
 pub mod error {
     use itertools::Itertools;
 

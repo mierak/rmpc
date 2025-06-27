@@ -1,4 +1,9 @@
-use std::{borrow::Cow, cmp::Ordering, collections::HashMap, time::Duration};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{HashMap, VecDeque},
+    time::Duration,
+};
 
 use album_art::AlbumArtPane;
 use albums::AlbumsPane;
@@ -46,6 +51,7 @@ use crate::{
                 PropertyKindOrText,
                 SongProperty,
                 StatusProperty,
+                Transform,
                 WidgetProperty,
             },
         },
@@ -56,7 +62,7 @@ use crate::{
         mpd_client::Tag,
     },
     shared::{
-        ext::{duration::DurationExt, num::NumExt},
+        ext::{duration::DurationExt, num::NumExt, span::SpanExt},
         key_event::KeyEvent,
         mouse_event::MouseEvent,
     },
@@ -658,6 +664,9 @@ impl Song {
                 PropertyKindOrText::Group(_) => format
                     .as_string(Some(self), "", TagResolutionStrategy::All)
                     .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
+                PropertyKindOrText::Transform(Transform::Truncate { .. }) => format
+                    .as_string(Some(self), "", TagResolutionStrategy::All)
+                    .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
             };
             if match_found.is_some_and(|v| v) {
                 return true;
@@ -746,6 +755,44 @@ impl Song {
                 }
                 return Some(buf);
             }
+            PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
+                self.as_line_ellipsized(content, max_len, symbols, tag_separator, strategy)
+                    .map(|mut line| {
+                        let mut buf = VecDeque::new();
+                        let mut remaining_len = *length;
+                        let push_fn =
+                            if *from_start { VecDeque::push_front } else { VecDeque::push_back };
+                        let truncate_fn =
+                            if *from_start { Span::truncate_start } else { Span::truncate_end };
+                        let spans_len = line.spans.len();
+
+                        for i in 0..spans_len {
+                            if remaining_len == 0 {
+                                break;
+                            }
+                            let i = if *from_start { spans_len - 1 - i } else { i };
+                            let mut span = std::mem::take(&mut line.spans[i]);
+
+                            let remaining = truncate_fn(&mut span, remaining_len);
+                            push_fn(&mut buf, span);
+                            remaining_len = remaining_len.saturating_sub(remaining);
+                        }
+
+                        line.spans = Vec::from(buf);
+                        line
+                    })
+                    .or_else(|| {
+                        format.default.as_ref().and_then(|format| {
+                            self.as_line_ellipsized(
+                                format,
+                                max_len,
+                                symbols,
+                                tag_separator,
+                                strategy,
+                            )
+                        })
+                    })
+            }
         }
     }
 }
@@ -800,6 +847,23 @@ impl Property<SongProperty> {
                     }
                 }
                 return Some(buf);
+            }
+            PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
+                content
+                    .as_string(song, tag_separator, strategy)
+                    .map(|mut result| {
+                        if *from_start {
+                            result.truncate_start(*length);
+                        } else {
+                            result.truncate_end(*length);
+                        }
+                        result
+                    })
+                    .or_else(|| {
+                        self.default
+                            .as_ref()
+                            .and_then(|d| d.as_string(song, tag_separator, strategy))
+                    })
             }
         }
     }
@@ -1009,6 +1073,37 @@ impl Property<PropertyKind> {
                 }
                 return Some(Either::Right(buf));
             }
+            PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
+                let truncate_fn =
+                    if *from_start { Span::truncate_start } else { Span::truncate_end };
+                match content.as_span(song, context, tag_separator, strategy) {
+                    Some(Either::Left(mut span)) => {
+                        truncate_fn(&mut span, *length);
+                        Some(Either::Left(span))
+                    }
+                    Some(Either::Right(mut spans)) => {
+                        let mut buf = VecDeque::new();
+                        let mut remaining_len = *length;
+                        let push_fn =
+                            if *from_start { VecDeque::push_front } else { VecDeque::push_back };
+                        let spans_len = spans.len();
+
+                        for i in 0..spans.len() {
+                            if remaining_len == 0 {
+                                break;
+                            }
+                            let i = if *from_start { spans_len - 1 - i } else { i };
+                            let mut span = std::mem::take(&mut spans[i]);
+
+                            let remaining = truncate_fn(&mut span, remaining_len);
+                            push_fn(&mut buf, span);
+                            remaining_len = remaining_len.saturating_sub(remaining);
+                        }
+                        Some(Either::Right(buf.into()))
+                    }
+                    None => self.default_as_span(song, context, tag_separator, strategy),
+                }
+            }
         }
     }
 }
@@ -1126,33 +1221,267 @@ impl StringExt for String {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod format_tests {
+    use std::{collections::HashMap, time::Duration};
+
+    use either::Either;
+    use ratatui::{
+        style::{Style, Stylize},
+        text::Span,
+    };
+    use rstest::rstest;
+
     use crate::{
-        config::theme::properties::{Property, PropertyKindOrText, SongProperty},
-        mpd::commands::Song,
+        config::theme::{
+            StyleFile,
+            TagResolutionStrategy,
+            properties::{
+                Property,
+                PropertyKind,
+                PropertyKindOrText,
+                SongProperty,
+                StatusProperty,
+                StatusPropertyFile,
+            },
+        },
+        context::AppContext,
+        mpd::commands::{Song, State, Status, Volume, status::OnOffOneshot},
+        tests::fixtures::app_context,
     };
 
-    mod correct_values {
-        use std::{collections::HashMap, time::Duration};
+    mod truncate {
+        use itertools::Itertools;
+        use ratatui::text::Line;
 
-        use either::Either;
-        use ratatui::{
-            style::{Style, Stylize},
-            text::Span,
-        };
-        use rstest::rstest;
+        use super::*;
+        use crate::config::theme::{SymbolsConfig, properties::Transform};
+
+        #[rstest]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 0, false, Either::Left(""))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 0, true, Either::Left(""))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 3, false, Either::Left("abc"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 3, true, Either::Left("fgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 8, false, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 8, true, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 99, false, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 99, true, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 3, false, Either::Right(vec!["ab", "c"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 3, true, Either::Right(vec!["f", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 8, false, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 8, true, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 99, false, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 99, true, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        fn as_span(
+            app_context: AppContext,
+            #[case] props: PropertyKindOrText<PropertyKind>,
+            #[case] length: usize,
+            #[case] from_start: bool,
+            #[case] expected: Either<&str, Vec<&str>>,
+        ) {
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Transform(Transform::Truncate {
+                    content: Box::new(Property { kind: props, style: None, default: None }),
+                    length,
+                    from_start,
+                }),
+                style: None,
+                default: None,
+            };
+
+            let result = format.as_span(None, &app_context, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(match expected {
+                    Either::Left(value) =>
+                        either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(value)),
+                    Either::Right(values) => either::Either::<Span<'_>, Vec<Span<'_>>>::Right(
+                        values.into_iter().map(Span::raw).collect()
+                    ),
+                })
+            );
+        }
+
+        #[rstest]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 0, false, "")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 0, true, "")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 3, false, "abc")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 3, true, "fgh")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 8, false, "abcdefgh")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 8, true, "abcdefgh")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 99, false, "abcdefgh")]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 99, true, "abcdefgh")]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 3, false, "abc")]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 3, true, "fgh")]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 8, false, "abcdefgh")]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 8, true, "abcdefgh")]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 99, false, "abcdefgh")]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 99, true, "abcdefgh")]
+        fn as_string(
+            #[case] props: PropertyKindOrText<SongProperty>,
+            #[case] length: usize,
+            #[case] from_start: bool,
+            #[case] expected: &str,
+        ) {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Transform(Transform::Truncate {
+                    content: Box::new(Property { kind: props, style: None, default: None }),
+                    length,
+                    from_start,
+                }),
+                style: None,
+                default: None,
+            };
+
+            let result = format.as_string(None, "", TagResolutionStrategy::All);
+
+            assert_eq!(result, Some(expected.to_string()));
+        }
+
+        #[rstest]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 0, false, Either::Left(""))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 0, true, Either::Left(""))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 3, false, Either::Left("abc"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 3, true, Either::Left("fgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 8, false, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 8, true, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 99, false, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Text("abcdefgh".into()), 99, true, Either::Left("abcdefgh"))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 3, false, Either::Right(vec!["ab", "c"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 3, true, Either::Right(vec!["f", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 8, false, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 8, true, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 99, false, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        #[case(PropertyKindOrText::Group(vec![
+                Property::builder().kind(PropertyKindOrText::Text("ab".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("cd".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("ef".into())).build(),
+                Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
+            ]), 99, true, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
+        fn as_line_ellipsized(
+            #[case] props: PropertyKindOrText<SongProperty>,
+            #[case] length: usize,
+            #[case] from_start: bool,
+            #[case] expected: Either<&str, Vec<&str>>,
+        ) {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Transform(Transform::Truncate {
+                    content: Box::new(Property { kind: props, style: None, default: None }),
+                    length,
+                    from_start,
+                }),
+                style: None,
+                default: None,
+            };
+
+            let song = Song::default();
+            let result = song.as_line_ellipsized(
+                &format,
+                999,
+                &SymbolsConfig::default(),
+                "",
+                TagResolutionStrategy::All,
+            );
+
+            assert_eq!(
+                result,
+                Some(match expected {
+                    Either::Left(value) => Line::from(value),
+                    Either::Right(values) =>
+                        Line::from(values.into_iter().map(Span::raw).collect_vec()),
+                })
+            );
+        }
+    }
+
+    mod correct_values {
         use test_case::test_case;
 
         use super::*;
-        use crate::{
-            config::theme::{
-                StyleFile,
-                TagResolutionStrategy,
-                properties::{PropertyKind, StatusProperty, StatusPropertyFile},
-            },
-            context::AppContext,
-            mpd::commands::{State, Status, Volume, status::OnOffOneshot},
-            tests::fixtures::app_context,
-        };
 
         #[test_case(SongProperty::Title, "title")]
         #[test_case(SongProperty::Artist, "artist")]
@@ -1354,10 +1683,7 @@ mod format_tests {
     }
 
     mod property {
-        use std::collections::HashMap;
-
         use super::*;
-        use crate::config::theme::TagResolutionStrategy;
 
         #[test]
         fn works() {
@@ -1431,10 +1757,7 @@ mod format_tests {
     }
 
     mod text {
-        use std::collections::HashMap;
-
         use super::*;
-        use crate::config::theme::TagResolutionStrategy;
 
         #[test]
         fn works() {
@@ -1487,10 +1810,7 @@ mod format_tests {
     }
 
     mod group {
-        use std::collections::HashMap;
-
         use super::*;
-        use crate::config::theme::TagResolutionStrategy;
 
         #[test]
         fn group_no_fallback() {

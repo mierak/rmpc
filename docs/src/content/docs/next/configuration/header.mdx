@@ -52,6 +52,35 @@ or predefined widgets.
 Will display static text in the table. Mostly useful for default values. For example if a song is missing an album tag,
 "Unknown Album" can be displayed by specifying `Text("Unknown Album")` as the default.
 
+### Transform
+
+<ConfigValue name="kind" type="other" customText="Transform(<transform>)" link="#property" />
+
+Apply a transformation to the given property. All transformations ignore style definitions, instead
+style the property directly.
+
+#### Truncate
+
+<ConfigValue
+    name="kind"
+    type="other"
+    customText="Transform(Truncate(content: <property>, length: <number>, from_start: bool))"
+    link="#property"
+/>
+
+Truncate the given property to a specified length. If `from_start` is true, the property is instead
+truncated from start.
+
+For example to truncate song's `date` in the `song_table_format` to the first 4 characters:
+
+```rust
+(
+    prop: (kind: Transform(Truncate(content: (kind: Property(Other("date"))), from_start: false, length: 4))),
+    width: "20%",
+    label: "Date"
+),
+```
+
 ### Group
 
 <ConfigValue name="kind" type="other" customText="Group(<property>[])" link="#property" />

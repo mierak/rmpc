@@ -393,6 +393,10 @@ impl Command {
                     Ok(())
                 }))
             }
+            Command::SendMessage { channel, content } => Ok(Box::new(move |client| {
+                client.send_message(&channel, &content)?;
+                Ok(())
+            })),
         }
     }
 }

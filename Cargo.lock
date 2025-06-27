@@ -1954,6 +1954,7 @@ dependencies = [
  "textwrap",
  "thiserror 2.0.12",
  "unicase",
+ "unicode-segmentation",
  "unicode-width 0.2.0",
  "url",
  "vergen-gitcl",

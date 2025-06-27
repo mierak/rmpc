@@ -30,6 +30,7 @@ use crate::mpd::{
     errors::MpdError,
     mpd_client::{Filter, MpdClient, SaveMode, SingleOrRange, Tag, ValueChange},
     proto_client::SocketClient,
+    version::Version,
 };
 
 #[fixture]
@@ -141,7 +142,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn enter_idle(&mut self) -> MpdResult<crate::mpd::proto_client::ProtoClient<'static, '_, Self>>
+    fn enter_idle(&mut self) -> MpdResult<()>
     where
         Self: SocketClient,
     {
@@ -639,6 +640,10 @@ impl MpdClient for TestMpdClient {
     fn move_output(&mut self, _output_name: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
+
+    fn send_message(&mut self, channel: &str, content: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }
 
 impl SocketClient for TestMpdClient {
@@ -652,5 +657,9 @@ impl SocketClient for TestMpdClient {
 
     fn clear_read_buf(&mut self) -> anyhow::Result<()> {
         Ok(())
+    }
+
+    fn version(&self) -> crate::mpd::version::Version {
+        Version::new(0, 0, 0)
     }
 }

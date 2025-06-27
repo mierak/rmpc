@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
     os::unix::net::UnixStream,
@@ -11,7 +10,7 @@ use log::debug;
 use super::{
     commands::mpd_config::MpdConfig,
     errors::MpdError,
-    proto_client::{ProtoClient, SocketClient},
+    proto_client::SocketClient,
     version::Version,
 };
 use crate::{
@@ -260,13 +259,6 @@ impl<'name> Client<'name> {
         self.stream.set_write_timeout(timeout)
     }
 
-    pub fn send<'cmd>(
-        &mut self,
-        command: impl Into<Cow<'cmd, str>>,
-    ) -> Result<ProtoClient<'cmd, '_, Self>, MpdError> {
-        ProtoClient::new(command, self)
-    }
-
     fn clear_read_buf(&mut self) -> Result<()> {
         log::trace!("Reinitialized read buffer");
         self.rx = BufReader::new(self.stream.try_clone()?);
@@ -285,5 +277,9 @@ impl SocketClient for Client<'_> {
 
     fn clear_read_buf(&mut self) -> Result<()> {
         self.clear_read_buf()
+    }
+
+    fn version(&self) -> Version {
+        self.version
     }
 }
