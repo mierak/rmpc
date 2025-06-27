@@ -3,6 +3,7 @@ use ratatui::{Frame, prelude::Rect};
 
 use super::Pane;
 use crate::{
+    config::{tabs::VolumeType, theme::volume_slider::VolumeSliderConfig},
     context::AppContext,
     mpd::{
         commands::volume::Bound,
@@ -12,17 +13,31 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    ui::widgets::volume_slider::VolumeSlider,
 };
 
 #[derive(Debug)]
 pub struct VolumePane {
     area: Rect,
+    config: VolumeType,
 }
 
 impl VolumePane {
-    pub fn new() -> Self {
-        Self { area: Rect::default() }
+    pub fn new(config: VolumeType) -> Self {
+        Self { area: Rect::default(), config }
     }
+}
+
+fn as_styled_volume_slider(config: &VolumeSliderConfig) -> VolumeSlider<'_> {
+    VolumeSlider::default()
+        .filled_style(config.filled_style)
+        .thumb_style(config.thumb_style)
+        .empty_style(config.track_style)
+        .start_char(&config.symbols[0])
+        .filled_char(&config.symbols[1])
+        .thumb_char(&config.symbols[2])
+        .empty_char(&config.symbols[3])
+        .end_char(&config.symbols[4])
 }
 
 impl Pane for VolumePane {
@@ -34,12 +49,14 @@ impl Pane for VolumePane {
     ) -> anyhow::Result<()> {
         self.area = area;
 
-        let volume_slider = context
-            .config
-            .as_styled_volume_slider()
-            .value(f32::from(*context.status.volume.value()) / 100.0);
+        match &self.config {
+            VolumeType::Slider(config) => {
+                let volume_slider = as_styled_volume_slider(config)
+                    .value(f32::from(*context.status.volume.value()) / 100.0);
 
-        frame.render_widget(volume_slider, self.area);
+                frame.render_widget(volume_slider, self.area);
+            }
+        }
 
         Ok(())
     }

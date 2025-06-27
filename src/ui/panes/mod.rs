@@ -95,7 +95,6 @@ pub enum Panes<'pane_ref, 'pane> {
     AlbumArt(&'pane_ref mut AlbumArtPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
-    Volume(&'pane_ref mut VolumePane),
     Header(&'pane_ref mut HeaderPane),
     Tabs(&'pane_ref mut TabsPane<'pane>),
     #[cfg(debug_assertions)]
@@ -124,7 +123,6 @@ pub struct PaneContainer<'panes> {
     pub album_art: AlbumArtPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
-    pub volume: VolumePane,
     pub header: HeaderPane,
     pub tabs: TabsPane<'panes>,
     pub cava: CavaPane,
@@ -153,7 +151,6 @@ impl<'panes> PaneContainer<'panes> {
             album_art: AlbumArtPane::new(context),
             lyrics: LyricsPane::new(context),
             progress_bar: ProgressBarPane::new(),
-            volume: VolumePane::new(),
             header: HeaderPane::new(),
             tabs: TabsPane::new(context)?,
             cava: CavaPane::new(context),
@@ -166,8 +163,15 @@ impl<'panes> PaneContainer<'panes> {
     pub fn init_other_panes(
         context: &AppContext,
     ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
-        context.config.tabs.tabs.iter().flat_map(|(_name, tab)| {
-            tab.panes.panes_iter().filter_map(|pane| match &pane.pane {
+        log::debug!("Initializing other panes");
+        context
+            .config
+            .tabs
+            .tabs
+            .iter()
+            .flat_map(|(_name, tab)| tab.panes.panes_iter())
+            .chain(context.config.theme.layout.panes_iter())
+            .filter_map(|pane| match &pane.pane {
                 PaneType::Browser { root_tag, separator } => Some((
                     pane.pane.clone(),
                     Box::new(TagBrowserPane::new(
@@ -177,9 +181,12 @@ impl<'panes> PaneContainer<'panes> {
                         context,
                     )) as Box<dyn BoxedPane>,
                 )),
+                PaneType::Volume { kind } => Some((
+                    pane.pane.clone(),
+                    Box::new(VolumePane::new(kind.clone())) as Box<dyn BoxedPane>,
+                )),
                 _ => None,
             })
-        })
     }
 
     pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
@@ -200,7 +207,6 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
-            PaneType::Volume => Ok(Panes::Volume(&mut self.volume)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
             PaneType::Tabs => Ok(Panes::Tabs(&mut self.tabs)),
             PaneType::TabContent => Ok(Panes::TabContent),
@@ -214,6 +220,11 @@ impl<'panes> PaneContainer<'panes> {
                     context,
                 )))
             }
+            p @ PaneType::Volume { .. } => Ok(Panes::Others(
+                self.others
+                    .get_mut(pane)
+                    .with_context(|| format!("expected pane to be defined {p:?}"))?,
+            )),
             p @ PaneType::Browser { .. } => Ok(Panes::Others(
                 self.others
                     .get_mut(pane)
@@ -239,7 +250,6 @@ macro_rules! pane_call {
             Panes::AlbumArt(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
-            Panes::Volume(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),
             Panes::Tabs(s) => s.$fn($($param),+),
             Panes::TabContent => Ok(()),

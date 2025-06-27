@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{StyleFile, style::ToConfigOr};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct VolumeSliderConfig {
     /// Symbols for the volume slider
     /// First symbol is used for the start boundary of the volume slider
@@ -24,7 +24,7 @@ pub struct VolumeSliderConfig {
     pub track_style: Style,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VolumeSliderConfigFile {
     pub(super) symbols: Vec<String>,
     pub(super) track_style: Option<StyleFile>,
@@ -62,7 +62,7 @@ impl Default for VolumeSliderConfigFile {
 }
 
 impl VolumeSliderConfigFile {
-    pub(super) fn into_config(mut self) -> Result<VolumeSliderConfig> {
+    pub fn into_config(mut self) -> Result<VolumeSliderConfig> {
         let start = std::mem::take(&mut self.symbols[0]);
         let filled = std::mem::take(&mut self.symbols[1]);
         let thumb = std::mem::take(&mut self.symbols[2]);
