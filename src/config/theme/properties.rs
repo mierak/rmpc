@@ -118,12 +118,12 @@ pub enum StatusPropertyFile {
         thousands_separator: String,
     },
     QueueTimeTotal {
-        #[serde(default = "defaults::default_time_unit_separator")]
-        separator: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        separator: Option<String>,
     },
     QueueTimeRemaining {
-        #[serde(default = "defaults::default_time_unit_separator")]
-        separator: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        separator: Option<String>,
     },
     ActiveTab,
 }
@@ -175,10 +175,10 @@ pub enum StatusProperty {
         thousands_separator: String,
     },
     QueueTimeTotal {
-        separator: String,
+        separator: Option<String>,
     },
     QueueTimeRemaining {
-        separator: String,
+        separator: Option<String>,
     },
     ActiveTab,
 }
