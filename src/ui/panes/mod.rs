@@ -1014,7 +1014,7 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
-                    let sum = context.find_current_song_in_queue().map_or(
+                    let remaining_time = context.find_current_song_in_queue().map_or(
                         Duration::default(),
                         |(current_song_idx, current_song)| {
                             let total_remaining: Duration = context
@@ -1031,8 +1031,8 @@ impl Property<PropertyKind> {
                         },
                     );
                     let formatted = match separator {
-                        Some(sep) => sum.format_to_duration(sep),
-                        None => sum.to_string(),
+                        Some(sep) => remaining_time.format_to_duration(sep),
+                        None => remaining_time.to_string(),
                     };
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
