@@ -1012,13 +1012,19 @@ impl Property<PropertyKind> {
                 StatusProperty::QueueTimeRemaining { separator } => {
                     let sum = context.find_current_song_in_queue().map_or(
                         Duration::default(),
-                        |(current_song_idx, _)| {
-                            context
+                        |(current_song_idx, current_song)| {
+                            let total_remaining: Duration = context
                                 .queue
                                 .iter()
                                 .skip(current_song_idx)
                                 .filter_map(|s| s.duration)
-                                .sum()
+                                .sum();
+
+                            if current_song.duration.is_some() {
+                                total_remaining.saturating_sub(context.status.elapsed)
+                            } else {
+                                total_remaining
+                            }
                         },
                     );
                     Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
