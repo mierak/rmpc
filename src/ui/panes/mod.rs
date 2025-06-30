@@ -1007,7 +1007,11 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
                     let sum: Duration = context.queue.iter().filter_map(|s| s.duration).sum();
-                    Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
+                    let formatted = match separator {
+                        Some(sep) => sum.format_to_duration(sep),
+                        None => sum.to_string(),
+                    };
+                    Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
                     let sum = context.find_current_song_in_queue().map_or(
@@ -1019,7 +1023,6 @@ impl Property<PropertyKind> {
                                 .skip(current_song_idx)
                                 .filter_map(|s| s.duration)
                                 .sum();
-
                             if current_song.duration.is_some() {
                                 total_remaining.saturating_sub(context.status.elapsed)
                             } else {
@@ -1027,7 +1030,11 @@ impl Property<PropertyKind> {
                             }
                         },
                     );
-                    Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
+                    let formatted = match separator {
+                        Some(sep) => sum.format_to_duration(sep),
+                        None => sum.to_string(),
+                    };
+                    Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {
                     Some(Either::Left(Span::styled(context.active_tab.0.as_ref(), style)))
