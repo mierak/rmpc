@@ -115,6 +115,10 @@ pub fn default_time_unit_separator() -> String {
     ", ".to_string()
 }
 
+pub fn default_optional_time_unit_separator() -> Option<String> {
+    None
+}
+
 pub fn default_scrollbar() -> Option<ScrollbarConfigFile> {
     Some(ScrollbarConfigFile::default())
 }
