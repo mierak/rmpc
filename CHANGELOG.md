@@ -13,7 +13,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
+
 ### Fixed
+
 - Fixed `QueueTimeRemaining` not updating remaining time
 
 ## [0.9.0] - 2025-06-23
