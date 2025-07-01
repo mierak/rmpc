@@ -1007,10 +1007,14 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
                     let sum: Duration = context.queue.iter().filter_map(|s| s.duration).sum();
-                    Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
+                    let formatted = match separator {
+                        Some(sep) => sum.format_to_duration(sep),
+                        None => sum.to_string(),
+                    };
+                    Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
-                    let sum = context.find_current_song_in_queue().map_or(
+                    let remaining_time = context.find_current_song_in_queue().map_or(
                         Duration::default(),
                         |(current_song_idx, current_song)| {
                             let total_remaining: Duration = context
@@ -1019,7 +1023,6 @@ impl Property<PropertyKind> {
                                 .skip(current_song_idx)
                                 .filter_map(|s| s.duration)
                                 .sum();
-
                             if current_song.duration.is_some() {
                                 total_remaining.saturating_sub(context.status.elapsed)
                             } else {
@@ -1027,7 +1030,11 @@ impl Property<PropertyKind> {
                             }
                         },
                     );
-                    Some(Either::Left(Span::styled(sum.format_to_duration(separator), style)))
+                    let formatted = match separator {
+                        Some(sep) => remaining_time.format_to_duration(sep),
+                        None => remaining_time.to_string(),
+                    };
+                    Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {
                     Some(Either::Left(Span::styled(context.active_tab.0.as_ref(), style)))
@@ -1567,6 +1574,155 @@ mod format_tests {
             };
 
             let result = format.as_span(Some(&song), &app_context, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[rstest]
+        // Standard format tests (no separator = MM:SS format)
+        #[case(StatusProperty::QueueTimeTotal { separator: None }, "6:09", Duration::from_secs(0))]
+        #[case(StatusProperty::QueueTimeTotal { separator: Some(String::new())}, "6m9s", Duration::from_secs(0))]
+        #[case(StatusProperty::QueueTimeRemaining { separator: None }, "6:09", Duration::from_secs(0))]
+        #[case(StatusProperty::QueueTimeRemaining { separator: Some(String::new()) }, "6m9s", Duration::from_secs(0))]
+        // With elapsed time, remaining should subtract elapsed from current song
+        #[case(StatusProperty::QueueTimeRemaining { separator: None }, "5:49", Duration::from_secs(20))]
+        #[case(StatusProperty::QueueTimeRemaining { separator: None }, "5:09", Duration::from_secs(60))]
+        // Verbose format tests (with separator = verbose format)
+        #[case(StatusProperty::QueueTimeTotal { separator: Some(",".to_string()) }, "6m,9s", Duration::from_secs(0))]
+        #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "6m,9s", Duration::from_secs(0))]
+        #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "5m,49s", Duration::from_secs(20))]
+        fn queue_time_property_resolves_correctly(
+            mut app_context: AppContext,
+            #[case] prop: StatusProperty,
+            #[case] expected: &str,
+            #[case] elapsed: Duration,
+        ) {
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
+                style: None,
+                default: None,
+            };
+
+            // Test with a fake current song
+            let current_song = Song {
+                id: 0,
+                file: "current.mp3".to_owned(),
+                duration: Some(Duration::from_secs(123)),
+                metadata: HashMap::from([
+                    ("title".to_string(), "Current Song".into()),
+                    ("artist".to_string(), "Artist".into()),
+                ]),
+                stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
+            };
+
+            // Set up the app context with a fake queue and status
+            let mut queue = vec![current_song.clone()];
+            queue.push(Song {
+                id: 1,
+                file: "song1.mp3".to_owned(),
+                duration: Some(Duration::from_secs(123)),
+                metadata: HashMap::from([("title".to_string(), "Song 1".into())]),
+                stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
+            });
+            queue.push(Song {
+                id: 2,
+                file: "song2.mp3".to_owned(),
+                duration: Some(Duration::from_secs(123)),
+                metadata: HashMap::from([("title".to_string(), "Song 2".into())]),
+                stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
+            });
+
+            app_context.queue = queue;
+            app_context.status = Status {
+                elapsed,
+                duration: Duration::from_secs(123),
+                state: State::Play,
+                song: Some(0),
+                songid: Some(0),
+                ..Default::default()
+            };
+
+            let result =
+                format.as_span(Some(&current_song), &app_context, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[rstest]
+        // no current song or if the queue is empty, the queue time should be 0:00
+        #[case(StatusProperty::QueueTimeTotal { separator: None }, "0:00")]
+        #[case(StatusProperty::QueueTimeRemaining { separator: None }, "0:00")]
+        #[case(StatusProperty::QueueTimeTotal { separator: Some(",".to_string()) }, "0s")]
+        #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "0s")]
+        fn queue_time_property_no_current_song(
+            mut app_context: AppContext,
+            #[case] prop: StatusProperty,
+            #[case] expected: &str,
+        ) {
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
+                style: None,
+                default: None,
+            };
+
+            app_context.queue = vec![];
+            app_context.status = Status { state: State::Stop, ..Default::default() };
+
+            let result = format.as_span(None, &app_context, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[rstest]
+        // Test edge case: songs without duration
+        // if somehow the queue contains songs without duration, the queue time should still be 0:00
+        #[case(StatusProperty::QueueTimeTotal { separator: None }, "0:00")]
+        #[case(StatusProperty::QueueTimeRemaining { separator: None }, "0:00")]
+        fn queue_time_property_no_duration(
+            mut app_context: AppContext,
+            #[case] prop: StatusProperty,
+            #[case] expected: &str,
+        ) {
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
+                style: None,
+                default: None,
+            };
+
+            let song_no_duration = Song {
+                id: 0,
+                file: "no_duration.mp3".to_owned(),
+                duration: None,
+                metadata: HashMap::from([("title".to_string(), "No Duration".into())]),
+                stickers: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
+            };
+
+            app_context.queue = vec![song_no_duration.clone()];
+            app_context.status = Status { state: State::Play, song: Some(0), ..Default::default() };
+
+            let result = format.as_span(
+                Some(&song_no_duration),
+                &app_context,
+                "",
+                TagResolutionStrategy::All,
+            );
 
             assert_eq!(
                 result,

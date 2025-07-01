@@ -218,8 +218,23 @@ pub mod duration {
     impl DurationExt for std::time::Duration {
         fn to_string(&self) -> String {
             let secs = self.as_secs();
+
             let min = secs / 60;
-            format!("{}:{:0>2}", min, secs - min * 60)
+            let frac_secs = secs - min * 60;
+
+            let hours = min / 60;
+            let frac_min = min - hours * 60;
+
+            let days = hours / 24;
+            let frac_hours = hours - days * 24;
+
+            if hours == 0 {
+                format!("{min}:{frac_secs:0>2}")
+            } else if days == 0 {
+                format!("{hours}:{frac_min:0>2}:{frac_secs:0>2}")
+            } else {
+                format!("{days}d {frac_hours:0>2}:{frac_min:0>2}:{frac_secs:0>2}")
+            }
         }
 
         fn format_to_duration(&self, unit_separator: &str) -> String {
@@ -289,6 +304,26 @@ pub mod duration {
         #[test_case(Duration::from_secs(99999), "1d, 3h, 46m, 39s")]
         fn duration_format(input: Duration, expected: &str) {
             assert_eq!(input.format_to_duration(", "), expected);
+        }
+
+        #[test_case(Duration::from_secs(0), "0:00")]
+        #[test_case(Duration::from_secs(1), "0:01")]
+        #[test_case(Duration::from_secs(30), "0:30")]
+        #[test_case(Duration::from_secs(60), "1:00")]
+        #[test_case(Duration::from_secs(95), "1:35")]
+        #[test_case(Duration::from_secs(123), "2:03")]
+        #[test_case(Duration::from_secs(3599), "59:59")]
+        #[test_case(Duration::from_secs(3600), "1:00:00")]
+        #[test_case(Duration::from_secs(3601), "1:00:01")]
+        #[test_case(Duration::from_secs(3661), "1:01:01")]
+        #[test_case(Duration::from_secs(7200), "2:00:00")]
+        #[test_case(Duration::from_secs(86399), "23:59:59")]
+        #[test_case(Duration::from_secs(86400), "1d 00:00:00")]
+        #[test_case(Duration::from_secs(90061), "1d 01:01:01")]
+        #[test_case(Duration::from_secs(99999), "1d 03:46:39")]
+        #[test_case(Duration::from_secs(172_800), "2d 00:00:00")]
+        fn duration_to_string(input: Duration, expected: &str) {
+            assert_eq!(input.to_string(), expected);
         }
     }
 }
