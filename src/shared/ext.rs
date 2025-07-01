@@ -218,7 +218,7 @@ pub mod duration {
     impl DurationExt for std::time::Duration {
         fn to_string(&self) -> String {
             let secs = self.as_secs();
-            
+
             let min = secs / 60;
             let frac_secs = secs - min * 60;
 

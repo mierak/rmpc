@@ -1590,7 +1590,7 @@ mod format_tests {
         // With elapsed time, remaining should subtract elapsed from current song
         #[case(StatusProperty::QueueTimeRemaining { separator: None }, "5:49", Duration::from_secs(20))]
         #[case(StatusProperty::QueueTimeRemaining { separator: None }, "5:09", Duration::from_secs(60))]
-        // Verbose format tests (with separator = verbose format)  
+        // Verbose format tests (with separator = verbose format)
         #[case(StatusProperty::QueueTimeTotal { separator: Some(",".to_string()) }, "6m,9s", Duration::from_secs(0))]
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "6m,9s", Duration::from_secs(0))]
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "5m,49s", Duration::from_secs(20))]
@@ -1646,12 +1646,13 @@ mod format_tests {
                 elapsed,
                 duration: Duration::from_secs(123),
                 state: State::Play,
-                song: Some(0), 
+                song: Some(0),
                 songid: Some(0),
                 ..Default::default()
             };
 
-            let result = format.as_span(Some(&current_song), &app_context, "", TagResolutionStrategy::All);
+            let result =
+                format.as_span(Some(&current_song), &app_context, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1677,10 +1678,7 @@ mod format_tests {
             };
 
             app_context.queue = vec![];
-            app_context.status = Status {
-                state: State::Stop,
-                ..Default::default()
-            };
+            app_context.status = Status { state: State::Stop, ..Default::default() };
 
             let result = format.as_span(None, &app_context, "", TagResolutionStrategy::All);
 
@@ -1717,13 +1715,14 @@ mod format_tests {
             };
 
             app_context.queue = vec![song_no_duration.clone()];
-            app_context.status = Status {
-                state: State::Play,
-                song: Some(0),
-                ..Default::default()
-            };
+            app_context.status = Status { state: State::Play, song: Some(0), ..Default::default() };
 
-            let result = format.as_span(Some(&song_no_duration), &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(
+                Some(&song_no_duration),
+                &app_context,
+                "",
+                TagResolutionStrategy::All,
+            );
 
             assert_eq!(
                 result,
