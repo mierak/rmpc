@@ -13,13 +13,14 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
-        mpd_client::{Filter, MpdClient, Tag, ValueChange},
+        mpd_client::{Filter, MpdClient, MpdCommand, Tag, ValueChange},
+        proto_client::ProtoClient,
         version::Version,
     },
     shared::{
         ext::duration::DurationExt,
         lrc::{LrcIndex, get_lrc_path},
-        macros::{status_error, status_info},
+        macros::status_error,
         ytdlp::YtDlp,
     },
 };
@@ -247,17 +248,15 @@ impl Command {
                 Ok(())
             })),
             Command::AddYt { url, position } => {
-                let file_path = YtDlp::init_and_download(config, &url)?;
-                status_info!("file path {file_path}");
-                Ok(Box::new(move |client| match client.add(&file_path, position) {
-                    Ok(()) => {
-                        status_info!("File '{file_path}' added to the queue");
-                        Ok(())
+                let file_paths = YtDlp::init_and_download(config, &url)?;
+                Ok(Box::new(move |client| {
+                    client.send_start_cmd_list()?;
+                    for file in file_paths {
+                        client.send_add(&file, position)?;
                     }
-                    Err(err) => {
-                        status_error!(err:?; "Failed to add '{file_path}' to the queue");
-                        Err(err.into())
-                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+                    Ok(())
                 }))
             }
             Command::Decoders => Ok(Box::new(|client| {

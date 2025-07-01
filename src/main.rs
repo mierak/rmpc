@@ -184,6 +184,7 @@ fn main() -> Result<()> {
                 }
             };
             let config = config.into_config(args.address, args.password);
+            let result = cmd.execute(&config)?;
             let mut client = Client::init(
                 config.address.clone(),
                 config.password.clone(),
@@ -192,7 +193,7 @@ fn main() -> Result<()> {
                 args.partition.autocreate,
             )?;
             client.set_read_timeout(None)?;
-            (cmd.execute(&config)?)(&mut client)?;
+            result(&mut client)?;
         }
         None => {
             let (worker_tx, worker_rx) = unbounded::<WorkRequest>();
