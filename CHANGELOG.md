@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 ### Fixed
+- Fixed `QueueTimeRemaining` not updating remaining time
 
 ## [0.9.0] - 2025-06-23
 
