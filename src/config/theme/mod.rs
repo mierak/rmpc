@@ -65,6 +65,7 @@ pub struct UiConfig {
     pub scrollbar: Option<ScrollbarConfig>,
     pub show_song_table_header: bool,
     pub song_table_format: Vec<SongTableColumn>,
+    pub song_table_album_separator: AlbumSeparator,
     pub header: HeaderConfig,
     #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
@@ -106,6 +107,8 @@ pub struct UiConfigFile {
     pub(super) highlight_border_style: Option<StyleFile>,
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
+    #[serde(default)]
+    pub(super) song_table_album_separator: AlbumSeparator,
     pub(super) header: HeaderConfigFile,
     pub(super) default_album_art_path: Option<String>,
     #[serde(default)]
@@ -180,6 +183,7 @@ impl Default for UiConfigFile {
                 playlist_style: None,
             },
             song_table_format: QueueTableColumnsFile::default(),
+            song_table_album_separator: AlbumSeparator::default(),
             browser_song_format: SongFormatFile::default(),
             format_tag_separator: " | ".to_owned(),
             multiple_tag_resolution_strategy: TagResolutionStrategy::default(),
@@ -199,6 +203,13 @@ impl Default for UiConfigFile {
             cava: CavaThemeFile::default(),
         }
     }
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AlbumSeparator {
+    None,
+    #[default]
+    Underline,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -377,6 +388,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             scrollbar: value.scrollbar.map(|sc| sc.into_config(fallback_border_fg)).transpose()?,
             progress_bar: value.progress_bar.into_config()?,
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
+            song_table_album_separator: value.song_table_album_separator,
             header: value.header.try_into()?,
             column_widths: [
                 value.browser_column_widths[0],

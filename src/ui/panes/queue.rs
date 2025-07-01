@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::{Style, Styled},
+    style::{Style, Styled, Stylize},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Cell, Row, Table, TableState},
 };
@@ -24,6 +24,7 @@ use crate::{
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
+    context::AppContext,
     core::command::{create_env, run_external},
     ctx::Ctx,
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
@@ -191,71 +192,80 @@ impl Pane for QueuePane {
         let viewport_len = self.scrolling_state.viewport_len().unwrap_or_default();
 
         let marker_symbol_len = config.theme.symbols.marker.chars().count();
-        let table_items = queue
-            .iter()
-            .enumerate()
-            .map(|(idx, song)| {
-                // Supply default row to skip unnecessary work for rows that are either below or
-                // above the visible portion of the table
-                if idx < offset || idx > viewport_len + offset {
-                    return Row::new((0..formats.len()).map(|_| Cell::default()));
-                }
+        let mut table_iter = queue.iter().enumerate().peekable();
+        let mut table_items = Vec::new();
+
+        while let Some((idx, song)) = table_iter.next() {
+            // Supply default row to skip unnecessary work for rows that are either below or
+            // above the visible portion of the table
+            if idx < offset || idx > viewport_len + offset {
+                table_items.push(Row::new((0..formats.len()).map(|_| Cell::default())));
+                continue;
+            }
 
                 let is_current = ctx
                     .find_current_song_in_queue()
                     .map(|(_, song)| song.id)
                     .is_some_and(|v| v == song.id);
 
-                let is_marked = self.scrolling_state.get_marked().contains(&idx);
-                let columns = (0..formats.len()).map(|i| {
-                    let mut max_len: usize = widths[i].width.into();
-                    // We have to subtract marker symbol length from max len in
-                    // order to make space for the marker
-                    // symbol in case we are in the first column of the table
-                    // and the song is marked.
-                    if is_marked && i == 0 {
-                        max_len = max_len.saturating_sub(marker_symbol_len);
-                    }
-
-                    let mut line = song
-                        .as_line_ellipsized(
-                            &formats[i].prop,
-                            max_len,
-                            &config.theme.symbols,
-                            &config.theme.format_tag_separator,
-                            config.theme.multiple_tag_resolution_strategy,
-                        )
-                        .unwrap_or_default()
-                        .alignment(formats[i].alignment.into());
-
-                    if is_marked && i == 0 {
-                        let marker_span = Span::styled(
-                            &config.theme.symbols.marker,
-                            config.theme.highlighted_item_style,
-                        );
-                        line.spans.splice(..0, std::iter::once(marker_span));
-                    }
-
-                    line
-                });
-
-                let is_highlighted = is_current
-                    || self
-                        .filter
-                        .as_ref()
-                        .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter));
-
-                if is_highlighted {
-                    Row::new(
-                        columns
-                            .map(|column| column.patch_style(config.theme.highlighted_item_style)),
-                    )
-                    .style(config.theme.highlighted_item_style)
-                } else {
-                    Row::new(columns)
+            let is_marked = self.scrolling_state.get_marked().contains(&idx);
+            let columns = (0..formats.len()).map(|i| {
+                let mut max_len: usize = widths[i].width.into();
+                // We have to subtract marker symbol length from max len in
+                // order to make space for the marker
+                // symbol in case we are in the first column of the table
+                // and the song is marked.
+                if is_marked && i == 0 {
+                    max_len = max_len.saturating_sub(marker_symbol_len);
                 }
-            })
-            .collect_vec();
+
+                let mut line = song
+                    .as_line_ellipsized(
+                        &formats[i].prop,
+                        max_len,
+                        &config.theme.symbols,
+                        &config.theme.format_tag_separator,
+                        config.theme.multiple_tag_resolution_strategy,
+                    )
+                    .unwrap_or_default()
+                    .alignment(formats[i].alignment.into());
+
+                if is_marked && i == 0 {
+                    let marker_span = Span::styled(
+                        &config.theme.symbols.marker,
+                        config.theme.highlighted_item_style,
+                    );
+                    line.spans.splice(..0, std::iter::once(marker_span));
+                }
+
+                line
+            });
+
+            let is_matching_search = is_current
+                || self
+                    .filter
+                    .as_ref()
+                    .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter));
+
+            let mut row = QueueRow::default();
+            if is_matching_search {
+                row.cell_style = Some(config.theme.highlighted_item_style);
+            }
+
+            if matches!(context.config.theme.song_table_album_separator, AlbumSeparator::Underline)
+            {
+                let is_new_album = if let Some((_, next_song)) = table_iter.peek() {
+                    next_song.metadata.get("album") != song.metadata.get("album")
+                        || next_song.metadata.get("album_artist")
+                            != song.metadata.get("album_artist")
+                } else {
+                    false
+                };
+                row.underlined = is_new_album;
+            }
+
+            table_items.push(row.into_row(columns));
+        }
 
         if config.theme.show_song_table_header {
             let header_table = Table::default()
@@ -1023,5 +1033,37 @@ impl QueuePane {
             .enumerate()
             .find(|(_, item)| item.matches(self.column_formats.as_slice(), filter))
             .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx), scrolloff));
+    }
+}
+
+#[derive(Default)]
+struct QueueRow {
+    cell_style: Option<Style>,
+    underlined: bool,
+}
+
+impl QueueRow {
+    fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
+        let mut row = if let Some(style) = self.cell_style {
+            // if self.underlined {
+            //     Row::new(cells.map(|column| column.patch_style(style.underlined())))
+            // } else {
+            //     Row::new(cells.map(|column| column.patch_style(style)))
+            // }
+            Row::new(cells.map(|column| column.patch_style(style)))
+        } else {
+            // if self.underlined {
+            //     Row::new(cells.map(|column|
+            // column.patch_style(Style::default().underlined()))) } else {
+            //     Row::new(cells)
+            // }
+            Row::new(cells)
+        };
+
+        if self.underlined {
+            row = row.style(self.cell_style.unwrap_or_default().underlined());
+        }
+
+        row
     }
 }
