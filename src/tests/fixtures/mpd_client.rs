@@ -641,7 +641,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn send_message(&mut self, channel: &str, content: &str) -> MpdResult<()> {
+    fn send_message(&mut self, _channel: &str, _content: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 }

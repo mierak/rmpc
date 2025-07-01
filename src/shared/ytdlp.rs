@@ -84,6 +84,8 @@ impl<'a> YtDlp<'a> {
                     );
                 }
 
+                status_info!("Found {} videos in playlist", stdout.lines().count(),);
+
                 let (success, error): (Vec<_>, Vec<_>) = stdout
                     .lines()
                     .map(|line| YtDlpHost {
@@ -105,7 +107,7 @@ impl<'a> YtDlp<'a> {
 
     fn download_single(&self, id: &YtDlpHost) -> Result<String> {
         if let Some(cached_file) = id.get_cached(self.cache_dir)? {
-            log::debug!(file:? = cached_file.as_str(); "Youtube video already downloaded");
+            status_info!(file:? = cached_file.as_str(); "Youtube video id '{}' already downloaded", id.id);
             return Ok(cached_file.as_str()?.to_string());
         }
 
