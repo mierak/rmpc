@@ -14,9 +14,11 @@ use crate::{
     mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
+        macros::modal,
         mouse_event::{MouseEvent, MouseEventKind},
         mpd_query::EXTERNAL_COMMAND,
     },
+    ui::modals::menu_modal::MenuModal,
 };
 
 pub enum MoveDirection {
@@ -40,7 +42,8 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add(&self, item: &T, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
+    #[must_use]
+    fn add(&self, item: &T, context: &AppContext) -> Option<Box<dyn AddCommand>>;
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
@@ -174,7 +177,12 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        self.add(item, context, None)?;
+                        if let Some(mut add_fn) = self.add(item, context) {
+                            context.command(move |client| {
+                                add_fn(client, None);
+                                Ok(())
+                            });
+                        }
                     }
 
                     self.prepare_preview(context);
@@ -322,14 +330,24 @@ where
             CommonAction::Add if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context, None)?;
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            add_fn(client, None);
+                            Ok(())
+                        });
+                    }
                 }
 
                 context.render()?;
             }
             CommonAction::Add => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context, None);
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            add_fn(client, None);
+                            Ok(())
+                        });
+                    }
                 }
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
@@ -344,7 +362,12 @@ where
                 });
                 for idx in self.stack().current().marked() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context, None)?;
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            add_fn(client, None);
+                            Ok(())
+                        });
+                    }
                 }
 
                 context.render()?;
@@ -355,7 +378,12 @@ where
                     Ok(())
                 });
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context, None);
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            add_fn(client, None);
+                            Ok(())
+                        });
+                    }
                 }
             }
             CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
@@ -369,14 +397,24 @@ where
             CommonAction::Insert if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.add(item, context, Some(QueuePosition::RelativeAdd(0)))?;
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            add_fn(client, Some(QueuePosition::RelativeAdd(0)));
+                            Ok(())
+                        });
+                    }
                 }
 
                 context.render()?;
             }
             CommonAction::Insert => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context, Some(QueuePosition::RelativeAdd(0)));
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            add_fn(client, Some(QueuePosition::RelativeAdd(0)));
+                            Ok(())
+                        });
+                    }
                 }
             }
             CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
@@ -419,8 +457,91 @@ where
             CommonAction::PaneUp => {}
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
+            CommonAction::AddOptions { .. } => {
+                let Some(item) = self.stack().current().selected() else {
+                    return Ok(());
+                };
+
+                let Some(add_fn) = self.add(item, context) else {
+                    return Ok(());
+                };
+
+                let add_fn1 = add_fn.clone();
+                let add_fn2 = add_fn.clone();
+                let add_fn3 = add_fn.clone();
+                let add_fn4 = add_fn.clone();
+                let add_fn5 = add_fn.clone();
+                let add_fn6 = add_fn.clone();
+
+                modal!(
+                    context,
+                    MenuModal::new(context)
+                        .add_section(context, |section| {
+                            section
+                                .add_item("At the end of queue", move |ctx| {
+                                    ctx.command(move |client| {
+                                        (add_fn1)(client, None);
+                                        Ok(())
+                                    });
+                                })
+                                .add_item("At the start of queue", move |ctx| {
+                                    ctx.command(move |client| {
+                                        (add_fn2)(client, Some(QueuePosition::Absolute(0)));
+                                        Ok(())
+                                    });
+                                })
+                                .add_item("Before the current song", move |ctx| {
+                                    ctx.command(move |client| {
+                                        (add_fn5)(client, Some(QueuePosition::RelativeSub(0)));
+                                        Ok(())
+                                    });
+                                })
+                                .add_item("After the current song", move |ctx| {
+                                    ctx.command(move |client| {
+                                        (add_fn4)(client, Some(QueuePosition::RelativeAdd(0)));
+                                        Ok(())
+                                    });
+                                })
+                        })
+                        .add_section(context, |section| {
+                            section
+                                .add_item("Replace queue", move |ctx| {
+                                    ctx.command(move |client| {
+                                        client.clear()?;
+                                        (add_fn3)(client, None);
+                                        Ok(())
+                                    });
+                                })
+                                .add_item("Replace queue and play", move |ctx| {
+                                    ctx.command(move |client| {
+                                        client.clear()?;
+                                        (add_fn6)(client, None);
+                                        client.play()?;
+                                        Ok(())
+                                    });
+                                })
+                        })
+                        .add_section(context, |section| { section.add_item("Cancel", |_ctx| {}) })
+                        .build()
+                );
+            }
         }
 
         Ok(())
+    }
+}
+
+pub trait AddCommand:
+    FnOnce(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Send + Sync + 'static
+{
+    fn clone(&self) -> Box<dyn AddCommand>;
+}
+
+impl<T> AddCommand for T
+where
+    T: FnOnce(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Clone + Send + Sync + 'static,
+{
+    fn clone(&self) -> Box<dyn AddCommand> {
+        Box::new(self.clone())
     }
 }

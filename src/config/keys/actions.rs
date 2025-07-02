@@ -342,6 +342,23 @@ impl ToDescription for QueueActions {
     }
 }
 
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
+)]
+pub enum Position {
+    AfterCurrentSong,
+    BeforeCurrentSong,
+    StartOfQueue,
+    EndOfQueue,
+}
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
+)]
+pub struct AddOpts {
+    replace: bool,
+    position: Position,
+}
+
 // Common actions
 
 #[derive(
@@ -380,6 +397,7 @@ pub enum CommonActionFile {
     AddAllReplace,
     Insert,
     InsertAll,
+    AddOptions { options: Option<AddOpts> },
     ShowInfo,
 }
 
@@ -418,6 +436,7 @@ pub enum CommonAction {
     AddAllReplace,
     Insert,
     InsertAll,
+    AddOptions { options: Option<AddOpts> },
     ShowInfo,
 }
 
@@ -466,6 +485,7 @@ impl ToDescription for CommonAction {
             CommonAction::AddAllReplace => "Replace current queue with all items",
             CommonAction::Insert => "Add item after current song",
             CommonAction::InsertAll => "Add all items after current song",
+            CommonAction::AddOptions {..} => "",
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup",
         }.into()
     }
@@ -507,6 +527,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::Insert => CommonAction::Insert,
             CommonActionFile::InsertAll => CommonAction::InsertAll,
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
+            CommonActionFile::AddOptions { options } => CommonAction::AddOptions { options },
         }
     }
 }

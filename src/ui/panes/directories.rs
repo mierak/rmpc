@@ -22,7 +22,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        browser::BrowserPane,
+        browser::{AddCommand, BrowserPane},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
@@ -99,10 +99,15 @@ impl DirectoriesPane {
                 context.render()?;
             }
             t @ DirOrSong::Song(_) => {
-                self.add(t, context, None)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                if let Some(add) = self.add(t, context) {
+                    let queue_len = context.queue.len();
+                    context.command(move |client| {
+                        add(client, None)?;
+                        if autoplay {
+                            client.play_last(queue_len)?;
+                        }
+                        Ok(())
+                    });
                 }
             }
         }
@@ -266,12 +271,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn add(&self, item: &DirOrSong, context: &AppContext) -> Option<Box<dyn AddCommand>> {
         match item {
             DirOrSong::Dir { name: dirname, playlist: is_playlist, .. } => {
                 let is_playlist = *is_playlist;
@@ -279,7 +279,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 next_path.push(dirname.clone());
                 let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
 
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     if is_playlist {
                         client.load_playlist(&next_path, position)?;
                         status_info!("Playlist '{next_path}' loaded");
@@ -288,7 +288,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                         status_info!("Directory '{next_path}' added to queue");
                     }
                     Ok(())
-                });
+                }))
             }
             DirOrSong::Song(song) => {
                 let file = song.file.clone();
@@ -296,19 +296,16 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     song.artist_str(&context.config.theme.format_tag_separator).into_owned();
                 let title_text =
                     song.title_str(&context.config.theme.format_tag_separator).into_owned();
-                context.command(move |client| {
+
+                Some(Box::new(move |client, position| {
                     client.add(&file, position)?;
                     if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
                         status_info!("'{}' by '{}' added to queue", title_text, artist_text);
                     }
                     Ok(())
-                });
+                }))
             }
         }
-
-        context.render()?;
-
-        Ok(())
     }
 
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {

@@ -28,7 +28,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        browser::BrowserPane,
+        browser::{AddCommand, BrowserPane},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
@@ -118,10 +118,15 @@ impl TagBrowserPane {
 
         match self.stack.path() {
             [_artist, _album] => {
-                self.add(current, context, position)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                if let Some(add) = self.add(current, context) {
+                    let queue_len = context.queue.len();
+                    context.command(move |client| {
+                        add(client, position)?;
+                        if autoplay {
+                            client.play_last(queue_len)?;
+                        }
+                        Ok(())
+                    });
                 }
             }
             [artist] => {
@@ -460,12 +465,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn add(&self, item: &DirOrSong, _ctx: &AppContext) -> Option<Box<dyn AddCommand>> {
         match self.stack.path() {
             [artist, album] => {
                 let root_tag = self.root_tag.clone();
@@ -473,17 +473,12 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let artist = artist.clone();
                 let name = item.dir_name_or_file_name().into_owned();
 
-                let Some(albums) = self.cache.0.get(&artist) else {
-                    return Ok(());
-                };
+                let albums = self.cache.0.get(&artist)?;
 
-                let Some(original_name) =
-                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())
-                else {
-                    return Ok(());
-                };
+                let original_name =
+                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())?;
 
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     client.find_add(
                         &[
                             Self::root_tag_filter(root_tag, separator, artist.as_str()),
@@ -495,7 +490,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
                     status_info!("'{name}' added to queue");
                     Ok(())
-                });
+                }))
             }
             [artist] => {
                 let artist = artist.clone();
@@ -503,17 +498,12 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
 
-                let Some(albums) = self.cache.0.get(&artist) else {
-                    return Ok(());
-                };
+                let albums = self.cache.0.get(&artist)?;
 
-                let Some(original_name) =
-                    albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())
-                else {
-                    return Ok(());
-                };
+                let original_name =
+                    albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())?;
 
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     client.find_add(
                         &[
                             Self::root_tag_filter(root_tag, separator, artist.as_str()),
@@ -524,24 +514,22 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
                     status_info!("Album '{name}' by '{artist}' added to queue");
                     Ok(())
-                });
+                }))
             }
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     client
                         .find_add(&[Self::root_tag_filter(root_tag, separator, &name)], position)?;
 
                     status_info!("All songs by '{name}' added to queue");
                     Ok(())
-                });
+                }))
             }
-            _ => {}
+            _ => None,
         }
-
-        Ok(())
     }
 
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {

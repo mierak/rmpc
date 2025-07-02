@@ -22,7 +22,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        browser::{BrowserPane, MoveDirection},
+        browser::{AddCommand, BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         modals::{
@@ -94,10 +94,15 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                self.add(selected, context, None)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                if let Some(add) = self.add(selected, context) {
+                    let queue_len = context.queue.len();
+                    context.command(move |client| {
+                        add(client, None)?;
+                        if autoplay {
+                            client.play_last(queue_len)?;
+                        }
+                        Ok(())
+                    });
                 }
             }
         }
@@ -430,7 +435,13 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             }
             [] => {
                 for playlist in self.stack().current().items.iter().rev() {
-                    self.add(playlist, context, position)?;
+                    if let Some(add) = self.add(playlist, context) {
+                        context.command(move |client| {
+                            add(client, position)?;
+                            // status_info!("Playlist '{}' added to queue", playlist.as_path());
+                            Ok(())
+                        });
+                    }
                 }
                 status_info!("All playlists added to queue");
             }
@@ -440,20 +451,15 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn add(&self, item: &DirOrSong, context: &AppContext) -> Option<Box<dyn AddCommand>> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 let d = d.clone();
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     client.load_playlist(&d, position)?;
                     status_info!("Playlist '{d}' added to queue");
                     Ok(())
-                });
+                }))
             }
             DirOrSong::Song(s) => {
                 let file = s.file.clone();
@@ -461,17 +467,16 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     s.artist_str(&context.config.theme.format_tag_separator).into_owned();
                 let title_text =
                     s.title_str(&context.config.theme.format_tag_separator).into_owned();
-                context.command(move |client| {
+
+                Some(Box::new(move |client, position| {
                     client.add(&file, position)?;
                     if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
                         status_info!("'{}' by '{}' added to queue", title_text, artist_text);
                     }
                     Ok(())
-                });
+                }))
             }
         }
-
-        Ok(())
     }
 
     fn rename(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {

@@ -23,7 +23,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        browser::BrowserPane,
+        browser::{AddCommand, BrowserPane},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         widgets::browser::Browser,
@@ -64,11 +64,17 @@ impl AlbumsPane {
 
         match self.stack.path() {
             [_album] => {
-                self.add(current, context, None)?;
+                let add = self.add(current, context);
                 let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
-                }
+                context.command(move |client| {
+                    if let Some(add) = add {
+                        (add)(client, None)?;
+                        if autoplay {
+                            client.play_last(queue_len)?;
+                        }
+                    }
+                    Ok(())
+                });
             }
             [] => {
                 let current = current.clone();
@@ -263,17 +269,12 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn add(
-        &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn add(&self, item: &DirOrSong, _context: &AppContext) -> Option<Box<dyn AddCommand>> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
                 let name = item.dir_name_or_file_name().into_owned();
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     client.find_add(
                         &[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())],
                         position,
@@ -281,21 +282,19 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
 
                     status_info!("'{name}' added to queue");
                     Ok(())
-                });
+                }))
             }
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
-                context.command(move |client| {
+                Some(Box::new(move |client, position| {
                     client.find_add(&[Filter::new(Tag::Album, &name)], position)?;
 
                     status_info!("Album '{name}' added to queue");
                     Ok(())
-                });
+                }))
             }
-            _ => {}
+            _ => None,
         }
-
-        Ok(())
     }
 
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {

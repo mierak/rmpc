@@ -904,6 +904,7 @@ impl Pane for QueuePane {
                 CommonAction::PaneUp => {}
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
+                CommonAction::AddOptions { .. } => {}
             }
         } else if let Some(action) = event.as_global_action(context) {
             match action {
