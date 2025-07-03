@@ -13,7 +13,12 @@ use ratatui::{
 use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
-    config::{Config, Search, keys::GlobalAction, tabs::PaneType},
+    config::{
+        Config,
+        Search,
+        keys::{GlobalAction, actions::Position},
+        tabs::PaneType,
+    },
     context::AppContext,
     core::command::{create_env, run_external},
     mpd::{
@@ -873,7 +878,6 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Add => {}
                         CommonAction::AddAll => {
                             self.search_add(context, None);
 
@@ -881,7 +885,6 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Insert => {}
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
 
@@ -889,7 +892,6 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::AddReplace => {}
                         CommonAction::AddAllReplace => {
                             context.command(|client| {
                                 client.clear()?;
@@ -1075,28 +1077,32 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => self.add_current(false, context, None)?,
                         CommonAction::AddAll => {
                             self.search_add(context, None);
                             status_info!("All found songs added to queue");
 
                             context.render()?;
                         }
-                        CommonAction::Insert => {
-                            self.add_current(false, context, Some(QueuePosition::RelativeAdd(0)))?;
+                        CommonAction::AddOptions { options } => {
+                            if options.replace {
+                                context.command(|client| {
+                                    client.clear()?;
+                                    Ok(())
+                                });
+                            }
+                            let position = match options.position {
+                                Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+                                Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+                                Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+                                Position::EndOfQueue => None,
+                            };
+                            self.add_current(false, context, position)?;
                         }
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
                             status_info!("All found songs added to queue");
 
                             context.render()?;
-                        }
-                        CommonAction::AddReplace => {
-                            context.command(|client| {
-                                client.clear()?;
-                                Ok(())
-                            });
-                            self.add_current(false, context, None)?;
                         }
                         CommonAction::AddAllReplace => {
                             context.command(|client| {
@@ -1114,7 +1120,6 @@ impl Pane for SearchPane {
                         CommonAction::PaneRight => {}
                         CommonAction::PaneLeft => {}
                         CommonAction::ShowInfo => {}
-                        CommonAction::AddOptions { .. } => {}
                     }
                 }
             }

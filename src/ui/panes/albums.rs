@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
@@ -269,12 +271,12 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn add(&self, item: &DirOrSong, _context: &AppContext) -> Option<Box<dyn AddCommand>> {
+    fn add(&self, item: &DirOrSong, _context: &AppContext) -> Option<Arc<dyn AddCommand>> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
                 let name = item.dir_name_or_file_name().into_owned();
-                Some(Box::new(move |client, position| {
+                Some(Arc::new(move |client, position| {
                     client.find_add(
                         &[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())],
                         position,
@@ -286,7 +288,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             }
             [] => {
                 let name = item.dir_name_or_file_name().into_owned();
-                Some(Box::new(move |client, position| {
+                Some(Arc::new(move |client, position| {
                     client.find_add(&[Filter::new(Tag::Album, &name)], position)?;
 
                     status_info!("Album '{name}' added to queue");

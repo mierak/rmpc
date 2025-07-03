@@ -85,7 +85,11 @@ impl TagBrowserPane {
         }
     }
 
-    fn root_tag_filter(root_tag: Tag, separator: Option<Arc<str>>, value: &str) -> Filter<'_> {
+    fn root_tag_filter<'value>(
+        root_tag: Tag,
+        separator: Option<&str>,
+        value: &'value str,
+    ) -> Filter<'value> {
         match separator {
             None => Filter::new(root_tag, value),
             Some(_) if value.is_empty() => Filter::new(root_tag, value),
@@ -160,7 +164,7 @@ impl TagBrowserPane {
                     context.query().id(OPEN_OR_PLAY).replace_id(OPEN_OR_PLAY).target(target).query(
                         move |client| {
                             let root_tag_filter =
-                                Self::root_tag_filter(root_tag, separator, &current);
+                                Self::root_tag_filter(root_tag, separator.as_deref(), &current);
                             let all_songs: Vec<Song> = client.find(&[root_tag_filter])?;
                             Ok(MpdQueryResult::SongsList {
                                 data: all_songs,
@@ -455,9 +459,13 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 DirOrSong::Dir { name, .. } => match path.as_slice() {
                     [artist] => client.find(&[
                         Filter::new(Tag::Album, &album_name),
-                        Self::root_tag_filter(root_tag, separator, artist),
+                        Self::root_tag_filter(root_tag, separator.as_deref(), artist),
                     ])?,
-                    [] => client.find(&[Self::root_tag_filter(root_tag, separator, &name)])?,
+                    [] => client.find(&[Self::root_tag_filter(
+                        root_tag,
+                        separator.as_deref(),
+                        &name,
+                    )])?,
                     _ => Vec::new(),
                 },
                 DirOrSong::Song(song) => vec![song.clone()],
@@ -465,7 +473,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn add(&self, item: &DirOrSong, _ctx: &AppContext) -> Option<Box<dyn AddCommand>> {
+    fn add(&self, item: &DirOrSong, _ctx: &AppContext) -> Option<Arc<dyn AddCommand>> {
         match self.stack.path() {
             [artist, album] => {
                 let root_tag = self.root_tag.clone();
@@ -478,11 +486,11 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let original_name =
                     albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())?;
 
-                Some(Box::new(move |client, position| {
+                Some(Arc::new(move |client, position| {
                     client.find_add(
                         &[
-                            Self::root_tag_filter(root_tag, separator, artist.as_str()),
-                            Filter::new(Tag::Album, original_name.as_str()),
+                            Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &artist),
+                            Filter::new(Tag::Album, &original_name),
                             Filter::new(Tag::File, &name),
                         ],
                         position,
@@ -503,10 +511,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let original_name =
                     albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())?;
 
-                Some(Box::new(move |client, position| {
+                Some(Arc::new(move |client, position| {
                     client.find_add(
                         &[
-                            Self::root_tag_filter(root_tag, separator, artist.as_str()),
+                            Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &artist),
                             Filter::new(Tag::Album, &original_name),
                         ],
                         position,
@@ -520,9 +528,11 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let name = item.dir_name_or_file_name().into_owned();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
-                Some(Box::new(move |client, position| {
-                    client
-                        .find_add(&[Self::root_tag_filter(root_tag, separator, &name)], position)?;
+                Some(Arc::new(move |client, position| {
+                    client.find_add(
+                        &[Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &name)],
+                        position,
+                    )?;
 
                     status_info!("All songs by '{name}' added to queue");
                     Ok(())
@@ -551,7 +561,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 context.command(move |client| {
                     client.find_add(
                         &[
-                            Self::root_tag_filter(root_tag, separator, artist.as_str()),
+                            Self::root_tag_filter(root_tag, separator.as_deref(), &artist),
                             Filter::new(Tag::Album, original_name.as_str()),
                         ],
                         position,
@@ -564,7 +574,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let artist = artist.clone();
                 context.command(move |client| {
                     client.find_add(
-                        &[Self::root_tag_filter(root_tag, separator, artist.as_str())],
+                        &[Self::root_tag_filter(root_tag, separator.as_deref(), &artist)],
                         position,
                     )?;
                     status_info!("All albums by '{artist}' added to queue");
@@ -657,6 +667,8 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                     let target = self.target_pane.clone();
                     context.query().id(PREVIEW).replace_id(PREVIEW).target(target).query(
                         move |client| {
+                            let separator = separator.map(|v| v.as_ref().to_owned());
+                            let separator = separator.as_deref();
                             let all_songs: Vec<Song> = client
                                 .find(&[Self::root_tag_filter(root_tag, separator, &current)])?;
                             Ok(MpdQueryResult::SongsList {

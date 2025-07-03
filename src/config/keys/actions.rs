@@ -355,8 +355,9 @@ pub enum Position {
     Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
 )]
 pub struct AddOpts {
-    replace: bool,
-    position: Position,
+    pub replace: bool,
+    pub autoplay: bool,
+    pub position: Position,
 }
 
 // Common actions
@@ -397,7 +398,7 @@ pub enum CommonActionFile {
     AddAllReplace,
     Insert,
     InsertAll,
-    AddOptions { options: Option<AddOpts> },
+    AddOptions { options: AddOpts },
     ShowInfo,
 }
 
@@ -430,13 +431,10 @@ pub enum CommonAction {
     Close,
     Confirm,
     FocusInput,
-    Add,
     AddAll,
-    AddReplace,
     AddAllReplace,
-    Insert,
     InsertAll,
-    AddOptions { options: Option<AddOpts> },
+    AddOptions { options: AddOpts },
     ShowInfo,
 }
 
@@ -479,11 +477,11 @@ impl ToDescription for CommonAction {
             CommonAction::PaneUp => "Focus the pane above the current one",
             CommonAction::PaneRight => "Focus the pane to the right of the current one",
             CommonAction::PaneLeft => "Focus the pane to the left of the current one",
-            CommonAction::Add => "Add item to queue",
+            // CommonAction::Add => "Add item to queue",
+            // CommonAction::AddReplace => "Replace current queue with the item",
+            // CommonAction::Insert => "Add item after current song",
             CommonAction::AddAll => "Add all items to queue",
-            CommonAction::AddReplace => "Replace current queue with the item",
             CommonAction::AddAllReplace => "Replace current queue with all items",
-            CommonAction::Insert => "Add item after current song",
             CommonAction::InsertAll => "Add all items after current song",
             CommonAction::AddOptions {..} => "",
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup",
@@ -511,21 +509,35 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::PreviousResult => CommonAction::PreviousResult,
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
-            CommonActionFile::Add => CommonAction::Add,
+            CommonActionFile::Add => CommonAction::AddOptions {
+                options: AddOpts {
+                    replace: false,
+                    autoplay: false,
+                    position: Position::EndOfQueue,
+                },
+            },
+            CommonActionFile::AddReplace => CommonAction::AddOptions {
+                options: AddOpts { replace: true, autoplay: false, position: Position::EndOfQueue },
+            },
+            CommonActionFile::Insert => CommonAction::AddOptions {
+                options: AddOpts {
+                    replace: false,
+                    autoplay: false,
+                    position: Position::AfterCurrentSong,
+                },
+            },
+            CommonActionFile::InsertAll => CommonAction::InsertAll,
+            CommonActionFile::AddAll => CommonAction::AddAll,
+            CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
             CommonActionFile::Delete => CommonAction::Delete,
             CommonActionFile::Rename => CommonAction::Rename,
             CommonActionFile::Close => CommonAction::Close,
             CommonActionFile::Confirm => CommonAction::Confirm,
             CommonActionFile::FocusInput => CommonAction::FocusInput,
-            CommonActionFile::AddAll => CommonAction::AddAll,
             CommonActionFile::PaneUp => CommonAction::PaneUp,
             CommonActionFile::PaneDown => CommonAction::PaneDown,
             CommonActionFile::PaneLeft => CommonAction::PaneLeft,
             CommonActionFile::PaneRight => CommonAction::PaneRight,
-            CommonActionFile::AddReplace => CommonAction::AddReplace,
-            CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
-            CommonActionFile::Insert => CommonAction::Insert,
-            CommonActionFile::InsertAll => CommonAction::InsertAll,
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { options } => CommonAction::AddOptions { options },
         }

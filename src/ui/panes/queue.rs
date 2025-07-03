@@ -16,7 +16,7 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        keys::{GlobalAction, QueueActions},
+        keys::{GlobalAction, QueueActions, actions::Position},
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
@@ -861,19 +861,31 @@ impl Pane for QueuePane {
                     self.scrolling_state.marked.clear();
                     context.render()?;
                 }
-                CommonAction::Add => {}
                 CommonAction::AddAll => {}
-                CommonAction::Insert => {
-                    let song_under_cursor =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx));
+                CommonAction::AddOptions { options } => {
+                    let Some(song) =
+                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                    else {
+                        return Ok(());
+                    };
 
-                    if let Some(song) = song_under_cursor {
-                        let file = song.file.clone();
-                        context.command(move |client| {
-                            client.add(&file, Some(QueuePosition::RelativeAdd(0)))?;
-                            Ok(())
-                        });
-                    }
+                    let file = song.file.clone();
+                    context.command(move |client| {
+                        if options.replace {
+                            client.clear()?;
+                        }
+
+                        let position = match options.position {
+                            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+                            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+                            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+                            Position::EndOfQueue => None,
+                        };
+
+                        client.add(&file, position)?;
+
+                        Ok(())
+                    });
                 }
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) =
@@ -892,7 +904,6 @@ impl Pane for QueuePane {
                     }
                 }
                 CommonAction::InsertAll => {}
-                CommonAction::AddReplace => {}
                 CommonAction::AddAllReplace => {}
                 CommonAction::Delete => {}
                 CommonAction::Rename => {}
@@ -904,7 +915,6 @@ impl Pane for QueuePane {
                 CommonAction::PaneUp => {}
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
-                CommonAction::AddOptions { .. } => {}
             }
         } else if let Some(action) = event.as_global_action(context) {
             match action {

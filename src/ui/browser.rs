@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use itertools::Itertools;
@@ -9,7 +11,7 @@ use super::{
 };
 use crate::{
     MpdQueryResult,
-    config::keys::{CommonAction, GlobalAction},
+    config::keys::{CommonAction, GlobalAction, actions::Position},
     context::AppContext,
     mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
@@ -42,8 +44,7 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    #[must_use]
-    fn add(&self, item: &T, context: &AppContext) -> Option<Box<dyn AddCommand>>;
+    fn add(&self, item: &T, context: &AppContext) -> Option<Arc<dyn AddCommand>>;
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
@@ -327,65 +328,11 @@ where
                 self.stack_mut().current_mut().marked_mut().clear();
                 context.render()?;
             }
-            CommonAction::Add if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked() {
-                    let item = &self.stack().current().items[*idx];
-                    if let Some(add_fn) = self.add(item, context) {
-                        context.command(move |client| {
-                            add_fn(client, None);
-                            Ok(())
-                        });
-                    }
-                }
-
-                context.render()?;
-            }
-            CommonAction::Add => {
-                if let Some(item) = self.stack().current().selected() {
-                    if let Some(add_fn) = self.add(item, context) {
-                        context.command(move |client| {
-                            add_fn(client, None);
-                            Ok(())
-                        });
-                    }
-                }
-            }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
                 log::debug!("add all");
                 self.add_all(context, None)?;
             }
             CommonAction::AddAll => {}
-            CommonAction::AddReplace if !self.stack().current().marked().is_empty() => {
-                context.command(|client| {
-                    client.clear();
-                    Ok(())
-                });
-                for idx in self.stack().current().marked() {
-                    let item = &self.stack().current().items[*idx];
-                    if let Some(add_fn) = self.add(item, context) {
-                        context.command(move |client| {
-                            add_fn(client, None);
-                            Ok(())
-                        });
-                    }
-                }
-
-                context.render()?;
-            }
-            CommonAction::AddReplace => {
-                context.command(|client| {
-                    client.clear();
-                    Ok(())
-                });
-                if let Some(item) = self.stack().current().selected() {
-                    if let Some(add_fn) = self.add(item, context) {
-                        context.command(move |client| {
-                            add_fn(client, None);
-                            Ok(())
-                        });
-                    }
-                }
-            }
             CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
                 context.command(|client| {
                     client.clear()?;
@@ -394,31 +341,7 @@ where
                 self.add_all(context, None)?;
             }
             CommonAction::AddAllReplace => {}
-            CommonAction::Insert if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked().iter().rev() {
-                    let item = &self.stack().current().items[*idx];
-                    if let Some(add_fn) = self.add(item, context) {
-                        context.command(move |client| {
-                            add_fn(client, Some(QueuePosition::RelativeAdd(0)));
-                            Ok(())
-                        });
-                    }
-                }
-
-                context.render()?;
-            }
-            CommonAction::Insert => {
-                if let Some(item) = self.stack().current().selected() {
-                    if let Some(add_fn) = self.add(item, context) {
-                        context.command(move |client| {
-                            add_fn(client, Some(QueuePosition::RelativeAdd(0)));
-                            Ok(())
-                        });
-                    }
-                }
-            }
             CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
-                log::debug!("add all next");
                 self.add_all(context, Some(QueuePosition::RelativeAdd(0)))?;
             }
             CommonAction::InsertAll => {}
@@ -457,6 +380,69 @@ where
             CommonAction::PaneUp => {}
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
+
+            CommonAction::AddOptions { options } if !self.stack().current().marked().is_empty() => {
+                let add_fns = self
+                    .stack()
+                    .current()
+                    .marked()
+                    .iter()
+                    .filter_map(|idx| self.add(&self.stack().current().items[*idx], context))
+                    .collect_vec();
+
+                context.command(move |client| {
+                    if options.replace {
+                        client.clear()?;
+                    }
+
+                    match options.position {
+                        Position::AfterCurrentSong => {
+                            for add_fn in add_fns.iter().rev() {
+                                add_fn(client, Some(QueuePosition::RelativeAdd(0)));
+                            }
+                        }
+                        Position::BeforeCurrentSong => {
+                            for add_fn in add_fns {
+                                add_fn(client, Some(QueuePosition::RelativeSub(0)));
+                            }
+                        }
+                        Position::StartOfQueue => {
+                            for add_fn in add_fns.iter().rev() {
+                                add_fn(client, Some(QueuePosition::Absolute(0)));
+                            }
+                        }
+                        Position::EndOfQueue => {
+                            for add_fn in add_fns {
+                                add_fn(client, None);
+                            }
+                        }
+                    }
+
+                    Ok(())
+                });
+            }
+            CommonAction::AddOptions { options } => {
+                if let Some(item) = self.stack().current().selected() {
+                    if let Some(add_fn) = self.add(item, context) {
+                        context.command(move |client| {
+                            if options.replace {
+                                client.clear()?;
+                            }
+
+                            let position = match options.position {
+                                Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+                                Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+                                Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+                                Position::EndOfQueue => None,
+                            };
+
+                            add_fn(client, position);
+
+                            Ok(())
+                        });
+                    }
+                }
+            }
             CommonAction::AddOptions { .. } => {
                 let Some(item) = self.stack().current().selected() else {
                     return Ok(());
@@ -466,12 +452,12 @@ where
                     return Ok(());
                 };
 
-                let add_fn1 = add_fn.clone();
-                let add_fn2 = add_fn.clone();
-                let add_fn3 = add_fn.clone();
-                let add_fn4 = add_fn.clone();
-                let add_fn5 = add_fn.clone();
-                let add_fn6 = add_fn.clone();
+                let add_fn1 = Arc::clone(&add_fn);
+                let add_fn2 = Arc::clone(&add_fn);
+                let add_fn3 = Arc::clone(&add_fn);
+                let add_fn4 = Arc::clone(&add_fn);
+                let add_fn5 = Arc::clone(&add_fn);
+                let add_fn6 = Arc::clone(&add_fn);
 
                 modal!(
                     context,
@@ -532,16 +518,11 @@ where
 }
 
 pub trait AddCommand:
-    FnOnce(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Send + Sync + 'static
+    Fn(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Send + Sync + 'static
 {
-    fn clone(&self) -> Box<dyn AddCommand>;
 }
 
-impl<T> AddCommand for T
-where
-    T: FnOnce(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Clone + Send + Sync + 'static,
+impl<T> AddCommand for T where
+    T: Fn(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Clone + Send + Sync + 'static
 {
-    fn clone(&self) -> Box<dyn AddCommand> {
-        Box::new(self.clone())
-    }
 }
