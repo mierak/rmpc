@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DirOrSong {
     Dir {
         name: String,

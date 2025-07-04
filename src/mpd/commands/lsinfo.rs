@@ -18,7 +18,7 @@ impl LsInfo {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, strum::EnumDiscriminants)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LsInfoEntry {
     Dir(Dir),
     File(Song),
