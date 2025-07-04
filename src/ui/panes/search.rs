@@ -39,7 +39,6 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::{Dir, DirStackItem},
-        modals::menu_modal::MenuModal,
         widgets::{button::Button, input::Input},
     },
 };

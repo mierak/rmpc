@@ -233,9 +233,8 @@ impl MenuModal {
     }
 
     pub fn create_add_modal(
-        opts: Vec<(String, AddOpts)>,
+        opts: Vec<(String, AddOpts, Arc<dyn AddCommand>)>,
         ctx: &AppContext,
-        add_fn: &Arc<dyn AddCommand>,
     ) -> MenuModal {
         MenuModal::new(ctx)
             .add_section(ctx, |section| {
@@ -243,8 +242,7 @@ impl MenuModal {
                 let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
                 let mut section = section;
 
-                for (label, options) in opts {
-                    let add_fn = add_fn.clone();
+                for (label, options, add_fn) in opts {
                     section = section.add_item(label, move |ctx| {
                         ctx.command(move |client| {
                             if options.replace {

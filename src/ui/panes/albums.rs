@@ -15,6 +15,7 @@ use crate::{
         commands::Song,
         errors::MpdError,
         mpd_client::{Filter, MpdClient, MpdCommand, Tag},
+        proto_client::ProtoClient,
     },
     shared::{
         ext::mpd_client::MpdClientExt,
@@ -66,11 +67,14 @@ impl AlbumsPane {
 
         match self.stack.path() {
             [_album] => {
-                let add = self.add(current, context);
+                let add = self.add(std::iter::once(current), context);
                 let queue_len = context.queue.len();
                 context.command(move |client| {
                     if let Some(add) = add {
+                        client.send_start_cmd_list()?;
                         (add)(client, None)?;
+                        client.send_execute_cmd_list()?;
+                        client.read_ok()?;
                         if autoplay {
                             client.play_position_safe(queue_len)?;
                         }
@@ -271,27 +275,56 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn add(&self, item: &DirOrSong, _context: &AppContext) -> Option<Arc<dyn AddCommand>> {
+    fn add<'a>(
+        &self,
+        item: impl Iterator<Item = &'a DirOrSong>,
+        _context: &AppContext,
+    ) -> Option<Arc<dyn AddCommand>> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
-                let name = item.dir_name_or_file_name().into_owned();
-                Some(Arc::new(move |client, position| {
-                    client.find_add(
-                        &[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())],
-                        position,
-                    )?;
+                let names =
+                    item.map(|item| item.dir_name_or_file_name().into_owned()).collect_vec();
 
-                    status_info!("'{name}' added to queue");
+                if names.is_empty() {
+                    return None;
+                }
+
+                Some(Arc::new(move |client, position| {
+                    client.send_start_cmd_list()?;
+                    for name in &names {
+                        client.send_find_add(
+                            &[
+                                Filter::new(Tag::File, name),
+                                Filter::new(Tag::Album, album.as_str()),
+                            ],
+                            position,
+                        )?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+
+                    // status_info!("'{name}' added to queue");
                     Ok(())
                 }))
             }
             [] => {
-                let name = item.dir_name_or_file_name().into_owned();
-                Some(Arc::new(move |client, position| {
-                    client.find_add(&[Filter::new(Tag::Album, &name)], position)?;
+                let names =
+                    item.map(|item| item.dir_name_or_file_name().into_owned()).collect_vec();
 
-                    status_info!("Album '{name}' added to queue");
+                if names.is_empty() {
+                    return None;
+                }
+
+                Some(Arc::new(move |client, position| {
+                    client.send_start_cmd_list()?;
+                    for name in &names {
+                        client.send_find_add(&[Filter::new(Tag::Album, name)], position)?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+
+                    // status_info!("Album '{name}' added to queue");
                     Ok(())
                 }))
             }

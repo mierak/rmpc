@@ -16,7 +16,8 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::{Song, metadata_tag::MetadataTagExt},
-        mpd_client::{Filter, FilterKind, MpdClient, Tag},
+        mpd_client::{Filter, FilterKind, MpdClient, MpdCommand, Tag},
+        proto_client::ProtoClient,
     },
     shared::{
         ext::mpd_client::MpdClientExt,
@@ -122,10 +123,13 @@ impl TagBrowserPane {
 
         match self.stack.path() {
             [_artist, _album] => {
-                if let Some(add) = self.add(current, context) {
+                if let Some(add) = self.add(std::iter::once(current), context) {
                     let queue_len = context.queue.len();
                     context.command(move |client| {
+                        client.send_start_cmd_list()?;
                         add(client, position)?;
+                        client.send_execute_cmd_list()?;
+                        client.read_ok()?;
                         if autoplay {
                             client.play_position_safe(queue_len)?;
                         }
@@ -473,68 +477,95 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn add(&self, item: &DirOrSong, _ctx: &AppContext) -> Option<Arc<dyn AddCommand>> {
+    fn add<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+        _ctx: &AppContext,
+    ) -> Option<Arc<dyn AddCommand>> {
         match self.stack.path() {
-            [artist, album] => {
-                let root_tag = self.root_tag.clone();
-                let separator = self.separator.clone();
-                let artist = artist.clone();
-                let name = item.dir_name_or_file_name().into_owned();
+            [_artist, _album] => {
+                let names =
+                    items.map(|item| item.dir_name_or_file_name().into_owned()).collect_vec();
 
-                let albums = self.cache.0.get(&artist)?;
-
-                let original_name =
-                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())?;
+                if names.is_empty() {
+                    return None;
+                }
 
                 Some(Arc::new(move |client, position| {
-                    client.find_add(
-                        &[
-                            Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &artist),
-                            Filter::new(Tag::Album, &original_name),
-                            Filter::new(Tag::File, &name),
-                        ],
-                        position,
-                    )?;
+                    client.send_start_cmd_list()?;
+                    for name in &names {
+                        client.send_find_add(&[Filter::new(Tag::File, name)], position)?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
 
-                    status_info!("'{name}' added to queue");
+                    // status_info!("'{name}' added to queue");
                     Ok(())
                 }))
             }
             [artist] => {
                 let artist = artist.clone();
-                let name = item.dir_name_or_file_name().into_owned();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
-
                 let albums = self.cache.0.get(&artist)?;
 
-                let original_name =
-                    albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())?;
+                let original_album_names = items
+                    .filter_map(|item| {
+                        let name = item.dir_name_or_file_name();
+                        albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())
+                    })
+                    .collect_vec();
+
+                if original_album_names.is_empty() {
+                    return None;
+                }
 
                 Some(Arc::new(move |client, position| {
-                    client.find_add(
-                        &[
-                            Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &artist),
-                            Filter::new(Tag::Album, &original_name),
-                        ],
-                        position,
-                    )?;
+                    client.send_start_cmd_list()?;
+                    for name in &original_album_names {
+                        client.send_find_add(
+                            &[
+                                Self::root_tag_filter(
+                                    root_tag.clone(),
+                                    separator.as_deref(),
+                                    &artist,
+                                ),
+                                Filter::new(Tag::Album, name),
+                            ],
+                            position,
+                        )?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
 
-                    status_info!("Album '{name}' by '{artist}' added to queue");
+                    // status_info!("Album '{name}' by '{artist}' added to queue");
                     Ok(())
                 }))
             }
             [] => {
-                let name = item.dir_name_or_file_name().into_owned();
+                // let name = item.dir_name_or_file_name().into_owned();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
-                Some(Arc::new(move |client, position| {
-                    client.find_add(
-                        &[Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &name)],
-                        position,
-                    )?;
 
-                    status_info!("All songs by '{name}' added to queue");
+                let tag_names =
+                    items.map(|item| item.dir_name_or_file_name().into_owned()).collect_vec();
+
+                if tag_names.is_empty() {
+                    return None;
+                }
+
+                Some(Arc::new(move |client, position| {
+                    client.send_start_cmd_list()?;
+                    for value in &tag_names {
+                        client.send_find_add(
+                            &[Self::root_tag_filter(root_tag.clone(), separator.as_deref(), value)],
+                            position,
+                        )?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+
+                    // status_info!("All songs by '{name}' added to queue");
                     Ok(())
                 }))
             }

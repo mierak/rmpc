@@ -14,10 +14,16 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, AddOpts, Position},
+        actions::{AddKind, Position},
     },
     context::AppContext,
-    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{
+        QueuePosition,
+        client::Client,
+        commands::Song,
+        mpd_client::{MpdClient, MpdCommand},
+        proto_client::ProtoClient,
+    },
     shared::{
         ext::mpd_client::MpdClientExt,
         key_event::KeyEvent,
@@ -49,7 +55,11 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add(&self, item: &T, context: &AppContext) -> Option<Arc<dyn AddCommand>>;
+    fn add<'a>(
+        &self,
+        item: impl Iterator<Item = &'a T>,
+        context: &AppContext,
+    ) -> Option<Arc<dyn AddCommand>>;
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
@@ -183,9 +193,12 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        if let Some(mut add_fn) = self.add(item, context) {
+                        if let Some(mut add_fn) = self.add(std::iter::once(item), context) {
                             context.command(move |client| {
+                                client.send_start_cmd_list()?;
                                 add_fn(client, None);
+                                client.send_execute_cmd_list()?;
+                                client.read_ok()?;
                                 Ok(())
                             });
                         }
@@ -385,88 +398,72 @@ where
             CommonAction::PaneUp => {}
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
-
-            CommonAction::AddOptions { kind: AddKind::Action(options) }
-                if !self.stack().current().marked().is_empty() =>
-            {
-                let add_fns = self
-                    .stack()
-                    .current()
-                    .marked()
-                    .iter()
-                    .filter_map(|idx| self.add(&self.stack().current().items[*idx], context))
-                    .collect_vec();
-
-                context.command(move |client| {
-                    if options.replace {
-                        client.clear()?;
-                    }
-
-                    match options.position {
-                        Position::AfterCurrentSong => {
-                            for add_fn in add_fns.iter().rev() {
-                                add_fn(client, Some(QueuePosition::RelativeAdd(0)));
-                            }
-                        }
-                        Position::BeforeCurrentSong => {
-                            for add_fn in add_fns {
-                                add_fn(client, Some(QueuePosition::RelativeSub(0)));
-                            }
-                        }
-                        Position::StartOfQueue => {
-                            for add_fn in add_fns.iter().rev() {
-                                add_fn(client, Some(QueuePosition::Absolute(0)));
-                            }
-                        }
-                        Position::EndOfQueue => {
-                            for add_fn in add_fns {
-                                add_fn(client, None);
-                            }
-                        }
-                    }
-
-                    Ok(())
-                });
-            }
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                if let Some(item) = self.stack().current().selected() {
-                    if let Some(add_fn) = self.add(item, context) {
-                        let queue_len = context.queue.len();
-                        let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
+                if let Some(add_fn) = self.add_current_items(context, options.position) {
+                    let queue_len = context.queue.len();
+                    let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
 
-                        context.command(move |client| {
-                            if options.replace {
-                                client.clear()?;
-                            }
+                    context.command(move |client| {
+                        if options.replace {
+                            client.clear()?;
+                        }
 
-                            let position = options.to_queue_position();
-                            let play_pos_idx =
-                                options.play_position_idx(queue_len, current_song_idx);
+                        let position = options.to_queue_position();
+                        let play_pos_idx = options.play_position_idx(queue_len, current_song_idx);
 
-                            add_fn(client, position);
-                            if let Some(pos) = play_pos_idx {
-                                client.play_position_safe(queue_len);
-                            }
+                        add_fn(client, position);
 
-                            Ok(())
-                        });
-                    }
+                        if let Some(pos) = play_pos_idx {
+                            client.play_position_safe(queue_len);
+                        }
+                        Ok(())
+                    });
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                let Some(item) = self.stack().current().selected() else {
-                    return Ok(());
-                };
-
-                let Some(add_fn) = self.add(item, context) else {
-                    return Ok(());
-                };
-
-                modal!(context, MenuModal::create_add_modal(items, context, &add_fn));
+                if let Some(opts) = items
+                    .iter()
+                    .map(|(label, opts)| {
+                        self.add_current_items(context, opts.position)
+                            .map(|add_fn| (label.to_owned(), *opts, add_fn))
+                    })
+                    .collect::<Option<Vec<_>>>()
+                {
+                    modal!(context, MenuModal::create_add_modal(opts, context));
+                }
             }
         }
 
         Ok(())
+    }
+
+    /// Returns `AddCommand` for the currently hovered item if no items are
+    /// marked. Otherwise returns `AddCommand` for all marked items.
+    fn add_current_items(
+        &self,
+        context: &AppContext,
+        position: Position,
+    ) -> Option<Arc<dyn AddCommand>> {
+        if self.stack().current().marked().is_empty() {
+            if let Some(item) = self.stack().current().selected() {
+                self.add(std::iter::once(item), context)
+            } else {
+                None
+            }
+        } else {
+            let should_reverse = match position {
+                Position::AfterCurrentSong | Position::StartOfQueue => true,
+                Position::BeforeCurrentSong | Position::EndOfQueue => false,
+            };
+            let items = self
+                .stack()
+                .current()
+                .marked()
+                .iter()
+                .map(|idx| &self.stack().current().items[*idx]);
+
+            if should_reverse { self.add(items.rev(), context) } else { self.add(items, context) }
+        }
     }
 }
 

@@ -13,7 +13,8 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},
-        mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
+        mpd_client::{MpdClient, MpdCommand, SingleOrRange},
+        proto_client::ProtoClient,
     },
     shared::{
         ext::mpd_client::MpdClientExt,
@@ -25,7 +26,7 @@ use crate::{
     ui::{
         UiEvent,
         browser::{AddCommand, BrowserPane, MoveDirection},
-        dir_or_song::DirOrSong,
+        dir_or_song::{DirOrSong, DirOrSongDiscriminants},
         dirstack::{DirStack, DirStackItem},
         modals::{
             confirm_modal::ConfirmModal,
@@ -96,10 +97,13 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                if let Some(add) = self.add(selected, context) {
+                if let Some(add) = self.add(std::iter::once(selected), context) {
                     let queue_len = context.queue.len();
                     context.command(move |client| {
+                        client.send_start_cmd_list()?;
                         add(client, None)?;
+                        client.send_execute_cmd_list()?;
+                        client.read_ok()?;
                         if autoplay {
                             client.play_position_safe(queue_len)?;
                         }
@@ -437,7 +441,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             }
             [] => {
                 for playlist in self.stack().current().items.iter().rev() {
-                    if let Some(add) = self.add(playlist, context) {
+                    if let Some(add) = self.add(std::iter::once(playlist), context) {
                         context.command(move |client| {
                             add(client, position)?;
                             // status_info!("Playlist '{}' added to queue", playlist.as_path());
@@ -453,32 +457,68 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add(&self, item: &DirOrSong, context: &AppContext) -> Option<Arc<dyn AddCommand>> {
-        match item {
-            DirOrSong::Dir { name: d, .. } => {
-                let d = d.clone();
-                Some(Arc::new(move |client, position| {
-                    client.load_playlist(&d, position)?;
-                    status_info!("Playlist '{d}' added to queue");
-                    Ok(())
-                }))
-            }
-            DirOrSong::Song(s) => {
-                let file = s.file.clone();
-                let artist_text =
-                    s.artist_str(&context.config.theme.format_tag_separator).into_owned();
-                let title_text =
-                    s.title_str(&context.config.theme.format_tag_separator).into_owned();
+    fn add<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+        _context: &AppContext,
+    ) -> Option<Arc<dyn AddCommand>> {
+        let items = items
+            .map(|item| match item {
+                DirOrSong::Dir { name, .. } => (DirOrSongDiscriminants::Dir, name.to_owned()),
+                DirOrSong::Song(song) => (DirOrSongDiscriminants::Song, song.file.clone()),
+            })
+            .collect_vec();
 
-                Some(Arc::new(move |client, position| {
-                    client.add(&file, position)?;
-                    if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
-                        status_info!("'{}' by '{}' added to queue", title_text, artist_text);
-                    }
-                    Ok(())
-                }))
-            }
+        if items.is_empty() {
+            return None;
         }
+
+        Some(Arc::new(move |client, position| {
+            client.send_start_cmd_list()?;
+            for item in &items {
+                match item {
+                    (DirOrSongDiscriminants::Dir, name) => {
+                        client.send_load_playlist(name, position)?;
+                    }
+                    (DirOrSongDiscriminants::Song, file) => {
+                        client.send_add(file, position)?;
+                    }
+                }
+            }
+            client.send_execute_cmd_list()?;
+            client.read_ok()?;
+
+            Ok(())
+        }))
+
+        // match item {
+        //     DirOrSong::Dir { name: playlist_name, .. } => {
+        //         let d = d.clone();
+        //         Some(Arc::new(move |client, position| {
+        //             client.load_playlist(&d, position)?;
+        //             status_info!("Playlist '{d}' added to queue");
+        //             Ok(())
+        //         }))
+        //     }
+        //     DirOrSong::Song(s) => {
+        //         let file = s.file.clone();
+        //         let artist_text =
+        //
+        // s.artist_str(&context.config.theme.format_tag_separator).
+        // into_owned();         let title_text =
+        //
+        // s.title_str(&context.config.theme.format_tag_separator).into_owned();
+        //
+        //         Some(Arc::new(move |client, position| {
+        //             client.add(&file, position)?;
+        //             if let Ok(Some(_song)) =
+        // client.find_one(&[Filter::new(Tag::File, &file)]) {
+        //                 status_info!("'{}' by '{}' added to queue",
+        // title_text, artist_text);             }
+        //             Ok(())
+        //         }))
+        //     }
+        // }
     }
 
     fn rename(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
