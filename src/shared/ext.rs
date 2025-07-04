@@ -498,8 +498,11 @@ pub mod mpd_client {
                 Autoplay::No => None,
             };
 
-            let position: Option<QueuePosition> = position.into();
             self.send_start_cmd_list()?;
+            if matches!(position, Position::Replace) {
+                self.send_clear()?;
+            }
+            let position: Option<QueuePosition> = position.into();
             for item in items {
                 match item {
                     Enqueue::File { path } => self.send_add(&path, position),
