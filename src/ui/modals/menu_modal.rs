@@ -250,13 +250,9 @@ impl MenuModal {
                             }
 
                             let position = options.to_queue_position();
-                            let play_pos_idx =
-                                options.play_position_idx(queue_len, current_song_idx);
+                            let autoplay = options.autoplay(queue_len, current_song_idx);
 
-                            client.send_enqueue_multiple(items, position)?;
-                            if let Some(pos) = play_pos_idx {
-                                client.play_position_safe(pos)?;
-                            }
+                            client.enqueue_multiple(items, position, autoplay)?;
 
                             Ok(())
                         });

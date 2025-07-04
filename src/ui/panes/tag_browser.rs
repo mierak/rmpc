@@ -19,7 +19,7 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::{Enqueue, MpdClientExt},
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::status_info,
         mouse_event::MouseEvent,
@@ -125,11 +125,13 @@ impl TagBrowserPane {
                 let items = self.add(std::iter::once(current), context);
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
+                    let autoplay = if autoplay {
+                        Autoplay::Yes { queue_len, current_song_idx: None }
+                    } else {
+                        Autoplay::No
+                    };
                     context.command(move |client| {
-                        client.send_enqueue_multiple(items, position)?;
-                        if autoplay {
-                            client.play_position_safe(queue_len)?;
-                        }
+                        client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
                 }

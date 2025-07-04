@@ -14,7 +14,7 @@ use crate::{
         mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
-        ext::mpd_client::{Enqueue, MpdClientExt},
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info},
         mouse_event::MouseEvent,
@@ -97,11 +97,13 @@ impl PlaylistsPane {
                 let items = self.add(std::iter::once(selected), context);
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
+                    let autoplay = if autoplay {
+                        Autoplay::Yes { queue_len, current_song_idx: None }
+                    } else {
+                        Autoplay::No
+                    };
                     context.command(move |client| {
-                        client.send_enqueue_multiple(items, None)?;
-                        if autoplay {
-                            client.play_position_safe(queue_len)?;
-                        }
+                        client.enqueue_multiple(items, None, autoplay)?;
                         Ok(())
                     });
                 }
@@ -439,7 +441,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     let items = self.add(std::iter::once(playlist), context);
                     if !items.is_empty() {
                         context.command(move |client| {
-                            client.send_enqueue_multiple(items, position)?;
+                            client.enqueue_multiple(items, position, Autoplay::No)?;
                             // status_info!("Playlist '{}' added to queue", playlist.as_path());
                             Ok(())
                         });

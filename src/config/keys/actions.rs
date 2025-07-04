@@ -7,6 +7,7 @@ use super::ToDescription;
 use crate::{
     config::{tabs::TabName, utils::tilde_expand},
     mpd::QueuePosition,
+    shared::ext::mpd_client::Autoplay,
 };
 
 // Global actions
@@ -419,22 +420,12 @@ impl AddOpts {
         }
     }
 
-    pub fn play_position_idx(
-        self,
-        queue_len: usize,
-        current_song_idx: Option<usize>,
-    ) -> Option<usize> {
+    pub fn autoplay(self, queue_len: usize, current_song_idx: Option<usize>) -> Autoplay {
         if !self.autoplay {
-            return None;
+            return Autoplay::No;
         }
 
-        match self.position {
-            Position::AfterCurrentSong => current_song_idx.map(|i| i + 1),
-            Position::BeforeCurrentSong => current_song_idx.map(|i| i.saturating_sub(1)),
-            Position::StartOfQueue => Some(0),
-            Position::EndOfQueue if self.replace => Some(0),
-            Position::EndOfQueue => Some(queue_len),
-        }
+        Autoplay::Yes { queue_len, current_song_idx }
     }
 }
 

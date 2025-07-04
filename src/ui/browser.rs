@@ -13,7 +13,7 @@ use crate::{
     context::AppContext,
     mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
-        ext::mpd_client::{Enqueue, MpdClientExt},
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::modal,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -180,7 +180,7 @@ where
                         let items = self.add(std::iter::once(item), context);
                         if !items.is_empty() {
                             context.command(move |client| {
-                                client.send_enqueue_multiple(items, None)?;
+                                client.enqueue_multiple(items, None, Autoplay::No)?;
                                 Ok(())
                             });
                         }
@@ -392,13 +392,9 @@ where
                         }
 
                         let position = options.to_queue_position();
-                        let play_pos_idx = options.play_position_idx(queue_len, current_song_idx);
+                        let autoplay = options.autoplay(queue_len, current_song_idx);
 
-                        client.send_enqueue_multiple(items, position)?;
-
-                        if let Some(pos) = play_pos_idx {
-                            client.play_position_safe(pos);
-                        }
+                        client.enqueue_multiple(items, position, autoplay)?;
 
                         Ok(())
                     });

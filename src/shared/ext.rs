@@ -430,12 +430,18 @@ pub mod mpd_client {
         Find { filter: Vec<(Tag, String)> },
     }
 
+    pub enum Autoplay {
+        Yes { queue_len: usize, current_song_idx: Option<usize> },
+        No,
+    }
+
     pub trait MpdClientExt {
         fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError>;
-        fn send_enqueue_multiple(
+        fn enqueue_multiple(
             &mut self,
             items: Vec<Enqueue>,
             position: Option<QueuePosition>,
+            autoplay: Autoplay,
         ) -> Result<(), MpdError>;
     }
 
@@ -456,10 +462,11 @@ pub mod mpd_client {
             Ok(())
         }
 
-        fn send_enqueue_multiple(
+        fn enqueue_multiple(
             &mut self,
             mut items: Vec<Enqueue>,
             position: Option<QueuePosition>,
+            autoplay: Autoplay,
         ) -> Result<(), MpdError> {
             let should_reverse = match position {
                 Some(QueuePosition::Absolute(_)) | Some(QueuePosition::RelativeAdd(_)) => true,
@@ -468,6 +475,22 @@ pub mod mpd_client {
             if should_reverse {
                 items.reverse();
             }
+
+            let autoplay_idx = match autoplay {
+                Autoplay::Yes { queue_len, current_song_idx: Some(curr) } => match position {
+                    Some(QueuePosition::Absolute(pos)) => Some(pos),
+                    Some(QueuePosition::RelativeAdd(pos)) => Some(curr + pos),
+                    Some(QueuePosition::RelativeSub(pos)) => Some(curr.saturating_sub(pos)),
+                    None => Some(queue_len),
+                },
+                Autoplay::Yes { queue_len, current_song_idx: None } => match position {
+                    Some(QueuePosition::Absolute(pos)) => Some(pos),
+                    Some(QueuePosition::RelativeAdd(_)) => None,
+                    Some(QueuePosition::RelativeSub(_)) => None,
+                    None => Some(queue_len),
+                },
+                Autoplay::No => None,
+            };
 
             self.send_start_cmd_list()?;
             for item in items {
@@ -492,6 +515,9 @@ pub mod mpd_client {
             }
             self.send_execute_cmd_list()?;
             self.read_ok()?;
+            if let Some(autoplay_idx) = autoplay_idx {
+                self.play_position_safe(autoplay_idx)?;
+            }
 
             Ok(())
         }

@@ -27,7 +27,7 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::{Enqueue, MpdClientExt},
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::{modal, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
@@ -649,7 +649,7 @@ impl Pane for SearchPane {
                         let items = self.add_current();
                         if !items.is_empty() {
                             context.command(move |client| {
-                                client.send_enqueue_multiple(items, None)?;
+                                client.enqueue_multiple(items, None, Autoplay::No)?;
                                 Ok(())
                             });
                         }
@@ -693,7 +693,7 @@ impl Pane for SearchPane {
                     let items = self.add_current();
                     if !items.is_empty() {
                         context.command(move |client| {
-                            client.send_enqueue_multiple(items, None)?;
+                            client.enqueue_multiple(items, None, Autoplay::No)?;
                             Ok(())
                         });
                     }
@@ -1016,7 +1016,7 @@ impl Pane for SearchPane {
                             let items = self.add_current();
                             if !items.is_empty() {
                                 context.command(move |client| {
-                                    client.send_enqueue_multiple(items, None)?;
+                                    client.enqueue_multiple(items, None, Autoplay::No)?;
                                     Ok(())
                                 });
                             }
@@ -1080,8 +1080,10 @@ impl Pane for SearchPane {
                             let queue_len = context.queue.len();
                             if !items.is_empty() {
                                 context.command(move |client| {
-                                    client.send_enqueue_multiple(items, None)?;
-                                    client.play_position_safe(queue_len)?;
+                                    client.enqueue_multiple(items, None, Autoplay::Yes {
+                                        queue_len,
+                                        current_song_idx: None,
+                                    })?;
                                     Ok(())
                                 });
                             }
@@ -1108,14 +1110,9 @@ impl Pane for SearchPane {
                                     }
 
                                     let position = opts.to_queue_position();
-                                    let play_pos_idx =
-                                        opts.play_position_idx(queue_len, current_song_idx);
+                                    let autoplay = opts.autoplay(queue_len, current_song_idx);
 
-                                    client.send_enqueue_multiple(items, position)?;
-
-                                    if let Some(pos) = play_pos_idx {
-                                        client.play_position_safe(pos)?;
-                                    }
+                                    client.enqueue_multiple(items, position, autoplay)?;
 
                                     Ok(())
                                 });
