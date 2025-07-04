@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use anyhow::{Result};
+use anyhow::Result;
 
 use super::parse_length;
 
@@ -54,7 +54,6 @@ impl FromStr for Lrc {
             let mut found_non_tag = false;
             let mut lyrics_start = 0;
             let mut offset_in_line = 1; // we skip the initial '[', so we want to include the first character after it in the offset
-                                        
 
             while !found_non_tag {
                 let mut bracket_count = 0;
@@ -96,11 +95,8 @@ impl FromStr for Lrc {
                 }
             }
 
-            let lyrics_text = if found_non_tag {
-                &line_content[lyrics_start..]
-            } else {
-                remaining.trim()
-            };
+            let lyrics_text =
+                if found_non_tag { &line_content[lyrics_start..] } else { remaining.trim() };
 
             if tags.is_empty() {
                 continue;
@@ -110,25 +106,30 @@ impl FromStr for Lrc {
                 match tag_content.chars().next() {
                     Some(c) if c.is_numeric() => {
                         // timestamps errors should be handle errors gracefully
-                        // we want to skip invalid timestamps instead of crashing because of a single wrong line for a better user experience
+                        // we want to skip invalid timestamps instead of crashing because of a
+                        // single wrong line for a better user experience
                         if let Some((minutes, time_rest)) = tag_content.split_once(':') {
-                            if let Some((seconds, fractions_of_second)) = time_rest
-                                .split_once('.')
-                                .or_else(|| time_rest.split_once(':'))
+                            if let Some((seconds, fractions_of_second)) =
+                                time_rest.split_once('.').or_else(|| time_rest.split_once(':'))
                             {
                                 // fractions of second can be up to 3 digits, truncate if longer
-                                let fractions_of_second = &fractions_of_second[..3.min(fractions_of_second.len())];
-                                
+                                let fractions_of_second =
+                                    &fractions_of_second[..3.min(fractions_of_second.len())];
+
                                 // try to parse all components
                                 if let (Ok(minutes), Ok(seconds), Ok(fractions)) = (
                                     minutes.parse::<u64>(),
                                     seconds.parse::<u64>(),
-                                    fractions_of_second.parse::<u64>()
+                                    fractions_of_second.parse::<u64>(),
                                 ) {
                                     let mut milis = 0;
                                     milis += minutes * 60 * 1000;
                                     milis += seconds * 1000;
-                                    milis += fractions * (10u64.pow(3 - u32::try_from(fractions_of_second.len()).unwrap_or(0)));
+                                    milis += fractions
+                                        * (10u64.pow(
+                                            3 - u32::try_from(fractions_of_second.len())
+                                                .unwrap_or(0),
+                                        ));
 
                                     milis = match offset {
                                         Some(offset) if offset > 0 => {
@@ -351,7 +352,10 @@ mod tests {
             lines: vec![
                 LrcLine { time: Duration::from_millis(9000), content: String::new() },
                 LrcLine { time: Duration::from_millis(10000), content: "[Drum Solo]".to_string() },
-                LrcLine { time: Duration::from_millis(11000), content: "Some text [with brackets] in lyrics".to_string() },
+                LrcLine {
+                    time: Duration::from_millis(11000),
+                    content: "Some text [with brackets] in lyrics".to_string()
+                },
             ]
         });
     }
@@ -447,7 +451,7 @@ mod tests {
 
         let result: Lrc = input.parse().unwrap();
         assert_eq!(result.lines[0].time, Duration::from_millis(500));
-        
+
         let input2 = r"
 [offset: -250]
 [00:01.00]offset negative with space
