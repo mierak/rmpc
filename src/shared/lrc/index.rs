@@ -14,18 +14,18 @@ use super::{Lrc, parse_metadata_only};
 use crate::{mpd::commands::Song, shared::macros::try_cont};
 
 /// Index of LRC files for fast song-to-lyrics matching.
-/// 
+///
 /// This structure maintains an in-memory index of all LRC files in a directory,
-/// allowing for fast lookup of lyrics based on song metadata (artist, title, album).
-/// The index is built using efficient metadata-only parsing to avoid processing
-/// the entire content of each LRC file during startup.
+/// allowing for fast lookup of lyrics based on song metadata (artist, title,
+/// album). The index is built using efficient metadata-only parsing to avoid
+/// processing the entire content of each LRC file during startup.
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
 pub struct LrcIndex {
     index: Vec<LrcIndexEntry>,
 }
 
 /// A single entry in the LRC index containing metadata for fast matching.
-/// 
+///
 /// This structure stores the essential metadata needed to match songs to their
 /// corresponding LRC files without having to parse the entire file content.
 #[derive(Debug, Eq, PartialEq, Hash, Serialize)]

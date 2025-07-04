@@ -30,8 +30,8 @@ pub struct Lrc {
     pub length: Option<Duration>,
 }
 
-/// Efficiently parse only metadata from LRC content, stopping at the first timestamp.
-/// and returning the line index where lyrics start.
+/// Efficiently parse only metadata from LRC content, stopping at the first
+/// timestamp. and returning the line index where lyrics start.
 pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
     let mut metadata = LrcMetadata::default();
     let lines: Vec<&str> = content.lines().collect();
@@ -147,8 +147,8 @@ impl FromStr for Lrc {
             length: metadata.length,
         };
 
-        // Process only lines starting from where lyrics begin (skip already-parsed metadata)
-        // since we dont want to parse metadata again
+        // Process only lines starting from where lyrics begin (skip already-parsed
+        // metadata) since we dont want to parse metadata again
         for s in s.lines().skip(lyrics_start_line) {
             if s.is_empty() || s.starts_with('#') {
                 continue;
