@@ -416,11 +416,14 @@ pub mod iter {
 pub mod mpd_client {
     use itertools::Itertools;
 
-    use crate::mpd::{
-        QueuePosition,
-        errors::{ErrorCode, MpdError, MpdFailureResponse},
-        mpd_client::{Filter, MpdClient, MpdCommand, Tag},
-        proto_client::ProtoClient,
+    use crate::{
+        config::keys::actions::Position,
+        mpd::{
+            QueuePosition,
+            errors::{ErrorCode, MpdError, MpdFailureResponse},
+            mpd_client::{Filter, MpdClient, MpdCommand, Tag},
+            proto_client::ProtoClient,
+        },
     };
 
     pub enum Enqueue {
@@ -440,7 +443,7 @@ pub mod mpd_client {
         fn enqueue_multiple(
             &mut self,
             items: Vec<Enqueue>,
-            position: Option<QueuePosition>,
+            position: Position,
             autoplay: Autoplay,
         ) -> Result<(), MpdError>;
     }
@@ -465,33 +468,37 @@ pub mod mpd_client {
         fn enqueue_multiple(
             &mut self,
             mut items: Vec<Enqueue>,
-            position: Option<QueuePosition>,
+            position: Position,
             autoplay: Autoplay,
         ) -> Result<(), MpdError> {
             let should_reverse = match position {
-                Some(QueuePosition::Absolute(_)) | Some(QueuePosition::RelativeAdd(_)) => true,
-                Some(QueuePosition::RelativeSub(_)) | None => false,
+                Position::AfterCurrentSong | Position::StartOfQueue => true,
+                Position::BeforeCurrentSong | Position::EndOfQueue | Position::Replace => false,
             };
+
             if should_reverse {
                 items.reverse();
             }
 
             let autoplay_idx = match autoplay {
                 Autoplay::Yes { queue_len, current_song_idx: Some(curr) } => match position {
-                    Some(QueuePosition::Absolute(pos)) => Some(pos),
-                    Some(QueuePosition::RelativeAdd(pos)) => Some(curr + pos),
-                    Some(QueuePosition::RelativeSub(pos)) => Some(curr.saturating_sub(pos)),
-                    None => Some(queue_len),
+                    Position::AfterCurrentSong => Some(curr + 1),
+                    Position::BeforeCurrentSong => Some(curr),
+                    Position::StartOfQueue => Some(0),
+                    Position::EndOfQueue => Some(queue_len),
+                    Position::Replace => Some(0),
                 },
                 Autoplay::Yes { queue_len, current_song_idx: None } => match position {
-                    Some(QueuePosition::Absolute(pos)) => Some(pos),
-                    Some(QueuePosition::RelativeAdd(_)) => None,
-                    Some(QueuePosition::RelativeSub(_)) => None,
-                    None => Some(queue_len),
+                    Position::AfterCurrentSong => None,
+                    Position::BeforeCurrentSong => None,
+                    Position::StartOfQueue => Some(0),
+                    Position::EndOfQueue => Some(queue_len),
+                    Position::Replace => Some(0),
                 },
                 Autoplay::No => None,
             };
 
+            let position: Option<QueuePosition> = position.into();
             self.send_start_cmd_list()?;
             for item in items {
                 match item {

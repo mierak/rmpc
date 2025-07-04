@@ -349,11 +349,25 @@ impl ToDescription for QueueActions {
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
 )]
+
 pub enum Position {
     AfterCurrentSong,
     BeforeCurrentSong,
     StartOfQueue,
     EndOfQueue,
+    Replace,
+}
+
+impl From<Position> for Option<QueuePosition> {
+    fn from(value: Position) -> Self {
+        match value {
+            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+            Position::EndOfQueue => None,
+            Position::Replace => None,
+        }
+    }
 }
 
 #[derive(
@@ -368,34 +382,33 @@ impl Default for AddKind {
     fn default() -> Self {
         AddKind::Modal(vec![
             ("At the end of queue".into(), AddOpts {
-                replace: false,
                 autoplay: false,
                 position: Position::EndOfQueue,
             }),
             ("At the start of queue".into(), AddOpts {
-                replace: false,
                 autoplay: false,
                 position: Position::StartOfQueue,
             }),
             ("Before the current song".into(), AddOpts {
-                replace: false,
                 autoplay: false,
                 position: Position::BeforeCurrentSong,
             }),
+            ("Before the current song and play".into(), AddOpts {
+                autoplay: true,
+                position: Position::BeforeCurrentSong,
+            }),
             ("After the current song".into(), AddOpts {
-                replace: false,
                 autoplay: false,
                 position: Position::AfterCurrentSong,
             }),
-            ("Replace the queue".into(), AddOpts {
-                replace: true,
-                autoplay: false,
-                position: Position::EndOfQueue,
-            }),
-            ("Replace the queue and play".into(), AddOpts {
-                replace: true,
+            ("After the current song and play".into(), AddOpts {
                 autoplay: true,
-                position: Position::EndOfQueue,
+                position: Position::AfterCurrentSong,
+            }),
+            ("Replace the queue".into(), AddOpts { autoplay: false, position: Position::Replace }),
+            ("Replace the queue and play".into(), AddOpts {
+                autoplay: true,
+                position: Position::Replace,
             }),
         ])
     }
@@ -405,21 +418,11 @@ impl Default for AddKind {
     Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
 )]
 pub struct AddOpts {
-    pub replace: bool,
     pub autoplay: bool,
     pub position: Position,
 }
 
 impl AddOpts {
-    pub fn to_queue_position(self) -> Option<QueuePosition> {
-        match self.position {
-            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
-            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
-            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
-            Position::EndOfQueue => None,
-        }
-    }
-
     pub fn autoplay(self, queue_len: usize, current_song_idx: Option<usize>) -> Autoplay {
         if !self.autoplay {
             return Autoplay::No;
@@ -582,22 +585,13 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
             CommonActionFile::Add => CommonAction::AddOptions {
-                kind: AddKind::Action(AddOpts {
-                    replace: false,
-                    autoplay: false,
-                    position: Position::EndOfQueue,
-                }),
+                kind: AddKind::Action(AddOpts { autoplay: false, position: Position::EndOfQueue }),
             },
             CommonActionFile::AddReplace => CommonAction::AddOptions {
-                kind: AddKind::Action(AddOpts {
-                    replace: true,
-                    autoplay: false,
-                    position: Position::EndOfQueue,
-                }),
+                kind: AddKind::Action(AddOpts { autoplay: false, position: Position::Replace }),
             },
             CommonActionFile::Insert => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    replace: false,
                     autoplay: false,
                     position: Position::AfterCurrentSong,
                 }),

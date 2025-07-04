@@ -5,10 +5,9 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{sort_mode::SortOptions, tabs::PaneType},
+    config::{keys::actions::Position, sort_mode::SortOptions, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::Song,
         errors::MpdError,
@@ -73,7 +72,7 @@ impl AlbumsPane {
                 };
                 if !items.is_empty() {
                     context.command(move |client| {
-                        client.enqueue_multiple(items, None, autoplay)?;
+                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
                         Ok(())
                     });
                 }
@@ -295,19 +294,19 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], position)?;
+                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], position.into())?;
                     status_info!("Album '{}' added to queue", album);
                     Ok(())
                 });
             }
             [] => {
                 context.command(move |client| {
-                    client.add("/", position)?; // add the whole library
+                    client.add("/", position.into())?; // add the whole library
                     status_info!("All albums added to queue");
                     Ok(())
                 });

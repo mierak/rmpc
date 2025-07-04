@@ -5,10 +5,9 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{keys::actions::Position, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -108,7 +107,7 @@ impl DirectoriesPane {
                         Autoplay::No
                     };
                     context.command(move |client| {
-                        client.enqueue_multiple(items, None, autoplay)?;
+                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
                         Ok(())
                     });
                 }
@@ -295,10 +294,10 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
             .collect_vec()
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
         context.command(move |client| {
-            client.add(&path, position)?;
+            client.add(&path, position.into())?;
             status_info!("Directory '{path}' added to queue");
             Ok(())
         });

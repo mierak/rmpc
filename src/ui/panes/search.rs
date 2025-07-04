@@ -16,7 +16,10 @@ use crate::{
     config::{
         Config,
         Search,
-        keys::{GlobalAction, actions::AddKind},
+        keys::{
+            GlobalAction,
+            actions::{AddKind, Position},
+        },
         tabs::PaneType,
     },
     context::AppContext,
@@ -649,7 +652,11 @@ impl Pane for SearchPane {
                         let items = self.add_current();
                         if !items.is_empty() {
                             context.command(move |client| {
-                                client.enqueue_multiple(items, None, Autoplay::No)?;
+                                client.enqueue_multiple(
+                                    items,
+                                    Position::EndOfQueue,
+                                    Autoplay::No,
+                                )?;
                                 Ok(())
                             });
                         }
@@ -693,7 +700,7 @@ impl Pane for SearchPane {
                     let items = self.add_current();
                     if !items.is_empty() {
                         context.command(move |client| {
-                            client.enqueue_multiple(items, None, Autoplay::No)?;
+                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::No)?;
                             Ok(())
                         });
                     }
@@ -1016,7 +1023,11 @@ impl Pane for SearchPane {
                             let items = self.add_current();
                             if !items.is_empty() {
                                 context.command(move |client| {
-                                    client.enqueue_multiple(items, None, Autoplay::No)?;
+                                    client.enqueue_multiple(
+                                        items,
+                                        Position::EndOfQueue,
+                                        Autoplay::No,
+                                    )?;
                                     Ok(())
                                 });
                             }
@@ -1080,10 +1091,11 @@ impl Pane for SearchPane {
                             let queue_len = context.queue.len();
                             if !items.is_empty() {
                                 context.command(move |client| {
-                                    client.enqueue_multiple(items, None, Autoplay::Yes {
-                                        queue_len,
-                                        current_song_idx: None,
-                                    })?;
+                                    client.enqueue_multiple(
+                                        items,
+                                        Position::EndOfQueue,
+                                        Autoplay::Yes { queue_len, current_song_idx: None },
+                                    )?;
                                     Ok(())
                                 });
                             }
@@ -1105,14 +1117,9 @@ impl Pane for SearchPane {
 
                             if !items.is_empty() {
                                 context.command(move |client| {
-                                    if opts.replace {
-                                        client.clear()?;
-                                    }
-
-                                    let position = opts.to_queue_position();
                                     let autoplay = opts.autoplay(queue_len, current_song_idx);
 
-                                    client.enqueue_multiple(items, position, autoplay)?;
+                                    client.enqueue_multiple(items, opts.position, autoplay)?;
 
                                     Ok(())
                                 });

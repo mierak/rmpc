@@ -867,6 +867,7 @@ impl Pane for QueuePane {
                 }
                 CommonAction::AddAll => {}
                 CommonAction::AddOptions { kind: AddKind::Action(options) } => {
+                    // TODO handle marked items
                     let Some(song) =
                         self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
                     else {
@@ -875,16 +876,16 @@ impl Pane for QueuePane {
 
                     let file = song.file.clone();
                     context.command(move |client| {
-                        if options.replace {
-                            client.clear()?;
-                        }
-
                         let position = match options.position {
                             Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
                             Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
                             Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
                             Position::EndOfQueue => None,
+                            Position::Replace => None,
                         };
+                        if matches!(options.position, Position::Replace) {
+                            client.clear()?;
+                        }
 
                         client.add(&file, position)?;
 
@@ -893,6 +894,7 @@ impl Pane for QueuePane {
                 }
                 CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
                 CommonAction::ShowInfo => {
+                    // TODO handle marked items
                     if let Some(selected_song) =
                         self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
                     {

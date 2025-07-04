@@ -5,10 +5,9 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{keys::actions::Position, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},
         mpd_client::{MpdClient, SingleOrRange},
@@ -103,7 +102,7 @@ impl PlaylistsPane {
                         Autoplay::No
                     };
                     context.command(move |client| {
-                        client.enqueue_multiple(items, None, autoplay)?;
+                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
                         Ok(())
                     });
                 }
@@ -426,12 +425,12 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
         match self.stack().path() {
             [playlist] => {
                 let playlist = playlist.clone();
                 context.command(move |client| {
-                    client.load_playlist(&playlist, position)?;
+                    client.load_playlist(&playlist, position.into())?;
                     status_info!("Playlist '{playlist}' added to queue");
                     Ok(())
                 });

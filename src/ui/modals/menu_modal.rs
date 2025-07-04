@@ -16,7 +16,6 @@ use super::{Modal, RectExt as _};
 use crate::{
     config::keys::{CommonAction, actions::AddOpts},
     context::AppContext,
-    mpd::mpd_client::MpdClient,
     shared::{
         ext::{
             mpd_client::{Enqueue, MpdClientExt},
@@ -245,14 +244,8 @@ impl MenuModal {
                 for (label, options, items) in opts {
                     section = section.add_item(label, move |ctx| {
                         ctx.command(move |client| {
-                            if options.replace {
-                                client.clear()?;
-                            }
-
-                            let position = options.to_queue_position();
                             let autoplay = options.autoplay(queue_len, current_song_idx);
-
-                            client.enqueue_multiple(items, position, autoplay)?;
+                            client.enqueue_multiple(items, options.position, autoplay)?;
 
                             Ok(())
                         });

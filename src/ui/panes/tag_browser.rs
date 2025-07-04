@@ -9,11 +9,11 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
+        keys::actions::Position,
         tabs::PaneType,
     },
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::{Song, metadata_tag::MetadataTagExt},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
@@ -105,12 +105,7 @@ impl TagBrowserPane {
         }
     }
 
-    fn open_or_play(
-        &mut self,
-        autoplay: bool,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -131,7 +126,7 @@ impl TagBrowserPane {
                         Autoplay::No
                     };
                     context.command(move |client| {
-                        client.enqueue_multiple(items, position, autoplay)?;
+                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
                         Ok(())
                     });
                 }
@@ -541,7 +536,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
         let root_tag = self.root_tag.clone();
         let separator = self.separator.clone();
         match self.stack.path() {
@@ -563,7 +558,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                             Self::root_tag_filter(root_tag, separator.as_deref(), &artist),
                             Filter::new(Tag::Album, original_name.as_str()),
                         ],
-                        position,
+                        position.into(),
                     )?;
                     status_info!("Album '{original_name}' by '{artist}' added to queue");
                     Ok(())
@@ -574,7 +569,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 context.command(move |client| {
                     client.find_add(
                         &[Self::root_tag_filter(root_tag, separator.as_deref(), &artist)],
-                        position,
+                        position.into(),
                     )?;
                     status_info!("All albums by '{artist}' added to queue");
                     Ok(())
@@ -582,7 +577,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
             }
             [] => {
                 context.command(move |client| {
-                    client.add("/", position)?; // add the whole library
+                    client.add("/", position.into())?; // add the whole library
                     status_info!("All songs added to queue");
                     Ok(())
                 });
@@ -593,11 +588,11 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context, None)
+        self.open_or_play(true, context)
     }
 
     fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context, None)
+        self.open_or_play(false, context)
     }
 
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {

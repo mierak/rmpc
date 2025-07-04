@@ -9,9 +9,13 @@ use super::{
 };
 use crate::{
     MpdQueryResult,
-    config::keys::{CommonAction, GlobalAction, actions::AddKind},
+    config::keys::{
+        CommonAction,
+        GlobalAction,
+        actions::{AddKind, Position},
+    },
     context::AppContext,
-    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
@@ -44,7 +48,7 @@ where
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
     fn add<'a>(&self, item: impl Iterator<Item = &'a T>, context: &AppContext) -> Vec<Enqueue>;
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
         Ok(())
@@ -180,7 +184,11 @@ where
                         let items = self.add(std::iter::once(item), context);
                         if !items.is_empty() {
                             context.command(move |client| {
-                                client.enqueue_multiple(items, None, Autoplay::No)?;
+                                client.enqueue_multiple(
+                                    items,
+                                    Position::EndOfQueue,
+                                    Autoplay::No,
+                                )?;
                                 Ok(())
                             });
                         }
@@ -330,7 +338,7 @@ where
             }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
                 log::debug!("add all");
-                self.add_all(context, None)?;
+                self.add_all(context, Position::EndOfQueue)?;
             }
             CommonAction::AddAll => {}
             CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
@@ -338,11 +346,11 @@ where
                     client.clear()?;
                     Ok(())
                 });
-                self.add_all(context, None)?;
+                self.add_all(context, Position::EndOfQueue)?;
             }
             CommonAction::AddAllReplace => {}
             CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
-                self.add_all(context, Some(QueuePosition::RelativeAdd(0)))?;
+                self.add_all(context, Position::AfterCurrentSong)?;
             }
             CommonAction::InsertAll => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
@@ -387,14 +395,8 @@ where
                     let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
 
                     context.command(move |client| {
-                        if options.replace {
-                            client.clear()?;
-                        }
-
-                        let position = options.to_queue_position();
                         let autoplay = options.autoplay(queue_len, current_song_idx);
-
-                        client.enqueue_multiple(items, position, autoplay)?;
+                        client.enqueue_multiple(items, options.position, autoplay)?;
 
                         Ok(())
                     });
@@ -413,8 +415,8 @@ where
         Ok(())
     }
 
-    /// Returns `AddCommand` for the currently hovered item if no items are
-    /// marked. Otherwise returns `AddCommand` for all marked items.
+    /// Returns `Enqueue` for the currently hovered item if no items are
+    /// marked. Otherwise returns a list of `Enqueue` for all marked items.
     fn add_current_items(&self, context: &AppContext) -> Vec<Enqueue> {
         if self.stack().current().marked().is_empty() {
             if let Some(item) = self.stack().current().selected() {
