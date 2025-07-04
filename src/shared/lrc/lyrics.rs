@@ -25,18 +25,106 @@ pub struct Lrc {
     pub length: Option<Duration>,
 }
 
+/// Parse only metadata from LRC content, stopping at the first timestamp.
+pub fn parse_metadata_only(content: &str) -> LrcMetadata {
+    let mut metadata = LrcMetadata::default();
+
+    for line in content.lines() {
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let line_content = line.trim();
+        if !line_content.starts_with('[') {
+            continue;
+        }
+
+        let mut remaining = &line_content[1..];
+        let mut found_timestamp = false;
+
+        loop {
+            let mut bracket_count = 0;
+            let mut close_pos = None;
+            for (i, c) in remaining.char_indices() {
+                match c {
+                    '[' => bracket_count += 1,
+                    ']' => {
+                        if bracket_count == 0 {
+                            close_pos = Some(i);
+                            break;
+                        }
+                        bracket_count -= 1;
+                    }
+                    _ => {}
+                }
+            }
+            let Some(close_pos) = close_pos else {
+                break;
+            };
+            let tag_content = &remaining[..close_pos];
+            let is_timestamp = tag_content.chars().next().is_some_and(|c| c.is_numeric())
+                && tag_content.contains(':');
+            let is_metadata = !is_timestamp && tag_content.contains(':');
+
+            if is_timestamp {
+                found_timestamp = true;
+                break; // Stop parsing once we hit the first timestamp
+            } else if is_metadata {
+                if let Some((key, value)) = tag_content.split_once(':') {
+                    match key.trim() {
+                        "ti" => metadata.title = Some(value.trim().to_owned()),
+                        "ar" => metadata.artist = Some(value.trim().to_owned()),
+                        "al" => metadata.album = Some(value.trim().to_owned()),
+                        "au" => metadata.author = Some(value.trim().to_owned()),
+                        "length" => {
+                            if let Ok(parsed_length) = parse_length(value.trim()) {
+                                metadata.length = Some(parsed_length);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            remaining = &remaining[close_pos + 1..];
+            if remaining.starts_with('[') {
+                remaining = &remaining[1..];
+            } else {
+                break;
+            }
+        }
+
+        if found_timestamp {
+            break; // Stop processing once we hit actual lyrics
+        }
+    }
+
+    metadata
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct LrcMetadata {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub author: Option<String>,
+    pub length: Option<Duration>,
+}
+
 impl FromStr for Lrc {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut offset: Option<i64> = None;
+        
+        let metadata = parse_metadata_only(s);
         let mut result = Self {
             lines: Vec::new(),
-            title: None,
-            artist: None,
-            album: None,
-            author: None,
-            length: None,
+            title: metadata.title,
+            artist: metadata.artist,
+            album: metadata.album,
+            author: metadata.author,
+            length: metadata.length,
         };
 
         for s in s.lines() {
@@ -151,26 +239,13 @@ impl FromStr for Lrc {
                         }
                     }
                     Some(_) => {
-                        // parse metadata should also be handled errors gracefully
+                        // offset should be parsed since its not part of the metadata initially parsed
                         if let Some((key, value)) = tag_content.split_once(':') {
-                            match key.trim() {
-                                "offset" => {
-                                    if let Ok(parsed_offset) = value.trim().parse::<i64>() {
-                                        offset = Some(parsed_offset);
-                                    }
-                                    // If parsing fails, ignore the offset
+                            if key.trim() == "offset" {
+                                if let Ok(parsed_offset) = value.trim().parse::<i64>() {
+                                    offset = Some(parsed_offset);
                                 }
-                                "ti" => result.title = Some(value.trim().to_owned()),
-                                "ar" => result.artist = Some(value.trim().to_owned()),
-                                "al" => result.album = Some(value.trim().to_owned()),
-                                "au" => result.author = Some(value.trim().to_owned()),
-                                "length" => {
-                                    if let Ok(parsed_length) = parse_length(value.trim()) {
-                                        result.length = Some(parsed_length);
-                                    }
-                                    // If parsing fails, ignore the length
-                                }
-                                _ => {}
+                                // If parsing fails, ignore the offset
                             }
                         }
                     }
@@ -190,6 +265,7 @@ impl FromStr for Lrc {
 mod tests {
     use std::time::Duration;
 
+    use super::parse_metadata_only;
     use crate::shared::lrc::{Lrc, lyrics::LrcLine};
 
     #[test]
@@ -715,5 +791,99 @@ invalid line without brackets
         assert_eq!(result.lines.len(), 1);
         assert_eq!(result.lines[0].time, Duration::from_millis(0));
         assert_eq!(result.lines[0].content, "");
+    }
+
+    #[test]
+    fn parse_metadata_only_basic() {
+        let input = r"
+[ti:Test Title]
+[ar:Test Artist]
+[al:Test Album]
+[au:Test Author]
+[length:3:45]
+[offset:+1000]
+[00:10.00]This is a lyrics line
+[00:20.00]This is another lyrics line
+";
+
+        let metadata = parse_metadata_only(input);
+
+        assert_eq!(metadata.title, Some("Test Title".to_string()));
+        assert_eq!(metadata.artist, Some("Test Artist".to_string()));
+        assert_eq!(metadata.album, Some("Test Album".to_string()));
+        assert_eq!(metadata.author, Some("Test Author".to_string()));
+        assert_eq!(metadata.length, Some(Duration::from_secs(225)));
+    }
+
+    #[test]
+    fn parse_metadata_only_stops_at_timestamp() {
+        let input = r"
+[ti:Test Title]
+[ar:Test Artist]
+[00:10.00]This is a lyrics line
+[al:Test Album]
+[au:Test Author]
+[length:3:45]
+";
+
+        let metadata = parse_metadata_only(input);
+
+        assert_eq!(metadata.title, Some("Test Title".to_string()));
+        assert_eq!(metadata.artist, Some("Test Artist".to_string()));
+        assert_eq!(metadata.album, None);
+        assert_eq!(metadata.author, None);
+        assert_eq!(metadata.length, None);
+    }
+
+    #[test]
+    fn parse_metadata_only_with_brackets_in_metadata() {
+        let input = r"
+[ti:Song [Explicit] (Remix)]
+[ar:Artist [Feat. Someone]]
+[al:Album [Deluxe Edition]]
+[00:10.00]lyrics
+";
+
+        let metadata = parse_metadata_only(input);
+
+        assert_eq!(metadata.title, Some("Song [Explicit] (Remix)".to_string()));
+        assert_eq!(metadata.artist, Some("Artist [Feat. Someone]".to_string()));
+        assert_eq!(metadata.album, Some("Album [Deluxe Edition]".to_string()));
+    }
+
+    #[test]
+    fn parse_metadata_only_graceful_error_handling() {
+        let input = r"
+[ti:Valid Title]
+[ar:Valid Artist]
+[invalid_tag_without_colon]
+[invalid:length:value]
+[length:invalid_format]
+[00:10.00]lyrics
+";
+
+        let metadata = parse_metadata_only(input);
+
+        assert_eq!(metadata.title, Some("Valid Title".to_string()));
+        assert_eq!(metadata.artist, Some("Valid Artist".to_string()));
+        assert_eq!(metadata.length, None); // invalid length should be ignored
+    }
+
+    #[test]
+    fn parse_metadata_only_empty_and_whitespace() {
+        let input = r"
+[ti:  Title with spaces  ]
+[ar:	Artist with tabs	]
+[al:]
+[au:   ]
+[00:10.00]lyrics
+";
+
+        let metadata = parse_metadata_only(input);
+
+        assert_eq!(metadata.title, Some("Title with spaces".to_string()));
+        assert_eq!(metadata.artist, Some("Artist with tabs".to_string()));
+        assert_eq!(metadata.album, Some(String::new()));
+        assert_eq!(metadata.author, Some(String::new()));
     }
 }
