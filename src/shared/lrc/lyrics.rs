@@ -4,32 +4,39 @@ use anyhow::Result;
 
 use super::parse_length;
 
+/// A single line of LRC lyrics with its timestamp.
 #[derive(Debug, Eq, PartialEq)]
 pub struct LrcLine {
+    /// The timestamp when this line should be displayed
     pub time: Duration,
+    /// The lyrics content for this line
     pub content: String,
 }
 
+/// Parsed LRC file containing metadata and timed lyrics lines.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Lrc {
+    /// The timed lyrics lines, sorted by timestamp
     pub lines: Vec<LrcLine>,
-    /// ti
+    /// Song title (from [ti:] tag)
     pub title: Option<String>,
-    /// ar
+    /// Artist name (from [ar:] tag)
     pub artist: Option<String>,
-    /// al
+    /// Album name (from [al:] tag)
     pub album: Option<String>,
-    /// au
+    /// Author/lyricist name (from [au:] tag)
     pub author: Option<String>,
-    /// length
+    /// Song length (from [length:] tag)
     pub length: Option<Duration>,
 }
 
-/// Parse only metadata from LRC content, stopping at the first timestamp.
-pub fn parse_metadata_only(content: &str) -> LrcMetadata {
+/// Efficiently parse only metadata from LRC content, stopping at the first timestamp.
+/// and returning the line index where lyrics start.
+pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
     let mut metadata = LrcMetadata::default();
+    let lines: Vec<&str> = content.lines().collect();
 
-    for line in content.lines() {
+    for (line_idx, line) in lines.iter().enumerate() {
         if line.trim().is_empty() || line.starts_with('#') {
             continue;
         }
@@ -81,6 +88,11 @@ pub fn parse_metadata_only(content: &str) -> LrcMetadata {
                                 metadata.length = Some(parsed_length);
                             }
                         }
+                        "offset" => {
+                            if let Ok(parsed_offset) = value.trim().parse::<i64>() {
+                                metadata.offset = Some(parsed_offset);
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -95,29 +107,37 @@ pub fn parse_metadata_only(content: &str) -> LrcMetadata {
         }
 
         if found_timestamp {
-            break; // Stop processing once we hit actual lyrics
+            return (metadata, line_idx);
         }
     }
 
-    metadata
+    (metadata, lines.len()) // No timestamps found, return end of file
 }
 
+/// Metadata extracted from LRC file header tags.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct LrcMetadata {
+    /// Song title (from [ti:] tag)
     pub title: Option<String>,
+    /// Artist name (from [ar:] tag)
     pub artist: Option<String>,
+    /// Album name (from [al:] tag)
     pub album: Option<String>,
+    /// Author/lyricist name (from [au:] tag)
     pub author: Option<String>,
+    /// Song length (from [length:] tag)
     pub length: Option<Duration>,
+    /// Timing offset in milliseconds (from [offset:] tag)
+    pub offset: Option<i64>,
 }
 
 impl FromStr for Lrc {
     type Err = anyhow::Error;
 
+    /// Parse a complete LRC file from string content.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut offset: Option<i64> = None;
-
-        let metadata = parse_metadata_only(s);
+        let (metadata, lyrics_start_line) = parse_metadata_only(s);
+        let offset = metadata.offset;
         let mut result = Self {
             lines: Vec::new(),
             title: metadata.title,
@@ -127,7 +147,9 @@ impl FromStr for Lrc {
             length: metadata.length,
         };
 
-        for s in s.lines() {
+        // Process only lines starting from where lyrics begin (skip already-parsed metadata)
+        // since we dont want to parse metadata again
+        for s in s.lines().skip(lyrics_start_line) {
             if s.is_empty() || s.starts_with('#') {
                 continue;
             }
@@ -239,16 +261,8 @@ impl FromStr for Lrc {
                         }
                     }
                     Some(_) => {
-                        // offset should be parsed since its not part of the metadata initially
-                        // parsed
-                        if let Some((key, value)) = tag_content.split_once(':') {
-                            if key.trim() == "offset" {
-                                if let Ok(parsed_offset) = value.trim().parse::<i64>() {
-                                    offset = Some(parsed_offset);
-                                }
-                                // If parsing fails, ignore the offset
-                            }
-                        }
+                        // Metadata tags are now handled in the metadata phase
+                        // Skip all non-timestamp tags here
                     }
                     None => {
                         // Empty tag content, skip
@@ -807,7 +821,7 @@ invalid line without brackets
 [00:20.00]This is another lyrics line
 ";
 
-        let metadata = parse_metadata_only(input);
+        let (metadata, _) = parse_metadata_only(input);
 
         assert_eq!(metadata.title, Some("Test Title".to_string()));
         assert_eq!(metadata.artist, Some("Test Artist".to_string()));
@@ -827,13 +841,14 @@ invalid line without brackets
 [length:3:45]
 ";
 
-        let metadata = parse_metadata_only(input);
+        let (metadata, start_line) = parse_metadata_only(input);
 
         assert_eq!(metadata.title, Some("Test Title".to_string()));
         assert_eq!(metadata.artist, Some("Test Artist".to_string()));
         assert_eq!(metadata.album, None);
         assert_eq!(metadata.author, None);
         assert_eq!(metadata.length, None);
+        assert_eq!(start_line, 3); // Should stop at line with timestamp
     }
 
     #[test]
@@ -845,7 +860,7 @@ invalid line without brackets
 [00:10.00]lyrics
 ";
 
-        let metadata = parse_metadata_only(input);
+        let (metadata, _) = parse_metadata_only(input);
 
         assert_eq!(metadata.title, Some("Song [Explicit] (Remix)".to_string()));
         assert_eq!(metadata.artist, Some("Artist [Feat. Someone]".to_string()));
@@ -863,7 +878,7 @@ invalid line without brackets
 [00:10.00]lyrics
 ";
 
-        let metadata = parse_metadata_only(input);
+        let (metadata, _) = parse_metadata_only(input);
 
         assert_eq!(metadata.title, Some("Valid Title".to_string()));
         assert_eq!(metadata.artist, Some("Valid Artist".to_string()));
@@ -880,7 +895,7 @@ invalid line without brackets
 [00:10.00]lyrics
 ";
 
-        let metadata = parse_metadata_only(input);
+        let (metadata, _) = parse_metadata_only(input);
 
         assert_eq!(metadata.title, Some("Title with spaces".to_string()));
         assert_eq!(metadata.artist, Some("Artist with tabs".to_string()));
