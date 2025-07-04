@@ -1,7 +1,5 @@
 #![allow(clippy::cast_possible_truncation)]
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
@@ -20,12 +18,14 @@ use crate::{
     context::AppContext,
     mpd::mpd_client::MpdClient,
     shared::{
-        ext::{mpd_client::MpdClientExt, rect::RectExt},
+        ext::{
+            mpd_client::{Enqueue, MpdClientExt},
+            rect::RectExt,
+        },
         key_event::KeyEvent,
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::browser::AddCommand,
 };
 
 #[derive(Debug)]
@@ -233,7 +233,7 @@ impl MenuModal {
     }
 
     pub fn create_add_modal(
-        opts: Vec<(String, AddOpts, Arc<dyn AddCommand>)>,
+        opts: Vec<(String, AddOpts, Vec<Enqueue>)>,
         ctx: &AppContext,
     ) -> MenuModal {
         MenuModal::new(ctx)
@@ -242,7 +242,7 @@ impl MenuModal {
                 let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
                 let mut section = section;
 
-                for (label, options, add_fn) in opts {
+                for (label, options, items) in opts {
                     section = section.add_item(label, move |ctx| {
                         ctx.command(move |client| {
                             if options.replace {
@@ -253,7 +253,7 @@ impl MenuModal {
                             let play_pos_idx =
                                 options.play_position_idx(queue_len, current_song_idx);
 
-                            add_fn(client, position)?;
+                            client.send_enqueue_multiple(items, position)?;
                             if let Some(pos) = play_pos_idx {
                                 client.play_position_safe(pos)?;
                             }

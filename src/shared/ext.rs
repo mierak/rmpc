@@ -414,16 +414,32 @@ pub mod iter {
 }
 
 pub mod mpd_client {
+    use itertools::Itertools;
+
     use crate::mpd::{
+        QueuePosition,
         errors::{ErrorCode, MpdError, MpdFailureResponse},
-        mpd_client::MpdClient,
+        mpd_client::{Filter, MpdClient, MpdCommand, Tag},
+        proto_client::ProtoClient,
     };
+
+    pub enum Enqueue {
+        File { path: String },
+        Playlist { name: String },
+        Search { filter: Vec<(Tag, String)> },
+        Find { filter: Vec<(Tag, String)> },
+    }
 
     pub trait MpdClientExt {
         fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError>;
+        fn send_enqueue_multiple(
+            &mut self,
+            items: Vec<Enqueue>,
+            position: Option<QueuePosition>,
+        ) -> Result<(), MpdError>;
     }
 
-    impl<T: MpdClient> MpdClientExt for T {
+    impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError> {
             match self.play_pos(queue_len) {
                 Ok(()) => {}
@@ -437,6 +453,46 @@ pub mod mpd_client {
                 }
                 Err(err) => return Err(err),
             }
+            Ok(())
+        }
+
+        fn send_enqueue_multiple(
+            &mut self,
+            mut items: Vec<Enqueue>,
+            position: Option<QueuePosition>,
+        ) -> Result<(), MpdError> {
+            let should_reverse = match position {
+                Some(QueuePosition::Absolute(_)) | Some(QueuePosition::RelativeAdd(_)) => true,
+                Some(QueuePosition::RelativeSub(_)) | None => false,
+            };
+            if should_reverse {
+                items.reverse();
+            }
+
+            self.send_start_cmd_list()?;
+            for item in items {
+                match item {
+                    Enqueue::File { path } => self.send_add(&path, position),
+                    Enqueue::Playlist { name } => self.send_load_playlist(&name, position),
+                    Enqueue::Search { filter } => self.send_search_add(
+                        &filter
+                            .into_iter()
+                            .map(|(tag, value)| Filter::new(tag, value))
+                            .collect_vec(),
+                        position,
+                    ),
+                    Enqueue::Find { filter } => self.send_find_add(
+                        &filter
+                            .into_iter()
+                            .map(|(tag, value)| Filter::new(tag, value))
+                            .collect_vec(),
+                        position,
+                    ),
+                }?;
+            }
+            self.send_execute_cmd_list()?;
+            self.read_ok()?;
+
             Ok(())
         }
     }

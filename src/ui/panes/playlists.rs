@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
@@ -13,11 +11,10 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},
-        mpd_client::{MpdClient, MpdCommand, SingleOrRange},
-        proto_client::ProtoClient,
+        mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info},
         mouse_event::MouseEvent,
@@ -25,8 +22,8 @@ use crate::{
     },
     ui::{
         UiEvent,
-        browser::{AddCommand, BrowserPane, MoveDirection},
-        dir_or_song::{DirOrSong, DirOrSongDiscriminants},
+        browser::{BrowserPane, MoveDirection},
+        dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         modals::{
             confirm_modal::ConfirmModal,
@@ -97,13 +94,11 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                if let Some(add) = self.add(std::iter::once(selected), context) {
+                let items = self.add(std::iter::once(selected), context);
+                if !items.is_empty() {
                     let queue_len = context.queue.len();
                     context.command(move |client| {
-                        client.send_start_cmd_list()?;
-                        add(client, None)?;
-                        client.send_execute_cmd_list()?;
-                        client.read_ok()?;
+                        client.send_enqueue_multiple(items, None)?;
                         if autoplay {
                             client.play_position_safe(queue_len)?;
                         }
@@ -441,9 +436,10 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
             }
             [] => {
                 for playlist in self.stack().current().items.iter().rev() {
-                    if let Some(add) = self.add(std::iter::once(playlist), context) {
+                    let items = self.add(std::iter::once(playlist), context);
+                    if !items.is_empty() {
                         context.command(move |client| {
-                            add(client, position)?;
+                            client.send_enqueue_multiple(items, position)?;
                             // status_info!("Playlist '{}' added to queue", playlist.as_path());
                             Ok(())
                         });
@@ -461,64 +457,15 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         &self,
         items: impl Iterator<Item = &'a DirOrSong>,
         _context: &AppContext,
-    ) -> Option<Arc<dyn AddCommand>> {
-        let items = items
+    ) -> Vec<Enqueue> {
+        items
             .map(|item| match item {
-                DirOrSong::Dir { name, .. } => (DirOrSongDiscriminants::Dir, name.to_owned()),
-                DirOrSong::Song(song) => (DirOrSongDiscriminants::Song, song.file.clone()),
+                // status_info!("Playlist '{d}' added to queue");
+                DirOrSong::Dir { name, .. } => Enqueue::Playlist { name: name.to_owned() },
+                // status_info!("'{}' by '{}' added to queue", title_text, artist_text);
+                DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
             })
-            .collect_vec();
-
-        if items.is_empty() {
-            return None;
-        }
-
-        Some(Arc::new(move |client, position| {
-            client.send_start_cmd_list()?;
-            for item in &items {
-                match item {
-                    (DirOrSongDiscriminants::Dir, name) => {
-                        client.send_load_playlist(name, position)?;
-                    }
-                    (DirOrSongDiscriminants::Song, file) => {
-                        client.send_add(file, position)?;
-                    }
-                }
-            }
-            client.send_execute_cmd_list()?;
-            client.read_ok()?;
-
-            Ok(())
-        }))
-
-        // match item {
-        //     DirOrSong::Dir { name: playlist_name, .. } => {
-        //         let d = d.clone();
-        //         Some(Arc::new(move |client, position| {
-        //             client.load_playlist(&d, position)?;
-        //             status_info!("Playlist '{d}' added to queue");
-        //             Ok(())
-        //         }))
-        //     }
-        //     DirOrSong::Song(s) => {
-        //         let file = s.file.clone();
-        //         let artist_text =
-        //
-        // s.artist_str(&context.config.theme.format_tag_separator).
-        // into_owned();         let title_text =
-        //
-        // s.title_str(&context.config.theme.format_tag_separator).into_owned();
-        //
-        //         Some(Arc::new(move |client, position| {
-        //             client.add(&file, position)?;
-        //             if let Ok(Some(_song)) =
-        // client.find_one(&[Filter::new(Tag::File, &file)]) {
-        //                 status_info!("'{}' by '{}' added to queue",
-        // title_text, artist_text);             }
-        //             Ok(())
-        //         }))
-        //     }
-        // }
+            .collect_vec()
     }
 
     fn rename(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {

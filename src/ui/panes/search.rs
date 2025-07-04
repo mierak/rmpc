@@ -16,10 +16,7 @@ use crate::{
     config::{
         Config,
         Search,
-        keys::{
-            GlobalAction,
-            actions::{AddKind, Position},
-        },
+        keys::{GlobalAction, actions::AddKind},
         tabs::PaneType,
     },
     context::AppContext,
@@ -30,15 +27,16 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Enqueue, MpdClientExt},
         key_event::KeyEvent,
-        macros::{status_info, status_warn},
+        macros::{modal, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
         mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
         dirstack::{Dir, DirStackItem},
+        modals::menu_modal::MenuModal,
         widgets::{button::Button, input::Input},
     },
 };
@@ -84,39 +82,22 @@ impl SearchPane {
         }
     }
 
-    fn add_current(
-        &mut self,
-        autoplay: bool,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn add_current(&mut self) -> Vec<Enqueue> {
         if !self.songs_dir.marked().is_empty() {
-            for idx in self.songs_dir.marked().iter().rev() {
-                let item = self.songs_dir.items[*idx].file.clone();
-                context.command(move |client| {
-                    client.add(&item, position)?;
-                    Ok(())
-                });
-            }
-            status_info!("Added {} songs to queue", self.songs_dir.marked().len());
-
-            context.render()?;
+            self.songs_dir
+                .marked()
+                .iter()
+                .map(|idx| self.songs_dir.items[*idx].file.clone())
+                .map(|path| Enqueue::File { path })
+                .collect_vec()
+        // status_info!("Added {} songs to queue",
+        // self.songs_dir.marked().len());
         } else if let Some(item) = self.songs_dir.selected() {
-            let item = item.file.clone();
-            context.command(move |client| {
-                client.add(&item, position)?;
-                status_info!("Added '{item}' to queue");
-                Ok(())
-            });
-            let queue_len = context.queue.len();
-            if autoplay {
-                context.command(move |client| Ok(client.play_position_safe(queue_len)?));
-            }
-
-            context.render()?;
+            vec![Enqueue::File { path: item.file.clone() }]
+        // status_info!("Added '{item}' to queue");
+        } else {
+            Vec::new()
         }
-
-        Ok(())
     }
 
     fn render_song_column(
@@ -665,7 +646,13 @@ impl Pane for SearchPane {
                         }
                     }
                     Phase::BrowseResults { .. } => {
-                        self.add_current(false, context, None)?;
+                        let items = self.add_current();
+                        if !items.is_empty() {
+                            context.command(move |client| {
+                                client.send_enqueue_multiple(items, None)?;
+                                Ok(())
+                            });
+                        }
                     }
                 }
             }
@@ -703,7 +690,13 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(false, context, None)?;
+                    let items = self.add_current();
+                    if !items.is_empty() {
+                        context.command(move |client| {
+                            client.send_enqueue_multiple(items, None)?;
+                            Ok(())
+                        });
+                    }
                 }
             },
             MouseEventKind::MiddleClick if self.column_areas[1].contains(event.into()) => {
@@ -959,7 +952,7 @@ impl Pane for SearchPane {
                     }
                 }
             }
-            Phase::BrowseResults { filter_input_on: filter_input_modce @ false } => {
+            Phase::BrowseResults { filter_input_on: filter_input_mode @ false } => {
                 if let Some(action) = event.as_global_action(context) {
                     match action {
                         GlobalAction::ExternalCommand { command, .. }
@@ -1019,7 +1012,15 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Right => self.add_current(false, context, None)?,
+                        CommonAction::Right => {
+                            let items = self.add_current();
+                            if !items.is_empty() {
+                                context.command(move |client| {
+                                    client.send_enqueue_multiple(items, None)?;
+                                    Ok(())
+                                });
+                            }
+                        }
                         CommonAction::Left => {
                             self.phase = Phase::Search;
                             self.prepare_preview(context);
@@ -1040,7 +1041,7 @@ impl Pane for SearchPane {
                         }
                         CommonAction::EnterSearch => {
                             self.songs_dir.set_filter(Some(String::new()), config);
-                            *filter_input_modce = true;
+                            *filter_input_mode = true;
 
                             context.render()?;
                         }
@@ -1075,7 +1076,15 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.add_current(true, context, None)?;
+                            let items = self.add_current();
+                            let queue_len = context.queue.len();
+                            if !items.is_empty() {
+                                context.command(move |client| {
+                                    client.send_enqueue_multiple(items, None)?;
+                                    client.play_position_safe(queue_len)?;
+                                    Ok(())
+                                });
+                            }
 
                             context.render()?;
                         }
@@ -1087,23 +1096,38 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                            if opts.replace {
-                                context.command(|client| {
-                                    client.clear()?;
+                            let items = self.add_current();
+                            let queue_len = context.queue.len();
+                            let current_song_idx =
+                                context.find_current_song_in_queue().map(|(i, _)| i);
+
+                            if !items.is_empty() {
+                                context.command(move |client| {
+                                    if opts.replace {
+                                        client.clear()?;
+                                    }
+
+                                    let position = opts.to_queue_position();
+                                    let play_pos_idx =
+                                        opts.play_position_idx(queue_len, current_song_idx);
+
+                                    client.send_enqueue_multiple(items, position)?;
+
+                                    if let Some(pos) = play_pos_idx {
+                                        client.play_position_safe(pos)?;
+                                    }
+
                                     Ok(())
                                 });
                             }
-                            let position = match opts.position {
-                                Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
-                                Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
-                                Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
-                                Position::EndOfQueue => None,
-                            };
-                            self.add_current(false, context, position)?;
                         }
                         CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
-                            // MenuModal::create_add_modal(opts, context,
-                            // add_fn);
+                            let opts = opts
+                                .iter()
+                                .map(|(label, opts)| (label.to_owned(), *opts, self.add_current()))
+                                .collect_vec();
+
+                            modal!(context, MenuModal::create_add_modal(opts, context));
                         }
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));

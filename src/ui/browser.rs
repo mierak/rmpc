@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use itertools::Itertools;
@@ -11,21 +9,11 @@ use super::{
 };
 use crate::{
     MpdQueryResult,
-    config::keys::{
-        CommonAction,
-        GlobalAction,
-        actions::{AddKind, Position},
-    },
+    config::keys::{CommonAction, GlobalAction, actions::AddKind},
     context::AppContext,
-    mpd::{
-        QueuePosition,
-        client::Client,
-        commands::Song,
-        mpd_client::{MpdClient, MpdCommand},
-        proto_client::ProtoClient,
-    },
+    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::modal,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -55,11 +43,7 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add<'a>(
-        &self,
-        item: impl Iterator<Item = &'a T>,
-        context: &AppContext,
-    ) -> Option<Arc<dyn AddCommand>>;
+    fn add<'a>(&self, item: impl Iterator<Item = &'a T>, context: &AppContext) -> Vec<Enqueue>;
     fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
@@ -193,12 +177,10 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        if let Some(mut add_fn) = self.add(std::iter::once(item), context) {
+                        let items = self.add(std::iter::once(item), context);
+                        if !items.is_empty() {
                             context.command(move |client| {
-                                client.send_start_cmd_list()?;
-                                add_fn(client, None);
-                                client.send_execute_cmd_list()?;
-                                client.read_ok()?;
+                                client.send_enqueue_multiple(items, None)?;
                                 Ok(())
                             });
                         }
@@ -399,7 +381,8 @@ where
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                if let Some(add_fn) = self.add_current_items(context, options.position) {
+                let items = self.add_current_items(context);
+                if !items.is_empty() {
                     let queue_len = context.queue.len();
                     let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
 
@@ -411,26 +394,23 @@ where
                         let position = options.to_queue_position();
                         let play_pos_idx = options.play_position_idx(queue_len, current_song_idx);
 
-                        add_fn(client, position);
+                        client.send_enqueue_multiple(items, position)?;
 
                         if let Some(pos) = play_pos_idx {
-                            client.play_position_safe(queue_len);
+                            client.play_position_safe(pos);
                         }
+
                         Ok(())
                     });
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                if let Some(opts) = items
+                let opts = items
                     .iter()
-                    .map(|(label, opts)| {
-                        self.add_current_items(context, opts.position)
-                            .map(|add_fn| (label.to_owned(), *opts, add_fn))
-                    })
-                    .collect::<Option<Vec<_>>>()
-                {
-                    modal!(context, MenuModal::create_add_modal(opts, context));
-                }
+                    .map(|(label, opts)| (label.to_owned(), *opts, self.add_current_items(context)))
+                    .collect_vec();
+
+                modal!(context, MenuModal::create_add_modal(opts, context));
             }
         }
 
@@ -439,40 +419,22 @@ where
 
     /// Returns `AddCommand` for the currently hovered item if no items are
     /// marked. Otherwise returns `AddCommand` for all marked items.
-    fn add_current_items(
-        &self,
-        context: &AppContext,
-        position: Position,
-    ) -> Option<Arc<dyn AddCommand>> {
+    fn add_current_items(&self, context: &AppContext) -> Vec<Enqueue> {
         if self.stack().current().marked().is_empty() {
             if let Some(item) = self.stack().current().selected() {
                 self.add(std::iter::once(item), context)
             } else {
-                None
+                Vec::new()
             }
         } else {
-            let should_reverse = match position {
-                Position::AfterCurrentSong | Position::StartOfQueue => true,
-                Position::BeforeCurrentSong | Position::EndOfQueue => false,
-            };
-            let items = self
-                .stack()
-                .current()
-                .marked()
-                .iter()
-                .map(|idx| &self.stack().current().items[*idx]);
-
-            if should_reverse { self.add(items.rev(), context) } else { self.add(items, context) }
+            self.add(
+                self.stack()
+                    .current()
+                    .marked()
+                    .iter()
+                    .map(|idx| &self.stack().current().items[*idx]),
+                context,
+            )
         }
     }
-}
-
-pub trait AddCommand:
-    Fn(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Send + Sync + 'static
-{
-}
-
-impl<T> AddCommand for T where
-    T: Fn(&mut Client<'_>, Option<QueuePosition>) -> Result<()> + Clone + Send + Sync + 'static
-{
 }
