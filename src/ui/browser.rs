@@ -11,10 +11,15 @@ use super::{
 };
 use crate::{
     MpdQueryResult,
-    config::keys::{CommonAction, GlobalAction, actions::Position},
+    config::keys::{
+        CommonAction,
+        GlobalAction,
+        actions::{AddKind, AddOpts, Position},
+    },
     context::AppContext,
     mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
+        ext::mpd_client::MpdClientExt,
         key_event::KeyEvent,
         macros::modal,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -237,7 +242,7 @@ where
         };
         let config = &context.config;
 
-        match action {
+        match action.to_owned() {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev(config.scrolloff, config.wrap_navigation);
                 self.prepare_preview(context);
@@ -381,7 +386,9 @@ where
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
 
-            CommonAction::AddOptions { options } if !self.stack().current().marked().is_empty() => {
+            CommonAction::AddOptions { kind: AddKind::Action(options) }
+                if !self.stack().current().marked().is_empty() =>
+            {
                 let add_fns = self
                     .stack()
                     .current()
@@ -421,29 +428,32 @@ where
                     Ok(())
                 });
             }
-            CommonAction::AddOptions { options } => {
+            CommonAction::AddOptions { kind: AddKind::Action(options) } => {
                 if let Some(item) = self.stack().current().selected() {
                     if let Some(add_fn) = self.add(item, context) {
+                        let queue_len = context.queue.len();
+                        let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
+
                         context.command(move |client| {
                             if options.replace {
                                 client.clear()?;
                             }
 
-                            let position = match options.position {
-                                Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
-                                Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
-                                Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
-                                Position::EndOfQueue => None,
-                            };
+                            let position = options.to_queue_position();
+                            let play_pos_idx =
+                                options.play_position_idx(queue_len, current_song_idx);
 
                             add_fn(client, position);
+                            if let Some(pos) = play_pos_idx {
+                                client.play_position_safe(queue_len);
+                            }
 
                             Ok(())
                         });
                     }
                 }
             }
-            CommonAction::AddOptions { .. } => {
+            CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
                 let Some(item) = self.stack().current().selected() else {
                     return Ok(());
                 };
@@ -452,64 +462,7 @@ where
                     return Ok(());
                 };
 
-                let add_fn1 = Arc::clone(&add_fn);
-                let add_fn2 = Arc::clone(&add_fn);
-                let add_fn3 = Arc::clone(&add_fn);
-                let add_fn4 = Arc::clone(&add_fn);
-                let add_fn5 = Arc::clone(&add_fn);
-                let add_fn6 = Arc::clone(&add_fn);
-
-                modal!(
-                    context,
-                    MenuModal::new(context)
-                        .add_section(context, |section| {
-                            section
-                                .add_item("At the end of queue", move |ctx| {
-                                    ctx.command(move |client| {
-                                        (add_fn1)(client, None);
-                                        Ok(())
-                                    });
-                                })
-                                .add_item("At the start of queue", move |ctx| {
-                                    ctx.command(move |client| {
-                                        (add_fn2)(client, Some(QueuePosition::Absolute(0)));
-                                        Ok(())
-                                    });
-                                })
-                                .add_item("Before the current song", move |ctx| {
-                                    ctx.command(move |client| {
-                                        (add_fn5)(client, Some(QueuePosition::RelativeSub(0)));
-                                        Ok(())
-                                    });
-                                })
-                                .add_item("After the current song", move |ctx| {
-                                    ctx.command(move |client| {
-                                        (add_fn4)(client, Some(QueuePosition::RelativeAdd(0)));
-                                        Ok(())
-                                    });
-                                })
-                        })
-                        .add_section(context, |section| {
-                            section
-                                .add_item("Replace queue", move |ctx| {
-                                    ctx.command(move |client| {
-                                        client.clear()?;
-                                        (add_fn3)(client, None);
-                                        Ok(())
-                                    });
-                                })
-                                .add_item("Replace queue and play", move |ctx| {
-                                    ctx.command(move |client| {
-                                        client.clear()?;
-                                        (add_fn6)(client, None);
-                                        client.play()?;
-                                        Ok(())
-                                    });
-                                })
-                        })
-                        .add_section(context, |section| { section.add_item("Cancel", |_ctx| {}) })
-                        .build()
-                );
+                modal!(context, MenuModal::create_add_modal(items, context, &add_fn));
             }
         }
 

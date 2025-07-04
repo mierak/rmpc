@@ -16,7 +16,11 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        keys::{GlobalAction, QueueActions, actions::Position},
+        keys::{
+            GlobalAction,
+            QueueActions,
+            actions::{AddKind, Position},
+        },
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
@@ -640,7 +644,7 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Unused => {}
             }
-        } else if let Some(action) = event.as_common_action(context) {
+        } else if let Some(action) = event.as_common_action(context).map(|v| v.to_owned()) {
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
@@ -862,7 +866,7 @@ impl Pane for QueuePane {
                     context.render()?;
                 }
                 CommonAction::AddAll => {}
-                CommonAction::AddOptions { options } => {
+                CommonAction::AddOptions { kind: AddKind::Action(options) } => {
                     let Some(song) =
                         self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
                     else {
@@ -887,6 +891,7 @@ impl Pane for QueuePane {
                         Ok(())
                     });
                 }
+                CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) =
                         self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))

@@ -32,12 +32,15 @@ impl KeyEvent {
         self.already_handled = false;
     }
 
-    pub fn as_common_action(&mut self, context: &AppContext) -> Option<CommonAction> {
+    pub fn as_common_action<'ctx>(
+        &mut self,
+        context: &'ctx AppContext,
+    ) -> Option<&'ctx CommonAction> {
         if self.already_handled {
             None
         } else if let Some(action) = context.config.keybinds.navigation.get(&self.inner.into()) {
             self.already_handled = true;
-            Some(*action)
+            Some(action)
         } else {
             None
         }

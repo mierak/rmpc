@@ -127,7 +127,7 @@ impl TagBrowserPane {
                     context.command(move |client| {
                         add(client, position)?;
                         if autoplay {
-                            client.play_last(queue_len)?;
+                            client.play_position_safe(queue_len)?;
                         }
                         Ok(())
                     });

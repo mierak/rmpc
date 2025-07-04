@@ -4,7 +4,10 @@ use itertools::Itertools;
 use strum::{Display, EnumDiscriminants, VariantArray};
 
 use super::ToDescription;
-use crate::config::{tabs::TabName, utils::tilde_expand};
+use crate::{
+    config::{tabs::TabName, utils::tilde_expand},
+    mpd::QueuePosition,
+};
 
 // Global actions
 
@@ -351,6 +354,52 @@ pub enum Position {
     StartOfQueue,
     EndOfQueue,
 }
+
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
+)]
+pub enum AddKind {
+    Modal(Vec<(String, AddOpts)>),
+    Action(AddOpts),
+}
+
+impl Default for AddKind {
+    fn default() -> Self {
+        AddKind::Modal(vec![
+            ("At the end of queue".into(), AddOpts {
+                replace: false,
+                autoplay: false,
+                position: Position::EndOfQueue,
+            }),
+            ("At the start of queue".into(), AddOpts {
+                replace: false,
+                autoplay: false,
+                position: Position::StartOfQueue,
+            }),
+            ("Before the current song".into(), AddOpts {
+                replace: false,
+                autoplay: false,
+                position: Position::BeforeCurrentSong,
+            }),
+            ("After the current song".into(), AddOpts {
+                replace: false,
+                autoplay: false,
+                position: Position::AfterCurrentSong,
+            }),
+            ("Replace the queue".into(), AddOpts {
+                replace: true,
+                autoplay: false,
+                position: Position::EndOfQueue,
+            }),
+            ("Replace the queue and play".into(), AddOpts {
+                replace: true,
+                autoplay: true,
+                position: Position::EndOfQueue,
+            }),
+        ])
+    }
+}
+
 #[derive(
     Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
 )]
@@ -358,6 +407,35 @@ pub struct AddOpts {
     pub replace: bool,
     pub autoplay: bool,
     pub position: Position,
+}
+
+impl AddOpts {
+    pub fn to_queue_position(self) -> Option<QueuePosition> {
+        match self.position {
+            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+            Position::EndOfQueue => None,
+        }
+    }
+
+    pub fn play_position_idx(
+        self,
+        queue_len: usize,
+        current_song_idx: Option<usize>,
+    ) -> Option<usize> {
+        if !self.autoplay {
+            return None;
+        }
+
+        match self.position {
+            Position::AfterCurrentSong => current_song_idx.map(|i| i + 1),
+            Position::BeforeCurrentSong => current_song_idx.map(|i| i.saturating_sub(1)),
+            Position::StartOfQueue => Some(0),
+            Position::EndOfQueue if self.replace => Some(0),
+            Position::EndOfQueue => Some(queue_len),
+        }
+    }
 }
 
 // Common actions
@@ -398,11 +476,14 @@ pub enum CommonActionFile {
     AddAllReplace,
     Insert,
     InsertAll,
-    AddOptions { options: AddOpts },
+    AddOptions {
+        #[serde(default)]
+        kind: AddKind,
+    },
     ShowInfo,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum CommonAction {
     Down,
@@ -434,7 +515,7 @@ pub enum CommonAction {
     AddAll,
     AddAllReplace,
     InsertAll,
-    AddOptions { options: AddOpts },
+    AddOptions { kind: AddKind },
     ShowInfo,
 }
 
@@ -510,21 +591,25 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
             CommonActionFile::Add => CommonAction::AddOptions {
-                options: AddOpts {
+                kind: AddKind::Action(AddOpts {
                     replace: false,
                     autoplay: false,
                     position: Position::EndOfQueue,
-                },
+                }),
             },
             CommonActionFile::AddReplace => CommonAction::AddOptions {
-                options: AddOpts { replace: true, autoplay: false, position: Position::EndOfQueue },
+                kind: AddKind::Action(AddOpts {
+                    replace: true,
+                    autoplay: false,
+                    position: Position::EndOfQueue,
+                }),
             },
             CommonActionFile::Insert => CommonAction::AddOptions {
-                options: AddOpts {
+                kind: AddKind::Action(AddOpts {
                     replace: false,
                     autoplay: false,
                     position: Position::AfterCurrentSong,
-                },
+                }),
             },
             CommonActionFile::InsertAll => CommonAction::InsertAll,
             CommonActionFile::AddAll => CommonAction::AddAll,
@@ -539,7 +624,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::PaneLeft => CommonAction::PaneLeft,
             CommonActionFile::PaneRight => CommonAction::PaneRight,
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
-            CommonActionFile::AddOptions { options } => CommonAction::AddOptions { options },
+            CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
         }
     }
 }

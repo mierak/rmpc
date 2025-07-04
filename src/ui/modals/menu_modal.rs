@@ -1,5 +1,7 @@
 #![allow(clippy::cast_possible_truncation)]
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
@@ -14,14 +16,16 @@ use ratatui::{
 
 use super::{Modal, RectExt as _};
 use crate::{
-    config::keys::CommonAction,
+    config::keys::{CommonAction, actions::AddOpts},
     context::AppContext,
+    mpd::mpd_client::MpdClient,
     shared::{
-        ext::rect::RectExt,
+        ext::{mpd_client::MpdClientExt, rect::RectExt},
         key_event::KeyEvent,
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    ui::browser::AddCommand,
 };
 
 #[derive(Debug)]
@@ -41,7 +45,7 @@ pub struct MenuSection {
 
 #[derive(derive_more::Debug)]
 pub struct MenuItem {
-    pub label: &'static str,
+    pub label: String,
     #[debug(skip)]
     pub on_confirm: Option<Box<dyn FnOnce(&AppContext) + Send + Sync + 'static>>,
 }
@@ -227,6 +231,44 @@ impl MenuModal {
                 current_section.selected_idx.map_or(Some(0), |i| Some(i.saturating_sub(1)));
         }
     }
+
+    pub fn create_add_modal(
+        opts: Vec<(String, AddOpts)>,
+        ctx: &AppContext,
+        add_fn: &Arc<dyn AddCommand>,
+    ) -> MenuModal {
+        MenuModal::new(ctx)
+            .add_section(ctx, |section| {
+                let queue_len = ctx.queue.len();
+                let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+                let mut section = section;
+
+                for (label, options) in opts {
+                    let add_fn = add_fn.clone();
+                    section = section.add_item(label, move |ctx| {
+                        ctx.command(move |client| {
+                            if options.replace {
+                                client.clear()?;
+                            }
+
+                            let position = options.to_queue_position();
+                            let play_pos_idx =
+                                options.play_position_idx(queue_len, current_song_idx);
+
+                            add_fn(client, position)?;
+                            if let Some(pos) = play_pos_idx {
+                                client.play_position_safe(pos)?;
+                            }
+
+                            Ok(())
+                        });
+                    });
+                }
+                section
+            })
+            .add_section(ctx, |section| section.add_item("Cancel", |_ctx| {}))
+            .build()
+    }
 }
 
 impl MenuSection {
@@ -236,10 +278,10 @@ impl MenuSection {
 
     pub fn add_item(
         mut self,
-        label: &'static str,
+        label: impl Into<String>,
         on_confirm: impl FnOnce(&AppContext) + Send + Sync + 'static,
     ) -> Self {
-        self.items.push(MenuItem { label, on_confirm: Some(Box::new(on_confirm)) });
+        self.items.push(MenuItem { label: label.into(), on_confirm: Some(Box::new(on_confirm)) });
         self
     }
 
@@ -275,7 +317,7 @@ impl Widget for &mut MenuSection {
         self.area = area;
 
         for (idx, item) in self.items.iter().enumerate() {
-            let mut text = Text::from(item.label);
+            let mut text = Text::raw(&item.label);
 
             if self.selected_idx.is_some_and(|i| i == idx) {
                 text = text.style(self.current_item_style);

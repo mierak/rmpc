@@ -14,7 +14,7 @@ use crate::{
         client::Client,
         commands::Song,
         errors::MpdError,
-        mpd_client::{Filter, MpdClient, Tag},
+        mpd_client::{Filter, MpdClient, MpdCommand, Tag},
     },
     shared::{
         ext::mpd_client::MpdClientExt,
@@ -72,7 +72,7 @@ impl AlbumsPane {
                     if let Some(add) = add {
                         (add)(client, None)?;
                         if autoplay {
-                            client.play_last(queue_len)?;
+                            client.play_position_safe(queue_len)?;
                         }
                     }
                     Ok(())

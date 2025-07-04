@@ -16,7 +16,10 @@ use crate::{
     config::{
         Config,
         Search,
-        keys::{GlobalAction, actions::Position},
+        keys::{
+            GlobalAction,
+            actions::{AddKind, Position},
+        },
         tabs::PaneType,
     },
     context::AppContext,
@@ -36,6 +39,7 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::{Dir, DirStackItem},
+        modals::menu_modal::MenuModal,
         widgets::{button::Button, input::Input},
     },
 };
@@ -107,7 +111,7 @@ impl SearchPane {
             });
             let queue_len = context.queue.len();
             if autoplay {
-                context.command(move |client| Ok(client.play_last(queue_len)?));
+                context.command(move |client| Ok(client.play_position_safe(queue_len)?));
             }
 
             context.render()?;
@@ -975,7 +979,7 @@ impl Pane for SearchPane {
                         }
                     }
                 } else if let Some(action) = event.as_common_action(context) {
-                    match action {
+                    match action.to_owned() {
                         CommonAction::Down => {
                             self.songs_dir
                                 .next(context.config.scrolloff, context.config.wrap_navigation);
@@ -1083,20 +1087,24 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::AddOptions { options } => {
-                            if options.replace {
+                        CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
+                            if opts.replace {
                                 context.command(|client| {
                                     client.clear()?;
                                     Ok(())
                                 });
                             }
-                            let position = match options.position {
+                            let position = match opts.position {
                                 Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
                                 Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
                                 Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
                                 Position::EndOfQueue => None,
                             };
                             self.add_current(false, context, position)?;
+                        }
+                        CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
+                            // MenuModal::create_add_modal(opts, context,
+                            // add_fn);
                         }
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));

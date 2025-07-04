@@ -420,11 +420,11 @@ pub mod mpd_client {
     };
 
     pub trait MpdClientExt {
-        fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError>;
+        fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError>;
     }
 
     impl<T: MpdClient> MpdClientExt for T {
-        fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError> {
+        fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError> {
             match self.play_pos(queue_len) {
                 Ok(()) => {}
                 Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::Argument, .. })) => {
