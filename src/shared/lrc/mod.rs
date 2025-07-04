@@ -5,7 +5,7 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result, bail};
 pub use index::{LrcIndex, LrcIndexEntry};
-pub use lyrics::Lrc;
+pub use lyrics::{Lrc, parse_metadata_only};
 
 fn parse_length(input: &str) -> anyhow::Result<Duration> {
     let (minutes, seconds) = input.split_once(':').context("Invalid lrc length format")?;

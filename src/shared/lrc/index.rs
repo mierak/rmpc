@@ -4,13 +4,13 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use serde::Serialize;
 use unicase::UniCase;
 use walkdir::WalkDir;
 
-use super::{Lrc, parse_length};
+use super::{Lrc, parse_metadata_only};
 use crate::{mpd::commands::Song, shared::macros::try_cont};
 
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
@@ -175,57 +175,20 @@ impl LrcIndex {
 }
 
 impl LrcIndexEntry {
-    fn read(read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
-        let mut title = None;
-        let mut artist = None;
-        let mut album = None;
-        let mut length = None;
+    fn read(mut read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
+        let mut content = String::new();
+        read.read_to_string(&mut content)?;
 
-        for buf in read.lines() {
-            let buf = buf?;
-            if buf.trim().is_empty() || buf.starts_with('#') {
-                continue;
-            }
+        let metadata = parse_metadata_only(&content);
 
-            let (metadata, rest) = buf
-                .trim()
-                .strip_prefix('[')
-                .and_then(|s| s.rsplit_once(']'))
-                .with_context(|| format!("Invalid lrc line format: '{buf}'"))?;
-            if !rest.is_empty() {
-                break;
-            }
-
-            match metadata.chars().next() {
-                Some(c) if c.is_numeric() => {
-                    break;
-                }
-                Some(_) => {
-                    let (key, value) = metadata
-                        .split_once(':')
-                        .with_context(|| format!("Invalid metadata line: '{metadata}'"))?;
-                    match key.trim() {
-                        "ti" => title = Some(value.trim().to_string()),
-                        "ar" => artist = Some(value.trim().to_string()),
-                        "al" => album = Some(value.trim().to_string()),
-                        "length" => length = Some(parse_length(value.trim())?),
-                        _ => {}
-                    }
-                }
-                None => {
-                    bail!("Invalid lrc metadata/timestamp: '{metadata}'");
-                }
-            }
-        }
-
-        let Some(artist) = artist else {
+        let Some(artist) = metadata.artist else {
             return Ok(None);
         };
-        let Some(title) = title else {
+        let Some(title) = metadata.title else {
             return Ok(None);
         };
 
-        Ok(Some(Self { path, title, artist, album, length }))
+        Ok(Some(Self { path, title, artist, album: metadata.album, length: metadata.length }))
     }
 }
 
