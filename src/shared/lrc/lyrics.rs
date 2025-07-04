@@ -116,7 +116,7 @@ impl FromStr for Lrc {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut offset: Option<i64> = None;
-        
+
         let metadata = parse_metadata_only(s);
         let mut result = Self {
             lines: Vec::new(),
@@ -239,7 +239,8 @@ impl FromStr for Lrc {
                         }
                     }
                     Some(_) => {
-                        // offset should be parsed since its not part of the metadata initially parsed
+                        // offset should be parsed since its not part of the metadata initially
+                        // parsed
                         if let Some((key, value)) = tag_content.split_once(':') {
                             if key.trim() == "offset" {
                                 if let Ok(parsed_offset) = value.trim().parse::<i64>() {
