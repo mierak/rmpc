@@ -34,14 +34,13 @@ pub struct Lrc {
 /// timestamp. and returning the line index where lyrics start.
 pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
     let mut metadata = LrcMetadata::default();
-    let lines: Vec<&str> = content.lines().collect();
 
-    for (line_idx, line) in lines.iter().enumerate() {
-        if line.trim().is_empty() || line.starts_with('#') {
+    for (line_idx, line) in content.lines().enumerate() {
+        let line_content = line.trim();
+        if line_content.is_empty() || line_content.starts_with('#') {
             continue;
         }
 
-        let line_content = line.trim();
         if !line_content.starts_with('[') {
             continue;
         }
@@ -78,18 +77,20 @@ pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
                 break; // Stop parsing once we hit the first timestamp
             } else if is_metadata {
                 if let Some((key, value)) = tag_content.split_once(':') {
-                    match key.trim() {
-                        "ti" => metadata.title = Some(value.trim().to_owned()),
-                        "ar" => metadata.artist = Some(value.trim().to_owned()),
-                        "al" => metadata.album = Some(value.trim().to_owned()),
-                        "au" => metadata.author = Some(value.trim().to_owned()),
+                    let key = key.trim();
+                    let value = value.trim();
+                    match key {
+                        "ti" => metadata.title = Some(value.to_owned()),
+                        "ar" => metadata.artist = Some(value.to_owned()),
+                        "al" => metadata.album = Some(value.to_owned()),
+                        "au" => metadata.author = Some(value.to_owned()),
                         "length" => {
-                            if let Ok(parsed_length) = parse_length(value.trim()) {
+                            if let Ok(parsed_length) = parse_length(value) {
                                 metadata.length = Some(parsed_length);
                             }
                         }
                         "offset" => {
-                            if let Ok(parsed_offset) = value.trim().parse::<i64>() {
+                            if let Ok(parsed_offset) = value.parse::<i64>() {
                                 metadata.offset = Some(parsed_offset);
                             }
                         }
@@ -111,7 +112,7 @@ pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
         }
     }
 
-    (metadata, lines.len()) // No timestamps found, return end of file
+    (metadata, content.lines().count()) // No timestamps found, return end of file
 }
 
 /// Metadata extracted from LRC file header tags.
@@ -138,8 +139,14 @@ impl FromStr for Lrc {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (metadata, lyrics_start_line) = parse_metadata_only(s);
         let offset = metadata.offset;
+        
+        // preallocate the Vec with an estimated capacity
+        // This avoids multiple reallocations during parsing
+        let remaining_lines = s.lines().count().saturating_sub(lyrics_start_line);
+        let estimated_capacity = remaining_lines * 2;
+        
         let mut result = Self {
-            lines: Vec::new(),
+            lines: Vec::with_capacity(estimated_capacity),
             title: metadata.title,
             artist: metadata.artist,
             album: metadata.album,
@@ -149,12 +156,12 @@ impl FromStr for Lrc {
 
         // Process only lines starting from where lyrics begin (skip already-parsed
         // metadata) since we dont want to parse metadata again
-        for s in s.lines().skip(lyrics_start_line) {
-            if s.is_empty() || s.starts_with('#') {
+        for line in s.lines().skip(lyrics_start_line) {
+            let line_content = line.trim();
+            if line_content.is_empty() || line_content.starts_with('#') {
                 continue;
             }
 
-            let line_content = s.trim();
             if !line_content.starts_with('[') {
                 continue;
             }
