@@ -4,6 +4,89 @@ use anyhow::Result;
 
 use super::parse_length;
 
+/// Result of parsing a single tag from an LRC line.
+#[derive(Debug, Clone)]
+enum TagParseResult {
+    /// timestamp tag (e.g.: [00:12.34]) with the timestamp content
+    Timestamp(String),
+    /// metadata tag (e.g.: [ti:Song Title]) with key and value
+    Metadata(String, String),
+    /// invalid or unrecognized tag
+    Invalid,
+}
+
+/// Parse a single tag from a line starting with '['.
+/// Returns the tag content and the number of characters consumed.
+fn parse_next_tag(line: &str) -> Option<(TagParseResult, usize)> {
+    if !line.starts_with('[') {
+        return None;
+    }
+
+    let mut bracket_count = 0;
+    let mut close_pos = None;
+    
+    for (i, c) in line[1..].char_indices() {
+        match c {
+            '[' => bracket_count += 1,
+            ']' => {
+                if bracket_count == 0 {
+                    close_pos = Some(i);
+                    break;
+                }
+                bracket_count -= 1;
+            }
+            _ => {}
+        }
+    }
+    
+    let close_pos = close_pos?;
+    let tag_content = &line[1..=close_pos];
+    let chars_consumed = close_pos + 2;
+    
+    let tag_result = if is_timestamp_tag(tag_content) {
+        TagParseResult::Timestamp(tag_content.to_string())
+    } else if let Some((key, value)) = tag_content.split_once(':') {
+        TagParseResult::Metadata(key.trim().to_string(), value.trim().to_string())
+    } else {
+        TagParseResult::Invalid
+    };
+    
+    Some((tag_result, chars_consumed))
+}
+
+/// Checks if a tag content represents a timestamp (starts with digit and contains ':').
+fn is_timestamp_tag(tag_content: &str) -> bool {
+    tag_content.chars().next().is_some_and(|c| c.is_numeric()) && tag_content.contains(':')
+}
+
+/// Parse a timestamp string into a Duration.
+fn parse_timestamp(timestamp: &str, offset: Option<i64>) -> Option<Duration> {
+    let (minutes, time_rest) = timestamp.split_once(':')?;
+    let (seconds, fractions_of_second) = time_rest.split_once('.').or_else(|| time_rest.split_once(':'))?;
+    
+    // fractions of second can be up to 3 digits, truncate if longer
+    let fractions_of_second = &fractions_of_second[..3.min(fractions_of_second.len())];
+    
+    let (minutes, seconds, fractions) = (
+        minutes.parse::<u64>().ok()?,
+        seconds.parse::<u64>().ok()?,
+        fractions_of_second.parse::<u64>().ok()?,
+    );
+    
+    let mut millis = 0;
+    millis += minutes * 60 * 1000;
+    millis += seconds * 1000;
+    millis += fractions * (10u64.pow(3 - u32::try_from(fractions_of_second.len()).unwrap_or(0)));
+    
+    millis = match offset {
+        Some(offset) if offset > 0 => millis.saturating_sub(offset.unsigned_abs()),
+        Some(offset) if offset < 0 => millis.saturating_add(offset.unsigned_abs()),
+        _ => millis,
+    };
+    
+    Some(Duration::from_millis(millis))
+}
+
 /// A single line of LRC lyrics with its timestamp.
 #[derive(Debug, Eq, PartialEq)]
 pub struct LrcLine {
@@ -45,47 +128,23 @@ pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
             continue;
         }
 
-        let mut remaining = &line_content[1..];
+        let mut remaining = line_content;
         let mut found_timestamp = false;
 
-        loop {
-            let mut bracket_count = 0;
-            let mut close_pos = None;
-            for (i, c) in remaining.char_indices() {
-                match c {
-                    '[' => bracket_count += 1,
-                    ']' => {
-                        if bracket_count == 0 {
-                            close_pos = Some(i);
-                            break;
-                        }
-                        bracket_count -= 1;
-                    }
-                    _ => {}
+        while let Some((tag_result, chars_consumed)) = parse_next_tag(remaining) {
+            match tag_result {
+                TagParseResult::Timestamp(_) => {
+                    found_timestamp = true;
+                    break; // Stop parsing once we hit the first timestamp
                 }
-            }
-            let Some(close_pos) = close_pos else {
-                break;
-            };
-            let tag_content = &remaining[..close_pos];
-            let is_timestamp = tag_content.chars().next().is_some_and(|c| c.is_numeric())
-                && tag_content.contains(':');
-            let is_metadata = !is_timestamp && tag_content.contains(':');
-
-            if is_timestamp {
-                found_timestamp = true;
-                break; // Stop parsing once we hit the first timestamp
-            } else if is_metadata {
-                if let Some((key, value)) = tag_content.split_once(':') {
-                    let key = key.trim();
-                    let value = value.trim();
-                    match key {
-                        "ti" => metadata.title = Some(value.to_owned()),
-                        "ar" => metadata.artist = Some(value.to_owned()),
-                        "al" => metadata.album = Some(value.to_owned()),
-                        "au" => metadata.author = Some(value.to_owned()),
+                TagParseResult::Metadata(key, value) => {
+                    match key.as_str() {
+                        "ti" => metadata.title = Some(value),
+                        "ar" => metadata.artist = Some(value),
+                        "al" => metadata.album = Some(value),
+                        "au" => metadata.author = Some(value),
                         "length" => {
-                            if let Ok(parsed_length) = parse_length(value) {
+                            if let Ok(parsed_length) = parse_length(&value) {
                                 metadata.length = Some(parsed_length);
                             }
                         }
@@ -97,13 +156,14 @@ pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
                         _ => {}
                     }
                 }
+                TagParseResult::Invalid => {
+                    // Skip invalid tags and continue to next potential tag
+                }
             }
 
-            remaining = &remaining[close_pos + 1..];
-            if remaining.starts_with('[') {
-                remaining = &remaining[1..];
-            } else {
-                break;
+            remaining = &remaining[chars_consumed..];
+            if !remaining.starts_with('[') {
+                break; // No more tags on this line
             }
         }
 
@@ -166,115 +226,48 @@ impl FromStr for Lrc {
                 continue;
             }
 
-            let mut remaining = &line_content[1..];
-            let mut tags = Vec::new();
-            let mut found_non_tag = false;
-            let mut lyrics_start = 0;
-            let mut offset_in_line = 1; // we skip the initial '[', so we want to include the first character after it in the offset
+            let mut timestamps = Vec::new();
+            let mut remaining = line_content;
+            let mut lyrics_start_pos = 0;
 
-            while !found_non_tag {
-                let mut bracket_count = 0;
-                let mut close_pos = None;
-                for (i, c) in remaining.char_indices() {
-                    match c {
-                        '[' => bracket_count += 1,
-                        ']' => {
-                            if bracket_count == 0 {
-                                close_pos = Some(i);
-                                break;
-                            }
-                            bracket_count -= 1;
+            while let Some((tag_result, chars_consumed)) = parse_next_tag(remaining) {
+                match tag_result {
+                    TagParseResult::Timestamp(timestamp) => {
+                        timestamps.push(timestamp);
+                        lyrics_start_pos += chars_consumed;
+                        remaining = &remaining[chars_consumed..];
+                        
+                        if !remaining.starts_with('[') {
+                            break;
                         }
-                        _ => {}
                     }
-                }
-                let Some(close_pos) = close_pos else {
-                    break; // No closing bracket found
-                };
-                let tag_content = &remaining[..close_pos];
-                let is_timestamp = tag_content.chars().next().is_some_and(|c| c.is_numeric())
-                    && tag_content.contains(':');
-                let is_metadata = !is_timestamp && tag_content.contains(':');
-                if is_timestamp || is_metadata {
-                    tags.push(tag_content);
-                    offset_in_line += close_pos + 1;
-                    remaining = &remaining[close_pos + 1..]; // Skip past the ']'
-                    if remaining.starts_with('[') {
-                        remaining = &remaining[1..];
-                        offset_in_line += 1;
-                    } else {
+                    TagParseResult::Metadata(_, _) | TagParseResult::Invalid => {
+                        // Found a non-timestamp tag, stop here and treat everything 
+                        // from this position as lyrics content. This is the conservative
+                        // approach that handles [00:10.00][Intro] Welcome correctly.
                         break;
                     }
-                } else {
-                    // not a valid tag, treat the rest as lyrics text
-                    found_non_tag = true;
-                    lyrics_start = offset_in_line - 1; // include the '['
                 }
             }
 
-            let lyrics_text =
-                if found_non_tag { &line_content[lyrics_start..] } else { remaining.trim() };
+            let lyrics_text = if lyrics_start_pos < line_content.len() {
+                &line_content[lyrics_start_pos..]
+            } else {
+                remaining
+            }.trim();
 
-            if tags.is_empty() {
+            if timestamps.is_empty() {
                 continue;
             }
 
-            for tag_content in tags {
-                match tag_content.chars().next() {
-                    Some(c) if c.is_numeric() => {
-                        // timestamps errors should be handle errors gracefully
-                        // we want to skip invalid timestamps instead of crashing because of a
-                        // single wrong line for a better user experience
-                        if let Some((minutes, time_rest)) = tag_content.split_once(':') {
-                            if let Some((seconds, fractions_of_second)) =
-                                time_rest.split_once('.').or_else(|| time_rest.split_once(':'))
-                            {
-                                // fractions of second can be up to 3 digits, truncate if longer
-                                let fractions_of_second =
-                                    &fractions_of_second[..3.min(fractions_of_second.len())];
-
-                                // try to parse all components
-                                if let (Ok(minutes), Ok(seconds), Ok(fractions)) = (
-                                    minutes.parse::<u64>(),
-                                    seconds.parse::<u64>(),
-                                    fractions_of_second.parse::<u64>(),
-                                ) {
-                                    let mut milis = 0;
-                                    milis += minutes * 60 * 1000;
-                                    milis += seconds * 1000;
-                                    milis += fractions
-                                        * (10u64.pow(
-                                            3 - u32::try_from(fractions_of_second.len())
-                                                .unwrap_or(0),
-                                        ));
-
-                                    milis = match offset {
-                                        Some(offset) if offset > 0 => {
-                                            milis.saturating_sub(offset.unsigned_abs())
-                                        }
-                                        Some(offset) if offset < 0 => {
-                                            milis.saturating_add(offset.unsigned_abs())
-                                        }
-                                        _ => milis,
-                                    };
-
-                                    result.lines.push(LrcLine {
-                                        time: Duration::from_millis(milis),
-                                        content: lyrics_text.to_owned(),
-                                    });
-                                }
-                                // if parsing fails, skip this timestamp
-                            }
-                        }
-                    }
-                    Some(_) => {
-                        // Metadata tags are now handled in the metadata phase
-                        // Skip all non-timestamp tags here
-                    }
-                    None => {
-                        // Empty tag content, skip
-                    }
+            for timestamp_content in timestamps {
+                if let Some(time) = parse_timestamp(&timestamp_content, offset) {
+                    result.lines.push(LrcLine {
+                        time,
+                        content: lyrics_text.to_owned(),
+                    });
                 }
+                // if parsing fails, gracefully skip this timestamp
             }
         }
 
@@ -908,5 +901,36 @@ invalid line without brackets
         assert_eq!(metadata.artist, Some("Artist with tabs".to_string()));
         assert_eq!(metadata.album, Some(String::new()));
         assert_eq!(metadata.author, Some(String::new()));
+    }
+
+    #[test]
+    fn edge_case_malformed_tags_between_timestamps() {
+        let input1 = r"
+[00:10.00][str:rst][00:12.00]repeated with mangled tag in the middle
+";
+        let result1: Lrc = input1.parse().unwrap();
+        assert_eq!(result1.lines.len(), 1);
+        assert_eq!(result1.lines[0].time, Duration::from_millis(10000));
+        assert_eq!(result1.lines[0].content, "[str:rst][00:12.00]repeated with mangled tag in the middle");
+
+        let input2 = r"
+[00:10.00][str][00:12.00]repeated with mangled tag in the middle
+";
+        let result2: Lrc = input2.parse().unwrap();
+        assert_eq!(result2.lines.len(), 1);
+        assert_eq!(result2.lines[0].time, Duration::from_millis(10000));
+        assert_eq!(result2.lines[0].content, "[str][00:12.00]repeated with mangled tag in the middle");
+
+        let input3 = r"
+[00:10.00][00:12.00][00:14.00]properly repeated line
+";
+        let result3: Lrc = input3.parse().unwrap();
+        assert_eq!(result3.lines.len(), 3);
+        assert_eq!(result3.lines[0].time, Duration::from_millis(10000));
+        assert_eq!(result3.lines[0].content, "properly repeated line");
+        assert_eq!(result3.lines[1].time, Duration::from_millis(12000));
+        assert_eq!(result3.lines[1].content, "properly repeated line");
+        assert_eq!(result3.lines[2].time, Duration::from_millis(14000));
+        assert_eq!(result3.lines[2].content, "properly repeated line");
     }
 }
