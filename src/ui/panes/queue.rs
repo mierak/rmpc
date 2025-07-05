@@ -897,6 +897,7 @@ impl Pane for QueuePane {
 
                             Ok(())
                         });
+                        self.scrolling_state.marked.clear();
                     }
                 }
                 CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
@@ -909,6 +910,7 @@ impl Pane for QueuePane {
                         .collect_vec();
 
                     modal!(context, MenuModal::create_add_modal(opts, context));
+                    self.scrolling_state.marked.clear();
                 }
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) =
