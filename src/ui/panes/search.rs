@@ -982,8 +982,9 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::Right => {
-                            // TODO this should only enque the single item and not marked
-                            let items = self.enqueue(false);
+                            let items = self.songs_dir.selected().map_or_else(Vec::new, |item| {
+                                vec![Enqueue::File { path: item.file.clone() }]
+                            });
                             if !items.is_empty() {
                                 context.command(move |client| {
                                     client.enqueue_multiple(
