@@ -5,17 +5,16 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{sort_mode::SortOptions, tabs::PaneType},
+    config::{keys::actions::Position, sort_mode::SortOptions, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::Song,
         errors::MpdError,
         mpd_client::{Filter, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::status_info,
         mouse_event::MouseEvent,
@@ -64,10 +63,18 @@ impl AlbumsPane {
 
         match self.stack.path() {
             [_album] => {
-                self.add(current, context, None)?;
+                let items = self.add(std::iter::once(current), context);
                 let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                let autoplay = if autoplay {
+                    Autoplay::Yes { queue_len, current_song_idx: None }
+                } else {
+                    Autoplay::No
+                };
+                if !items.is_empty() {
+                    context.command(move |client| {
+                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
+                        Ok(())
+                    });
                 }
             }
             [] => {
@@ -263,54 +270,39 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn add(
+    fn add<'a>(
         &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+        item: impl Iterator<Item = &'a DirOrSong>,
+        _context: &AppContext,
+    ) -> Vec<Enqueue> {
         match self.stack.path() {
-            [album] => {
-                let album = album.clone();
-                let name = item.dir_name_or_file_name().into_owned();
-                context.command(move |client| {
-                    client.find_add(
-                        &[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())],
-                        position,
-                    )?;
-
-                    status_info!("'{name}' added to queue");
-                    Ok(())
-                });
-            }
-            [] => {
-                let name = item.dir_name_or_file_name().into_owned();
-                context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, &name)], position)?;
-
-                    status_info!("Album '{name}' added to queue");
-                    Ok(())
-                });
-            }
-            _ => {}
+            [album] => item
+                .map(|item| item.dir_name_or_file_name().into_owned())
+                .map(|name| Enqueue::Find {
+                    filter: vec![(Tag::File, name), (Tag::Album, album.clone())],
+                })
+                .collect_vec(),
+            [] => item
+                .map(|item| item.dir_name_or_file_name().into_owned())
+                .map(|name| Enqueue::Find { filter: vec![(Tag::Album, name)] })
+                .collect_vec(),
+            _ => Vec::new(),
         }
-
-        Ok(())
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
                 context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], position)?;
+                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], position.into())?;
                     status_info!("Album '{}' added to queue", album);
                     Ok(())
                 });
             }
             [] => {
                 context.command(move |client| {
-                    client.add("/", position)?; // add the whole library
+                    client.add("/", position.into())?; // add the whole library
                     status_info!("All albums added to queue");
                     Ok(())
                 });

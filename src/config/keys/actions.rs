@@ -4,7 +4,11 @@ use itertools::Itertools;
 use strum::{Display, EnumDiscriminants, VariantArray};
 
 use super::ToDescription;
-use crate::config::{tabs::TabName, utils::tilde_expand};
+use crate::{
+    config::{tabs::TabName, utils::tilde_expand},
+    mpd::QueuePosition,
+    shared::ext::mpd_client::Autoplay,
+};
 
 // Global actions
 
@@ -342,6 +346,92 @@ impl ToDescription for QueueActions {
     }
 }
 
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
+)]
+
+pub enum Position {
+    AfterCurrentSong,
+    BeforeCurrentSong,
+    StartOfQueue,
+    EndOfQueue,
+    Replace,
+}
+
+impl From<Position> for Option<QueuePosition> {
+    fn from(value: Position) -> Self {
+        match value {
+            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+            Position::EndOfQueue => None,
+            Position::Replace => None,
+        }
+    }
+}
+
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
+)]
+pub enum AddKind {
+    Modal(Vec<(String, AddOpts)>),
+    Action(AddOpts),
+}
+
+impl Default for AddKind {
+    fn default() -> Self {
+        AddKind::Modal(vec![
+            ("At the end of queue".into(), AddOpts {
+                autoplay: false,
+                position: Position::EndOfQueue,
+            }),
+            ("At the start of queue".into(), AddOpts {
+                autoplay: false,
+                position: Position::StartOfQueue,
+            }),
+            ("Before the current song".into(), AddOpts {
+                autoplay: false,
+                position: Position::BeforeCurrentSong,
+            }),
+            ("Before the current song and play".into(), AddOpts {
+                autoplay: true,
+                position: Position::BeforeCurrentSong,
+            }),
+            ("After the current song".into(), AddOpts {
+                autoplay: false,
+                position: Position::AfterCurrentSong,
+            }),
+            ("After the current song and play".into(), AddOpts {
+                autoplay: true,
+                position: Position::AfterCurrentSong,
+            }),
+            ("Replace the queue".into(), AddOpts { autoplay: false, position: Position::Replace }),
+            ("Replace the queue and play".into(), AddOpts {
+                autoplay: true,
+                position: Position::Replace,
+            }),
+        ])
+    }
+}
+
+#[derive(
+    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
+)]
+pub struct AddOpts {
+    pub autoplay: bool,
+    pub position: Position,
+}
+
+impl AddOpts {
+    pub fn autoplay(self, queue_len: usize, current_song_idx: Option<usize>) -> Autoplay {
+        if !self.autoplay {
+            return Autoplay::No;
+        }
+
+        Autoplay::Yes { queue_len, current_song_idx }
+    }
+}
+
 // Common actions
 
 #[derive(
@@ -380,10 +470,14 @@ pub enum CommonActionFile {
     AddAllReplace,
     Insert,
     InsertAll,
+    AddOptions {
+        #[serde(default)]
+        kind: AddKind,
+    },
     ShowInfo,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum CommonAction {
     Down,
@@ -412,12 +506,10 @@ pub enum CommonAction {
     Close,
     Confirm,
     FocusInput,
-    Add,
     AddAll,
-    AddReplace,
     AddAllReplace,
-    Insert,
     InsertAll,
+    AddOptions { kind: AddKind },
     ShowInfo,
 }
 
@@ -460,12 +552,13 @@ impl ToDescription for CommonAction {
             CommonAction::PaneUp => "Focus the pane above the current one",
             CommonAction::PaneRight => "Focus the pane to the right of the current one",
             CommonAction::PaneLeft => "Focus the pane to the left of the current one",
-            CommonAction::Add => "Add item to queue",
+            // CommonAction::Add => "Add item to queue",
+            // CommonAction::AddReplace => "Replace current queue with the item",
+            // CommonAction::Insert => "Add item after current song",
             CommonAction::AddAll => "Add all items to queue",
-            CommonAction::AddReplace => "Replace current queue with the item",
             CommonAction::AddAllReplace => "Replace current queue with all items",
-            CommonAction::Insert => "Add item after current song",
             CommonAction::InsertAll => "Add all items after current song",
+            CommonAction::AddOptions {..} => "",
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup",
         }.into()
     }
@@ -491,22 +584,32 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::PreviousResult => CommonAction::PreviousResult,
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
-            CommonActionFile::Add => CommonAction::Add,
+            CommonActionFile::Add => CommonAction::AddOptions {
+                kind: AddKind::Action(AddOpts { autoplay: false, position: Position::EndOfQueue }),
+            },
+            CommonActionFile::AddReplace => CommonAction::AddOptions {
+                kind: AddKind::Action(AddOpts { autoplay: false, position: Position::Replace }),
+            },
+            CommonActionFile::Insert => CommonAction::AddOptions {
+                kind: AddKind::Action(AddOpts {
+                    autoplay: false,
+                    position: Position::AfterCurrentSong,
+                }),
+            },
+            CommonActionFile::InsertAll => CommonAction::InsertAll,
+            CommonActionFile::AddAll => CommonAction::AddAll,
+            CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
             CommonActionFile::Delete => CommonAction::Delete,
             CommonActionFile::Rename => CommonAction::Rename,
             CommonActionFile::Close => CommonAction::Close,
             CommonActionFile::Confirm => CommonAction::Confirm,
             CommonActionFile::FocusInput => CommonAction::FocusInput,
-            CommonActionFile::AddAll => CommonAction::AddAll,
             CommonActionFile::PaneUp => CommonAction::PaneUp,
             CommonActionFile::PaneDown => CommonAction::PaneDown,
             CommonActionFile::PaneLeft => CommonAction::PaneLeft,
             CommonActionFile::PaneRight => CommonAction::PaneRight,
-            CommonActionFile::AddReplace => CommonAction::AddReplace,
-            CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
-            CommonActionFile::Insert => CommonAction::Insert,
-            CommonActionFile::InsertAll => CommonAction::InsertAll,
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
+            CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
         }
     }
 }

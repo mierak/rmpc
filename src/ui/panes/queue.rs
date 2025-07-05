@@ -16,7 +16,11 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        keys::{GlobalAction, QueueActions},
+        keys::{
+            GlobalAction,
+            QueueActions,
+            actions::{AddKind, Position},
+        },
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
@@ -640,7 +644,7 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Unused => {}
             }
-        } else if let Some(action) = event.as_common_action(context) {
+        } else if let Some(action) = event.as_common_action(context).map(|v| v.to_owned()) {
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
@@ -861,21 +865,36 @@ impl Pane for QueuePane {
                     self.scrolling_state.marked.clear();
                     context.render()?;
                 }
-                CommonAction::Add => {}
                 CommonAction::AddAll => {}
-                CommonAction::Insert => {
-                    let song_under_cursor =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx));
+                CommonAction::AddOptions { kind: AddKind::Action(options) } => {
+                    // TODO handle marked items
+                    let Some(song) =
+                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                    else {
+                        return Ok(());
+                    };
 
-                    if let Some(song) = song_under_cursor {
-                        let file = song.file.clone();
-                        context.command(move |client| {
-                            client.add(&file, Some(QueuePosition::RelativeAdd(0)))?;
-                            Ok(())
-                        });
-                    }
+                    let file = song.file.clone();
+                    context.command(move |client| {
+                        let position = match options.position {
+                            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+                            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+                            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+                            Position::EndOfQueue => None,
+                            Position::Replace => None,
+                        };
+                        if matches!(options.position, Position::Replace) {
+                            client.clear()?;
+                        }
+
+                        client.add(&file, position)?;
+
+                        Ok(())
+                    });
                 }
+                CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
                 CommonAction::ShowInfo => {
+                    // TODO handle marked items
                     if let Some(selected_song) =
                         self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
                     {
@@ -892,7 +911,6 @@ impl Pane for QueuePane {
                     }
                 }
                 CommonAction::InsertAll => {}
-                CommonAction::AddReplace => {}
                 CommonAction::AddAllReplace => {}
                 CommonAction::Delete => {}
                 CommonAction::Rename => {}

@@ -5,16 +5,15 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{keys::actions::Position, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::status_info,
         mouse_event::MouseEvent,
@@ -99,10 +98,18 @@ impl DirectoriesPane {
                 context.render()?;
             }
             t @ DirOrSong::Song(_) => {
-                self.add(t, context, None)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                let items = self.add(std::iter::once(t), context);
+                if !items.is_empty() {
+                    let queue_len = context.queue.len();
+                    let autoplay = if autoplay {
+                        Autoplay::Yes { queue_len, current_song_idx: None }
+                    } else {
+                        Autoplay::No
+                    };
+                    context.command(move |client| {
+                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
+                        Ok(())
+                    });
                 }
             }
         }
@@ -266,55 +273,28 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn add(
+    fn add<'a>(
         &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
-        match item {
-            DirOrSong::Dir { name: dirname, playlist: is_playlist, .. } => {
-                let is_playlist = *is_playlist;
-                let mut next_path = self.stack.path().to_vec();
-                next_path.push(dirname.clone());
-                let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
-
-                context.command(move |client| {
-                    if is_playlist {
-                        client.load_playlist(&next_path, position)?;
-                        status_info!("Playlist '{next_path}' loaded");
-                    } else {
-                        client.add(&next_path, position)?;
-                        status_info!("Directory '{next_path}' added to queue");
-                    }
-                    Ok(())
-                });
-            }
-            DirOrSong::Song(song) => {
-                let file = song.file.clone();
-                let artist_text =
-                    song.artist_str(&context.config.theme.format_tag_separator).into_owned();
-                let title_text =
-                    song.title_str(&context.config.theme.format_tag_separator).into_owned();
-                context.command(move |client| {
-                    client.add(&file, position)?;
-                    if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
-                        status_info!("'{}' by '{}' added to queue", title_text, artist_text);
-                    }
-                    Ok(())
-                });
-            }
-        }
-
-        context.render()?;
-
-        Ok(())
+        items: impl Iterator<Item = &'a DirOrSong>,
+        _context: &AppContext,
+    ) -> Vec<Enqueue> {
+        items
+            .map(|item| match item {
+                DirOrSong::Dir { full_path, playlist: true, .. } => {
+                    Enqueue::Playlist { name: full_path.to_owned() }
+                }
+                DirOrSong::Dir { full_path, playlist: false, .. } => {
+                    Enqueue::File { path: full_path.to_owned() }
+                }
+                DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
+            })
+            .collect_vec()
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
         let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
         context.command(move |client| {
-            client.add(&path, position)?;
+            client.add(&path, position.into())?;
             status_info!("Directory '{path}' added to queue");
             Ok(())
         });

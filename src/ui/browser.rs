@@ -9,14 +9,21 @@ use super::{
 };
 use crate::{
     MpdQueryResult,
-    config::keys::{CommonAction, GlobalAction},
+    config::keys::{
+        CommonAction,
+        GlobalAction,
+        actions::{AddKind, Position},
+    },
     context::AppContext,
-    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
+        macros::modal,
         mouse_event::{MouseEvent, MouseEventKind},
         mpd_query::EXTERNAL_COMMAND,
     },
+    ui::modals::menu_modal::MenuModal,
 };
 
 pub enum MoveDirection {
@@ -40,8 +47,8 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add(&self, item: &T, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()>;
+    fn add<'a>(&self, item: impl Iterator<Item = &'a T>, context: &AppContext) -> Vec<Enqueue>;
+    fn add_all(&self, context: &AppContext, position: Position) -> Result<()>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
         Ok(())
@@ -174,7 +181,17 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        self.add(item, context, None)?;
+                        let items = self.add(std::iter::once(item), context);
+                        if !items.is_empty() {
+                            context.command(move |client| {
+                                client.enqueue_multiple(
+                                    items,
+                                    Position::EndOfQueue,
+                                    Autoplay::No,
+                                )?;
+                                Ok(())
+                            });
+                        }
                     }
 
                     self.prepare_preview(context);
@@ -228,7 +245,7 @@ where
         };
         let config = &context.config;
 
-        match action {
+        match action.to_owned() {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev(config.scrolloff, config.wrap_navigation);
                 self.prepare_preview(context);
@@ -319,69 +336,21 @@ where
                 self.stack_mut().current_mut().marked_mut().clear();
                 context.render()?;
             }
-            CommonAction::Add if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked() {
-                    let item = &self.stack().current().items[*idx];
-                    self.add(item, context, None)?;
-                }
-
-                context.render()?;
-            }
-            CommonAction::Add => {
-                if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context, None);
-                }
-            }
             CommonAction::AddAll if !self.stack().current().items.is_empty() => {
                 log::debug!("add all");
-                self.add_all(context, None)?;
+                self.add_all(context, Position::EndOfQueue)?;
             }
             CommonAction::AddAll => {}
-            CommonAction::AddReplace if !self.stack().current().marked().is_empty() => {
-                context.command(|client| {
-                    client.clear();
-                    Ok(())
-                });
-                for idx in self.stack().current().marked() {
-                    let item = &self.stack().current().items[*idx];
-                    self.add(item, context, None)?;
-                }
-
-                context.render()?;
-            }
-            CommonAction::AddReplace => {
-                context.command(|client| {
-                    client.clear();
-                    Ok(())
-                });
-                if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context, None);
-                }
-            }
             CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
                 context.command(|client| {
                     client.clear()?;
                     Ok(())
                 });
-                self.add_all(context, None)?;
+                self.add_all(context, Position::EndOfQueue)?;
             }
             CommonAction::AddAllReplace => {}
-            CommonAction::Insert if !self.stack().current().marked().is_empty() => {
-                for idx in self.stack().current().marked().iter().rev() {
-                    let item = &self.stack().current().items[*idx];
-                    self.add(item, context, Some(QueuePosition::RelativeAdd(0)))?;
-                }
-
-                context.render()?;
-            }
-            CommonAction::Insert => {
-                if let Some(item) = self.stack().current().selected() {
-                    self.add(item, context, Some(QueuePosition::RelativeAdd(0)));
-                }
-            }
             CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
-                log::debug!("add all next");
-                self.add_all(context, Some(QueuePosition::RelativeAdd(0)))?;
+                self.add_all(context, Position::AfterCurrentSong)?;
             }
             CommonAction::InsertAll => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
@@ -419,8 +388,50 @@ where
             CommonAction::PaneUp => {}
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
+            CommonAction::AddOptions { kind: AddKind::Action(options) } => {
+                let items = self.add_current_items(context);
+                if !items.is_empty() {
+                    let queue_len = context.queue.len();
+                    let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
+
+                    context.command(move |client| {
+                        let autoplay = options.autoplay(queue_len, current_song_idx);
+                        client.enqueue_multiple(items, options.position, autoplay)?;
+
+                        Ok(())
+                    });
+                }
+            }
+            CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
+                let enqueue = self.add_current_items(context);
+                let opts =
+                    items.iter().map(|(label, opts)| (label.to_owned(), *opts)).collect_vec();
+
+                modal!(context, MenuModal::create_add_modal(opts, enqueue, context));
+            }
         }
 
         Ok(())
+    }
+
+    /// Returns `Enqueue` for the currently hovered item if no items are
+    /// marked. Otherwise returns a list of `Enqueue` for all marked items.
+    fn add_current_items(&self, context: &AppContext) -> Vec<Enqueue> {
+        if self.stack().current().marked().is_empty() {
+            if let Some(item) = self.stack().current().selected() {
+                self.add(std::iter::once(item), context)
+            } else {
+                Vec::new()
+            }
+        } else {
+            self.add(
+                self.stack()
+                    .current()
+                    .marked()
+                    .iter()
+                    .map(|idx| &self.stack().current().items[*idx]),
+                context,
+            )
+        }
     }
 }

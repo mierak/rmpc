@@ -414,17 +414,44 @@ pub mod iter {
 }
 
 pub mod mpd_client {
-    use crate::mpd::{
-        errors::{ErrorCode, MpdError, MpdFailureResponse},
-        mpd_client::MpdClient,
+    use itertools::Itertools;
+
+    use crate::{
+        config::keys::actions::Position,
+        mpd::{
+            QueuePosition,
+            errors::{ErrorCode, MpdError, MpdFailureResponse},
+            mpd_client::{Filter, MpdClient, MpdCommand, Tag},
+            proto_client::ProtoClient,
+        },
+        shared::macros::status_info,
+        status_warn,
     };
 
-    pub trait MpdClientExt {
-        fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError>;
+    pub enum Enqueue {
+        File { path: String },
+        Playlist { name: String },
+        Search { filter: Vec<(Tag, String)> },
+        Find { filter: Vec<(Tag, String)> },
     }
 
-    impl<T: MpdClient> MpdClientExt for T {
-        fn play_last(&mut self, queue_len: usize) -> Result<(), MpdError> {
+    pub enum Autoplay {
+        Yes { queue_len: usize, current_song_idx: Option<usize> },
+        No,
+    }
+
+    pub trait MpdClientExt {
+        fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError>;
+        fn enqueue_multiple(
+            &mut self,
+            items: Vec<Enqueue>,
+            position: Position,
+            autoplay: Autoplay,
+        ) -> Result<(), MpdError>;
+    }
+
+    impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
+        fn play_position_safe(&mut self, queue_len: usize) -> Result<(), MpdError> {
             match self.play_pos(queue_len) {
                 Ok(()) => {}
                 Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::Argument, .. })) => {
@@ -437,6 +464,89 @@ pub mod mpd_client {
                 }
                 Err(err) => return Err(err),
             }
+            Ok(())
+        }
+
+        fn enqueue_multiple(
+            &mut self,
+            mut items: Vec<Enqueue>,
+            position: Position,
+            autoplay: Autoplay,
+        ) -> Result<(), MpdError> {
+            if items.is_empty() {
+                return Ok(());
+            }
+            let should_reverse = match position {
+                Position::AfterCurrentSong | Position::StartOfQueue => true,
+                Position::BeforeCurrentSong | Position::EndOfQueue | Position::Replace => false,
+            };
+
+            if should_reverse {
+                items.reverse();
+            }
+
+            let autoplay_idx = match autoplay {
+                Autoplay::Yes { queue_len, current_song_idx: Some(curr) } => match position {
+                    Position::AfterCurrentSong => Some(curr + 1),
+                    Position::BeforeCurrentSong => Some(curr),
+                    Position::StartOfQueue => Some(0),
+                    Position::EndOfQueue => Some(queue_len),
+                    Position::Replace => Some(0),
+                },
+                Autoplay::Yes { queue_len, current_song_idx: None } => match position {
+                    Position::AfterCurrentSong => {
+                        status_warn!("No current song to queue after");
+                        return Ok(());
+                    }
+                    Position::BeforeCurrentSong => {
+                        status_warn!("No current song to queue before");
+                        return Ok(());
+                    }
+                    Position::StartOfQueue => Some(0),
+                    Position::EndOfQueue => Some(queue_len),
+                    Position::Replace => Some(0),
+                },
+                Autoplay::No => None,
+            };
+
+            self.send_start_cmd_list()?;
+            if matches!(position, Position::Replace) {
+                self.send_clear()?;
+            }
+            let position: Option<QueuePosition> = position.into();
+            let items_len = items.len();
+            for item in items {
+                match item {
+                    Enqueue::File { path } => self.send_add(&path, position),
+                    Enqueue::Playlist { name } => self.send_load_playlist(&name, position),
+                    Enqueue::Search { filter } => self.send_search_add(
+                        &filter
+                            .into_iter()
+                            .map(|(tag, value)| Filter::new(tag, value))
+                            .collect_vec(),
+                        position,
+                    ),
+                    Enqueue::Find { filter } => self.send_find_add(
+                        &filter
+                            .into_iter()
+                            .map(|(tag, value)| Filter::new(tag, value))
+                            .collect_vec(),
+                        position,
+                    ),
+                }?;
+            }
+            self.send_execute_cmd_list()?;
+            self.read_ok()?;
+            if items_len == 1 {
+                status_info!("Added 1 item to the queue");
+            } else {
+                status_info!("Added {items_len} items to the queue");
+            }
+
+            if let Some(autoplay_idx) = autoplay_idx {
+                self.play_position_safe(autoplay_idx)?;
+            }
+
             Ok(())
         }
     }

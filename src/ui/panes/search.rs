@@ -13,7 +13,15 @@ use ratatui::{
 use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
-    config::{Config, Search, keys::GlobalAction, tabs::PaneType},
+    config::{
+        Config,
+        Search,
+        keys::{
+            GlobalAction,
+            actions::{AddKind, Position},
+        },
+        tabs::PaneType,
+    },
     context::AppContext,
     core::command::{create_env, run_external},
     mpd::{
@@ -22,15 +30,16 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
-        macros::{status_info, status_warn},
+        macros::{modal, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
         mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
         dirstack::{Dir, DirStackItem},
+        modals::menu_modal::MenuModal,
         widgets::{button::Button, input::Input},
     },
 };
@@ -76,39 +85,19 @@ impl SearchPane {
         }
     }
 
-    fn add_current(
-        &mut self,
-        autoplay: bool,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn add_current(&mut self) -> Vec<Enqueue> {
         if !self.songs_dir.marked().is_empty() {
-            for idx in self.songs_dir.marked().iter().rev() {
-                let item = self.songs_dir.items[*idx].file.clone();
-                context.command(move |client| {
-                    client.add(&item, position)?;
-                    Ok(())
-                });
-            }
-            status_info!("Added {} songs to queue", self.songs_dir.marked().len());
-
-            context.render()?;
+            self.songs_dir
+                .marked()
+                .iter()
+                .map(|idx| self.songs_dir.items[*idx].file.clone())
+                .map(|path| Enqueue::File { path })
+                .collect_vec()
         } else if let Some(item) = self.songs_dir.selected() {
-            let item = item.file.clone();
-            context.command(move |client| {
-                client.add(&item, position)?;
-                status_info!("Added '{item}' to queue");
-                Ok(())
-            });
-            let queue_len = context.queue.len();
-            if autoplay {
-                context.command(move |client| Ok(client.play_last(queue_len)?));
-            }
-
-            context.render()?;
+            vec![Enqueue::File { path: item.file.clone() }]
+        } else {
+            Vec::new()
         }
-
-        Ok(())
     }
 
     fn render_song_column(
@@ -657,7 +646,17 @@ impl Pane for SearchPane {
                         }
                     }
                     Phase::BrowseResults { .. } => {
-                        self.add_current(false, context, None)?;
+                        let items = self.add_current();
+                        if !items.is_empty() {
+                            context.command(move |client| {
+                                client.enqueue_multiple(
+                                    items,
+                                    Position::EndOfQueue,
+                                    Autoplay::No,
+                                )?;
+                                Ok(())
+                            });
+                        }
                     }
                 }
             }
@@ -695,7 +694,13 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    self.add_current(false, context, None)?;
+                    let items = self.add_current();
+                    if !items.is_empty() {
+                        context.command(move |client| {
+                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::No)?;
+                            Ok(())
+                        });
+                    }
                 }
             },
             MouseEventKind::MiddleClick if self.column_areas[1].contains(event.into()) => {
@@ -873,7 +878,6 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Add => {}
                         CommonAction::AddAll => {
                             self.search_add(context, None);
 
@@ -881,7 +885,6 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Insert => {}
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
 
@@ -889,7 +892,6 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::AddReplace => {}
                         CommonAction::AddAllReplace => {
                             context.command(|client| {
                                 client.clear()?;
@@ -916,6 +918,7 @@ impl Pane for SearchPane {
                         CommonAction::PaneRight => {}
                         CommonAction::PaneLeft => {}
                         CommonAction::ShowInfo => {}
+                        CommonAction::AddOptions { .. } => {}
                     }
                 }
             }
@@ -953,7 +956,7 @@ impl Pane for SearchPane {
                     }
                 }
             }
-            Phase::BrowseResults { filter_input_on: filter_input_modce @ false } => {
+            Phase::BrowseResults { filter_input_on: filter_input_mode @ false } => {
                 if let Some(action) = event.as_global_action(context) {
                     match action {
                         GlobalAction::ExternalCommand { command, .. }
@@ -972,7 +975,7 @@ impl Pane for SearchPane {
                         }
                     }
                 } else if let Some(action) = event.as_common_action(context) {
-                    match action {
+                    match action.to_owned() {
                         CommonAction::Down => {
                             self.songs_dir
                                 .next(context.config.scrolloff, context.config.wrap_navigation);
@@ -1013,7 +1016,19 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::Right => self.add_current(false, context, None)?,
+                        CommonAction::Right => {
+                            let items = self.add_current();
+                            if !items.is_empty() {
+                                context.command(move |client| {
+                                    client.enqueue_multiple(
+                                        items,
+                                        Position::EndOfQueue,
+                                        Autoplay::No,
+                                    )?;
+                                    Ok(())
+                                });
+                            }
+                        }
                         CommonAction::Left => {
                             self.phase = Phase::Search;
                             self.prepare_preview(context);
@@ -1034,7 +1049,7 @@ impl Pane for SearchPane {
                         }
                         CommonAction::EnterSearch => {
                             self.songs_dir.set_filter(Some(String::new()), config);
-                            *filter_input_modce = true;
+                            *filter_input_mode = true;
 
                             context.render()?;
                         }
@@ -1069,33 +1084,58 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.add_current(true, context, None)?;
+                            let items = self.add_current();
+                            let queue_len = context.queue.len();
+                            if !items.is_empty() {
+                                context.command(move |client| {
+                                    client.enqueue_multiple(
+                                        items,
+                                        Position::EndOfQueue,
+                                        Autoplay::Yes { queue_len, current_song_idx: None },
+                                    )?;
+                                    Ok(())
+                                });
+                            }
 
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::Add => self.add_current(false, context, None)?,
                         CommonAction::AddAll => {
                             self.search_add(context, None);
                             status_info!("All found songs added to queue");
 
                             context.render()?;
                         }
-                        CommonAction::Insert => {
-                            self.add_current(false, context, Some(QueuePosition::RelativeAdd(0)))?;
+                        CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
+                            let items = self.add_current();
+                            let queue_len = context.queue.len();
+                            let current_song_idx =
+                                context.find_current_song_in_queue().map(|(i, _)| i);
+
+                            if !items.is_empty() {
+                                context.command(move |client| {
+                                    let autoplay = opts.autoplay(queue_len, current_song_idx);
+
+                                    client.enqueue_multiple(items, opts.position, autoplay)?;
+
+                                    Ok(())
+                                });
+                            }
+                        }
+                        CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
+                            let items = self.add_current();
+                            let opts = opts
+                                .iter()
+                                .map(|(label, opts)| (label.to_owned(), *opts))
+                                .collect_vec();
+
+                            modal!(context, MenuModal::create_add_modal(opts, items, context));
                         }
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
                             status_info!("All found songs added to queue");
 
                             context.render()?;
-                        }
-                        CommonAction::AddReplace => {
-                            context.command(|client| {
-                                client.clear()?;
-                                Ok(())
-                            });
-                            self.add_current(false, context, None)?;
                         }
                         CommonAction::AddAllReplace => {
                             context.command(|client| {
