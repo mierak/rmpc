@@ -4,30 +4,41 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use itertools::Itertools;
 use serde::Serialize;
 use unicase::UniCase;
 use walkdir::WalkDir;
 
-use super::{Lrc, parse_length};
+use super::{Lrc, parse_metadata_only};
 use crate::{mpd::commands::Song, shared::macros::try_cont};
 
+/// Index of LRC files for fast song-to-lyrics matching.
+///
+/// This structure maintains an in-memory index of all LRC files in a directory,
+/// allowing for fast lookup of lyrics based on song metadata (artist, title,
+/// album). The index is built using efficient metadata-only parsing to avoid
+/// processing the entire content of each LRC file during startup.
 #[derive(Debug, Eq, PartialEq, Default, Serialize)]
 pub struct LrcIndex {
     index: Vec<LrcIndexEntry>,
 }
 
+/// A single entry in the LRC index containing metadata for fast matching.
+///
+/// This structure stores the essential metadata needed to match songs to their
+/// corresponding LRC files without having to parse the entire file content.
 #[derive(Debug, Eq, PartialEq, Hash, Serialize)]
 pub struct LrcIndexEntry {
+    /// Path to the LRC file
     pub path: PathBuf,
-    /// ti
+    /// Song title (from [ti:] tag)
     pub title: String,
-    /// ar
+    /// Artist name (from [ar:] tag)
     pub artist: String,
-    /// al
+    /// Album name (from [al:] tag)
     pub album: Option<String>,
-    /// length
+    /// Song length (from [length:] tag)
     pub length: Option<Duration>,
 }
 
@@ -175,57 +186,44 @@ impl LrcIndex {
 }
 
 impl LrcIndexEntry {
-    fn read(read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
-        let mut title = None;
-        let mut artist = None;
-        let mut album = None;
-        let mut length = None;
+    fn read(mut read: impl BufRead, path: PathBuf) -> Result<Option<Self>> {
+        let mut content = String::new();
+        let mut line = String::new();
 
-        for buf in read.lines() {
-            let buf = buf?;
-            if buf.trim().is_empty() || buf.starts_with('#') {
-                continue;
+        loop {
+            if read.read_line(&mut line)? == 0 {
+                break; // EOF
             }
-
-            let (metadata, rest) = buf
-                .trim()
-                .strip_prefix('[')
-                .and_then(|s| s.rsplit_once(']'))
-                .with_context(|| format!("Invalid lrc line format: '{buf}'"))?;
-            if !rest.is_empty() {
-                break;
-            }
-
-            match metadata.chars().next() {
-                Some(c) if c.is_numeric() => {
-                    break;
-                }
-                Some(_) => {
-                    let (key, value) = metadata
-                        .split_once(':')
-                        .with_context(|| format!("Invalid metadata line: '{metadata}'"))?;
-                    match key.trim() {
-                        "ti" => title = Some(value.trim().to_string()),
-                        "ar" => artist = Some(value.trim().to_string()),
-                        "al" => album = Some(value.trim().to_string()),
-                        "length" => length = Some(parse_length(value.trim())?),
-                        _ => {}
+            // if this line has a timestamp, stop reading
+            // We are looking for lines that start with [ and have a timestamp in them
+            // reading all the way to the end of the file is not necessary
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && trimmed.starts_with('[') {
+                if let Some(bracket_end) = trimmed.find(']') {
+                    let tag_content = &trimmed[1..bracket_end];
+                    if tag_content.chars().next().is_some_and(|c| c.is_numeric())
+                        && tag_content.contains(':')
+                    {
+                        // timestamp found, add this line and stop
+                        content.push_str(&line);
+                        break;
                     }
                 }
-                None => {
-                    bail!("Invalid lrc metadata/timestamp: '{metadata}'");
-                }
             }
+            content.push_str(&line);
+            line.clear();
         }
 
-        let Some(artist) = artist else {
+        let (metadata, _) = parse_metadata_only(&content);
+
+        let Some(artist) = metadata.artist else {
             return Ok(None);
         };
-        let Some(title) = title else {
+        let Some(title) = metadata.title else {
             return Ok(None);
         };
 
-        Ok(Some(Self { path, title, artist, album, length }))
+        Ok(Some(Self { path, title, artist, album: metadata.album, length: metadata.length }))
     }
 }
 
