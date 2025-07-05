@@ -15,7 +15,7 @@ use crate::{
         actions::{AddKind, Position},
     },
     context::AppContext,
-    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{client::Client, commands::Song},
     shared::{
         ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
@@ -47,8 +47,7 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn add<'a>(&self, item: impl Iterator<Item = &'a T>, context: &AppContext) -> Vec<Enqueue>;
-    fn add_all(&self, context: &AppContext, position: Position) -> Result<()>;
+    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> Vec<Enqueue>;
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
         Ok(())
@@ -181,7 +180,7 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        let items = self.add(std::iter::once(item), context);
+                        let items = self.enqueue(std::iter::once(item));
                         if !items.is_empty() {
                             context.command(move |client| {
                                 client.enqueue_multiple(
@@ -336,23 +335,6 @@ where
                 self.stack_mut().current_mut().marked_mut().clear();
                 context.render()?;
             }
-            CommonAction::AddAll if !self.stack().current().items.is_empty() => {
-                log::debug!("add all");
-                self.add_all(context, Position::EndOfQueue)?;
-            }
-            CommonAction::AddAll => {}
-            CommonAction::AddAllReplace if !self.stack().current().items.is_empty() => {
-                context.command(|client| {
-                    client.clear()?;
-                    Ok(())
-                });
-                self.add_all(context, Position::EndOfQueue)?;
-            }
-            CommonAction::AddAllReplace => {}
-            CommonAction::InsertAll if !self.stack().current().items.is_empty() => {
-                self.add_all(context, Position::AfterCurrentSong)?;
-            }
-            CommonAction::InsertAll => {}
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
@@ -389,7 +371,7 @@ where
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                let items = self.add_current_items(context);
+                let items = self.enqueue_items(options.all);
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
                     let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
@@ -403,34 +385,39 @@ where
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                let enqueue = self.add_current_items(context);
-                let opts =
-                    items.iter().map(|(label, opts)| (label.to_owned(), *opts)).collect_vec();
+                let opts = items
+                    .iter()
+                    .map(|(label, opts)| {
+                        let enqueue = self.enqueue_items(opts.all);
+                        (label.to_owned(), *opts, enqueue)
+                    })
+                    .collect_vec();
 
-                modal!(context, MenuModal::create_add_modal(opts, enqueue, context));
+                modal!(context, MenuModal::create_add_modal(opts, context));
             }
         }
 
         Ok(())
     }
 
-    /// Returns `Enqueue` for the currently hovered item if no items are
-    /// marked. Otherwise returns a list of `Enqueue` for all marked items.
-    fn add_current_items(&self, context: &AppContext) -> Vec<Enqueue> {
-        if self.stack().current().marked().is_empty() {
-            if let Some(item) = self.stack().current().selected() {
-                self.add(std::iter::once(item), context)
-            } else {
-                Vec::new()
-            }
+    /// If `all` is true, returns `Enqueue` for all items in the current stack
+    /// dir. Otherwise returns `Enqueue` for the currently hovered item if no
+    /// items are marked or a list of `Enqueue` for all marked items.
+    fn enqueue_items(&self, all: bool) -> Vec<Enqueue> {
+        if all {
+            self.enqueue(self.stack().current().items.iter())
+        } else if self.stack().current().marked().is_empty() {
+            self.stack()
+                .current()
+                .selected()
+                .map_or(Vec::new(), |item| self.enqueue(std::iter::once(item)))
         } else {
-            self.add(
+            self.enqueue(
                 self.stack()
                     .current()
                     .marked()
                     .iter()
                     .map(|idx| &self.stack().current().items[*idx]),
-                context,
             )
         }
     }

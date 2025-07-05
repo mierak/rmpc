@@ -15,7 +15,6 @@ use crate::{
     shared::{
         ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
-        macros::status_info,
         mouse_event::MouseEvent,
         mpd_query::PreviewGroup,
     },
@@ -98,7 +97,7 @@ impl DirectoriesPane {
                 context.render()?;
             }
             t @ DirOrSong::Song(_) => {
-                let items = self.add(std::iter::once(t), context);
+                let items = self.enqueue(std::iter::once(t));
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
                     let autoplay = if autoplay {
@@ -273,11 +272,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn add<'a>(
-        &self,
-        items: impl Iterator<Item = &'a DirOrSong>,
-        _context: &AppContext,
-    ) -> Vec<Enqueue> {
+    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a DirOrSong>) -> Vec<Enqueue> {
         items
             .map(|item| match item {
                 DirOrSong::Dir { full_path, playlist: true, .. } => {
@@ -289,17 +284,6 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
             })
             .collect_vec()
-    }
-
-    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
-        let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
-        context.command(move |client| {
-            client.add(&path, position.into())?;
-            status_info!("Directory '{path}' added to queue");
-            Ok(())
-        });
-
-        Ok(())
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {

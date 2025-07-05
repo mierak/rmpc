@@ -93,7 +93,7 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                let items = self.add(std::iter::once(selected), context);
+                let items = self.enqueue(std::iter::once(selected));
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
                     let autoplay = if autoplay {
@@ -425,40 +425,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add_all(&self, context: &AppContext, position: Position) -> Result<()> {
-        match self.stack().path() {
-            [playlist] => {
-                let playlist = playlist.clone();
-                context.command(move |client| {
-                    client.load_playlist(&playlist, position.into())?;
-                    status_info!("Playlist '{playlist}' added to queue");
-                    Ok(())
-                });
-            }
-            [] => {
-                for playlist in self.stack().current().items.iter().rev() {
-                    let items = self.add(std::iter::once(playlist), context);
-                    if !items.is_empty() {
-                        context.command(move |client| {
-                            client.enqueue_multiple(items, position, Autoplay::No)?;
-                            // status_info!("Playlist '{}' added to queue", playlist.as_path());
-                            Ok(())
-                        });
-                    }
-                }
-                status_info!("All playlists added to queue");
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    fn add<'a>(
-        &self,
-        items: impl Iterator<Item = &'a DirOrSong>,
-        _context: &AppContext,
-    ) -> Vec<Enqueue> {
+    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a DirOrSong>) -> Vec<Enqueue> {
         items
             .map(|item| match item {
                 DirOrSong::Dir { name, .. } => Enqueue::Playlist { name: name.to_owned() },

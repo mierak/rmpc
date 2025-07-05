@@ -25,7 +25,6 @@ use crate::{
     context::AppContext,
     core::command::{create_env, run_external},
     mpd::{
-        QueuePosition,
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
@@ -85,8 +84,23 @@ impl SearchPane {
         }
     }
 
-    fn add_current(&mut self) -> Vec<Enqueue> {
-        if !self.songs_dir.marked().is_empty() {
+    fn enqueue(&mut self, all: bool) -> Vec<Enqueue> {
+        if all {
+            let (filter_kind, case_sensitive) = self.filter_type();
+            let filter = self
+                .inputs
+                .textbox_inputs
+                .iter()
+                .filter_map(|input| match &input {
+                    Textbox { value, filter_key, .. } if !value.is_empty() => {
+                        Some((Tag::Custom(filter_key.to_owned()), filter_kind, value.to_owned()))
+                    }
+                    _ => None,
+                })
+                .collect_vec();
+
+            vec![if case_sensitive { Enqueue::Find { filter } } else { Enqueue::Search { filter } }]
+        } else if !self.songs_dir.marked().is_empty() {
             self.songs_dir
                 .marked()
                 .iter()
@@ -307,50 +321,6 @@ impl SearchPane {
             }
             acc
         })
-    }
-
-    fn search_add(&mut self, context: &AppContext, position: Option<QueuePosition>) {
-        let (filter_kind, case_sensitive) = self.filter_type();
-        let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
-            Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
-            }
-            _ => None,
-        });
-
-        let mut filter = filter.collect_vec();
-
-        if filter.is_empty() {
-            return;
-        }
-
-        if case_sensitive {
-            context.command(move |client| {
-                client.find_add(
-                    &filter
-                        .iter_mut()
-                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                            Filter::new(std::mem::take(key), value).with_type(*kind)
-                        })
-                        .collect_vec(),
-                    position,
-                )?;
-                Ok(())
-            });
-        } else {
-            context.command(move |client| {
-                client.search_add(
-                    &filter
-                        .iter_mut()
-                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                            Filter::new(std::mem::take(key), value).with_type(*kind)
-                        })
-                        .collect_vec(),
-                    position,
-                )?;
-                Ok(())
-            });
-        }
     }
 
     fn search(&mut self, context: &AppContext) {
@@ -646,7 +616,7 @@ impl Pane for SearchPane {
                         }
                     }
                     Phase::BrowseResults { .. } => {
-                        let items = self.add_current();
+                        let items = self.enqueue(false);
                         if !items.is_empty() {
                             context.command(move |client| {
                                 client.enqueue_multiple(
@@ -694,7 +664,7 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    let items = self.add_current();
+                    let items = self.enqueue(false);
                     if !items.is_empty() {
                         context.command(move |client| {
                             client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::No)?;
@@ -816,7 +786,7 @@ impl Pane for SearchPane {
                         event.abandon();
                     }
                 } else if let Some(action) = event.as_common_action(context) {
-                    match action {
+                    match action.to_owned() {
                         CommonAction::Down => {
                             if config.wrap_navigation {
                                 self.inputs.next();
@@ -878,31 +848,27 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
-                        CommonAction::AddAll => {
-                            self.search_add(context, None);
+                        // Modal while we are on search column does not support all options. It can
+                        // be implemented later.
+                        CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
+                        CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
+                            let enqueue = self.enqueue(opts.all);
+                            if !enqueue.is_empty() {
+                                let queue_len = context.queue.len();
+                                let current_song_idx =
+                                    context.find_current_song_in_queue().map(|(i, _)| i);
 
-                            status_info!("All found songs added to queue");
+                                context.command(move |client| {
+                                    let autoplay = opts.autoplay(queue_len, current_song_idx);
+                                    client.enqueue_multiple(enqueue, opts.position, autoplay)?;
 
-                            context.render()?;
+                                    Ok(())
+                                });
+                            }
                         }
-                        CommonAction::InsertAll => {
-                            self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
-
-                            status_info!("All found songs added to queue");
-
-                            context.render()?;
-                        }
-                        CommonAction::AddAllReplace => {
-                            context.command(|client| {
-                                client.clear()?;
-                                Ok(())
-                            });
-                            self.search_add(context, None);
-
-                            status_info!("All found songs added to queue");
-
-                            context.render()?;
-                        }
+                        // This action only makes sense when opts.all is true while we are on the
+                        // search column.
+                        CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
                         CommonAction::FocusInput => {}
                         CommonAction::Delete => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
@@ -918,7 +884,6 @@ impl Pane for SearchPane {
                         CommonAction::PaneRight => {}
                         CommonAction::PaneLeft => {}
                         CommonAction::ShowInfo => {}
-                        CommonAction::AddOptions { .. } => {}
                     }
                 }
             }
@@ -1017,7 +982,8 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::Right => {
-                            let items = self.add_current();
+                            // TODO this should only enque the single item and not marked
+                            let items = self.enqueue(false);
                             if !items.is_empty() {
                                 context.command(move |client| {
                                     client.enqueue_multiple(
@@ -1084,7 +1050,7 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            let items = self.add_current();
+                            let items = self.enqueue(false);
                             let queue_len = context.queue.len();
                             if !items.is_empty() {
                                 context.command(move |client| {
@@ -1100,52 +1066,34 @@ impl Pane for SearchPane {
                             context.render()?;
                         }
                         CommonAction::FocusInput => {}
-                        CommonAction::AddAll => {
-                            self.search_add(context, None);
-                            status_info!("All found songs added to queue");
-
-                            context.render()?;
-                        }
                         CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                            let items = self.add_current();
-                            let queue_len = context.queue.len();
-                            let current_song_idx =
-                                context.find_current_song_in_queue().map(|(i, _)| i);
+                            let enqueue = self.enqueue(opts.all);
 
-                            if !items.is_empty() {
+                            if !enqueue.is_empty() {
+                                let queue_len = context.queue.len();
+                                let current_song_idx =
+                                    context.find_current_song_in_queue().map(|(i, _)| i);
+
                                 context.command(move |client| {
                                     let autoplay = opts.autoplay(queue_len, current_song_idx);
 
-                                    client.enqueue_multiple(items, opts.position, autoplay)?;
+                                    client.enqueue_multiple(enqueue, opts.position, autoplay)?;
 
                                     Ok(())
                                 });
                             }
                         }
                         CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
-                            let items = self.add_current();
                             let opts = opts
                                 .iter()
-                                .map(|(label, opts)| (label.to_owned(), *opts))
+                                .map(|(label, opts)| {
+                                    let enqueue = self.enqueue(opts.all);
+
+                                    (label.to_owned(), *opts, enqueue)
+                                })
                                 .collect_vec();
 
-                            modal!(context, MenuModal::create_add_modal(opts, items, context));
-                        }
-                        CommonAction::InsertAll => {
-                            self.search_add(context, Some(QueuePosition::RelativeAdd(0)));
-                            status_info!("All found songs added to queue");
-
-                            context.render()?;
-                        }
-                        CommonAction::AddAllReplace => {
-                            context.command(|client| {
-                                client.clear()?;
-                                Ok(())
-                            });
-                            self.search_add(context, None);
-                            status_info!("All found songs added to queue");
-
-                            context.render()?;
+                            modal!(context, MenuModal::create_add_modal(opts, context));
                         }
                         CommonAction::Delete => {}
                         CommonAction::PaneDown => {}

@@ -421,7 +421,7 @@ pub mod mpd_client {
         mpd::{
             QueuePosition,
             errors::{ErrorCode, MpdError, MpdFailureResponse},
-            mpd_client::{Filter, MpdClient, MpdCommand, Tag},
+            mpd_client::{Filter, FilterKind, MpdClient, MpdCommand, Tag},
             proto_client::ProtoClient,
         },
         shared::macros::status_info,
@@ -431,8 +431,8 @@ pub mod mpd_client {
     pub enum Enqueue {
         File { path: String },
         Playlist { name: String },
-        Search { filter: Vec<(Tag, String)> },
-        Find { filter: Vec<(Tag, String)> },
+        Search { filter: Vec<(Tag, FilterKind, String)> },
+        Find { filter: Vec<(Tag, FilterKind, String)> },
     }
 
     pub enum Autoplay {
@@ -522,14 +522,14 @@ pub mod mpd_client {
                     Enqueue::Search { filter } => self.send_search_add(
                         &filter
                             .into_iter()
-                            .map(|(tag, value)| Filter::new(tag, value))
+                            .map(|(tag, kind, value)| Filter::new_with_kind(tag, value, kind))
                             .collect_vec(),
                         position,
                     ),
                     Enqueue::Find { filter } => self.send_find_add(
                         &filter
                             .into_iter()
-                            .map(|(tag, value)| Filter::new(tag, value))
+                            .map(|(tag, kind, value)| Filter::new_with_kind(tag, value, kind))
                             .collect_vec(),
                         position,
                     ),

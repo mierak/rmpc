@@ -347,9 +347,18 @@ impl ToDescription for QueueActions {
 }
 
 #[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
+    Debug,
+    Display,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    Copy,
+    Ord,
+    PartialOrd,
 )]
-
 pub enum Position {
     AfterCurrentSong,
     BeforeCurrentSong,
@@ -378,37 +387,61 @@ pub enum AddKind {
     Action(AddOpts),
 }
 
+impl std::fmt::Display for AddKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AddKind::Modal(modal) => write!(f, "Modal with options {:?} options", modal.len()),
+            AddKind::Action(opts) => write!(
+                f,
+                "position: {}, autoplay: {}, all: {}",
+                opts.position, opts.autoplay, opts.all
+            ),
+        }
+    }
+}
+
 impl Default for AddKind {
     fn default() -> Self {
         AddKind::Modal(vec![
             ("At the end of queue".into(), AddOpts {
                 autoplay: false,
                 position: Position::EndOfQueue,
+                all: false,
             }),
             ("At the start of queue".into(), AddOpts {
                 autoplay: false,
                 position: Position::StartOfQueue,
+                all: false,
             }),
             ("Before the current song".into(), AddOpts {
                 autoplay: false,
                 position: Position::BeforeCurrentSong,
+                all: false,
             }),
             ("Before the current song and play".into(), AddOpts {
                 autoplay: true,
                 position: Position::BeforeCurrentSong,
+                all: false,
             }),
             ("After the current song".into(), AddOpts {
                 autoplay: false,
                 position: Position::AfterCurrentSong,
+                all: false,
             }),
             ("After the current song and play".into(), AddOpts {
                 autoplay: true,
                 position: Position::AfterCurrentSong,
+                all: false,
             }),
-            ("Replace the queue".into(), AddOpts { autoplay: false, position: Position::Replace }),
+            ("Replace the queue".into(), AddOpts {
+                autoplay: false,
+                position: Position::Replace,
+                all: false,
+            }),
             ("Replace the queue and play".into(), AddOpts {
                 autoplay: true,
                 position: Position::Replace,
+                all: false,
             }),
         ])
     }
@@ -419,6 +452,7 @@ impl Default for AddKind {
 )]
 pub struct AddOpts {
     pub autoplay: bool,
+    pub all: bool,
     pub position: Position,
 }
 
@@ -506,10 +540,10 @@ pub enum CommonAction {
     Close,
     Confirm,
     FocusInput,
-    AddAll,
-    AddAllReplace,
-    InsertAll,
-    AddOptions { kind: AddKind },
+    #[strum(to_string = "AddOptions({kind})")]
+    AddOptions {
+        kind: AddKind,
+    },
     ShowInfo,
 }
 
@@ -552,12 +586,6 @@ impl ToDescription for CommonAction {
             CommonAction::PaneUp => "Focus the pane above the current one",
             CommonAction::PaneRight => "Focus the pane to the right of the current one",
             CommonAction::PaneLeft => "Focus the pane to the left of the current one",
-            // CommonAction::Add => "Add item to queue",
-            // CommonAction::AddReplace => "Replace current queue with the item",
-            // CommonAction::Insert => "Add item after current song",
-            CommonAction::AddAll => "Add all items to queue",
-            CommonAction::AddAllReplace => "Replace current queue with all items",
-            CommonAction::InsertAll => "Add all items after current song",
             CommonAction::AddOptions {..} => "",
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup",
         }.into()
@@ -585,20 +613,47 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
             CommonActionFile::Add => CommonAction::AddOptions {
-                kind: AddKind::Action(AddOpts { autoplay: false, position: Position::EndOfQueue }),
+                kind: AddKind::Action(AddOpts {
+                    autoplay: false,
+                    position: Position::EndOfQueue,
+                    all: false,
+                }),
             },
             CommonActionFile::AddReplace => CommonAction::AddOptions {
-                kind: AddKind::Action(AddOpts { autoplay: false, position: Position::Replace }),
+                kind: AddKind::Action(AddOpts {
+                    autoplay: false,
+                    position: Position::Replace,
+                    all: false,
+                }),
             },
             CommonActionFile::Insert => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
                     autoplay: false,
                     position: Position::AfterCurrentSong,
+                    all: false,
                 }),
             },
-            CommonActionFile::InsertAll => CommonAction::InsertAll,
-            CommonActionFile::AddAll => CommonAction::AddAll,
-            CommonActionFile::AddAllReplace => CommonAction::AddAllReplace,
+            CommonActionFile::InsertAll => CommonAction::AddOptions {
+                kind: AddKind::Action(AddOpts {
+                    autoplay: false,
+                    position: Position::AfterCurrentSong,
+                    all: true,
+                }),
+            },
+            CommonActionFile::AddAll => CommonAction::AddOptions {
+                kind: AddKind::Action(AddOpts {
+                    autoplay: false,
+                    position: Position::EndOfQueue,
+                    all: true,
+                }),
+            },
+            CommonActionFile::AddAllReplace => CommonAction::AddOptions {
+                kind: AddKind::Action(AddOpts {
+                    autoplay: false,
+                    position: Position::Replace,
+                    all: true,
+                }),
+            },
             CommonActionFile::Delete => CommonAction::Delete,
             CommonActionFile::Rename => CommonAction::Rename,
             CommonActionFile::Close => CommonAction::Close,

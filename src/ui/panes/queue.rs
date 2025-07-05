@@ -16,11 +16,7 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        keys::{
-            GlobalAction,
-            QueueActions,
-            actions::{AddKind, Position},
-        },
+        keys::{GlobalAction, QueueActions, actions::AddKind},
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
@@ -28,7 +24,11 @@ use crate::{
     core::command::{create_env, run_external},
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
-        ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
+        ext::{
+            btreeset_ranges::BTreeSetRanges,
+            mpd_client::{Enqueue, MpdClientExt},
+            rect::RectExt,
+        },
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
@@ -40,6 +40,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
+            menu_modal::MenuModal,
             select_modal::SelectModal,
         },
     },
@@ -105,6 +106,24 @@ impl QueuePane {
         self.filter
             .as_ref()
             .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }))
+    }
+
+    fn enqueue_items(&self, all: bool, ctx: &AppContext) -> Vec<Enqueue> {
+        if all {
+            ctx.queue.iter().map(|v| Enqueue::File { path: v.file.clone() }).collect_vec()
+        } else if self.scrolling_state.marked.is_empty() {
+            self.scrolling_state
+                .get_selected()
+                .and_then(|idx| ctx.queue.get(idx))
+                .map_or(Vec::new(), |v| vec![Enqueue::File { path: v.file.clone() }])
+        } else {
+            self.scrolling_state
+                .marked
+                .iter()
+                .filter_map(|idx| ctx.queue.get(*idx))
+                .map(|v| Enqueue::File { path: v.file.clone() })
+                .collect_vec()
+        }
     }
 }
 
@@ -865,36 +884,33 @@ impl Pane for QueuePane {
                     self.scrolling_state.marked.clear();
                     context.render()?;
                 }
-                CommonAction::AddAll => {}
                 CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                    // TODO handle marked items
-                    let Some(song) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
-                    else {
-                        return Ok(());
-                    };
+                    let enqueue = self.enqueue_items(options.all, context);
 
-                    let file = song.file.clone();
-                    context.command(move |client| {
-                        let position = match options.position {
-                            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
-                            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
-                            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
-                            Position::EndOfQueue => None,
-                            Position::Replace => None,
-                        };
-                        if matches!(options.position, Position::Replace) {
-                            client.clear()?;
-                        }
+                    if !enqueue.is_empty() {
+                        let queue_len = context.queue.len();
+                        let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
 
-                        client.add(&file, position)?;
+                        context.command(move |client| {
+                            let autoplay = options.autoplay(queue_len, current_song_idx);
+                            client.enqueue_multiple(enqueue, options.position, autoplay)?;
 
-                        Ok(())
-                    });
+                            Ok(())
+                        });
+                    }
                 }
-                CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
+                CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
+                    let opts = items
+                        .iter()
+                        .map(|(label, opts)| {
+                            let enqueue = self.enqueue_items(opts.all, context);
+                            (label.to_owned(), *opts, enqueue)
+                        })
+                        .collect_vec();
+
+                    modal!(context, MenuModal::create_add_modal(opts, context));
+                }
                 CommonAction::ShowInfo => {
-                    // TODO handle marked items
                     if let Some(selected_song) =
                         self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
                     {
@@ -910,8 +926,6 @@ impl Pane for QueuePane {
                         status_error!("No song selected");
                     }
                 }
-                CommonAction::InsertAll => {}
-                CommonAction::AddAllReplace => {}
                 CommonAction::Delete => {}
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
