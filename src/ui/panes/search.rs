@@ -93,11 +93,8 @@ impl SearchPane {
                 .map(|idx| self.songs_dir.items[*idx].file.clone())
                 .map(|path| Enqueue::File { path })
                 .collect_vec()
-        // status_info!("Added {} songs to queue",
-        // self.songs_dir.marked().len());
         } else if let Some(item) = self.songs_dir.selected() {
             vec![Enqueue::File { path: item.file.clone() }]
-        // status_info!("Added '{item}' to queue");
         } else {
             Vec::new()
         }
@@ -1126,12 +1123,13 @@ impl Pane for SearchPane {
                             }
                         }
                         CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
+                            let items = self.add_current();
                             let opts = opts
                                 .iter()
-                                .map(|(label, opts)| (label.to_owned(), *opts, self.add_current()))
+                                .map(|(label, opts)| (label.to_owned(), *opts))
                                 .collect_vec();
 
-                            modal!(context, MenuModal::create_add_modal(opts, context));
+                            modal!(context, MenuModal::create_add_modal(opts, items, context));
                         }
                         CommonAction::InsertAll => {
                             self.search_add(context, Some(QueuePosition::RelativeAdd(0)));

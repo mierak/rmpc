@@ -1,7 +1,10 @@
 #![allow(clippy::cast_possible_truncation)]
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use itertools::Itertools;
+use parking_lot::Mutex;
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -232,20 +235,29 @@ impl MenuModal {
     }
 
     pub fn create_add_modal(
-        opts: Vec<(String, AddOpts, Vec<Enqueue>)>,
+        opts: Vec<(String, AddOpts)>,
+        enqueue: Vec<Enqueue>,
         ctx: &AppContext,
     ) -> MenuModal {
+        // The mutex is here to avoid cloning the whole `Enqueue` vec for every option
+        // in the menu. The vec is only ever used by one option so we can let the first
+        // closure consume the contents of it.
+        let enqueue = Arc::new(Mutex::new(Some(enqueue)));
+
         MenuModal::new(ctx)
             .add_section(ctx, |section| {
                 let queue_len = ctx.queue.len();
                 let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
                 let mut section = section;
 
-                for (label, options, items) in opts {
+                for (label, options) in opts {
+                    let enqueue = Arc::clone(&enqueue);
                     section = section.add_item(label, move |ctx| {
                         ctx.command(move |client| {
-                            let autoplay = options.autoplay(queue_len, current_song_idx);
-                            client.enqueue_multiple(items, options.position, autoplay)?;
+                            if let Some(enqueue) = enqueue.try_lock().and_then(|mut l| l.take()) {
+                                let autoplay = options.autoplay(queue_len, current_song_idx);
+                                client.enqueue_multiple(enqueue, options.position, autoplay)?;
+                            }
 
                             Ok(())
                         });

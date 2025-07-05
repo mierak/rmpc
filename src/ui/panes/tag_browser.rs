@@ -477,13 +477,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         _ctx: &AppContext,
     ) -> Vec<Enqueue> {
         match self.stack.path() {
-            [_artist, _album] => {
-                items
-                    .map(|item| item.dir_name_or_file_name().into_owned())
-                    .map(|name| Enqueue::Find { filter: vec![(Tag::File, name)] })
-                    .collect_vec()
-                // status_info!("'{name}' added to queue");
-            }
+            [_artist, _album] => items
+                .map(|item| item.dir_name_or_file_name().into_owned())
+                .map(|name| Enqueue::Find { filter: vec![(Tag::File, name)] })
+                .collect_vec(),
             [artist] => {
                 let artist = artist.clone();
                 let root_tag = self.root_tag.clone();
@@ -511,7 +508,6 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                         }
                     })
                     .collect_vec()
-                // status_info!("Album '{name}' by '{artist}' added to queue");
             }
             [] => {
                 let root_tag = self.root_tag.clone();
@@ -530,7 +526,6 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                         }
                     })
                     .collect_vec()
-                // status_info!("All songs by '{name}' added to queue");
             }
             _ => Vec::new(),
         }

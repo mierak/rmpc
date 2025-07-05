@@ -424,6 +424,8 @@ pub mod mpd_client {
             mpd_client::{Filter, MpdClient, MpdCommand, Tag},
             proto_client::ProtoClient,
         },
+        shared::macros::status_info,
+        status_warn,
     };
 
     pub enum Enqueue {
@@ -471,6 +473,9 @@ pub mod mpd_client {
             position: Position,
             autoplay: Autoplay,
         ) -> Result<(), MpdError> {
+            if items.is_empty() {
+                return Ok(());
+            }
             let should_reverse = match position {
                 Position::AfterCurrentSong | Position::StartOfQueue => true,
                 Position::BeforeCurrentSong | Position::EndOfQueue | Position::Replace => false,
@@ -489,8 +494,14 @@ pub mod mpd_client {
                     Position::Replace => Some(0),
                 },
                 Autoplay::Yes { queue_len, current_song_idx: None } => match position {
-                    Position::AfterCurrentSong => None,
-                    Position::BeforeCurrentSong => None,
+                    Position::AfterCurrentSong => {
+                        status_warn!("No current song to queue after");
+                        return Ok(());
+                    }
+                    Position::BeforeCurrentSong => {
+                        status_warn!("No current song to queue before");
+                        return Ok(());
+                    }
                     Position::StartOfQueue => Some(0),
                     Position::EndOfQueue => Some(queue_len),
                     Position::Replace => Some(0),
@@ -503,6 +514,7 @@ pub mod mpd_client {
                 self.send_clear()?;
             }
             let position: Option<QueuePosition> = position.into();
+            let items_len = items.len();
             for item in items {
                 match item {
                     Enqueue::File { path } => self.send_add(&path, position),
@@ -525,6 +537,12 @@ pub mod mpd_client {
             }
             self.send_execute_cmd_list()?;
             self.read_ok()?;
+            if items_len == 1 {
+                status_info!("Added 1 item to the queue");
+            } else {
+                status_info!("Added {items_len} items to the queue");
+            }
+
             if let Some(autoplay_idx) = autoplay_idx {
                 self.play_position_safe(autoplay_idx)?;
             }

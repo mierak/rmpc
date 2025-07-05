@@ -281,15 +281,12 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         items
             .map(|item| match item {
                 DirOrSong::Dir { full_path, playlist: true, .. } => {
-                    // status_info!("Playlist '{next_path}' loaded");
                     Enqueue::Playlist { name: full_path.to_owned() }
                 }
                 DirOrSong::Dir { full_path, playlist: false, .. } => {
-                    // status_info!("Directory '{next_path}' added to queue");
                     Enqueue::File { path: full_path.to_owned() }
                 }
                 DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
-                // status_info!("'{}' by '{}' added to queue", title_text, artist_text);
             })
             .collect_vec()
     }

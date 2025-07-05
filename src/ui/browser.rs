@@ -403,12 +403,11 @@ where
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                let opts = items
-                    .iter()
-                    .map(|(label, opts)| (label.to_owned(), *opts, self.add_current_items(context)))
-                    .collect_vec();
+                let enqueue = self.add_current_items(context);
+                let opts =
+                    items.iter().map(|(label, opts)| (label.to_owned(), *opts)).collect_vec();
 
-                modal!(context, MenuModal::create_add_modal(opts, context));
+                modal!(context, MenuModal::create_add_modal(opts, enqueue, context));
             }
         }
 

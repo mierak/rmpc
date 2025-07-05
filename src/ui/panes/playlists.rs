@@ -461,9 +461,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     ) -> Vec<Enqueue> {
         items
             .map(|item| match item {
-                // status_info!("Playlist '{d}' added to queue");
                 DirOrSong::Dir { name, .. } => Enqueue::Playlist { name: name.to_owned() },
-                // status_info!("'{}' by '{}' added to queue", title_text, artist_text);
                 DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
             })
             .collect_vec()

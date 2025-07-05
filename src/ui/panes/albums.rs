@@ -276,20 +276,16 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         _context: &AppContext,
     ) -> Vec<Enqueue> {
         match self.stack.path() {
-            [album] => {
-                item.map(|item| item.dir_name_or_file_name().into_owned())
-                    .map(|name| Enqueue::Find {
-                        filter: vec![(Tag::File, name), (Tag::Album, album.clone())],
-                    })
-                    .collect_vec()
-                //     // status_info!("'{name}' added to queue");
-            }
-            [] => {
-                item.map(|item| item.dir_name_or_file_name().into_owned())
-                    .map(|name| Enqueue::Find { filter: vec![(Tag::Album, name)] })
-                    .collect_vec()
-                //     // status_info!("Album '{name}' added to queue");
-            }
+            [album] => item
+                .map(|item| item.dir_name_or_file_name().into_owned())
+                .map(|name| Enqueue::Find {
+                    filter: vec![(Tag::File, name), (Tag::Album, album.clone())],
+                })
+                .collect_vec(),
+            [] => item
+                .map(|item| item.dir_name_or_file_name().into_owned())
+                .map(|name| Enqueue::Find { filter: vec![(Tag::Album, name)] })
+                .collect_vec(),
             _ => Vec::new(),
         }
     }
