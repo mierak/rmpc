@@ -139,12 +139,12 @@ impl FromStr for Lrc {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (metadata, lyrics_start_line) = parse_metadata_only(s);
         let offset = metadata.offset;
-        
+
         // preallocate the Vec with an estimated capacity
         // This avoids multiple reallocations during parsing
         let remaining_lines = s.lines().count().saturating_sub(lyrics_start_line);
         let estimated_capacity = remaining_lines * 2;
-        
+
         let mut result = Self {
             lines: Vec::with_capacity(estimated_capacity),
             title: metadata.title,
