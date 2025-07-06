@@ -98,6 +98,15 @@ impl Command {
                     Ok(())
                 }))
             }
+            Command::Queue => Ok(Box::new(|client| {
+                let queue = client.playlist_info(false)?;
+                if let Some(queue) = queue {
+                    println!("{}", serde_json::ser::to_string(&queue)?);
+                    Ok(())
+                } else {
+                    std::process::exit(1);
+                }
+            })),
             Command::Play { position: None } => Ok(Box::new(|client| Ok(client.play()?))),
             Command::Play { position: Some(pos) } => {
                 Ok(Box::new(move |client| Ok(client.play_pos(pos)?)))

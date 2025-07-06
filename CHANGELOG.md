@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Added configurable kebyind for adding items to the Queue - `AddOptions`
 - Multiple marked items can now be moved inside playlists
 - New `song_table_album_separator` theme property
+- Add `queue` cli command to print contents of the current queue
 
 ### Changed
 
