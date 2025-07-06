@@ -34,7 +34,7 @@ pub fn client_request_channel() -> (Sender<ClientRequest>, Receiver<ClientReques
 }
 
 #[fixture]
-pub fn app_context(
+pub fn ctx(
     work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
     client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
 ) -> Ctx {

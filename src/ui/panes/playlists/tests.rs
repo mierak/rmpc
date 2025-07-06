@@ -14,7 +14,7 @@ use rstest::{fixture, rstest};
 use crate::{
     ctx::Ctx,
     mpd::commands::Song,
-    tests::fixtures::app_context,
+    tests::fixtures::ctx,
     ui::{
         browser::BrowserPane,
         dir_or_song::DirOrSong,
@@ -35,7 +35,7 @@ mod on_idle_event {
         use super::*;
 
         #[rstest]
-        fn selects_the_same_playlist_by_name(mut screen: PlaylistsPane, app_context: Ctx) {
+        fn selects_the_same_playlist_by_name(mut screen: PlaylistsPane, ctx: Ctx) {
             screen
                 .on_query_finished(
                     INIT,
@@ -44,7 +44,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             let current = screen.stack.current_mut();
@@ -59,7 +59,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
 
@@ -69,7 +69,7 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_same_index_when_playlist_not_found_after_refresh(
             mut screen: PlaylistsPane,
-            app_context: Ctx,
+            ctx: Ctx,
         ) {
             screen
                 .on_query_finished(
@@ -79,7 +79,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -92,7 +92,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
 
@@ -102,7 +102,7 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_last_playlist_when_last_was_selected_and_removed(
             mut screen: PlaylistsPane,
-            app_context: Ctx,
+            ctx: Ctx,
         ) {
             screen
                 .on_query_finished(
@@ -112,7 +112,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(3, 0);
@@ -125,7 +125,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
 
@@ -135,7 +135,7 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_first_playlist_when_first_was_selected_and_removed(
             mut screen: PlaylistsPane,
-            app_context: Ctx,
+            ctx: Ctx,
         ) {
             screen
                 .on_query_finished(
@@ -145,7 +145,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(0, 0);
@@ -157,7 +157,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
 
@@ -181,7 +181,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = app_context(work_request_channel, client_request_channel);
+            let app_context = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -247,7 +247,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = app_context(work_request_channel, client_request_channel);
+            let app_context = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -313,7 +313,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = app_context(work_request_channel, client_request_channel);
+            let app_context = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -378,7 +378,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = app_context(work_request_channel, client_request_channel);
+            let app_context = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -443,7 +443,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = app_context(work_request_channel, client_request_channel);
+            let app_context = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             let initial_playlists = vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")];
             screen
@@ -529,8 +529,8 @@ fn dir(name: &str) -> DirOrSong {
 }
 
 #[fixture]
-fn screen(app_context: Ctx) -> PlaylistsPane {
-    let mut screen = PlaylistsPane::new(&app_context);
-    screen.before_show(&app_context).unwrap();
+fn screen(ctx: Ctx) -> PlaylistsPane {
+    let mut screen = PlaylistsPane::new(&ctx);
+    screen.before_show(&ctx).unwrap();
     screen
 }

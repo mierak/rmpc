@@ -174,7 +174,7 @@ mod tests {
             events::{ClientRequest, WorkRequest},
             mpd_query::MpdQuery,
         },
-        tests::fixtures::{app_context, client_request_channel, work_request_channel},
+        tests::fixtures::{client_request_channel, ctx, work_request_channel},
         ui::{
             UiEvent,
             panes::{Pane, album_art::ALBUM_ART},
@@ -192,7 +192,7 @@ mod tests {
         client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
         let rx = client_request_channel.1.clone();
-        let mut app_context = app_context(work_request_channel, client_request_channel);
+        let mut app_context = ctx(work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
@@ -233,7 +233,7 @@ mod tests {
         client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
         let rx = client_request_channel.1.clone();
-        let mut app_context = app_context(work_request_channel, client_request_channel);
+        let mut app_context = ctx(work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;

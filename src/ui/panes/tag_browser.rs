@@ -653,7 +653,7 @@ mod tests {
     use super::*;
     use crate::{
         config::Config,
-        tests::fixtures::{app_context, config},
+        tests::fixtures::{config, ctx},
     };
 
     fn song(
@@ -675,11 +675,11 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_no_date_sort_name(mut app_context: Ctx, mut config: Config) {
+    fn albums_no_date_sort_name(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Name;
-        app_context.config = std::sync::Arc::new(config);
-        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -688,7 +688,7 @@ mod tests {
             song("album_b", "2022"),
         ];
 
-        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].name, "album_a");
@@ -696,11 +696,11 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_split_date_sort_name(mut app_context: Ctx, mut config: Config) {
+    fn albums_split_date_sort_name(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Name;
-        app_context.config = std::sync::Arc::new(config);
-        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -709,7 +709,7 @@ mod tests {
             song("album_b", "2022"),
         ];
 
-        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
 
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].name, "(2020) album_a");
@@ -718,11 +718,11 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_split_date_sort_date(mut app_context: Ctx, mut config: Config) {
+    fn albums_split_date_sort_date(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        app_context.config = std::sync::Arc::new(config);
-        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -731,7 +731,7 @@ mod tests {
             song("album_b", "2019"),
         ];
 
-        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
 
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].name, "(2019) album_b");
@@ -740,11 +740,11 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_no_date_sort_date(mut app_context: Ctx, mut config: Config) {
+    fn albums_no_date_sort_date(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        app_context.config = std::sync::Arc::new(config);
-        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &app_context);
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
         let songs = vec![
             song("album_a", "2020"),
@@ -753,7 +753,7 @@ mod tests {
             song("album_b", "2025"),
         ];
 
-        let CachedRootTag(result) = pane.process_songs(artist, songs, &app_context);
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
         dbg!(&result);
 
         assert_eq!(result.len(), 2);
