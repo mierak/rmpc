@@ -22,9 +22,11 @@ use crate::{
             actions::{AddKind, AutoplayKind},
         },
         tabs::PaneType,
-        theme::properties::{Property, SongProperty},
+        theme::{
+            AlbumSeparator,
+            properties::{Property, SongProperty},
+        },
     },
-    context::AppContext,
     core::command::{create_env, run_external},
     ctx::Ctx,
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
@@ -203,18 +205,17 @@ impl Pane for QueuePane {
                 continue;
             }
 
-                let is_current = ctx
-                    .find_current_song_in_queue()
-                    .map(|(_, song)| song.id)
-                    .is_some_and(|v| v == song.id);
+            let is_current = ctx
+                .find_current_song_in_queue()
+                .map(|(_, song)| song.id)
+                .is_some_and(|v| v == song.id);
 
             let is_marked = self.scrolling_state.get_marked().contains(&idx);
             let columns = (0..formats.len()).map(|i| {
                 let mut max_len: usize = widths[i].width.into();
-                // We have to subtract marker symbol length from max len in
-                // order to make space for the marker
-                // symbol in case we are in the first column of the table
-                // and the song is marked.
+                // We have to subtract marker symbol length from max len in order to make space
+                // for the marker symbol in case we are in the first column of the table and the
+                // song is marked.
                 if is_marked && i == 0 {
                     max_len = max_len.saturating_sub(marker_symbol_len);
                 }
@@ -252,8 +253,7 @@ impl Pane for QueuePane {
                 row.cell_style = Some(config.theme.highlighted_item_style);
             }
 
-            if matches!(context.config.theme.song_table_album_separator, AlbumSeparator::Underline)
-            {
+            if matches!(ctx.config.theme.song_table_album_separator, AlbumSeparator::Underline) {
                 let is_new_album = if let Some((_, next_song)) = table_iter.peek() {
                     next_song.metadata.get("album") != song.metadata.get("album")
                         || next_song.metadata.get("album_artist")
