@@ -1,10 +1,3 @@
----
-title: FAQ
-description: Frequently Asked Questions
----
-
-import { path } from "./data.ts";
-
 ## Table of contents
 
 - [Mopidy does not work with rmpc](#mopidy-does-not-work-with-rmpc)
@@ -31,8 +24,7 @@ not the right tool for the job here.
 See comment from MPD's author https://github.com/mierak/rmpc/issues/287#issuecomment-2902083413.
 
 If you still want some convenience in this matter, you can try scripting your way around this by
-integrating rmpc with other tools via <a href={path("configuration/keybinds#externalcommand")}>ExternalCommand</a>
-or some other means.
+integrating rmpc with other tools via `ExternalCommand` keybind or some other means.
 
 ### Album art is not working in Zellij
 
@@ -59,3 +51,4 @@ rmpc!
 - https://github.com/natsukagami/mpd-mpris
 
 There is also a very useful article on [Arch wiki](https://wiki.archlinux.org/title/Music_Player_Daemon/Tips_and_tricks)
+

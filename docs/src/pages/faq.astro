@@ -1,0 +1,15 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { Content, getHeadings } from "../../../FAQ.md";
+---
+
+<StarlightPage
+    frontmatter={{ title: "Frequently Asked Questions" }}
+    hasSidebar={false}
+    sidebar={[]}
+    headings={getHeadings()}
+>
+    <div class="container">
+        <Content />
+    </div>
+</StarlightPage>
