@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
@@ -13,12 +15,16 @@ use crate::{
         mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
-        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
+        ext::{
+            btreeset_ranges::BTreeSetRanges,
+            mpd_client::{Autoplay, Enqueue, MpdClientExt},
+        },
         key_event::KeyEvent,
-        macros::{modal, status_error, status_info},
+        macros::{modal, status_info},
         mouse_event::MouseEvent,
         mpd_query::PreviewGroup,
     },
+    status_warn,
     ui::{
         UiEvent,
         browser::{BrowserPane, MoveDirection},
@@ -237,6 +243,7 @@ impl Pane for PlaylistsPane {
                 let mut new_stack = DirStack::new(data);
                 let old_viewport_len = self.stack.current().state.viewport_len();
                 let old_content_len = self.stack.current().state.content_len();
+                let old_marked = self.stack.current().marked().clone();
                 match self.stack.path() {
                     [playlist_name] => {
                         let (selected_idx, selected_playlist) = self
@@ -289,6 +296,7 @@ impl Pane for PlaylistsPane {
                                 .state
                                 .select(Some(idx_to_select), ctx.config.scrolloff);
                         }
+                        *self.stack_mut().current_mut().marked_mut() = old_marked;
                         self.stack_mut().clear_preview();
                         self.prepare_preview(ctx)?;
                         ctx.render()?;
@@ -484,29 +492,75 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn move_selected(&mut self, direction: MoveDirection, ctx: &Ctx) -> Result<()> {
-        let Some((idx, selected)) = self.stack().current().selected_with_idx() else {
-            status_error!("Failed to move playlist. No playlist selected");
-            return Ok(());
-        };
         let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
             return Ok(());
         };
 
-        match selected {
-            DirOrSong::Dir { .. } => {}
-            DirOrSong::Song(_) => {
-                let new_idx = match direction {
-                    MoveDirection::Up => idx.saturating_sub(1),
-                    MoveDirection::Down => (idx + 1).min(self.stack().current().items.len() - 1),
-                };
-                let playlist = playlist.clone();
-                ctx.command(move |client| {
-                    client.move_in_playlist(&playlist, &SingleOrRange::single(idx), new_idx)?;
-                    Ok(())
-                });
-                self.stack_mut().current_mut().items.swap(idx, new_idx);
-                self.stack_mut().current_mut().select_idx(new_idx, ctx.config.scrolloff);
+        if self.stack().current().marked().is_empty() {
+            let Some(idx) = self.stack().current().selected_with_idx().map(|(idx, _)| idx) else {
+                status_warn!("Cannot move because no item is selected");
+                return Ok(());
+            };
+
+            let new_idx = match direction {
+                MoveDirection::Up => idx.saturating_sub(1),
+                MoveDirection::Down => (idx + 1).min(self.stack().current().items.len() - 1),
+            };
+
+            let playlist = playlist.clone();
+            ctx.query_sync(move |client| {
+                client.move_in_playlist(&playlist, &SingleOrRange::single(idx), new_idx)?;
+                Ok(())
+            })?;
+            self.stack_mut().current_mut().items.swap(idx, new_idx);
+            self.stack_mut().current_mut().select_idx(new_idx, ctx.config.scrolloff);
+        } else {
+            match direction {
+                MoveDirection::Up => {
+                    if let Some(0) = self.stack().current().marked().first() {
+                        return Ok(());
+                    }
+                }
+                MoveDirection::Down => {
+                    if let Some(last_idx) = self.stack().current().marked().last() {
+                        if *last_idx == self.stack().current().items.len() - 1 {
+                            return Ok(());
+                        }
+                    }
+                }
             }
+
+            let playlist = playlist.clone();
+            let ranges = self.stack().current().marked().ranges().collect_vec();
+
+            ctx.query_sync(move |client| {
+                for range in ranges {
+                    let idx = range.start();
+                    let new_idx = match direction {
+                        MoveDirection::Up => idx.saturating_sub(1),
+                        MoveDirection::Down => idx + 1,
+                    };
+                    client.move_in_playlist(&playlist, &(range.into()), new_idx)?;
+                }
+
+                Ok(())
+            })?;
+
+            let mut new_marked = BTreeSet::new();
+            for marked in self.stack().current().marked() {
+                match direction {
+                    MoveDirection::Up => {
+                        new_marked.insert(marked.saturating_sub(1));
+                    }
+                    MoveDirection::Down => {
+                        new_marked.insert(*marked + 1);
+                    }
+                }
+            }
+
+            *self.stack_mut().current_mut().marked_mut() = new_marked;
+
+            return Ok(());
         }
         ctx.render()?;
 

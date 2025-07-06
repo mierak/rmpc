@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Added `sendmessage` cli command for inter client communication
 - Support for youtube playlists
 - Added configurable kebyind for adding items to the Queue - `AddOptions`
+- Multiple marked items can now be moved inside playlists
 
 ### Changed
 
