@@ -83,22 +83,22 @@ impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
 }
 
 impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
-    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(self.size.width, self.size.height);
         frame.render_widget(Clear, popup_area);
 
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
         let paragraph = Paragraph::new(self.message.as_ref())
-            .style(app.config.as_text_style())
+            .style(ctx.config.as_text_style())
             .wrap(Wrap { trim: true })
             .block(block.clone())
             .centered();

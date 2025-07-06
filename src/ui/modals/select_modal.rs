@@ -91,10 +91,10 @@ impl<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> SelectModal<
 impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>> Modal
     for SelectModal<'_, V, Callback>
 {
-    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
@@ -108,23 +108,23 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>
         let options =
             self.options.iter().enumerate().map(|(idx, v)| format!("{:>3}: {v}", idx + 1));
         let playlists = List::new(options)
-            .style(app.config.as_text_style())
+            .style(ctx.config.as_text_style())
             .highlight_style(match self.focused {
                 FocusedComponent::Buttons => Style::default().reversed(),
-                FocusedComponent::List => app.config.theme.current_item_style,
+                FocusedComponent::List => ctx.config.theme.current_item_style,
             })
             .block(
                 Block::default()
                     .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
                     .border_set(symbols::border::ROUNDED)
-                    .border_style(app.config.as_border_style())
+                    .border_style(ctx.config.as_border_style())
                     .title_alignment(ratatui::prelude::Alignment::Center)
                     .title(self.title.bold()),
             );
 
         self.button_group.set_active_style(match self.focused {
             FocusedComponent::List => Style::default().reversed(),
-            FocusedComponent::Buttons => app.config.theme.current_item_style,
+            FocusedComponent::Buttons => ctx.config.theme.current_item_style,
         });
 
         let scrollbar_area =
@@ -137,7 +137,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>
             list_area,
             self.scrolling_state.as_render_state_ref(),
         );
-        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+        if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
                 scrollbar_area,

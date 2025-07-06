@@ -101,17 +101,17 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
 }
 
 impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
-    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title(self.title);
 
         let popup_area = frame.area().centered_exact(50, 7);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
         let [body_area, buttons_area] =
@@ -122,16 +122,16 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
 
         let input = Input::default()
             .set_label(self.input_label)
-            .set_label_style(app.config.as_text_style())
+            .set_label_style(ctx.config.as_text_style())
             .set_text(&self.value)
             .set_focused(self.input_focused)
-            .set_focused_style(app.config.theme.highlight_border_style)
-            .set_unfocused_style(app.config.as_border_style());
+            .set_focused_style(ctx.config.theme.highlight_border_style)
+            .set_unfocused_style(ctx.config.as_border_style());
 
         self.button_group.set_active_style(if self.input_focused {
             Style::default().reversed()
         } else {
-            app.config.theme.current_item_style
+            ctx.config.theme.current_item_style
         });
 
         self.input_area = body_area;

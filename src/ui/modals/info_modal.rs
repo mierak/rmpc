@@ -73,7 +73,7 @@ impl<'a> InfoModal<'a> {
 }
 
 impl Modal for InfoModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let width = match (frame.area().width, self.size) {
             (fw, Some(Size { width, .. })) => width.min(fw),
             (fw, None) if fw > 60 => fw / 2,
@@ -92,14 +92,14 @@ impl Modal for InfoModal<'_> {
             .centered_exact(width, self.size.map_or(u16::try_from(lines.len())? + 4, |v| v.height));
         frame.render_widget(Clear, popup_area);
 
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let mut block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(Alignment::Left);
         if let Some(title) = &self.title {
             block = block.title(title.as_ref());
@@ -114,7 +114,7 @@ impl Modal for InfoModal<'_> {
 
         for (idx, message) in lines.iter().enumerate() {
             let paragraph =
-                Line::from(message.as_ref()).style(app.config.as_text_style()).left_aligned();
+                Line::from(message.as_ref()).style(ctx.config.as_text_style()).left_aligned();
 
             let Some(area) = areas.get(idx) else {
                 continue;

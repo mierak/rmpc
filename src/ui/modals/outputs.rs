@@ -57,17 +57,17 @@ impl OutputsModal {
 }
 
 impl Modal for OutputsModal {
-    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut Ctx) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut ratatui::Frame, ctx: &mut Ctx) -> anyhow::Result<()> {
         let popup_area = frame.area().centered_exact(60, 10);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let block = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Outputs");
 
@@ -91,16 +91,16 @@ impl Modal for OutputsModal {
             Constraint::Length(10),
         ])
         .column_spacing(0)
-        .style(app.config.as_text_style())
+        .style(ctx.config.as_text_style())
         .header(Row::new(["Id", "Name", "Plugin", "Enabled"]))
-        .row_highlight_style(app.config.theme.current_item_style);
+        .row_highlight_style(ctx.config.theme.current_item_style);
 
         let table_area = table_area.inner(Margin { horizontal: 1, vertical: 0 });
         self.outputs_table_area = table_area;
 
         frame.render_widget(block, popup_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+        if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
                 popup_area.inner(Margin { horizontal: 0, vertical: 1 }),

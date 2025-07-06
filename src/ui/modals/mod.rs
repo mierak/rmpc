@@ -26,9 +26,9 @@ pub mod select_modal;
 
 #[allow(unused)]
 pub(crate) trait Modal: std::fmt::Debug {
-    fn render(&mut self, frame: &mut Frame, app: &mut crate::ctx::Ctx) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, ctx: &mut crate::ctx::Ctx) -> Result<()>;
 
-    fn handle_key(&mut self, key: &mut KeyEvent, app: &mut Ctx) -> Result<()>;
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()>;
 

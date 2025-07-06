@@ -102,16 +102,16 @@ impl AddRandomModal<'_> {
 }
 
 impl Modal for AddRandomModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
         let popup_area = frame.area().centered_exact(50, 6);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
@@ -124,35 +124,35 @@ impl Modal for AddRandomModal<'_> {
 
         let mut combobox = Input::default()
             .set_label("Tag:   ")
-            .set_label_style(app.config.as_text_style())
+            .set_label_style(ctx.config.as_text_style())
             .set_text(self.selected_tag.into())
             .set_focused(false)
             .set_borderless(true)
-            .set_unfocused_style(app.config.as_border_style());
+            .set_unfocused_style(ctx.config.as_border_style());
 
         if matches!(self.active_input, InputType::Tag) {
             combobox = combobox
-                .set_label_style(app.config.theme.current_item_style)
-                .set_input_style(app.config.theme.current_item_style);
+                .set_label_style(ctx.config.theme.current_item_style)
+                .set_input_style(ctx.config.theme.current_item_style);
         }
 
         let mut count = Input::default()
             .set_label("Count: ")
-            .set_label_style(app.config.as_text_style())
+            .set_label_style(ctx.config.as_text_style())
             .set_text(&self.count)
             .set_focused(matches!(self.active_input, InputType::CountFocused))
-            .set_focused_style(app.config.theme.highlight_border_style)
+            .set_focused_style(ctx.config.theme.highlight_border_style)
             .set_borderless(true)
-            .set_unfocused_style(app.config.as_border_style());
+            .set_unfocused_style(ctx.config.as_border_style());
 
         if matches!(self.active_input, InputType::Count) {
             count = count
-                .set_label_style(app.config.theme.current_item_style)
-                .set_input_style(app.config.theme.current_item_style);
+                .set_label_style(ctx.config.theme.current_item_style)
+                .set_input_style(ctx.config.theme.current_item_style);
         }
 
         self.button_group.set_active_style(match self.active_input {
-            InputType::Buttons => app.config.theme.current_item_style,
+            InputType::Buttons => ctx.config.theme.current_item_style,
             _ => Style::default().reversed(),
         });
 

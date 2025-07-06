@@ -75,17 +75,17 @@ impl DecodersModal {
 }
 
 impl Modal for DecodersModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(80, 80);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let block = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Decoder plugins");
 
@@ -137,7 +137,7 @@ impl Modal for DecodersModal {
         )
         .column_spacing(1)
         .block(
-            Block::default().borders(Borders::BOTTOM).border_style(app.config.as_border_style()),
+            Block::default().borders(Borders::BOTTOM).border_style(ctx.config.as_border_style()),
         );
         let table = Table::new(rows, [
             Constraint::Percentage(name_col_width),
@@ -145,15 +145,15 @@ impl Modal for DecodersModal {
             Constraint::Percentage(suffix_col_width),
         ])
         .column_spacing(1)
-        .style(app.config.as_text_style())
-        .row_highlight_style(app.config.theme.current_item_style);
+        .style(ctx.config.as_text_style())
+        .row_highlight_style(ctx.config.theme.current_item_style);
 
         self.table_area = table_area;
 
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+        if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
                 popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
