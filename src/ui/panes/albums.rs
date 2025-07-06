@@ -5,19 +5,17 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{sort_mode::SortOptions, tabs::PaneType},
+    config::{keys::actions::Position, sort_mode::SortOptions, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::Song,
         errors::MpdError,
-        mpd_client::{Filter, MpdClient, Tag},
+        mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
-        macros::status_info,
         mouse_event::MouseEvent,
         mpd_query::PreviewGroup,
     },
@@ -64,10 +62,22 @@ impl AlbumsPane {
 
         match self.stack.path() {
             [_album] => {
-                self.add(current, context, None)?;
+                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                let (position, autoplay) = if autoplay {
+                    (Position::Replace, Autoplay::Hovered {
+                        queue_len,
+                        current_song_idx: None,
+                        hovered_song_idx,
+                    })
+                } else {
+                    (Position::EndOfQueue, Autoplay::None)
+                };
+                if !items.is_empty() {
+                    context.command(move |client| {
+                        client.enqueue_multiple(items, position, autoplay)?;
+                        Ok(())
+                    });
                 }
             }
             [] => {
@@ -263,61 +273,40 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn add(
+    fn enqueue<'a>(
         &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
         match self.stack.path() {
             [album] => {
-                let album = album.clone();
-                let name = item.dir_name_or_file_name().into_owned();
-                context.command(move |client| {
-                    client.find_add(
-                        &[Filter::new(Tag::File, &name), Filter::new(Tag::Album, album.as_str())],
-                        position,
-                    )?;
+                let hovered =
+                    self.stack.current().selected().map(|item| item.dir_name_or_file_name());
+                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let filename = item.dir_name_or_file_name().into_owned();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::Find {
+                        filter: vec![
+                            (Tag::File, FilterKind::Exact, filename),
+                            (Tag::Album, FilterKind::Exact, album.clone()),
+                        ],
+                    });
 
-                    status_info!("'{name}' added to queue");
-                    Ok(())
-                });
+                    acc
+                })
             }
-            [] => {
-                let name = item.dir_name_or_file_name().into_owned();
-                context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, &name)], position)?;
-
-                    status_info!("Album '{name}' added to queue");
-                    Ok(())
-                });
-            }
-            _ => {}
+            [] => (
+                items
+                    .map(|item| item.dir_name_or_file_name().into_owned())
+                    .map(|name| Enqueue::Find {
+                        filter: vec![(Tag::Album, FilterKind::Exact, name)],
+                    })
+                    .collect_vec(),
+                None,
+            ),
+            _ => (Vec::new(), None),
         }
-
-        Ok(())
-    }
-
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
-        match self.stack.path() {
-            [album] => {
-                let album = album.clone();
-                context.command(move |client| {
-                    client.find_add(&[Filter::new(Tag::Album, album.as_str())], position)?;
-                    status_info!("Album '{}' added to queue", album);
-                    Ok(())
-                });
-            }
-            [] => {
-                context.command(move |client| {
-                    client.add("/", position)?; // add the whole library
-                    status_info!("All albums added to queue");
-                    Ok(())
-                });
-            }
-            _ => {}
-        }
-        Ok(())
     }
 
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {

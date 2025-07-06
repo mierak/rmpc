@@ -9,19 +9,18 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
+        keys::actions::Position,
         tabs::PaneType,
     },
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::{Song, metadata_tag::MetadataTagExt},
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
-        macros::status_info,
         mouse_event::MouseEvent,
         mpd_query::PreviewGroup,
         string_util::StringExt,
@@ -85,7 +84,11 @@ impl TagBrowserPane {
         }
     }
 
-    fn root_tag_filter(root_tag: Tag, separator: Option<Arc<str>>, value: &str) -> Filter<'_> {
+    fn root_tag_filter<'value>(
+        root_tag: Tag,
+        separator: Option<&str>,
+        value: &'value str,
+    ) -> Filter<'value> {
         match separator {
             None => Filter::new(root_tag, value),
             Some(_) if value.is_empty() => Filter::new(root_tag, value),
@@ -101,12 +104,7 @@ impl TagBrowserPane {
         }
     }
 
-    fn open_or_play(
-        &mut self,
-        autoplay: bool,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -118,10 +116,22 @@ impl TagBrowserPane {
 
         match self.stack.path() {
             [_artist, _album] => {
-                self.add(current, context, position)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
+                if !items.is_empty() {
+                    let queue_len = context.queue.len();
+                    let (position, autoplay) = if autoplay {
+                        (Position::Replace, Autoplay::Hovered {
+                            queue_len,
+                            current_song_idx: None,
+                            hovered_song_idx,
+                        })
+                    } else {
+                        (Position::EndOfQueue, Autoplay::None)
+                    };
+                    context.command(move |client| {
+                        client.enqueue_multiple(items, position, autoplay)?;
+                        Ok(())
+                    });
                 }
             }
             [artist] => {
@@ -155,7 +165,7 @@ impl TagBrowserPane {
                     context.query().id(OPEN_OR_PLAY).replace_id(OPEN_OR_PLAY).target(target).query(
                         move |client| {
                             let root_tag_filter =
-                                Self::root_tag_filter(root_tag, separator, &current);
+                                Self::root_tag_filter(root_tag, separator.as_deref(), &current);
                             let all_songs: Vec<Song> = client.find(&[root_tag_filter])?;
                             Ok(MpdQueryResult::SongsList {
                                 data: all_songs,
@@ -450,9 +460,13 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 DirOrSong::Dir { name, .. } => match path.as_slice() {
                     [artist] => client.find(&[
                         Filter::new(Tag::Album, &album_name),
-                        Self::root_tag_filter(root_tag, separator, artist),
+                        Self::root_tag_filter(root_tag, separator.as_deref(), artist),
                     ])?,
-                    [] => client.find(&[Self::root_tag_filter(root_tag, separator, &name)])?,
+                    [] => client.find(&[Self::root_tag_filter(
+                        root_tag,
+                        separator.as_deref(),
+                        &name,
+                    )])?,
                     _ => Vec::new(),
                 },
                 DirOrSong::Song(song) => vec![song.clone()],
@@ -460,147 +474,101 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn add(
+    fn enqueue<'a>(
         &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
         match self.stack.path() {
-            [artist, album] => {
-                let root_tag = self.root_tag.clone();
-                let separator = self.separator.clone();
-                let artist = artist.clone();
-                let name = item.dir_name_or_file_name().into_owned();
+            [_tag_value, _album] => {
+                let hovered =
+                    self.stack.current().selected().map(|item| item.dir_name_or_file_name());
 
-                let Some(albums) = self.cache.0.get(&artist) else {
-                    return Ok(());
-                };
+                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let filename = item.dir_name_or_file_name().into_owned();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::Find {
+                        filter: vec![(Tag::File, FilterKind::Exact, filename)],
+                    });
 
-                let Some(original_name) =
-                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())
-                else {
-                    return Ok(());
-                };
-
-                context.command(move |client| {
-                    client.find_add(
-                        &[
-                            Self::root_tag_filter(root_tag, separator, artist.as_str()),
-                            Filter::new(Tag::Album, original_name.as_str()),
-                            Filter::new(Tag::File, &name),
-                        ],
-                        position,
-                    )?;
-
-                    status_info!("'{name}' added to queue");
-                    Ok(())
-                });
+                    acc
+                })
             }
-            [artist] => {
-                let artist = artist.clone();
-                let name = item.dir_name_or_file_name().into_owned();
+            [tag_value] => {
+                let tag_value = tag_value.clone();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
-
-                let Some(albums) = self.cache.0.get(&artist) else {
-                    return Ok(());
+                let Some(albums) = self.cache.0.get(&tag_value) else {
+                    return (Vec::new(), None);
                 };
 
-                let Some(original_name) =
-                    albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())
-                else {
-                    return Ok(());
-                };
-
-                context.command(move |client| {
-                    client.find_add(
-                        &[
-                            Self::root_tag_filter(root_tag, separator, artist.as_str()),
-                            Filter::new(Tag::Album, &original_name),
-                        ],
-                        position,
-                    )?;
-
-                    status_info!("Album '{name}' by '{artist}' added to queue");
-                    Ok(())
-                });
+                (
+                    items
+                        .filter_map(|item| {
+                            let name = item.dir_name_or_file_name();
+                            albums
+                                .0
+                                .iter()
+                                .find(|a| a.name == name)
+                                .map(|a| a.original_name.clone())
+                        })
+                        .map(|album| {
+                            let mut root_tag_filter = Self::root_tag_filter(
+                                root_tag.clone(),
+                                separator.as_deref(),
+                                &tag_value,
+                            );
+                            Enqueue::Find {
+                                filter: vec![
+                                    (
+                                        root_tag_filter.tag,
+                                        root_tag_filter.kind,
+                                        std::mem::take(&mut root_tag_filter.value).into_owned(),
+                                    ),
+                                    (Tag::Album, FilterKind::Exact, album),
+                                ],
+                            }
+                        })
+                        .collect_vec(),
+                    None,
+                )
             }
             [] => {
-                let name = item.dir_name_or_file_name().into_owned();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
-                context.command(move |client| {
-                    client
-                        .find_add(&[Self::root_tag_filter(root_tag, separator, &name)], position)?;
 
-                    status_info!("All songs by '{name}' added to queue");
-                    Ok(())
-                });
+                (
+                    items
+                        .map(|item| item.dir_name_or_file_name().into_owned())
+                        .map(|name| {
+                            let mut filter = Self::root_tag_filter(
+                                root_tag.clone(),
+                                separator.as_deref(),
+                                &name,
+                            );
+                            Enqueue::Find {
+                                filter: vec![(
+                                    filter.tag,
+                                    filter.kind,
+                                    std::mem::take(&mut filter.value).into_owned(),
+                                )],
+                            }
+                        })
+                        .collect_vec(),
+                    None,
+                )
             }
-            _ => {}
+            _ => (Vec::new(), None),
         }
-
-        Ok(())
-    }
-
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
-        let root_tag = self.root_tag.clone();
-        let separator = self.separator.clone();
-        match self.stack.path() {
-            [artist, album] => {
-                let artist = artist.clone();
-                let Some(albums) = self.cache.0.get(&artist) else {
-                    return Ok(());
-                };
-
-                let Some(original_name) =
-                    albums.0.iter().find(|a| &a.name == album).map(|a| a.original_name.clone())
-                else {
-                    return Ok(());
-                };
-
-                context.command(move |client| {
-                    client.find_add(
-                        &[
-                            Self::root_tag_filter(root_tag, separator, artist.as_str()),
-                            Filter::new(Tag::Album, original_name.as_str()),
-                        ],
-                        position,
-                    )?;
-                    status_info!("Album '{original_name}' by '{artist}' added to queue");
-                    Ok(())
-                });
-            }
-            [artist] => {
-                let artist = artist.clone();
-                context.command(move |client| {
-                    client.find_add(
-                        &[Self::root_tag_filter(root_tag, separator, artist.as_str())],
-                        position,
-                    )?;
-                    status_info!("All albums by '{artist}' added to queue");
-                    Ok(())
-                });
-            }
-            [] => {
-                context.command(move |client| {
-                    client.add("/", position)?; // add the whole library
-                    status_info!("All songs added to queue");
-                    Ok(())
-                });
-            }
-            _ => {}
-        }
-        Ok(())
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context, None)
+        self.open_or_play(true, context)
     }
 
     fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context, None)
+        self.open_or_play(false, context)
     }
 
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
@@ -669,6 +637,8 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                     let target = self.target_pane.clone();
                     context.query().id(PREVIEW).replace_id(PREVIEW).target(target).query(
                         move |client| {
+                            let separator = separator.map(|v| v.as_ref().to_owned());
+                            let separator = separator.as_deref();
                             let all_songs: Vec<Song> = client
                                 .find(&[Self::root_tag_filter(root_tag, separator, &current)])?;
                             Ok(MpdQueryResult::SongsList {

@@ -5,16 +5,15 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{keys::actions::Position, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},
-        mpd_client::{Filter, MpdClient, SingleOrRange, Tag},
+        mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info},
         mouse_event::MouseEvent,
@@ -63,12 +62,7 @@ impl PlaylistsPane {
         }
     }
 
-    fn open_or_play(
-        &mut self,
-        autoplay: bool,
-        context: &AppContext,
-        action_id: &'static str,
-    ) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
 
@@ -83,7 +77,7 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query().id(action_id).target(PaneType::Playlists).query(move |client| {
+                context.query().id(OPEN_OR_PLAY).target(PaneType::Playlists).query(move |client| {
                     Ok(MpdQueryResult::SongsList {
                         data: client.list_playlist_info(&playlist, None)?,
                         origin_path: Some(next_path),
@@ -94,10 +88,22 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                self.add(selected, context, None)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
+                if !items.is_empty() {
+                    let queue_len = context.queue.len();
+                    let (position, autoplay) = if autoplay {
+                        (Position::Replace, Autoplay::Hovered {
+                            queue_len,
+                            current_song_idx: None,
+                            hovered_song_idx,
+                        })
+                    } else {
+                        (Position::EndOfQueue, Autoplay::None)
+                    };
+                    context.command(move |client| {
+                        client.enqueue_multiple(items, position, autoplay)?;
+                        Ok(())
+                    });
                 }
             }
         }
@@ -418,60 +424,26 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
-        match self.stack().path() {
-            [playlist] => {
-                let playlist = playlist.clone();
-                context.command(move |client| {
-                    client.load_playlist(&playlist, position)?;
-                    status_info!("Playlist '{playlist}' added to queue");
-                    Ok(())
-                });
-            }
-            [] => {
-                for playlist in self.stack().current().items.iter().rev() {
-                    self.add(playlist, context, position)?;
-                }
-                status_info!("All playlists added to queue");
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    fn add(
+    fn enqueue<'a>(
         &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
-        match item {
-            DirOrSong::Dir { name: d, .. } => {
-                let d = d.clone();
-                context.command(move |client| {
-                    client.load_playlist(&d, position)?;
-                    status_info!("Playlist '{d}' added to queue");
-                    Ok(())
-                });
-            }
-            DirOrSong::Song(s) => {
-                let file = s.file.clone();
-                let artist_text =
-                    s.artist_str(&context.config.theme.format_tag_separator).into_owned();
-                let title_text =
-                    s.title_str(&context.config.theme.format_tag_separator).into_owned();
-                context.command(move |client| {
-                    client.add(&file, position)?;
-                    if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
-                        status_info!("'{}' by '{}' added to queue", title_text, artist_text);
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file_name());
+        items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+            match item {
+                DirOrSong::Dir { name, .. } => {
+                    acc.0.push(Enqueue::Playlist { name: name.to_owned() });
+                }
+                DirOrSong::Song(song) => {
+                    let filename = song.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
                     }
-                    Ok(())
-                });
+                    acc.0.push(Enqueue::File { path: song.file.clone() });
+                }
             }
-        }
-
-        Ok(())
+            acc
+        })
     }
 
     fn rename(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
@@ -510,11 +482,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context, OPEN_OR_PLAY)
+        self.open_or_play(true, context)
     }
 
     fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context, OPEN_OR_PLAY)
+        self.open_or_play(false, context)
     }
 
     fn move_selected(&mut self, direction: MoveDirection, context: &AppContext) -> Result<()> {

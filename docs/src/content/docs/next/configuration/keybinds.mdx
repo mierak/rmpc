@@ -132,11 +132,77 @@ list and controlling search mode.
 |       `r`       | Rename          | Rename. Currently only for playlists                                                                                               |
 |       `a`       | Add             | Add item to queue                                                                                                                  |
 |       `A`       | AddAll          | Add all items to queue                                                                                                             |
-|                 | AddReplace      | Replace current queue with the item                                                                                                |
-|                 | AddAllReplace   | Replace current queue with all items                                                                                               |
-|                 | Insert          | Insert item after current (playing) item                                                                                           |
-|                 | InsertAll       | Insert all items after current (playing) item                                                                                      |
 |       `B`       | ShowInfo        | Show info about the item under cursor in a modal popup                                                                             |
+|                 | AddOptions      | Add item(s) to the queue with specified options. More info [in its section](#AddOptions)                                           |
+
+#### AddOptions
+
+A configurable keybind to add items to the the queue. Allows you to add either a single or all items,
+select a position at which they will be added as well as to choose whether you want to automatically
+play the added items.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+##### Syntax
+
+Possible values for the action kind are either a `Modal` or `Action`. Where `Modal` takes a list of
+tuples of a label and the action configuration and `Action` takes just a single action configuration.
+
+Possible `position`s are: `StartOfQueue`, `EndOfQueue`, `BeforeCurrentSong`, `AfterCurrentSong` and
+`Replace`.
+
+Possible `autoplay` values are:
+
+- `None` - Do not play added items
+- `First` - Play the first added item
+- `Hovered` - Play the hovered item after adding. Nothing will be played if no item is hovered or
+  you are adding several marked items while hovering over a non-marked item. This works on a best
+  effort basis due to technical reasons and only when adding just songs and not directories.
+- `HoveredOrFirst` - Same as `Hovered` but if no hovered item could be determined, start playing
+  from the `First` item instead.
+
+Possible values for `all`:
+
+- `true` - Add all items in the current directory
+- `false` - Add all marked items and only the hovered item if non are marked
+
+##### Examples
+
+- Add a single item or the marked items at the end of the queue
+
+```rust
+AddOptions(kind: Action(all: false, autoplay: None, position: EndOfQueue))
+```
+
+- Add a single item or the marked items at the start of the queue and start playing from the hovered
+  item
+
+```rust
+AddOptions(kind: Action(all: false, autoplay: Hovered, position: StartOfQueue))
+```
+
+- Add a single item or the marked items after the current and start playing from the hovered item
+  or from the first item if no item was hovered.
+
+```rust
+AddOptions(kind: Action(all: false, autoplay: HoveredOrFirst, position: AfterCurrentSong))
+```
+
+- Open a modal window with the default congiruation
+
+```rust
+AddOptions()
+```
+
+- Open a modal window with the configured options
+
+```rust
+AddOptions(kind: Modal([
+    ("End of queue and play", (all: false, autoplay: First, position: EndOfQueue),
+    ("After the current song", (all: false, autoplay: None, position: AfterCurrentSong),
+]))
+```
 
 ### Queue
 

@@ -5,18 +5,16 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{keys::actions::Position, tabs::PaneType},
     context::AppContext,
     mpd::{
-        QueuePosition,
         client::Client,
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::MpdClientExt,
+        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
-        macros::status_info,
         mouse_event::MouseEvent,
         mpd_query::PreviewGroup,
     },
@@ -98,11 +96,32 @@ impl DirectoriesPane {
                 self.stack_mut().clear_preview();
                 context.render()?;
             }
-            t @ DirOrSong::Song(_) => {
-                self.add(t, context, None)?;
-                let queue_len = context.queue.len();
-                if autoplay {
-                    context.command(move |client| Ok(client.play_last(queue_len)?));
+            DirOrSong::Song(_) => {
+                let (items, hovered_song_idx) = self.enqueue(
+                    self.stack()
+                        .current()
+                        .items
+                        .iter()
+                        // Only add songs here in case the directory contains combination of
+                        // directories, playlists and songs to be able to use autoplay from the
+                        // hovered song properly.
+                        .filter(|item| matches!(item, DirOrSong::Song(_))),
+                );
+                if !items.is_empty() {
+                    let queue_len = context.queue.len();
+                    let (position, autoplay) = if autoplay {
+                        (Position::Replace, Autoplay::Hovered {
+                            queue_len,
+                            current_song_idx: None,
+                            hovered_song_idx,
+                        })
+                    } else {
+                        (Position::EndOfQueue, Autoplay::None)
+                    };
+                    context.command(move |client| {
+                        client.enqueue_multiple(items, position, autoplay)?;
+                        Ok(())
+                    });
                 }
             }
         }
@@ -266,60 +285,45 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn add(
+    fn enqueue<'a>(
         &self,
-        item: &DirOrSong,
-        context: &AppContext,
-        position: Option<QueuePosition>,
-    ) -> Result<()> {
-        match item {
-            DirOrSong::Dir { name: dirname, playlist: is_playlist, .. } => {
-                let is_playlist = *is_playlist;
-                let mut next_path = self.stack.path().to_vec();
-                next_path.push(dirname.clone());
-                let next_path = next_path.join(std::path::MAIN_SEPARATOR_STR).to_string();
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        let mut dir_or_playlist_found = false;
+        let items = items
+            .map(|item| match item {
+                DirOrSong::Dir { full_path, playlist: true, .. } => {
+                    dir_or_playlist_found = true;
+                    Enqueue::Playlist { name: full_path.to_owned() }
+                }
+                DirOrSong::Dir { full_path, playlist: false, .. } => {
+                    dir_or_playlist_found = true;
+                    Enqueue::File { path: full_path.to_owned() }
+                }
+                DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
+            })
+            .collect_vec();
 
-                context.command(move |client| {
-                    if is_playlist {
-                        client.load_playlist(&next_path, position)?;
-                        status_info!("Playlist '{next_path}' loaded");
-                    } else {
-                        client.add(&next_path, position)?;
-                        status_info!("Directory '{next_path}' added to queue");
-                    }
-                    Ok(())
-                });
+        let hovered_idx = if dir_or_playlist_found {
+            None
+        } else {
+            // We are not adding any playlists or directories so autoplay on hovered item
+            // can work
+            if let Some(curr) = self.stack().current().selected() {
+                items
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, item)| {
+                        if let Enqueue::File { path } = item { Some((idx, path)) } else { None }
+                    })
+                    .find(|(_, path)| path == &&curr.dir_name_or_file_name())
+                    .map(|(idx, _)| idx)
+            } else {
+                None
             }
-            DirOrSong::Song(song) => {
-                let file = song.file.clone();
-                let artist_text =
-                    song.artist_str(&context.config.theme.format_tag_separator).into_owned();
-                let title_text =
-                    song.title_str(&context.config.theme.format_tag_separator).into_owned();
-                context.command(move |client| {
-                    client.add(&file, position)?;
-                    if let Ok(Some(_song)) = client.find_one(&[Filter::new(Tag::File, &file)]) {
-                        status_info!("'{}' by '{}' added to queue", title_text, artist_text);
-                    }
-                    Ok(())
-                });
-            }
-        }
+        };
 
-        context.render()?;
-
-        Ok(())
-    }
-
-    fn add_all(&self, context: &AppContext, position: Option<QueuePosition>) -> Result<()> {
-        let path = self.stack().path().join(std::path::MAIN_SEPARATOR_STR);
-        context.command(move |client| {
-            client.add(&path, position)?;
-            status_info!("Directory '{path}' added to queue");
-            Ok(())
-        });
-
-        Ok(())
+        (items, hovered_idx)
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {

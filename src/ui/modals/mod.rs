@@ -20,6 +20,7 @@ pub mod info_list_modal;
 pub mod info_modal;
 pub mod input_modal;
 pub mod keybinds;
+pub mod menu_modal;
 pub mod outputs;
 pub mod select_modal;
 

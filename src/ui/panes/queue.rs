@@ -16,7 +16,11 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        keys::{GlobalAction, QueueActions},
+        keys::{
+            GlobalAction,
+            QueueActions,
+            actions::{AddKind, AutoplayKind},
+        },
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
@@ -24,7 +28,11 @@ use crate::{
     core::command::{create_env, run_external},
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
-        ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
+        ext::{
+            btreeset_ranges::BTreeSetRanges,
+            mpd_client::{Autoplay, Enqueue, MpdClientExt},
+            rect::RectExt,
+        },
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
@@ -36,6 +44,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
+            menu_modal::MenuModal,
             select_modal::SelectModal,
         },
     },
@@ -101,6 +110,50 @@ impl QueuePane {
         self.filter
             .as_ref()
             .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }))
+    }
+
+    fn enqueue_items(&self, all: bool, ctx: &AppContext) -> (Vec<Enqueue>, Option<usize>) {
+        let hovered = self
+            .scrolling_state
+            .get_selected()
+            .and_then(|idx| ctx.queue.get(idx))
+            .map(|s| s.file.as_str());
+        if all {
+            ctx.queue.iter().enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                let path = item.file.clone();
+                if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                    acc.1 = Some(idx);
+                }
+
+                acc.0.push(Enqueue::File { path });
+
+                acc
+            })
+        } else if self.scrolling_state.marked.is_empty() {
+            (
+                self.scrolling_state
+                    .get_selected()
+                    .and_then(|idx| ctx.queue.get(idx))
+                    .map_or(Vec::new(), |v| vec![Enqueue::File { path: v.file.clone() }]),
+                None,
+            )
+        } else {
+            self.scrolling_state
+                .marked
+                .iter()
+                .filter_map(|idx| ctx.queue.get(*idx))
+                .enumerate()
+                .fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let path = item.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                        acc.1 = Some(idx);
+                    }
+
+                    acc.0.push(Enqueue::File { path });
+
+                    acc
+                })
+        }
     }
 }
 
@@ -640,7 +693,7 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Unused => {}
             }
-        } else if let Some(action) = event.as_common_action(context) {
+        } else if let Some(action) = event.as_common_action(context).map(|v| v.to_owned()) {
             match action {
                 CommonAction::Up => {
                     if !context.queue.is_empty() {
@@ -861,19 +914,30 @@ impl Pane for QueuePane {
                     self.scrolling_state.marked.clear();
                     context.render()?;
                 }
-                CommonAction::Add => {}
-                CommonAction::AddAll => {}
-                CommonAction::Insert => {
-                    let song_under_cursor =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx));
+                CommonAction::AddOptions { kind: AddKind::Action(options) } => {
+                    let (enqueue, _hovered_song_idx) = self.enqueue_items(options.all, context);
 
-                    if let Some(song) = song_under_cursor {
-                        let file = song.file.clone();
+                    if !enqueue.is_empty() {
                         context.command(move |client| {
-                            client.add(&file, Some(QueuePosition::RelativeAdd(0)))?;
+                            client.enqueue_multiple(enqueue, options.position, Autoplay::None)?;
+
                             Ok(())
                         });
+                        self.scrolling_state.marked.clear();
                     }
+                }
+                CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
+                    let opts = items
+                        .into_iter()
+                        .map(|(label, mut opts)| {
+                            opts.autoplay = AutoplayKind::None;
+                            let (enqueue, hovered_song_idx) = self.enqueue_items(opts.all, context);
+                            (label, opts, (enqueue, hovered_song_idx))
+                        })
+                        .collect_vec();
+
+                    modal!(context, MenuModal::create_add_modal(opts, context));
+                    self.scrolling_state.marked.clear();
                 }
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) =
@@ -891,9 +955,6 @@ impl Pane for QueuePane {
                         status_error!("No song selected");
                     }
                 }
-                CommonAction::InsertAll => {}
-                CommonAction::AddReplace => {}
-                CommonAction::AddAllReplace => {}
                 CommonAction::Delete => {}
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
