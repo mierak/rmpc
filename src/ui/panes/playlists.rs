@@ -6,7 +6,7 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{keys::actions::Position, tabs::PaneType},
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},

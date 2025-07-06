@@ -7,7 +7,7 @@ use ratatui::{Frame, layout::Rect};
 use super::{Pane as _, PaneContainer, Panes, panes::pane_call};
 use crate::{
     config::{keys::CommonAction, tabs::SizedPaneOrSplit},
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         ext::{rect::RectExt, vec::VecExt},
         id::Id,

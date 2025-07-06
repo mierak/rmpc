@@ -8,8 +8,8 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use config::{DeserError, cli_config::CliConfigFile};
-use context::Ctx;
 use crossbeam::channel::unbounded;
+use ctx::Ctx;
 use log::info;
 use rustix::path::Arg;
 use shared::{
@@ -40,8 +40,8 @@ mod tests {
 }
 
 mod config;
-mod context;
 mod core;
+mod ctx;
 mod mpd;
 mod shared;
 mod ui;

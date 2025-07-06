@@ -14,7 +14,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,

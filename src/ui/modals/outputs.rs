@@ -10,7 +10,7 @@ use super::{Modal, RectExt};
 use crate::{
     MpdQueryResult,
     config::keys::CommonAction,
-    context::Ctx,
+    ctx::Ctx,
     mpd::{commands::Output, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,

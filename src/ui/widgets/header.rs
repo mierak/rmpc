@@ -11,7 +11,7 @@ use crate::{
         Config,
         theme::properties::{Property, PropertyKind},
     },
-    context::Ctx,
+    ctx::Ctx,
     mpd::commands::Song,
 };
 

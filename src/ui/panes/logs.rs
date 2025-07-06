@@ -10,7 +10,7 @@ use ratatui::{
 use super::Pane;
 use crate::{
     config::keys::{CommonAction, LogsActions},
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},

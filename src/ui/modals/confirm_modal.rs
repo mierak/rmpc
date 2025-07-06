@@ -16,7 +16,7 @@ use crate::{
         Size,
         keys::{CommonAction, GlobalAction},
     },
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,

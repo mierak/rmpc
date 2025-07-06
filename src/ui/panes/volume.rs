@@ -4,7 +4,7 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     config::{tabs::VolumeType, theme::volume_slider::VolumeSliderConfig},
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         commands::volume::Bound,
         mpd_client::{MpdClient, ValueChange},

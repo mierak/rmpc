@@ -14,7 +14,7 @@ use crate::{
         GlobalAction,
         actions::{AddKind, Position},
     },
-    context::Ctx,
+    ctx::Ctx,
     mpd::{client::Client, commands::Song},
     shared::{
         ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},

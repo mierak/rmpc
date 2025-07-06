@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::{Frame, prelude::Rect, style::Stylize, text::Text};
 
 use super::Pane;
-use crate::{context::Ctx, shared::key_event::KeyEvent};
+use crate::{ctx::Ctx, shared::key_event::KeyEvent};
 
 #[derive(Debug)]
 pub struct FrameCountPane {

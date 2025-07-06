@@ -9,7 +9,7 @@ use ratatui::{
 use super::Pane;
 use crate::{
     config::theme::properties::{Property, PropertyKind},
-    context::Ctx,
+    ctx::Ctx,
     shared::key_event::KeyEvent,
     ui::widgets::scrolling_line::ScrollingLine,
 };

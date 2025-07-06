@@ -16,7 +16,7 @@ use strum::{IntoDiscriminant, VariantArray};
 use super::{Modal, RectExt};
 use crate::{
     config::keys::{CommonAction, ToDescription},
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         ext::iter::IntoZipLongest2,
         key_event::KeyEvent,

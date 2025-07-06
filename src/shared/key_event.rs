@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent as CKeyEvent};
 use crate::config::keys::LogsActions;
 use crate::{
     config::keys::{CommonAction, GlobalAction, QueueActions},
-    context::Ctx,
+    ctx::Ctx,
 };
 
 #[derive(Debug, Clone)]

@@ -8,7 +8,7 @@ use crate::{
         cli::{AddRandom, Command, StickerCmd},
         cli_config::CliConfig,
     },
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         QueuePosition,
         client::Client,

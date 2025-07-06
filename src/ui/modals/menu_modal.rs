@@ -15,7 +15,7 @@ use ratatui::{
 use super::{Modal, RectExt as _};
 use crate::{
     config::keys::{CommonAction, actions::AddOpts},
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         ext::{
             mpd_client::{Enqueue, MpdClientExt},

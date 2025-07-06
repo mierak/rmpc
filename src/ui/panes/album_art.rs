@@ -5,7 +5,7 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::tabs::PaneType,
-    context::Ctx,
+    ctx::Ctx,
     mpd::mpd_client::MpdClient,
     shared::{image::ImageProtocol, key_event::KeyEvent},
     ui::{UiEvent, image::facade::AlbumArtFacade},

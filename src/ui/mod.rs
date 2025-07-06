@@ -31,8 +31,8 @@ use crate::{
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
-    context::Ctx,
     core::command::{create_env, run_external},
+    ctx::Ctx,
     mpd::{
         commands::{State, idle::IdleEvent},
         mpd_client::{FilterKind, MpdClient, ValueChange},

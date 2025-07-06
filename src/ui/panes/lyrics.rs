@@ -8,7 +8,7 @@ use ratatui::{
 
 use super::Pane;
 use crate::{
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         ext::duration::DurationExt,
         key_event::KeyEvent,

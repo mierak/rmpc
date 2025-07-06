@@ -21,7 +21,7 @@ use crate::{
         cava::Cava,
         theme::cava::{CavaTheme, Orientation},
     },
-    context::Ctx,
+    ctx::Ctx,
     mpd::commands::State,
     shared::{
         dependencies::CAVA,

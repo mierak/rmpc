@@ -10,7 +10,7 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
         mpd_client::{MpdClient, SaveMode},

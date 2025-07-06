@@ -22,8 +22,8 @@ use crate::{
         },
         tabs::PaneType,
     },
-    context::Ctx,
     core::command::{create_env, run_external},
+    ctx::Ctx,
     mpd::{
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},

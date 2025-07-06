@@ -24,8 +24,8 @@ use crate::{
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
-    context::Ctx,
     core::command::{create_env, run_external},
+    ctx::Ctx,
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
         ext::{

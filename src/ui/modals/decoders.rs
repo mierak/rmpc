@@ -12,7 +12,7 @@ use ratatui::{
 use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::Ctx,
+    ctx::Ctx,
     mpd::commands::Decoder,
     shared::{
         ext::iter::IntoZipLongest2,

@@ -4,7 +4,7 @@ use ratatui::{Frame, layout::Position, prelude::Rect, widgets::Widget};
 use super::Pane;
 use crate::{
     config::tabs::TabName,
-    context::Ctx,
+    ctx::Ctx,
     shared::{events::AppEvent, key_event::KeyEvent, mouse_event::MouseEvent},
     ui::{UiAppEvent, UiEvent, widgets::tabs::Tabs},
 };

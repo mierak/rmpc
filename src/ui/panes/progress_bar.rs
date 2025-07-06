@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect, widgets::Paragraph};
 
 use super::Pane;
 use crate::{
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         commands::State,
         mpd_client::{MpdClient, ValueChange},

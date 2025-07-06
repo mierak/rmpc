@@ -15,7 +15,7 @@ use ratatui::{
 use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::Ctx,
+    ctx::Ctx,
     mpd::commands::Song,
     shared::{
         ext::duration::DurationExt,

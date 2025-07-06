@@ -56,7 +56,7 @@ use crate::{
             },
         },
     },
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         commands::{Song, State, status::OnOffOneshot, volume::Bound},
         mpd_client::Tag,
@@ -1250,7 +1250,7 @@ mod format_tests {
                 StatusPropertyFile,
             },
         },
-        context::Ctx,
+        ctx::Ctx,
         mpd::commands::{Song, State, Status, Volume, status::OnOffOneshot},
         tests::fixtures::app_context,
     };

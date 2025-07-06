@@ -3,7 +3,7 @@ use ratatui::{Frame, prelude::Rect};
 
 use super::Pane;
 use crate::{
-    context::Ctx,
+    ctx::Ctx,
     mpd::mpd_client::{MpdClient, ValueChange},
     shared::{
         key_event::KeyEvent,

@@ -17,7 +17,7 @@ use crate::{
         cli::{AddRandom, Command},
         keys::CommonAction,
     },
-    context::Ctx,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,

@@ -12,7 +12,7 @@ use std::{
 use rstest::{fixture, rstest};
 
 use crate::{
-    context::Ctx,
+    ctx::Ctx,
     mpd::commands::Song,
     tests::fixtures::app_context,
     ui::{
@@ -25,7 +25,7 @@ use crate::{
 mod on_idle_event {
     use super::*;
     use crate::{
-        context::Ctx,
+        ctx::Ctx,
         shared::mpd_query::MpdQueryResult,
         ui::panes::playlists::{INIT, OPEN_OR_PLAY, REINIT},
     };

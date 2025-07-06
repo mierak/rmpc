@@ -6,8 +6,8 @@ use rstest::fixture;
 
 use crate::{
     config::{Config, ConfigFile, tabs::TabName},
-    context::Ctx,
     core::scheduler::Scheduler,
+    ctx::Ctx,
     mpd::commands::Status,
     shared::{
         events::{ClientRequest, WorkRequest},

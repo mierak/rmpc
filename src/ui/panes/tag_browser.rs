@@ -12,7 +12,7 @@ use crate::{
         keys::actions::Position,
         tabs::PaneType,
     },
-    context::Ctx,
+    ctx::Ctx,
     mpd::{
         client::Client,
         commands::{Song, metadata_tag::MetadataTagExt},
