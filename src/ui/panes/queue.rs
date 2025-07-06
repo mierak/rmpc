@@ -24,7 +24,7 @@ use crate::{
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
-    context::AppContext,
+    context::Ctx,
     core::command::{create_env, run_external},
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
@@ -74,7 +74,7 @@ enum Areas {
 const ADD_TO_PLAYLIST: &str = "add_to_playlist";
 
 impl QueuePane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(context: &Ctx) -> Self {
         let (header, column_widths, column_formats) = Self::init(context);
 
         Self {
@@ -91,7 +91,7 @@ impl QueuePane {
         }
     }
 
-    fn init(context: &AppContext) -> (Vec<String>, Vec<Constraint>, Vec<Property<SongProperty>>) {
+    fn init(context: &Ctx) -> (Vec<String>, Vec<Constraint>, Vec<Property<SongProperty>>) {
         (
             context.config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
             context
@@ -112,7 +112,7 @@ impl QueuePane {
             .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }))
     }
 
-    fn enqueue_items(&self, all: bool, ctx: &AppContext) -> (Vec<Enqueue>, Option<usize>) {
+    fn enqueue_items(&self, all: bool, ctx: &Ctx) -> (Vec<Enqueue>, Option<usize>) {
         let hovered = self
             .scrolling_state
             .get_selected()
@@ -158,13 +158,8 @@ impl QueuePane {
 }
 
 impl Pane for QueuePane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
-        let AppContext { queue, config, .. } = context;
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
+        let Ctx { queue, config, .. } = context;
         let queue_len = queue.len();
         self.calculate_areas(area, context)?;
 
@@ -311,8 +306,8 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
-        let AppContext { config, .. } = context;
+    fn calculate_areas(&mut self, area: Rect, context: &Ctx) -> Result<()> {
+        let Ctx { config, .. } = context;
 
         let header_height: u16 = config.theme.show_song_table_header.into();
         let scrollbar_area_width: u16 = config.theme.scrollbar.is_some().into();
@@ -360,7 +355,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &Ctx) -> Result<()> {
         self.scrolling_state.set_content_len(Some(context.queue.len()));
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
 
@@ -383,7 +378,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn resize(&mut self, _area: Rect, context: &AppContext) -> Result<()> {
+    fn resize(&mut self, _area: Rect, context: &Ctx) -> Result<()> {
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
         let to_select = self
             .scrolling_state
@@ -394,12 +389,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged => {
                 if let Some((idx, _)) = context.find_current_song_in_queue() {
@@ -436,7 +426,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         if !self.areas[Areas::Table].contains(event.into()) {
             return Ok(());
         }
@@ -499,7 +489,7 @@ impl Pane for QueuePane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (ADD_TO_PLAYLIST, MpdQueryResult::AddToPlaylist { playlists, song_file }) => {
@@ -535,7 +525,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if self.filter_input_mode {
             match event.as_common_action(context) {
                 Some(CommonAction::Confirm) => {

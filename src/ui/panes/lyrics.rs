@@ -8,7 +8,7 @@ use ratatui::{
 
 use super::Pane;
 use crate::{
-    context::AppContext,
+    context::Ctx,
     shared::{
         ext::duration::DurationExt,
         key_event::KeyEvent,
@@ -27,13 +27,13 @@ pub struct LyricsPane {
 }
 
 impl LyricsPane {
-    pub fn new(_context: &AppContext) -> Self {
+    pub fn new(_context: &Ctx) -> Self {
         Self { current_lyrics: None, initialized: false, last_requested_line_idx: 0 }
     }
 }
 
 impl Pane for LyricsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
         let Some(lrc) = &self.current_lyrics else { return Ok(()) };
 
         let elapsed = context.status.elapsed;
@@ -142,7 +142,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &Ctx) -> Result<()> {
         if !self.initialized {
             match context.find_lrc() {
                 Ok(lrc) => {
@@ -160,12 +160,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected => {
                 match context.find_lrc() {
@@ -198,7 +193,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

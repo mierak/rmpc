@@ -7,7 +7,7 @@ use ratatui::{Frame, layout::Rect};
 use super::{Pane as _, PaneContainer, Panes, panes::pane_call};
 use crate::{
     config::{keys::CommonAction, tabs::SizedPaneOrSplit},
-    context::AppContext,
+    context::Ctx,
     shared::{
         ext::{rect::RectExt, vec::VecExt},
         id::Id,
@@ -64,7 +64,7 @@ impl TabScreen {
         pane_container: &mut PaneContainer,
         frame: &mut Frame,
         area: Rect,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         let focused = self.panes.panes_iter().find(|pane| pane.id == self.focused);
         self.panes.for_each_pane_custom_data(
@@ -103,7 +103,7 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: &mut KeyEvent,
-        context: &mut AppContext,
+        context: &mut Ctx,
     ) -> Result<()> {
         let Some(focused_pane_data) = self.pane_data.get(&self.focused) else {
             log::warn!(focused:? = self.focused, pane_areas:? = self.pane_data; "Tried to find focused pane area but it does not exist");
@@ -189,7 +189,7 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: MouseEvent,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         if matches!(event.kind, MouseEventKind::LeftClick) {
             let Some(pane) = self
@@ -217,7 +217,7 @@ impl TabScreen {
         Ok(())
     }
 
-    pub fn on_hide(&mut self, panes: &mut PaneContainer, context: &AppContext) -> Result<()> {
+    pub fn on_hide(&mut self, panes: &mut PaneContainer, context: &Ctx) -> Result<()> {
         for pane in self.panes.panes_iter() {
             let mut pane = panes.get_mut(&pane.pane, context)?;
             pane_call!(pane, on_hide(context))?;
@@ -229,7 +229,7 @@ impl TabScreen {
         &mut self,
         pane_container: &mut PaneContainer,
         area: Rect,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
             let pane_data =
@@ -265,7 +265,7 @@ impl TabScreen {
         &mut self,
         pane_container: &mut PaneContainer,
         area: Rect,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
             let pane_data =

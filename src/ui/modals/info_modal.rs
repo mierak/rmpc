@@ -16,7 +16,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::{Size, keys::CommonAction},
-    context::AppContext,
+    context::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -40,7 +40,7 @@ pub struct InfoModal<'a> {
 impl<'a> InfoModal<'a> {
     #[builder]
     pub fn new(
-        context: &AppContext,
+        context: &Ctx,
         size: Option<impl Into<Size>>,
         confirm_label: Option<&'a str>,
         message: Vec<String>,
@@ -73,7 +73,7 @@ impl<'a> InfoModal<'a> {
 }
 
 impl Modal for InfoModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let width = match (frame.area().width, self.size) {
             (fw, Some(Size { width, .. })) => width.min(fw),
             (fw, None) if fw > 60 => fw / 2,
@@ -130,7 +130,7 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(context) {
             pop_modal!(context);
         }
@@ -138,7 +138,7 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {

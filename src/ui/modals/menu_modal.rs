@@ -15,7 +15,7 @@ use ratatui::{
 use super::{Modal, RectExt as _};
 use crate::{
     config::keys::{CommonAction, actions::AddOpts},
-    context::AppContext,
+    context::Ctx,
     shared::{
         ext::{
             mpd_client::{Enqueue, MpdClientExt},
@@ -46,11 +46,11 @@ pub struct MenuSection {
 pub struct MenuItem {
     pub label: String,
     #[debug(skip)]
-    pub on_confirm: Option<Box<dyn FnOnce(&AppContext) + Send + Sync + 'static>>,
+    pub on_confirm: Option<Box<dyn FnOnce(&Ctx) + Send + Sync + 'static>>,
 }
 
 impl Modal for MenuModal {
-    fn render(&mut self, frame: &mut Frame, ctx: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let needed_height: usize = self.sections.iter().map(|section| section.len()).sum::<usize>()
             + 1
             + self.sections.len();
@@ -96,7 +96,7 @@ impl Modal for MenuModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Up => {
@@ -128,7 +128,7 @@ impl Modal for MenuModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 self.select_item_at_position(event.into());
@@ -158,7 +158,7 @@ impl Modal for MenuModal {
 }
 
 impl MenuModal {
-    pub fn new(_context: &AppContext) -> Self {
+    pub fn new(_context: &Ctx) -> Self {
         Self { sections: Vec::default(), current_section_idx: 0, area: Rect::default() }
     }
 
@@ -171,7 +171,7 @@ impl MenuModal {
 
     pub fn add_section(
         mut self,
-        context: &AppContext,
+        context: &Ctx,
         cb: impl FnOnce(MenuSection) -> MenuSection,
     ) -> Self {
         let section = MenuSection::new(context.config.theme.current_item_style);
@@ -233,7 +233,7 @@ impl MenuModal {
 
     pub fn create_add_modal(
         opts: Vec<(String, AddOpts, (Vec<Enqueue>, Option<usize>))>,
-        ctx: &AppContext,
+        ctx: &Ctx,
     ) -> MenuModal {
         MenuModal::new(ctx)
             .add_section(ctx, |section| {
@@ -269,7 +269,7 @@ impl MenuSection {
     pub fn add_item(
         mut self,
         label: impl Into<String>,
-        on_confirm: impl FnOnce(&AppContext) + Send + Sync + 'static,
+        on_confirm: impl FnOnce(&Ctx) + Send + Sync + 'static,
     ) -> Self {
         self.items.push(MenuItem { label: label.into(), on_confirm: Some(Box::new(on_confirm)) });
         self

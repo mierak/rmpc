@@ -14,7 +14,7 @@ use crate::{
         GlobalAction,
         actions::{AddKind, Position},
     },
-    context::AppContext,
+    context::Ctx,
     mpd::{client::Client, commands::Song},
     shared::{
         ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
@@ -41,27 +41,27 @@ where
     fn browser_areas(&self) -> [Rect; 3];
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, context: &AppContext) -> Result<()>;
+    fn next(&mut self, context: &Ctx) -> Result<()>;
     fn list_songs_in_item(
         &self,
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
-    fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
+    fn prepare_preview(&mut self, context: &Ctx) -> Result<()>;
     fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> (Vec<Enqueue>, Option<usize>);
-    fn open(&mut self, context: &AppContext) -> Result<()>;
-    fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
+    fn open(&mut self, context: &Ctx) -> Result<()>;
+    fn show_info(&self, item: &T, context: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn delete(&self, item: &T, index: usize, context: &AppContext) -> Result<()> {
+    fn delete(&self, item: &T, index: usize, context: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn rename(&self, item: &T, context: &AppContext) -> Result<()> {
+    fn rename(&self, item: &T, context: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn move_selected(&mut self, direction: MoveDirection, context: &AppContext) -> Result<()> {
+    fn move_selected(&mut self, direction: MoveDirection, context: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn handle_filter_input(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_filter_input(&mut self, event: &mut KeyEvent, context: &Ctx) -> Result<()> {
         if !self.is_filter_input_mode_active() {
             return Ok(());
         }
@@ -97,7 +97,7 @@ where
         Ok(())
     }
 
-    fn handle_global_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_global_action(&mut self, event: &mut KeyEvent, context: &Ctx) -> Result<()> {
         let Some(action) = event.as_global_action(context) else {
             return Ok(());
         };
@@ -144,7 +144,7 @@ where
         Ok(())
     }
 
-    fn handle_mouse_action(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_action(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         let [prev_area, current_area, preview_area] = self.browser_areas();
 
         let position = event.into();
@@ -238,7 +238,7 @@ where
         Ok(())
     }
 
-    fn handle_common_action(&mut self, event: &mut KeyEvent, context: &AppContext) -> Result<()> {
+    fn handle_common_action(&mut self, event: &mut KeyEvent, context: &Ctx) -> Result<()> {
         let Some(action) = event.as_common_action(context) else {
             return Ok(());
         };

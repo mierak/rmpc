@@ -12,7 +12,7 @@ use std::{
 use rstest::{fixture, rstest};
 
 use crate::{
-    context::AppContext,
+    context::Ctx,
     mpd::commands::Song,
     tests::fixtures::app_context,
     ui::{
@@ -25,7 +25,7 @@ use crate::{
 mod on_idle_event {
     use super::*;
     use crate::{
-        context::AppContext,
+        context::Ctx,
         shared::mpd_query::MpdQueryResult,
         ui::panes::playlists::{INIT, OPEN_OR_PLAY, REINIT},
     };
@@ -35,7 +35,7 @@ mod on_idle_event {
         use super::*;
 
         #[rstest]
-        fn selects_the_same_playlist_by_name(mut screen: PlaylistsPane, app_context: AppContext) {
+        fn selects_the_same_playlist_by_name(mut screen: PlaylistsPane, app_context: Ctx) {
             screen
                 .on_query_finished(
                     INIT,
@@ -69,7 +69,7 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_same_index_when_playlist_not_found_after_refresh(
             mut screen: PlaylistsPane,
-            app_context: AppContext,
+            app_context: Ctx,
         ) {
             screen
                 .on_query_finished(
@@ -102,7 +102,7 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_last_playlist_when_last_was_selected_and_removed(
             mut screen: PlaylistsPane,
-            app_context: AppContext,
+            app_context: Ctx,
         ) {
             screen
                 .on_query_finished(
@@ -135,7 +135,7 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_first_playlist_when_first_was_selected_and_removed(
             mut screen: PlaylistsPane,
-            app_context: AppContext,
+            app_context: Ctx,
         ) {
             screen
                 .on_query_finished(
@@ -529,7 +529,7 @@ fn dir(name: &str) -> DirOrSong {
 }
 
 #[fixture]
-fn screen(app_context: AppContext) -> PlaylistsPane {
+fn screen(app_context: Ctx) -> PlaylistsPane {
     let mut screen = PlaylistsPane::new(&app_context);
     screen.before_show(&app_context).unwrap();
     screen

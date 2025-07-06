@@ -56,7 +56,7 @@ use crate::{
             },
         },
     },
-    context::AppContext,
+    context::Ctx,
     mpd::{
         commands::{Song, State, status::OnOffOneshot, volume::Bound},
         mpd_client::Tag,
@@ -138,7 +138,7 @@ pub struct PaneContainer<'panes> {
 }
 
 impl<'panes> PaneContainer<'panes> {
-    pub fn new(context: &AppContext) -> Result<Self> {
+    pub fn new(context: &Ctx) -> Result<Self> {
         Ok(Self {
             queue: QueuePane::new(context),
             #[cfg(debug_assertions)]
@@ -167,7 +167,7 @@ impl<'panes> PaneContainer<'panes> {
     }
 
     pub fn init_other_panes(
-        context: &AppContext,
+        context: &Ctx,
     ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
         context
             .config
@@ -197,7 +197,7 @@ impl<'panes> PaneContainer<'panes> {
     pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
         &'pane_ref mut self,
         pane: &'pane_type_ref PaneType,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<Panes<'pane_ref, 'panes>> {
         match pane {
             PaneType::Queue => Ok(Panes::Queue(&mut self.queue)),
@@ -270,31 +270,26 @@ pub(crate) use pane_call;
 
 #[allow(unused_variables)]
 pub(crate) trait Pane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, context: &AppContext) -> Result<()> {
+    fn on_hide(&mut self, context: &Ctx) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &Ctx) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()>;
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()>;
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         Ok(())
     }
 
@@ -303,16 +298,16 @@ pub(crate) trait Pane {
         id: &'static str,
         data: MpdQueryResult,
         is_visible: bool,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+    fn resize(&mut self, area: Rect, context: &Ctx) -> Result<()> {
         Ok(())
     }
 }
@@ -872,7 +867,7 @@ impl Property<PropertyKind> {
     fn default_as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        context: &'song AppContext,
+        context: &'song Ctx,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
@@ -882,7 +877,7 @@ impl Property<PropertyKind> {
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        context: &'song AppContext,
+        context: &'song Ctx,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
@@ -1255,7 +1250,7 @@ mod format_tests {
                 StatusPropertyFile,
             },
         },
-        context::AppContext,
+        context::Ctx,
         mpd::commands::{Song, State, Status, Volume, status::OnOffOneshot},
         tests::fixtures::app_context,
     };
@@ -1313,7 +1308,7 @@ mod format_tests {
                 Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
             ]), 99, true, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
         fn as_span(
-            app_context: AppContext,
+            app_context: Ctx,
             #[case] props: PropertyKindOrText<PropertyKind>,
             #[case] length: usize,
             #[case] from_start: bool,
@@ -1535,7 +1530,7 @@ mod format_tests {
         #[case(StatusProperty::Crossfade, "3")]
         #[case(StatusProperty::Bitrate, "123")]
         fn status_property_resolves_correctly(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
         ) {
@@ -1595,7 +1590,7 @@ mod format_tests {
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "6m,9s", Duration::from_secs(0))]
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "5m,49s", Duration::from_secs(20))]
         fn queue_time_property_resolves_correctly(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
             #[case] elapsed: Duration,
@@ -1667,7 +1662,7 @@ mod format_tests {
         #[case(StatusProperty::QueueTimeTotal { separator: Some(",".to_string()) }, "0s")]
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "0s")]
         fn queue_time_property_no_current_song(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
         ) {
@@ -1694,7 +1689,7 @@ mod format_tests {
         #[case(StatusProperty::QueueTimeTotal { separator: None }, "0:00")]
         #[case(StatusProperty::QueueTimeRemaining { separator: None }, "0:00")]
         fn queue_time_property_no_duration(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
         ) {
@@ -1735,7 +1730,7 @@ mod format_tests {
         #[case("otherplay", "otherstopped", "otherpaused", State::Pause, "otherpaused")]
         #[case("otherplay", "otherstopped", "otherpaused", State::Stop, "otherstopped")]
         fn playback_state_label_is_correct(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] playing_label: &'static str,
             #[case] stopped_label: &'static str,
             #[case] paused_label: &'static str,
@@ -1788,7 +1783,7 @@ mod format_tests {
         #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::Off, ..Default::default() }, "Off")]
         #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::Oneshot, ..Default::default() }, "OS")]
         fn on_off_states_label_is_correct(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] prop: StatusPropertyFile,
             #[case] status: Status,
             #[case] expected_label: &str,
@@ -1818,7 +1813,7 @@ mod format_tests {
         #[case(StatusPropertyFile::RandomV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, Status { random: true, ..Default::default() }, None)]
         #[case(StatusPropertyFile::RepeatV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, Status { repeat: true, ..Default::default() }, None)]
         fn on_off_oneshot_styles_are_correct(
-            mut app_context: AppContext,
+            mut app_context: Ctx,
             #[case] prop: StatusPropertyFile,
             #[case] status: Status,
             #[case] expected_style: Option<Style>,

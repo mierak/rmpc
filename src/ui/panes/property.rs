@@ -9,7 +9,7 @@ use ratatui::{
 use super::Pane;
 use crate::{
     config::theme::properties::{Property, PropertyKind},
-    context::AppContext,
+    context::Ctx,
     shared::key_event::KeyEvent,
     ui::widgets::scrolling_line::ScrollingLine,
 };
@@ -26,14 +26,14 @@ impl<'content> PropertyPane<'content> {
         content: &'content Vec<Property<PropertyKind>>,
         align: Alignment,
         scroll_speed: u64,
-        _context: &AppContext,
+        _context: &Ctx,
     ) -> Self {
         Self { content, align, scroll_speed }
     }
 }
 
 impl Pane for PropertyPane<'_> {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
         let song = context.find_current_song_in_queue().map(|(_, song)| song);
 
         let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {
@@ -61,7 +61,7 @@ impl Pane for PropertyPane<'_> {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

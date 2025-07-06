@@ -10,7 +10,7 @@ use ratatui::{
 use super::Pane;
 use crate::{
     config::keys::{CommonAction, LogsActions},
-    context::AppContext,
+    context::Ctx,
     shared::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
@@ -48,7 +48,7 @@ impl Pane for LogsPane {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        AppContext { config, .. }: &AppContext,
+        Ctx { config, .. }: &Ctx,
     ) -> anyhow::Result<()> {
         let scrollbar_area_width: u16 = config.theme.scrollbar.is_some().into();
         let [logs_area, scrollbar_area] = Layout::horizontal([
@@ -101,17 +101,12 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
         self.scrolling_state.last();
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push(std::mem::take(msg));
             self.should_scroll_to_last = true;
@@ -123,7 +118,7 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         if !self.logs_area.contains(event.into()) {
             return Ok(());
         }
@@ -145,7 +140,7 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         let config = &context.config;
         if let Some(action) = event.as_logs_action(context) {
             match action {

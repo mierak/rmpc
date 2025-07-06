@@ -4,7 +4,7 @@ use ratatui::{Frame, layout::Position, prelude::Rect, widgets::Widget};
 use super::Pane;
 use crate::{
     config::tabs::TabName,
-    context::AppContext,
+    context::Ctx,
     shared::{events::AppEvent, key_event::KeyEvent, mouse_event::MouseEvent},
     ui::{UiAppEvent, UiEvent, widgets::tabs::Tabs},
 };
@@ -17,7 +17,7 @@ pub struct TabsPane<'a> {
 }
 
 impl TabsPane<'_> {
-    pub fn new(context: &AppContext) -> Result<Self> {
+    pub fn new(context: &Ctx) -> Result<Self> {
         let active_tab = Self::init_active_tab(context)?;
         let tab_names = Self::init_tab_names(context);
         let tabs = Self::init_tabs(tab_names, context);
@@ -29,15 +29,15 @@ impl TabsPane<'_> {
         self.tabs.areas.iter().enumerate().find(|(_, area)| area.contains(position)).map(|v| v.0)
     }
 
-    fn init_active_tab(context: &AppContext) -> Result<TabName> {
+    fn init_active_tab(context: &Ctx) -> Result<TabName> {
         Ok(context.config.tabs.names.first().context("Expected at least one tab")?.clone())
     }
 
-    fn init_tab_names(context: &AppContext) -> Vec<String> {
+    fn init_tab_names(context: &Ctx) -> Vec<String> {
         context.config.tabs.names.iter().map(|e| format!("  {e: ^9}  ")).collect::<Vec<String>>()
     }
 
-    fn init_tabs<'a>(tab_names: Vec<String>, context: &AppContext) -> Tabs<'a> {
+    fn init_tabs<'a>(tab_names: Vec<String>, context: &Ctx) -> Tabs<'a> {
         Tabs::new(tab_names)
             .divider("")
             .block(context.config.as_tabs_block())
@@ -48,12 +48,7 @@ impl TabsPane<'_> {
 }
 
 impl Pane for TabsPane<'_> {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
         self.area = area;
         if self.area.height > 0 {
             let Some(selected_tab) = context
@@ -74,16 +69,11 @@ impl Pane for TabsPane<'_> {
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::TabChanged(tab) => {
                 self.active_tab = tab.clone();
@@ -110,7 +100,7 @@ impl Pane for TabsPane<'_> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         if !self.area.contains(event.into()) {
             return Ok(());
         }
@@ -132,7 +122,7 @@ impl Pane for TabsPane<'_> {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

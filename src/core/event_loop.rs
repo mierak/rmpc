@@ -10,7 +10,7 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    context::AppContext,
+    context::Ctx,
     mpd::{
         commands::{IdleEvent, State},
         mpd_client::{MpdClient, SaveMode},
@@ -35,7 +35,7 @@ use crate::{
 static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
 
 pub fn init<B: Backend + std::io::Write + Send + 'static>(
-    context: AppContext,
+    context: Ctx,
     event_rx: Receiver<AppEvent>,
     terminal: Terminal<B>,
 ) -> std::io::Result<std::thread::JoinHandle<Terminal<B>>> {
@@ -45,7 +45,7 @@ pub fn init<B: Backend + std::io::Write + Send + 'static>(
 }
 
 fn main_task<B: Backend + std::io::Write>(
-    mut context: AppContext,
+    mut context: Ctx,
     event_rx: Receiver<AppEvent>,
     mut terminal: Terminal<B>,
 ) -> Terminal<B> {
@@ -481,7 +481,7 @@ fn main_task<B: Backend + std::io::Write>(
     terminal
 }
 
-fn handle_idle_event(event: IdleEvent, context: &AppContext, result_ui_evs: &mut HashSet<UiEvent>) {
+fn handle_idle_event(event: IdleEvent, context: &Ctx, result_ui_evs: &mut HashSet<UiEvent>) {
     match event {
         IdleEvent::Mixer if context.supported_commands.contains("getvol") => {
             context

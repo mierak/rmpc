@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::{Frame, prelude::Rect, style::Stylize, text::Text};
 
 use super::Pane;
-use crate::{context::AppContext, shared::key_event::KeyEvent};
+use crate::{context::Ctx, shared::key_event::KeyEvent};
 
 #[derive(Debug)]
 pub struct FrameCountPane {
@@ -16,12 +16,7 @@ impl FrameCountPane {
 }
 
 impl Pane for FrameCountPane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
         self.area = area;
         let text = format!("{} frames", context.rendered_frames);
         frame.render_widget(
@@ -36,7 +31,7 @@ impl Pane for FrameCountPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

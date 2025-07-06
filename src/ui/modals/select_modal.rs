@@ -14,7 +14,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    context::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -33,7 +33,7 @@ enum FocusedComponent {
 }
 
 #[derive(derive_more::Debug)]
-pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>> {
+pub struct SelectModal<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     scrolling_state: DirState<ListState>,
@@ -46,12 +46,10 @@ pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, V, usize) ->
 }
 
 #[bon]
-impl<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>>
-    SelectModal<'a, V, Callback>
-{
+impl<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
     #[builder]
     pub fn new(
-        context: &AppContext,
+        context: &Ctx,
         title: Option<&'a str>,
         options: Vec<V>,
         on_confirm: Callback,
@@ -90,10 +88,10 @@ impl<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>>
     }
 }
 
-impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Result<()>> Modal
+impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>> Modal
     for SelectModal<'_, V, Callback>
 {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -154,7 +152,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Down => {
@@ -241,7 +239,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.options_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.options_area.y).into();

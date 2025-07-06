@@ -5,7 +5,7 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::tabs::PaneType,
-    context::AppContext,
+    context::Ctx,
     mpd::mpd_client::MpdClient,
     shared::{image::ImageProtocol, key_event::KeyEvent},
     ui::{UiEvent, image::facade::AlbumArtFacade},
@@ -21,7 +21,7 @@ pub struct AlbumArtPane {
 const ALBUM_ART: &str = "album_art";
 
 impl AlbumArtPane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(context: &Ctx) -> Self {
         Self {
             album_art: AlbumArtFacade::new(&context.config),
             is_modal_open: false,
@@ -30,7 +30,7 @@ impl AlbumArtPane {
     }
 
     /// returns none if album art is supposed to be hidden
-    fn fetch_album_art(context: &AppContext) -> Option<()> {
+    fn fetch_album_art(context: &Ctx) -> Option<()> {
         if matches!(context.config.album_art.method.into(), ImageProtocol::None) {
             return None;
         }
@@ -59,25 +59,25 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(&mut self, _frame: &mut Frame, area: Rect, _context: &AppContext) -> Result<()> {
+    fn render(&mut self, _frame: &mut Frame, area: Rect, _context: &Ctx) -> Result<()> {
         self.album_art.set_size(area);
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, _context: &AppContext) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, _context: &Ctx) -> Result<()> {
         self.album_art.set_size(area);
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn on_hide(&mut self, _context: &AppContext) -> Result<()> {
+    fn on_hide(&mut self, _context: &Ctx) -> Result<()> {
         self.album_art.hide()
     }
 
-    fn resize(&mut self, area: Rect, _context: &AppContext) -> Result<()> {
+    fn resize(&mut self, area: Rect, _context: &Ctx) -> Result<()> {
         if self.is_modal_open {
             return Ok(());
         }
@@ -85,7 +85,7 @@ impl Pane for AlbumArtPane {
         self.album_art.show_current()
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &Ctx) -> Result<()> {
         if AlbumArtPane::fetch_album_art(context).is_none() {
             self.album_art.show_default()?;
         }
@@ -97,7 +97,7 @@ impl Pane for AlbumArtPane {
         id: &'static str,
         data: MpdQueryResult,
         is_visible: bool,
-        _context: &AppContext,
+        _context: &Ctx,
     ) -> Result<()> {
         if !is_visible || self.is_modal_open {
             return Ok(());
@@ -114,12 +114,7 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected if is_visible => {
                 if self.is_modal_open {

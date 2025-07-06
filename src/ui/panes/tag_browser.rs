@@ -12,7 +12,7 @@ use crate::{
         keys::actions::Position,
         tabs::PaneType,
     },
-    context::AppContext,
+    context::Ctx,
     mpd::{
         client::Client,
         commands::{Song, metadata_tag::MetadataTagExt},
@@ -69,7 +69,7 @@ impl TagBrowserPane {
         root_tag: Tag,
         target_pane: PaneType,
         separator: Option<String>,
-        _context: &AppContext,
+        _context: &Ctx,
     ) -> Self {
         Self {
             root_tag,
@@ -104,7 +104,7 @@ impl TagBrowserPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -186,12 +186,7 @@ impl TagBrowserPane {
         Ok(())
     }
 
-    fn process_songs(
-        &mut self,
-        artist: String,
-        data: Vec<Song>,
-        context: &AppContext,
-    ) -> &CachedRootTag {
+    fn process_songs(&mut self, artist: String, data: Vec<Song>, context: &Ctx) -> &CachedRootTag {
         let display_mode = context.config.artists.album_display_mode;
         let sort_mode = context.config.artists.album_sort_by;
 
@@ -258,7 +253,7 @@ impl TagBrowserPane {
 }
 
 impl Pane for TagBrowserPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
@@ -269,7 +264,7 @@ impl Pane for TagBrowserPane {
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &Ctx) -> Result<()> {
         if !self.initialized {
             let root_tag = self.root_tag.clone();
             let target = self.target_pane.clone();
@@ -284,12 +279,7 @@ impl Pane for TagBrowserPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 let root_tag = self.root_tag.clone();
@@ -309,11 +299,11 @@ impl Pane for TagBrowserPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         self.handle_mouse_action(event, context)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         self.handle_filter_input(event, context)?;
         self.handle_common_action(event, context)?;
         self.handle_global_action(event, context)?;
@@ -325,7 +315,7 @@ impl Pane for TagBrowserPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::SongsList { data, origin_path }) => {
@@ -563,15 +553,15 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn open(&mut self, context: &AppContext) -> Result<()> {
+    fn open(&mut self, context: &Ctx) -> Result<()> {
         self.open_or_play(true, context)
     }
 
-    fn next(&mut self, context: &AppContext) -> Result<()> {
+    fn next(&mut self, context: &Ctx) -> Result<()> {
         self.open_or_play(false, context)
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
+    fn prepare_preview(&mut self, context: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected().map(DirStackItem::as_path) else {
             return Ok(());
         };
@@ -688,7 +678,7 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_no_date_sort_name(mut app_context: AppContext, mut config: Config) {
+    fn albums_no_date_sort_name(mut app_context: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Name;
         app_context.config = std::sync::Arc::new(config);
@@ -709,7 +699,7 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_split_date_sort_name(mut app_context: AppContext, mut config: Config) {
+    fn albums_split_date_sort_name(mut app_context: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Name;
         app_context.config = std::sync::Arc::new(config);
@@ -731,7 +721,7 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_split_date_sort_date(mut app_context: AppContext, mut config: Config) {
+    fn albums_split_date_sort_date(mut app_context: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
         app_context.config = std::sync::Arc::new(config);
@@ -753,7 +743,7 @@ mod tests {
     }
 
     #[rstest]
-    fn albums_no_date_sort_date(mut app_context: AppContext, mut config: Config) {
+    fn albums_no_date_sort_date(mut app_context: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
         config.artists.album_sort_by = AlbumSortMode::Date;
         app_context.config = std::sync::Arc::new(config);

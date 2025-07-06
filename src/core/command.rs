@@ -8,7 +8,7 @@ use crate::{
         cli::{AddRandom, Command, StickerCmd},
         cli_config::CliConfig,
     },
-    context::AppContext,
+    context::Ctx,
     mpd::{
         QueuePosition,
         client::Client,
@@ -454,7 +454,7 @@ pub fn run_external<K: Into<String>, V: Into<String>>(
 }
 
 pub fn create_env<'a>(
-    context: &AppContext,
+    context: &Ctx,
     selected_songs_paths: impl IntoIterator<Item = &'a str>,
 ) -> Vec<(String, String)> {
     let mut result = Vec::new();

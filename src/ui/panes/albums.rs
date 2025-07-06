@@ -6,7 +6,7 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{keys::actions::Position, sort_mode::SortOptions, tabs::PaneType},
-    context::AppContext,
+    context::Ctx,
     mpd::{
         client::Client,
         commands::Song,
@@ -41,7 +41,7 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl AlbumsPane {
-    pub fn new(_context: &AppContext) -> Self {
+    pub fn new(_context: &Ctx) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
@@ -50,7 +50,7 @@ impl AlbumsPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -107,7 +107,7 @@ impl AlbumsPane {
 }
 
 impl Pane for AlbumsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
@@ -118,7 +118,7 @@ impl Pane for AlbumsPane {
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, context: &Ctx) -> Result<()> {
         if !self.initialized {
             context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
                 move |client| {
@@ -132,12 +132,7 @@ impl Pane for AlbumsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
@@ -157,11 +152,11 @@ impl Pane for AlbumsPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         self.handle_mouse_action(event, context)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         self.handle_filter_input(event, context)?;
         self.handle_common_action(event, context)?;
         self.handle_global_action(event, context)?;
@@ -173,7 +168,7 @@ impl Pane for AlbumsPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
@@ -265,11 +260,11 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn open(&mut self, context: &AppContext) -> Result<()> {
+    fn open(&mut self, context: &Ctx) -> Result<()> {
         self.open_or_play(true, context)
     }
 
-    fn next(&mut self, context: &AppContext) -> Result<()> {
+    fn next(&mut self, context: &Ctx) -> Result<()> {
         self.open_or_play(false, context)
     }
 
@@ -309,7 +304,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
+    fn prepare_preview(&mut self, context: &Ctx) -> Result<()> {
         let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
             return Ok(());
         };

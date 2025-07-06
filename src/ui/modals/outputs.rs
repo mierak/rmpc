@@ -10,7 +10,7 @@ use super::{Modal, RectExt};
 use crate::{
     MpdQueryResult,
     config::keys::CommonAction,
-    context::AppContext,
+    context::Ctx,
     mpd::{commands::Output, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
@@ -40,7 +40,7 @@ impl OutputsModal {
         result
     }
 
-    pub fn toggle_selected_output(&mut self, context: &AppContext) {
+    pub fn toggle_selected_output(&mut self, context: &Ctx) {
         let Some(idx) = self.scrolling_state.get_selected() else {
             return;
         };
@@ -57,7 +57,7 @@ impl OutputsModal {
 }
 
 impl Modal for OutputsModal {
-    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut ratatui::Frame, app: &mut Ctx) -> anyhow::Result<()> {
         let popup_area = frame.area().centered_exact(60, 10);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -115,7 +115,7 @@ impl Modal for OutputsModal {
         &mut self,
         id: &'static str,
         data: &mut MpdQueryResult,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             ("refresh_outputs", MpdQueryResult::Outputs(outputs)) => {
@@ -127,7 +127,7 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
@@ -174,7 +174,7 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.outputs_table_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.outputs_table_area.y).into();

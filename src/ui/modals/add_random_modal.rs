@@ -17,7 +17,7 @@ use crate::{
         cli::{AddRandom, Command},
         keys::CommonAction,
     },
-    context::AppContext,
+    context::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -67,7 +67,7 @@ impl AddRandom {
 }
 
 impl AddRandomModal<'_> {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(context: &Ctx) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Add"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
@@ -94,7 +94,7 @@ impl AddRandomModal<'_> {
         }
     }
 
-    fn add_random(tag: AddRandom, count: &str, ctx: &AppContext) -> Result<()> {
+    fn add_random(tag: AddRandom, count: &str, ctx: &Ctx) -> Result<()> {
         Ok(ctx
             .work_sender
             .send(WorkRequest::Command(Command::AddRandom { tag, count: count.parse()? }))?)
@@ -102,7 +102,7 @@ impl AddRandomModal<'_> {
 }
 
 impl Modal for AddRandomModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -171,7 +171,7 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         let action = key.as_common_action(context);
         match self.active_input {
             InputType::CountFocused => {
@@ -290,7 +290,7 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>

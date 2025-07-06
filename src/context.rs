@@ -32,7 +32,7 @@ use crate::{
 };
 
 #[derive(derive_more::Debug)]
-pub struct AppContext {
+pub struct Ctx {
     pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
@@ -56,7 +56,7 @@ pub struct AppContext {
 }
 
 #[bon]
-impl AppContext {
+impl Ctx {
     pub(crate) fn try_new(
         client: &mut Client<'_>,
         mut config: Config,

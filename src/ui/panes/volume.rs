@@ -4,7 +4,7 @@ use ratatui::{Frame, prelude::Rect};
 use super::Pane;
 use crate::{
     config::{tabs::VolumeType, theme::volume_slider::VolumeSliderConfig},
-    context::AppContext,
+    context::Ctx,
     mpd::{
         commands::volume::Bound,
         mpd_client::{MpdClient, ValueChange},
@@ -41,12 +41,7 @@ fn as_styled_volume_slider(config: &VolumeSliderConfig) -> VolumeSlider<'_> {
 }
 
 impl Pane for VolumePane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
         self.area = area;
 
         match &self.config {
@@ -61,11 +56,11 @@ impl Pane for VolumePane {
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         if !self.area.contains(event.into()) {
             return Ok(());
         }
@@ -111,7 +106,7 @@ impl Pane for VolumePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

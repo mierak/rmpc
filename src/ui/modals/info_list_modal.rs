@@ -15,7 +15,7 @@ use ratatui::{
 use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    context::Ctx,
     mpd::commands::Song,
     shared::{
         ext::duration::DurationExt,
@@ -90,7 +90,7 @@ impl InfoListModal {
 }
 
 impl Modal for InfoListModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(self.size.0, self.size.1);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -161,7 +161,7 @@ impl Modal for InfoListModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
@@ -206,7 +206,7 @@ impl Modal for InfoListModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }

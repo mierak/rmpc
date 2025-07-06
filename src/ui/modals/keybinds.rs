@@ -16,7 +16,7 @@ use strum::{IntoDiscriminant, VariantArray};
 use super::{Modal, RectExt};
 use crate::{
     config::keys::{CommonAction, ToDescription},
-    context::AppContext,
+    context::Ctx,
     shared::{
         ext::iter::IntoZipLongest2,
         key_event::KeyEvent,
@@ -58,7 +58,7 @@ where
 }
 
 impl KeybindsModal {
-    pub fn new(_ctx: &mut AppContext) -> Self {
+    pub fn new(_ctx: &mut Ctx) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
 
@@ -204,7 +204,7 @@ fn row<'a>(
 }
 
 impl Modal for KeybindsModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(90, 90);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -324,7 +324,7 @@ impl Modal for KeybindsModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if self.filter_input_mode {
             match key.as_common_action(context) {
                 Some(CommonAction::Confirm) => {
@@ -422,7 +422,7 @@ impl Modal for KeybindsModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }

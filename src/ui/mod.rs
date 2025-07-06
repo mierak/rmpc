@@ -31,7 +31,7 @@ use crate::{
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
-    context::AppContext,
+    context::Ctx,
     core::command::{create_env, run_external},
     mpd::{
         commands::{State, idle::IdleEvent},
@@ -85,7 +85,7 @@ macro_rules! active_tab_call {
 }
 
 impl<'ui> Ui<'ui> {
-    pub fn new(context: &AppContext) -> Result<Ui<'ui>> {
+    pub fn new(context: &Ctx) -> Result<Ui<'ui>> {
         Ok(Self {
             panes: PaneContainer::new(context)?,
             layout: context.config.theme.layout.clone(),
@@ -95,7 +95,7 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    fn init_tabs(context: &AppContext) -> Result<HashMap<TabName, TabScreen>> {
+    fn init_tabs(context: &Ctx) -> Result<HashMap<TabName, TabScreen>> {
         context
             .config
             .tabs
@@ -107,11 +107,11 @@ impl<'ui> Ui<'ui> {
             .try_collect()
     }
 
-    fn calc_areas(&mut self, area: Rect, _context: &AppContext) {
+    fn calc_areas(&mut self, area: Rect, _context: &Ctx) {
         self.area = area;
     }
 
-    fn change_tab(&mut self, new_tab: TabName, context: &mut AppContext) -> Result<()> {
+    fn change_tab(&mut self, new_tab: TabName, context: &mut Ctx) -> Result<()> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
             match self.panes.get_mut(&pane.pane, context)? {
                 Panes::TabContent => {
@@ -136,7 +136,7 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    pub fn render(&mut self, frame: &mut Frame, context: &mut AppContext) -> Result<()> {
+    pub fn render(&mut self, frame: &mut Frame, context: &mut Ctx) -> Result<()> {
         self.area = frame.area();
         if let Some(bg_color) = context.config.theme.background_color {
             frame
@@ -182,11 +182,7 @@ impl<'ui> Ui<'ui> {
         Ok(())
     }
 
-    pub fn handle_mouse_event(
-        &mut self,
-        event: MouseEvent,
-        context: &mut AppContext,
-    ) -> Result<()> {
+    pub fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         if let Some(ref mut modal) = self.modals.last_mut() {
             modal.handle_mouse_event(event, context)?;
             return Ok(());
@@ -205,11 +201,7 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    pub fn handle_key(
-        &mut self,
-        key: &mut KeyEvent,
-        context: &mut AppContext,
-    ) -> Result<KeyHandleResult> {
+    pub fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<KeyHandleResult> {
         if let Some(ref mut modal) = self.modals.last_mut() {
             modal.handle_key(key, context)?;
             return Ok(KeyHandleResult::None);
@@ -480,7 +472,7 @@ impl<'ui> Ui<'ui> {
         Ok(KeyHandleResult::None)
     }
 
-    pub fn before_show(&mut self, area: Rect, context: &mut AppContext) -> Result<()> {
+    pub fn before_show(&mut self, area: Rect, context: &mut Ctx) -> Result<()> {
         self.calc_areas(area, context);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
@@ -497,7 +489,7 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut AppContext) -> Result<()> {
+    pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut Ctx) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
                 if let Some(id) = modal.get_id() {
@@ -531,7 +523,7 @@ impl<'ui> Ui<'ui> {
         Ok(())
     }
 
-    pub fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+    pub fn resize(&mut self, area: Rect, context: &Ctx) -> Result<()> {
         log::trace!(area:?; "Terminal was resized");
         self.calc_areas(area, context);
 
@@ -549,7 +541,7 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    pub fn on_event(&mut self, mut event: UiEvent, context: &mut AppContext) -> Result<()> {
+    pub fn on_event(&mut self, mut event: UiEvent, context: &mut Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 status_warn!(
@@ -638,7 +630,7 @@ impl<'ui> Ui<'ui> {
         id: &'static str,
         pane: Option<PaneType>,
         data: MpdQueryResult,
-        context: &mut AppContext,
+        context: &mut Ctx,
     ) -> Result<()> {
         match pane {
             Some(pane_type) => {

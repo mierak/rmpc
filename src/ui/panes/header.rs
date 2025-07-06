@@ -3,7 +3,7 @@ use ratatui::{Frame, prelude::Rect};
 
 use super::Pane;
 use crate::{
-    context::AppContext,
+    context::Ctx,
     mpd::mpd_client::{MpdClient, ValueChange},
     shared::{
         key_event::KeyEvent,
@@ -24,31 +24,21 @@ impl HeaderPane {
 }
 
 impl Pane for HeaderPane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
         self.area = area;
         frame.render_widget(Header::new(context), self.area);
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        _event: &mut UiEvent,
-        _is_visible: bool,
-        _context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, _event: &mut UiEvent, _is_visible: bool, _context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         if !self.area.contains(event.into()) {
             return Ok(());
         }
@@ -80,7 +70,7 @@ impl Pane for HeaderPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

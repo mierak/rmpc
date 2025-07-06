@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect, widgets::Paragraph};
 
 use super::Pane;
 use crate::{
-    context::AppContext,
+    context::Ctx,
     mpd::{
         commands::State,
         mpd_client::{MpdClient, ValueChange},
@@ -28,12 +28,7 @@ impl ProgressBarPane {
 }
 
 impl Pane for ProgressBarPane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
         self.area = area;
 
         match context.messages.last() {
@@ -60,11 +55,11 @@ impl Pane for ProgressBarPane {
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
         if !self.area.contains(event.into()) {
             return Ok(());
         }
@@ -93,7 +88,7 @@ impl Pane for ProgressBarPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

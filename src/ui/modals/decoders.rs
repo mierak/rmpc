@@ -12,7 +12,7 @@ use ratatui::{
 use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    context::Ctx,
     mpd::commands::Decoder,
     shared::{
         ext::iter::IntoZipLongest2,
@@ -75,7 +75,7 @@ impl DecodersModal {
 }
 
 impl Modal for DecodersModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(80, 80);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = app.config.theme.modal_background_color {
@@ -164,7 +164,7 @@ impl Modal for DecodersModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::DownHalf => {
@@ -209,7 +209,7 @@ impl Modal for DecodersModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.table_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.table_area.y).into();

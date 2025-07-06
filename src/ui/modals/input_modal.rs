@@ -12,7 +12,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    context::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
+pub struct InputModal<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     input_focused: bool,
@@ -35,9 +35,7 @@ pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug
-    for InputModal<'_, Callback>
-{
+impl<Callback: FnMut(&Ctx, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -47,8 +45,8 @@ impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug
     }
 }
 
-impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> InputModal<'a, C> {
-    pub fn new(context: &AppContext) -> Self {
+impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
+    pub fn new(context: &Ctx) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
@@ -102,8 +100,8 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> InputModal<'a, C> {
     }
 }
 
-impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
@@ -148,7 +146,7 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         let action = key.as_common_action(context);
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
@@ -214,7 +212,7 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {

@@ -22,7 +22,7 @@ use crate::{
         },
         tabs::PaneType,
     },
-    context::AppContext,
+    context::Ctx,
     core::command::{create_env, run_external},
     mpd::{
         commands::Song,
@@ -57,7 +57,7 @@ const PREVIEW: &str = "preview";
 const SEARCH: &str = "search";
 
 impl SearchPane {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(context: &Ctx) -> Self {
         let config = &context.config;
         Self {
             preview: None,
@@ -161,7 +161,7 @@ impl SearchPane {
         }
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) {
+    fn prepare_preview(&mut self, context: &Ctx) {
         let Some(origin_path) = self.songs_dir.selected().map(|s| vec![s.as_path().to_owned()])
         else {
             return;
@@ -326,7 +326,7 @@ impl SearchPane {
         })
     }
 
-    fn search(&mut self, context: &AppContext) {
+    fn search(&mut self, context: &Ctx) {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
@@ -376,7 +376,7 @@ impl SearchPane {
         }
     }
 
-    fn activate_input(&mut self, context: &AppContext) {
+    fn activate_input(&mut self, context: &Ctx) {
         match self.inputs.focused_mut() {
             FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
             FocusedInputGroup::Buttons(_) => {
@@ -435,7 +435,7 @@ impl Pane for SearchPane {
         &mut self,
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
-        AppContext { config, .. }: &AppContext,
+        Ctx { config, .. }: &Ctx,
     ) -> anyhow::Result<()> {
         let widths = &config.theme.column_widths;
         let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
@@ -515,12 +515,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 self.songs_dir = Dir::default();
@@ -549,7 +544,7 @@ impl Pane for SearchPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        context: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
@@ -580,7 +575,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, mut event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, mut event: MouseEvent, context: &Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
@@ -741,7 +736,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         let config = &context.config;
         match &mut self.phase {
             Phase::SearchTextboxInput => match event.as_common_action(context) {

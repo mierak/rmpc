@@ -11,12 +11,12 @@ use crate::{
         Config,
         theme::properties::{Property, PropertyKind},
     },
-    context::AppContext,
+    context::Ctx,
     mpd::commands::Song,
 };
 
 pub struct Header<'a> {
-    context: &'a AppContext,
+    context: &'a Ctx,
 }
 
 impl Widget for Header<'_> {
@@ -57,12 +57,7 @@ impl Widget for Header<'_> {
 
 struct PropertyTemplates<'a>(&'a [Property<PropertyKind>]);
 impl<'a> PropertyTemplates<'a> {
-    fn format(
-        &'a self,
-        song: Option<&'a Song>,
-        context: &'a AppContext,
-        config: &Config,
-    ) -> Line<'a> {
+    fn format(&'a self, song: Option<&'a Song>, context: &'a Ctx, config: &Config) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(
                 song,
@@ -80,7 +75,7 @@ impl<'a> PropertyTemplates<'a> {
 }
 
 impl<'a> Header<'a> {
-    pub fn new(context: &'a AppContext) -> Self {
+    pub fn new(context: &'a Ctx) -> Self {
         Self { context }
     }
 }

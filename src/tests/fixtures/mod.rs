@@ -6,7 +6,7 @@ use rstest::fixture;
 
 use crate::{
     config::{Config, ConfigFile, tabs::TabName},
-    context::AppContext,
+    context::Ctx,
     core::scheduler::Scheduler,
     mpd::commands::Status,
     shared::{
@@ -37,7 +37,7 @@ pub fn client_request_channel() -> (Sender<ClientRequest>, Receiver<ClientReques
 pub fn app_context(
     work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
     client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
-) -> AppContext {
+) -> Ctx {
     let chan1 = unbounded();
     let config = ConfigFile::default()
         .into_config(None, None, None, None, true)
@@ -45,7 +45,7 @@ pub fn app_context(
 
     let chan1 = Box::leak(Box::new(chan1));
     let scheduler = Scheduler::new((chan1.0.clone(), unbounded().0));
-    AppContext {
+    Ctx {
         status: Status::default(),
         config: std::sync::Arc::new(config),
         queue: Vec::default(),

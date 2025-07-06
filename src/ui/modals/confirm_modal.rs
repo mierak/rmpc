@@ -16,7 +16,7 @@ use crate::{
         Size,
         keys::{CommonAction, GlobalAction},
     },
-    context::AppContext,
+    context::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -25,7 +25,7 @@ use crate::{
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
-pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
+pub struct ConfirmModal<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> {
     message: Cow<'a, str>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
@@ -33,7 +33,7 @@ pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
     size: Size,
 }
 
-impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
+impl<Callback: FnMut(&Ctx) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -45,10 +45,10 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModa
 
 #[allow(dead_code)]
 #[bon]
-impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
+impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
     #[builder]
     pub fn new(
-        context: &AppContext,
+        context: &Ctx,
         size: impl Into<Size>,
         confirm_label: Option<&'a str>,
         cancel_label: Option<&'a str>,
@@ -82,8 +82,8 @@ impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callb
     }
 }
 
-impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
+    fn render(&mut self, frame: &mut Frame, app: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(self.size.width, self.size.height);
         frame.render_widget(Clear, popup_area);
 
@@ -118,7 +118,7 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(context) {
             match action {
                 CommonAction::Right => {
@@ -159,7 +159,7 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {

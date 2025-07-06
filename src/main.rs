@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use config::{DeserError, cli_config::CliConfigFile};
-use context::AppContext;
+use context::Ctx;
 use crossbeam::channel::unbounded;
 use log::info;
 use rustix::path::Arg;
@@ -268,7 +268,7 @@ fn main() -> Result<()> {
 
             let tx_clone = event_tx.clone();
 
-            let context = AppContext::try_new(
+            let context = Ctx::try_new(
                 &mut client,
                 config,
                 tx_clone,
