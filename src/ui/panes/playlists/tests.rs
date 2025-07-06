@@ -181,7 +181,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -191,7 +191,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -201,7 +201,7 @@ mod on_idle_event {
                     OPEN_OR_PLAY,
                     MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -230,7 +230,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
@@ -247,7 +247,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -257,7 +257,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -267,7 +267,7 @@ mod on_idle_event {
                     OPEN_OR_PLAY,
                     MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -295,7 +295,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
@@ -313,7 +313,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -323,7 +323,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -333,7 +333,7 @@ mod on_idle_event {
                     OPEN_OR_PLAY,
                     MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -361,7 +361,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
@@ -378,7 +378,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -388,7 +388,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -398,7 +398,7 @@ mod on_idle_event {
                     OPEN_OR_PLAY,
                     MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(1, 0);
@@ -426,7 +426,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
@@ -443,7 +443,7 @@ mod on_idle_event {
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let app_context = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
             let initial_playlists = vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")];
             screen
@@ -451,7 +451,7 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong { data: initial_playlists, origin_path: None },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
@@ -461,7 +461,7 @@ mod on_idle_event {
                     OPEN_OR_PLAY,
                     MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(1, 0);
@@ -489,7 +489,7 @@ mod on_idle_event {
                         origin_path: None,
                     },
                     true,
-                    &app_context,
+                    &ctx,
                 )
                 .unwrap();
             assert_eq!(screen.stack.previous().selected(), Some(&dir("pl4")));

@@ -192,17 +192,17 @@ mod tests {
         client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
         let rx = client_request_channel.1.clone();
-        let mut app_context = ctx(work_request_channel, client_request_channel);
+        let mut ctx = ctx(work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
-        app_context.config = std::sync::Arc::new(config);
-        app_context.queue.push(Song { id: selected_song_id, ..Default::default() });
-        app_context.status.songid = Some(selected_song_id);
-        app_context.status.state = State::Play;
-        let mut screen = AlbumArtPane::new(&app_context);
+        ctx.config = std::sync::Arc::new(config);
+        ctx.queue.push(Song { id: selected_song_id, ..Default::default() });
+        ctx.status.songid = Some(selected_song_id);
+        ctx.status.state = State::Play;
+        let mut screen = AlbumArtPane::new(&ctx);
 
-        screen.before_show(&app_context).unwrap();
+        screen.before_show(&ctx).unwrap();
 
         if should_search {
             assert!(matches!(
@@ -233,17 +233,17 @@ mod tests {
         client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
         let rx = client_request_channel.1.clone();
-        let mut app_context = ctx(work_request_channel, client_request_channel);
+        let mut ctx = ctx(work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
-        app_context.config = std::sync::Arc::new(config);
-        app_context.queue.push(Song { id: selected_song_id, ..Default::default() });
-        app_context.status.songid = Some(selected_song_id);
-        app_context.status.state = State::Play;
-        let mut screen = AlbumArtPane::new(&app_context);
+        ctx.config = std::sync::Arc::new(config);
+        ctx.queue.push(Song { id: selected_song_id, ..Default::default() });
+        ctx.status.songid = Some(selected_song_id);
+        ctx.status.state = State::Play;
+        let mut screen = AlbumArtPane::new(&ctx);
 
-        screen.on_event(&mut UiEvent::SongChanged, true, &app_context).unwrap();
+        screen.on_event(&mut UiEvent::SongChanged, true, &ctx).unwrap();
 
         if should_search {
             assert!(matches!(
