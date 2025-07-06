@@ -8,8 +8,8 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use config::{DeserError, cli_config::CliConfigFile};
-use context::AppContext;
 use crossbeam::channel::unbounded;
+use ctx::Ctx;
 use log::info;
 use rustix::path::Arg;
 use shared::{
@@ -40,8 +40,8 @@ mod tests {
 }
 
 mod config;
-mod context;
 mod core;
+mod ctx;
 mod mpd;
 mod shared;
 mod ui;
@@ -268,7 +268,7 @@ fn main() -> Result<()> {
 
             let tx_clone = event_tx.clone();
 
-            let context = AppContext::try_new(
+            let ctx = Ctx::try_new(
                 &mut client,
                 config,
                 tx_clone,
@@ -282,36 +282,33 @@ fn main() -> Result<()> {
                 client_rx.clone(),
                 event_tx.clone(),
                 client,
-                Arc::clone(&context.config),
+                Arc::clone(&ctx.config),
             )?;
             core::work::init(
                 worker_rx.clone(),
                 client_tx.clone(),
                 event_tx.clone(),
-                Arc::clone(&context.config),
+                Arc::clone(&ctx.config),
             )?;
             core::input::init(event_tx.clone())?;
-            let _sock_guard = core::socket::init(
-                event_tx.clone(),
-                worker_tx.clone(),
-                Arc::clone(&context.config),
-            )
-            .context("Failed to initialize socket listener")?;
+            let _sock_guard =
+                core::socket::init(event_tx.clone(), worker_tx.clone(), Arc::clone(&ctx.config))
+                    .context("Failed to initialize socket listener")?;
 
-            let _config_watcher_guard = context.config.enable_config_hot_reload.then_some(
+            let _config_watcher_guard = ctx.config.enable_config_hot_reload.then_some(
                 core::config_watcher::init(
                     config_path,
-                    context.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
+                    ctx.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
                     event_tx.clone(),
                 )
                 .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}")),
             );
 
-            let enable_mouse = context.config.enable_mouse;
+            let enable_mouse = ctx.config.enable_mouse;
             let terminal =
                 shared::terminal::setup(enable_mouse).context("Failed to setup terminal")?;
 
-            let event_loop_handle = core::event_loop::init(context, event_rx, terminal)?;
+            let event_loop_handle = core::event_loop::init(ctx, event_rx, terminal)?;
 
             let original_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {

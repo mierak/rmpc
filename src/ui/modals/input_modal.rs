@@ -12,7 +12,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
+pub struct InputModal<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     input_focused: bool,
@@ -35,9 +35,7 @@ pub struct InputModal<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug
-    for InputModal<'_, Callback>
-{
+impl<Callback: FnMut(&Ctx, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -47,20 +45,20 @@ impl<Callback: FnMut(&AppContext, &str) -> Result<()>> std::fmt::Debug
     }
 }
 
-impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> InputModal<'a, C> {
-    pub fn new(context: &AppContext) -> Self {
+impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
+    pub fn new(ctx: &Ctx) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
 
         let button_group = ButtonGroup::default()
             .buttons(buttons)
-            .inactive_style(context.config.as_text_style())
+            .inactive_style(ctx.config.as_text_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -102,18 +100,18 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> InputModal<'a, C> {
     }
 }
 
-impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title(self.title);
 
         let popup_area = frame.area().centered_exact(50, 7);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
         let [body_area, buttons_area] =
@@ -124,16 +122,16 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
 
         let input = Input::default()
             .set_label(self.input_label)
-            .set_label_style(app.config.as_text_style())
+            .set_label_style(ctx.config.as_text_style())
             .set_text(&self.value)
             .set_focused(self.input_focused)
-            .set_focused_style(app.config.theme.highlight_border_style)
-            .set_unfocused_style(app.config.as_border_style());
+            .set_focused_style(ctx.config.theme.highlight_border_style)
+            .set_unfocused_style(ctx.config.as_border_style());
 
         self.button_group.set_active_style(if self.input_focused {
             Style::default().reversed()
         } else {
-            app.config.theme.current_item_style
+            ctx.config.theme.current_item_style
         });
 
         self.input_area = body_area;
@@ -148,21 +146,21 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        let action = key.as_common_action(context);
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let action = key.as_common_action(ctx);
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
 
-                context.render()?;
+                ctx.render()?;
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group_state.selected == 0 {
                     if let Some(ref mut callback) = self.callback {
-                        (callback)(context, &self.value)?;
+                        (callback)(ctx, &self.value)?;
                     }
                 }
-                pop_modal!(context);
+                pop_modal!(ctx);
                 return Ok(());
             }
 
@@ -170,12 +168,12 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
                 KeyCode::Char(c) => {
                     self.value.push(c);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 KeyCode::Backspace => {
                     self.value.pop();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -184,28 +182,28 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
                 CommonAction::Down => {
                     self.button_group_state.next();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
                     self.button_group_state.next();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(context, &self.value)?;
+                            (callback)(ctx, &self.value)?;
                         }
                     }
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -214,30 +212,30 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
                     self.input_focused = false;
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(context, &self.value)?;
+                            (callback)(ctx, &self.value)?;
                         }
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     Some(_) => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     None => {
                         if self.input_area.contains(event.into()) {
                             self.input_focused = true;
-                            context.render()?;
+                            ctx.render()?;
                         }
                     }
                 }
@@ -248,14 +246,14 @@ impl<'a, C: FnMut(&AppContext, &str) -> Result<()> + 'a> Modal for InputModal<'a
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
                     self.input_focused = false;
                     self.button_group_state.prev();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::ScrollDown => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
                     self.input_focused = false;
                     self.button_group_state.next();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
         }

@@ -24,8 +24,8 @@ use crate::{
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
-    context::AppContext,
     core::command::{create_env, run_external},
+    ctx::Ctx,
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
         ext::{
@@ -74,8 +74,8 @@ enum Areas {
 const ADD_TO_PLAYLIST: &str = "add_to_playlist";
 
 impl QueuePane {
-    pub fn new(context: &AppContext) -> Self {
-        let (header, column_widths, column_formats) = Self::init(context);
+    pub fn new(ctx: &Ctx) -> Self {
+        let (header, column_widths, column_formats) = Self::init(ctx);
 
         Self {
             scrolling_state: DirState::default(),
@@ -87,22 +87,21 @@ impl QueuePane {
             areas: enum_map! {
                 _ => Rect::default(),
             },
-            should_center_cursor_on_current: context.config.center_current_song_on_change,
+            should_center_cursor_on_current: ctx.config.center_current_song_on_change,
         }
     }
 
-    fn init(context: &AppContext) -> (Vec<String>, Vec<Constraint>, Vec<Property<SongProperty>>) {
+    fn init(ctx: &Ctx) -> (Vec<String>, Vec<Constraint>, Vec<Property<SongProperty>>) {
         (
-            context.config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
-            context
-                .config
+            ctx.config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
+            ctx.config
                 .theme
                 .song_table_format
                 .iter()
                 // This 0 is fine - song_table_format should never have the Ratio constraint
                 .map(|v| v.width.into_constraint(0))
                 .collect_vec(),
-            context.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
+            ctx.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
         )
     }
 
@@ -112,7 +111,7 @@ impl QueuePane {
             .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }))
     }
 
-    fn enqueue_items(&self, all: bool, ctx: &AppContext) -> (Vec<Enqueue>, Option<usize>) {
+    fn enqueue_items(&self, all: bool, ctx: &Ctx) -> (Vec<Enqueue>, Option<usize>) {
         let hovered = self
             .scrolling_state
             .get_selected()
@@ -158,15 +157,10 @@ impl QueuePane {
 }
 
 impl Pane for QueuePane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
-        let AppContext { queue, config, .. } = context;
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
+        let Ctx { queue, config, .. } = ctx;
         let queue_len = queue.len();
-        self.calculate_areas(area, context)?;
+        self.calculate_areas(area, ctx)?;
 
         let filter_text = self.filter_text();
 
@@ -207,7 +201,7 @@ impl Pane for QueuePane {
                     return Row::new((0..formats.len()).map(|_| Cell::default()));
                 }
 
-                let is_current = context
+                let is_current = ctx
                     .find_current_song_in_queue()
                     .map(|(_, song)| song.id)
                     .is_some_and(|v| v == song.id);
@@ -311,8 +305,8 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
-        let AppContext { config, .. } = context;
+    fn calculate_areas(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
+        let Ctx { config, .. } = ctx;
 
         let header_height: u16 = config.theme.show_song_table_header.into();
         let scrollbar_area_width: u16 = config.theme.scrollbar.is_some().into();
@@ -343,7 +337,7 @@ impl Pane for QueuePane {
             table_block_area
         };
 
-        let table_area = if self.filter.is_some() && !context.config.theme.show_song_table_header {
+        let table_area = if self.filter.is_some() && !ctx.config.theme.show_song_table_header {
             self.areas[Areas::FilterArea] =
                 Rect::new(table_area.x, table_area.y, table_area.width, 1);
             table_area.shrink_from_top(1)
@@ -360,12 +354,12 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
-        self.scrolling_state.set_content_len(Some(context.queue.len()));
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
+        self.scrolling_state.set_content_len(Some(ctx.queue.len()));
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
 
         if self.should_center_cursor_on_current {
-            let to_select = context
+            let to_select = ctx
                 .find_current_song_in_queue()
                 .map(|(idx, _)| idx)
                 .or(self.scrolling_state.get_selected())
@@ -376,35 +370,30 @@ impl Pane for QueuePane {
             let to_select = self
                 .scrolling_state
                 .get_selected()
-                .or(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
-            self.scrolling_state.select(to_select, context.config.scrolloff);
+                .or(ctx.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
+            self.scrolling_state.select(to_select, ctx.config.scrolloff);
         }
 
         Ok(())
     }
 
-    fn resize(&mut self, _area: Rect, context: &AppContext) -> Result<()> {
+    fn resize(&mut self, _area: Rect, ctx: &Ctx) -> Result<()> {
         self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
         let to_select = self
             .scrolling_state
             .get_selected()
-            .or(context.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
-        self.scrolling_state.select(to_select, context.config.scrolloff);
-        context.render()?;
+            .or(ctx.find_current_song_in_queue().map(|v| v.0).or(Some(0)));
+        self.scrolling_state.select(to_select, ctx.config.scrolloff);
+        ctx.render()?;
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged => {
-                if let Some((idx, _)) = context.find_current_song_in_queue() {
-                    if context.config.select_current_song_on_change {
-                        match (is_visible, context.config.center_current_song_on_change) {
+                if let Some((idx, _)) = ctx.find_current_song_in_queue() {
+                    if ctx.config.select_current_song_on_change {
+                        match (is_visible, ctx.config.center_current_song_on_change) {
                             (true, true) => {
                                 self.scrolling_state.select(Some(idx), usize::MAX);
                             }
@@ -413,19 +402,19 @@ impl Pane for QueuePane {
                                 self.should_center_cursor_on_current = true;
                             }
                             (true, false) | (false, false) => {
-                                self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                                self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
                             }
                         }
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                 }
             }
             UiEvent::Reconnected => {
-                self.before_show(context)?;
+                self.before_show(ctx)?;
             }
             UiEvent::ConfigChanged => {
-                let (header, column_widths, column_formats) = Self::init(context);
+                let (header, column_widths, column_formats) = Self::init(ctx);
                 self.header = header;
                 self.column_formats = column_formats;
                 self.column_widths = column_widths;
@@ -436,7 +425,7 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         if !self.areas[Areas::Table].contains(event.into()) {
             return Ok(());
         }
@@ -445,9 +434,9 @@ impl Pane for QueuePane {
             MouseEventKind::LeftClick => {
                 let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(clicked_row) {
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
@@ -456,10 +445,10 @@ impl Pane for QueuePane {
                 if let Some(song) = self
                     .scrolling_state
                     .get_at_rendered_row(clicked_row)
-                    .and_then(|idx| context.queue.get(idx))
+                    .and_then(|idx| ctx.queue.get(idx))
                 {
                     let id = song.id;
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.play_id(id)?;
                         Ok(())
                     });
@@ -471,22 +460,22 @@ impl Pane for QueuePane {
                 if let Some(selected_song) = self
                     .scrolling_state
                     .get_at_rendered_row(clicked_row)
-                    .and_then(|idx| context.queue.get(idx))
+                    .and_then(|idx| ctx.queue.get(idx))
                 {
                     let id = selected_song.id;
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.delete_id(id)?;
                         Ok(())
                     });
                 }
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.next(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::RightClick => {}
         }
@@ -499,20 +488,20 @@ impl Pane for QueuePane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (ADD_TO_PLAYLIST, MpdQueryResult::AddToPlaylist { playlists, song_file }) => {
                 modal!(
-                    context,
+                    ctx,
                     SelectModal::builder()
-                        .context(context)
+                        .ctx(ctx)
                         .options(playlists)
                         .confirm_label("Add")
                         .title("Select a playlist")
-                        .on_confirm(move |context, selected, _idx| {
+                        .on_confirm(move |ctx, selected, _idx| {
                             let song_file = song_file.clone();
-                            context.command(move |client| {
+                            ctx.command(move |client| {
                                 if song_file.starts_with('/') {
                                     client.add_to_playlist(
                                         &selected,
@@ -535,19 +524,19 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
         if self.filter_input_mode {
-            match event.as_common_action(context) {
+            match event.as_common_action(ctx) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 Some(CommonAction::Close) => {
                     self.filter_input_mode = false;
                     self.filter = None;
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {
                     event.stop_propagation();
@@ -556,40 +545,40 @@ impl Pane for QueuePane {
                             if let Some(ref mut f) = self.filter {
                                 f.push(c);
                             }
-                            self.jump_first(&context.queue, context.config.scrolloff);
+                            self.jump_first(&ctx.queue, ctx.config.scrolloff);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         KeyCode::Backspace => {
                             if let Some(ref mut f) = self.filter {
                                 f.pop();
                             }
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         _ => {}
                     }
                 }
             }
-        } else if let Some(action) = event.as_queue_action(context) {
+        } else if let Some(action) = event.as_queue_action(ctx) {
             match action {
                 QueueActions::Delete if !self.scrolling_state.marked.is_empty() => {
                     for range in self.scrolling_state.marked.ranges().rev() {
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.delete_from_queue(range.into())?;
                             Ok(())
                         });
                     }
                     self.scrolling_state.marked.clear();
                     status_info!("Marked songs removed from queue");
-                    context.render()?;
+                    ctx.render()?;
                 }
                 QueueActions::Delete => {
                     if let Some(selected_song) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                        self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx))
                     {
                         let id = selected_song.id;
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.delete_id(id)?;
                             Ok(())
                         });
@@ -599,11 +588,11 @@ impl Pane for QueuePane {
                 }
                 QueueActions::DeleteAll => {
                     modal!(
-                        context,
-                        ConfirmModal::builder().context(context)
+                        ctx,
+                        ConfirmModal::builder().ctx(ctx)
                             .message("Are you sure you want to clear the queue? This action cannot be undone.")
-                            .on_confirm(|context| {
-                                context.command(|client| Ok(client.clear()?));
+                            .on_confirm(|ctx| {
+                                ctx.command(|client| Ok(client.clear()?));
                                 Ok(())
                             })
                             .confirm_label("Clear")
@@ -613,33 +602,33 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Play => {
                     if let Some(selected_song) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                        self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx))
                     {
                         let id = selected_song.id;
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.play_id(id)?;
                             Ok(())
                         });
                     }
                 }
                 QueueActions::JumpToCurrent => {
-                    if let Some((idx, _)) = context.find_current_song_in_queue() {
-                        self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                        context.render()?;
+                    if let Some((idx, _)) = ctx.find_current_song_in_queue() {
+                        self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                        ctx.render()?;
                     } else {
                         status_info!("No song is currently playing");
                     }
                 }
                 QueueActions::Save => {
                     modal!(
-                        context,
-                        InputModal::new(context)
+                        ctx,
+                        InputModal::new(ctx)
                             .title("Save queue as playlist")
                             .confirm_label("Save")
                             .input_label("Playlist name:")
-                            .on_confirm(move |context, value| {
+                            .on_confirm(move |ctx, value| {
                                 let value = value.to_owned();
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     match client.save_queue_as_playlist(&value, None) {
                                         Ok(()) => {
                                             status_info!("Playlist '{}' saved", value);
@@ -656,11 +645,10 @@ impl Pane for QueuePane {
                 }
                 QueueActions::AddToPlaylist => {
                     if let Some(selected_song) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                        self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx))
                     {
                         let uri = selected_song.file.clone();
-                        context
-                            .query()
+                        ctx.query()
                             .id(ADD_TO_PLAYLIST)
                             .replace_id(ADD_TO_PLAYLIST)
                             .target(PaneType::Queue)
@@ -677,7 +665,7 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Shuffle if !self.scrolling_state.marked.is_empty() => {
                     for range in self.scrolling_state.marked.ranges().rev() {
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.shuffle(Some(range.into()))?;
                             Ok(())
                         });
@@ -685,7 +673,7 @@ impl Pane for QueuePane {
                     status_info!("Shuffled selected songs");
                 }
                 QueueActions::Shuffle => {
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.shuffle(None)?;
                         Ok(())
                     });
@@ -693,26 +681,24 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Unused => {}
             }
-        } else if let Some(action) = event.as_common_action(context).map(|v| v.to_owned()) {
+        } else if let Some(action) = event.as_common_action(ctx).map(|v| v.to_owned()) {
             match action {
                 CommonAction::Up => {
-                    if !context.queue.is_empty() {
-                        self.scrolling_state
-                            .prev(context.config.scrolloff, context.config.wrap_navigation);
+                    if !ctx.queue.is_empty() {
+                        self.scrolling_state.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
-                    if !context.queue.is_empty() {
-                        self.scrolling_state
-                            .next(context.config.scrolloff, context.config.wrap_navigation);
+                    if !ctx.queue.is_empty() {
+                        self.scrolling_state.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::MoveUp if !self.scrolling_state.get_marked().is_empty() => {
-                    if context.queue.is_empty() {
+                    if ctx.queue.is_empty() {
                         return Ok(());
                     }
 
@@ -723,11 +709,11 @@ impl Pane for QueuePane {
                     for range in self.scrolling_state.marked.ranges() {
                         for idx in range.clone() {
                             let new_idx = idx.saturating_sub(1);
-                            context.queue.swap(idx, new_idx);
+                            ctx.queue.swap(idx, new_idx);
                         }
 
                         let new_start_idx = range.start().saturating_sub(1);
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.move_in_queue(
                                 range.into(),
                                 QueuePosition::Absolute(new_start_idx),
@@ -738,23 +724,23 @@ impl Pane for QueuePane {
 
                     if let Some(start) = self.scrolling_state.marked.first() {
                         let new_idx = start.saturating_sub(1);
-                        self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                        self.scrolling_state.select(Some(new_idx), ctx.config.scrolloff);
                     }
 
                     let mut new_marked =
                         self.scrolling_state.marked.iter().map(|i| i.saturating_sub(1)).collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
-                    context.render()?;
+                    ctx.render()?;
                     return Ok(());
                 }
                 CommonAction::MoveDown if !self.scrolling_state.get_marked().is_empty() => {
-                    if context.queue.is_empty() {
+                    if ctx.queue.is_empty() {
                         return Ok(());
                     }
 
                     if let Some(last_idx) = self.scrolling_state.marked.last() {
-                        if *last_idx == context.queue.len() - 1 {
+                        if *last_idx == ctx.queue.len() - 1 {
                             return Ok(());
                         }
                     }
@@ -762,11 +748,11 @@ impl Pane for QueuePane {
                     for range in self.scrolling_state.marked.ranges().rev() {
                         for idx in range.clone().rev() {
                             let new_idx = idx.saturating_add(1);
-                            context.queue.swap(idx, new_idx);
+                            ctx.queue.swap(idx, new_idx);
                         }
 
                         let new_start_idx = range.start().saturating_add(1);
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.move_in_queue(
                                 range.into(),
                                 QueuePosition::Absolute(new_start_idx),
@@ -777,18 +763,18 @@ impl Pane for QueuePane {
 
                     if let Some(start) = self.scrolling_state.marked.last() {
                         let new_idx = start.saturating_add(1);
-                        self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
+                        self.scrolling_state.select(Some(new_idx), ctx.config.scrolloff);
                     }
 
                     let mut new_marked =
                         self.scrolling_state.marked.iter().map(|i| i.saturating_add(1)).collect();
                     std::mem::swap(&mut self.scrolling_state.marked, &mut new_marked);
 
-                    context.render()?;
+                    ctx.render()?;
                     return Ok(());
                 }
                 CommonAction::MoveUp => {
-                    if context.queue.is_empty() {
+                    if ctx.queue.is_empty() {
                         return Ok(());
                     }
 
@@ -797,23 +783,23 @@ impl Pane for QueuePane {
                     };
 
                     let Some(selected) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                        self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx))
                     else {
                         return Ok(());
                     };
 
                     let new_idx = idx.saturating_sub(1);
                     let id = selected.id;
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.move_id(id, QueuePosition::Absolute(new_idx))?;
                         Ok(())
                     });
-                    self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
-                    context.queue.swap(idx, new_idx);
-                    context.render()?;
+                    self.scrolling_state.select(Some(new_idx), ctx.config.scrolloff);
+                    ctx.queue.swap(idx, new_idx);
+                    ctx.render()?;
                 }
                 CommonAction::MoveDown => {
-                    if context.queue.is_empty() {
+                    if ctx.queue.is_empty() {
                         return Ok(());
                     }
 
@@ -821,62 +807,62 @@ impl Pane for QueuePane {
                         return Ok(());
                     };
                     let Some(selected) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                        self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx))
                     else {
                         return Ok(());
                     };
 
-                    let new_idx = (idx + 1).min(context.queue.len() - 1);
+                    let new_idx = (idx + 1).min(ctx.queue.len() - 1);
                     let id = selected.id;
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.move_id(id, QueuePosition::Absolute(new_idx))?;
                         Ok(())
                     });
-                    self.scrolling_state.select(Some(new_idx), context.config.scrolloff);
-                    context.queue.swap(idx, new_idx);
-                    context.render()?;
+                    self.scrolling_state.select(Some(new_idx), ctx.config.scrolloff);
+                    ctx.queue.swap(idx, new_idx);
+                    ctx.render()?;
                 }
                 CommonAction::DownHalf => {
-                    if !context.queue.is_empty() {
-                        self.scrolling_state.next_half_viewport(context.config.scrolloff);
+                    if !ctx.queue.is_empty() {
+                        self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::UpHalf => {
-                    if !context.queue.is_empty() {
-                        self.scrolling_state.prev_half_viewport(context.config.scrolloff);
+                    if !ctx.queue.is_empty() {
+                        self.scrolling_state.prev_half_viewport(ctx.config.scrolloff);
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::PageDown => {
-                    if !context.queue.is_empty() {
-                        self.scrolling_state.next_viewport(context.config.scrolloff);
+                    if !ctx.queue.is_empty() {
+                        self.scrolling_state.next_viewport(ctx.config.scrolloff);
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::PageUp => {
-                    if !context.queue.is_empty() {
-                        self.scrolling_state.prev_viewport(context.config.scrolloff);
+                    if !ctx.queue.is_empty() {
+                        self.scrolling_state.prev_viewport(ctx.config.scrolloff);
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Bottom => {
-                    if !context.queue.is_empty() {
+                    if !ctx.queue.is_empty() {
                         self.scrolling_state.last();
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Top => {
-                    if !context.queue.is_empty() {
+                    if !ctx.queue.is_empty() {
                         self.scrolling_state.first();
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Right => {}
                 CommonAction::Left => {}
@@ -884,41 +870,40 @@ impl Pane for QueuePane {
                     self.filter_input_mode = true;
                     self.filter = Some(String::new());
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(&context.queue, context.config.scrolloff);
+                    self.jump_forward(&ctx.queue, ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(&context.queue, context.config.scrolloff);
+                    self.jump_back(&ctx.queue, ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Select => {
                     if let Some(sel) = self.scrolling_state.get_selected() {
                         self.scrolling_state.toggle_mark(sel);
-                        self.scrolling_state
-                            .next(context.config.scrolloff, context.config.wrap_navigation);
+                        self.scrolling_state.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                 }
                 CommonAction::InvertSelection => {
                     self.scrolling_state.invert_marked();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close if !self.scrolling_state.marked.is_empty() => {
                     self.scrolling_state.marked.clear();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                    let (enqueue, _hovered_song_idx) = self.enqueue_items(options.all, context);
+                    let (enqueue, _hovered_song_idx) = self.enqueue_items(options.all, ctx);
 
                     if !enqueue.is_empty() {
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.enqueue_multiple(enqueue, options.position, Autoplay::None)?;
 
                             Ok(())
@@ -931,20 +916,20 @@ impl Pane for QueuePane {
                         .into_iter()
                         .map(|(label, mut opts)| {
                             opts.autoplay = AutoplayKind::None;
-                            let (enqueue, hovered_song_idx) = self.enqueue_items(opts.all, context);
+                            let (enqueue, hovered_song_idx) = self.enqueue_items(opts.all, ctx);
                             (label, opts, (enqueue, hovered_song_idx))
                         })
                         .collect_vec();
 
-                    modal!(context, MenuModal::create_add_modal(opts, context));
+                    modal!(ctx, MenuModal::create_add_modal(opts, ctx));
                     self.scrolling_state.marked.clear();
                 }
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) =
-                        self.scrolling_state.get_selected().and_then(|idx| context.queue.get(idx))
+                        self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx))
                     {
                         modal!(
-                            context,
+                            ctx,
                             InfoListModal::builder()
                                 .items(selected_song)
                                 .title("Song info")
@@ -966,15 +951,15 @@ impl Pane for QueuePane {
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
             }
-        } else if let Some(action) = event.as_global_action(context) {
+        } else if let Some(action) = event.as_global_action(ctx) {
             match action {
                 GlobalAction::ExternalCommand { command, .. } => {
                     let song = self
                         .scrolling_state
                         .get_selected()
-                        .and_then(|idx| context.queue.get(idx).map(|song| song.file.as_str()));
+                        .and_then(|idx| ctx.queue.get(idx).map(|song| song.file.as_str()));
 
-                    run_external(command.clone(), create_env(context, song));
+                    run_external(command.clone(), create_env(ctx, song));
                 }
                 _ => {
                     event.abandon();

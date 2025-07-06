@@ -21,7 +21,7 @@ use crate::{
         cava::Cava,
         theme::cava::{CavaTheme, Orientation},
     },
-    context::AppContext,
+    ctx::Ctx,
     mpd::commands::State,
     shared::{
         dependencies::CAVA,
@@ -67,7 +67,7 @@ impl Drop for ProcessGuard {
 }
 
 impl CavaPane {
-    pub fn new(_context: &AppContext) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self {
             area: Rect::default(),
             handle: None,
@@ -76,7 +76,7 @@ impl CavaPane {
         }
     }
 
-    pub fn run(&mut self, ctx: &AppContext) -> Result<()> {
+    pub fn run(&mut self, ctx: &Ctx) -> Result<()> {
         self.clear(ctx)?;
         self.command(CavaCommand::Start { area: self.area })?;
         Ok(())
@@ -332,21 +332,20 @@ impl CavaPane {
         Ok(())
     }
 
-    fn pause_and_clear(&mut self, context: &AppContext) -> Result<()> {
+    fn pause_and_clear(&mut self, ctx: &Ctx) -> Result<()> {
         log::debug!("Stopping cava thread and clearing area");
         self.command(CavaCommand::Pause)?;
         log::debug!("Waiting for cava thread to finish");
-        self.clear(context)?;
+        self.clear(ctx)?;
 
         Ok(())
     }
 
-    fn clear(&self, context: &AppContext) -> Result<()> {
+    fn clear(&self, ctx: &Ctx) -> Result<()> {
         let writer = TERMINAL.writer();
         let mut w = writer.lock();
 
-        let colors =
-            Colors { background: Some(context.config.theme.cava.bg_color), foreground: None };
+        let colors = Colors { background: Some(ctx.config.theme.cava.bg_color), foreground: None };
         clear_area(w.by_ref(), colors, self.area)?;
 
         Ok(())
@@ -372,7 +371,7 @@ impl CavaPane {
 }
 
 impl Pane for CavaPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &AppContext) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         self.area = area;
         frame.render_widget(
             Block::default().style(Style::default().bg(ctx.config.theme.cava.bg_color.into())),
@@ -382,31 +381,31 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, _context: &AppContext) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, _ctx: &Ctx) -> Result<()> {
         self.area = area;
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
-        self.spawn(context.config.cava.clone(), context.config.theme.cava.clone())?;
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
+        self.spawn(ctx.config.cava.clone(), ctx.config.theme.cava.clone())?;
 
-        if matches!(context.status.state, State::Play) {
-            self.run(context)?;
+        if matches!(ctx.status.state, State::Play) {
+            self.run(ctx)?;
         }
 
         Ok(())
     }
 
-    fn handle_action(&mut self, _ev: &mut KeyEvent, _ctx: &mut AppContext) -> anyhow::Result<()> {
+    fn handle_action(&mut self, _ev: &mut KeyEvent, _ctx: &mut Ctx) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn on_hide(&mut self, context: &AppContext) -> Result<()> {
-        self.pause_and_clear(context)?;
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
+        self.pause_and_clear(ctx)?;
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &AppContext) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Exit => {
                 self.command(CavaCommand::Stop)?;
@@ -454,16 +453,16 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+    fn resize(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         if self.is_modal_open {
             return Ok(());
         }
 
         self.area = area;
-        self.pause_and_clear(context)?;
+        self.pause_and_clear(ctx)?;
 
-        if matches!(context.status.state, State::Play) {
-            self.run(context)?;
+        if matches!(ctx.status.state, State::Play) {
+            self.run(ctx)?;
         }
         Ok(())
     }

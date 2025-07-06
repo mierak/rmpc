@@ -6,7 +6,7 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{keys::actions::Position, tabs::PaneType},
-    context::AppContext,
+    ctx::Ctx,
     mpd::{
         client::Client,
         commands::{Song, lsinfo::LsInfoEntry},
@@ -52,7 +52,7 @@ const PREVIEW: &str = "preview";
 const PLAYLIST_INFO: &str = "preview";
 
 impl PlaylistsPane {
-    pub fn new(_context: &AppContext) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
@@ -62,11 +62,11 @@ impl PlaylistsPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
 
-            context.render()?;
+            ctx.render()?;
             return Ok(());
         };
         let Some(next_path) = self.stack.next_path() else {
@@ -77,7 +77,7 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query().id(OPEN_OR_PLAY).target(PaneType::Playlists).query(move |client| {
+                ctx.query().id(OPEN_OR_PLAY).target(PaneType::Playlists).query(move |client| {
                     Ok(MpdQueryResult::SongsList {
                         data: client.list_playlist_info(&playlist, None)?,
                         origin_path: Some(next_path),
@@ -85,12 +85,12 @@ impl PlaylistsPane {
                 });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
-                context.render()?;
+                ctx.render()?;
             }
             DirOrSong::Song(_song) => {
                 let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 if !items.is_empty() {
-                    let queue_len = context.queue.len();
+                    let queue_len = ctx.queue.len();
                     let (position, autoplay) = if autoplay {
                         (Position::Replace, Autoplay::Hovered {
                             queue_len,
@@ -100,7 +100,7 @@ impl PlaylistsPane {
                     } else {
                         (Position::EndOfQueue, Autoplay::None)
                     };
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
@@ -113,20 +113,20 @@ impl PlaylistsPane {
 }
 
 impl Pane for PlaylistsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &context.config,
+            &ctx.config,
         );
 
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).target(PaneType::Playlists).replace_id(INIT).query(
+            ctx.query().id(INIT).target(PaneType::Playlists).replace_id(INIT).query(
                 move |client| {
                     let result: Vec<_> = client
                         .list_playlists()
@@ -144,12 +144,7 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         let id = match event {
             UiEvent::Database => Some(INIT),
             UiEvent::StoredPlaylist => Some(REINIT),
@@ -158,7 +153,7 @@ impl Pane for PlaylistsPane {
         match event {
             UiEvent::Database | UiEvent::StoredPlaylist => {
                 if let Some(id) = id {
-                    context.query().id(id).replace_id(id).target(PaneType::Playlists).query(
+                    ctx.query().id(id).replace_id(id).target(PaneType::Playlists).query(
                         move |client| {
                             let result: Vec<_> = client
                                 .list_playlists()
@@ -174,7 +169,7 @@ impl Pane for PlaylistsPane {
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
-                self.before_show(context)?;
+                self.before_show(ctx)?;
             }
             _ => {}
         }
@@ -182,14 +177,14 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
-        self.handle_mouse_action(event, context)
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
+        self.handle_mouse_action(event, ctx)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        self.handle_filter_input(event, context)?;
-        self.handle_common_action(event, context)?;
-        self.handle_global_action(event, context)?;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        self.handle_filter_input(event, ctx)?;
+        self.handle_common_action(event, ctx)?;
+        self.handle_global_action(event, ctx)?;
         Ok(())
     }
 
@@ -198,12 +193,12 @@ impl Pane for PlaylistsPane {
         id: &'static str,
         mpd_command: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, mpd_command) {
             (PLAYLIST_INFO, MpdQueryResult::SongsList { data, .. }) => {
                 modal!(
-                    context,
+                    ctx,
                     InfoListModal::builder()
                         .column_widths(&[30, 70])
                         .title("Playlist info")
@@ -211,7 +206,7 @@ impl Pane for PlaylistsPane {
                         .size((40, 20))
                         .build()
                 );
-                context.render()?;
+                ctx.render()?;
             }
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {
@@ -221,7 +216,7 @@ impl Pane for PlaylistsPane {
                     }
                 }
                 self.stack_mut().set_preview(data);
-                context.render()?;
+                ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {
@@ -231,12 +226,12 @@ impl Pane for PlaylistsPane {
                     }
                 }
                 self.stack_mut().replace(data.into_iter().map(DirOrSong::Song).collect());
-                self.prepare_preview(context)?;
-                context.render()?;
+                self.prepare_preview(ctx)?;
+                ctx.render()?;
             }
             (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
                 self.stack = DirStack::new(data);
-                self.prepare_preview(context)?;
+                self.prepare_preview(ctx)?;
             }
             (REINIT, MpdQueryResult::DirOrSong { data, .. }) => {
                 let mut new_stack = DirStack::new(data);
@@ -262,7 +257,7 @@ impl Pane for PlaylistsPane {
                         new_stack
                             .current_mut()
                             .state
-                            .select(Some(idx_to_select), context.config.scrolloff);
+                            .select(Some(idx_to_select), ctx.config.scrolloff);
 
                         if let Some((idx, DirOrSong::Song(song))) =
                             self.stack().current().selected_with_idx()
@@ -274,12 +269,12 @@ impl Pane for PlaylistsPane {
                         self.stack_mut().current_mut().state.set_content_len(old_content_len);
                         self.stack_mut().current_mut().state.set_viewport_len(old_viewport_len);
 
-                        let songs = context.query_sync(move |client| {
+                        let songs = ctx.query_sync(move |client| {
                             Ok(client.list_playlist_info(&playlist, None)?)
                         })?;
 
                         self.stack_mut().push(songs.into_iter().map(DirOrSong::Song).collect());
-                        self.prepare_preview(context)?;
+                        self.prepare_preview(ctx)?;
                         if let Some((idx, song)) = &self.selected_song {
                             let idx_to_select = self
                                 .stack
@@ -292,11 +287,11 @@ impl Pane for PlaylistsPane {
                             self.stack
                                 .current_mut()
                                 .state
-                                .select(Some(idx_to_select), context.config.scrolloff);
+                                .select(Some(idx_to_select), ctx.config.scrolloff);
                         }
                         self.stack_mut().clear_preview();
-                        self.prepare_preview(context)?;
-                        context.render()?;
+                        self.prepare_preview(ctx)?;
+                        ctx.render()?;
                     }
                     [] => {
                         let Some((selected_idx, selected_playlist)) = self
@@ -318,10 +313,10 @@ impl Pane for PlaylistsPane {
                         new_stack
                             .current_mut()
                             .state
-                            .select(Some(idx_to_select), context.config.scrolloff);
+                            .select(Some(idx_to_select), ctx.config.scrolloff);
 
                         self.stack = new_stack;
-                        self.prepare_preview(context)?;
+                        self.prepare_preview(ctx)?;
                     }
                     _ => {
                         log::error!(stack:? = self.stack; "Invalid playlist stack state");
@@ -351,12 +346,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         self.filter_input_mode
     }
 
-    fn show_info(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
+    fn show_info(&self, item: &DirOrSong, ctx: &Ctx) -> Result<()> {
         match item {
             DirOrSong::Dir { name, .. } => {
                 let playlist = name.clone();
-                context
-                    .query()
+                ctx.query()
                     .target(PaneType::Playlists)
                     .replace_id(PLAYLIST_INFO)
                     .id(PLAYLIST_INFO)
@@ -382,18 +376,18 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         }
     }
 
-    fn delete(&self, item: &DirOrSong, index: usize, context: &AppContext) -> Result<()> {
+    fn delete(&self, item: &DirOrSong, index: usize, ctx: &Ctx) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 let d = d.clone();
                 modal!(
-                    context,
+                    ctx,
                     ConfirmModal::builder()
-                    .context(context)
+                    .ctx(ctx)
                         .message("Are you sure you want to delete this playlist? This action cannot be undone.")
-                        .on_confirm(move |context| {
+                        .on_confirm(move |ctx| {
                             let d = d.clone();
-                            context.command(move |client| {
+                            ctx.command(move |client| {
                                 client.delete_playlist(&d)?;
                                 status_info!("Playlist '{d}' deleted");
                                 Ok(())
@@ -412,13 +406,13 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 };
                 let playlist = playlist.clone();
                 let file = s.file.clone();
-                context.command(move |client| {
+                ctx.command(move |client| {
                     client.delete_from_playlist(&playlist, &SingleOrRange::single(index))?;
                     status_info!("File '{file}' deleted from playlist '{playlist}'");
                     Ok(())
                 });
 
-                context.render()?;
+                ctx.render()?;
             }
         }
         Ok(())
@@ -446,22 +440,22 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         })
     }
 
-    fn rename(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
+    fn rename(&self, item: &DirOrSong, ctx: &Ctx) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 let current_name = d.clone();
                 modal!(
-                    context,
-                    InputModal::new(context)
+                    ctx,
+                    InputModal::new(ctx)
                         .title("Rename playlist")
                         .confirm_label("Rename")
                         .input_label("New name:")
                         .initial_value(current_name.clone())
-                        .on_confirm(move |context, new_value| {
+                        .on_confirm(move |ctx, new_value| {
                             if current_name != new_value {
                                 let current_name = current_name.clone();
                                 let new_value = new_value.to_owned();
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     client.rename_playlist(&current_name, &new_value)?;
                                     status_info!(
                                         "Playlist '{}' renamed to '{}'",
@@ -481,15 +475,15 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context)
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
     }
 
-    fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context)
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
     }
 
-    fn move_selected(&mut self, direction: MoveDirection, context: &AppContext) -> Result<()> {
+    fn move_selected(&mut self, direction: MoveDirection, ctx: &Ctx) -> Result<()> {
         let Some((idx, selected)) = self.stack().current().selected_with_idx() else {
             status_error!("Failed to move playlist. No playlist selected");
             return Ok(());
@@ -506,30 +500,26 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     MoveDirection::Down => (idx + 1).min(self.stack().current().items.len() - 1),
                 };
                 let playlist = playlist.clone();
-                context.command(move |client| {
+                ctx.command(move |client| {
                     client.move_in_playlist(&playlist, &SingleOrRange::single(idx), new_idx)?;
                     Ok(())
                 });
                 self.stack_mut().current_mut().items.swap(idx, new_idx);
-                self.stack_mut().current_mut().select_idx(new_idx, context.config.scrolloff);
+                self.stack_mut().current_mut().select_idx(new_idx, ctx.config.scrolloff);
             }
         }
-        context.render()?;
+        ctx.render()?;
 
         Ok(())
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
-        let config = std::sync::Arc::clone(&context.config);
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
+        let config = std::sync::Arc::clone(&ctx.config);
         let s = self.stack().current().selected().cloned();
         self.stack_mut().clear_preview();
         let origin_path = Some(self.stack().path().to_vec());
-        context
-            .query()
-            .id(PREVIEW)
-            .replace_id("playlists_preview")
-            .target(PaneType::Playlists)
-            .query(move |client| {
+        ctx.query().id(PREVIEW).replace_id("playlists_preview").target(PaneType::Playlists).query(
+            move |client| {
                 let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
                     let response = match current {
                         DirOrSong::Dir { name: d, .. } => Some(vec![PreviewGroup::from(
@@ -561,7 +551,8 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 })?;
 
                 Ok(MpdQueryResult::Preview { data, origin_path })
-            });
+            },
+        );
         Ok(())
     }
 

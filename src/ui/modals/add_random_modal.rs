@@ -17,7 +17,7 @@ use crate::{
         cli::{AddRandom, Command},
         keys::CommonAction,
     },
-    context::AppContext,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -67,19 +67,19 @@ impl AddRandom {
 }
 
 impl AddRandomModal<'_> {
-    pub fn new(context: &AppContext) -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Add"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
 
         let button_group = ButtonGroup::default()
             .buttons(buttons)
-            .inactive_style(context.config.as_text_style())
+            .inactive_style(ctx.config.as_text_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -94,7 +94,7 @@ impl AddRandomModal<'_> {
         }
     }
 
-    fn add_random(tag: AddRandom, count: &str, ctx: &AppContext) -> Result<()> {
+    fn add_random(tag: AddRandom, count: &str, ctx: &Ctx) -> Result<()> {
         Ok(ctx
             .work_sender
             .send(WorkRequest::Command(Command::AddRandom { tag, count: count.parse()? }))?)
@@ -102,16 +102,16 @@ impl AddRandomModal<'_> {
 }
 
 impl Modal for AddRandomModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
         let popup_area = frame.area().centered_exact(50, 6);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
@@ -124,35 +124,35 @@ impl Modal for AddRandomModal<'_> {
 
         let mut combobox = Input::default()
             .set_label("Tag:   ")
-            .set_label_style(app.config.as_text_style())
+            .set_label_style(ctx.config.as_text_style())
             .set_text(self.selected_tag.into())
             .set_focused(false)
             .set_borderless(true)
-            .set_unfocused_style(app.config.as_border_style());
+            .set_unfocused_style(ctx.config.as_border_style());
 
         if matches!(self.active_input, InputType::Tag) {
             combobox = combobox
-                .set_label_style(app.config.theme.current_item_style)
-                .set_input_style(app.config.theme.current_item_style);
+                .set_label_style(ctx.config.theme.current_item_style)
+                .set_input_style(ctx.config.theme.current_item_style);
         }
 
         let mut count = Input::default()
             .set_label("Count: ")
-            .set_label_style(app.config.as_text_style())
+            .set_label_style(ctx.config.as_text_style())
             .set_text(&self.count)
             .set_focused(matches!(self.active_input, InputType::CountFocused))
-            .set_focused_style(app.config.theme.highlight_border_style)
+            .set_focused_style(ctx.config.theme.highlight_border_style)
             .set_borderless(true)
-            .set_unfocused_style(app.config.as_border_style());
+            .set_unfocused_style(ctx.config.as_border_style());
 
         if matches!(self.active_input, InputType::Count) {
             count = count
-                .set_label_style(app.config.theme.current_item_style)
-                .set_input_style(app.config.theme.current_item_style);
+                .set_label_style(ctx.config.theme.current_item_style)
+                .set_input_style(ctx.config.theme.current_item_style);
         }
 
         self.button_group.set_active_style(match self.active_input {
-            InputType::Buttons => app.config.theme.current_item_style,
+            InputType::Buttons => ctx.config.theme.current_item_style,
             _ => Style::default().reversed(),
         });
 
@@ -171,18 +171,18 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        let action = key.as_common_action(context);
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let action = key.as_common_action(ctx);
         match self.active_input {
             InputType::CountFocused => {
                 // handle typing into input field
                 if let Some(CommonAction::Close) = action {
                     self.active_input = InputType::Count;
-                    context.render()?;
+                    ctx.render()?;
                     return Ok(());
                 } else if let Some(CommonAction::Confirm) = action {
-                    Self::add_random(self.selected_tag, &self.count, context)?;
-                    pop_modal!(context);
+                    Self::add_random(self.selected_tag, &self.count, ctx)?;
+                    pop_modal!(ctx);
                     return Ok(());
                 }
 
@@ -190,12 +190,12 @@ impl Modal for AddRandomModal<'_> {
                     KeyCode::Char(c) => {
                         self.count.push(c);
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     KeyCode::Backspace => {
                         self.count.pop();
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     _ => {}
                 }
@@ -207,19 +207,19 @@ impl Modal for AddRandomModal<'_> {
                 match action {
                     CommonAction::Down => {
                         self.active_input = InputType::Count;
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::Up => {
                         self.active_input = InputType::Buttons;
                         self.button_group_state.last();
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::FocusInput | CommonAction::Confirm => {
                         self.selected_tag = self.selected_tag.next();
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::Close => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     _ => {}
                 }
@@ -232,18 +232,18 @@ impl Modal for AddRandomModal<'_> {
                     CommonAction::Down => {
                         self.active_input = InputType::Buttons;
                         self.button_group_state.first();
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::Up => {
                         self.active_input = InputType::Tag;
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::FocusInput | CommonAction::Confirm => {
                         self.active_input = InputType::CountFocused;
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::Close => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     _ => {}
                 }
@@ -262,7 +262,7 @@ impl Modal for AddRandomModal<'_> {
                             self.button_group_state.next();
                         }
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::Up => {
                         if state.selected == 0 {
@@ -271,16 +271,16 @@ impl Modal for AddRandomModal<'_> {
                             self.button_group_state.prev();
                         }
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     CommonAction::Close => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     CommonAction::Confirm => {
                         if state.selected == 0 {
-                            Self::add_random(self.selected_tag, &self.count, context)?;
+                            Self::add_random(self.selected_tag, &self.count, ctx)?;
                         }
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     _ => {}
                 }
@@ -290,48 +290,48 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>
             {
                 self.active_input = InputType::Tag;
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::DoubleClick | MouseEventKind::RightClick
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>
             {
                 self.active_input = InputType::Tag;
                 self.selected_tag = self.selected_tag.next();
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::LeftClick
                 if self.input_areas[InputAreas::Count].contains(event.into()) =>
             {
                 self.active_input = InputType::Count;
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::DoubleClick
                 if self.input_areas[InputAreas::Count].contains(event.into()) =>
             {
                 self.active_input = InputType::CountFocused;
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
                     self.active_input = InputType::Buttons;
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        Self::add_random(self.selected_tag, &self.count, context)?;
-                        pop_modal!(context);
+                        Self::add_random(self.selected_tag, &self.count, ctx)?;
+                        pop_modal!(ctx);
                     }
                     Some(_) => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     None => {}
                 }
@@ -362,7 +362,7 @@ impl Modal for AddRandomModal<'_> {
                         }
                     }
                 }
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
@@ -385,7 +385,7 @@ impl Modal for AddRandomModal<'_> {
                         }
                     }
                 }
-                context.render()?;
+                ctx.render()?;
             }
         }
         Ok(())

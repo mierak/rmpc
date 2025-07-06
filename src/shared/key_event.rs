@@ -4,7 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent as CKeyEvent};
 use crate::config::keys::LogsActions;
 use crate::{
     config::keys::{CommonAction, GlobalAction, QueueActions},
-    context::AppContext,
+    ctx::Ctx,
 };
 
 #[derive(Debug, Clone)]
@@ -32,13 +32,10 @@ impl KeyEvent {
         self.already_handled = false;
     }
 
-    pub fn as_common_action<'ctx>(
-        &mut self,
-        context: &'ctx AppContext,
-    ) -> Option<&'ctx CommonAction> {
+    pub fn as_common_action<'ctx>(&mut self, ctx: &'ctx Ctx) -> Option<&'ctx CommonAction> {
         if self.already_handled {
             None
-        } else if let Some(action) = context.config.keybinds.navigation.get(&self.inner.into()) {
+        } else if let Some(action) = ctx.config.keybinds.navigation.get(&self.inner.into()) {
             self.already_handled = true;
             Some(action)
         } else {
@@ -46,13 +43,10 @@ impl KeyEvent {
         }
     }
 
-    pub fn as_global_action<'ctx>(
-        &mut self,
-        context: &'ctx AppContext,
-    ) -> Option<&'ctx GlobalAction> {
+    pub fn as_global_action<'ctx>(&mut self, ctx: &'ctx Ctx) -> Option<&'ctx GlobalAction> {
         if self.already_handled {
             None
-        } else if let Some(action) = context.config.keybinds.global.get(&self.inner.into()) {
+        } else if let Some(action) = ctx.config.keybinds.global.get(&self.inner.into()) {
             self.already_handled = true;
             Some(action)
         } else {
@@ -61,10 +55,10 @@ impl KeyEvent {
     }
 
     #[cfg(debug_assertions)]
-    pub fn as_logs_action(&mut self, context: &AppContext) -> Option<LogsActions> {
+    pub fn as_logs_action(&mut self, ctx: &Ctx) -> Option<LogsActions> {
         if self.already_handled {
             None
-        } else if let Some(action) = context.config.keybinds.logs.get(&self.inner.into()) {
+        } else if let Some(action) = ctx.config.keybinds.logs.get(&self.inner.into()) {
             self.already_handled = true;
             Some(*action)
         } else {
@@ -72,10 +66,10 @@ impl KeyEvent {
         }
     }
 
-    pub fn as_queue_action(&mut self, context: &AppContext) -> Option<QueueActions> {
+    pub fn as_queue_action(&mut self, ctx: &Ctx) -> Option<QueueActions> {
         if self.already_handled {
             None
-        } else if let Some(action) = context.config.keybinds.queue.get(&self.inner.into()) {
+        } else if let Some(action) = ctx.config.keybinds.queue.get(&self.inner.into()) {
             self.already_handled = true;
             Some(*action)
         } else {

@@ -12,7 +12,7 @@ use ratatui::{
 use super::{Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    ctx::Ctx,
     mpd::commands::Decoder,
     shared::{
         ext::iter::IntoZipLongest2,
@@ -75,17 +75,17 @@ impl DecodersModal {
 }
 
 impl Modal for DecodersModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(80, 80);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let block = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Decoder plugins");
 
@@ -137,7 +137,7 @@ impl Modal for DecodersModal {
         )
         .column_spacing(1)
         .block(
-            Block::default().borders(Borders::BOTTOM).border_style(app.config.as_border_style()),
+            Block::default().borders(Borders::BOTTOM).border_style(ctx.config.as_border_style()),
         );
         let table = Table::new(rows, [
             Constraint::Percentage(name_col_width),
@@ -145,15 +145,15 @@ impl Modal for DecodersModal {
             Constraint::Percentage(suffix_col_width),
         ])
         .column_spacing(1)
-        .style(app.config.as_text_style())
-        .row_highlight_style(app.config.theme.current_item_style);
+        .style(ctx.config.as_text_style())
+        .row_highlight_style(ctx.config.theme.current_item_style);
 
         self.table_area = table_area;
 
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+        if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
                 popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
@@ -164,44 +164,42 @@ impl Modal for DecodersModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.prev_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
-                    self.scrolling_state
-                        .prev(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
-                    self.scrolling_state
-                        .next(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Confirm => {}
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 _ => {}
             }
@@ -209,25 +207,25 @@ impl Modal for DecodersModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.table_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.table_area.y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    context.render()?;
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {}
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown if self.table_area.contains(event.into()) => {
-                self.scrolling_state.next(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.next(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp if self.table_area.contains(event.into()) => {
-                self.scrolling_state.prev(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::LeftClick => {}
             MouseEventKind::ScrollDown => {}

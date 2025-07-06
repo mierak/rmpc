@@ -16,7 +16,7 @@ use crate::{
         Size,
         keys::{CommonAction, GlobalAction},
     },
-    context::AppContext,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -25,7 +25,7 @@ use crate::{
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
-pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
+pub struct ConfirmModal<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> {
     message: Cow<'a, str>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
@@ -33,7 +33,7 @@ pub struct ConfirmModal<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> {
     size: Size,
 }
 
-impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
+impl<Callback: FnMut(&Ctx) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -45,10 +45,10 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> std::fmt::Debug for ConfirmModa
 
 #[allow(dead_code)]
 #[bon]
-impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
+impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
     #[builder]
     pub fn new(
-        context: &AppContext,
+        ctx: &Ctx,
         size: impl Into<Size>,
         confirm_label: Option<&'a str>,
         cancel_label: Option<&'a str>,
@@ -62,14 +62,14 @@ impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callb
         ];
         button_group_state.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
-            .active_style(context.config.theme.current_item_style)
-            .inactive_style(context.config.as_text_style())
+            .active_style(ctx.config.theme.current_item_style)
+            .inactive_style(ctx.config.as_text_style())
             .buttons(buttons)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -82,23 +82,23 @@ impl<'a, Callback: FnMut(&AppContext) -> Result<()> + 'a> ConfirmModal<'a, Callb
     }
 }
 
-impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(self.size.width, self.size.height);
         frame.render_widget(Clear, popup_area);
 
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
         let paragraph = Paragraph::new(self.message.as_ref())
-            .style(app.config.as_text_style())
+            .style(ctx.config.as_text_style())
             .wrap(Wrap { trim: true })
             .block(block.clone())
             .centered();
@@ -118,39 +118,39 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::Right => {
                     self.button_group_state.next();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Left => {
                     self.button_group_state.prev();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close => {
                     self.button_group_state = ButtonGroupState::default();
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
-                        (self.on_confirm)(context)?;
+                        (self.on_confirm)(ctx)?;
                     }
                     self.button_group_state = ButtonGroupState::default();
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 _ => {}
             }
-        } else if let Some(action) = key.as_global_action(context) {
+        } else if let Some(action) = key.as_global_action(ctx) {
             match action {
                 GlobalAction::NextTab => {
                     self.button_group_state.next();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 GlobalAction::PreviousTab => {
                     self.button_group_state.prev();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -159,22 +159,22 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        (self.on_confirm)(context)?;
-                        pop_modal!(context);
+                        (self.on_confirm)(ctx)?;
+                        pop_modal!(ctx);
                     }
                     Some(_) => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     None => {}
                 }
@@ -184,13 +184,13 @@ impl<Callback: FnMut(&AppContext) -> Result<()>> Modal for ConfirmModal<'_, Call
             MouseEventKind::ScrollUp => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
                     self.button_group_state.prev();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::ScrollDown => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
                     self.button_group_state.next();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
         }

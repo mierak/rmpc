@@ -16,7 +16,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::{Size, keys::CommonAction},
-    context::AppContext,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -40,7 +40,7 @@ pub struct InfoModal<'a> {
 impl<'a> InfoModal<'a> {
     #[builder]
     pub fn new(
-        context: &AppContext,
+        ctx: &Ctx,
         size: Option<impl Into<Size>>,
         confirm_label: Option<&'a str>,
         message: Vec<String>,
@@ -51,14 +51,14 @@ impl<'a> InfoModal<'a> {
         let buttons = vec![Button::default().label(confirm_label.unwrap_or("Ok"))];
         button_group_state.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
-            .active_style(context.config.theme.current_item_style)
-            .inactive_style(context.config.as_text_style())
+            .active_style(ctx.config.theme.current_item_style)
+            .inactive_style(ctx.config.as_text_style())
             .buttons(buttons)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -73,7 +73,7 @@ impl<'a> InfoModal<'a> {
 }
 
 impl Modal for InfoModal<'_> {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let width = match (frame.area().width, self.size) {
             (fw, Some(Size { width, .. })) => width.min(fw),
             (fw, None) if fw > 60 => fw / 2,
@@ -92,14 +92,14 @@ impl Modal for InfoModal<'_> {
             .centered_exact(width, self.size.map_or(u16::try_from(lines.len())? + 4, |v| v.height));
         frame.render_widget(Clear, popup_area);
 
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let mut block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(Alignment::Left);
         if let Some(title) = &self.title {
             block = block.title(title.as_ref());
@@ -114,7 +114,7 @@ impl Modal for InfoModal<'_> {
 
         for (idx, message) in lines.iter().enumerate() {
             let paragraph =
-                Line::from(message.as_ref()).style(app.config.as_text_style()).left_aligned();
+                Line::from(message.as_ref()).style(ctx.config.as_text_style()).left_aligned();
 
             let Some(area) = areas.get(idx) else {
                 continue;
@@ -130,20 +130,20 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(context) {
-            pop_modal!(context);
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(ctx) {
+            pop_modal!(ctx);
         }
 
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
             }
             _ => {}

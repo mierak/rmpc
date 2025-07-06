@@ -6,7 +6,7 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{keys::actions::Position, tabs::PaneType},
-    context::AppContext,
+    ctx::Ctx,
     mpd::{
         client::Client,
         commands::Song,
@@ -40,7 +40,7 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl DirectoriesPane {
-    pub fn new(_context: &AppContext) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
@@ -49,7 +49,7 @@ impl DirectoriesPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
         let Some(selected) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -59,13 +59,12 @@ impl DirectoriesPane {
             return Ok(());
         };
 
-        let sort = context.config.directories_sort.clone();
+        let sort = ctx.config.directories_sort.clone();
         match selected {
             DirOrSong::Dir { playlist: is_playlist, .. } => {
                 let is_playlist = *is_playlist;
-                let playlist_display_mode = context.config.show_playlists_in_browser;
-                context
-                    .query()
+                let playlist_display_mode = ctx.config.show_playlists_in_browser;
+                ctx.query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
                     .target(PaneType::Directories)
@@ -94,7 +93,7 @@ impl DirectoriesPane {
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
-                context.render()?;
+                ctx.render()?;
             }
             DirOrSong::Song(_) => {
                 let (items, hovered_song_idx) = self.enqueue(
@@ -108,7 +107,7 @@ impl DirectoriesPane {
                         .filter(|item| matches!(item, DirOrSong::Song(_))),
                 );
                 if !items.is_empty() {
-                    let queue_len = context.queue.len();
+                    let queue_len = ctx.queue.len();
                     let (position, autoplay) = if autoplay {
                         (Position::Replace, Autoplay::Hovered {
                             queue_len,
@@ -118,7 +117,7 @@ impl DirectoriesPane {
                     } else {
                         (Position::EndOfQueue, Autoplay::None)
                     };
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
@@ -131,27 +130,22 @@ impl DirectoriesPane {
 }
 
 impl Pane for DirectoriesPane {
-    fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        context: &AppContext,
-    ) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &context.config,
+            &ctx.config,
         );
 
         Ok(())
     }
 
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            let sort = context.config.directories_sort.clone();
-            let playlist_display_mode = context.config.show_playlists_in_browser;
-            context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
+            let sort = ctx.config.directories_sort.clone();
+            let playlist_display_mode = ctx.config.show_playlists_in_browser;
+            ctx.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                 move |client| {
                     let result = client
                         .lsinfo(None)?
@@ -168,17 +162,12 @@ impl Pane for DirectoriesPane {
         Ok(())
     }
 
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        _is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
-                let sort = context.config.directories_sort.clone();
-                let playlist_display_mode = context.config.show_playlists_in_browser;
-                context.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
+                let sort = ctx.config.directories_sort.clone();
+                let playlist_display_mode = ctx.config.show_playlists_in_browser;
+                ctx.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                     move |client| {
                         let result = client
                             .lsinfo(None)?
@@ -194,21 +183,21 @@ impl Pane for DirectoriesPane {
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
-                self.before_show(context)?;
+                self.before_show(ctx)?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
-        self.handle_mouse_action(event, context)
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
+        self.handle_mouse_action(event, ctx)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        self.handle_filter_input(event, context)?;
-        self.handle_common_action(event, context)?;
-        self.handle_global_action(event, context)?;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        self.handle_filter_input(event, ctx)?;
+        self.handle_common_action(event, ctx)?;
+        self.handle_global_action(event, ctx)?;
         Ok(())
     }
 
@@ -217,7 +206,7 @@ impl Pane for DirectoriesPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &AppContext,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
@@ -228,12 +217,12 @@ impl Pane for DirectoriesPane {
                     }
                 }
                 self.stack_mut().set_preview(data);
-                context.render()?;
+                ctx.render()?;
             }
             (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
                 self.stack = DirStack::new(data);
-                self.prepare_preview(context)?;
-                context.render()?;
+                self.prepare_preview(ctx)?;
+                ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {
@@ -243,8 +232,8 @@ impl Pane for DirectoriesPane {
                     }
                 }
                 self.stack_mut().replace(data);
-                self.prepare_preview(context)?;
-                context.render()?;
+                self.prepare_preview(ctx)?;
+                ctx.render()?;
             }
             _ => {}
         }
@@ -326,15 +315,15 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         (items, hovered_idx)
     }
 
-    fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context)
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
     }
 
-    fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context)
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
     }
 
-    fn prepare_preview(&mut self, context: &AppContext) -> Result<()> {
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
         let origin_path = Some(self.stack().path().to_vec());
         match &self.stack.current().selected() {
             Some(DirOrSong::Dir { playlist: is_playlist, .. }) => {
@@ -343,14 +332,13 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                     return Ok(());
                 };
                 let next_path = next_path.join("/").to_string();
-                let config = std::sync::Arc::clone(&context.config);
-                let sort = context.config.directories_sort.clone();
+                let config = std::sync::Arc::clone(&ctx.config);
+                let sort = ctx.config.directories_sort.clone();
                 let is_playlist = *is_playlist;
-                let playlist_display_mode = context.config.show_playlists_in_browser;
+                let playlist_display_mode = ctx.config.show_playlists_in_browser;
 
                 self.stack_mut().clear_preview();
-                context
-                    .query()
+                ctx.query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
                     .target(PaneType::Directories)
@@ -394,10 +382,9 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
             }
             Some(DirOrSong::Song(song)) => {
                 let file = song.file.clone();
-                let key_style = context.config.theme.preview_label_style;
-                let group_style = context.config.theme.preview_metadata_group_style;
-                context
-                    .query()
+                let key_style = ctx.config.theme.preview_label_style;
+                let group_style = ctx.config.theme.preview_metadata_group_style;
+                ctx.query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
                     .target(PaneType::Directories)

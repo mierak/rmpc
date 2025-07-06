@@ -16,7 +16,7 @@ use strum::{IntoDiscriminant, VariantArray};
 use super::{Modal, RectExt};
 use crate::{
     config::keys::{CommonAction, ToDescription},
-    context::AppContext,
+    ctx::Ctx,
     shared::{
         ext::iter::IntoZipLongest2,
         key_event::KeyEvent,
@@ -58,7 +58,7 @@ where
 }
 
 impl KeybindsModal {
-    pub fn new(_ctx: &mut AppContext) -> Self {
+    pub fn new(_ctx: &mut Ctx) -> Self {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
 
@@ -204,17 +204,17 @@ fn row<'a>(
 }
 
 impl Modal for KeybindsModal {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(90, 90);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
         let mut block = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED)
-            .border_style(app.config.as_border_style())
+            .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
         if let Some(filter) = &self.filter {
             block = block.title(format!("Keybinds | [FILTER]: {filter}"));
@@ -240,8 +240,8 @@ impl Modal for KeybindsModal {
         action_area.width = action_area.width.saturating_sub(1); // account for the column spacing
         desc_area.width = desc_area.width.saturating_sub(2); // account for the column spacing
 
-        let keybinds = &app.config.keybinds;
-        let header_style = app.config.theme.current_item_style;
+        let keybinds = &ctx.config.keybinds;
+        let header_style = ctx.config.theme.current_item_style;
 
         let global = keybinds.global.sort_by_action().collect_vec();
         let navigation = keybinds.navigation.sort_by_action().collect_vec();
@@ -252,7 +252,7 @@ impl Modal for KeybindsModal {
             action_area.width,
             desc_area.width,
             self.filter.as_deref(),
-            app.config.theme.highlighted_item_style,
+            ctx.config.theme.highlighted_item_style,
         )
         .unzip();
         let nav_rows: (Vec<_>, Vec<_>) = row(
@@ -261,7 +261,7 @@ impl Modal for KeybindsModal {
             action_area.width,
             desc_area.width,
             self.filter.as_deref(),
-            app.config.theme.highlighted_item_style,
+            ctx.config.theme.highlighted_item_style,
         )
         .unzip();
         let queue_rows: (Vec<_>, Vec<_>) = row(
@@ -270,7 +270,7 @@ impl Modal for KeybindsModal {
             action_area.width,
             desc_area.width,
             self.filter.as_deref(),
-            app.config.theme.highlighted_item_style,
+            ctx.config.theme.highlighted_item_style,
         )
         .unzip();
 
@@ -300,20 +300,20 @@ impl Modal for KeybindsModal {
         )
         .column_spacing(1)
         .block(
-            Block::default().borders(Borders::BOTTOM).border_style(app.config.as_border_style()),
+            Block::default().borders(Borders::BOTTOM).border_style(ctx.config.as_border_style()),
         );
 
         let table = Table::new(rows, constraints)
             .column_spacing(1)
-            .style(app.config.as_text_style())
-            .row_highlight_style(app.config.theme.current_item_style);
+            .style(ctx.config.as_text_style())
+            .row_highlight_style(ctx.config.theme.current_item_style);
 
         self.table_area = table_area;
 
         frame.render_widget(block, popup_area);
         frame.render_widget(header_table, header_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+        if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
                 popup_area.inner(Margin { horizontal: 0, vertical: 1 }),
@@ -324,19 +324,19 @@ impl Modal for KeybindsModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
         if self.filter_input_mode {
-            match key.as_common_action(context) {
+            match key.as_common_action(ctx) {
                 Some(CommonAction::Confirm) => {
                     self.filter_input_mode = false;
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 Some(CommonAction::Close) => {
                     self.filter_input_mode = false;
                     self.filter = None;
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {
                     key.stop_propagation();
@@ -347,73 +347,71 @@ impl Modal for KeybindsModal {
                                     f.push(c);
                                 }
                             }
-                            self.jump_first(context.config.scrolloff);
+                            self.jump_first(ctx.config.scrolloff);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         KeyCode::Backspace => {
                             if let Some(ref mut f) = self.filter {
                                 f.pop();
                             }
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         _ => {}
                     }
                 }
             }
-        } else if let Some(action) = key.as_common_action(context) {
+        } else if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.prev_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
-                    self.scrolling_state
-                        .prev(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
-                    self.scrolling_state
-                        .next(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
                     self.filter = Some(String::new());
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(context.config.scrolloff);
+                    self.jump_forward(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(context.config.scrolloff);
+                    self.jump_back(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -422,7 +420,7 @@ impl Modal for KeybindsModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }
@@ -431,19 +429,19 @@ impl Modal for KeybindsModal {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
                 let y: usize = event.y.saturating_sub(self.table_area.y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    context.render()?;
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                    ctx.render()?;
                 }
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.next(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
         }
 

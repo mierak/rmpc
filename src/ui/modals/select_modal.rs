@@ -14,7 +14,7 @@ use ratatui::{
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
 use crate::{
     config::keys::CommonAction,
-    context::AppContext,
+    ctx::Ctx,
     shared::{
         key_event::KeyEvent,
         macros::pop_modal,
@@ -33,7 +33,7 @@ enum FocusedComponent {
 }
 
 #[derive(derive_more::Debug)]
-pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>> {
+pub struct SelectModal<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> {
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     scrolling_state: DirState<ListState>,
@@ -46,12 +46,10 @@ pub struct SelectModal<'a, V: Display, Callback: FnMut(&AppContext, V, usize) ->
 }
 
 #[bon]
-impl<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>>
-    SelectModal<'a, V, Callback>
-{
+impl<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
     #[builder]
     pub fn new(
-        context: &AppContext,
+        ctx: &Ctx,
         title: Option<&'a str>,
         options: Vec<V>,
         on_confirm: Callback,
@@ -69,12 +67,12 @@ impl<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>>
 
         let button_group = ButtonGroup::default()
             .buttons(buttons)
-            .inactive_style(context.config.as_text_style())
+            .inactive_style(ctx.config.as_text_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -90,13 +88,13 @@ impl<'a, V: Display, Callback: FnMut(&AppContext, V, usize) -> Result<()>>
     }
 }
 
-impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Result<()>> Modal
+impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>> Modal
     for SelectModal<'_, V, Callback>
 {
-    fn render(&mut self, frame: &mut Frame, app: &mut AppContext) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
-        if let Some(bg_color) = app.config.theme.modal_background_color {
+        if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
 
@@ -110,23 +108,23 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
         let options =
             self.options.iter().enumerate().map(|(idx, v)| format!("{:>3}: {v}", idx + 1));
         let playlists = List::new(options)
-            .style(app.config.as_text_style())
+            .style(ctx.config.as_text_style())
             .highlight_style(match self.focused {
                 FocusedComponent::Buttons => Style::default().reversed(),
-                FocusedComponent::List => app.config.theme.current_item_style,
+                FocusedComponent::List => ctx.config.theme.current_item_style,
             })
             .block(
                 Block::default()
                     .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
                     .border_set(symbols::border::ROUNDED)
-                    .border_style(app.config.as_border_style())
+                    .border_style(ctx.config.as_border_style())
                     .title_alignment(ratatui::prelude::Alignment::Center)
                     .title(self.title.bold()),
             );
 
         self.button_group.set_active_style(match self.focused {
             FocusedComponent::List => Style::default().reversed(),
-            FocusedComponent::Buttons => app.config.theme.current_item_style,
+            FocusedComponent::Buttons => ctx.config.theme.current_item_style,
         });
 
         let scrollbar_area =
@@ -139,7 +137,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
             list_area,
             self.scrolling_state.as_render_state_ref(),
         );
-        if let Some(scrollbar) = app.config.as_styled_scrollbar() {
+        if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
                 scrollbar_area,
@@ -154,8 +152,8 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut AppContext) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::Down => {
                     match self.focused {
@@ -168,7 +166,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group_state.first();
                             } else {
-                                self.scrolling_state.next(context.config.scrolloff, true);
+                                self.scrolling_state.next(ctx.config.scrolloff, true);
                             }
                         }
                         FocusedComponent::Buttons => {
@@ -183,7 +181,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
                         }
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
                     match self.focused {
@@ -192,7 +190,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
                                 self.focused = FocusedComponent::Buttons;
                                 self.button_group_state.last();
                             } else {
-                                self.scrolling_state.prev(context.config.scrolloff, true);
+                                self.scrolling_state.prev(ctx.config.scrolloff, true);
                             }
                         }
                         FocusedComponent::Buttons => {
@@ -205,34 +203,34 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
                         }
                     }
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Confirm => match self.focused {
                     FocusedComponent::List => {
                         self.focused = FocusedComponent::Buttons;
                         self.button_group_state.first();
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     FocusedComponent::Buttons if self.button_group_state.selected == 0 => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
                             if let Some(ref mut callback) = self.callback {
-                                (callback)(context, self.options.remove(idx), idx)?;
+                                (callback)(ctx, self.options.remove(idx), idx)?;
                             }
                         }
-                        pop_modal!(context);
-                        context.render()?;
+                        pop_modal!(ctx);
+                        ctx.render()?;
                     }
                     FocusedComponent::Buttons => {
                         self.button_group_state = ButtonGroupState::default();
-                        pop_modal!(context);
-                        context.render()?;
+                        pop_modal!(ctx);
+                        ctx.render()?;
                     }
                 },
                 CommonAction::Close => {
                     self.button_group_state = ButtonGroupState::default();
-                    pop_modal!(context);
-                    context.render()?;
+                    pop_modal!(ctx);
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -241,22 +239,22 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.options_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.options_area.y).into();
                 let y = y.saturating_sub(1); // Subtract one to account for the header
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
                     self.focused = FocusedComponent::List;
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    context.render()?;
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                    ctx.render()?;
                 }
             }
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
                     self.focused = FocusedComponent::Buttons;
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
@@ -264,14 +262,14 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
                     Some(0) => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
                             if let Some(ref mut callback) = self.callback {
-                                (callback)(context, self.options.remove(idx), idx)?;
+                                (callback)(ctx, self.options.remove(idx), idx)?;
                             }
                         }
-                        pop_modal!(context);
-                        context.render()?;
+                        pop_modal!(ctx);
+                        ctx.render()?;
                     }
                     Some(_) => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     None => {}
                 }
@@ -283,24 +281,24 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&AppContext, V, usize) -> Res
             {
                 self.focused = FocusedComponent::Buttons;
                 self.button_group_state.prev();
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown
                 if self.button_group.get_button_idx_at(event.into()).is_some() =>
             {
                 self.focused = FocusedComponent::Buttons;
                 self.button_group_state.next();
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp if self.options_area.contains(event.into()) => {
                 self.focused = FocusedComponent::List;
-                self.scrolling_state.prev(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown if self.options_area.contains(event.into()) => {
                 self.focused = FocusedComponent::List;
-                self.scrolling_state.next(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.next(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown => {}
             MouseEventKind::ScrollUp => {}

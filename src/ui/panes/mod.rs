@@ -56,7 +56,7 @@ use crate::{
             },
         },
     },
-    context::AppContext,
+    ctx::Ctx,
     mpd::{
         commands::{Song, State, status::OnOffOneshot, volume::Bound},
         mpd_client::Tag,
@@ -138,44 +138,38 @@ pub struct PaneContainer<'panes> {
 }
 
 impl<'panes> PaneContainer<'panes> {
-    pub fn new(context: &AppContext) -> Result<Self> {
+    pub fn new(ctx: &Ctx) -> Result<Self> {
         Ok(Self {
-            queue: QueuePane::new(context),
+            queue: QueuePane::new(ctx),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
-            directories: DirectoriesPane::new(context),
-            albums: AlbumsPane::new(context),
-            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, context),
-            album_artists: TagBrowserPane::new(
-                Tag::AlbumArtist,
-                PaneType::AlbumArtists,
-                None,
-                context,
-            ),
-            playlists: PlaylistsPane::new(context),
-            search: SearchPane::new(context),
-            album_art: AlbumArtPane::new(context),
-            lyrics: LyricsPane::new(context),
+            directories: DirectoriesPane::new(ctx),
+            albums: AlbumsPane::new(ctx),
+            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, ctx),
+            album_artists: TagBrowserPane::new(Tag::AlbumArtist, PaneType::AlbumArtists, None, ctx),
+            playlists: PlaylistsPane::new(ctx),
+            search: SearchPane::new(ctx),
+            album_art: AlbumArtPane::new(ctx),
+            lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
-            tabs: TabsPane::new(context)?,
-            cava: CavaPane::new(context),
+            tabs: TabsPane::new(ctx)?,
+            cava: CavaPane::new(ctx),
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
-            others: Self::init_other_panes(context).collect(),
+            others: Self::init_other_panes(ctx).collect(),
         })
     }
 
     pub fn init_other_panes(
-        context: &AppContext,
+        ctx: &Ctx,
     ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
-        context
-            .config
+        ctx.config
             .tabs
             .tabs
             .iter()
             .flat_map(|(_name, tab)| tab.panes.panes_iter())
-            .chain(context.config.theme.layout.panes_iter())
+            .chain(ctx.config.theme.layout.panes_iter())
             .filter_map(|pane| match &pane.pane {
                 PaneType::Browser { root_tag, separator } => Some((
                     pane.pane.clone(),
@@ -183,7 +177,7 @@ impl<'panes> PaneContainer<'panes> {
                         Tag::Custom(root_tag.clone()),
                         pane.pane.clone(),
                         separator.clone(),
-                        context,
+                        ctx,
                     )) as Box<dyn BoxedPane>,
                 )),
                 PaneType::Volume { kind } => Some((
@@ -197,7 +191,7 @@ impl<'panes> PaneContainer<'panes> {
     pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
         &'pane_ref mut self,
         pane: &'pane_type_ref PaneType,
-        context: &AppContext,
+        ctx: &Ctx,
     ) -> Result<Panes<'pane_ref, 'panes>> {
         match pane {
             PaneType::Queue => Ok(Panes::Queue(&mut self.queue)),
@@ -217,14 +211,9 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::TabContent => Ok(Panes::TabContent),
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Ok(Panes::FrameCount(&mut self.frame_count)),
-            PaneType::Property { content, align, scroll_speed } => {
-                Ok(Panes::Property(PropertyPane::<'pane_type_ref>::new(
-                    content,
-                    *align,
-                    (*scroll_speed).into(),
-                    context,
-                )))
-            }
+            PaneType::Property { content, align, scroll_speed } => Ok(Panes::Property(
+                PropertyPane::<'pane_type_ref>::new(content, *align, (*scroll_speed).into(), ctx),
+            )),
             p @ PaneType::Volume { .. } => Ok(Panes::Others(
                 self.others
                     .get_mut(pane)
@@ -270,31 +259,26 @@ pub(crate) use pane_call;
 
 #[allow(unused_variables)]
 pub(crate) trait Pane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &AppContext) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, context: &AppContext) -> Result<()> {
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, context: &AppContext) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(
-        &mut self,
-        event: &mut UiEvent,
-        is_visible: bool,
-        context: &AppContext,
-    ) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut AppContext) -> Result<()>;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &AppContext) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
@@ -303,16 +287,16 @@ pub(crate) trait Pane {
         id: &'static str,
         data: MpdQueryResult,
         is_visible: bool,
-        context: &AppContext,
+        ctx: &Ctx,
     ) -> Result<()> {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn resize(&mut self, area: Rect, context: &AppContext) -> Result<()> {
+    fn resize(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 }
@@ -872,22 +856,22 @@ impl Property<PropertyKind> {
     fn default_as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        context: &'song AppContext,
+        ctx: &'song Ctx,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        self.default.as_ref().and_then(|p| p.as_span(song, context, tag_separator, strategy))
+        self.default.as_ref().and_then(|p| p.as_span(song, ctx, tag_separator, strategy))
     }
 
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        context: &'song AppContext,
+        ctx: &'song Ctx,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
-        let status = &context.status;
+        let status = &ctx.status;
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),
             PropertyKindOrText::Sticker(key) => {
@@ -896,17 +880,17 @@ impl Property<PropertyKind> {
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
-                    self.default_as_span(song, context, tag_separator, strategy)
+                    self.default_as_span(song, ctx, tag_separator, strategy)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
                     song.format(property, tag_separator, strategy).map_or_else(
-                        || self.default_as_span(Some(song), context, tag_separator, strategy),
+                        || self.default_as_span(Some(song), ctx, tag_separator, strategy),
                         |s| Some(Either::Left(Span::styled(s, style))),
                     )
                 } else {
-                    self.default_as_span(song, context, tag_separator, strategy)
+                    self.default_as_span(song, ctx, tag_separator, strategy)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
@@ -992,21 +976,21 @@ impl Property<PropertyKind> {
                     .unwrap_or(style),
                 ))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
-                    || self.default_as_span(song, context, tag_separator, strategy),
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
-                    || self.default_as_span(song, context, tag_separator, strategy),
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::QueueLength { thousands_separator } => {
                     Some(Either::Left(Span::styled(
-                        context.queue.len().with_thousands_separator(thousands_separator),
+                        ctx.queue.len().with_thousands_separator(thousands_separator),
                         style,
                     )))
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
-                    let sum: Duration = context.queue.iter().filter_map(|s| s.duration).sum();
+                    let sum: Duration = ctx.queue.iter().filter_map(|s| s.duration).sum();
                     let formatted = match separator {
                         Some(sep) => sum.format_to_duration(sep),
                         None => sum.to_string(),
@@ -1014,17 +998,17 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
-                    let remaining_time = context.find_current_song_in_queue().map_or(
+                    let remaining_time = ctx.find_current_song_in_queue().map_or(
                         Duration::default(),
                         |(current_song_idx, current_song)| {
-                            let total_remaining: Duration = context
+                            let total_remaining: Duration = ctx
                                 .queue
                                 .iter()
                                 .skip(current_song_idx)
                                 .filter_map(|s| s.duration)
                                 .sum();
                             if current_song.duration.is_some() {
-                                total_remaining.saturating_sub(context.status.elapsed)
+                                total_remaining.saturating_sub(ctx.status.elapsed)
                             } else {
                                 total_remaining
                             }
@@ -1037,7 +1021,7 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {
-                    Some(Either::Left(Span::styled(context.active_tab.0.as_ref(), style)))
+                    Some(Either::Left(Span::styled(ctx.active_tab.0.as_ref(), style)))
                 }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
@@ -1064,7 +1048,7 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
-                WidgetProperty::ScanStatus => context.db_update_start.map(|update_start| {
+                WidgetProperty::ScanStatus => ctx.db_update_start.map(|update_start| {
                     Either::Left(Span::styled(
                         ScanStatus::new(Some(update_start))
                             .get_str()
@@ -1077,7 +1061,7 @@ impl Property<PropertyKind> {
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
                 for format in group {
-                    match format.as_span(song, context, tag_separator, strategy) {
+                    match format.as_span(song, ctx, tag_separator, strategy) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
                         None => return None,
@@ -1088,7 +1072,7 @@ impl Property<PropertyKind> {
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
                 let truncate_fn =
                     if *from_start { Span::truncate_start } else { Span::truncate_end };
-                match content.as_span(song, context, tag_separator, strategy) {
+                match content.as_span(song, ctx, tag_separator, strategy) {
                     Some(Either::Left(mut span)) => {
                         truncate_fn(&mut span, *length);
                         Some(Either::Left(span))
@@ -1113,7 +1097,7 @@ impl Property<PropertyKind> {
                         }
                         Some(Either::Right(buf.into()))
                     }
-                    None => self.default_as_span(song, context, tag_separator, strategy),
+                    None => self.default_as_span(song, ctx, tag_separator, strategy),
                 }
             }
         }
@@ -1255,9 +1239,9 @@ mod format_tests {
                 StatusPropertyFile,
             },
         },
-        context::AppContext,
+        ctx::Ctx,
         mpd::commands::{Song, State, Status, Volume, status::OnOffOneshot},
-        tests::fixtures::app_context,
+        tests::fixtures::ctx,
     };
 
     mod truncate {
@@ -1313,7 +1297,7 @@ mod format_tests {
                 Property::builder().kind(PropertyKindOrText::Text("gh".into())).build(),
             ]), 99, true, Either::Right(vec!["ab", "cd", "ef", "gh"]))]
         fn as_span(
-            app_context: AppContext,
+            ctx: Ctx,
             #[case] props: PropertyKindOrText<PropertyKind>,
             #[case] length: usize,
             #[case] from_start: bool,
@@ -1329,7 +1313,7 @@ mod format_tests {
                 default: None,
             };
 
-            let result = format.as_span(None, &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1535,7 +1519,7 @@ mod format_tests {
         #[case(StatusProperty::Crossfade, "3")]
         #[case(StatusProperty::Bitrate, "123")]
         fn status_property_resolves_correctly(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
         ) {
@@ -1559,7 +1543,7 @@ mod format_tests {
                 last_modified: chrono::Utc::now(),
                 added: None,
             };
-            app_context.status = Status {
+            ctx.status = Status {
                 volume: Volume::new(123),
                 repeat: true,
                 random: true,
@@ -1573,7 +1557,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_span(Some(&song), &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(Some(&song), &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1595,7 +1579,7 @@ mod format_tests {
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "6m,9s", Duration::from_secs(0))]
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "5m,49s", Duration::from_secs(20))]
         fn queue_time_property_resolves_correctly(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
             #[case] elapsed: Duration,
@@ -1641,8 +1625,8 @@ mod format_tests {
                 added: None,
             });
 
-            app_context.queue = queue;
-            app_context.status = Status {
+            ctx.queue = queue;
+            ctx.status = Status {
                 elapsed,
                 duration: Duration::from_secs(123),
                 state: State::Play,
@@ -1651,8 +1635,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result =
-                format.as_span(Some(&current_song), &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(Some(&current_song), &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1667,7 +1650,7 @@ mod format_tests {
         #[case(StatusProperty::QueueTimeTotal { separator: Some(",".to_string()) }, "0s")]
         #[case(StatusProperty::QueueTimeRemaining { separator: Some(",".to_string()) }, "0s")]
         fn queue_time_property_no_current_song(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
         ) {
@@ -1677,10 +1660,10 @@ mod format_tests {
                 default: None,
             };
 
-            app_context.queue = vec![];
-            app_context.status = Status { state: State::Stop, ..Default::default() };
+            ctx.queue = vec![];
+            ctx.status = Status { state: State::Stop, ..Default::default() };
 
-            let result = format.as_span(None, &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1694,7 +1677,7 @@ mod format_tests {
         #[case(StatusProperty::QueueTimeTotal { separator: None }, "0:00")]
         #[case(StatusProperty::QueueTimeRemaining { separator: None }, "0:00")]
         fn queue_time_property_no_duration(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] prop: StatusProperty,
             #[case] expected: &str,
         ) {
@@ -1714,15 +1697,11 @@ mod format_tests {
                 added: None,
             };
 
-            app_context.queue = vec![song_no_duration.clone()];
-            app_context.status = Status { state: State::Play, song: Some(0), ..Default::default() };
+            ctx.queue = vec![song_no_duration.clone()];
+            ctx.status = Status { state: State::Play, song: Some(0), ..Default::default() };
 
-            let result = format.as_span(
-                Some(&song_no_duration),
-                &app_context,
-                "",
-                TagResolutionStrategy::All,
-            );
+            let result =
+                format.as_span(Some(&song_no_duration), &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1735,7 +1714,7 @@ mod format_tests {
         #[case("otherplay", "otherstopped", "otherpaused", State::Pause, "otherpaused")]
         #[case("otherplay", "otherstopped", "otherpaused", State::Stop, "otherstopped")]
         fn playback_state_label_is_correct(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] playing_label: &'static str,
             #[case] stopped_label: &'static str,
             #[case] paused_label: &'static str,
@@ -1756,9 +1735,9 @@ mod format_tests {
             };
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
-            app_context.status = Status { state, ..Default::default() };
+            ctx.status = Status { state, ..Default::default() };
 
-            let result = format.as_span(Some(&song), &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(Some(&song), &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(
                 result,
@@ -1788,7 +1767,7 @@ mod format_tests {
         #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::Off, ..Default::default() }, "Off")]
         #[case(StatusPropertyFile::Single, Status { single: OnOffOneshot::Oneshot, ..Default::default() }, "OS")]
         fn on_off_states_label_is_correct(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] prop: StatusPropertyFile,
             #[case] status: Status,
             #[case] expected_label: &str,
@@ -1801,9 +1780,9 @@ mod format_tests {
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
 
-            app_context.status = status;
+            ctx.status = status;
 
-            let result = format.as_span(Some(&song), &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(Some(&song), &ctx, "", TagResolutionStrategy::All);
 
             assert_eq!(result, Some(Either::Left(Span::raw(expected_label))));
         }
@@ -1818,7 +1797,7 @@ mod format_tests {
         #[case(StatusPropertyFile::RandomV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, Status { random: true, ..Default::default() }, None)]
         #[case(StatusPropertyFile::RepeatV2  { on_style: None, off_style: None, on_label: String::new(), off_label: String::new() }, Status { repeat: true, ..Default::default() }, None)]
         fn on_off_oneshot_styles_are_correct(
-            mut app_context: AppContext,
+            mut ctx: Ctx,
             #[case] prop: StatusPropertyFile,
             #[case] status: Status,
             #[case] expected_style: Option<Style>,
@@ -1831,9 +1810,9 @@ mod format_tests {
 
             let song = Song { id: 1, file: "file".to_owned(), ..Default::default() };
 
-            app_context.status = status;
+            ctx.status = status;
 
-            let result = format.as_span(Some(&song), &app_context, "", TagResolutionStrategy::All);
+            let result = format.as_span(Some(&song), &ctx, "", TagResolutionStrategy::All);
 
             dbg!(&result);
             assert_eq!(
