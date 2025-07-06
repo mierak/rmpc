@@ -107,6 +107,8 @@ pub enum Command {
     DebugInfo,
     /// Prints the rmpc version
     Version,
+    /// Prints the list of songs in the current queue
+    Queue,
     /// Plays song at the position in the current playlist. Defaults to current
     /// paused song.
     Play {
