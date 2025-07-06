@@ -84,33 +84,36 @@ impl SearchPane {
         }
     }
 
-    fn enqueue(&mut self, all: bool) -> Vec<Enqueue> {
+    fn enqueue(&mut self, all: bool) -> (Vec<Enqueue>, Option<usize>) {
+        let hovered = self.songs_dir.selected().map(|s| s.file.as_str());
         if all {
-            let (filter_kind, case_sensitive) = self.filter_type();
-            let filter = self
-                .inputs
-                .textbox_inputs
-                .iter()
-                .filter_map(|input| match &input {
-                    Textbox { value, filter_key, .. } if !value.is_empty() => {
-                        Some((Tag::Custom(filter_key.to_owned()), filter_kind, value.to_owned()))
+            self.songs_dir.items.iter().enumerate().fold(
+                (Vec::new(), None),
+                |mut acc, (idx, item)| {
+                    let path = item.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                        acc.1 = Some(idx);
                     }
-                    _ => None,
-                })
-                .collect_vec();
-
-            vec![if case_sensitive { Enqueue::Find { filter } } else { Enqueue::Search { filter } }]
+                    acc.0.push(Enqueue::File { path });
+                    acc
+                },
+            )
         } else if !self.songs_dir.marked().is_empty() {
-            self.songs_dir
-                .marked()
-                .iter()
-                .map(|idx| self.songs_dir.items[*idx].file.clone())
-                .map(|path| Enqueue::File { path })
-                .collect_vec()
+            self.songs_dir.marked().iter().map(|idx| &self.songs_dir.items[*idx]).enumerate().fold(
+                (Vec::new(), None),
+                |mut acc, (idx, item)| {
+                    let path = item.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::File { path });
+                    acc
+                },
+            )
         } else if let Some(item) = self.songs_dir.selected() {
-            vec![Enqueue::File { path: item.file.clone() }]
+            (vec![Enqueue::File { path: item.file.clone() }], Some(0))
         } else {
-            Vec::new()
+            (Vec::new(), None)
         }
     }
 
@@ -616,13 +619,13 @@ impl Pane for SearchPane {
                         }
                     }
                     Phase::BrowseResults { .. } => {
-                        let items = self.enqueue(false);
+                        let (items, _hovered_idx) = self.enqueue(false);
                         if !items.is_empty() {
                             context.command(move |client| {
                                 client.enqueue_multiple(
                                     items,
                                     Position::EndOfQueue,
-                                    Autoplay::No,
+                                    Autoplay::None,
                                 )?;
                                 Ok(())
                             });
@@ -664,10 +667,10 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    let items = self.enqueue(false);
+                    let (items, _hovered_idx) = self.enqueue(false);
                     if !items.is_empty() {
                         context.command(move |client| {
-                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::No)?;
+                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::None)?;
                             Ok(())
                         });
                     }
@@ -852,14 +855,14 @@ impl Pane for SearchPane {
                         // be implemented later.
                         CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
                         CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
-                            let enqueue = self.enqueue(opts.all);
+                            let (enqueue, _hovered_idx) = self.enqueue(opts.all);
                             if !enqueue.is_empty() {
                                 let queue_len = context.queue.len();
                                 let current_song_idx =
                                     context.find_current_song_in_queue().map(|(i, _)| i);
 
                                 context.command(move |client| {
-                                    let autoplay = opts.autoplay(queue_len, current_song_idx);
+                                    let autoplay = opts.autoplay(queue_len, current_song_idx, None);
                                     client.enqueue_multiple(enqueue, opts.position, autoplay)?;
 
                                     Ok(())
@@ -990,7 +993,7 @@ impl Pane for SearchPane {
                                     client.enqueue_multiple(
                                         items,
                                         Position::EndOfQueue,
-                                        Autoplay::No,
+                                        Autoplay::None,
                                     )?;
                                     Ok(())
                                 });
@@ -1050,15 +1053,22 @@ impl Pane for SearchPane {
                         }
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
-                        CommonAction::Confirm => {
-                            let items = self.enqueue(false);
+                        CommonAction::Confirm if self.songs_dir.marked().is_empty() => {
+                            let (items, hovered_song_idx) = self.enqueue(true);
                             let queue_len = context.queue.len();
+                            let current_song_idx =
+                                context.find_current_song_in_queue().map(|(i, _)| i);
+
                             if !items.is_empty() {
                                 context.command(move |client| {
                                     client.enqueue_multiple(
                                         items,
-                                        Position::EndOfQueue,
-                                        Autoplay::Yes { queue_len, current_song_idx: None },
+                                        Position::Replace,
+                                        Autoplay::Hovered {
+                                            queue_len,
+                                            current_song_idx,
+                                            hovered_song_idx,
+                                        },
                                     )?;
                                     Ok(())
                                 });
@@ -1066,9 +1076,10 @@ impl Pane for SearchPane {
 
                             context.render()?;
                         }
+                        CommonAction::Confirm => {}
                         CommonAction::FocusInput => {}
                         CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                            let enqueue = self.enqueue(opts.all);
+                            let (enqueue, hovered_song_idx) = self.enqueue(opts.all);
 
                             if !enqueue.is_empty() {
                                 let queue_len = context.queue.len();
@@ -1076,7 +1087,11 @@ impl Pane for SearchPane {
                                     context.find_current_song_in_queue().map(|(i, _)| i);
 
                                 context.command(move |client| {
-                                    let autoplay = opts.autoplay(queue_len, current_song_idx);
+                                    let autoplay = opts.autoplay(
+                                        queue_len,
+                                        current_song_idx,
+                                        hovered_song_idx,
+                                    );
 
                                     client.enqueue_multiple(enqueue, opts.position, autoplay)?;
 
@@ -1088,9 +1103,9 @@ impl Pane for SearchPane {
                             let opts = opts
                                 .iter()
                                 .map(|(label, opts)| {
-                                    let enqueue = self.enqueue(opts.all);
+                                    let (enqueue, hovered_song_idx) = self.enqueue(opts.all);
 
-                                    (label.to_owned(), *opts, enqueue)
+                                    (label.to_owned(), *opts, (enqueue, hovered_song_idx))
                                 })
                                 .collect_vec();
 

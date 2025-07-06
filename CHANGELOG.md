@@ -10,10 +10,17 @@ All notable changes to this project will be documented in this file.
 - Added `Transform` properties and `Truncate` transformation
 - Added `sendmessage` cli command for inter client communication
 - Support for youtube playlists
+- Added configurable kebyind for adding items to the Queue - `AddOptions`
 
 ### Changed
 
 - Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
+- Confirm action in browsers, which either opens a directory or adds the hovered song to the queue
+no longer exhibits the latter behavior. It now instead replaces the queue with all songs in the
+directory.
+- Removed `Add`, `Insert`, `AddAndReplace`, `AddAll`, `InsertAll` and `AddAllReplace` from the code.
+They are now mapped to the new `AddOptions` action. Existing configs are not affected and will
+continue to work.
 
 ### Fixed
 

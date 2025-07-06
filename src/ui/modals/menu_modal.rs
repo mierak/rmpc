@@ -232,7 +232,7 @@ impl MenuModal {
     }
 
     pub fn create_add_modal(
-        opts: Vec<(String, AddOpts, Vec<Enqueue>)>,
+        opts: Vec<(String, AddOpts, (Vec<Enqueue>, Option<usize>))>,
         ctx: &AppContext,
     ) -> MenuModal {
         MenuModal::new(ctx)
@@ -241,11 +241,12 @@ impl MenuModal {
                 let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
                 let mut section = section;
 
-                for (label, options, enqueue) in opts {
+                for (label, options, (enqueue, hovered_idx)) in opts {
                     section = section.add_item(label, move |ctx| {
                         if !enqueue.is_empty() {
                             ctx.command(move |client| {
-                                let autoplay = options.autoplay(queue_len, current_song_idx);
+                                let autoplay =
+                                    options.autoplay(queue_len, current_song_idx, hovered_idx);
                                 client.enqueue_multiple(enqueue, options.position, autoplay)?;
 
                                 Ok(())

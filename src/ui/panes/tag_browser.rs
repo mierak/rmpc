@@ -116,16 +116,20 @@ impl TagBrowserPane {
 
         match self.stack.path() {
             [_artist, _album] => {
-                let items = self.enqueue(std::iter::once(current));
+                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
-                    let autoplay = if autoplay {
-                        Autoplay::Yes { queue_len, current_song_idx: None }
+                    let (position, autoplay) = if autoplay {
+                        (Position::Replace, Autoplay::Hovered {
+                            queue_len,
+                            current_song_idx: None,
+                            hovered_song_idx,
+                        })
                     } else {
-                        Autoplay::No
+                        (Position::EndOfQueue, Autoplay::None)
                     };
                     context.command(move |client| {
-                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
+                        client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
                 }
@@ -470,64 +474,92 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a DirOrSong>) -> Vec<Enqueue> {
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
         match self.stack.path() {
-            [_tag_value, _album] => items
-                .map(|item| item.dir_name_or_file_name().into_owned())
-                .map(|name| Enqueue::Find { filter: vec![(Tag::File, FilterKind::Exact, name)] })
-                .collect_vec(),
+            [_tag_value, _album] => {
+                let hovered =
+                    self.stack.current().selected().map(|item| item.dir_name_or_file_name());
+
+                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let filename = item.dir_name_or_file_name().into_owned();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::Find {
+                        filter: vec![(Tag::File, FilterKind::Exact, filename)],
+                    });
+
+                    acc
+                })
+            }
             [tag_value] => {
                 let tag_value = tag_value.clone();
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
                 let Some(albums) = self.cache.0.get(&tag_value) else {
-                    return Vec::new();
+                    return (Vec::new(), None);
                 };
 
-                items
-                    .filter_map(|item| {
-                        let name = item.dir_name_or_file_name();
-                        albums.0.iter().find(|a| a.name == name).map(|a| a.original_name.clone())
-                    })
-                    .map(|album| {
-                        let mut root_tag_filter = Self::root_tag_filter(
-                            root_tag.clone(),
-                            separator.as_deref(),
-                            &tag_value,
-                        );
-                        Enqueue::Find {
-                            filter: vec![
-                                (
-                                    root_tag_filter.tag,
-                                    FilterKind::Exact,
-                                    std::mem::take(&mut root_tag_filter.value).into_owned(),
-                                ),
-                                (Tag::Album, FilterKind::Exact, album),
-                            ],
-                        }
-                    })
-                    .collect_vec()
+                (
+                    items
+                        .filter_map(|item| {
+                            let name = item.dir_name_or_file_name();
+                            albums
+                                .0
+                                .iter()
+                                .find(|a| a.name == name)
+                                .map(|a| a.original_name.clone())
+                        })
+                        .map(|album| {
+                            let mut root_tag_filter = Self::root_tag_filter(
+                                root_tag.clone(),
+                                separator.as_deref(),
+                                &tag_value,
+                            );
+                            Enqueue::Find {
+                                filter: vec![
+                                    (
+                                        root_tag_filter.tag,
+                                        root_tag_filter.kind,
+                                        std::mem::take(&mut root_tag_filter.value).into_owned(),
+                                    ),
+                                    (Tag::Album, FilterKind::Exact, album),
+                                ],
+                            }
+                        })
+                        .collect_vec(),
+                    None,
+                )
             }
             [] => {
                 let root_tag = self.root_tag.clone();
                 let separator = self.separator.clone();
 
-                items
-                    .map(|item| item.dir_name_or_file_name().into_owned())
-                    .map(|name| {
-                        let mut filter =
-                            Self::root_tag_filter(root_tag.clone(), separator.as_deref(), &name);
-                        Enqueue::Find {
-                            filter: vec![(
-                                filter.tag,
-                                FilterKind::Exact,
-                                std::mem::take(&mut filter.value).into_owned(),
-                            )],
-                        }
-                    })
-                    .collect_vec()
+                (
+                    items
+                        .map(|item| item.dir_name_or_file_name().into_owned())
+                        .map(|name| {
+                            let mut filter = Self::root_tag_filter(
+                                root_tag.clone(),
+                                separator.as_deref(),
+                                &name,
+                            );
+                            Enqueue::Find {
+                                filter: vec![(
+                                    filter.tag,
+                                    filter.kind,
+                                    std::mem::take(&mut filter.value).into_owned(),
+                                )],
+                            }
+                        })
+                        .collect_vec(),
+                    None,
+                )
             }
-            _ => Vec::new(),
+            _ => (Vec::new(), None),
         }
     }
 

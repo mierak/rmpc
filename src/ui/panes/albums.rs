@@ -62,16 +62,20 @@ impl AlbumsPane {
 
         match self.stack.path() {
             [_album] => {
-                let items = self.enqueue(std::iter::once(current));
+                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 let queue_len = context.queue.len();
-                let autoplay = if autoplay {
-                    Autoplay::Yes { queue_len, current_song_idx: None }
+                let (position, autoplay) = if autoplay {
+                    (Position::Replace, Autoplay::Hovered {
+                        queue_len,
+                        current_song_idx: None,
+                        hovered_song_idx,
+                    })
                 } else {
-                    Autoplay::No
+                    (Position::EndOfQueue, Autoplay::None)
                 };
                 if !items.is_empty() {
                     context.command(move |client| {
-                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
+                        client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
                 }
@@ -269,22 +273,39 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         self.open_or_play(false, context)
     }
 
-    fn enqueue<'a>(&self, item: impl Iterator<Item = &'a DirOrSong>) -> Vec<Enqueue> {
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
         match self.stack.path() {
-            [album] => item
-                .map(|item| item.dir_name_or_file_name().into_owned())
-                .map(|name| Enqueue::Find {
-                    filter: vec![
-                        (Tag::File, FilterKind::Exact, name),
-                        (Tag::Album, FilterKind::Exact, album.clone()),
-                    ],
+            [album] => {
+                let hovered =
+                    self.stack.current().selected().map(|item| item.dir_name_or_file_name());
+                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let filename = item.dir_name_or_file_name().into_owned();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::Find {
+                        filter: vec![
+                            (Tag::File, FilterKind::Exact, filename),
+                            (Tag::Album, FilterKind::Exact, album.clone()),
+                        ],
+                    });
+
+                    acc
                 })
-                .collect_vec(),
-            [] => item
-                .map(|item| item.dir_name_or_file_name().into_owned())
-                .map(|name| Enqueue::Find { filter: vec![(Tag::Album, FilterKind::Exact, name)] })
-                .collect_vec(),
-            _ => Vec::new(),
+            }
+            [] => (
+                items
+                    .map(|item| item.dir_name_or_file_name().into_owned())
+                    .map(|name| Enqueue::Find {
+                        filter: vec![(Tag::Album, FilterKind::Exact, name)],
+                    })
+                    .collect_vec(),
+                None,
+            ),
+            _ => (Vec::new(), None),
         }
     }
 

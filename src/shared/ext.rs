@@ -428,6 +428,7 @@ pub mod mpd_client {
         status_warn,
     };
 
+    #[allow(dead_code, reason = "Search is currently unused")]
     pub enum Enqueue {
         File { path: String },
         Playlist { name: String },
@@ -436,8 +437,21 @@ pub mod mpd_client {
     }
 
     pub enum Autoplay {
-        Yes { queue_len: usize, current_song_idx: Option<usize> },
-        No,
+        First {
+            queue_len: usize,
+            current_song_idx: Option<usize>,
+        },
+        Hovered {
+            queue_len: usize,
+            current_song_idx: Option<usize>,
+            hovered_song_idx: Option<usize>,
+        },
+        HoveredOrFirst {
+            queue_len: usize,
+            current_song_idx: Option<usize>,
+            hovered_song_idx: Option<usize>,
+        },
+        None,
     }
 
     pub trait MpdClientExt {
@@ -486,14 +500,14 @@ pub mod mpd_client {
             }
 
             let autoplay_idx = match autoplay {
-                Autoplay::Yes { queue_len, current_song_idx: Some(curr) } => match position {
+                Autoplay::First { queue_len, current_song_idx: Some(curr) } => match position {
                     Position::AfterCurrentSong => Some(curr + 1),
                     Position::BeforeCurrentSong => Some(curr),
                     Position::StartOfQueue => Some(0),
                     Position::EndOfQueue => Some(queue_len),
                     Position::Replace => Some(0),
                 },
-                Autoplay::Yes { queue_len, current_song_idx: None } => match position {
+                Autoplay::First { queue_len, current_song_idx: None } => match position {
                     Position::AfterCurrentSong => {
                         status_warn!("No current song to queue after");
                         return Ok(());
@@ -506,7 +520,58 @@ pub mod mpd_client {
                     Position::EndOfQueue => Some(queue_len),
                     Position::Replace => Some(0),
                 },
-                Autoplay::No => None,
+                Autoplay::Hovered { queue_len, current_song_idx, hovered_song_idx } => {
+                    match position {
+                        Position::AfterCurrentSong => {
+                            let Some(current_song_idx) = current_song_idx else {
+                                status_warn!("No current song to queue after");
+                                return Ok(());
+                            };
+
+                            hovered_song_idx.map(|i| i + 1 + current_song_idx)
+                        }
+                        Position::BeforeCurrentSong => {
+                            let Some(current_song_idx) = current_song_idx else {
+                                status_warn!("No current song to queue before");
+                                return Ok(());
+                            };
+
+                            hovered_song_idx.map(|i| i + current_song_idx)
+                        }
+                        Position::StartOfQueue => hovered_song_idx,
+                        Position::EndOfQueue => hovered_song_idx.map(|i| i + queue_len),
+                        Position::Replace => hovered_song_idx,
+                    }
+                }
+                Autoplay::HoveredOrFirst { queue_len, current_song_idx, hovered_song_idx } => {
+                    match position {
+                        Position::AfterCurrentSong => {
+                            let Some(current_song_idx) = current_song_idx else {
+                                status_warn!("No current song to queue after");
+                                return Ok(());
+                            };
+
+                            hovered_song_idx
+                                .map(|i| i + 1 + current_song_idx)
+                                .or(Some(current_song_idx + 1))
+                        }
+                        Position::BeforeCurrentSong => {
+                            let Some(current_song_idx) = current_song_idx else {
+                                status_warn!("No current song to queue before");
+                                return Ok(());
+                            };
+                            hovered_song_idx
+                                .map(|i| i + current_song_idx)
+                                .or(Some(current_song_idx))
+                        }
+                        Position::StartOfQueue => hovered_song_idx.or(Some(0)),
+                        Position::EndOfQueue => {
+                            hovered_song_idx.map(|i| i + queue_len).or(Some(queue_len))
+                        }
+                        Position::Replace => hovered_song_idx.or(Some(0)),
+                    }
+                }
+                Autoplay::None => None,
             };
 
             self.send_start_cmd_list()?;

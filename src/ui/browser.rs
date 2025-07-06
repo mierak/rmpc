@@ -47,7 +47,7 @@ where
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
     fn prepare_preview(&mut self, context: &AppContext) -> Result<()>;
-    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> Vec<Enqueue>;
+    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> (Vec<Enqueue>, Option<usize>);
     fn open(&mut self, context: &AppContext) -> Result<()>;
     fn show_info(&self, item: &T, context: &AppContext) -> Result<()> {
         Ok(())
@@ -180,13 +180,13 @@ where
                         .current_mut()
                         .select_idx(idx_to_select, context.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
-                        let items = self.enqueue(std::iter::once(item));
+                        let (items, _) = self.enqueue(std::iter::once(item));
                         if !items.is_empty() {
                             context.command(move |client| {
                                 client.enqueue_multiple(
                                     items,
                                     Position::EndOfQueue,
-                                    Autoplay::No,
+                                    Autoplay::None,
                                 )?;
                                 Ok(())
                             });
@@ -371,14 +371,14 @@ where
             CommonAction::PaneRight => {}
             CommonAction::PaneLeft => {}
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                let items = self.enqueue_items(options.all);
-                if !items.is_empty() {
+                let (enqueue, hovered_idx) = self.enqueue_items(options.all);
+                if !enqueue.is_empty() {
                     let queue_len = context.queue.len();
                     let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
 
                     context.command(move |client| {
-                        let autoplay = options.autoplay(queue_len, current_song_idx);
-                        client.enqueue_multiple(items, options.position, autoplay)?;
+                        let autoplay = options.autoplay(queue_len, current_song_idx, hovered_idx);
+                        client.enqueue_multiple(enqueue, options.position, autoplay)?;
 
                         Ok(())
                     });
@@ -403,14 +403,14 @@ where
     /// If `all` is true, returns `Enqueue` for all items in the current stack
     /// dir. Otherwise returns `Enqueue` for the currently hovered item if no
     /// items are marked or a list of `Enqueue` for all marked items.
-    fn enqueue_items(&self, all: bool) -> Vec<Enqueue> {
+    fn enqueue_items(&self, all: bool) -> (Vec<Enqueue>, Option<usize>) {
         if all {
             self.enqueue(self.stack().current().items.iter())
         } else if self.stack().current().marked().is_empty() {
             self.stack()
                 .current()
                 .selected()
-                .map_or(Vec::new(), |item| self.enqueue(std::iter::once(item)))
+                .map_or((Vec::new(), None), |item| self.enqueue(std::iter::once(item)))
         } else {
             self.enqueue(
                 self.stack()

@@ -96,17 +96,30 @@ impl DirectoriesPane {
                 self.stack_mut().clear_preview();
                 context.render()?;
             }
-            t @ DirOrSong::Song(_) => {
-                let items = self.enqueue(std::iter::once(t));
+            DirOrSong::Song(_) => {
+                let (items, hovered_song_idx) = self.enqueue(
+                    self.stack()
+                        .current()
+                        .items
+                        .iter()
+                        // Only add songs here in case the directory contains combination of
+                        // directories, playlists and songs to be able to use autoplay from the
+                        // hovered song properly.
+                        .filter(|item| matches!(item, DirOrSong::Song(_))),
+                );
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
-                    let autoplay = if autoplay {
-                        Autoplay::Yes { queue_len, current_song_idx: None }
+                    let (position, autoplay) = if autoplay {
+                        (Position::Replace, Autoplay::Hovered {
+                            queue_len,
+                            current_song_idx: None,
+                            hovered_song_idx,
+                        })
                     } else {
-                        Autoplay::No
+                        (Position::EndOfQueue, Autoplay::None)
                     };
                     context.command(move |client| {
-                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
+                        client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
                 }
@@ -272,18 +285,45 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a DirOrSong>) -> Vec<Enqueue> {
-        items
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        let mut dir_or_playlist_found = false;
+        let items = items
             .map(|item| match item {
                 DirOrSong::Dir { full_path, playlist: true, .. } => {
+                    dir_or_playlist_found = true;
                     Enqueue::Playlist { name: full_path.to_owned() }
                 }
                 DirOrSong::Dir { full_path, playlist: false, .. } => {
+                    dir_or_playlist_found = true;
                     Enqueue::File { path: full_path.to_owned() }
                 }
                 DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
             })
-            .collect_vec()
+            .collect_vec();
+
+        let hovered_idx = if dir_or_playlist_found {
+            None
+        } else {
+            // We are not adding any playlists or directories so autoplay on hovered item
+            // can work
+            if let Some(curr) = self.stack().current().selected() {
+                items
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, item)| {
+                        if let Enqueue::File { path } = item { Some((idx, path)) } else { None }
+                    })
+                    .find(|(_, path)| path == &&curr.dir_name_or_file_name())
+                    .map(|(idx, _)| idx)
+            } else {
+                None
+            }
+        };
+
+        (items, hovered_idx)
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {

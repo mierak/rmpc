@@ -62,12 +62,7 @@ impl PlaylistsPane {
         }
     }
 
-    fn open_or_play(
-        &mut self,
-        autoplay: bool,
-        context: &AppContext,
-        action_id: &'static str,
-    ) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, context: &AppContext) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
 
@@ -82,7 +77,7 @@ impl PlaylistsPane {
         match selected {
             DirOrSong::Dir { name: playlist, .. } => {
                 let playlist = playlist.clone();
-                context.query().id(action_id).target(PaneType::Playlists).query(move |client| {
+                context.query().id(OPEN_OR_PLAY).target(PaneType::Playlists).query(move |client| {
                     Ok(MpdQueryResult::SongsList {
                         data: client.list_playlist_info(&playlist, None)?,
                         origin_path: Some(next_path),
@@ -93,16 +88,20 @@ impl PlaylistsPane {
                 context.render()?;
             }
             DirOrSong::Song(_song) => {
-                let items = self.enqueue(std::iter::once(selected));
+                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 if !items.is_empty() {
                     let queue_len = context.queue.len();
-                    let autoplay = if autoplay {
-                        Autoplay::Yes { queue_len, current_song_idx: None }
+                    let (position, autoplay) = if autoplay {
+                        (Position::Replace, Autoplay::Hovered {
+                            queue_len,
+                            current_song_idx: None,
+                            hovered_song_idx,
+                        })
                     } else {
-                        Autoplay::No
+                        (Position::EndOfQueue, Autoplay::None)
                     };
                     context.command(move |client| {
-                        client.enqueue_multiple(items, Position::EndOfQueue, autoplay)?;
+                        client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
                 }
@@ -425,13 +424,26 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a DirOrSong>) -> Vec<Enqueue> {
-        items
-            .map(|item| match item {
-                DirOrSong::Dir { name, .. } => Enqueue::Playlist { name: name.to_owned() },
-                DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
-            })
-            .collect_vec()
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file_name());
+        items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+            match item {
+                DirOrSong::Dir { name, .. } => {
+                    acc.0.push(Enqueue::Playlist { name: name.to_owned() });
+                }
+                DirOrSong::Song(song) => {
+                    let filename = song.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::File { path: song.file.clone() });
+                }
+            }
+            acc
+        })
     }
 
     fn rename(&self, item: &DirOrSong, context: &AppContext) -> Result<()> {
@@ -470,11 +482,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn open(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(true, context, OPEN_OR_PLAY)
+        self.open_or_play(true, context)
     }
 
     fn next(&mut self, context: &AppContext) -> Result<()> {
-        self.open_or_play(false, context, OPEN_OR_PLAY)
+        self.open_or_play(false, context)
     }
 
     fn move_selected(&mut self, direction: MoveDirection, context: &AppContext) -> Result<()> {

@@ -349,6 +349,7 @@ impl ToDescription for QueueActions {
 #[derive(
     Debug,
     Display,
+    Default,
     serde::Serialize,
     serde::Deserialize,
     PartialEq,
@@ -363,6 +364,7 @@ pub enum Position {
     AfterCurrentSong,
     BeforeCurrentSong,
     StartOfQueue,
+    #[default]
     EndOfQueue,
     Replace,
 }
@@ -404,42 +406,27 @@ impl Default for AddKind {
     fn default() -> Self {
         AddKind::Modal(vec![
             ("At the end of queue".into(), AddOpts {
-                autoplay: false,
+                autoplay: AutoplayKind::None,
                 position: Position::EndOfQueue,
                 all: false,
             }),
             ("At the start of queue".into(), AddOpts {
-                autoplay: false,
+                autoplay: AutoplayKind::None,
                 position: Position::StartOfQueue,
                 all: false,
             }),
-            ("Before the current song".into(), AddOpts {
-                autoplay: false,
-                position: Position::BeforeCurrentSong,
-                all: false,
-            }),
-            ("Before the current song and play".into(), AddOpts {
-                autoplay: true,
-                position: Position::BeforeCurrentSong,
-                all: false,
-            }),
             ("After the current song".into(), AddOpts {
-                autoplay: false,
-                position: Position::AfterCurrentSong,
-                all: false,
-            }),
-            ("After the current song and play".into(), AddOpts {
-                autoplay: true,
+                autoplay: AutoplayKind::None,
                 position: Position::AfterCurrentSong,
                 all: false,
             }),
             ("Replace the queue".into(), AddOpts {
-                autoplay: false,
+                autoplay: AutoplayKind::None,
                 position: Position::Replace,
                 all: false,
             }),
             ("Replace the queue and play".into(), AddOpts {
-                autoplay: true,
+                autoplay: AutoplayKind::First,
                 position: Position::Replace,
                 all: false,
             }),
@@ -448,21 +435,56 @@ impl Default for AddKind {
 }
 
 #[derive(
+    Debug,
+    Default,
+    Display,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    Copy,
+    Ord,
+    PartialOrd,
+)]
+pub enum AutoplayKind {
+    First,
+    #[default]
+    Hovered,
+    HoveredOrFirst,
+    None,
+}
+
+#[derive(
     Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
 )]
 pub struct AddOpts {
-    pub autoplay: bool,
+    #[serde(default)]
+    pub autoplay: AutoplayKind,
+    #[serde(default)]
     pub all: bool,
+    #[serde(default)]
     pub position: Position,
 }
 
 impl AddOpts {
-    pub fn autoplay(self, queue_len: usize, current_song_idx: Option<usize>) -> Autoplay {
-        if !self.autoplay {
-            return Autoplay::No;
+    pub fn autoplay(
+        self,
+        queue_len: usize,
+        current_song_idx: Option<usize>,
+        hovered_song_idx: Option<usize>,
+    ) -> Autoplay {
+        match self.autoplay {
+            AutoplayKind::First => Autoplay::First { queue_len, current_song_idx },
+            AutoplayKind::Hovered => {
+                Autoplay::Hovered { queue_len, current_song_idx, hovered_song_idx }
+            }
+            AutoplayKind::HoveredOrFirst => {
+                Autoplay::HoveredOrFirst { queue_len, current_song_idx, hovered_song_idx }
+            }
+            AutoplayKind::None => Autoplay::None,
         }
-
-        Autoplay::Yes { queue_len, current_song_idx }
     }
 }
 
@@ -550,45 +572,69 @@ pub enum CommonAction {
 impl ToDescription for CommonAction {
     fn to_description(&self) -> Cow<'static, str> {
         match self {
-            CommonAction::Up => "Go up",
-            CommonAction::Down => "Go down",
-            CommonAction::UpHalf => "Jump by half a screen up",
-            CommonAction::DownHalf => "Jump by half a screen down",
-            CommonAction::PageUp => "Jump a screen up",
-            CommonAction::PageDown => "Jump a screen down",
-            CommonAction::MoveUp => "Move current item up, for example song in a queue",
-            CommonAction::MoveDown => "Move current item down, for example song in a queue",
-            CommonAction::Right => "Go right",
-            CommonAction::Left => "Go left",
-            CommonAction::Top => "Jump all the way to the top",
-            CommonAction::Bottom => "Jump all the way to the bottom",
-            CommonAction::EnterSearch => "Enter search mode",
-            CommonAction::NextResult => "When a filter is active, jump to the next result",
-            CommonAction::PreviousResult => "When a filter is active, jump to the previous result",
+            CommonAction::Up => "Go up".into(),
+            CommonAction::Down => "Go down".into(),
+            CommonAction::UpHalf => "Jump by half a screen up".into(),
+            CommonAction::DownHalf => "Jump by half a screen down".into(),
+            CommonAction::PageUp => "Jump a screen up".into(),
+            CommonAction::PageDown => "Jump a screen down".into(),
+            CommonAction::MoveUp => "Move current item up, for example song in a queue".into(),
+            CommonAction::MoveDown => "Move current item down, for example song in a queue".into(),
+            CommonAction::Right => "Go right".into(),
+            CommonAction::Left => "Go left".into(),
+            CommonAction::Top => "Jump all the way to the top".into(),
+            CommonAction::Bottom => "Jump all the way to the bottom".into(),
+            CommonAction::EnterSearch => "Enter search mode".into(),
+            CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
+            CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
             CommonAction::Select => {
-                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist"
+                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
             }
-            CommonAction::InvertSelection => "Inverts the current selected items",
+            CommonAction::InvertSelection => "Inverts the current selected items".into(),
             CommonAction::Delete => {
-                "Delete. For example a playlist, song from a playlist or wipe the current queue"
+                "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
             }
-            CommonAction::Rename => "Rename. Currently only for playlists",
+            CommonAction::Rename => "Rename. Currently only for playlists".into(),
             CommonAction::Close => {
-                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc."
+                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
             }
             CommonAction::Confirm => {
-                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor"
+                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
             }
             CommonAction::FocusInput => {
-                "Focuses textbox if any is on the screen and is not focused"
+                "Focuses textbox if any is on the screen and is not focused".into()
             }
-            CommonAction::PaneDown => "Focus the pane below the current one",
-            CommonAction::PaneUp => "Focus the pane above the current one",
-            CommonAction::PaneRight => "Focus the pane to the right of the current one",
-            CommonAction::PaneLeft => "Focus the pane to the left of the current one",
-            CommonAction::AddOptions {..} => "",
-            CommonAction::ShowInfo => "Show info about item under cursor in a modal popup",
-        }.into()
+            CommonAction::PaneDown => "Focus the pane below the current one".into(),
+            CommonAction::PaneUp => "Focus the pane above the current one".into(),
+            CommonAction::PaneRight => "Focus the pane to the right of the current one".into(),
+            CommonAction::PaneLeft => "Focus the pane to the left of the current one".into(),
+            CommonAction::AddOptions { kind: AddKind::Modal(items) } => format!("Open add menu modal with {} options", items.len()).into(),
+            CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
+                let mut buf = String::from("Add");
+                if opts.all {
+                    buf.push_str(" all items");
+                } else {
+                    buf.push_str(" item");
+                }
+                buf.push_str(match opts.position {
+                    Position::AfterCurrentSong => " after the current song",
+                    Position::BeforeCurrentSong => " before the current song",
+                    Position::StartOfQueue => " at the start of the queue",
+                    Position::EndOfQueue => " at the end of the queue",
+                    Position::Replace => " and replace the queue",
+                });
+
+                buf.push_str(match opts.autoplay {
+                    AutoplayKind::First => " and play the first item",
+                    AutoplayKind::Hovered => " and play the hovered item",
+                    AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
+                    AutoplayKind::None => "",
+                });
+
+                buf.into()
+            },
+            CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
+        }
     }
 }
 
@@ -614,42 +660,42 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
             CommonActionFile::Add => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    autoplay: false,
+                    autoplay: AutoplayKind::None,
                     position: Position::EndOfQueue,
                     all: false,
                 }),
             },
             CommonActionFile::AddReplace => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    autoplay: false,
+                    autoplay: AutoplayKind::None,
                     position: Position::Replace,
                     all: false,
                 }),
             },
             CommonActionFile::Insert => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    autoplay: false,
+                    autoplay: AutoplayKind::None,
                     position: Position::AfterCurrentSong,
                     all: false,
                 }),
             },
             CommonActionFile::InsertAll => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    autoplay: false,
+                    autoplay: AutoplayKind::None,
                     position: Position::AfterCurrentSong,
                     all: true,
                 }),
             },
             CommonActionFile::AddAll => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    autoplay: false,
+                    autoplay: AutoplayKind::None,
                     position: Position::EndOfQueue,
                     all: true,
                 }),
             },
             CommonActionFile::AddAllReplace => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
-                    autoplay: false,
+                    autoplay: AutoplayKind::None,
                     position: Position::Replace,
                     all: true,
                 }),

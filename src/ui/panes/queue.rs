@@ -16,7 +16,11 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        keys::{GlobalAction, QueueActions, actions::AddKind},
+        keys::{
+            GlobalAction,
+            QueueActions,
+            actions::{AddKind, AutoplayKind},
+        },
         tabs::PaneType,
         theme::properties::{Property, SongProperty},
     },
@@ -26,7 +30,7 @@ use crate::{
     shared::{
         ext::{
             btreeset_ranges::BTreeSetRanges,
-            mpd_client::{Enqueue, MpdClientExt},
+            mpd_client::{Autoplay, Enqueue, MpdClientExt},
             rect::RectExt,
         },
         key_event::KeyEvent,
@@ -108,21 +112,47 @@ impl QueuePane {
             .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }))
     }
 
-    fn enqueue_items(&self, all: bool, ctx: &AppContext) -> Vec<Enqueue> {
+    fn enqueue_items(&self, all: bool, ctx: &AppContext) -> (Vec<Enqueue>, Option<usize>) {
+        let hovered = self
+            .scrolling_state
+            .get_selected()
+            .and_then(|idx| ctx.queue.get(idx))
+            .map(|s| s.file.as_str());
         if all {
-            ctx.queue.iter().map(|v| Enqueue::File { path: v.file.clone() }).collect_vec()
+            ctx.queue.iter().enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                let path = item.file.clone();
+                if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                    acc.1 = Some(idx);
+                }
+
+                acc.0.push(Enqueue::File { path });
+
+                acc
+            })
         } else if self.scrolling_state.marked.is_empty() {
-            self.scrolling_state
-                .get_selected()
-                .and_then(|idx| ctx.queue.get(idx))
-                .map_or(Vec::new(), |v| vec![Enqueue::File { path: v.file.clone() }])
+            (
+                self.scrolling_state
+                    .get_selected()
+                    .and_then(|idx| ctx.queue.get(idx))
+                    .map_or(Vec::new(), |v| vec![Enqueue::File { path: v.file.clone() }]),
+                None,
+            )
         } else {
             self.scrolling_state
                 .marked
                 .iter()
                 .filter_map(|idx| ctx.queue.get(*idx))
-                .map(|v| Enqueue::File { path: v.file.clone() })
-                .collect_vec()
+                .enumerate()
+                .fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let path = item.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                        acc.1 = Some(idx);
+                    }
+
+                    acc.0.push(Enqueue::File { path });
+
+                    acc
+                })
         }
     }
 }
@@ -885,15 +915,11 @@ impl Pane for QueuePane {
                     context.render()?;
                 }
                 CommonAction::AddOptions { kind: AddKind::Action(options) } => {
-                    let enqueue = self.enqueue_items(options.all, context);
+                    let (enqueue, _hovered_song_idx) = self.enqueue_items(options.all, context);
 
                     if !enqueue.is_empty() {
-                        let queue_len = context.queue.len();
-                        let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
-
                         context.command(move |client| {
-                            let autoplay = options.autoplay(queue_len, current_song_idx);
-                            client.enqueue_multiple(enqueue, options.position, autoplay)?;
+                            client.enqueue_multiple(enqueue, options.position, Autoplay::None)?;
 
                             Ok(())
                         });
@@ -902,10 +928,11 @@ impl Pane for QueuePane {
                 }
                 CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
                     let opts = items
-                        .iter()
-                        .map(|(label, opts)| {
-                            let enqueue = self.enqueue_items(opts.all, context);
-                            (label.to_owned(), *opts, enqueue)
+                        .into_iter()
+                        .map(|(label, mut opts)| {
+                            opts.autoplay = AutoplayKind::None;
+                            let (enqueue, hovered_song_idx) = self.enqueue_items(opts.all, context);
+                            (label, opts, (enqueue, hovered_song_idx))
                         })
                         .collect_vec();
 
