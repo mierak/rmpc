@@ -64,6 +64,13 @@ Configures how the Cava music visualizer is displayed. More info on the <a href=
 
 If set to false, the header of the song table is not displayed. Default is `true`.
 
+### song_table_album_separator
+
+<ConfigValue name="song_table_album_separator" type={["None", "Underline"]} />
+
+Visually separate albums in the queue. A song is considered as being in another album when `albumartist`
+or `album` are different from the previous song. Defaults to `None`.
+
 ### draw_borders
 
 <ConfigValue name="draw_borders" type="boolean" />
