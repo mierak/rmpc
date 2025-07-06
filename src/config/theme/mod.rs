@@ -207,8 +207,8 @@ impl Default for UiConfigFile {
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AlbumSeparator {
-    None,
     #[default]
+    None,
     Underline,
 }
 

@@ -1045,18 +1045,8 @@ struct QueueRow {
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
         let mut row = if let Some(style) = self.cell_style {
-            // if self.underlined {
-            //     Row::new(cells.map(|column| column.patch_style(style.underlined())))
-            // } else {
-            //     Row::new(cells.map(|column| column.patch_style(style)))
-            // }
             Row::new(cells.map(|column| column.patch_style(style)))
         } else {
-            // if self.underlined {
-            //     Row::new(cells.map(|column|
-            // column.patch_style(Style::default().underlined()))) } else {
-            //     Row::new(cells)
-            // }
             Row::new(cells)
         };
 
