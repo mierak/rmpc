@@ -26,6 +26,7 @@ use crate::{
     ui::modals::menu_modal::MenuModal,
 };
 
+#[derive(Debug, Clone, Copy)]
 pub enum MoveDirection {
     Up,
     Down,
