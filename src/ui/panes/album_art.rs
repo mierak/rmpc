@@ -21,23 +21,23 @@ pub struct AlbumArtPane {
 const ALBUM_ART: &str = "album_art";
 
 impl AlbumArtPane {
-    pub fn new(context: &Ctx) -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
         Self {
-            album_art: AlbumArtFacade::new(&context.config),
+            album_art: AlbumArtFacade::new(&ctx.config),
             is_modal_open: false,
             fetch_needed: false,
         }
     }
 
     /// returns none if album art is supposed to be hidden
-    fn fetch_album_art(context: &Ctx) -> Option<()> {
-        if matches!(context.config.album_art.method.into(), ImageProtocol::None) {
+    fn fetch_album_art(ctx: &Ctx) -> Option<()> {
+        if matches!(ctx.config.album_art.method.into(), ImageProtocol::None) {
             return None;
         }
 
-        let (_, current_song) = context.find_current_song_in_queue()?;
+        let (_, current_song) = ctx.find_current_song_in_queue()?;
 
-        let disabled_protos = &context.config.album_art.disabled_protocols;
+        let disabled_protos = &ctx.config.album_art.disabled_protocols;
         let song_uri = current_song.file.as_str();
         if disabled_protos.iter().any(|proto| song_uri.starts_with(proto)) {
             log::debug!(uri = song_uri; "Not downloading album art because the protocol is disabled");
@@ -45,7 +45,7 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
-        context.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneType::AlbumArt).query(move |client| {
+        ctx.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneType::AlbumArt).query(move |client| {
             let start = std::time::Instant::now();
             log::debug!(file = song_uri.as_str(); "Searching for album art");
             let result = client.find_album_art(&song_uri)?;
@@ -59,25 +59,25 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(&mut self, _frame: &mut Frame, area: Rect, _context: &Ctx) -> Result<()> {
+    fn render(&mut self, _frame: &mut Frame, area: Rect, _ctx: &Ctx) -> Result<()> {
         self.album_art.set_size(area);
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, _context: &Ctx) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, _ctx: &Ctx) -> Result<()> {
         self.album_art.set_size(area);
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn on_hide(&mut self, _context: &Ctx) -> Result<()> {
+    fn on_hide(&mut self, _ctx: &Ctx) -> Result<()> {
         self.album_art.hide()
     }
 
-    fn resize(&mut self, area: Rect, _context: &Ctx) -> Result<()> {
+    fn resize(&mut self, area: Rect, _ctx: &Ctx) -> Result<()> {
         if self.is_modal_open {
             return Ok(());
         }
@@ -85,8 +85,8 @@ impl Pane for AlbumArtPane {
         self.album_art.show_current()
     }
 
-    fn before_show(&mut self, context: &Ctx) -> Result<()> {
-        if AlbumArtPane::fetch_album_art(context).is_none() {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
+        if AlbumArtPane::fetch_album_art(ctx).is_none() {
             self.album_art.show_default()?;
         }
         Ok(())
@@ -97,7 +97,7 @@ impl Pane for AlbumArtPane {
         id: &'static str,
         data: MpdQueryResult,
         is_visible: bool,
-        _context: &Ctx,
+        _ctx: &Ctx,
     ) -> Result<()> {
         if !is_visible || self.is_modal_open {
             return Ok(());
@@ -114,14 +114,14 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected if is_visible => {
                 if self.is_modal_open {
                     self.fetch_needed = true;
                     return Ok(());
                 }
-                self.before_show(context)?;
+                self.before_show(ctx)?;
             }
             UiEvent::Displayed if is_visible => {
                 if is_visible && !self.is_modal_open {
@@ -137,13 +137,13 @@ impl Pane for AlbumArtPane {
 
                 if self.fetch_needed {
                     self.fetch_needed = false;
-                    self.before_show(context)?;
+                    self.before_show(ctx)?;
                     return Ok(());
                 }
                 self.album_art.show_current()?;
             }
             UiEvent::ConfigChanged => {
-                self.album_art.set_config(&context.config)?;
+                self.album_art.set_config(&ctx.config)?;
                 if is_visible && !self.is_modal_open {
                     self.album_art.show_current()?;
                 }

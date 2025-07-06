@@ -96,19 +96,19 @@ impl Modal for MenuModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::Up => {
                     self.prev();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
                     self.next();
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::Confirm => {
                     let current_section = &mut self.sections[self.current_section_idx];
@@ -116,10 +116,10 @@ impl Modal for MenuModal {
                         &mut current_section.items[current_section.selected_idx.unwrap_or(0)];
 
                     if let Some(cb) = item.on_confirm.take() {
-                        (cb)(context);
+                        (cb)(ctx);
                     }
 
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 _ => {}
             }
@@ -128,29 +128,29 @@ impl Modal for MenuModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 self.select_item_at_position(event.into());
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::DoubleClick => {
                 if let Some(item) = self.item_at_position(event.into()) {
                     if let Some(cb) = item.on_confirm.take() {
-                        (cb)(context);
+                        (cb)(ctx);
                     }
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollUp => {
                 self.prev();
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown => {
                 self.next();
-                context.render()?;
+                ctx.render()?;
             }
         }
         Ok(())
@@ -158,7 +158,7 @@ impl Modal for MenuModal {
 }
 
 impl MenuModal {
-    pub fn new(_context: &Ctx) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self { sections: Vec::default(), current_section_idx: 0, area: Rect::default() }
     }
 
@@ -169,12 +169,8 @@ impl MenuModal {
         self
     }
 
-    pub fn add_section(
-        mut self,
-        context: &Ctx,
-        cb: impl FnOnce(MenuSection) -> MenuSection,
-    ) -> Self {
-        let section = MenuSection::new(context.config.theme.current_item_style);
+    pub fn add_section(mut self, ctx: &Ctx, cb: impl FnOnce(MenuSection) -> MenuSection) -> Self {
+        let section = MenuSection::new(ctx.config.theme.current_item_style);
         let section = cb(section);
         self.sections.push(section);
         self

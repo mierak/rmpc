@@ -16,12 +16,12 @@ use crate::{
 };
 
 pub struct Header<'a> {
-    context: &'a Ctx,
+    ctx: &'a Ctx,
 }
 
 impl Widget for Header<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
-        let config = &self.context.config;
+        let config = &self.ctx.config;
 
         if let Some(header_bg_color) = config.theme.header_background_color {
             Block::default().style(Style::default().bg(header_bg_color)).render(area, buf);
@@ -30,7 +30,7 @@ impl Widget for Header<'_> {
         let row_count = config.theme.header.rows.len();
 
         let layouts = Layout::vertical((0..row_count).map(|_| Constraint::Length(1))).split(area);
-        let song = self.context.find_current_song_in_queue().map(|(_, song)| song);
+        let song = self.ctx.find_current_song_in_queue().map(|(_, song)| song);
         for row in 0..row_count {
             let [left, center, right] = *Layout::horizontal([
                 Constraint::Percentage(30),
@@ -41,15 +41,15 @@ impl Widget for Header<'_> {
                 return;
             };
             let template = PropertyTemplates(&config.theme.header.rows[row].left);
-            let widget = template.format(song, self.context, &self.context.config).left_aligned();
+            let widget = template.format(song, self.ctx, &self.ctx.config).left_aligned();
             widget.render(left, buf);
 
             let template = PropertyTemplates(&config.theme.header.rows[row].center);
-            let widget = template.format(song, self.context, &self.context.config).centered();
+            let widget = template.format(song, self.ctx, &self.ctx.config).centered();
             widget.render(center, buf);
 
             let template = PropertyTemplates(&config.theme.header.rows[row].right);
-            let widget = template.format(song, self.context, &self.context.config).right_aligned();
+            let widget = template.format(song, self.ctx, &self.ctx.config).right_aligned();
             widget.render(right, buf);
         }
     }
@@ -57,11 +57,11 @@ impl Widget for Header<'_> {
 
 struct PropertyTemplates<'a>(&'a [Property<PropertyKind>]);
 impl<'a> PropertyTemplates<'a> {
-    fn format(&'a self, song: Option<&'a Song>, context: &'a Ctx, config: &Config) -> Line<'a> {
+    fn format(&'a self, song: Option<&'a Song>, ctx: &'a Ctx, config: &Config) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(
                 song,
-                context,
+                ctx,
                 &config.theme.format_tag_separator,
                 config.theme.multiple_tag_resolution_strategy,
             ) {
@@ -75,7 +75,7 @@ impl<'a> PropertyTemplates<'a> {
 }
 
 impl<'a> Header<'a> {
-    pub fn new(context: &'a Ctx) -> Self {
-        Self { context }
+    pub fn new(ctx: &'a Ctx) -> Self {
+        Self { ctx }
     }
 }

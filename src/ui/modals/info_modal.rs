@@ -40,7 +40,7 @@ pub struct InfoModal<'a> {
 impl<'a> InfoModal<'a> {
     #[builder]
     pub fn new(
-        context: &Ctx,
+        ctx: &Ctx,
         size: Option<impl Into<Size>>,
         confirm_label: Option<&'a str>,
         message: Vec<String>,
@@ -51,14 +51,14 @@ impl<'a> InfoModal<'a> {
         let buttons = vec![Button::default().label(confirm_label.unwrap_or("Ok"))];
         button_group_state.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
-            .active_style(context.config.theme.current_item_style)
-            .inactive_style(context.config.as_text_style())
+            .active_style(ctx.config.theme.current_item_style)
+            .inactive_style(ctx.config.as_text_style())
             .buttons(buttons)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -130,20 +130,20 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(context) {
-            pop_modal!(context);
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(ctx) {
+            pop_modal!(ctx);
         }
 
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
             }
             _ => {}

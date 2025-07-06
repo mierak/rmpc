@@ -161,43 +161,41 @@ impl Modal for InfoListModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.prev_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
-                    self.scrolling_state
-                        .prev(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
-                    self.scrolling_state
-                        .next(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 _ => {}
             }
@@ -206,7 +204,7 @@ impl Modal for InfoListModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         if !self.table_area.contains(event.into()) {
             return Ok(());
         }
@@ -215,19 +213,19 @@ impl Modal for InfoListModal {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
                 let y: usize = event.y.saturating_sub(self.table_area.y).into();
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    context.render()?;
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                    ctx.render()?;
                 }
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.next(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
         }
 

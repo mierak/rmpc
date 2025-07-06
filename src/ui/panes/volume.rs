@@ -41,13 +41,13 @@ fn as_styled_volume_slider(config: &VolumeSliderConfig) -> VolumeSlider<'_> {
 }
 
 impl Pane for VolumePane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         self.area = area;
 
         match &self.config {
             VolumeType::Slider(config) => {
                 let volume_slider = as_styled_volume_slider(config)
-                    .value(f32::from(*context.status.volume.value()) / 100.0);
+                    .value(f32::from(*ctx.status.volume.value()) / 100.0);
 
                 frame.render_widget(volume_slider, self.area);
             }
@@ -56,11 +56,11 @@ impl Pane for VolumePane {
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
+    fn before_show(&mut self, _ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         if !self.area.contains(event.into()) {
             return Ok(());
         }
@@ -79,23 +79,23 @@ impl Pane for VolumePane {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
-                context.command(move |client| {
+                ctx.command(move |client| {
                     client.volume(ValueChange::Set(new_volume))?;
                     Ok(())
                 });
 
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                let volume_step = context.config.volume_step.into();
-                context.command(move |client| {
+                let volume_step = ctx.config.volume_step.into();
+                ctx.command(move |client| {
                     client.volume(ValueChange::Increase(volume_step))?;
                     Ok(())
                 });
             }
             MouseEventKind::ScrollDown => {
-                let volume_step = context.config.volume_step.into();
-                context.command(move |client| {
+                let volume_step = ctx.config.volume_step.into();
+                ctx.command(move |client| {
                     client.volume(ValueChange::Decrease(volume_step))?;
                     Ok(())
                 });
@@ -106,7 +106,7 @@ impl Pane for VolumePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

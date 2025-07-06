@@ -64,7 +64,7 @@ impl TabScreen {
         pane_container: &mut PaneContainer,
         frame: &mut Frame,
         area: Rect,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         let focused = self.panes.panes_iter().find(|pane| pane.id == self.focused);
         self.panes.for_each_pane_custom_data(
@@ -78,21 +78,18 @@ impl TabScreen {
                 pane_data.area = area;
                 pane_data.block_area = block_area;
                 let block = block.border_style(if focused.is_some_and(|p| p.id == pane.id) {
-                    context.config.as_focused_border_style()
+                    ctx.config.as_focused_border_style()
                 } else {
-                    context.config.as_border_style()
+                    ctx.config.as_border_style()
                 });
 
-                let mut pane_instance = pane_container.get_mut(&pane.pane, context)?;
-                pane_call!(pane_instance, render(frame, area, context))?;
+                let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
+                pane_call!(pane_instance, render(frame, area, ctx))?;
                 frame.render_widget(block, block_area);
                 Ok(())
             },
             &mut |block, block_area, frame| {
-                frame.render_widget(
-                    block.border_style(context.config.as_border_style()),
-                    block_area,
-                );
+                frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
                 Ok(())
             },
         )?;
@@ -103,7 +100,7 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: &mut KeyEvent,
-        context: &mut Ctx,
+        ctx: &mut Ctx,
     ) -> Result<()> {
         let Some(focused_pane_data) = self.pane_data.get(&self.focused) else {
             log::warn!(focused:? = self.focused, pane_areas:? = self.pane_data; "Tried to find focused pane area but it does not exist");
@@ -111,7 +108,7 @@ impl TabScreen {
         };
         let focused_area = focused_pane_data.area;
 
-        match event.as_common_action(context) {
+        match event.as_common_action(ctx) {
             Some(CommonAction::PaneUp) => {
                 let pane_to_focus = self
                     .panes_directly_above(focused_area)
@@ -124,7 +121,7 @@ impl TabScreen {
                 if let Some(pane) = pane_to_focus {
                     self.set_focused(pane.id);
                 }
-                context.render()?;
+                ctx.render()?;
             }
             Some(CommonAction::PaneDown) => {
                 let pane_to_focus = self
@@ -138,7 +135,7 @@ impl TabScreen {
                 if let Some(pane) = pane_to_focus {
                     self.set_focused(pane.id);
                 }
-                context.render()?;
+                ctx.render()?;
             }
             Some(CommonAction::PaneRight) => {
                 let pane_to_focus = self
@@ -152,7 +149,7 @@ impl TabScreen {
                 if let Some(pane) = pane_to_focus {
                     self.set_focused(pane.id);
                 }
-                context.render()?;
+                ctx.render()?;
             }
             Some(CommonAction::PaneLeft) => {
                 let pane_to_focus = self
@@ -166,7 +163,7 @@ impl TabScreen {
                 if let Some(pane) = pane_to_focus {
                     self.set_focused(pane.id);
                 }
-                context.render()?;
+                ctx.render()?;
             }
             Some(_) | None => {
                 event.abandon();
@@ -177,8 +174,8 @@ impl TabScreen {
                     );
                     return Ok(());
                 };
-                let mut pane = panes.get_mut(&focused.pane, context)?;
-                pane_call!(pane, handle_action(event, context))?;
+                let mut pane = panes.get_mut(&focused.pane, ctx)?;
+                pane_call!(pane, handle_action(event, ctx))?;
             }
         }
 
@@ -189,7 +186,7 @@ impl TabScreen {
         &mut self,
         panes: &mut PaneContainer,
         event: MouseEvent,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         if matches!(event.kind, MouseEventKind::LeftClick) {
             let Some(pane) = self
@@ -203,7 +200,7 @@ impl TabScreen {
                 return Ok(());
             };
             self.set_focused(pane.id);
-            context.render()?;
+            ctx.render()?;
         }
 
         let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == self.focused) else {
@@ -212,15 +209,15 @@ impl TabScreen {
             );
             return Ok(());
         };
-        let mut pane = panes.get_mut(&focused.pane, context)?;
-        pane_call!(pane, handle_mouse_event(event, context))?;
+        let mut pane = panes.get_mut(&focused.pane, ctx)?;
+        pane_call!(pane, handle_mouse_event(event, ctx))?;
         Ok(())
     }
 
-    pub fn on_hide(&mut self, panes: &mut PaneContainer, context: &Ctx) -> Result<()> {
+    pub fn on_hide(&mut self, panes: &mut PaneContainer, ctx: &Ctx) -> Result<()> {
         for pane in self.panes.panes_iter() {
-            let mut pane = panes.get_mut(&pane.pane, context)?;
-            pane_call!(pane, on_hide(context))?;
+            let mut pane = panes.get_mut(&pane.pane, ctx)?;
+            pane_call!(pane, on_hide(ctx))?;
         }
         Ok(())
     }
@@ -229,16 +226,16 @@ impl TabScreen {
         &mut self,
         pane_container: &mut PaneContainer,
         area: Rect,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
             let pane_data =
                 self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
             pane_data.area = pane_area;
             pane_data.block_area = block_area;
-            let mut pane_instance = pane_container.get_mut(&pane.pane, context)?;
-            pane_call!(pane_instance, calculate_areas(pane_area, context))?;
-            pane_call!(pane_instance, before_show(context))?;
+            let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
+            pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+            pane_call!(pane_instance, before_show(ctx))?;
             Ok(())
         })?;
         if !self.initialized {
@@ -265,16 +262,16 @@ impl TabScreen {
         &mut self,
         pane_container: &mut PaneContainer,
         area: Rect,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
             let pane_data =
                 self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
             pane_data.area = area;
             pane_data.block_area = block_area;
-            let mut pane_instance = pane_container.get_mut(&pane.pane, context)?;
-            pane_call!(pane_instance, calculate_areas(pane_area, context))?;
-            pane_call!(pane_instance, resize(pane_area, context))?;
+            let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
+            pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+            pane_call!(pane_instance, resize(pane_area, ctx))?;
             Ok(())
         })
     }

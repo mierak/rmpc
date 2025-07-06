@@ -27,16 +27,16 @@ pub struct LyricsPane {
 }
 
 impl LyricsPane {
-    pub fn new(_context: &Ctx) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self { current_lyrics: None, initialized: false, last_requested_line_idx: 0 }
     }
 }
 
 impl Pane for LyricsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         let Some(lrc) = &self.current_lyrics else { return Ok(()) };
 
-        let elapsed = context.status.elapsed;
+        let elapsed = ctx.status.elapsed;
         let (current_line_idx, first_line_reached) = lrc
             .lines
             .iter()
@@ -49,16 +49,15 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows / 2;
 
-        let default_style =
-            Style::default().fg(context.config.theme.text_color.unwrap_or_default());
+        let default_style = Style::default().fg(ctx.config.theme.text_color.unwrap_or_default());
 
         let middle_style = if first_line_reached {
-            context.config.theme.highlighted_item_style
+            ctx.config.theme.highlighted_item_style
         } else {
             default_style
         };
 
-        let timestamp = context.config.theme.lyrics.timestamp;
+        let timestamp = ctx.config.theme.lyrics.timestamp;
 
         let mut current_area = middle_row as usize;
         let Some(current_line) = lrc.lines.get(current_line_idx) else {
@@ -133,18 +132,17 @@ impl Pane for LyricsPane {
         if self.last_requested_line_idx != current_line_idx + 1 {
             if let Some(line) = lrc.lines.get(current_line_idx + 1) {
                 self.last_requested_line_idx = current_line_idx + 1;
-                context
-                    .scheduler
-                    .schedule(line.time.saturating_sub(context.status.elapsed), run_status_update);
+                ctx.scheduler
+                    .schedule(line.time.saturating_sub(ctx.status.elapsed), run_status_update);
             }
         }
 
         Ok(())
     }
 
-    fn before_show(&mut self, context: &Ctx) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            match context.find_lrc() {
+            match ctx.find_lrc() {
                 Ok(lrc) => {
                     self.current_lyrics = lrc;
                 }
@@ -160,13 +158,13 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected => {
-                match context.find_lrc() {
+                match ctx.find_lrc() {
                     Ok(lrc) => {
                         self.current_lyrics = lrc;
-                        context.render()?;
+                        ctx.render()?;
                     }
                     Err(err) => {
                         self.current_lyrics = None;
@@ -176,10 +174,10 @@ impl Pane for LyricsPane {
                 self.last_requested_line_idx = 0;
             }
             UiEvent::LyricsIndexed if self.current_lyrics.is_none() => {
-                match context.find_lrc() {
+                match ctx.find_lrc() {
                     Ok(lrc) => {
                         self.current_lyrics = lrc;
-                        context.render()?;
+                        ctx.render()?;
                     }
                     Err(err) => {
                         self.current_lyrics = None;
@@ -193,7 +191,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

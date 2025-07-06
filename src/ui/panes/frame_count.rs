@@ -16,11 +16,11 @@ impl FrameCountPane {
 }
 
 impl Pane for FrameCountPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> anyhow::Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         self.area = area;
-        let text = format!("{} frames", context.rendered_frames);
+        let text = format!("{} frames", ctx.rendered_frames);
         frame.render_widget(
-            Text::from(text).fg(context.config.theme.text_color.unwrap_or_default()).bg(context
+            Text::from(text).fg(ctx.config.theme.text_color.unwrap_or_default()).bg(ctx
                 .config
                 .theme
                 .background_color
@@ -31,7 +31,7 @@ impl Pane for FrameCountPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _context: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

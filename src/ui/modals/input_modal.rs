@@ -46,19 +46,19 @@ impl<Callback: FnMut(&Ctx, &str) -> Result<()>> std::fmt::Debug for InputModal<'
 }
 
 impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
-    pub fn new(context: &Ctx) -> Self {
+    pub fn new(ctx: &Ctx) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
         button_group_state.set_button_count(buttons.len());
 
         let button_group = ButtonGroup::default()
             .buttons(buttons)
-            .inactive_style(context.config.as_text_style())
+            .inactive_style(ctx.config.as_text_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_set(BUTTON_GROUP_SYMBOLS)
-                    .border_style(context.config.as_border_style()),
+                    .border_style(ctx.config.as_border_style()),
             );
 
         Self {
@@ -146,21 +146,21 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        let action = key.as_common_action(context);
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let action = key.as_common_action(ctx);
         if self.input_focused {
             if let Some(CommonAction::Close) = action {
                 self.input_focused = false;
 
-                context.render()?;
+                ctx.render()?;
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group_state.selected == 0 {
                     if let Some(ref mut callback) = self.callback {
-                        (callback)(context, &self.value)?;
+                        (callback)(ctx, &self.value)?;
                     }
                 }
-                pop_modal!(context);
+                pop_modal!(ctx);
                 return Ok(());
             }
 
@@ -168,12 +168,12 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                 KeyCode::Char(c) => {
                     self.value.push(c);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 KeyCode::Backspace => {
                     self.value.pop();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -182,28 +182,28 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                 CommonAction::Down => {
                     self.button_group_state.next();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
                     self.button_group_state.next();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(context, &self.value)?;
+                            (callback)(ctx, &self.value)?;
                         }
                     }
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }
@@ -212,30 +212,30 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
                     self.input_focused = false;
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         if let Some(ref mut callback) = self.callback {
-                            (callback)(context, &self.value)?;
+                            (callback)(ctx, &self.value)?;
                         }
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     Some(_) => {
-                        pop_modal!(context);
+                        pop_modal!(ctx);
                     }
                     None => {
                         if self.input_area.contains(event.into()) {
                             self.input_focused = true;
-                            context.render()?;
+                            ctx.render()?;
                         }
                     }
                 }
@@ -246,14 +246,14 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
                     self.input_focused = false;
                     self.button_group_state.prev();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             MouseEventKind::ScrollDown => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
                     self.input_focused = false;
                     self.button_group_state.next();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
         }

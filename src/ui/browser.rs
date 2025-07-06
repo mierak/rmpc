@@ -41,41 +41,41 @@ where
     fn browser_areas(&self) -> [Rect; 3];
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, context: &Ctx) -> Result<()>;
+    fn next(&mut self, ctx: &Ctx) -> Result<()>;
     fn list_songs_in_item(
         &self,
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + 'static;
-    fn prepare_preview(&mut self, context: &Ctx) -> Result<()>;
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()>;
     fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> (Vec<Enqueue>, Option<usize>);
-    fn open(&mut self, context: &Ctx) -> Result<()>;
-    fn show_info(&self, item: &T, context: &Ctx) -> Result<()> {
+    fn open(&mut self, ctx: &Ctx) -> Result<()>;
+    fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn delete(&self, item: &T, index: usize, context: &Ctx) -> Result<()> {
+    fn delete(&self, item: &T, index: usize, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn rename(&self, item: &T, context: &Ctx) -> Result<()> {
+    fn rename(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn move_selected(&mut self, direction: MoveDirection, context: &Ctx) -> Result<()> {
+    fn move_selected(&mut self, direction: MoveDirection, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
-    fn handle_filter_input(&mut self, event: &mut KeyEvent, context: &Ctx) -> Result<()> {
+    fn handle_filter_input(&mut self, event: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
         if !self.is_filter_input_mode_active() {
             return Ok(());
         }
 
-        let config = &context.config;
-        match event.as_common_action(context) {
+        let config = &ctx.config;
+        match event.as_common_action(ctx) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().set_filter(None, config);
-                self.prepare_preview(context);
+                self.prepare_preview(ctx);
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
-                context.render()?;
+                ctx.render()?;
             }
             _ => {
                 event.stop_propagation();
@@ -83,11 +83,11 @@ where
                     KeyCode::Char(c) => {
                         self.stack_mut().current_mut().push_filter(c, config);
                         self.stack_mut().current_mut().jump_first_matching(config);
-                        self.prepare_preview(context);
+                        self.prepare_preview(ctx);
                     }
                     KeyCode::Backspace => {
                         self.stack_mut().current_mut().pop_filter(config);
-                        context.render()?;
+                        ctx.render()?;
                     }
                     _ => {}
                 }
@@ -97,12 +97,12 @@ where
         Ok(())
     }
 
-    fn handle_global_action(&mut self, event: &mut KeyEvent, context: &Ctx) -> Result<()> {
-        let Some(action) = event.as_global_action(context) else {
+    fn handle_global_action(&mut self, event: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
+        let Some(action) = event.as_global_action(ctx) else {
             return Ok(());
         };
 
-        let config = &context.config;
+        let config = &ctx.config;
         match &action {
             GlobalAction::ExternalCommand { command, .. }
                 if !self.stack().current().marked().is_empty() =>
@@ -115,7 +115,7 @@ where
                     .collect();
                 let path = self.stack().path().to_owned();
                 let command = std::sync::Arc::clone(command);
-                context.query().id(EXTERNAL_COMMAND).query(move |client| {
+                ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
                     let songs: Vec<_> = marked_items
                         .into_iter()
                         .map(|item| (item)(client))
@@ -130,7 +130,7 @@ where
                     let path = self.stack().path().to_owned();
                     let songs = self.list_songs_in_item(selected);
                     let command = std::sync::Arc::clone(command);
-                    context.query().id(EXTERNAL_COMMAND).query(move |client| {
+                    ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
                         let songs = (songs)(client)?;
                         Ok(MpdQueryResult::ExternalCommand(command, songs))
                     });
@@ -144,7 +144,7 @@ where
         Ok(())
     }
 
-    fn handle_mouse_action(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
+    fn handle_mouse_action(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         let [prev_area, current_area, preview_area] = self.browser_areas();
 
         let position = event.into();
@@ -155,10 +155,10 @@ where
                 let clicked_row: usize = event.y.saturating_sub(prev_area.y).into();
                 let prev_stack = self.stack_mut().previous_mut();
                 if let Some(idx_to_select) = prev_stack.state.get_at_rendered_row(clicked_row) {
-                    prev_stack.select_idx(idx_to_select, context.config.scrolloff);
+                    prev_stack.select_idx(idx_to_select, ctx.config.scrolloff);
                 }
                 self.stack_mut().pop();
-                self.prepare_preview(context);
+                self.prepare_preview(ctx);
             }
             MouseEventKind::DoubleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
@@ -166,8 +166,8 @@ where
                 if let Some(idx_to_select) =
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
-                    self.next(context)?;
-                    self.prepare_preview(context);
+                    self.next(ctx)?;
+                    self.prepare_preview(ctx);
                 }
             }
             MouseEventKind::MiddleClick if current_area.contains(position) => {
@@ -176,13 +176,11 @@ where
                 if let Some(idx_to_select) =
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
-                    self.stack_mut()
-                        .current_mut()
-                        .select_idx(idx_to_select, context.config.scrolloff);
+                    self.stack_mut().current_mut().select_idx(idx_to_select, ctx.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
                         let (items, _) = self.enqueue(std::iter::once(item));
                         if !items.is_empty() {
-                            context.command(move |client| {
+                            ctx.command(move |client| {
                                 client.enqueue_multiple(
                                     items,
                                     Position::EndOfQueue,
@@ -193,7 +191,7 @@ where
                         }
                     }
 
-                    self.prepare_preview(context);
+                    self.prepare_preview(ctx);
                 }
             }
             MouseEventKind::LeftClick if current_area.contains(position) => {
@@ -202,10 +200,8 @@ where
                 if let Some(idx_to_select) =
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
-                    self.stack_mut()
-                        .current_mut()
-                        .select_idx(idx_to_select, context.config.scrolloff);
-                    self.prepare_preview(context);
+                    self.stack_mut().current_mut().select_idx(idx_to_select, ctx.config.scrolloff);
+                    self.prepare_preview(ctx);
                 }
             }
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick
@@ -219,18 +215,18 @@ where
                     if clicked_row < preview.len() { Some(clicked_row) } else { None }
                 });
 
-                self.next(context)?;
+                self.next(ctx)?;
                 self.stack_mut().current_mut().select_idx(idx_to_select.unwrap_or_default(), 0);
 
-                self.prepare_preview(context);
+                self.prepare_preview(ctx);
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
-                self.stack_mut().current_mut().prev(context.config.scrolloff, false);
-                self.prepare_preview(context);
+                self.stack_mut().current_mut().prev(ctx.config.scrolloff, false);
+                self.prepare_preview(ctx);
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
-                self.stack_mut().current_mut().next(context.config.scrolloff, false);
-                self.prepare_preview(context);
+                self.stack_mut().current_mut().next(ctx.config.scrolloff, false);
+                self.prepare_preview(ctx);
             }
             _ => {}
         }
@@ -238,131 +234,131 @@ where
         Ok(())
     }
 
-    fn handle_common_action(&mut self, event: &mut KeyEvent, context: &Ctx) -> Result<()> {
-        let Some(action) = event.as_common_action(context) else {
+    fn handle_common_action(&mut self, event: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
+        let Some(action) = event.as_common_action(ctx) else {
             return Ok(());
         };
-        let config = &context.config;
+        let config = &ctx.config;
 
         match action.to_owned() {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev(config.scrolloff, config.wrap_navigation);
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::Down => {
                 self.stack_mut().current_mut().next(config.scrolloff, config.wrap_navigation);
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::MoveUp => {
-                self.move_selected(MoveDirection::Up, context);
+                self.move_selected(MoveDirection::Up, ctx);
             }
             CommonAction::MoveDown => {
-                self.move_selected(MoveDirection::Down, context);
+                self.move_selected(MoveDirection::Down, ctx);
             }
             CommonAction::DownHalf => {
-                self.stack_mut().current_mut().next_half_viewport(context.config.scrolloff);
-                self.prepare_preview(context);
-                context.render()?;
+                self.stack_mut().current_mut().next_half_viewport(ctx.config.scrolloff);
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::UpHalf => {
-                self.stack_mut().current_mut().prev_half_viewport(context.config.scrolloff);
-                self.prepare_preview(context);
-                context.render()?;
+                self.stack_mut().current_mut().prev_half_viewport(ctx.config.scrolloff);
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::PageUp => {
-                self.stack_mut().current_mut().prev_viewport(context.config.scrolloff);
-                self.prepare_preview(context);
-                context.render()?;
+                self.stack_mut().current_mut().prev_viewport(ctx.config.scrolloff);
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::PageDown => {
-                self.stack_mut().current_mut().next_viewport(context.config.scrolloff);
-                self.prepare_preview(context);
-                context.render()?;
+                self.stack_mut().current_mut().next_viewport(ctx.config.scrolloff);
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::Bottom => {
                 self.stack_mut().current_mut().last();
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::Top => {
                 self.stack_mut().current_mut().first();
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::Right => {
-                self.next(context)?;
-                self.prepare_preview(context);
-                context.render()?;
+                self.next(ctx)?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::Left => {
                 self.stack_mut().pop();
                 self.stack_mut().clear_preview();
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::EnterSearch => {
                 self.set_filter_input_mode_active(true);
                 self.stack_mut().current_mut().set_filter(Some(String::new()), config);
 
-                context.render()?;
+                ctx.render()?;
             }
             CommonAction::NextResult => {
                 self.stack_mut().current_mut().jump_next_matching(config);
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::PreviousResult => {
                 self.stack_mut().current_mut().jump_previous_matching(config);
-                self.prepare_preview(context);
-                context.render()?;
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::InvertSelection => {
                 self.stack_mut().current_mut().invert_marked();
 
-                context.render()?;
+                ctx.render()?;
             }
             CommonAction::Select => {
                 self.stack_mut().current_mut().toggle_mark_selected();
                 self.stack_mut()
                     .current_mut()
-                    .next(context.config.scrolloff, context.config.wrap_navigation);
-                self.prepare_preview(context);
-                context.render()?;
+                    .next(ctx.config.scrolloff, ctx.config.wrap_navigation);
+                self.prepare_preview(ctx);
+                ctx.render()?;
             }
             CommonAction::Close if !self.stack().current().marked().is_empty() => {
                 self.stack_mut().current_mut().marked_mut().clear();
-                context.render()?;
+                ctx.render()?;
             }
             CommonAction::Delete if !self.stack().current().marked().is_empty() => {
                 for idx in self.stack().current().marked().iter().rev() {
                     let item = &self.stack().current().items[*idx];
-                    self.delete(item, *idx, context)?;
+                    self.delete(item, *idx, ctx)?;
                 }
 
-                context.render()?;
+                ctx.render()?;
             }
             CommonAction::Delete => {
                 if let Some((index, item)) = self.stack().current().selected_with_idx() {
-                    self.delete(item, index, context)?;
-                    context.render()?;
+                    self.delete(item, index, ctx)?;
+                    ctx.render()?;
                 }
             }
             CommonAction::Rename => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.rename(item, context);
+                    self.rename(item, ctx);
                 }
             }
             CommonAction::FocusInput => {}
             CommonAction::Close => {}
             CommonAction::Confirm if self.stack().current().marked().is_empty() => {
-                self.open(context)?;
-                context.render()?;
+                self.open(ctx)?;
+                ctx.render()?;
             }
             CommonAction::ShowInfo => {
                 if let Some(item) = self.stack().current().selected() {
-                    self.show_info(item, context);
+                    self.show_info(item, ctx);
                 }
             }
             CommonAction::Confirm => {}
@@ -373,10 +369,10 @@ where
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
                 let (enqueue, hovered_idx) = self.enqueue_items(options.all);
                 if !enqueue.is_empty() {
-                    let queue_len = context.queue.len();
-                    let current_song_idx = context.find_current_song_in_queue().map(|(i, _)| i);
+                    let queue_len = ctx.queue.len();
+                    let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
 
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         let autoplay = options.autoplay(queue_len, current_song_idx, hovered_idx);
                         client.enqueue_multiple(enqueue, options.position, autoplay)?;
 
@@ -393,7 +389,7 @@ where
                     })
                     .collect_vec();
 
-                modal!(context, MenuModal::create_add_modal(opts, context));
+                modal!(ctx, MenuModal::create_add_modal(opts, ctx));
             }
         }
 

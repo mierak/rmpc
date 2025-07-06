@@ -40,7 +40,7 @@ impl OutputsModal {
         result
     }
 
-    pub fn toggle_selected_output(&mut self, context: &Ctx) {
+    pub fn toggle_selected_output(&mut self, ctx: &Ctx) {
         let Some(idx) = self.scrolling_state.get_selected() else {
             return;
         };
@@ -49,7 +49,7 @@ impl OutputsModal {
         };
 
         let id = output.id;
-        context.query().id("refresh_outputs").query(move |client| {
+        ctx.query().id("refresh_outputs").query(move |client| {
             client.toggle_output(id)?;
             Ok(MpdQueryResult::Outputs(client.outputs()?.0))
         });
@@ -115,58 +115,56 @@ impl Modal for OutputsModal {
         &mut self,
         id: &'static str,
         data: &mut MpdQueryResult,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             ("refresh_outputs", MpdQueryResult::Outputs(outputs)) => {
                 self.outputs = std::mem::take(outputs);
-                context.render()?;
+                ctx.render()?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        if let Some(action) = key.as_common_action(context) {
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.prev_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
-                    self.scrolling_state
-                        .prev(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
-                    self.scrolling_state
-                        .next(context.config.scrolloff, context.config.wrap_navigation);
+                    self.scrolling_state.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Confirm => {
-                    self.toggle_selected_output(context);
+                    self.toggle_selected_output(ctx);
                 }
                 CommonAction::Close => {
-                    pop_modal!(context);
+                    pop_modal!(ctx);
                 }
                 _ => {}
             }
@@ -174,29 +172,29 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.outputs_table_area.contains(event.into()) => {
                 let y: usize = event.y.saturating_sub(self.outputs_table_area.y).into();
                 let y = y.saturating_sub(1); // Subtract one to account for table header
                 if let Some(idx) = self.scrolling_state.get_at_rendered_row(y) {
-                    self.scrolling_state.select(Some(idx), context.config.scrolloff);
-                    context.render()?;
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                    ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick if self.outputs_table_area.contains(event.into()) => {
-                self.toggle_selected_output(context);
-                context.render()?;
+                self.toggle_selected_output(ctx);
+                ctx.render()?;
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown if self.outputs_table_area.contains(event.into()) => {
-                self.scrolling_state.next(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.next(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::ScrollUp if self.outputs_table_area.contains(event.into()) => {
-                self.scrolling_state.prev(context.config.scrolloff, false);
-                context.render()?;
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                ctx.render()?;
             }
             MouseEventKind::LeftClick => {}
             MouseEventKind::DoubleClick => {}

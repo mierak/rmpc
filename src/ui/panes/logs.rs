@@ -101,38 +101,38 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn before_show(&mut self, _context: &Ctx) -> Result<()> {
+    fn before_show(&mut self, _ctx: &Ctx) -> Result<()> {
         self.scrolling_state.last();
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         if let UiEvent::LogAdded(msg) = event {
             self.logs.push(std::mem::take(msg));
             self.should_scroll_to_last = true;
             if is_visible {
-                context.render()?;
+                ctx.render()?;
             }
         }
 
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         if !self.logs_area.contains(event.into()) {
             return Ok(());
         }
 
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(context.config.scrolloff, false);
+                self.scrolling_state.prev(ctx.config.scrolloff, false);
 
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(context.config.scrolloff, false);
+                self.scrolling_state.next(ctx.config.scrolloff, false);
 
-                context.render()?;
+                ctx.render()?;
             }
             _ => {}
         }
@@ -140,50 +140,50 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        let config = &context.config;
-        if let Some(action) = event.as_logs_action(context) {
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let config = &ctx.config;
+        if let Some(action) = event.as_logs_action(ctx) {
             match action {
                 LogsActions::Clear => {
                     self.logs.clear();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 LogsActions::ToggleScroll => {
                     self.scroll_enabled ^= true;
                 }
             }
-        } else if let Some(action) = event.as_common_action(context) {
+        } else if let Some(action) = event.as_common_action(ctx) {
             match action {
                 CommonAction::DownHalf => {
-                    self.scrolling_state.next_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::UpHalf => {
-                    self.scrolling_state.prev_half_viewport(context.config.scrolloff);
+                    self.scrolling_state.prev_half_viewport(ctx.config.scrolloff);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Up => {
-                    self.scrolling_state.prev(context.config.scrolloff, config.wrap_navigation);
+                    self.scrolling_state.prev(ctx.config.scrolloff, config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Down => {
-                    self.scrolling_state.next(context.config.scrolloff, config.wrap_navigation);
+                    self.scrolling_state.next(ctx.config.scrolloff, config.wrap_navigation);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Bottom => {
                     self.scrolling_state.last();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {}
             }

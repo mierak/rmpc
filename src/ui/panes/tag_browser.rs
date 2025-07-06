@@ -69,7 +69,7 @@ impl TagBrowserPane {
         root_tag: Tag,
         target_pane: PaneType,
         separator: Option<String>,
-        _context: &Ctx,
+        _ctx: &Ctx,
     ) -> Self {
         Self {
             root_tag,
@@ -104,7 +104,7 @@ impl TagBrowserPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &Ctx) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -118,7 +118,7 @@ impl TagBrowserPane {
             [_artist, _album] => {
                 let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 if !items.is_empty() {
-                    let queue_len = context.queue.len();
+                    let queue_len = ctx.queue.len();
                     let (position, autoplay) = if autoplay {
                         (Position::Replace, Autoplay::Hovered {
                             queue_len,
@@ -128,7 +128,7 @@ impl TagBrowserPane {
                     } else {
                         (Position::EndOfQueue, Autoplay::None)
                     };
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
@@ -147,7 +147,7 @@ impl TagBrowserPane {
                     songs.iter().map(|song| DirOrSong::Song(song.clone())).collect::<Vec<_>>();
 
                 self.stack_mut().push(songs);
-                context.render()?;
+                ctx.render()?;
             }
             [] => {
                 let current = current.as_path().to_owned();
@@ -162,7 +162,7 @@ impl TagBrowserPane {
                     let root_tag = self.root_tag.clone();
                     let separator = self.separator.clone();
                     let target = self.target_pane.clone();
-                    context.query().id(OPEN_OR_PLAY).replace_id(OPEN_OR_PLAY).target(target).query(
+                    ctx.query().id(OPEN_OR_PLAY).replace_id(OPEN_OR_PLAY).target(target).query(
                         move |client| {
                             let root_tag_filter =
                                 Self::root_tag_filter(root_tag, separator.as_deref(), &current);
@@ -175,7 +175,7 @@ impl TagBrowserPane {
                     );
                     self.stack_mut().push(Vec::new());
                     self.stack_mut().clear_preview();
-                    context.render()?;
+                    ctx.render()?;
                 }
             }
             _ => {
@@ -186,9 +186,9 @@ impl TagBrowserPane {
         Ok(())
     }
 
-    fn process_songs(&mut self, artist: String, data: Vec<Song>, context: &Ctx) -> &CachedRootTag {
-        let display_mode = context.config.artists.album_display_mode;
-        let sort_mode = context.config.artists.album_sort_by;
+    fn process_songs(&mut self, artist: String, data: Vec<Song>, ctx: &Ctx) -> &CachedRootTag {
+        let display_mode = ctx.config.artists.album_display_mode;
+        let sort_mode = ctx.config.artists.album_sort_by;
 
         let cached_artist = self.cache.0.entry(artist).or_default();
 
@@ -196,7 +196,7 @@ impl TagBrowserPane {
             .into_iter()
             .into_group_map_by(|song| {
                 let album = song.metadata.get("album").map_or("<no album>".to_string(), |v| {
-                    v.join(&context.config.theme.format_tag_separator).to_string()
+                    v.join(&ctx.config.theme.format_tag_separator).to_string()
                 });
                 let song_date = song.metadata.get("date").map_or("<no date>", |v| v.last());
                 let original_album = song.metadata.get("album").last().map(|v| v.to_owned());
@@ -213,8 +213,8 @@ impl TagBrowserPane {
             })
             .map(|((album, date, original_name), mut songs)| {
                 songs.sort_by(|a, b| {
-                    a.with_custom_sort(&context.config.browser_song_sort)
-                        .cmp(&b.with_custom_sort(&context.config.browser_song_sort))
+                    a.with_custom_sort(&ctx.config.browser_song_sort)
+                        .cmp(&b.with_custom_sort(&ctx.config.browser_song_sort))
                 });
 
                 CachedAlbum {
@@ -253,22 +253,22 @@ impl TagBrowserPane {
 }
 
 impl Pane for TagBrowserPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &context.config,
+            &ctx.config,
         );
 
         Ok(())
     }
 
-    fn before_show(&mut self, context: &Ctx) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
             let root_tag = self.root_tag.clone();
             let target = self.target_pane.clone();
-            context.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
+            ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
                 let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                 Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
             });
@@ -279,34 +279,34 @@ impl Pane for TagBrowserPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 let root_tag = self.root_tag.clone();
                 let target = self.target_pane.clone();
                 self.cache = TagBrowserCache::default();
-                context.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
+                ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
                     let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                     Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
                 });
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
-                self.before_show(context)?;
+                self.before_show(ctx)?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
-        self.handle_mouse_action(event, context)
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
+        self.handle_mouse_action(event, ctx)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        self.handle_filter_input(event, context)?;
-        self.handle_common_action(event, context)?;
-        self.handle_global_action(event, context)?;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        self.handle_filter_input(event, ctx)?;
+        self.handle_common_action(event, ctx)?;
+        self.handle_global_action(event, ctx)?;
         Ok(())
     }
 
@@ -315,7 +315,7 @@ impl Pane for TagBrowserPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::SongsList { data, origin_path }) => {
@@ -335,7 +335,7 @@ impl Pane for TagBrowserPane {
                     true
                 };
 
-                let cached_artist = self.process_songs(artist, data, context);
+                let cached_artist = self.process_songs(artist, data, ctx);
 
                 if cache_only {
                     return Ok(());
@@ -349,12 +349,12 @@ impl Pane for TagBrowserPane {
                         .iter()
                         .map(|album| {
                             DirOrSong::name_only(album.name.clone())
-                                .to_list_item_simple(&context.config)
+                                .to_list_item_simple(&ctx.config)
                         })
                         .collect(),
                 )];
                 self.stack.set_preview(Some(preview));
-                context.render()?;
+                ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
                 let Some(artist) = origin_path.and_then(|mut v| v.first_mut().map(std::mem::take))
@@ -376,7 +376,7 @@ impl Pane for TagBrowserPane {
                     return Ok(());
                 }
 
-                let cached_artist = self.process_songs(artist, data, context);
+                let cached_artist = self.process_songs(artist, data, ctx);
 
                 let albums = cached_artist
                     .0
@@ -384,8 +384,8 @@ impl Pane for TagBrowserPane {
                     .map(|CachedAlbum { name, .. }| DirOrSong::name_only(name.to_owned()))
                     .collect();
                 self.stack.replace(albums);
-                self.prepare_preview(context)?;
-                context.render()?;
+                self.prepare_preview(ctx)?;
+                ctx.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
                 let data = if let Some(sep) = &self.unescaped_separator {
@@ -400,8 +400,8 @@ impl Pane for TagBrowserPane {
                 };
 
                 self.stack = DirStack::new(data);
-                self.prepare_preview(context)?;
-                context.render()?;
+                self.prepare_preview(ctx)?;
+                ctx.render()?;
             }
             _ => {}
         }
@@ -553,15 +553,15 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn open(&mut self, context: &Ctx) -> Result<()> {
-        self.open_or_play(true, context)
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
     }
 
-    fn next(&mut self, context: &Ctx) -> Result<()> {
-        self.open_or_play(false, context)
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
     }
 
-    fn prepare_preview(&mut self, context: &Ctx) -> Result<()> {
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected().map(DirStackItem::as_path) else {
             return Ok(());
         };
@@ -570,8 +570,8 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         self.stack_mut().clear_preview();
         match self.stack.path() {
             [artist, album] => {
-                let key_style = context.config.theme.preview_label_style;
-                let group_style = context.config.theme.preview_metadata_group_style;
+                let key_style = ctx.config.theme.preview_label_style;
+                let group_style = ctx.config.theme.preview_metadata_group_style;
                 let Some(albums) = self.cache.0.get(artist) else {
                     return Ok(());
                 };
@@ -584,7 +584,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                     .find(|song| song.file == current)
                     .map(|song| song.to_preview(key_style, group_style));
                 self.stack_mut().set_preview(song);
-                context.render()?;
+                ctx.render()?;
             }
             [artist] => {
                 let Some(albums) = self.cache.0.get(artist) else {
@@ -598,13 +598,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let songs = vec![PreviewGroup::from(
                     None,
                     None,
-                    songs
-                        .iter()
-                        .map(|song| song.to_list_item_simple(&context.config))
-                        .collect_vec(),
+                    songs.iter().map(|song| song.to_list_item_simple(&ctx.config)).collect_vec(),
                 )];
                 self.stack_mut().set_preview(Some(songs));
-                context.render()?;
+                ctx.render()?;
             }
             [] => {
                 if let Some(albums) = self.cache.0.get(&current) {
@@ -616,16 +613,16 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                             .iter()
                             .map(|CachedAlbum { name, .. }| {
                                 DirOrSong::name_only(name.to_owned())
-                                    .to_list_item_simple(&context.config)
+                                    .to_list_item_simple(&ctx.config)
                             })
                             .collect(),
                     )]));
-                    context.render()?;
+                    ctx.render()?;
                 } else {
                     let root_tag = self.root_tag.clone();
                     let separator = self.separator.clone();
                     let target = self.target_pane.clone();
-                    context.query().id(PREVIEW).replace_id(PREVIEW).target(target).query(
+                    ctx.query().id(PREVIEW).replace_id(PREVIEW).target(target).query(
                         move |client| {
                             let separator = separator.map(|v| v.as_ref().to_owned());
                             let separator = separator.as_deref();

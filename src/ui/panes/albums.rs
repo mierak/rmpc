@@ -41,7 +41,7 @@ const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
 
 impl AlbumsPane {
-    pub fn new(_context: &Ctx) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self {
             stack: DirStack::default(),
             filter_input_mode: false,
@@ -50,7 +50,7 @@ impl AlbumsPane {
         }
     }
 
-    fn open_or_play(&mut self, autoplay: bool, context: &Ctx) -> Result<()> {
+    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
@@ -63,7 +63,7 @@ impl AlbumsPane {
         match self.stack.path() {
             [_album] => {
                 let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
-                let queue_len = context.queue.len();
+                let queue_len = ctx.queue.len();
                 let (position, autoplay) = if autoplay {
                     (Position::Replace, Autoplay::Hovered {
                         queue_len,
@@ -74,7 +74,7 @@ impl AlbumsPane {
                     (Position::EndOfQueue, Autoplay::None)
                 };
                 if !items.is_empty() {
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.enqueue_multiple(items, position, autoplay)?;
                         Ok(())
                     });
@@ -82,9 +82,8 @@ impl AlbumsPane {
             }
             [] => {
                 let current = current.clone();
-                let sort_order = context.config.browser_song_sort.clone();
-                context
-                    .query()
+                let sort_order = ctx.config.browser_song_sort.clone();
+                ctx.query()
                     .id(OPEN_OR_PLAY)
                     .replace_id(OPEN_OR_PLAY)
                     .target(PaneType::Albums)
@@ -94,11 +93,11 @@ impl AlbumsPane {
                     });
                 self.stack_mut().push(Vec::new());
                 self.stack_mut().clear_preview();
-                context.render()?;
+                ctx.render()?;
             }
             _ => {
                 log::error!("Unexpected nesting in Artists dir structure");
-                context.render()?;
+                ctx.render()?;
             }
         }
 
@@ -107,35 +106,33 @@ impl AlbumsPane {
 }
 
 impl Pane for AlbumsPane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()> {
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.browser.set_filter_input_active(self.filter_input_mode).render(
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &context.config,
+            &ctx.config,
         );
 
         Ok(())
     }
 
-    fn before_show(&mut self, context: &Ctx) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
-                move |client| {
-                    let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                    Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
-                },
-            );
+            ctx.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(move |client| {
+                let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
+                Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+            });
             self.initialized = true;
         }
 
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
-                context.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
+                ctx.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(
                     move |client| {
                         let result =
                             client.list_tag(Tag::Album, None).context("Cannot list tags")?;
@@ -145,21 +142,21 @@ impl Pane for AlbumsPane {
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
-                self.before_show(context)?;
+                self.before_show(ctx)?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
-        self.handle_mouse_action(event, context)
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
+        self.handle_mouse_action(event, ctx)
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        self.handle_filter_input(event, context)?;
-        self.handle_common_action(event, context)?;
-        self.handle_global_action(event, context)?;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        self.handle_filter_input(event, ctx)?;
+        self.handle_common_action(event, ctx)?;
+        self.handle_global_action(event, ctx)?;
         Ok(())
     }
 
@@ -168,7 +165,7 @@ impl Pane for AlbumsPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
@@ -179,12 +176,12 @@ impl Pane for AlbumsPane {
                     }
                 }
                 self.stack_mut().set_preview(data);
-                context.render()?;
+                ctx.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
                 let root = data.into_iter().map(DirOrSong::name_only).collect_vec();
                 self.stack = DirStack::new(root);
-                self.prepare_preview(context)?;
+                self.prepare_preview(ctx)?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
                 if let Some(origin_path) = origin_path {
@@ -194,8 +191,8 @@ impl Pane for AlbumsPane {
                     }
                 }
                 self.stack_mut().replace(data);
-                self.prepare_preview(context)?;
-                context.render()?;
+                self.prepare_preview(ctx)?;
+                ctx.render()?;
             }
             _ => {}
         }
@@ -260,12 +257,12 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn open(&mut self, context: &Ctx) -> Result<()> {
-        self.open_or_play(true, context)
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
     }
 
-    fn next(&mut self, context: &Ctx) -> Result<()> {
-        self.open_or_play(false, context)
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
     }
 
     fn enqueue<'a>(
@@ -304,21 +301,20 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn prepare_preview(&mut self, context: &Ctx) -> Result<()> {
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
         let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
             return Ok(());
         };
         let current = current.to_owned();
-        let config = std::sync::Arc::clone(&context.config);
+        let config = std::sync::Arc::clone(&ctx.config);
         let origin_path = Some(self.stack().path().to_vec());
 
         self.stack_mut().clear_preview();
         match self.stack.path() {
             [album] => {
                 let album = album.clone();
-                let sort_order = context.config.browser_song_sort.clone();
-                context
-                    .query()
+                let sort_order = ctx.config.browser_song_sort.clone();
+                ctx.query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)
@@ -332,9 +328,8 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
                     });
             }
             [] => {
-                let sort_order = context.config.browser_song_sort.clone();
-                context
-                    .query()
+                let sort_order = ctx.config.browser_song_sort.clone();
+                ctx.query()
                     .id(PREVIEW)
                     .replace_id("albums_preview")
                     .target(PaneType::Albums)

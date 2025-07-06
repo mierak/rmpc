@@ -57,8 +57,8 @@ const PREVIEW: &str = "preview";
 const SEARCH: &str = "search";
 
 impl SearchPane {
-    pub fn new(context: &Ctx) -> Self {
-        let config = &context.config;
+    pub fn new(ctx: &Ctx) -> Self {
+        let config = &ctx.config;
         Self {
             preview: None,
             phase: Phase::Search,
@@ -161,7 +161,7 @@ impl SearchPane {
         }
     }
 
-    fn prepare_preview(&mut self, context: &Ctx) {
+    fn prepare_preview(&mut self, ctx: &Ctx) {
         let Some(origin_path) = self.songs_dir.selected().map(|s| vec![s.as_path().to_owned()])
         else {
             return;
@@ -172,9 +172,9 @@ impl SearchPane {
                 let data = Some(vec![PreviewGroup::from(
                     None,
                     None,
-                    self.songs_dir.to_list_items(&context.config),
+                    self.songs_dir.to_list_items(&ctx.config),
                 )]);
-                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
+                ctx.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
                     |_| Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) }),
                 );
             }
@@ -183,10 +183,10 @@ impl SearchPane {
                     return;
                 };
                 let file = current.file.clone();
-                let key_style = context.config.theme.preview_label_style;
-                let group_style = context.config.theme.preview_metadata_group_style;
+                let key_style = ctx.config.theme.preview_label_style;
+                let group_style = ctx.config.theme.preview_metadata_group_style;
 
-                context.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
+                ctx.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
                     move |client| {
                         let data = Some(
                             client
@@ -326,7 +326,7 @@ impl SearchPane {
         })
     }
 
-    fn search(&mut self, context: &Ctx) {
+    fn search(&mut self, ctx: &Ctx) {
         let (filter_kind, case_sensitive) = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
@@ -343,20 +343,18 @@ impl SearchPane {
             return;
         }
 
-        context.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
-            move |client| {
-                let filter = filter
-                    .iter_mut()
-                    .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                        Filter::new(std::mem::take(key), value).with_type(*kind)
-                    })
-                    .collect_vec();
-                let result =
-                    if case_sensitive { client.find(&filter) } else { client.search(&filter) }?;
+        ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(move |client| {
+            let filter = filter
+                .iter_mut()
+                .map(|&mut (ref mut key, ref value, ref mut kind)| {
+                    Filter::new(std::mem::take(key), value).with_type(*kind)
+                })
+                .collect_vec();
+            let result =
+                if case_sensitive { client.find(&filter) } else { client.search(&filter) }?;
 
-                Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
-            },
-        );
+            Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
+        });
     }
 
     fn reset(&mut self, search_config: &Search) {
@@ -376,28 +374,28 @@ impl SearchPane {
         }
     }
 
-    fn activate_input(&mut self, context: &Ctx) {
+    fn activate_input(&mut self, ctx: &Ctx) {
         match self.inputs.focused_mut() {
             FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
             FocusedInputGroup::Buttons(_) => {
                 // Reset is the only button in this group at the moment
-                self.reset(&context.config.search);
+                self.reset(&ctx.config.search);
                 self.songs_dir = Dir::default();
-                self.prepare_preview(context);
+                self.prepare_preview(ctx);
             }
             FocusedInputGroup::Filters(FilterInput {
                 variant: FilterInputVariant::SelectFilterKind { value },
                 ..
             }) => {
                 value.cycle();
-                self.search(context);
+                self.search(ctx);
             }
             FocusedInputGroup::Filters(FilterInput {
                 variant: FilterInputVariant::SelectFilterCaseSensitive { value },
                 ..
             }) => {
                 *value = !*value;
-                self.search(context);
+                self.search(ctx);
             }
         }
     }
@@ -515,11 +513,11 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 self.songs_dir = Dir::default();
-                self.prepare_preview(context);
+                self.prepare_preview(ctx);
                 self.phase = Phase::Search;
 
                 status_warn!(
@@ -532,7 +530,7 @@ impl Pane for SearchPane {
                 self.songs_dir = Dir::default();
             }
             UiEvent::ConfigChanged => {
-                *self = Self::new(context);
+                *self = Self::new(ctx);
             }
             _ => {}
         }
@@ -544,7 +542,7 @@ impl Pane for SearchPane {
         id: &'static str,
         data: MpdQueryResult,
         _is_visible: bool,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
@@ -559,23 +557,23 @@ impl Pane for SearchPane {
                     }
                 }
                 self.preview = data;
-                context.render()?;
+                ctx.render()?;
             }
             (SEARCH, MpdQueryResult::SongsList { data, origin_path: _ }) => {
                 self.songs_dir = Dir::new(data);
                 self.preview = Some(vec![PreviewGroup::from(
                     None,
                     None,
-                    self.songs_dir.to_list_items(&context.config),
+                    self.songs_dir.to_list_items(&ctx.config),
                 )]);
-                context.render()?;
+                ctx.render()?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, mut event: MouseEvent, context: &Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, mut event: MouseEvent, ctx: &Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
@@ -587,9 +585,9 @@ impl Pane for SearchPane {
                 if let Some(input) = self.get_clicked_input(event) {
                     self.inputs.focused_idx = input;
                 }
-                self.prepare_preview(context);
+                self.prepare_preview(ctx);
 
-                context.render()?;
+                ctx.render()?;
             }
             MouseEventKind::LeftClick if self.column_areas[2].contains(event.into()) => {
                 match self.phase {
@@ -605,18 +603,18 @@ impl Pane for SearchPane {
                                 self.songs_dir
                                     .state
                                     .set_viewport_len(Some(self.column_areas[2].height as usize));
-                                self.songs_dir.select_idx(idx_to_select, context.config.scrolloff);
+                                self.songs_dir.select_idx(idx_to_select, ctx.config.scrolloff);
                             }
 
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                     }
                     Phase::BrowseResults { .. } => {
                         let (items, _hovered_idx) = self.enqueue(false);
                         if !items.is_empty() {
-                            context.command(move |client| {
+                            ctx.command(move |client| {
                                 client.enqueue_multiple(
                                     items,
                                     Position::EndOfQueue,
@@ -633,22 +631,22 @@ impl Pane for SearchPane {
                     Phase::SearchTextboxInput | Phase::Search => {
                         if matches!(self.phase, Phase::SearchTextboxInput) {
                             self.phase = Phase::Search;
-                            self.search(context);
+                            self.search(ctx);
                         }
 
                         if let Some(input) = self.get_clicked_input(event) {
                             self.inputs.focused_idx = input;
                         }
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     Phase::BrowseResults { .. } => {
                         let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
                         if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
-                            self.songs_dir.select_idx(idx, context.config.scrolloff);
-                            self.prepare_preview(context);
+                            self.songs_dir.select_idx(idx, ctx.config.scrolloff);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                     }
                 }
@@ -656,15 +654,15 @@ impl Pane for SearchPane {
             MouseEventKind::DoubleClick => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if self.get_clicked_input(event).is_some() {
-                        self.activate_input(context);
+                        self.activate_input(ctx);
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                 }
                 Phase::BrowseResults { .. } => {
                     let (items, _hovered_idx) = self.enqueue(false);
                     if !items.is_empty() {
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::None)?;
                             Ok(())
                         });
@@ -677,20 +675,20 @@ impl Pane for SearchPane {
                     Phase::BrowseResults { .. } => {
                         let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
                         if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
-                            self.songs_dir.select_idx(idx, context.config.scrolloff);
-                            self.prepare_preview(context);
+                            self.songs_dir.select_idx(idx, ctx.config.scrolloff);
+                            self.prepare_preview(ctx);
 
-                            self.songs_dir.select_idx(idx, context.config.scrolloff);
+                            self.songs_dir.select_idx(idx, ctx.config.scrolloff);
                             if let Some(item) = self.songs_dir.selected() {
                                 let item = item.file.clone();
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     client.add(&item, None)?;
                                     status_info!("Added '{item}' to queue");
                                     Ok(())
                                 });
                             }
-                            self.prepare_preview(context);
-                            context.render()?;
+                            self.prepare_preview(ctx);
+                            ctx.render()?;
                         }
                     }
                 }
@@ -699,35 +697,35 @@ impl Pane for SearchPane {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if matches!(self.phase, Phase::SearchTextboxInput) {
                         self.phase = Phase::Search;
-                        self.search(context);
+                        self.search(ctx);
                     }
                     self.inputs.next_non_wrapping();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
-                    self.songs_dir.next(context.config.scrolloff, false);
-                    self.prepare_preview(context);
+                    self.songs_dir.next(ctx.config.scrolloff, false);
+                    self.prepare_preview(ctx);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
             },
             MouseEventKind::ScrollUp => match self.phase {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if matches!(self.phase, Phase::SearchTextboxInput) {
                         self.phase = Phase::Search;
-                        self.search(context);
+                        self.search(ctx);
                     }
 
                     self.inputs.prev_non_wrapping();
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
-                    self.songs_dir.prev(context.config.scrolloff, false);
-                    self.prepare_preview(context);
+                    self.songs_dir.prev(ctx.config.scrolloff, false);
+                    self.prepare_preview(ctx);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
             },
             _ => {}
@@ -736,21 +734,21 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()> {
-        let config = &context.config;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let config = &ctx.config;
         match &mut self.phase {
-            Phase::SearchTextboxInput => match event.as_common_action(context) {
+            Phase::SearchTextboxInput => match event.as_common_action(ctx) {
                 Some(CommonAction::Close) => {
                     self.phase = Phase::Search;
-                    self.search(context);
+                    self.search(ctx);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 Some(CommonAction::Confirm) => {
                     self.phase = Phase::Search;
-                    self.search(context);
+                    self.search(ctx);
 
-                    context.render()?;
+                    ctx.render()?;
                 }
                 _ => {
                     event.stop_propagation();
@@ -759,7 +757,7 @@ impl Pane for SearchPane {
                             FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
                                 value.push(c);
 
-                                context.render()?;
+                                ctx.render()?;
                             }
                             FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
                         },
@@ -767,7 +765,7 @@ impl Pane for SearchPane {
                             FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
                                 value.pop();
 
-                                context.render()?;
+                                ctx.render()?;
                             }
                             FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
                         },
@@ -776,14 +774,14 @@ impl Pane for SearchPane {
                 }
             },
             Phase::Search => {
-                if let Some(action) = event.as_global_action(context) {
+                if let Some(action) = event.as_global_action(ctx) {
                     if let GlobalAction::ExternalCommand { command, .. } = action {
                         let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                        run_external(command.clone(), create_env(context, songs));
+                        run_external(command.clone(), create_env(ctx, songs));
                     } else {
                         event.abandon();
                     }
-                } else if let Some(action) = event.as_common_action(context) {
+                } else if let Some(action) = event.as_common_action(ctx) {
                     match action.to_owned() {
                         CommonAction::Down => {
                             if config.wrap_navigation {
@@ -792,7 +790,7 @@ impl Pane for SearchPane {
                                 self.inputs.next_non_wrapping();
                             }
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Up => {
                             if config.wrap_navigation {
@@ -801,7 +799,7 @@ impl Pane for SearchPane {
                                 self.inputs.prev_non_wrapping();
                             }
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::MoveDown => {}
                         CommonAction::MoveUp => {}
@@ -812,21 +810,21 @@ impl Pane for SearchPane {
                         CommonAction::Right if !self.songs_dir.items.is_empty() => {
                             self.phase = Phase::BrowseResults { filter_input_on: false };
                             self.preview = None;
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Right => {}
                         CommonAction::Left => {}
                         CommonAction::Top => {
                             self.inputs.first();
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Bottom => {
                             self.inputs.last();
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::EnterSearch => {}
                         CommonAction::NextResult => {}
@@ -836,15 +834,15 @@ impl Pane for SearchPane {
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm => {
-                            self.activate_input(context);
-                            context.render()?;
+                            self.activate_input(ctx);
+                            ctx.render()?;
                         }
                         CommonAction::FocusInput
                             if matches!(self.inputs.focused(), FocusedInputGroup::Textboxes(_)) =>
                         {
                             self.phase = Phase::SearchTextboxInput;
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         // Modal while we are on search column does not support all options. It can
                         // be implemented later.
@@ -852,11 +850,11 @@ impl Pane for SearchPane {
                         CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
                             let (enqueue, _hovered_idx) = self.enqueue(opts.all);
                             if !enqueue.is_empty() {
-                                let queue_len = context.queue.len();
+                                let queue_len = ctx.queue.len();
                                 let current_song_idx =
-                                    context.find_current_song_in_queue().map(|(i, _)| i);
+                                    ctx.find_current_song_in_queue().map(|(i, _)| i);
 
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     let autoplay = opts.autoplay(queue_len, current_song_idx, None);
                                     client.enqueue_multiple(enqueue, opts.position, autoplay)?;
 
@@ -871,9 +869,9 @@ impl Pane for SearchPane {
                         CommonAction::Delete => match self.inputs.focused_mut() {
                             FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
                                 textbox.value.clear();
-                                self.search(context);
+                                self.search(ctx);
 
-                                context.render()?;
+                                ctx.render()?;
                             }
                             _ => {}
                         },
@@ -886,18 +884,18 @@ impl Pane for SearchPane {
                 }
             }
             Phase::BrowseResults { filter_input_on: filter_input_on @ true } => {
-                match event.as_common_action(context) {
+                match event.as_common_action(ctx) {
                     Some(CommonAction::Close) => {
                         *filter_input_on = false;
                         self.songs_dir.set_filter(None, config);
-                        self.prepare_preview(context);
+                        self.prepare_preview(ctx);
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     Some(CommonAction::Confirm) => {
                         *filter_input_on = false;
 
-                        context.render()?;
+                        ctx.render()?;
                     }
                     _ => {
                         event.stop_propagation();
@@ -905,14 +903,14 @@ impl Pane for SearchPane {
                             KeyCode::Char(c) => {
                                 self.songs_dir.push_filter(c, config);
                                 self.songs_dir.jump_first_matching(config);
-                                self.prepare_preview(context);
+                                self.prepare_preview(ctx);
 
-                                context.render()?;
+                                ctx.render()?;
                             }
                             KeyCode::Backspace => {
                                 self.songs_dir.pop_filter(config);
 
-                                context.render()?;
+                                ctx.render()?;
                             }
                             _ => {}
                         }
@@ -920,71 +918,69 @@ impl Pane for SearchPane {
                 }
             }
             Phase::BrowseResults { filter_input_on: filter_input_mode @ false } => {
-                if let Some(action) = event.as_global_action(context) {
+                if let Some(action) = event.as_global_action(ctx) {
                     match action {
                         GlobalAction::ExternalCommand { command, .. }
                             if !self.songs_dir.marked().is_empty() =>
                         {
                             let songs =
                                 self.songs_dir.marked_items().map(|song| song.file.as_str());
-                            run_external(command.clone(), create_env(context, songs));
+                            run_external(command.clone(), create_env(ctx, songs));
                         }
                         GlobalAction::ExternalCommand { command, .. } => {
                             let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                            run_external(command.clone(), create_env(context, selected));
+                            run_external(command.clone(), create_env(ctx, selected));
                         }
                         _ => {
                             event.abandon();
                         }
                     }
-                } else if let Some(action) = event.as_common_action(context) {
+                } else if let Some(action) = event.as_common_action(ctx) {
                     match action.to_owned() {
                         CommonAction::Down => {
-                            self.songs_dir
-                                .next(context.config.scrolloff, context.config.wrap_navigation);
-                            self.prepare_preview(context);
+                            self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Up => {
-                            self.songs_dir
-                                .prev(context.config.scrolloff, context.config.wrap_navigation);
-                            self.prepare_preview(context);
+                            self.songs_dir.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::MoveDown => {}
                         CommonAction::MoveUp => {}
                         CommonAction::DownHalf => {
-                            self.songs_dir.next_half_viewport(context.config.scrolloff);
-                            self.prepare_preview(context);
+                            self.songs_dir.next_half_viewport(ctx.config.scrolloff);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::UpHalf => {
-                            self.songs_dir.prev_half_viewport(context.config.scrolloff);
-                            self.prepare_preview(context);
+                            self.songs_dir.prev_half_viewport(ctx.config.scrolloff);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::PageDown => {
-                            self.songs_dir.next_viewport(context.config.scrolloff);
-                            self.prepare_preview(context);
+                            self.songs_dir.next_viewport(ctx.config.scrolloff);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::PageUp => {
-                            self.songs_dir.prev_viewport(context.config.scrolloff);
-                            self.prepare_preview(context);
+                            self.songs_dir.prev_viewport(ctx.config.scrolloff);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Right => {
                             let items = self.songs_dir.selected().map_or_else(Vec::new, |item| {
                                 vec![Enqueue::File { path: item.file.clone() }]
                             });
                             if !items.is_empty() {
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     client.enqueue_multiple(
                                         items,
                                         Position::EndOfQueue,
@@ -996,66 +992,64 @@ impl Pane for SearchPane {
                         }
                         CommonAction::Left => {
                             self.phase = Phase::Search;
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Top => {
                             self.songs_dir.first();
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Bottom => {
                             self.songs_dir.last();
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::EnterSearch => {
                             self.songs_dir.set_filter(Some(String::new()), config);
                             *filter_input_mode = true;
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::NextResult => {
                             self.songs_dir.jump_next_matching(config);
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::PreviousResult => {
                             self.songs_dir.jump_previous_matching(config);
-                            self.prepare_preview(context);
+                            self.prepare_preview(ctx);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Select => {
                             self.songs_dir.toggle_mark_selected();
-                            self.songs_dir
-                                .next(context.config.scrolloff, context.config.wrap_navigation);
+                            self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::InvertSelection => {
                             self.songs_dir.invert_marked();
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Close if !self.songs_dir.marked().is_empty() => {
                             self.songs_dir.marked_mut().clear();
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Rename => {}
                         CommonAction::Close => {}
                         CommonAction::Confirm if self.songs_dir.marked().is_empty() => {
                             let (items, hovered_song_idx) = self.enqueue(true);
-                            let queue_len = context.queue.len();
-                            let current_song_idx =
-                                context.find_current_song_in_queue().map(|(i, _)| i);
+                            let queue_len = ctx.queue.len();
+                            let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
 
                             if !items.is_empty() {
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     client.enqueue_multiple(
                                         items,
                                         Position::Replace,
@@ -1069,7 +1063,7 @@ impl Pane for SearchPane {
                                 });
                             }
 
-                            context.render()?;
+                            ctx.render()?;
                         }
                         CommonAction::Confirm => {}
                         CommonAction::FocusInput => {}
@@ -1077,11 +1071,11 @@ impl Pane for SearchPane {
                             let (enqueue, hovered_song_idx) = self.enqueue(opts.all);
 
                             if !enqueue.is_empty() {
-                                let queue_len = context.queue.len();
+                                let queue_len = ctx.queue.len();
                                 let current_song_idx =
-                                    context.find_current_song_in_queue().map(|(i, _)| i);
+                                    ctx.find_current_song_in_queue().map(|(i, _)| i);
 
-                                context.command(move |client| {
+                                ctx.command(move |client| {
                                     let autoplay = opts.autoplay(
                                         queue_len,
                                         current_song_idx,
@@ -1104,7 +1098,7 @@ impl Pane for SearchPane {
                                 })
                                 .collect_vec();
 
-                            modal!(context, MenuModal::create_add_modal(opts, context));
+                            modal!(ctx, MenuModal::create_add_modal(opts, ctx));
                         }
                         CommonAction::Delete => {}
                         CommonAction::PaneDown => {}

@@ -67,7 +67,7 @@ impl Drop for ProcessGuard {
 }
 
 impl CavaPane {
-    pub fn new(_context: &Ctx) -> Self {
+    pub fn new(_ctx: &Ctx) -> Self {
         Self {
             area: Rect::default(),
             handle: None,
@@ -332,21 +332,20 @@ impl CavaPane {
         Ok(())
     }
 
-    fn pause_and_clear(&mut self, context: &Ctx) -> Result<()> {
+    fn pause_and_clear(&mut self, ctx: &Ctx) -> Result<()> {
         log::debug!("Stopping cava thread and clearing area");
         self.command(CavaCommand::Pause)?;
         log::debug!("Waiting for cava thread to finish");
-        self.clear(context)?;
+        self.clear(ctx)?;
 
         Ok(())
     }
 
-    fn clear(&self, context: &Ctx) -> Result<()> {
+    fn clear(&self, ctx: &Ctx) -> Result<()> {
         let writer = TERMINAL.writer();
         let mut w = writer.lock();
 
-        let colors =
-            Colors { background: Some(context.config.theme.cava.bg_color), foreground: None };
+        let colors = Colors { background: Some(ctx.config.theme.cava.bg_color), foreground: None };
         clear_area(w.by_ref(), colors, self.area)?;
 
         Ok(())
@@ -382,16 +381,16 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, _context: &Ctx) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, _ctx: &Ctx) -> Result<()> {
         self.area = area;
         Ok(())
     }
 
-    fn before_show(&mut self, context: &Ctx) -> Result<()> {
-        self.spawn(context.config.cava.clone(), context.config.theme.cava.clone())?;
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
+        self.spawn(ctx.config.cava.clone(), ctx.config.theme.cava.clone())?;
 
-        if matches!(context.status.state, State::Play) {
-            self.run(context)?;
+        if matches!(ctx.status.state, State::Play) {
+            self.run(ctx)?;
         }
 
         Ok(())
@@ -401,8 +400,8 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn on_hide(&mut self, context: &Ctx) -> Result<()> {
-        self.pause_and_clear(context)?;
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
+        self.pause_and_clear(ctx)?;
         Ok(())
     }
 
@@ -454,16 +453,16 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn resize(&mut self, area: Rect, context: &Ctx) -> Result<()> {
+    fn resize(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         if self.is_modal_open {
             return Ok(());
         }
 
         self.area = area;
-        self.pause_and_clear(context)?;
+        self.pause_and_clear(ctx)?;
 
-        if matches!(context.status.state, State::Play) {
-            self.run(context)?;
+        if matches!(ctx.status.state, State::Play) {
+            self.run(ctx)?;
         }
         Ok(())
     }

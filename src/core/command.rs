@@ -454,24 +454,24 @@ pub fn run_external<K: Into<String>, V: Into<String>>(
 }
 
 pub fn create_env<'a>(
-    context: &Ctx,
+    ctx: &Ctx,
     selected_songs_paths: impl IntoIterator<Item = &'a str>,
 ) -> Vec<(String, String)> {
     let mut result = Vec::new();
 
-    if let Some((_, current)) = context.find_current_song_in_queue() {
+    if let Some((_, current)) = ctx.find_current_song_in_queue() {
         result.push(("CURRENT_SONG".to_owned(), current.file.clone()));
         result.extend(
             current.metadata.iter().map(|(k, v)| (k.to_ascii_uppercase(), v.last().to_owned())),
         );
-        let lrc_path = context
+        let lrc_path = ctx
             .config
             .lyrics_dir
             .as_ref()
             .and_then(|dir| get_lrc_path(dir, &current.file).ok())
             .map(|path| path.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let lrc = context.find_lrc().ok().flatten();
+        let lrc = ctx.find_lrc().ok().flatten();
         let duration = current.duration.map_or_else(String::new, |d| d.to_string());
         result.push(("DURATION".to_owned(), duration));
         result.push(("HAS_LRC".to_owned(), lrc.is_some().to_string()));
@@ -494,7 +494,7 @@ pub fn create_env<'a>(
     }
     result.push(("VERSION".to_owned(), env!("CARGO_PKG_VERSION").to_string()));
 
-    result.push(("STATE".to_owned(), context.status.state.to_string()));
+    result.push(("STATE".to_owned(), ctx.status.state.to_string()));
 
     result
 }

@@ -138,44 +138,38 @@ pub struct PaneContainer<'panes> {
 }
 
 impl<'panes> PaneContainer<'panes> {
-    pub fn new(context: &Ctx) -> Result<Self> {
+    pub fn new(ctx: &Ctx) -> Result<Self> {
         Ok(Self {
-            queue: QueuePane::new(context),
+            queue: QueuePane::new(ctx),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
-            directories: DirectoriesPane::new(context),
-            albums: AlbumsPane::new(context),
-            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, context),
-            album_artists: TagBrowserPane::new(
-                Tag::AlbumArtist,
-                PaneType::AlbumArtists,
-                None,
-                context,
-            ),
-            playlists: PlaylistsPane::new(context),
-            search: SearchPane::new(context),
-            album_art: AlbumArtPane::new(context),
-            lyrics: LyricsPane::new(context),
+            directories: DirectoriesPane::new(ctx),
+            albums: AlbumsPane::new(ctx),
+            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, ctx),
+            album_artists: TagBrowserPane::new(Tag::AlbumArtist, PaneType::AlbumArtists, None, ctx),
+            playlists: PlaylistsPane::new(ctx),
+            search: SearchPane::new(ctx),
+            album_art: AlbumArtPane::new(ctx),
+            lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
-            tabs: TabsPane::new(context)?,
-            cava: CavaPane::new(context),
+            tabs: TabsPane::new(ctx)?,
+            cava: CavaPane::new(ctx),
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
-            others: Self::init_other_panes(context).collect(),
+            others: Self::init_other_panes(ctx).collect(),
         })
     }
 
     pub fn init_other_panes(
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> impl Iterator<Item = (PaneType, Box<dyn BoxedPane>)> + use<'_> {
-        context
-            .config
+        ctx.config
             .tabs
             .tabs
             .iter()
             .flat_map(|(_name, tab)| tab.panes.panes_iter())
-            .chain(context.config.theme.layout.panes_iter())
+            .chain(ctx.config.theme.layout.panes_iter())
             .filter_map(|pane| match &pane.pane {
                 PaneType::Browser { root_tag, separator } => Some((
                     pane.pane.clone(),
@@ -183,7 +177,7 @@ impl<'panes> PaneContainer<'panes> {
                         Tag::Custom(root_tag.clone()),
                         pane.pane.clone(),
                         separator.clone(),
-                        context,
+                        ctx,
                     )) as Box<dyn BoxedPane>,
                 )),
                 PaneType::Volume { kind } => Some((
@@ -197,7 +191,7 @@ impl<'panes> PaneContainer<'panes> {
     pub fn get_mut<'pane_ref, 'pane_type_ref: 'pane_ref>(
         &'pane_ref mut self,
         pane: &'pane_type_ref PaneType,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<Panes<'pane_ref, 'panes>> {
         match pane {
             PaneType::Queue => Ok(Panes::Queue(&mut self.queue)),
@@ -217,14 +211,9 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::TabContent => Ok(Panes::TabContent),
             #[cfg(debug_assertions)]
             PaneType::FrameCount => Ok(Panes::FrameCount(&mut self.frame_count)),
-            PaneType::Property { content, align, scroll_speed } => {
-                Ok(Panes::Property(PropertyPane::<'pane_type_ref>::new(
-                    content,
-                    *align,
-                    (*scroll_speed).into(),
-                    context,
-                )))
-            }
+            PaneType::Property { content, align, scroll_speed } => Ok(Panes::Property(
+                PropertyPane::<'pane_type_ref>::new(content, *align, (*scroll_speed).into(), ctx),
+            )),
             p @ PaneType::Volume { .. } => Ok(Panes::Others(
                 self.others
                     .get_mut(pane)
@@ -270,26 +259,26 @@ pub(crate) use pane_call;
 
 #[allow(unused_variables)]
 pub(crate) trait Pane {
-    fn render(&mut self, frame: &mut Frame, area: Rect, context: &Ctx) -> Result<()>;
+    fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()>;
 
     /// For any cleanup operations, ran when the screen hides
-    fn on_hide(&mut self, context: &Ctx) -> Result<()> {
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
     /// For work that needs to be done BEFORE the first render
-    fn before_show(&mut self, context: &Ctx) -> Result<()> {
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
     /// Used to keep the current state but refresh data
-    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, context: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, context: &mut Ctx) -> Result<()>;
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
@@ -298,16 +287,16 @@ pub(crate) trait Pane {
         id: &'static str,
         data: MpdQueryResult,
         is_visible: bool,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         Ok(())
     }
 
-    fn calculate_areas(&mut self, area: Rect, context: &Ctx) -> Result<()> {
+    fn calculate_areas(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
-    fn resize(&mut self, area: Rect, context: &Ctx) -> Result<()> {
+    fn resize(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 }
@@ -867,22 +856,22 @@ impl Property<PropertyKind> {
     fn default_as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        context: &'song Ctx,
+        ctx: &'song Ctx,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        self.default.as_ref().and_then(|p| p.as_span(song, context, tag_separator, strategy))
+        self.default.as_ref().and_then(|p| p.as_span(song, ctx, tag_separator, strategy))
     }
 
     pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
-        context: &'song Ctx,
+        ctx: &'song Ctx,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
         let style = self.style.unwrap_or_default();
-        let status = &context.status;
+        let status = &ctx.status;
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),
             PropertyKindOrText::Sticker(key) => {
@@ -891,17 +880,17 @@ impl Property<PropertyKind> {
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
-                    self.default_as_span(song, context, tag_separator, strategy)
+                    self.default_as_span(song, ctx, tag_separator, strategy)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Song(property)) => {
                 if let Some(song) = song {
                     song.format(property, tag_separator, strategy).map_or_else(
-                        || self.default_as_span(Some(song), context, tag_separator, strategy),
+                        || self.default_as_span(Some(song), ctx, tag_separator, strategy),
                         |s| Some(Either::Left(Span::styled(s, style))),
                     )
                 } else {
-                    self.default_as_span(song, context, tag_separator, strategy)
+                    self.default_as_span(song, ctx, tag_separator, strategy)
                 }
             }
             PropertyKindOrText::Property(PropertyKind::Status(s)) => match s {
@@ -987,21 +976,21 @@ impl Property<PropertyKind> {
                     .unwrap_or(style),
                 ))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
-                    || self.default_as_span(song, context, tag_separator, strategy),
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::Crossfade => status.xfade.as_ref().map_or_else(
-                    || self.default_as_span(song, context, tag_separator, strategy),
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
                     |v| Some(Either::Left(Span::styled(v.to_string(), style))),
                 ),
                 StatusProperty::QueueLength { thousands_separator } => {
                     Some(Either::Left(Span::styled(
-                        context.queue.len().with_thousands_separator(thousands_separator),
+                        ctx.queue.len().with_thousands_separator(thousands_separator),
                         style,
                     )))
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
-                    let sum: Duration = context.queue.iter().filter_map(|s| s.duration).sum();
+                    let sum: Duration = ctx.queue.iter().filter_map(|s| s.duration).sum();
                     let formatted = match separator {
                         Some(sep) => sum.format_to_duration(sep),
                         None => sum.to_string(),
@@ -1009,17 +998,17 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
-                    let remaining_time = context.find_current_song_in_queue().map_or(
+                    let remaining_time = ctx.find_current_song_in_queue().map_or(
                         Duration::default(),
                         |(current_song_idx, current_song)| {
-                            let total_remaining: Duration = context
+                            let total_remaining: Duration = ctx
                                 .queue
                                 .iter()
                                 .skip(current_song_idx)
                                 .filter_map(|s| s.duration)
                                 .sum();
                             if current_song.duration.is_some() {
-                                total_remaining.saturating_sub(context.status.elapsed)
+                                total_remaining.saturating_sub(ctx.status.elapsed)
                             } else {
                                 total_remaining
                             }
@@ -1032,7 +1021,7 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {
-                    Some(Either::Left(Span::styled(context.active_tab.0.as_ref(), style)))
+                    Some(Either::Left(Span::styled(ctx.active_tab.0.as_ref(), style)))
                 }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
@@ -1059,7 +1048,7 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
-                WidgetProperty::ScanStatus => context.db_update_start.map(|update_start| {
+                WidgetProperty::ScanStatus => ctx.db_update_start.map(|update_start| {
                     Either::Left(Span::styled(
                         ScanStatus::new(Some(update_start))
                             .get_str()
@@ -1072,7 +1061,7 @@ impl Property<PropertyKind> {
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();
                 for format in group {
-                    match format.as_span(song, context, tag_separator, strategy) {
+                    match format.as_span(song, ctx, tag_separator, strategy) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
                         None => return None,
@@ -1083,7 +1072,7 @@ impl Property<PropertyKind> {
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
                 let truncate_fn =
                     if *from_start { Span::truncate_start } else { Span::truncate_end };
-                match content.as_span(song, context, tag_separator, strategy) {
+                match content.as_span(song, ctx, tag_separator, strategy) {
                     Some(Either::Left(mut span)) => {
                         truncate_fn(&mut span, *length);
                         Some(Either::Left(span))
@@ -1108,7 +1097,7 @@ impl Property<PropertyKind> {
                         }
                         Some(Either::Right(buf.into()))
                     }
-                    None => self.default_as_span(song, context, tag_separator, strategy),
+                    None => self.default_as_span(song, ctx, tag_separator, strategy),
                 }
             }
         }

@@ -85,19 +85,18 @@ macro_rules! active_tab_call {
 }
 
 impl<'ui> Ui<'ui> {
-    pub fn new(context: &Ctx) -> Result<Ui<'ui>> {
+    pub fn new(ctx: &Ctx) -> Result<Ui<'ui>> {
         Ok(Self {
-            panes: PaneContainer::new(context)?,
-            layout: context.config.theme.layout.clone(),
+            panes: PaneContainer::new(ctx)?,
+            layout: ctx.config.theme.layout.clone(),
             modals: Vec::default(),
             area: Rect::default(),
-            tabs: Self::init_tabs(context)?,
+            tabs: Self::init_tabs(ctx)?,
         })
     }
 
-    fn init_tabs(context: &Ctx) -> Result<HashMap<TabName, TabScreen>> {
-        context
-            .config
+    fn init_tabs(ctx: &Ctx) -> Result<HashMap<TabName, TabScreen>> {
+        ctx.config
             .tabs
             .tabs
             .iter()
@@ -107,28 +106,28 @@ impl<'ui> Ui<'ui> {
             .try_collect()
     }
 
-    fn calc_areas(&mut self, area: Rect, _context: &Ctx) {
+    fn calc_areas(&mut self, area: Rect, _ctx: &Ctx) {
         self.area = area;
     }
 
-    fn change_tab(&mut self, new_tab: TabName, context: &mut Ctx) -> Result<()> {
+    fn change_tab(&mut self, new_tab: TabName, ctx: &mut Ctx) -> Result<()> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane, context)? {
+            match self.panes.get_mut(&pane.pane, ctx)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, context, on_hide(context))?;
+                    active_tab_call!(self, ctx, on_hide(ctx))?;
                 }
                 _ => {}
             }
             Ok(())
         })?;
 
-        context.active_tab = new_tab.clone();
-        self.on_event(UiEvent::TabChanged(new_tab), context)?;
+        ctx.active_tab = new_tab.clone();
+        self.on_event(UiEvent::TabChanged(new_tab), ctx)?;
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, context)? {
+            match self.panes.get_mut(&pane.pane, ctx)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, context, before_show(pane_area, context))?;
+                    active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
                 }
                 _ => {}
             }
@@ -136,9 +135,9 @@ impl<'ui> Ui<'ui> {
         })
     }
 
-    pub fn render(&mut self, frame: &mut Frame, context: &mut Ctx) -> Result<()> {
+    pub fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         self.area = frame.area();
-        if let Some(bg_color) = context.config.theme.background_color {
+        if let Some(bg_color) = ctx.config.theme.background_color {
             frame
                 .render_widget(Block::default().style(Style::default().bg(bg_color)), frame.area());
         }
@@ -147,81 +146,75 @@ impl<'ui> Ui<'ui> {
             self.area,
             &mut *frame,
             &mut |pane, pane_area, block, block_area, frame| {
-                match self.panes.get_mut(&pane.pane, context)? {
+                match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
-                        active_tab_call!(self, context, render(frame, pane_area, context))?;
+                        active_tab_call!(self, ctx, render(frame, pane_area, ctx))?;
                     }
                     mut pane_instance => {
-                        pane_call!(pane_instance, render(frame, pane_area, context))?;
+                        pane_call!(pane_instance, render(frame, pane_area, ctx))?;
                     }
                 }
-                frame.render_widget(
-                    block.border_style(context.config.as_border_style()),
-                    block_area,
-                );
+                frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
                 Ok(())
             },
             &mut |block, block_area, frame| {
-                frame.render_widget(
-                    block.border_style(context.config.as_border_style()),
-                    block_area,
-                );
+                frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
                 Ok(())
             },
         )?;
 
-        if context.config.theme.modal_backdrop && !self.modals.is_empty() {
+        if ctx.config.theme.modal_backdrop && !self.modals.is_empty() {
             let buffer = frame.buffer_mut();
             buffer.set_style(*buffer.area(), Style::default().fg(Color::DarkGray));
         }
 
         for modal in &mut self.modals {
-            modal.render(frame, context)?;
+            modal.render(frame, ctx)?;
         }
 
         Ok(())
     }
 
-    pub fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()> {
+    pub fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()> {
         if let Some(ref mut modal) = self.modals.last_mut() {
-            modal.handle_mouse_event(event, context)?;
+            modal.handle_mouse_event(event, ctx)?;
             return Ok(());
         }
 
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane, context)? {
+            match self.panes.get_mut(&pane.pane, ctx)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, context, handle_mouse_event(event, context))?;
+                    active_tab_call!(self, ctx, handle_mouse_event(event, ctx))?;
                 }
                 mut pane_instance => {
-                    pane_call!(pane_instance, handle_mouse_event(event, context))?;
+                    pane_call!(pane_instance, handle_mouse_event(event, ctx))?;
                 }
             }
             Ok(())
         })
     }
 
-    pub fn handle_key(&mut self, key: &mut KeyEvent, context: &mut Ctx) -> Result<KeyHandleResult> {
+    pub fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<KeyHandleResult> {
         if let Some(ref mut modal) = self.modals.last_mut() {
-            modal.handle_key(key, context)?;
+            modal.handle_key(key, ctx)?;
             return Ok(KeyHandleResult::None);
         }
 
-        active_tab_call!(self, context, handle_action(key, context))?;
+        active_tab_call!(self, ctx, handle_action(key, ctx))?;
 
-        if let Some(action) = key.as_global_action(context) {
+        if let Some(action) = key.as_global_action(ctx) {
             match action {
                 GlobalAction::SwitchPartition => {
                     // TODO make this async before finalizing the functionality
-                    let result = context.query_sync(move |client| {
+                    let result = ctx.query_sync(move |client| {
                         let partitions = client.list_partitions()?;
                         Ok(partitions.0)
                     })?;
 
                     modal!(
-                        context,
+                        ctx,
                         SelectModal::builder()
-                            .context(context)
+                            .ctx(ctx)
                             .title("Switch partition")
                             .confirm_label("Switch")
                             .options(result)
@@ -240,24 +233,23 @@ impl<'ui> Ui<'ui> {
                     log::debug!("executing {cmd:?}");
 
                     if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                        if context.work_sender.send(WorkRequest::Command(cmd)).is_err() {
+                        if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err() {
                             log::error!("Failed to send command");
                         }
                     }
                 }
                 GlobalAction::CommandMode => {
                     modal!(
-                        context,
-                        InputModal::new(context)
+                        ctx,
+                        InputModal::new(ctx)
                             .title("Execute a command")
                             .confirm_label("Execute")
-                            .on_confirm(|context, value| {
+                            .on_confirm(|ctx, value| {
                                 let cmd = value.parse();
                                 log::debug!("executing {cmd:?}");
 
                                 if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                                    if context.work_sender.send(WorkRequest::Command(cmd)).is_err()
-                                    {
+                                    if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err() {
                                         log::error!("Failed to send command");
                                     }
                                 }
@@ -265,16 +257,16 @@ impl<'ui> Ui<'ui> {
                             })
                     );
                 }
-                GlobalAction::NextTrack if context.status.state != State::Stop => {
-                    context.command(move |client| {
+                GlobalAction::NextTrack if ctx.status.state != State::Stop => {
+                    ctx.command(move |client| {
                         client.next()?;
                         Ok(())
                     });
                 }
-                GlobalAction::PreviousTrack if context.status.state != State::Stop => {
-                    let rewind_to_start = context.config.rewind_to_start_sec;
-                    let elapsed_sec = context.status.elapsed.as_secs();
-                    context.command(move |client| {
+                GlobalAction::PreviousTrack if ctx.status.state != State::Stop => {
+                    let rewind_to_start = ctx.config.rewind_to_start_sec;
+                    let elapsed_sec = ctx.status.elapsed.as_secs();
+                    ctx.command(move |client| {
                         match rewind_to_start {
                             Some(value) => {
                                 if elapsed_sec >= value {
@@ -290,31 +282,29 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
-                GlobalAction::Stop
-                    if matches!(context.status.state, State::Play | State::Pause) =>
-                {
-                    context.command(move |client| {
+                GlobalAction::Stop if matches!(ctx.status.state, State::Play | State::Pause) => {
+                    ctx.command(move |client| {
                         client.stop()?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleRepeat => {
-                    let repeat = !context.status.repeat;
-                    context.command(move |client| {
+                    let repeat = !ctx.status.repeat;
+                    ctx.command(move |client| {
                         client.repeat(repeat)?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleRandom => {
-                    let random = !context.status.random;
-                    context.command(move |client| {
+                    let random = !ctx.status.random;
+                    ctx.command(move |client| {
                         client.random(random)?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleSingle => {
-                    let single = context.status.single;
-                    context.command(move |client| {
+                    let single = ctx.status.single;
+                    ctx.command(move |client| {
                         if client.version() < Version::new(0, 21, 0) {
                             client.single(single.cycle_skip_oneshot())?;
                         } else {
@@ -324,8 +314,8 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::ToggleConsume => {
-                    let consume = context.status.consume;
-                    context.command(move |client| {
+                    let consume = ctx.status.consume;
+                    ctx.command(move |client| {
                         if client.version() < Version::new(0, 24, 0) {
                             client.consume(consume.cycle_skip_oneshot())?;
                         } else {
@@ -335,86 +325,86 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::ToggleSingleOnOff => {
-                    let single = context.status.single;
-                    context.command(move |client| {
+                    let single = ctx.status.single;
+                    ctx.command(move |client| {
                         client.single(single.cycle_skip_oneshot())?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleConsumeOnOff => {
-                    let consume = context.status.consume;
-                    context.command(move |client| {
+                    let consume = ctx.status.consume;
+                    ctx.command(move |client| {
                         client.consume(consume.cycle_skip_oneshot())?;
                         Ok(())
                     });
                 }
                 GlobalAction::TogglePause => {
-                    if matches!(context.status.state, State::Play | State::Pause) {
-                        context.command(move |client| {
+                    if matches!(ctx.status.state, State::Play | State::Pause) {
+                        ctx.command(move |client| {
                             client.pause_toggle()?;
                             Ok(())
                         });
                     } else {
-                        context.command(move |client| {
+                        ctx.command(move |client| {
                             client.play()?;
                             Ok(())
                         });
                     }
                 }
                 GlobalAction::VolumeUp => {
-                    let step = context.config.volume_step;
-                    context.command(move |client| {
+                    let step = ctx.config.volume_step;
+                    ctx.command(move |client| {
                         client.volume(ValueChange::Increase(step.into()))?;
                         Ok(())
                     });
                 }
                 GlobalAction::VolumeDown => {
-                    let step = context.config.volume_step;
-                    context.command(move |client| {
+                    let step = ctx.config.volume_step;
+                    ctx.command(move |client| {
                         client.volume(ValueChange::Decrease(step.into()))?;
                         Ok(())
                     });
                 }
                 GlobalAction::SeekForward
-                    if matches!(context.status.state, State::Play | State::Pause) =>
+                    if matches!(ctx.status.state, State::Play | State::Pause) =>
                 {
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.seek_current(ValueChange::Increase(5))?;
                         Ok(())
                     });
                 }
                 GlobalAction::SeekBack
-                    if matches!(context.status.state, State::Play | State::Pause) =>
+                    if matches!(ctx.status.state, State::Play | State::Pause) =>
                 {
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.seek_current(ValueChange::Decrease(5))?;
                         Ok(())
                     });
                 }
                 GlobalAction::Update => {
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.update(None)?;
                         Ok(())
                     });
                 }
                 GlobalAction::Rescan => {
-                    context.command(move |client| {
+                    ctx.command(move |client| {
                         client.rescan(None)?;
                         Ok(())
                     });
                 }
                 GlobalAction::NextTab => {
-                    self.change_tab(context.config.next_screen(&context.active_tab), context)?;
-                    context.render()?;
+                    self.change_tab(ctx.config.next_screen(&ctx.active_tab), ctx)?;
+                    ctx.render()?;
                 }
                 GlobalAction::PreviousTab => {
-                    self.change_tab(context.config.prev_screen(&context.active_tab), context)?;
-                    context.render()?;
+                    self.change_tab(ctx.config.prev_screen(&ctx.active_tab), ctx)?;
+                    ctx.render()?;
                 }
                 GlobalAction::SwitchToTab(name) => {
-                    if context.config.tabs.names.contains(name) {
-                        self.change_tab(name.clone(), context)?;
-                        context.render()?;
+                    if ctx.config.tabs.names.contains(name) {
+                        self.change_tab(name.clone(), ctx)?;
+                        ctx.render()?;
                     } else {
                         status_error!(
                             "Tab with name '{}' does not exist. Check your configuration.",
@@ -428,31 +418,29 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
                 GlobalAction::ExternalCommand { command, .. } => {
-                    run_external(command.clone(), create_env(context, std::iter::empty::<&str>()));
+                    run_external(command.clone(), create_env(ctx, std::iter::empty::<&str>()));
                 }
                 GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                 GlobalAction::ShowHelp => {
-                    let modal = KeybindsModal::new(context);
-                    modal!(context, modal);
+                    let modal = KeybindsModal::new(ctx);
+                    modal!(ctx, modal);
                 }
                 GlobalAction::ShowOutputs => {
-                    context
-                        .query()
+                    ctx.query()
                         .id(OPEN_OUTPUTS_MODAL)
                         .replace_id(OPEN_OUTPUTS_MODAL)
                         .query(|client| Ok(MpdQueryResult::Outputs(client.outputs()?.0)));
                 }
                 GlobalAction::ShowDecoders => {
-                    context
-                        .query()
+                    ctx.query()
                         .id(OPEN_DECODERS_MODAL)
                         .replace_id(OPEN_DECODERS_MODAL)
                         .query(|client| Ok(MpdQueryResult::Decoders(client.decoders()?.0)));
                 }
                 GlobalAction::ShowCurrentSongInfo => {
-                    if let Some((_, current_song)) = context.find_current_song_in_queue() {
+                    if let Some((_, current_song)) = ctx.find_current_song_in_queue() {
                         modal!(
-                            context,
+                            ctx,
                             InfoListModal::builder()
                                 .items(current_song)
                                 .title("Song info")
@@ -464,7 +452,7 @@ impl<'ui> Ui<'ui> {
                     }
                 }
                 GlobalAction::AddRandom => {
-                    modal!(context, AddRandomModal::new(context));
+                    modal!(ctx, AddRandomModal::new(ctx));
                 }
             }
         }
@@ -472,24 +460,24 @@ impl<'ui> Ui<'ui> {
         Ok(KeyHandleResult::None)
     }
 
-    pub fn before_show(&mut self, area: Rect, context: &mut Ctx) -> Result<()> {
-        self.calc_areas(area, context);
+    pub fn before_show(&mut self, area: Rect, ctx: &mut Ctx) -> Result<()> {
+        self.calc_areas(area, ctx);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, context)? {
+            match self.panes.get_mut(&pane.pane, ctx)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, context, before_show(pane_area, context))?;
+                    active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
                 }
                 mut pane_instance => {
-                    pane_call!(pane_instance, calculate_areas(pane_area, context))?;
-                    pane_call!(pane_instance, before_show(context))?;
+                    pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+                    pane_call!(pane_instance, before_show(ctx))?;
                 }
             }
             Ok(())
         })
     }
 
-    pub fn on_ui_app_event(&mut self, event: UiAppEvent, context: &mut Ctx) -> Result<()> {
+    pub fn on_ui_app_event(&mut self, event: UiAppEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
                 if let Some(id) = modal.get_id() {
@@ -503,45 +491,45 @@ impl<'ui> Ui<'ui> {
                 } else {
                     self.modals.push(modal);
                 }
-                self.on_event(UiEvent::ModalOpened, context)?;
-                context.render()?;
+                self.on_event(UiEvent::ModalOpened, ctx)?;
+                ctx.render()?;
             }
             UiAppEvent::PopConfigErrorModal => {
                 if let Some(config_modal) = self.modals.last() {
                     if config_modal.get_id() == Some("config_error_modal".into()) {
-                        let _ = self.on_ui_app_event(UiAppEvent::PopModal, context);
+                        let _ = self.on_ui_app_event(UiAppEvent::PopModal, ctx);
                     }
                 }
             }
             UiAppEvent::PopModal => {
                 self.modals.pop();
-                self.on_event(UiEvent::ModalClosed, context)?;
-                context.render()?;
+                self.on_event(UiEvent::ModalClosed, ctx)?;
+                ctx.render()?;
             }
-            UiAppEvent::ChangeTab(tab_name) => self.change_tab(tab_name, context)?,
+            UiAppEvent::ChangeTab(tab_name) => self.change_tab(tab_name, ctx)?,
         }
         Ok(())
     }
 
-    pub fn resize(&mut self, area: Rect, context: &Ctx) -> Result<()> {
+    pub fn resize(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         log::trace!(area:?; "Terminal was resized");
-        self.calc_areas(area, context);
+        self.calc_areas(area, ctx);
 
         self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, context)? {
+            match self.panes.get_mut(&pane.pane, ctx)? {
                 Panes::TabContent => {
-                    active_tab_call!(self, context, resize(pane_area, context))?;
+                    active_tab_call!(self, ctx, resize(pane_area, ctx))?;
                 }
                 mut pane_instance => {
-                    pane_call!(pane_instance, calculate_areas(pane_area, context))?;
-                    pane_call!(pane_instance, resize(pane_area, context))?;
+                    pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+                    pane_call!(pane_instance, resize(pane_area, ctx))?;
                 }
             }
             Ok(())
         })
     }
 
-    pub fn on_event(&mut self, mut event: UiEvent, context: &mut Ctx) -> Result<()> {
+    pub fn on_event(&mut self, mut event: UiEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 status_warn!(
@@ -552,71 +540,71 @@ impl<'ui> Ui<'ui> {
                 // Call on_hide for all panes in the current tab and current layout because they
                 // might not be visible after the change
                 self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-                    match self.panes.get_mut(&pane.pane, context)? {
+                    match self.panes.get_mut(&pane.pane, ctx)? {
                         Panes::TabContent => {
-                            active_tab_call!(self, context, on_hide(context))?;
+                            active_tab_call!(self, ctx, on_hide(ctx))?;
                         }
                         mut pane_instance => {
-                            pane_call!(pane_instance, on_hide(context))?;
+                            pane_call!(pane_instance, on_hide(ctx))?;
                         }
                     }
                     Ok(())
                 })?;
 
-                self.layout = context.config.theme.layout.clone();
-                let new_active_tab = context
+                self.layout = ctx.config.theme.layout.clone();
+                let new_active_tab = ctx
                     .config
                     .tabs
                     .names
                     .iter()
-                    .find(|tab| tab == &&context.active_tab)
-                    .or(context.config.tabs.names.first())
+                    .find(|tab| tab == &&ctx.active_tab)
+                    .or(ctx.config.tabs.names.first())
                     .context("Expected at least one tab")?;
 
                 let mut old_other_panes = std::mem::take(&mut self.panes.others);
-                for (key, new_other_pane) in PaneContainer::init_other_panes(context) {
+                for (key, new_other_pane) in PaneContainer::init_other_panes(ctx) {
                     let old = old_other_panes.remove(&key);
                     self.panes.others.insert(key, old.unwrap_or(new_other_pane));
                 }
                 // We have to be careful about the order of operations here as they might cause
                 // a panic if done incorrectly
-                self.tabs = Self::init_tabs(context)?;
-                context.active_tab = new_active_tab.clone();
-                self.on_event(UiEvent::TabChanged(new_active_tab.clone()), context)?;
+                self.tabs = Self::init_tabs(ctx)?;
+                ctx.active_tab = new_active_tab.clone();
+                self.on_event(UiEvent::TabChanged(new_active_tab.clone()), ctx)?;
 
                 // Call before_show here, because we have "hidden" all the panes before and this
                 // will force them to reinitialize
-                self.before_show(self.area, context)?;
+                self.before_show(self.area, ctx)?;
             }
             _ => {}
         }
 
-        for pane_type in &context.config.active_panes {
+        for pane_type in &ctx.config.active_panes {
             let visible = self
                 .tabs
-                .get(&context.active_tab)
+                .get(&ctx.active_tab)
                 .is_some_and(|tab| tab.panes.panes_iter().any(|pane| pane.pane == *pane_type))
                 || self.layout.panes_iter().any(|pane| pane.pane == *pane_type);
 
-            match self.panes.get_mut(pane_type, context)? {
+            match self.panes.get_mut(pane_type, ctx)? {
                 #[cfg(debug_assertions)]
-                Panes::Logs(p) => p.on_event(&mut event, visible, context),
-                Panes::Queue(p) => p.on_event(&mut event, visible, context),
-                Panes::Directories(p) => p.on_event(&mut event, visible, context),
-                Panes::Albums(p) => p.on_event(&mut event, visible, context),
-                Panes::Artists(p) => p.on_event(&mut event, visible, context),
-                Panes::Playlists(p) => p.on_event(&mut event, visible, context),
-                Panes::Search(p) => p.on_event(&mut event, visible, context),
-                Panes::AlbumArtists(p) => p.on_event(&mut event, visible, context),
-                Panes::AlbumArt(p) => p.on_event(&mut event, visible, context),
-                Panes::Lyrics(p) => p.on_event(&mut event, visible, context),
-                Panes::ProgressBar(p) => p.on_event(&mut event, visible, context),
-                Panes::Header(p) => p.on_event(&mut event, visible, context),
-                Panes::Tabs(p) => p.on_event(&mut event, visible, context),
+                Panes::Logs(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Queue(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Directories(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Albums(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Artists(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Playlists(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Search(p) => p.on_event(&mut event, visible, ctx),
+                Panes::AlbumArtists(p) => p.on_event(&mut event, visible, ctx),
+                Panes::AlbumArt(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Lyrics(p) => p.on_event(&mut event, visible, ctx),
+                Panes::ProgressBar(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Header(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Tabs(p) => p.on_event(&mut event, visible, ctx),
                 #[cfg(debug_assertions)]
-                Panes::FrameCount(p) => p.on_event(&mut event, visible, context),
-                Panes::Others(p) => p.on_event(&mut event, visible, context),
-                Panes::Cava(p) => p.on_event(&mut event, visible, context),
+                Panes::FrameCount(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Others(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Cava(p) => p.on_event(&mut event, visible, ctx),
                 // Property and the dummy TabContent pane do not need to receive events
                 Panes::Property(_) | Panes::TabContent => Ok(()),
             }?;
@@ -630,34 +618,34 @@ impl<'ui> Ui<'ui> {
         id: &'static str,
         pane: Option<PaneType>,
         data: MpdQueryResult,
-        context: &mut Ctx,
+        ctx: &mut Ctx,
     ) -> Result<()> {
         match pane {
             Some(pane_type) => {
                 let visible =
-                    self.tabs.get(&context.active_tab).is_some_and(|tab| {
+                    self.tabs.get(&ctx.active_tab).is_some_and(|tab| {
                         tab.panes.panes_iter().any(|pane| pane.pane == pane_type)
                     }) || self.layout.panes_iter().any(|pane| pane.pane == pane_type);
 
-                match self.panes.get_mut(&pane_type, context)? {
+                match self.panes.get_mut(&pane_type, ctx)? {
                     #[cfg(debug_assertions)]
-                    Panes::Logs(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Queue(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Directories(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Albums(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Artists(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Playlists(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Search(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::AlbumArtists(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::AlbumArt(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Lyrics(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::ProgressBar(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Header(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Tabs(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Others(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::Logs(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Queue(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Directories(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Albums(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Artists(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Playlists(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Search(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::AlbumArtists(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::AlbumArt(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Lyrics(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::ProgressBar(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Header(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Tabs(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Others(p) => p.on_query_finished(id, data, visible, ctx),
                     #[cfg(debug_assertions)]
-                    Panes::FrameCount(p) => p.on_query_finished(id, data, visible, context),
-                    Panes::Cava(p) => p.on_query_finished(id, data, visible, context),
+                    Panes::FrameCount(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Cava(p) => p.on_query_finished(id, data, visible, ctx),
                     // Property and the dummy TabContent pane do not need to receive command
                     // notifications
                     Panes::Property(_) | Panes::TabContent => Ok(()),
@@ -665,15 +653,15 @@ impl<'ui> Ui<'ui> {
             }
             None => match (id, data) {
                 (OPEN_OUTPUTS_MODAL, MpdQueryResult::Outputs(outputs)) => {
-                    modal!(context, OutputsModal::new(outputs));
+                    modal!(ctx, OutputsModal::new(outputs));
                 }
                 (OPEN_DECODERS_MODAL, MpdQueryResult::Decoders(decoders)) => {
-                    modal!(context, DecodersModal::new(decoders));
+                    modal!(ctx, DecodersModal::new(decoders));
                 }
                 (id, mut data) => {
                     // TODO a proper modal target
                     for modal in &mut self.modals {
-                        modal.on_query_finished(id, &mut data, context)?;
+                        modal.on_query_finished(id, &mut data, ctx)?;
                     }
                 }
             },

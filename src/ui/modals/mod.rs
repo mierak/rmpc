@@ -30,13 +30,13 @@ pub(crate) trait Modal: std::fmt::Debug {
 
     fn handle_key(&mut self, key: &mut KeyEvent, app: &mut Ctx) -> Result<()>;
 
-    fn handle_mouse_event(&mut self, event: MouseEvent, context: &mut Ctx) -> Result<()>;
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()>;
 
     fn on_query_finished(
         &mut self,
         id: &'static str,
         data: &mut MpdQueryResult,
-        context: &Ctx,
+        ctx: &Ctx,
     ) -> Result<()> {
         Ok(())
     }
