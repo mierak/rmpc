@@ -27,7 +27,7 @@ pub use key::Key;
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod actions;
-mod key;
+pub mod key;
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct KeyConfig {

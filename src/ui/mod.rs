@@ -110,7 +110,7 @@ impl<'ui> Ui<'ui> {
         self.area = area;
     }
 
-    fn change_tab(&mut self, new_tab: TabName, ctx: &mut Ctx) -> Result<()> {
+    pub fn change_tab(&mut self, new_tab: TabName, ctx: &mut Ctx) -> Result<()> {
         self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
             match self.panes.get_mut(&pane.pane, ctx)? {
                 Panes::TabContent => {
