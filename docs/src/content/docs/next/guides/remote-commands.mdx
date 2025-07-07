@@ -1,0 +1,229 @@
+---
+title: remote commands
+description: control rmpc remotely from command line and scripts
+sidebar:
+    order: 7
+---
+
+import { steps } from "@astrojs/starlight/components";
+import { code } from "@astrojs/starlight/components";
+import { path } from "../data.ts";
+
+rmpc provides powerful remote command capabilities that allow you to control a running rmpc instance from the command line. this is especially useful for scripting and window manager integration.
+
+## overview
+
+the remote command system allows you to:
+- **emulate key presses** (`keybind`) - trigger any keybind as if pressed in the interface
+- **execute actions directly** (`command`) - run specific commands like switching tabs or playing music
+- **target specific instances** - send commands to a particular rmpc process by pid
+
+## usage
+
+all remote commands follow this pattern:
+
+```bash
+rmpc remote [--pid <pid>] <command> <args>
+```
+
+if `--pid` is not specified, the command will be sent to all running rmpc instances.
+
+## keybind command
+
+the `keybind` command emulates pressing a key combination in the running rmpc interface.
+
+### syntax
+
+```bash
+rmpc remote keybind <key>
+```
+
+### examples
+
+```bash
+# press 'p' (typically play/pause)
+rmpc remote keybind p
+```
+
+### common key examples
+
+```bash
+# basic navigation
+rmpc remote keybind j  # move down
+rmpc remote keybind k  # move up
+rmpc remote keybind h  # move left
+rmpc remote keybind l  # move right
+
+# playback control
+rmpc remote keybind p      # toggle play/pause
+rmpc remote keybind s      # stop playback
+rmpc remote keybind ">"    # next track
+rmpc remote keybind "<"    # previous track
+
+# tab switching (numbers)
+rmpc remote keybind 1      # switch to queue tab
+rmpc remote keybind 2      # switch to directories tab
+rmpc remote keybind 3      # switch to artists tab
+rmpc remote keybind 4      # switch to album artists tab
+rmpc remote keybind 5      # switch to albums tab
+rmpc remote keybind 6      # switch to playlists tab
+rmpc remote keybind 7      # switch to search tab
+
+# volume control
+rmpc remote keybind "."    # volume up
+rmpc remote keybind ","    # volume down
+
+# seek control
+rmpc remote keybind f      # seek forward
+rmpc remote keybind b      # seek backward
+
+# modes
+rmpc remote keybind z      # toggle repeat
+rmpc remote keybind x      # toggle random
+rmpc remote keybind c      # toggle consume
+rmpc remote keybind v      # toggle single
+
+# help and info
+rmpc remote keybind "~"       # Show help
+rmpc remote keybind I         # Show current song info
+rmpc remote keybind O         # Show outputs
+rmpc remote keybind P         # Show decoders
+```
+
+## Command Action
+
+The `command` command executes specific actions or commands directly, bypassing the need for key presses.
+
+### Syntax
+
+```bash
+rmpc remote command <ACTION>
+```
+
+### Tab Switching
+
+Switch between tabs using the `SwitchToTab` action:
+
+```bash
+# Switch to Queue tab
+rmpc remote command 'SwitchToTab("Queue")'
+
+# Switch to Directories tab  
+rmpc remote command 'SwitchToTab("Directories")'
+
+# Switch to Artists tab
+rmpc remote command 'SwitchToTab("Artists")'
+
+# Switch to Albums tab
+rmpc remote command 'SwitchToTab("Albums")'
+
+# Switch to Lyrics tab
+rmpc remote command 'SwitchToTab("Lyrics")'
+
+# Switch to any custom tab name
+rmpc remote command 'SwitchToTab("My Custom Tab")'
+```
+
+### MPD Commands
+
+Execute any CLI command that rmpc supports:
+
+```bash
+# Playback control
+rmpc remote command play
+rmpc remote command pause
+rmpc remote command next
+rmpc remote command prev
+rmpc remote command stop
+
+# Volume control
+rmpc remote command 'volume 50'
+rmpc remote command 'volume +10'
+rmpc remote command 'volume -5'
+
+# Queue management
+rmpc remote command clear
+rmpc remote command 'add artist/album/song.mp3'
+
+# Seek commands  
+rmpc remote command 'seek +30'
+rmpc remote command 'seek -10'
+rmpc remote command 'seek 120'
+```
+
+## Other Remote Commands
+
+Besides `keybind` and `command`, rmpc supports a few other remote commands:
+
+### Status Messages
+
+Display custom messages in the rmpc status bar:
+
+```bash
+# Show an info message for 5 seconds (default)
+rmpc remote status "Hello from script!"
+
+# Show an error message for 10 seconds
+rmpc remote status --level error --timeout 10000 "Something went wrong"
+
+# Show a warning message
+rmpc remote status --level warn "Check your config"
+```
+
+### Lyrics Index
+
+Notify rmpc about new lyrics files:
+
+```bash
+# Tell rmpc to index a new .lrc file
+rmpc remote indexlrc --path /path/to/song.lrc
+```
+
+### Set Commands
+
+Update configuration in a running rmpc instance:
+
+```bash
+# Update theme from file
+rmpc remote set theme /path/to/new-theme.ron
+
+# Update theme from stdin
+cat new-theme.ron | rmpc remote set theme -
+```
+
+## Targeting Specific Instances
+
+If you have multiple rmpc instances running, you can target a specific one using the `--pid` option:
+
+```bash
+# Find rmpc processes
+ps aux | grep rmpc
+
+# Send command to specific instance
+rmpc remote --pid 12345 keybind p
+rmpc remote --pid 12345 command 'SwitchToTab("Lyrics")'
+```
+
+## Error Handling
+
+Remote commands will fail silently if:
+- No rmpc instance is running
+- The specified PID doesn't exist
+- Invalid key format is provided
+- Invalid command syntax is used
+- Tab name doesn't exist in your configuration
+
+Check the rmpc logs for detailed error messages if commands aren't working as expected.
+
+## Tips and Best Practices
+
+- **Use quotes for complex commands**: Always quote commands with spaces or special characters
+- **Check keybind configuration**: The remote keybind command uses your configured keybinds from your config file
+- **Test interactively first**: Try commands manually before adding them to scripts  
+- **Consider tab names**: Make sure tab names in `SwitchToTab` match your configuration exactly (case-sensitive)
+
+## See Also
+
+- <a href={path("configuration/keybinds")}>Keybind Configuration</a> - Configure what keys do what
+- <a href={path("configuration/tabs")}>Tab Configuration</a> - Set up custom tab names
+- <a href={path("reference/cli-command-mode")}>CLI Reference</a> - Full command reference

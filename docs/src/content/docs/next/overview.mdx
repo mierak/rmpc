@@ -23,6 +23,7 @@ It also features ranger/lf inspired browsing of songs and other goodies.
 -   Ranger/LF-like three-column browser through your music library
 -   Basic playlist management
 -   Support scripting through basic CLI mode and script hooks
+-   **Remote control** - Send commands to running rmpc instances (useful for window manager integration).
 
 ## Showcase
 
@@ -51,5 +52,21 @@ or searching with regexes.
 
 ### Command line interface
 
-Some basic feature are also available on the command line. Use `rmpc --help` to get a list of available commands or
-check out the <a href={path("reference/cli-command-mode")}>CLI reference</a>
+Some basic features are also available on the command line. Use `rmpc --help` to get a list of available commands or
+check out the <a href={path("reference/cli-command-mode")}>CLI reference</a>.
+
+Rmpc also supports **remote commands** that allow you to control running instances from scripts, or other terminal sessions. For example:
+
+```bash
+# Emulate pressing the play/pause key
+rmpc remote keybind p
+
+# Switch to a specific tab
+rmpc remote command 'SwitchToTab("Queue")'
+
+# Control playback directly
+rmpc remote command play
+rmpc remote command 'volume +10'
+```
+
+Learn more about remote control in the <a href={path("guides/remote-commands")}>Remote Commands Guide</a>.
