@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-mod commands;
+pub mod commands;
 
 pub fn get_socket_path(pid: u32) -> PathBuf {
     let mut temp = std::env::temp_dir();

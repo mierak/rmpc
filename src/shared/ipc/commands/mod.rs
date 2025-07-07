@@ -14,9 +14,9 @@ use crate::config::{
     cli::{RemoteCmd, SetCommand},
 };
 
-pub(super) mod command;
+pub mod command;
 pub(super) mod index_lrc;
-pub(super) mod keybind;
+pub mod keybind;
 pub(super) mod set;
 pub(super) mod status_message;
 pub(super) mod tmux;
