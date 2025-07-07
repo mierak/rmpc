@@ -90,6 +90,24 @@ rmpc remote keybind O         # Show outputs
 rmpc remote keybind P         # Show decoders
 ```
 
+### Key Format Notes
+
+For special keys, use the angle bracket format to ensure proper recognition:
+
+```bash
+# Correct formats for special keys
+rmpc remote keybind "<CR>"     # Enter key
+rmpc remote keybind "<Space>"  # Space key  
+rmpc remote keybind "<Esc>"    # Escape key
+rmpc remote keybind "<Tab>"    # Tab key
+rmpc remote keybind "<BS>"     # Backspace key
+
+# Modifiers use angle brackets too
+rmpc remote keybind "<C-p>"    # Ctrl+p
+rmpc remote keybind "<S-CR>"   # Shift+Enter
+rmpc remote keybind "<A-h>"    # Alt+h
+```
+
 ## Command Action
 
 The `command` command executes specific actions or commands directly, bypassing the need for key presses.
