@@ -66,12 +66,8 @@ impl TryFrom<RemoteCmd> for SocketCommand {
 
                 Ok(SocketCommand::Set(Box::new(SetIpcCommand::Theme(ron::de::from_reader(read)?))))
             }
-            RemoteCmd::Keybind { key } => {
-                Ok(SocketCommand::Keybind(KeybindCommand { key }))
-            }
-            RemoteCmd::Command { action } => {
-                Ok(SocketCommand::Command(CommandCommand { action }))
-            }
+            RemoteCmd::Keybind { key } => Ok(SocketCommand::Keybind(KeybindCommand { key })),
+            RemoteCmd::Command { action } => Ok(SocketCommand::Command(CommandCommand { action })),
         }
     }
 }

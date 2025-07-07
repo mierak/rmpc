@@ -455,12 +455,13 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::Command(action_str) => {
                     if action_str.starts_with("SwitchToTab(") && action_str.ends_with(')') {
-                        let tab_name = action_str.trim_start_matches("SwitchToTab(\"")
+                        let tab_name = action_str
+                            .trim_start_matches("SwitchToTab(\"")
                             .trim_start_matches("SwitchToTab(")
                             .trim_end_matches("\")")
                             .trim_end_matches(')')
                             .to_string();
-                        
+
                         if ctx.config.tabs.names.contains(&tab_name.clone().into()) {
                             if let Err(err) = ui.change_tab(tab_name.as_str().into(), &mut ctx) {
                                 status_error!("Failed to switch to tab '{}': {}", tab_name, err);

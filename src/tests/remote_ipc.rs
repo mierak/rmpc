@@ -6,14 +6,10 @@ mod remote_ipc_tests {
     use crate::{
         AppEvent,
         config::{Config, cli::RemoteCmd},
-        shared::{
-            ipc::{
-                SocketCommand, SocketCommandExecute,
-                commands::{
-                    command::CommandCommand,
-                    keybind::KeybindCommand,
-                },
-            },
+        shared::ipc::{
+            SocketCommand,
+            SocketCommandExecute,
+            commands::{command::CommandCommand, keybind::KeybindCommand},
         },
     };
 
@@ -36,13 +32,13 @@ mod remote_ipc_tests {
         let config = Config::default();
 
         let keybind_cmd = KeybindCommand { key: "p".to_string() };
-        
+
         let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_ok(), "Keybind command execution should succeed");
 
         let received_event = event_rx.try_recv();
         assert!(received_event.is_ok(), "Should have received an event");
-        
+
         match received_event.expect("Should have received an event") {
             AppEvent::UserKeyInput(key_event) => {
                 assert_eq!(key_event.code, KeyCode::Char('p'));
@@ -58,13 +54,13 @@ mod remote_ipc_tests {
         let config = Config::default();
 
         let command_cmd = CommandCommand { action: "play".to_string() };
-        
+
         let result = command_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_ok(), "Command execution should succeed");
 
         let received_event = event_rx.try_recv();
         assert!(received_event.is_ok(), "Should have received an event");
-        
+
         match received_event.expect("Should have received an event") {
             AppEvent::Command(action) => {
                 assert_eq!(action, "play");
@@ -80,13 +76,13 @@ mod remote_ipc_tests {
         let config = Config::default();
 
         let keybind_cmd = KeybindCommand { key: "p".to_string() };
-        
+
         let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_ok(), "Simple keybind command should succeed");
 
         let received_event = event_rx.try_recv();
         assert!(received_event.is_ok(), "Should have received an event");
-        
+
         match received_event.expect("Should have received an event") {
             AppEvent::UserKeyInput(key_event) => {
                 assert_eq!(key_event.code, KeyCode::Char('p'));
@@ -102,7 +98,7 @@ mod remote_ipc_tests {
         let config = Config::default();
 
         let keybind_cmd = KeybindCommand { key: "invalid_key_format".to_string() };
-        
+
         let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_err(), "Invalid keybind should fail");
     }
@@ -110,8 +106,9 @@ mod remote_ipc_tests {
     #[test]
     fn test_remote_cmd_to_socket_command_conversion() {
         let keybind_cmd = RemoteCmd::Keybind { key: "p".to_string() };
-        let socket_cmd = SocketCommand::try_from(keybind_cmd).expect("Keybind conversion should succeed");
-        
+        let socket_cmd =
+            SocketCommand::try_from(keybind_cmd).expect("Keybind conversion should succeed");
+
         match socket_cmd {
             SocketCommand::Keybind(cmd) => {
                 assert_eq!(cmd.key, "p");
@@ -120,8 +117,9 @@ mod remote_ipc_tests {
         }
 
         let command_cmd = RemoteCmd::Command { action: "play".to_string() };
-        let socket_cmd = SocketCommand::try_from(command_cmd).expect("Command conversion should succeed");
-        
+        let socket_cmd =
+            SocketCommand::try_from(command_cmd).expect("Command conversion should succeed");
+
         match socket_cmd {
             SocketCommand::Command(cmd) => {
                 assert_eq!(cmd.action, "play");
@@ -137,13 +135,13 @@ mod remote_ipc_tests {
         let config = Config::default();
 
         let command_cmd = CommandCommand { action: "SwitchToTab(\"Lyrics\")".to_string() };
-        
+
         let result = command_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_ok(), "SwitchToTab command should succeed");
 
         let received_event = event_rx.try_recv();
         assert!(received_event.is_ok(), "Should have received an event");
-        
+
         match received_event.expect("Should have received an event") {
             AppEvent::Command(action) => {
                 assert_eq!(action, "SwitchToTab(\"Lyrics\")");

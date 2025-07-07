@@ -2,12 +2,7 @@ use anyhow::Result;
 use crossbeam::channel::Sender;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    AppEvent,
-    WorkRequest,
-    config::Config,
-    shared::ipc::SocketCommandExecute,
-};
+use crate::{AppEvent, WorkRequest, config::Config, shared::ipc::SocketCommandExecute};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct CommandCommand {
