@@ -22,12 +22,9 @@ impl SocketCommandExecute for KeybindCommand {
         _work_tx: &Sender<WorkRequest>,
         _config: &Config,
     ) -> Result<()> {
-        // Parse the key string into a Key
         match self.key.parse::<Key>() {
             Ok(key) => {
-                // Convert Key to crossterm KeyEvent
                 let crossterm_event = KeyEvent::new(key.key, key.modifiers);
-                // Send the key event to the application
                 event_tx.send(AppEvent::UserKeyInput(crossterm_event))?;
             }
             Err(err) => {
