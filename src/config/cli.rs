@@ -298,6 +298,14 @@ pub enum RemoteCmd {
         #[command(subcommand)]
         command: SetCommand,
     },
+    /// Emulate a keybind press in the running rmpc instance
+    Keybind {
+        key: String,
+    },
+    /// Execute a command/action in the running rmpc instance
+    Command {
+        action: String,
+    },
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
