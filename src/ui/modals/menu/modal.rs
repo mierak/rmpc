@@ -194,7 +194,10 @@ impl<'a> MenuModal<'a> {
     }
 
     pub fn build(mut self) -> Self {
-        if let Some(s) = self.sections.get_mut(0) {
+        if let Some((i, s)) =
+            self.sections.iter_mut().enumerate().find_or_first(|(_, s)| s.len() > 0)
+        {
+            self.current_section_idx = i;
             s.down();
         }
         self
