@@ -36,7 +36,9 @@ use crate::{
 
 #[cfg(test)]
 mod tests {
+    mod cli_integration;
     pub mod fixtures;
+    mod remote_ipc;
 }
 
 mod config;

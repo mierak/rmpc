@@ -11,13 +11,14 @@ use crate::{
     config::{Config, cli::RemoteCmd},
     shared::ipc::commands::{
         index_lrc::IndexLrcCommand,
+        keybind::KeybindCommand,
         set::SetIpcCommand,
         status_message::StatusMessageCommand,
         tmux::TmuxHookCommand,
     },
 };
 
-mod commands;
+pub mod commands;
 
 pub fn get_socket_path(pid: u32) -> PathBuf {
     let mut temp = std::env::temp_dir();
@@ -61,6 +62,7 @@ pub(crate) enum SocketCommand {
     StatusMessage(StatusMessageCommand),
     TmuxHook(TmuxHookCommand),
     Set(Box<SetIpcCommand>),
+    Keybind(KeybindCommand),
 }
 
 impl SocketCommandExecute for SocketCommand {
@@ -75,6 +77,7 @@ impl SocketCommandExecute for SocketCommand {
             SocketCommand::StatusMessage(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::TmuxHook(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::Set(cmd) => cmd.execute(event_tx, work_tx, config),
+            SocketCommand::Keybind(cmd) => cmd.execute(event_tx, work_tx, config),
         }
     }
 }

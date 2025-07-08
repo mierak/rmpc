@@ -2,6 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use index_lrc::IndexLrcCommand;
+use keybind::KeybindCommand;
 use set::SetIpcCommand;
 use status_message::StatusMessageCommand;
 use tmux::TmuxHookCommand;
@@ -13,6 +14,7 @@ use crate::config::{
 };
 
 pub(super) mod index_lrc;
+pub mod keybind;
 pub(super) mod set;
 pub(super) mod status_message;
 pub(super) mod tmux;
@@ -62,6 +64,7 @@ impl TryFrom<RemoteCmd> for SocketCommand {
 
                 Ok(SocketCommand::Set(Box::new(SetIpcCommand::Theme(ron::de::from_reader(read)?))))
             }
+            RemoteCmd::Keybind { key } => Ok(SocketCommand::Keybind(KeybindCommand { key })),
         }
     }
 }

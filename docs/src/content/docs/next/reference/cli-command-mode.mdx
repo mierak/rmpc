@@ -77,3 +77,47 @@ Options:
       --autocreate             Automatically create the partition if it does not exist. Requires partition to be set
   -h, --help                   Print help
 ```
+
+## Remote Commands
+
+The `remote` command allows you to control a running rmpc instance from external scripts or other terminal sessions. This is particularly useful for:
+- Window manager integration
+- Media key bindings
+- Automation scripts
+- Headless control
+
+### Available Remote Commands
+
+```bash
+rmpc remote <COMMAND>
+
+Commands:
+  keybind   Emulate a keybind press in the running rmpc instance
+  status    Display a message in the status bar
+  set       Sets a value in running rmpc instance
+  indexlrc  Notify rmpc that a new lyrics file has been added
+
+Options:
+  --pid <PID>  Target a specific rmpc instance by process ID
+```
+
+### Examples
+
+```bash
+# Emulate pressing 'p' (play/pause)
+rmpc remote keybind p
+
+# Switch to the Queue tab (using number key)
+rmpc remote keybind 1
+
+# Next track
+rmpc remote keybind ">"
+
+# Target a specific rmpc instance
+rmpc remote --pid 12345 keybind "a"
+
+# Display a custom status message
+rmpc remote status "Custom message" --level info
+```
+
+For detailed information and more examples, see the <a href={path("guides/remote-commands")}>Remote Commands Guide</a>.
