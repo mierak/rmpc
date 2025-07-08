@@ -207,7 +207,7 @@ impl<'ui> Ui<'ui> {
 
         if let Some(action) = key.as_global_action(ctx) {
             match action {
-                GlobalAction::SwitchPartition { name: Some(name), autocreate } => {
+                GlobalAction::Partition { name: Some(name), autocreate } => {
                     let name = name.clone();
                     let autocreate = *autocreate;
                     ctx.command(move |client| {
@@ -225,7 +225,7 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
-                GlobalAction::SwitchPartition { name: None, .. } => {
+                GlobalAction::Partition { name: None, .. } => {
                     let result = ctx.query_sync(move |client| {
                         let partitions = client.list_partitions()?;
                         Ok(partitions.0)

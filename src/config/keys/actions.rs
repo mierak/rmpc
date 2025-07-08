@@ -20,8 +20,8 @@ pub enum GlobalAction {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
-    #[strum(to_string = "SwitchPartition({name:?})")]
-    SwitchPartition {
+    #[strum(to_string = "Partition({name:?})")]
+    Partition {
         name: Option<String>,
         autocreate: bool,
     },
@@ -66,7 +66,7 @@ pub enum GlobalActionFile {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
-    SwitchPartition {
+    Partition {
         #[serde(default)]
         name: Option<String>,
         #[serde(default)]
@@ -155,8 +155,8 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::AddRandom => GlobalAction::AddRandom,
             GlobalActionFile::ToggleSingleOnOff => GlobalAction::ToggleSingleOnOff,
             GlobalActionFile::ToggleConsumeOnOff => GlobalAction::ToggleConsumeOnOff,
-            GlobalActionFile::SwitchPartition { name, autocreate } => {
-                GlobalAction::SwitchPartition { name, autocreate }
+            GlobalActionFile::Partition { name, autocreate } => {
+                GlobalAction::Partition { name, autocreate }
             }
         }
     }
@@ -201,8 +201,8 @@ impl ToDescription for GlobalAction {
             GlobalAction::AddRandom => "Add random songs to the queue".into(),
             GlobalAction::ToggleSingleOnOff => "Toggle single mode on or off, skipping oneshot".into(),
             GlobalAction::ToggleConsumeOnOff => "Toggle consume mode on or off, skipping oneshot".into(),
-            GlobalAction::SwitchPartition { name: Some(name), .. }=> format!("Switch to '{name}' partition").into(),
-            GlobalAction::SwitchPartition { name: None, .. }=> "Open partition management modal".into(),
+            GlobalAction::Partition { name: Some(name), .. }=> format!("Switch to '{name}' partition").into(),
+            GlobalAction::Partition { name: None, .. }=> "Open partition management modal".into(),
         }
     }
 }
