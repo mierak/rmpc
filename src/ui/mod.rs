@@ -262,7 +262,10 @@ impl<'ui> Ui<'ui> {
                                     });
                                 });
                             let mut any_non_default = false;
-                            for partition in result.iter().filter(|p| *p != "default") {
+                            for partition in result
+                                .iter()
+                                .filter(|p| *p != "default" && **p != ctx.status.partition)
+                            {
                                 section = section.add_item(partition);
                                 any_non_default = true;
                             }
