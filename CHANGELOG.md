@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 - Multiple marked items can now be moved inside playlists
 - New `song_table_album_separator` theme property
 - Add `queue` cli command to print contents of the current queue
+- New `Partition` keybind to facilitate partition switching and management
+- New `Partition` status property to show rmpc's current partition
 
 ### Changed
 
