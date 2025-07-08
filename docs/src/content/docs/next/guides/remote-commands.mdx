@@ -15,7 +15,7 @@ rmpc provides powerful remote command capabilities that allow you to control a r
 
 the remote command system allows you to:
 - **emulate key presses** (`keybind`) - trigger any keybind as if pressed in the interface
-- **execute actions directly** (`command`) - run specific commands like switching tabs or playing music
+- **send status messages** - display custom messages in the status bar
 - **target specific instances** - send commands to a particular rmpc process by pid
 
 ## usage
@@ -108,70 +108,9 @@ rmpc remote keybind "<S-CR>"   # Shift+Enter
 rmpc remote keybind "<A-h>"    # Alt+h
 ```
 
-## Command Action
-
-The `command` command executes specific actions or commands directly, bypassing the need for key presses.
-
-### Syntax
-
-```bash
-rmpc remote command <ACTION>
-```
-
-### Tab Switching
-
-Switch between tabs using the `SwitchToTab` action:
-
-```bash
-# Switch to Queue tab
-rmpc remote command 'SwitchToTab("Queue")'
-
-# Switch to Directories tab  
-rmpc remote command 'SwitchToTab("Directories")'
-
-# Switch to Artists tab
-rmpc remote command 'SwitchToTab("Artists")'
-
-# Switch to Albums tab
-rmpc remote command 'SwitchToTab("Albums")'
-
-# Switch to Lyrics tab
-rmpc remote command 'SwitchToTab("Lyrics")'
-
-# Switch to any custom tab name
-rmpc remote command 'SwitchToTab("My Custom Tab")'
-```
-
-### MPD Commands
-
-Execute any CLI command that rmpc supports:
-
-```bash
-# Playback control
-rmpc remote command play
-rmpc remote command pause
-rmpc remote command next
-rmpc remote command prev
-rmpc remote command stop
-
-# Volume control
-rmpc remote command 'volume 50'
-rmpc remote command 'volume +10'
-rmpc remote command 'volume -5'
-
-# Queue management
-rmpc remote command clear
-rmpc remote command 'add artist/album/song.mp3'
-
-# Seek commands  
-rmpc remote command 'seek +30'
-rmpc remote command 'seek -10'
-rmpc remote command 'seek 120'
-```
-
 ## Other Remote Commands
 
-Besides `keybind` and `command`, rmpc supports a few other remote commands:
+Besides `keybind`, rmpc supports several other remote commands:
 
 ### Status Messages
 
@@ -219,7 +158,7 @@ ps aux | grep rmpc
 
 # Send command to specific instance
 rmpc remote --pid 12345 keybind p
-rmpc remote --pid 12345 command 'SwitchToTab("Lyrics")'
+rmpc remote --pid 12345 status "Hello from specific instance"
 ```
 
 ## Error Handling
@@ -228,17 +167,15 @@ Remote commands will fail silently if:
 - No rmpc instance is running
 - The specified PID doesn't exist
 - Invalid key format is provided
-- Invalid command syntax is used
-- Tab name doesn't exist in your configuration
+- Tab name doesn't exist in your configuration (for tab switching keybinds)
 
 Check the rmpc logs for detailed error messages if commands aren't working as expected.
 
 ## Tips and Best Practices
 
-- **Use quotes for complex commands**: Always quote commands with spaces or special characters
+- **Use quotes for special characters**: Always quote keys with special characters like `">"` or `"<"` or `"<Tab>"`
 - **Check keybind configuration**: The remote keybind command uses your configured keybinds from your config file
 - **Test interactively first**: Try commands manually before adding them to scripts  
-- **Consider tab names**: Make sure tab names in `SwitchToTab` match your configuration exactly (case-sensitive)
 
 ## See Also
 

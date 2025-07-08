@@ -84,7 +84,6 @@ pub(crate) enum AppEvent {
     ThemeChanged {
         theme: Box<UiConfig>,
     },
-    Command(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]

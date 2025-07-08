@@ -1,7 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
-use command::CommandCommand;
 use index_lrc::IndexLrcCommand;
 use keybind::KeybindCommand;
 use set::SetIpcCommand;
@@ -14,7 +13,6 @@ use crate::config::{
     cli::{RemoteCmd, SetCommand},
 };
 
-pub mod command;
 pub(super) mod index_lrc;
 pub mod keybind;
 pub(super) mod set;
@@ -67,7 +65,6 @@ impl TryFrom<RemoteCmd> for SocketCommand {
                 Ok(SocketCommand::Set(Box::new(SetIpcCommand::Theme(ron::de::from_reader(read)?))))
             }
             RemoteCmd::Keybind { key } => Ok(SocketCommand::Keybind(KeybindCommand { key })),
-            RemoteCmd::Command { action } => Ok(SocketCommand::Command(CommandCommand { action })),
         }
     }
 }

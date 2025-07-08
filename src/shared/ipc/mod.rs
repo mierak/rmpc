@@ -10,7 +10,6 @@ use crate::{
     WorkRequest,
     config::{Config, cli::RemoteCmd},
     shared::ipc::commands::{
-        command::CommandCommand,
         index_lrc::IndexLrcCommand,
         keybind::KeybindCommand,
         set::SetIpcCommand,
@@ -64,7 +63,6 @@ pub(crate) enum SocketCommand {
     TmuxHook(TmuxHookCommand),
     Set(Box<SetIpcCommand>),
     Keybind(KeybindCommand),
-    Command(CommandCommand),
 }
 
 impl SocketCommandExecute for SocketCommand {
@@ -80,7 +78,6 @@ impl SocketCommandExecute for SocketCommand {
             SocketCommand::TmuxHook(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::Set(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::Keybind(cmd) => cmd.execute(event_tx, work_tx, config),
-            SocketCommand::Command(cmd) => cmd.execute(event_tx, work_tx, config),
         }
     }
 }

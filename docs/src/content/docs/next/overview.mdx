@@ -61,12 +61,14 @@ Rmpc also supports **remote commands** that allow you to control running instanc
 # Emulate pressing the play/pause key
 rmpc remote keybind p
 
-# Switch to a specific tab
-rmpc remote command 'SwitchToTab("Queue")'
+# Switch to Queue tab (number 1 key)
+rmpc remote keybind 1
 
-# Control playback directly
-rmpc remote command play
-rmpc remote command 'volume +10'
+# Next track
+rmpc remote keybind ">"
+
+# Volume up
+rmpc remote keybind "."
 ```
 
 Learn more about remote control in the <a href={path("guides/remote-commands")}>Remote Commands Guide</a>.

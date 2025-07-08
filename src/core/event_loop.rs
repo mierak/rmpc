@@ -10,14 +10,13 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    config::cli::Args,
     ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
         mpd_client::{MpdClient, SaveMode},
     },
     shared::{
-        events::{AppEvent, WorkDone, WorkRequest},
+        events::{AppEvent, WorkDone},
         ext::error::ErrorExt,
         id::{self, Id},
         macros::{status_error, status_warn},
@@ -448,48 +447,6 @@ fn main_task<B: Backend + std::io::Write>(
                             Ok(()) => {}
                             Err(err) => {
                                 status_error!(err:?; "Error: {}", err.to_status());
-                                render_wanted = true;
-                            }
-                        }
-                    }
-                }
-                AppEvent::Command(action_str) => {
-                    if action_str.starts_with("SwitchToTab(") && action_str.ends_with(')') {
-                        let tab_name = action_str
-                            .trim_start_matches("SwitchToTab(\"")
-                            .trim_start_matches("SwitchToTab(")
-                            .trim_end_matches("\")")
-                            .trim_end_matches(')')
-                            .to_string();
-
-                        if ctx.config.tabs.names.contains(&tab_name.clone().into()) {
-                            if let Err(err) = ui.change_tab(tab_name.as_str().into(), &mut ctx) {
-                                status_error!("Failed to switch to tab '{}': {}", tab_name, err);
-                                render_wanted = true;
-                            } else {
-                                render_wanted = true;
-                            }
-                        } else {
-                            status_error!(
-                                "Tab with name '{}' does not exist. Check your configuration.",
-                                tab_name
-                            );
-                            render_wanted = true;
-                        }
-                    } else {
-                        match action_str.parse::<Args>() {
-                            Ok(Args { command: Some(cmd), .. }) => {
-                                if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err() {
-                                    status_error!("Failed to send command");
-                                    render_wanted = true;
-                                }
-                            }
-                            Ok(_) => {
-                                status_error!("Invalid command format: '{}'", action_str);
-                                render_wanted = true;
-                            }
-                            Err(err) => {
-                                status_error!("Failed to parse command '{}': {}", action_str, err);
                                 render_wanted = true;
                             }
                         }

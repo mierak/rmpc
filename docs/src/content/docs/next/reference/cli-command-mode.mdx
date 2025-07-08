@@ -93,7 +93,6 @@ rmpc remote <COMMAND>
 
 Commands:
   keybind   Emulate a keybind press in the running rmpc instance
-  command   Execute a command/action in the running rmpc instance
   status    Display a message in the status bar
   set       Sets a value in running rmpc instance
   indexlrc  Notify rmpc that a new lyrics file has been added
@@ -108,12 +107,11 @@ Options:
 # Emulate pressing 'p' (play/pause)
 rmpc remote keybind p
 
-# Switch to the Queue tab
-rmpc remote command "SwitchToTab(\"Queue\")"
+# Switch to the Queue tab (using number key)
+rmpc remote keybind 1
 
-# Execute MPD commands
-rmpc remote command "play"
-rmpc remote command 'volume +10'
+# Next track
+rmpc remote keybind ">"
 
 # Target a specific rmpc instance
 rmpc remote --pid 12345 keybind "a"
