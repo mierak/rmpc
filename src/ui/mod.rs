@@ -269,7 +269,7 @@ impl<'ui> Ui<'ui> {
 
                             if any_non_default { Some(section) } else { None }
                         })
-                        .add_input_section(ctx, "New partition", |section| {
+                        .add_input_section(ctx, "New partition:", |section| {
                             section.action(|ctx, value| {
                                 if !value.is_empty() {
                                     ctx.command(move |client| {

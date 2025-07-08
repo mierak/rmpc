@@ -224,7 +224,8 @@ impl<'a> MenuModal<'a> {
     ) -> Self {
         let section = MultiActionSection::new(ctx.config.theme.current_item_style);
         let section = cb(section);
-        if let Some(section) = section {
+        if let Some(mut section) = section {
+            section.build();
             self.sections.push(SectionType::Multi(section));
             self.areas.push(Rect::default());
         }

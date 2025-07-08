@@ -43,13 +43,9 @@ impl<'a> MultiActionSection<'a> {
     }
 
     pub fn add_item(mut self, label: impl Into<String>) -> Self {
-        let mut buttons = ButtonGroup::default().spacing(1);
-        for action in &self.actions {
-            buttons = buttons.add_button(Button::default().label(action.0));
-        }
         self.items.push(MultiActionItem {
             label: label.into(),
-            buttons,
+            buttons: ButtonGroup::default().spacing(1),
             buttons_state: ButtonGroupState::default(),
         });
         self
@@ -62,6 +58,16 @@ impl<'a> MultiActionSection<'a> {
     ) -> Self {
         self.actions.push((label, Some(Box::new(action))));
         self
+    }
+
+    pub fn build(&mut self) {
+        for item in &mut self.items {
+            let mut buttons = std::mem::take(&mut item.buttons);
+            for action in &mut self.actions {
+                buttons = buttons.add_button(Button::default().label(action.0));
+            }
+            item.buttons = buttons;
+        }
     }
 }
 
