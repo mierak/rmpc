@@ -11,24 +11,25 @@ use crate::{
     MpdQueryResult,
     config::keys::CommonAction,
     ctx::Ctx,
-    mpd::{commands::Output, mpd_client::MpdClient},
+    mpd::mpd_client::MpdClient,
     shared::{
+        ext::mpd_client::{MpdClientExt, PartitionedOutput, PartitionedOutputKind},
         key_event::KeyEvent,
         macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::dirstack::DirState,
+    ui::{UiEvent, dirstack::DirState},
 };
 
 #[derive(Debug)]
 pub struct OutputsModal {
     scrolling_state: DirState<TableState>,
     outputs_table_area: Rect,
-    outputs: Vec<Output>,
+    outputs: Vec<PartitionedOutput>,
 }
 
 impl OutputsModal {
-    pub fn new(outputs: Vec<Output>) -> Self {
+    pub fn new(outputs: Vec<PartitionedOutput>) -> Self {
         let mut result = Self {
             outputs,
             scrolling_state: DirState::default(),
@@ -49,16 +50,39 @@ impl OutputsModal {
         };
 
         let id = output.id;
+        let name = output.name.clone();
+        let kind = output.kind;
+        let current_partition = ctx.status.partition.clone();
         ctx.query().id("refresh_outputs").query(move |client| {
-            client.toggle_output(id)?;
-            Ok(MpdQueryResult::Outputs(client.outputs()?.0))
+            match kind {
+                PartitionedOutputKind::OtherPartition => {
+                    client.move_output(&name)?;
+                    let new_outputs = client.outputs()?.0;
+                    if let Some(output) = new_outputs.iter().find(|output| output.name == name) {
+                        client.enable_output(output.id)?;
+                    }
+                }
+                PartitionedOutputKind::CurrentPartition => {
+                    client.toggle_output(id)?;
+                }
+            }
+
+            Ok(MpdQueryResult::Outputs(client.list_partitioned_outputs(&current_partition)?))
+        });
+    }
+
+    fn refresh_outputs(&mut self, ctx: &Ctx) {
+        let current_partition = ctx.status.partition.clone();
+        ctx.query().id("refresh_outputs").replace_id("refresh_outputs").query(move |client| {
+            let outputs = client.list_partitioned_outputs(&current_partition)?;
+            Ok(MpdQueryResult::Outputs(outputs))
         });
     }
 }
 
 impl Modal for OutputsModal {
     fn render(&mut self, frame: &mut ratatui::Frame, ctx: &mut Ctx) -> anyhow::Result<()> {
-        let popup_area = frame.area().centered_exact(60, 10);
+        let popup_area = frame.area().centered_exact(70, 10);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
@@ -73,26 +97,32 @@ impl Modal for OutputsModal {
 
         let table_area = popup_area.inner(Margin { horizontal: 1, vertical: 1 });
 
-        let rows = self.outputs.iter().map(|output| {
-            Row::new([
-                Cell::from(output.id.to_string()),
-                Cell::from(output.name.clone()),
-                Cell::from(output.plugin.clone()),
-                Cell::from(if output.enabled { "yes" } else { "no" }),
-            ])
+        let rows = self.outputs.iter().map(|output| match output.kind {
+            PartitionedOutputKind::OtherPartition => Row::new([
+                Cell::new(output.name.as_str()),
+                Cell::new("-"),
+                Cell::new("no"),
+                Cell::new("other"),
+            ]),
+            PartitionedOutputKind::CurrentPartition => Row::new([
+                Cell::new(output.name.as_str()),
+                Cell::new(output.plugin.as_str()),
+                Cell::new(if output.enabled { "yes" } else { "no" }),
+                Cell::new("current"),
+            ]),
         });
 
         self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
 
         let table = Table::new(rows, [
-            Constraint::Length(3),
             Constraint::Percentage(80),
             Constraint::Percentage(20),
             Constraint::Length(10),
+            Constraint::Length(9),
         ])
         .column_spacing(0)
         .style(ctx.config.as_text_style())
-        .header(Row::new(["Id", "Name", "Plugin", "Enabled"]))
+        .header(Row::new(["Name", "Plugin", "Enabled", "Partition"]))
         .row_highlight_style(ctx.config.theme.current_item_style);
 
         let table_area = table_area.inner(Margin { horizontal: 1, vertical: 0 });
@@ -122,6 +152,14 @@ impl Modal for OutputsModal {
                 self.outputs = std::mem::take(outputs);
                 ctx.render()?;
             }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn on_event(&mut self, event: &mut UiEvent, ctx: &Ctx) -> Result<()> {
+        match event {
+            UiEvent::Output => self.refresh_outputs(ctx),
             _ => {}
         }
         Ok(())

@@ -5,12 +5,12 @@ use bon::Builder;
 use crossbeam::channel::Sender;
 use ratatui::{style::Style, widgets::ListItem};
 
-use super::events::AppEvent;
+use super::{events::AppEvent, ext::mpd_client::PartitionedOutput};
 use crate::{
     config::tabs::PaneType,
     mpd::{
         client::Client,
-        commands::{Decoder, IdleEvent, Output, Song, Status, Volume},
+        commands::{Decoder, IdleEvent, Song, Status, Volume},
         mpd_client::MpdClient,
     },
     shared::{events::ClientRequest, macros::try_skip},
@@ -96,7 +96,7 @@ pub(crate) enum MpdQueryResult {
     Status { data: Status, source_event: Option<IdleEvent> },
     Queue(Option<Vec<Song>>),
     Volume(Volume),
-    Outputs(Vec<Output>),
+    Outputs(Vec<PartitionedOutput>),
     Decoders(Vec<Decoder>),
     ExternalCommand(Arc<Vec<String>>, Vec<Song>),
     Any(Box<dyn Any + Send + Sync>),

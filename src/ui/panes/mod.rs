@@ -920,6 +920,9 @@ impl Property<PropertyKind> {
                 StatusProperty::Elapsed => {
                     Some(Either::Left(Span::styled(status.elapsed.to_string(), style)))
                 }
+                StatusProperty::Partition => {
+                    Some(Either::Left(Span::styled(&status.partition, style)))
+                }
                 StatusProperty::Volume => {
                     Some(Either::Left(Span::styled(status.volume.value().to_string(), style)))
                 }

@@ -47,6 +47,7 @@ pub enum StatusPropertyFile {
     Single,
     Consume,
     State,
+    Partition,
     RepeatV2 {
         #[serde(default = "defaults::default_on_label")]
         on_label: String,
@@ -167,6 +168,7 @@ pub enum StatusProperty {
         paused_style: Option<Style>,
         stopped_style: Option<Style>,
     },
+    Partition,
     Elapsed,
     Duration,
     Crossfade,
@@ -363,6 +365,7 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                 paused_style: None,
                 stopped_style: None,
             },
+            StatusPropertyFile::Partition => StatusProperty::Partition,
             StatusPropertyFile::Duration => StatusProperty::Duration,
             StatusPropertyFile::Elapsed => StatusProperty::Elapsed,
             StatusPropertyFile::Volume => StatusProperty::Volume,

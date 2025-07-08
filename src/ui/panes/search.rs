@@ -38,7 +38,7 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::{Dir, DirStackItem},
-        modals::menu_modal::MenuModal,
+        modals::menu::create_add_modal,
         widgets::{button::Button, input::Input},
     },
 };
@@ -1098,7 +1098,7 @@ impl Pane for SearchPane {
                                 })
                                 .collect_vec();
 
-                            modal!(ctx, MenuModal::create_add_modal(opts, ctx));
+                            modal!(ctx, create_add_modal(opts, ctx));
                         }
                         CommonAction::Delete => {}
                         CommonAction::PaneDown => {}
