@@ -20,7 +20,11 @@ pub enum GlobalAction {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
-    SwitchPartition,
+    #[strum(to_string = "Partition({name:?})")]
+    Partition {
+        name: Option<String>,
+        autocreate: bool,
+    },
     AddRandom,
     NextTrack,
     PreviousTrack,
@@ -62,7 +66,12 @@ pub enum GlobalActionFile {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
-    SwitchPartition,
+    Partition {
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        autocreate: bool,
+    },
     NextTrack,
     PreviousTrack,
     Stop,
@@ -89,8 +98,14 @@ pub enum GlobalActionFile {
     PlaylistsTab,
     SearchTab,
     CommandMode,
-    Command { command: String, description: Option<String> },
-    ExternalCommand { command: Vec<String>, description: Option<String> },
+    Command {
+        command: String,
+        description: Option<String>,
+    },
+    ExternalCommand {
+        command: Vec<String>,
+        description: Option<String>,
+    },
     AddRandom,
 }
 
@@ -140,7 +155,9 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::AddRandom => GlobalAction::AddRandom,
             GlobalActionFile::ToggleSingleOnOff => GlobalAction::ToggleSingleOnOff,
             GlobalActionFile::ToggleConsumeOnOff => GlobalAction::ToggleConsumeOnOff,
-            GlobalActionFile::SwitchPartition => GlobalAction::SwitchPartition,
+            GlobalActionFile::Partition { name, autocreate } => {
+                GlobalAction::Partition { name, autocreate }
+            }
         }
     }
 }
@@ -184,7 +201,8 @@ impl ToDescription for GlobalAction {
             GlobalAction::AddRandom => "Add random songs to the queue".into(),
             GlobalAction::ToggleSingleOnOff => "Toggle single mode on or off, skipping oneshot".into(),
             GlobalAction::ToggleConsumeOnOff => "Toggle consume mode on or off, skipping oneshot".into(),
-            GlobalAction::SwitchPartition => "Switch to partition".into(),
+            GlobalAction::Partition { name: Some(name), .. }=> format!("Switch to '{name}' partition").into(),
+            GlobalAction::Partition { name: None, .. }=> "Open partition management modal".into(),
         }
     }
 }

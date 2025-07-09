@@ -7,6 +7,7 @@ use ratatui::{
     symbols,
 };
 
+use super::UiEvent;
 use crate::{
     MpdQueryResult,
     ctx::Ctx,
@@ -20,7 +21,7 @@ pub mod info_list_modal;
 pub mod info_modal;
 pub mod input_modal;
 pub mod keybinds;
-pub mod menu_modal;
+pub mod menu;
 pub mod outputs;
 pub mod select_modal;
 
@@ -38,6 +39,10 @@ pub(crate) trait Modal: std::fmt::Debug {
         data: &mut MpdQueryResult,
         ctx: &Ctx,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    fn on_event(&mut self, event: &mut UiEvent, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 

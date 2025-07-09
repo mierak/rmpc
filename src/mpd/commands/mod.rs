@@ -24,7 +24,6 @@ pub use self::{
     list_mounts::Mounts,
     list_playlists::Playlist,
     lsinfo::LsInfo,
-    outputs::Output,
     status::{State, Status},
     update::Update,
     volume::Volume,

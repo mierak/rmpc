@@ -23,7 +23,7 @@ use crate::{
         mouse_event::{MouseEvent, MouseEventKind},
         mpd_query::EXTERNAL_COMMAND,
     },
-    ui::modals::menu_modal::MenuModal,
+    ui::modals::menu::create_add_modal,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -390,7 +390,7 @@ where
                     })
                     .collect_vec();
 
-                modal!(ctx, MenuModal::create_add_modal(opts, ctx));
+                modal!(ctx, create_add_modal(opts, ctx));
             }
         }
 

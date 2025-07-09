@@ -90,6 +90,7 @@ pub struct ButtonGroup<'a> {
     inactive_style: Style,
     direction: Direction,
     pub areas: Vec<Rect>,
+    spacing: u16,
 }
 
 impl Default for ButtonGroup<'_> {
@@ -101,6 +102,7 @@ impl Default for ButtonGroup<'_> {
             inactive_style: Style::default(),
             direction: Direction::Horizontal,
             areas: Vec::default(),
+            spacing: 0,
         }
     }
 }
@@ -129,9 +131,13 @@ impl StatefulWidget for &mut ButtonGroup<'_> {
         let constraints: Vec<Constraint> =
             (0..button_count).map(|_| Constraint::Percentage(portion_per_button as u16)).collect();
 
-        let chunks =
-            Layout::default().direction(self.direction).constraints(constraints).split(area);
+        let chunks = Layout::default()
+            .direction(self.direction)
+            .constraints(constraints)
+            .spacing(self.spacing)
+            .split(area);
 
+        state.button_count = button_count;
         self.buttons.iter_mut().enumerate().for_each(|(idx, button)| {
             if idx == state.selected {
                 button.set_style(self.active_style);
@@ -155,6 +161,11 @@ impl<'a> ButtonGroup<'a> {
     pub fn add_button(mut self, button: Button<'a>) -> Self {
         self.buttons.push(button);
         self.areas.push(Rect::default());
+        self
+    }
+
+    pub fn spacing(mut self, spacing: u16) -> Self {
+        self.spacing = spacing;
         self
     }
 

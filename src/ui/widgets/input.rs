@@ -17,13 +17,16 @@ pub struct Input<'a> {
     focused_style: Style,
     unfocused_style: Style,
     borderless: bool,
+    spacing: u16,
 }
 
 impl Widget for Input<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let label_len = self.label.chars().count() as u16;
         let [text_area, input_area] =
-            *Layout::horizontal([Constraint::Max(label_len + 2), Constraint::Fill(1)]).split(area)
+            *Layout::horizontal([Constraint::Max(label_len + 2), Constraint::Fill(1)])
+                .spacing(self.spacing)
+                .split(area)
         else {
             return;
         };
@@ -73,6 +76,11 @@ impl<'a> Input<'a> {
             self.text.chars().skip(self.text.len().saturating_sub(input_len)).collect::<String>(),
             if self.focused { "█" } else { "" },
         ))
+    }
+
+    pub fn spacing(mut self, spacing: u16) -> Self {
+        self.spacing = spacing;
+        self
     }
 
     pub fn set_text(mut self, text: &'a str) -> Self {

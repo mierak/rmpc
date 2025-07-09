@@ -420,6 +420,7 @@ pub mod mpd_client {
         config::keys::actions::Position,
         mpd::{
             QueuePosition,
+            commands::outputs::Outputs,
             errors::{ErrorCode, MpdError, MpdFailureResponse},
             mpd_client::{Filter, FilterKind, MpdClient, MpdCommand, Tag},
             proto_client::ProtoClient,
@@ -462,6 +463,10 @@ pub mod mpd_client {
             position: Position,
             autoplay: Autoplay,
         ) -> Result<(), MpdError>;
+        fn list_partitioned_outputs(
+            &mut self,
+            current_partition: &str,
+        ) -> Result<Vec<PartitionedOutput>, MpdError>;
     }
 
     impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
@@ -614,6 +619,90 @@ pub mod mpd_client {
 
             Ok(())
         }
+
+        fn list_partitioned_outputs(
+            &mut self,
+            current_partition: &str,
+        ) -> Result<Vec<PartitionedOutput>, MpdError> {
+            if current_partition == "default" {
+                Ok(self
+                    .outputs()?
+                    .0
+                    .into_iter()
+                    .map(|output| PartitionedOutput {
+                        id: output.id,
+                        name: output.name,
+                        enabled: if output.plugin == "dummy" { false } else { output.enabled },
+                        kind: if output.plugin == "dummy" {
+                            PartitionedOutputKind::OtherPartition
+                        } else {
+                            PartitionedOutputKind::CurrentPartition
+                        },
+                        plugin: output.plugin,
+                    })
+                    .collect())
+            } else {
+                // MPD lists all outputs only on the default partition so we have to
+                // switch to it, list the outputs and then switch back. We also have to
+                // list outputs on the current partition to find out which output is
+                // actually enabled on the current partition.
+                self.send_start_cmd_list_ok()?;
+                self.send_switch_to_partition("default")?;
+                self.send_outputs()?;
+                self.send_switch_to_partition(current_partition)?;
+                self.send_outputs()?;
+                self.send_execute_cmd_list()?;
+
+                self.read_ok()?; // switch to default
+                let all_outputs = self.read_response::<Outputs>()?.0;
+                self.read_ok()?; // switch to current
+                let mut current_outputs = self.read_response::<Outputs>()?.0;
+                self.read_ok()?; // OK for the whole command list
+
+                let mut result = Vec::with_capacity(all_outputs.len());
+                for output in all_outputs {
+                    if let Some(current) = current_outputs
+                        .iter_mut()
+                        .find(|o| o.name == output.name && o.plugin != "dummy")
+                    {
+                        result.push(PartitionedOutput {
+                            id: current.id,
+                            name: std::mem::take(&mut current.name),
+                            enabled: current.enabled,
+                            plugin: std::mem::take(&mut current.plugin),
+                            kind: PartitionedOutputKind::CurrentPartition,
+                        });
+                    } else {
+                        result.push(PartitionedOutput {
+                            id: output.id,
+                            name: output.name,
+                            enabled: false,
+                            plugin: output.plugin,
+                            kind: PartitionedOutputKind::OtherPartition,
+                        });
+                    }
+                }
+
+                Ok(result)
+            }
+        }
+    }
+
+    /// Output where ID is only defined when the output is on the current
+    /// partition.
+    #[derive(Debug)]
+    pub struct PartitionedOutput {
+        pub id: u32,
+        pub name: String,
+        pub enabled: bool,
+        pub plugin: String,
+        pub kind: PartitionedOutputKind,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub enum PartitionedOutputKind {
+        OtherPartition,
+        CurrentPartition,
     }
 }
 

@@ -8,8 +8,8 @@ use modals::{
     info_list_modal::InfoListModal,
     input_modal::InputModal,
     keybinds::KeybindsModal,
+    menu::modal::MenuModal,
     outputs::OutputsModal,
-    select_modal::SelectModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
@@ -35,11 +35,14 @@ use crate::{
     ctx::Ctx,
     mpd::{
         commands::{State, idle::IdleEvent},
-        mpd_client::{FilterKind, MpdClient, ValueChange},
+        errors::{ErrorCode, MpdError, MpdFailureResponse},
+        mpd_client::{FilterKind, MpdClient, MpdCommand, ValueChange},
+        proto_client::ProtoClient,
         version::Version,
     },
     shared::{
         events::{Level, WorkRequest},
+        ext::mpd_client::MpdClientExt,
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
@@ -204,29 +207,93 @@ impl<'ui> Ui<'ui> {
 
         if let Some(action) = key.as_global_action(ctx) {
             match action {
-                GlobalAction::SwitchPartition => {
-                    // TODO make this async before finalizing the functionality
+                GlobalAction::Partition { name: Some(name), autocreate } => {
+                    let name = name.clone();
+                    let autocreate = *autocreate;
+                    ctx.command(move |client| {
+                        match client.switch_to_partition(&name) {
+                            Ok(()) => {}
+                            Err(MpdError::Mpd(MpdFailureResponse {
+                                code: ErrorCode::NoExist,
+                                ..
+                            })) if autocreate => {
+                                client.new_partition(&name)?;
+                                client.switch_to_partition(&name)?;
+                            }
+                            err @ Err(_) => err?,
+                        }
+                        Ok(())
+                    });
+                }
+                GlobalAction::Partition { name: None, .. } => {
                     let result = ctx.query_sync(move |client| {
                         let partitions = client.list_partitions()?;
                         Ok(partitions.0)
                     })?;
+                    let modal = MenuModal::new(ctx)
+                        .width(60)
+                        .add_list_section(ctx, |section| {
+                            if ctx.status.partition == "default" {
+                                None
+                            } else {
+                                let section =
+                                    section.add_item("Switch to default partition", |ctx| {
+                                        ctx.command(move |client| {
+                                            client.switch_to_partition("default")?;
+                                            Ok(())
+                                        });
+                                    });
 
-                    modal!(
-                        ctx,
-                        SelectModal::builder()
-                            .ctx(ctx)
-                            .title("Switch partition")
-                            .confirm_label("Switch")
-                            .options(result)
-                            .on_confirm(|ctx, value, _idx| {
-                                ctx.command(move |client| {
-                                    client.switch_to_partition(&value)?;
-                                    Ok(())
+                                Some(section)
+                            }
+                        })
+                        .add_multi_section(ctx, |section| {
+                            let mut section = section
+                                .add_action("Switch", |ctx, label| {
+                                    ctx.command(move |client| {
+                                        client.switch_to_partition(&label)?;
+                                        Ok(())
+                                    });
+                                })
+                                .add_action("Delete", |ctx, label| {
+                                    ctx.command(move |client| {
+                                        client.delete_partition(&label)?;
+                                        Ok(())
+                                    });
                                 });
-                                Ok(())
+                            let mut any_non_default = false;
+                            for partition in result
+                                .iter()
+                                .filter(|p| *p != "default" && **p != ctx.status.partition)
+                            {
+                                section = section.add_item(partition);
+                                any_non_default = true;
+                            }
+
+                            if any_non_default { Some(section) } else { None }
+                        })
+                        .add_input_section(ctx, "New partition:", |section| {
+                            section.action(|ctx, value| {
+                                if !value.is_empty() {
+                                    ctx.command(move |client| {
+                                        client.send_start_cmd_list()?;
+                                        client.send_new_partition(&value)?;
+                                        client.send_switch_to_partition(&value)?;
+                                        client.send_execute_cmd_list()?;
+                                        client.read_ok()?;
+                                        Ok(())
+                                    });
+                                }
                             })
-                            .build()
-                    );
+                        })
+                        .add_list_section(ctx, |section| {
+                            Some(section.add_item("Cancel", |ctx| {
+                                ctx.command(|_| Ok(()));
+                            }))
+                        })
+                        .build();
+
+                    modal!(ctx, modal);
                 }
                 GlobalAction::Command { command, .. } => {
                     let cmd = command.parse();
@@ -426,10 +493,13 @@ impl<'ui> Ui<'ui> {
                     modal!(ctx, modal);
                 }
                 GlobalAction::ShowOutputs => {
-                    ctx.query()
-                        .id(OPEN_OUTPUTS_MODAL)
-                        .replace_id(OPEN_OUTPUTS_MODAL)
-                        .query(|client| Ok(MpdQueryResult::Outputs(client.outputs()?.0)));
+                    let current_partition = ctx.status.partition.clone();
+                    ctx.query().id(OPEN_OUTPUTS_MODAL).replace_id(OPEN_OUTPUTS_MODAL).query(
+                        move |client| {
+                            let outputs = client.list_partitioned_outputs(&current_partition)?;
+                            Ok(MpdQueryResult::Outputs(outputs))
+                        },
+                    );
                 }
                 GlobalAction::ShowDecoders => {
                     ctx.query()
@@ -610,6 +680,10 @@ impl<'ui> Ui<'ui> {
             }?;
         }
 
+        for modal in &mut self.modals {
+            modal.on_event(&mut event, ctx)?;
+        }
+
         Ok(())
     }
 
@@ -684,6 +758,7 @@ pub enum UiAppEvent {
 pub enum UiEvent {
     Player,
     Database,
+    Output,
     StoredPlaylist,
     LogAdded(Vec<u8>),
     ModalOpened,
@@ -707,6 +782,7 @@ impl TryFrom<IdleEvent> for UiEvent {
             IdleEvent::Player => UiEvent::Player,
             IdleEvent::Database => UiEvent::Database,
             IdleEvent::StoredPlaylist => UiEvent::StoredPlaylist,
+            IdleEvent::Output => UiEvent::Output,
             _ => return Err(()),
         })
     }

@@ -542,8 +542,8 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Ui
             });
         }
         IdleEvent::Update => {}
-        IdleEvent::Output
-        | IdleEvent::Partition
+        IdleEvent::Output => {}
+        IdleEvent::Partition
         | IdleEvent::Subscription
         | IdleEvent::Message
         | IdleEvent::Neighbor

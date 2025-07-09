@@ -47,7 +47,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
-            menu_modal::MenuModal,
+            menu::create_add_modal,
             select_modal::SelectModal,
         },
     },
@@ -931,7 +931,7 @@ impl Pane for QueuePane {
                         })
                         .collect_vec();
 
-                    modal!(ctx, MenuModal::create_add_modal(opts, ctx));
+                    modal!(ctx, create_add_modal(opts, ctx));
                     self.scrolling_state.marked.clear();
                 }
                 CommonAction::ShowInfo => {

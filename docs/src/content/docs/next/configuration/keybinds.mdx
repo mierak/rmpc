@@ -66,41 +66,43 @@ Below you can find list of all the possible actions along with a short descripti
 These keybinds work everywhere (except when a modal is active) and are used to control things like playback, navigation
 between different tabs and exiting rmpc.
 
-|    Default Key     | Action                     | Info                                                                                                                         |
-| :----------------: | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-|        `q`         | Quit                       | Exit rmpc                                                                                                                    |
-|        `~`         | ShowHelp                   | Show help modal with the current keybinds and their description                                                              |
-|        `:`         | CommandMode                | Enter command mode. Commands that can be used are the same as in the CLI                                                     |
-|                    | ExternalCommand            | Special keybind that allows you to bind external commands to a key. Check [ExternalCommand](#externalcommand) for more info. |
-|        `q`         | ShowHelp                   | Show keybinds modal                                                                                                          |
-|        `I`         | ShowCurrentSongInfo        | Show metadata of the currently playing song in a modal popup                                                                 |
-|        `O`         | ShowOutputs                | Show MPD outputs config modal                                                                                                |
-|        `P`         | ShowDecoders               | Show MPD decoder plugins in a modal popup                                                                                    |
-|        `z`         | ToggleRepeat               | Toggle repeat                                                                                                                |
-|        `x`         | ToggleRandom               | Toggles random                                                                                                               |
-|        `c`         | ToggleConsume              | Remove song from the queue after playing                                                                                     |
-|        `v`         | ToggleSingle               | Whether to stop playing after single track or repeat track/playlist when repeat is on                                        |
-|        `p`         | TogglePause                | Pause/Unpause playback                                                                                                       |
-|                    | ToggleSingleOnOff          | Toggles single mode on or off, skipping oneshot                                                                              |
-|                    | ToggleConsumeOnOff         | Toggles consume mode on or off, skipping oneshot                                                                             |
-|        `s`         | Stop                       | Stop playback                                                                                                                |
-|        `.`         | VolumeUp                   | Raise volume                                                                                                                 |
-|        `,`         | VolumeDown                 | Lower volume                                                                                                                 |
-|        `f`         | SeekForward                | Seek currently playing track forwards                                                                                        |
-|        `b`         | SeekBack                   | Seek currently playing track backwards                                                                                       |
-|        `>`         | NextTrack                  | Play next track in the queue                                                                                                 |
-|        `<`         | PreviousTrack              | Play previous track in the queue                                                                                             |
-|  `Right` / `Tab`   | NextTab                    | Switch to next tab                                                                                                           |
-| `Left` / `<S-Tab>` | PreviousTab                | Switch to previous tab                                                                                                       |
-|        `1`         | SwitchToTab("Queue")       | Switch directly to Queue tab                                                                                                 |
-|        `2`         | SwitchToTab("Directories") | Switch directly to Directories tab                                                                                           |
-|        `3`         | SwitchToTab("Artists")     | Switch directly to Artists tab                                                                                               |
-|        `4`         | SwitchToTab("Album")       | Switch directly to Albums tab                                                                                                |
-|        `5`         | SwitchToTab("Playlists")   | Switch directly to Playlists tab                                                                                             |
-|        `6`         | SwitchToTab("Search")      | Switch directly to Search tab                                                                                                |
-|        `R`         | AddRandom                  | Add random songs to the queue                                                                                                |
-|        `u`         | Update                     | Update music library                                                                                                         |
-|        `U`         | Rescan                     | Rescan music library (including unmodified files)                                                                            |
+|    Default Key     | Action                                      | Info                                                                                                                         |
+| :----------------: | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+|        `q`         | Quit                                        | Exit rmpc                                                                                                                    |
+|        `~`         | ShowHelp                                    | Show help modal with the current keybinds and their description                                                              |
+|        `:`         | CommandMode                                 | Enter command mode. Commands that can be used are the same as in the CLI                                                     |
+|                    | ExternalCommand                             | Special keybind that allows you to bind external commands to a key. Check [ExternalCommand](#externalcommand) for more info. |
+|        `q`         | ShowHelp                                    | Show keybinds modal                                                                                                          |
+|        `I`         | ShowCurrentSongInfo                         | Show metadata of the currently playing song in a modal popup                                                                 |
+|        `O`         | ShowOutputs                                 | Show MPD outputs config modal                                                                                                |
+|        `P`         | ShowDecoders                                | Show MPD decoder plugins in a modal popup                                                                                    |
+|        `z`         | ToggleRepeat                                | Toggle repeat                                                                                                                |
+|        `x`         | ToggleRandom                                | Toggles random                                                                                                               |
+|        `c`         | ToggleConsume                               | Remove song from the queue after playing                                                                                     |
+|        `v`         | ToggleSingle                                | Whether to stop playing after single track or repeat track/playlist when repeat is on                                        |
+|        `p`         | TogglePause                                 | Pause/Unpause playback                                                                                                       |
+|                    | ToggleSingleOnOff                           | Toggles single mode on or off, skipping oneshot                                                                              |
+|                    | ToggleConsumeOnOff                          | Toggles consume mode on or off, skipping oneshot                                                                             |
+|        `s`         | Stop                                        | Stop playback                                                                                                                |
+|        `.`         | VolumeUp                                    | Raise volume                                                                                                                 |
+|        `,`         | VolumeDown                                  | Lower volume                                                                                                                 |
+|        `f`         | SeekForward                                 | Seek currently playing track forwards                                                                                        |
+|        `b`         | SeekBack                                    | Seek currently playing track backwards                                                                                       |
+|        `>`         | NextTrack                                   | Play next track in the queue                                                                                                 |
+|        `<`         | PreviousTrack                               | Play previous track in the queue                                                                                             |
+|  `Right` / `Tab`   | NextTab                                     | Switch to next tab                                                                                                           |
+| `Left` / `<S-Tab>` | PreviousTab                                 | Switch to previous tab                                                                                                       |
+|        `1`         | SwitchToTab("Queue")                        | Switch directly to Queue tab                                                                                                 |
+|        `2`         | SwitchToTab("Directories")                  | Switch directly to Directories tab                                                                                           |
+|        `3`         | SwitchToTab("Artists")                      | Switch directly to Artists tab                                                                                               |
+|        `4`         | SwitchToTab("Album")                        | Switch directly to Albums tab                                                                                                |
+|        `5`         | SwitchToTab("Playlists")                    | Switch directly to Playlists tab                                                                                             |
+|        `6`         | SwitchToTab("Search")                       | Switch directly to Search tab                                                                                                |
+|        `R`         | AddRandom                                   | Add random songs to the queue                                                                                                |
+|        `u`         | Update                                      | Update music library                                                                                                         |
+|        `U`         | Rescan                                      | Rescan music library (including unmodified files)                                                                            |
+|                    | Partition()                                 | Open a partition management modal                                                                                            |
+|                    | Partition(name: "mypart", autocreate: true) | Switch to partition "mypart" directly and create it if it does not exist already                                             |
 
 ### Navigation
 
@@ -216,6 +218,6 @@ Keybinds specific to the queue pane.
 |     `D`     | DeleteAll     | Clear current queue                                           |
 |   `Enter`   | Play          | Play song under cursor                                        |
 |     `a`     | AddToPlaylist | Add song under cursor to an existing playlist                 |
-|     `d`     | Delete        | Remove song under cursor from the queue                        |
+|     `d`     | Delete        | Remove song under cursor from the queue                       |
 |     `C`     | JumpToCurrent | Moves the cursor in Queue table to the currently playing song |
 |     `X`     | Shuffle       | Shuffles the whole queue or selected range(s)                 |
