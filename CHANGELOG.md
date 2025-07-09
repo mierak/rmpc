@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Added `rmpc remote keybind` command to emulate key presses in running instances
+- Added `rmpc remote switch-tab` command to switch tabs directly without relying on keybinds
 - Added new `Volume` pane with mouse control support.
 - Added `Transform` properties and `Truncate` transformation
 - Added `sendmessage` cli command for inter client communication
