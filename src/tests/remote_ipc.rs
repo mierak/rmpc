@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod remote_ipc_tests {
-    use crossbeam::channel;
+    use crossbeam::channel::{self, Receiver, Sender};
     use crossterm::event::KeyCode;
 
     use crate::{
         AppEvent,
+        WorkRequest,
         config::{Config, ConfigFile, cli::RemoteCmd, tabs::TabName},
         shared::ipc::{
             SocketCommand,
@@ -13,6 +14,35 @@ mod remote_ipc_tests {
         },
         ui::UiAppEvent,
     };
+
+    fn setup_test() -> (Sender<AppEvent>, Receiver<AppEvent>, Sender<WorkRequest>, Config) {
+        let (event_tx, event_rx) = channel::unbounded();
+        let (work_tx, _work_rx) = channel::unbounded();
+        let config = ConfigFile::default()
+            .into_config(None, None, None, None, true)
+            .expect("Failed to create test config");
+        (event_tx, event_rx, work_tx, config)
+    }
+
+    fn expect_key_event(event_rx: &Receiver<AppEvent>, expected_key: char) {
+        let event = event_rx.try_recv().expect("Should have received an event");
+        match event {
+            AppEvent::UserKeyInput(key_event) => {
+                assert_eq!(key_event.code, KeyCode::Char(expected_key));
+            }
+            _ => panic!("Expected UserKeyInput event"),
+        }
+    }
+
+    fn expect_tab_change(event_rx: &Receiver<AppEvent>, expected_tab: &str) {
+        let event = event_rx.try_recv().expect("Should have received an event");
+        match event {
+            AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name)) => {
+                assert_eq!(tab_name, TabName::from(expected_tab.to_string()));
+            }
+            _ => panic!("Expected UiEvent::ChangeTab event"),
+        }
+    }
 
     #[test]
     fn test_keybind_command_creation() {
@@ -28,107 +58,57 @@ mod remote_ipc_tests {
 
     #[test]
     fn test_keybind_command_execution() {
-        let (event_tx, event_rx) = channel::unbounded();
-        let (work_tx, _work_rx) = channel::unbounded();
-        let config = Config::default();
-
+        let (event_tx, event_rx, work_tx, config) = setup_test();
         let keybind_cmd = KeybindCommand { key: "p".to_string() };
 
         let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
-        assert!(result.is_ok(), "Keybind command execution should succeed");
+        assert!(result.is_ok());
 
-        let received_event = event_rx.try_recv();
-        assert!(received_event.is_ok(), "Should have received an event");
-
-        match received_event.expect("Should have received an event") {
-            AppEvent::UserKeyInput(key_event) => {
-                assert_eq!(key_event.code, KeyCode::Char('p'));
-            }
-            _ => panic!("Expected UserKeyInput event"),
-        }
+        expect_key_event(&event_rx, 'p');
     }
 
     #[test]
     fn test_switch_tab_command_execution() {
-        let (event_tx, event_rx) = channel::unbounded();
-        let (work_tx, _work_rx) = channel::unbounded();
-
-        let config_file = ConfigFile::default();
-        let config = config_file
-            .into_config(None, None, None, None, true)
-            .expect("Failed to create config from default config file");
-
+        let (event_tx, event_rx, work_tx, config) = setup_test();
         let switch_tab_cmd = SwitchTabCommand { tab: "Queue".to_string() };
 
         let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
-        assert!(result.is_ok(), "SwitchTab command execution should succeed");
+        assert!(result.is_ok());
 
-        let received_event = event_rx.try_recv();
-        assert!(received_event.is_ok(), "Should have received an event");
-
-        match received_event.expect("Should have received an event") {
-            AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name)) => {
-                assert_eq!(tab_name, TabName::from("Queue".to_string()));
-            }
-            _ => panic!("Expected UiEvent::ChangeTab event"),
-        }
+        expect_tab_change(&event_rx, "Queue");
     }
 
     #[test]
     fn test_switch_tab_case_insensitive() {
-        let (event_tx, event_rx) = channel::unbounded();
-        let (work_tx, _work_rx) = channel::unbounded();
-
-        let config_file = ConfigFile::default();
-        let config = config_file
-            .into_config(None, None, None, None, true)
-            .expect("Failed to create config from default config file");
-
-        let test_cases = vec!["queue", "QUEUE", "Queue", "QuEuE"];
+        let (event_tx, event_rx, work_tx, config) = setup_test();
+        let test_cases = ["queue", "QUEUE", "Queue", "QuEuE"];
 
         for test_case in test_cases {
             let switch_tab_cmd = SwitchTabCommand { tab: test_case.to_string() };
             let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
-            assert!(
-                result.is_ok(),
-                "Switch tab should work case-insensitively for '{test_case}'"
-            );
+            assert!(result.is_ok(), "Switch tab should work case-insensitively for '{test_case}'");
 
-            let received_event = event_rx.try_recv();
-            assert!(received_event.is_ok(), "Should have received an event for '{test_case}'");
-
-            match received_event.expect("Should have received an event") {
-                AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name)) => {
-                    // this should always resolve to the correct case "Queue"
-                    assert_eq!(tab_name, TabName::from("Queue".to_string()));
-                }
-                _ => panic!("Expected UiEvent::ChangeTab event for '{test_case}'"),
-            }
+            expect_tab_change(&event_rx, "Queue");
         }
     }
 
     #[test]
     fn test_switch_tab_invalid_tab() {
-        let (event_tx, _event_rx) = channel::unbounded();
-        let (work_tx, _work_rx) = channel::unbounded();
-        let config = Config::default();
-
+        let (event_tx, _event_rx, work_tx, _) = setup_test();
+        let config = Config::default(); // Use minimal config for error test
         let switch_tab_cmd = SwitchTabCommand { tab: "NonExistentTab".to_string() };
 
         let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
-        assert!(result.is_err(), "Invalid tab name should fail");
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_invalid_keybind() {
-        let (event_tx, _event_rx) = channel::unbounded();
-        let (work_tx, _work_rx) = channel::unbounded();
-        let config = Config::default();
-
+        let (event_tx, _event_rx, work_tx, config) = setup_test();
         let keybind_cmd = KeybindCommand { key: "invalid_key_format".to_string() };
 
         let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
-        assert!(result.is_err(), "Invalid keybind should fail");
+        assert!(result.is_err());
     }
 
     #[test]
