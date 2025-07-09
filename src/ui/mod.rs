@@ -506,7 +506,10 @@ impl<'ui> Ui<'ui> {
                 self.on_event(UiEvent::ModalClosed, ctx)?;
                 ctx.render()?;
             }
-            UiAppEvent::ChangeTab(tab_name) => self.change_tab(tab_name, ctx)?,
+            UiAppEvent::ChangeTab(tab_name) => {
+                self.change_tab(tab_name, ctx)?;
+                ctx.render()?;
+            }
         }
         Ok(())
     }
