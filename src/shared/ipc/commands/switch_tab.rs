@@ -29,14 +29,14 @@ impl SocketCommandExecute for SwitchTabCommand {
             .find(|name| name.as_str().eq_ignore_ascii_case(&self.tab))
             .cloned()
             .ok_or_else(|| {
-                let available = config.tabs.names.iter()
+                let available = config
+                    .tabs
+                    .names
+                    .iter()
                     .map(|name| name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ");
-                anyhow::anyhow!(
-                    "Tab '{}' does not exist. Available tabs: {}", 
-                    self.tab, available
-                )
+                anyhow::anyhow!("Tab '{}' does not exist. Available tabs: {}", self.tab, available)
             })?;
 
         event_tx.send(AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name)))?;
