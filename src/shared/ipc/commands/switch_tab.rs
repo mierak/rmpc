@@ -22,30 +22,22 @@ impl SocketCommandExecute for SwitchTabCommand {
         _work_tx: &Sender<WorkRequest>,
         config: &Config,
     ) -> Result<()> {
-        // tabs are case-insensitive matching
-        let target_tab_name = config
+        let tab_name = config
             .tabs
             .names
             .iter()
-            .find(|name| name.to_lowercase() == self.tab.to_lowercase())
-            .cloned();
-
-        let tab_name = match target_tab_name {
-            Some(name) => name,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "Tab '{}' does not exist in configuration. Available tabs: {}",
-                    self.tab,
-                    config
-                        .tabs
-                        .names
-                        .iter()
-                        .map(|name| name.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-        };
+            .find(|name| name.as_str().eq_ignore_ascii_case(&self.tab))
+            .cloned()
+            .ok_or_else(|| {
+                let available = config.tabs.names.iter()
+                    .map(|name| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                anyhow::anyhow!(
+                    "Tab '{}' does not exist. Available tabs: {}", 
+                    self.tab, available
+                )
+            })?;
 
         event_tx.send(AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name)))?;
         Ok(())
