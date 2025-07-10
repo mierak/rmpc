@@ -100,8 +100,8 @@ mod remote_ipc_tests {
         let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_ok(), "Command execution should always succeed at socket level");
 
-        // Checking that a RemoteSwitchTab event was sent (since validation happens in main event
-        // loop)
+        // Checking that a RemoteSwitchTab event was sent (since validation happens in
+        // main event loop)
         expect_remote_switch_tab(&event_rx, "NonExistentTab");
     }
 
