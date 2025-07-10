@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet};
+use std::{cell::Cell, collections::HashSet, time::Instant};
 
 use crossbeam::channel::{Receiver, Sender, unbounded};
 use ratatui::{Terminal, backend::TestBackend};
@@ -61,6 +61,8 @@ pub fn ctx(
         scheduler,
         db_update_start: None,
         messages: RingVec::default(),
+        last_status_update: Instant::now(),
+        song_played: None,
     }
 }
 

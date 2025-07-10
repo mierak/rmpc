@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     ops::Sub,
     sync::{Arc, LazyLock},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
@@ -74,13 +74,21 @@ fn main_task<B: Backend + std::io::Write>(
         }
     };
 
-    // Check the playback status and start the periodic status update if needed
-    if ctx.status.state == State::Play {
-        _update_loop_guard = ctx
-            .config
-            .status_update_interval_ms
-            .map(Duration::from_millis)
-            .map(|interval| ctx.scheduler.repeated(interval, run_status_update));
+    match ctx.status.state {
+        State::Play => {
+            // Start update loop since a song is playing on startup
+            _update_loop_guard = ctx
+                .config
+                .status_update_interval_ms
+                .map(Duration::from_millis)
+                .map(|interval| ctx.scheduler.repeated(interval, run_status_update));
+
+            ctx.song_played = Some(ctx.status.elapsed);
+        }
+        State::Pause => {
+            ctx.song_played = Some(ctx.status.elapsed);
+        }
+        State::Stop => {}
     }
 
     loop {
@@ -246,7 +254,7 @@ fn main_task<B: Backend + std::io::Write>(
                             let previous_state = ctx.status.state;
                             let current_updating_db = ctx.status.updating_db;
                             let current_playlist = ctx.status.lastloadedplaylist.take();
-                            ctx.status = status;
+                            let previous_status = std::mem::replace(&mut ctx.status, status);
                             let new_playlist = ctx.status.lastloadedplaylist.as_ref();
                             let mut song_changed = false;
 
@@ -309,22 +317,27 @@ fn main_task<B: Backend + std::io::Write>(
                             }
 
                             match ctx.status.state {
-                                State::Play => {
-                                    if previous_state != ctx.status.state {
-                                        _update_loop_guard = ctx
-                                            .config
-                                            .status_update_interval_ms
-                                            .map(Duration::from_millis)
-                                            .map(|interval| {
-                                                ctx.scheduler.repeated(interval, run_status_update)
-                                            });
+                                State::Play if previous_state == ctx.status.state => {
+                                    if let Some(played) = &mut ctx.song_played {
+                                        *played += ctx.last_status_update.elapsed();
                                     }
                                 }
+                                State::Play if previous_state != ctx.status.state => {
+                                    _update_loop_guard = ctx
+                                        .config
+                                        .status_update_interval_ms
+                                        .map(Duration::from_millis)
+                                        .map(|interval| {
+                                            ctx.scheduler.repeated(interval, run_status_update)
+                                        });
+                                }
+                                State::Play => {}
                                 State::Pause => {
                                     _update_loop_guard = None;
                                 }
                                 State::Stop => {
                                     song_changed = true;
+                                    ctx.song_played = None;
                                     _update_loop_guard = None;
                                 }
                             }
@@ -332,11 +345,36 @@ fn main_task<B: Backend + std::io::Write>(
                             if let Some((_, song)) = ctx.find_current_song_in_queue() {
                                 if Some(song.id) != current_song_id {
                                     if let Some(command) = &ctx.config.on_song_change {
-                                        let env = create_env(&ctx, std::iter::empty());
+                                        let mut env = create_env(&ctx, std::iter::empty());
+
+                                        let prev_song_file = (previous_status.state != State::Stop)
+                                            .then_some(
+                                                previous_status
+                                                    .songid
+                                                    .and_then(|id| {
+                                                        ctx.queue
+                                                            .iter()
+                                                            .enumerate()
+                                                            .find(|(_, song)| song.id == id)
+                                                    })
+                                                    .map(|(_, s)| s.file.clone()),
+                                            )
+                                            .flatten();
+
+                                        if let (Some(prev_song), Some(played)) =
+                                            (prev_song_file, ctx.song_played)
+                                        {
+                                            env.push(("PREV_SONG".to_owned(), prev_song));
+                                            env.push((
+                                                "PREV_ELAPSED".to_owned(),
+                                                played.as_secs().to_string(),
+                                            ));
+                                        }
 
                                         run_external(command.clone(), env);
                                     }
                                     song_changed = true;
+                                    ctx.song_played = Some(Duration::ZERO);
                                 }
                             }
                             if song_changed {
@@ -344,6 +382,8 @@ fn main_task<B: Backend + std::io::Write>(
                                     status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
                                 }
                             }
+
+                            ctx.last_status_update = Instant::now();
                             render_wanted = true;
                         }
                         ("global_volume_update", None, MpdQueryResult::Volume(volume)) => {
