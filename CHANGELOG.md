@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Breaking**: TabName equality comparison is now case-insensitive.
 - Improved `.lrc` lyrics files parser performance and fixed parsing issues
 - Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
 - Confirm action in browsers, which either opens a directory or adds the hovered song to the queue
