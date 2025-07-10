@@ -6,13 +6,12 @@ mod remote_ipc_tests {
     use crate::{
         AppEvent,
         WorkRequest,
-        config::{Config, ConfigFile, cli::RemoteCmd, tabs::TabName},
+        config::{Config, ConfigFile, cli::RemoteCmd},
         shared::ipc::{
             SocketCommand,
             SocketCommandExecute,
             commands::{keybind::KeybindCommand, switch_tab::SwitchTabCommand},
         },
-        ui::UiAppEvent,
     };
 
     fn setup_test() -> (Sender<AppEvent>, Receiver<AppEvent>, Sender<WorkRequest>, Config) {
@@ -34,13 +33,13 @@ mod remote_ipc_tests {
         }
     }
 
-    fn expect_tab_change(event_rx: &Receiver<AppEvent>, expected_tab: &str) {
+    fn expect_remote_switch_tab(event_rx: &Receiver<AppEvent>, expected_tab: &str) {
         let event = event_rx.try_recv().expect("Should have received an event");
         match event {
-            AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name)) => {
-                assert_eq!(tab_name, TabName::from(expected_tab.to_string()));
+            AppEvent::RemoteSwitchTab { tab_name } => {
+                assert_eq!(tab_name, expected_tab);
             }
-            _ => panic!("Expected UiEvent::ChangeTab event"),
+            _ => panic!("Expected RemoteSwitchTab event"),
         }
     }
 
@@ -75,7 +74,7 @@ mod remote_ipc_tests {
         let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
         assert!(result.is_ok());
 
-        expect_tab_change(&event_rx, "Queue");
+        expect_remote_switch_tab(&event_rx, "Queue");
     }
 
     #[test]
@@ -88,18 +87,22 @@ mod remote_ipc_tests {
             let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
             assert!(result.is_ok(), "Switch tab should work case-insensitively for '{test_case}'");
 
-            expect_tab_change(&event_rx, "Queue");
+            expect_remote_switch_tab(&event_rx, test_case);
         }
     }
 
     #[test]
     fn test_switch_tab_invalid_tab() {
-        let (event_tx, _event_rx, work_tx, _) = setup_test();
+        let (event_tx, event_rx, work_tx, _) = setup_test();
         let config = Config::default(); // Use minimal config for error test
         let switch_tab_cmd = SwitchTabCommand { tab: "NonExistentTab".to_string() };
 
         let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
-        assert!(result.is_err());
+        assert!(result.is_ok(), "Command execution should always succeed at socket level");
+
+        // Checking that a RemoteSwitchTab event was sent (since validation happens in main event
+        // loop)
+        expect_remote_switch_tab(&event_rx, "NonExistentTab");
     }
 
     #[test]
