@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Added `rmpc remote keybind` command to emulate key presses in running instances
+- Added `rmpc remote switch-tab` command to switch tabs directly without relying on keybinds
 - Added new `Volume` pane with mouse control support.
 - Added `Transform` properties and `Truncate` transformation
 - Added `sendmessage` cli command for inter client communication
@@ -20,6 +21,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Breaking**: TabName equality comparison is now case-insensitive.
 - Improved `.lrc` lyrics files parser performance and fixed parsing issues
 - Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
 - Confirm action in browsers, which either opens a directory or adds the hovered song to the queue

@@ -84,6 +84,9 @@ pub(crate) enum AppEvent {
     ThemeChanged {
         theme: Box<UiConfig>,
     },
+    RemoteSwitchTab {
+        tab_name: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]

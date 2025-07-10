@@ -14,6 +14,7 @@ use crate::{
         keybind::KeybindCommand,
         set::SetIpcCommand,
         status_message::StatusMessageCommand,
+        switch_tab::SwitchTabCommand,
         tmux::TmuxHookCommand,
     },
 };
@@ -63,6 +64,7 @@ pub(crate) enum SocketCommand {
     TmuxHook(TmuxHookCommand),
     Set(Box<SetIpcCommand>),
     Keybind(KeybindCommand),
+    SwitchTab(SwitchTabCommand),
 }
 
 impl SocketCommandExecute for SocketCommand {
@@ -78,6 +80,7 @@ impl SocketCommandExecute for SocketCommand {
             SocketCommand::TmuxHook(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::Set(cmd) => cmd.execute(event_tx, work_tx, config),
             SocketCommand::Keybind(cmd) => cmd.execute(event_tx, work_tx, config),
+            SocketCommand::SwitchTab(cmd) => cmd.execute(event_tx, work_tx, config),
         }
     }
 }

@@ -300,6 +300,9 @@ pub enum RemoteCmd {
     },
     /// Emulate a keybind press in the running rmpc instance
     Keybind { key: String },
+    /// Switch to a specific tab by name
+    #[clap(name = "switch-tab")]
+    SwitchTab { tab: String },
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
