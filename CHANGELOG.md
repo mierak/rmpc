@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Add `queue` cli command to print contents of the current queue
 - New `Partition` keybind to facilitate partition switching and management
 - New `Partition` status property to show rmpc's current partition
+- `PREV_SONG` and `PREV_ELAPSED` env variables in `on_song_change`
 
 ### Changed
 
