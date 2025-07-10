@@ -20,6 +20,8 @@ Additional environment variables available to the script are:
 - `$PID` - intended for use with the `remote` command and allows it to target specific rmpc instance
 - `$LRC_FILE` - contains the path where rmpc expects to find the lrc file
 - `$HAS_LRC` - indicates whether any lyrics were found for the current song.
+- `$PREV_SONG` - file path of the previous song, if any, use `rmpc song --path "$PREV_SONG"` to query its metadata
+- `$PREV_ELAPSED` - how much of the previous song was really played, in seconds
 
 ## Desktop notification on song change
 

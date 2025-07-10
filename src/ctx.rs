@@ -1,4 +1,9 @@
-use std::{cell::Cell, collections::HashSet, ops::AddAssign, time::Instant};
+use std::{
+    cell::Cell,
+    collections::HashSet,
+    ops::AddAssign,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, bail};
 use bon::bon;
@@ -53,6 +58,8 @@ pub struct Ctx {
     #[debug(skip)]
     pub(crate) scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
     pub(crate) messages: RingVec<10, StatusMessage>,
+    pub(crate) last_status_update: Instant,
+    pub(crate) song_played: Option<Duration>,
 }
 
 #[bon]
@@ -103,6 +110,8 @@ impl Ctx {
             should_fetch_stickers: sticker_support_needed,
             rendered_frames: 0,
             messages: RingVec::default(),
+            song_played: None,
+            last_status_update: Instant::now(),
         })
     }
 
