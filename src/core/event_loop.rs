@@ -449,6 +449,34 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                 },
+                AppEvent::RemoteSwitchTab { tab_name } => {
+                    let target_tab = tab_name.as_str().into();
+
+                    if let Some(tab) =
+                        ctx.config.tabs.names.iter().find(|&name| *name == target_tab)
+                    {
+                        if let Err(err) =
+                            ui.on_ui_app_event(UiAppEvent::ChangeTab(tab.clone()), &mut ctx)
+                        {
+                            status_error!(err:?; "Error switching to tab '{}': {}", tab_name, err.to_status());
+                        }
+                    } else {
+                        let available = ctx
+                            .config
+                            .tabs
+                            .names
+                            .iter()
+                            .map(|name| name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        status_error!(
+                            "Tab '{}' does not exist. Available tabs: {}",
+                            tab_name,
+                            available
+                        );
+                    }
+                    render_wanted = true;
+                }
                 AppEvent::Reconnected => {
                     for ev in [IdleEvent::Player, IdleEvent::Playlist, IdleEvent::Options] {
                         handle_idle_event(ev, &ctx, &mut additional_evs);

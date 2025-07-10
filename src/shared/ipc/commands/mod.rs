@@ -5,6 +5,7 @@ use index_lrc::IndexLrcCommand;
 use keybind::KeybindCommand;
 use set::SetIpcCommand;
 use status_message::StatusMessageCommand;
+use switch_tab::SwitchTabCommand;
 use tmux::TmuxHookCommand;
 
 use super::SocketCommand;
@@ -17,6 +18,7 @@ pub(super) mod index_lrc;
 pub mod keybind;
 pub(super) mod set;
 pub(super) mod status_message;
+pub mod switch_tab;
 pub(super) mod tmux;
 
 impl TryFrom<RemoteCmd> for SocketCommand {
@@ -65,6 +67,7 @@ impl TryFrom<RemoteCmd> for SocketCommand {
                 Ok(SocketCommand::Set(Box::new(SetIpcCommand::Theme(ron::de::from_reader(read)?))))
             }
             RemoteCmd::Keybind { key } => Ok(SocketCommand::Keybind(KeybindCommand { key })),
+            RemoteCmd::SwitchTab { tab } => Ok(SocketCommand::SwitchTab(SwitchTabCommand { tab })),
         }
     }
 }

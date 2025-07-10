@@ -7,6 +7,7 @@ use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use unicase::UniCase;
 
 use super::theme::{
     PercentOrLength,
@@ -16,8 +17,9 @@ use super::theme::{
 };
 use crate::shared::id::{self, Id};
 
-#[derive(Debug, Into, Deref, Hash, Eq, PartialEq, Display)]
+#[derive(Debug, Into, Deref, Display)]
 pub struct TabName(pub std::sync::Arc<String>);
+
 impl From<String> for TabName {
     fn from(value: String) -> Self {
         Self(value.into())
@@ -33,6 +35,20 @@ impl From<&str> for TabName {
 impl Clone for TabName {
     fn clone(&self) -> Self {
         TabName(std::sync::Arc::clone(&self.0))
+    }
+}
+
+impl PartialEq for TabName {
+    fn eq(&self, other: &Self) -> bool {
+        UniCase::new(self.0.as_str()) == UniCase::new(other.0.as_str())
+    }
+}
+
+impl Eq for TabName {}
+
+impl std::hash::Hash for TabName {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        UniCase::new(self.0.as_str()).hash(state);
     }
 }
 

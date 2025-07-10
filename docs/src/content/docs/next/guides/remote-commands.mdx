@@ -15,7 +15,9 @@ rmpc provides powerful remote command capabilities that allow you to control a r
 
 the remote command system allows you to:
 - **emulate key presses** (`keybind`) - trigger any keybind as if pressed in the interface
+- **switch tabs directly** (`switch-tab`) - change to a specific tab without relying on keybinds
 - **send status messages** - display custom messages in the status bar
+- **update configuration** - modify theme and other settings remotely
 - **target specific instances** - send commands to a particular rmpc process by pid
 
 ## usage
@@ -108,6 +110,45 @@ rmpc remote keybind "<S-CR>"   # Shift+Enter
 rmpc remote keybind "<A-h>"    # Alt+h
 ```
 
+## switch-tab command
+
+The `switch-tab` command provides a direct way to switch between tabs without relying on keybind configuration.
+
+### Syntax
+
+```bash
+rmpc remote switch-tab <tab-name>
+```
+
+### Examples
+
+```bash
+# Switch to specific tabs
+rmpc remote switch-tab "Queue"
+rmpc remote switch-tab "Directories"
+rmpc remote switch-tab "Artists"
+rmpc remote switch-tab "Albums"
+rmpc remote switch-tab "Playlists"
+rmpc remote switch-tab "Search"
+rmpc remote switch-tab "Lyrics"
+
+# Works with custom tab names too
+rmpc remote switch-tab "My Custom Tab"
+
+# Tab names are case-insensitive
+rmpc remote switch-tab "queue"     # same as "Queue"
+rmpc remote switch-tab "ARTISTS"   # same as "Artists"
+rmpc remote switch-tab "playlists" # same as "Playlists"
+```
+
+### Tab Name Validation
+
+The `switch-tab` command validates that the specified tab exists in your configuration using **case-insensitive matching**. This means you can use any capitalization you prefer - `queue`, `Queue`, `QUEUE`, etc. will all match the same tab.
+
+If you try to switch to a non-existent tab, the command will fail with an error message listing all available tabs.
+
+You can check your available tabs by looking at your configuration file or using `rmpc config` to see the configured tabs.
+
 ## Other Remote Commands
 
 Besides `keybind`, rmpc supports several other remote commands:
@@ -158,6 +199,7 @@ ps aux | grep rmpc
 
 # Send command to specific instance
 rmpc remote --pid 12345 keybind p
+rmpc remote --pid 12345 switch-tab "Queue"
 rmpc remote --pid 12345 status "Hello from specific instance"
 ```
 
@@ -167,9 +209,14 @@ Remote commands will fail silently if:
 - No rmpc instance is running
 - The specified PID doesn't exist
 - Invalid key format is provided
-- Tab name doesn't exist in your configuration (for tab switching keybinds)
+- Tab name doesn't exist in your configuration (for switch-tab commands)
 
-Check the rmpc logs for detailed error messages if commands aren't working as expected.
+**Note**: Command execution errors (like invalid tab names) are logged in the running rmpc instance at the warn level, not displayed to the CLI caller. Check the rmpc logs for detailed error messages if commands aren't working as expected.
+
+To see these errors, you can:
+- Run rmpc with debug logging: `RUST_LOG=debug rmpc`
+- Check rmpc's log output in your terminal
+- Look for "Socket command execution failed" messages
 
 ## Tips and Best Practices
 
