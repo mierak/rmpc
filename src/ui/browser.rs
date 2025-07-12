@@ -157,7 +157,115 @@ where
         Ok(())
     }
 
+    /// checks if a mouse click is on the scrollbar area and also handles
+    /// scrollbar interactions
+    fn handle_scrollbar_interaction(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<bool> {
+        let [prev_area, current_area, _] = self.browser_areas();
+
+        let Some(_) = ctx.config.theme.scrollbar else {
+            return Ok(false);
+        };
+
+        let position: ratatui::layout::Position = event.into();
+
+        // calculate scrollbar areas, scrollbar is considered to be on the right edge of
+        // each column
+        let scrollbar_margin = match ctx.config.theme.scrollbar.as_ref() {
+            Some(scrollbar) if ctx.config.theme.draw_borders => {
+                let scrollbar_track = &scrollbar.symbols[0];
+                ratatui::layout::Margin {
+                    vertical: 0,
+                    horizontal: scrollbar_track.is_empty().into(),
+                }
+            }
+            Some(_) | None => ratatui::layout::Margin { vertical: 0, horizontal: 0 },
+        };
+
+        match event.kind {
+            MouseEventKind::LeftClick | MouseEventKind::Drag => {
+                if prev_area.width > 0 {
+                    let scrollbar_area = prev_area.inner(scrollbar_margin);
+                    let scrollbar_x = scrollbar_area.right().saturating_sub(1);
+
+                    if position.x == scrollbar_x && scrollbar_area.contains(position) {
+                        let clicked_y = event.y.saturating_sub(scrollbar_area.y);
+                        let scrollbar_height = scrollbar_area.height;
+                        let content_len = self.stack().previous().items.len();
+
+                        if content_len > scrollbar_height as usize && scrollbar_height > 0 {
+                            let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+                                content_len.saturating_sub(1)
+                            } else {
+                                let position_ratio = f64::from(clicked_y)
+                                    / f64::from(scrollbar_height.saturating_sub(1));
+                                #[allow(
+                                    clippy::cast_precision_loss,
+                                    clippy::cast_possible_truncation,
+                                    clippy::cast_sign_loss
+                                )]
+                                let target = (position_ratio
+                                    * (content_len.saturating_sub(1)) as f64)
+                                    .round() as usize;
+                                target.min(content_len.saturating_sub(1))
+                            };
+
+                            self.stack_mut()
+                                .previous_mut()
+                                .select_idx(target_idx, ctx.config.scrolloff);
+                            self.prepare_preview(ctx)?;
+                            ctx.render()?;
+                            return Ok(true);
+                        }
+                    }
+                }
+
+                if current_area.width > 0 {
+                    let scrollbar_area = current_area.inner(scrollbar_margin);
+                    let scrollbar_x = scrollbar_area.right().saturating_sub(1);
+
+                    if position.x == scrollbar_x && scrollbar_area.contains(position) {
+                        let clicked_y = event.y.saturating_sub(scrollbar_area.y);
+                        let scrollbar_height = scrollbar_area.height;
+                        let content_len = self.stack().current().items.len();
+
+                        if content_len > scrollbar_height as usize && scrollbar_height > 0 {
+                            let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+                                content_len.saturating_sub(1)
+                            } else {
+                                let position_ratio = f64::from(clicked_y)
+                                    / f64::from(scrollbar_height.saturating_sub(1));
+                                #[allow(
+                                    clippy::cast_precision_loss,
+                                    clippy::cast_possible_truncation,
+                                    clippy::cast_sign_loss
+                                )]
+                                let target = (position_ratio
+                                    * (content_len.saturating_sub(1)) as f64)
+                                    .round() as usize;
+                                target.min(content_len.saturating_sub(1))
+                            };
+
+                            self.stack_mut()
+                                .current_mut()
+                                .select_idx(target_idx, ctx.config.scrolloff);
+                            self.prepare_preview(ctx)?;
+                            ctx.render()?;
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        Ok(false)
+    }
+
     fn handle_mouse_action(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
+        if self.handle_scrollbar_interaction(event, ctx)? {
+            return Ok(());
+        }
+
         let [prev_area, current_area, preview_area] = self.browser_areas();
 
         let position = event.into();
@@ -613,5 +721,401 @@ where
 
         modal!(ctx, modal);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod scrollbar_tests {
+    use ratatui::layout::Rect;
+
+    use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+
+    #[test]
+    fn test_scrollbar_click_calculation() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8); // x=29, y=1, width=1, height=8
+        let total_items = 20;
+        let viewport_height = 8;
+
+        // Click at the top of the scrollbar (should go to first item)
+        let click_y = 1;
+        let relative_y = click_y - scrollbar_area.y;
+        let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+
+        assert_eq!(target_item, 0);
+
+        // Click at the bottom of the scrollbar (should go to last item)
+        let click_y = 8;
+        let relative_y = click_y - scrollbar_area.y;
+        let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+
+        assert_eq!(target_item, total_items - viewport_height);
+
+        // Click in the middle
+        let click_y = 4;
+        let relative_y = click_y - scrollbar_area.y;
+        let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+
+        // Should be roughly in the middle
+        assert!((5..=7).contains(&target_item));
+    }
+
+    #[test]
+    fn test_mouse_event_in_scrollbar_area() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8);
+
+        let inside_event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 3 };
+
+        assert!(scrollbar_area.contains(inside_event.into()));
+
+        let outside_event = MouseEvent { kind: MouseEventKind::LeftClick, x: 28, y: 3 };
+
+        assert!(!scrollbar_area.contains(outside_event.into()));
+    }
+
+    #[test]
+    fn test_scrollbar_drag_events() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8);
+
+        let drag_event = MouseEvent { kind: MouseEventKind::Drag, x: 29, y: 5 };
+
+        assert!(scrollbar_area.contains(drag_event.into()));
+
+        assert!(matches!(drag_event.kind, MouseEventKind::Drag));
+    }
+
+    #[test]
+    fn test_scrollbar_position_bounds() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8);
+        let total_items = 50;
+        let viewport_height = 8;
+
+        let test_positions: Vec<(u16, usize)> = vec![
+            (0, 0),   // Top bound
+            (1, 0),   // Just above top
+            (4, 21),  // Middle
+            (7, 42),  // Bottom bound
+            (8, 42),  // Just below bottom (should be clamped)
+            (10, 42), // Way below bottom (should be clamped)
+        ];
+
+        for (click_y, expected_max_target) in test_positions {
+            let relative_y = click_y.saturating_sub(scrollbar_area.y);
+            let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+            let clamped_target = target_item.min(total_items - viewport_height);
+
+            assert!(
+                clamped_target <= expected_max_target,
+                "Click at y={click_y} should produce target <= {expected_max_target}, got {clamped_target}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_scrollbar_bottom_click_exact() {
+        let scrollbar_height: u16 = 10;
+        let total_items: usize = 50;
+
+        let clicked_y = scrollbar_height.saturating_sub(1);
+        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+            total_items.saturating_sub(1)
+        } else {
+            let position_ratio =
+                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1))
+        };
+
+        assert_eq!(target_idx, total_items - 1);
+
+        let clicked_y = scrollbar_height + 5;
+        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+            total_items.saturating_sub(1)
+        } else {
+            let position_ratio =
+                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1));
+            target_idx
+        };
+
+        assert_eq!(target_idx, total_items - 1);
+    }
+
+    #[test]
+    fn test_scrollbar_small_list_not_interactive() {
+        let scrollbar_height: u16 = 10;
+        let small_content_len: usize = 5;
+        let large_content_len: usize = 20;
+
+        let should_handle_small = small_content_len > scrollbar_height as usize;
+        assert!(!should_handle_small);
+
+        let should_handle_large = large_content_len > scrollbar_height as usize;
+        assert!(should_handle_large);
+    }
+
+    #[test]
+    fn test_scrollbar_position_ratio_calculation() {
+        let scrollbar_height: u16 = 10;
+        let total_items: usize = 100;
+
+        let test_cases = vec![
+            (0, 0),  // Top
+            (2, 22), // 20% position
+            (4, 44), // 40% position
+            (5, 55), // 50% position
+            (7, 77), // 70% position
+            (9, 99), // Bottom (should be last item)
+        ];
+
+        for (clicked_y, expected_target) in test_cases {
+            let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+                total_items.saturating_sub(1)
+            } else {
+                let position_ratio =
+                    f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    clippy::cast_precision_loss
+                )]
+                ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                    .min(total_items.saturating_sub(1))
+            };
+
+            assert_eq!(target_idx, expected_target);
+        }
+    }
+}
+
+#[cfg(test)]
+mod scrollbar_tests {
+    use ratatui::layout::Rect;
+
+    use crate::shared::mouse_event::{MouseEvent, MouseEventKind};
+
+    #[test]
+    fn test_scrollbar_click_calculation() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8); // x=29, y=1, width=1, height=8
+        let total_items = 20;
+        let viewport_height = 8;
+
+        // Click at the top of the scrollbar (should go to first item)
+        let click_y = 1;
+        let relative_y = click_y - scrollbar_area.y;
+        let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+
+        assert_eq!(target_item, 0);
+
+        // Click at the bottom of the scrollbar (should go to last item)
+        let click_y = 8;
+        let relative_y = click_y - scrollbar_area.y;
+        let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+
+        assert_eq!(target_item, total_items - viewport_height);
+
+        // Click in the middle
+        let click_y = 4;
+        let relative_y = click_y - scrollbar_area.y;
+        let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+
+        // Should be roughly in the middle
+        assert!((5..=7).contains(&target_item));
+    }
+
+    #[test]
+    fn test_mouse_event_in_scrollbar_area() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8);
+
+        let inside_event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 3 };
+
+        assert!(scrollbar_area.contains(inside_event.into()));
+
+        let outside_event = MouseEvent { kind: MouseEventKind::LeftClick, x: 28, y: 3 };
+
+        assert!(!scrollbar_area.contains(outside_event.into()));
+    }
+
+    #[test]
+    fn test_scrollbar_drag_events() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8);
+
+        let drag_event = MouseEvent { kind: MouseEventKind::Drag, x: 29, y: 5 };
+
+        assert!(scrollbar_area.contains(drag_event.into()));
+
+        assert!(matches!(drag_event.kind, MouseEventKind::Drag));
+    }
+
+    #[test]
+    fn test_scrollbar_position_bounds() {
+        let scrollbar_area = Rect::new(29, 1, 1, 8);
+        let total_items = 50;
+        let viewport_height = 8;
+
+        let test_positions: Vec<(u16, usize)> = vec![
+            (0, 0),   // Top bound
+            (1, 0),   // Just above top
+            (4, 21),  // Middle
+            (7, 42),  // Bottom bound
+            (8, 42),  // Just below bottom (should be clamped)
+            (10, 42), // Way below bottom (should be clamped)
+        ];
+
+        for (click_y, expected_max_target) in test_positions {
+            let relative_y = click_y.saturating_sub(scrollbar_area.y);
+            let position_ratio = f64::from(relative_y) / f64::from(scrollbar_area.height - 1);
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            let target_item = (position_ratio * (total_items - viewport_height) as f64) as usize;
+            let clamped_target = target_item.min(total_items - viewport_height);
+
+            assert!(
+                clamped_target <= expected_max_target,
+                "Click at y={click_y} should produce target <= {expected_max_target}, got {clamped_target}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_scrollbar_bottom_click_exact() {
+        let scrollbar_height: u16 = 10;
+        let total_items: usize = 50;
+
+        let clicked_y = scrollbar_height.saturating_sub(1);
+        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+            total_items.saturating_sub(1)
+        } else {
+            let position_ratio =
+                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1))
+        };
+
+        assert_eq!(target_idx, total_items - 1);
+
+        let clicked_y = scrollbar_height + 5;
+        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+            total_items.saturating_sub(1)
+        } else {
+            let position_ratio =
+                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1));
+            target_idx
+        };
+
+        assert_eq!(target_idx, total_items - 1);
+    }
+
+    #[test]
+    fn test_scrollbar_small_list_not_interactive() {
+        let scrollbar_height: u16 = 10;
+        let small_content_len: usize = 5;
+        let large_content_len: usize = 20;
+
+        let should_handle_small = small_content_len > scrollbar_height as usize;
+        assert!(!should_handle_small);
+
+        let should_handle_large = large_content_len > scrollbar_height as usize;
+        assert!(should_handle_large);
+    }
+
+    #[test]
+    fn test_scrollbar_position_ratio_calculation() {
+        let scrollbar_height: u16 = 10;
+        let total_items: usize = 100;
+
+        let test_cases = vec![
+            (0, 0),  // Top
+            (2, 22), // 20% position
+            (4, 44), // 40% position
+            (5, 55), // 50% position
+            (7, 77), // 70% position
+            (9, 99), // Bottom (should be last item)
+        ];
+
+        for (clicked_y, expected_target) in test_cases {
+            let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+                total_items.saturating_sub(1)
+            } else {
+                let position_ratio =
+                    f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    clippy::cast_precision_loss
+                )]
+                ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                    .min(total_items.saturating_sub(1))
+            };
+
+            assert_eq!(target_idx, expected_target);
+        }
     }
 }

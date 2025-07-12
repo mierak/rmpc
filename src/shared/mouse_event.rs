@@ -51,6 +51,9 @@ impl MouseEventTracker {
             }
             CTMouseEventKind::ScrollUp => Some(MouseEvent { x, y, kind: MouseEventKind::ScrollUp }),
             CTMouseEventKind::Up(_) => None,
+            CTMouseEventKind::Drag(MouseButton::Left) => {
+                Some(MouseEvent { x, y, kind: MouseEventKind::Drag })
+            }
             CTMouseEventKind::Drag(_) => None,
             CTMouseEventKind::Moved => None,
             CTMouseEventKind::ScrollLeft => None,
@@ -74,6 +77,7 @@ pub enum MouseEventKind {
     RightClick,
     ScrollDown,
     ScrollUp,
+    Drag,
 }
 
 #[derive(Debug, Clone, Copy)]

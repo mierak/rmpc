@@ -244,6 +244,7 @@ impl Modal for OutputsModal {
             MouseEventKind::DoubleClick => {}
             MouseEventKind::ScrollDown => {}
             MouseEventKind::ScrollUp => {}
+            MouseEventKind::Drag => {}
         }
 
         Ok(())

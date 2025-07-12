@@ -199,6 +199,7 @@ impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
                     ctx.render()?;
                 }
             }
+            MouseEventKind::Drag => {}
         }
         Ok(())
     }

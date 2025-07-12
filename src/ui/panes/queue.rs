@@ -541,7 +541,41 @@ impl Pane for QueuePane {
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
-        if !self.areas[Areas::Table].contains(event.into()) {
+        let position = event.into();
+
+        if self.areas[Areas::Scrollbar].contains(position) && ctx.config.theme.scrollbar.is_some() {
+            match event.kind {
+                MouseEventKind::LeftClick | MouseEventKind::Drag => {
+                    let clicked_y = event.y.saturating_sub(self.areas[Areas::Scrollbar].y);
+                    let scrollbar_height = self.areas[Areas::Scrollbar].height;
+                    let content_len = ctx.queue.len();
+
+                    if content_len > scrollbar_height as usize && scrollbar_height > 0 {
+                        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+                            content_len.saturating_sub(1)
+                        } else {
+                            let position_ratio = f64::from(clicked_y)
+                                / f64::from(scrollbar_height.saturating_sub(1));
+                            #[allow(
+                                clippy::cast_precision_loss,
+                                clippy::cast_possible_truncation,
+                                clippy::cast_sign_loss
+                            )]
+                            let target = (position_ratio * (content_len.saturating_sub(1)) as f64)
+                                .round() as usize;
+                            target.min(content_len.saturating_sub(1))
+                        };
+
+                        self.scrolling_state.select(Some(target_idx), ctx.config.scrolloff);
+                        ctx.render()?;
+                    }
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+
+        if !self.areas[Areas::Table].contains(position) {
             return Ok(());
         }
 
@@ -601,6 +635,7 @@ impl Pane for QueuePane {
                 }
                 self.open_context_menu(ctx)?;
             }
+            MouseEventKind::Drag => {}
         }
 
         Ok(())
