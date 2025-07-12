@@ -1,4 +1,5 @@
 #![allow(clippy::cast_possible_truncation)]
+use anyhow::Result;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Position, Rect},
@@ -112,7 +113,7 @@ impl Section for MultiActionSection<'_> {
         self.selected_idx = None;
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> bool {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if let Some(selected_idx) = self.selected_idx {
             let label = std::mem::take(&mut self.items[selected_idx].label);
             let selected_button = self.items[selected_idx].buttons_state.selected;
@@ -120,7 +121,8 @@ impl Section for MultiActionSection<'_> {
                 (cb)(ctx, label);
             }
         }
-        false
+
+        Ok(false)
     }
 
     fn len(&self) -> usize {
@@ -152,9 +154,9 @@ impl Section for MultiActionSection<'_> {
         }
     }
 
-    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> bool {
-        self.confirm(ctx);
-        false
+    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
+        self.confirm(ctx)?;
+        Ok(false)
     }
 }
 

@@ -1,4 +1,4 @@
-use core::scheduler::Scheduler;
+use core::{config_watcher::ERROR_CONFIG_MODAL_ID, scheduler::Scheduler};
 use std::{
     fs::File,
     io::{Read, Write},
@@ -232,7 +232,7 @@ fn main() -> Result<()> {
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
                             message: vec![err.to_string()],
-                            id: Some("config_error_modal".into()),
+                            replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
                             title: None,
                             size: None
                         }),

@@ -1,6 +1,6 @@
 ---
-title: remote commands
-description: control rmpc remotely from command line and scripts
+title: Remote commands
+description: Control rmpc remotely from command line and scripts
 sidebar:
     order: 7
 ---
@@ -14,6 +14,7 @@ rmpc provides powerful remote command capabilities that allow you to control a r
 ## overview
 
 the remote command system allows you to:
+
 - **emulate key presses** (`keybind`) - trigger any keybind as if pressed in the interface
 - **switch tabs directly** (`switch-tab`) - change to a specific tab without relying on keybinds
 - **send status messages** - display custom messages in the status bar
@@ -99,7 +100,7 @@ For special keys, use the angle bracket format to ensure proper recognition:
 ```bash
 # Correct formats for special keys
 rmpc remote keybind "<CR>"     # Enter key
-rmpc remote keybind "<Space>"  # Space key  
+rmpc remote keybind "<Space>"  # Space key
 rmpc remote keybind "<Esc>"    # Escape key
 rmpc remote keybind "<Tab>"    # Tab key
 rmpc remote keybind "<BS>"     # Backspace key
@@ -206,6 +207,7 @@ rmpc remote --pid 12345 status "Hello from specific instance"
 ## Error Handling
 
 Remote commands will fail silently if:
+
 - No rmpc instance is running
 - The specified PID doesn't exist
 - Invalid key format is provided
@@ -214,6 +216,7 @@ Remote commands will fail silently if:
 **Note**: Command execution errors (like invalid tab names) are logged in the running rmpc instance at the warn level, not displayed to the CLI caller. Check the rmpc logs for detailed error messages if commands aren't working as expected.
 
 To see these errors, you can:
+
 - Run rmpc with debug logging: `RUST_LOG=debug rmpc`
 - Check rmpc's log output in your terminal
 - Look for "Socket command execution failed" messages
@@ -222,7 +225,7 @@ To see these errors, you can:
 
 - **Use quotes for special characters**: Always quote keys with special characters like `">"` or `"<"` or `"<Tab>"`
 - **Check keybind configuration**: The remote keybind command uses your configured keybinds from your config file
-- **Test interactively first**: Try commands manually before adding them to scripts  
+- **Test interactively first**: Try commands manually before adding them to scripts
 
 ## See Also
 

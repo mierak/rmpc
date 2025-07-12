@@ -23,8 +23,8 @@ use crate::{
     config::keys::CommonAction,
     ctx::Ctx,
     shared::{
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::modals::{Modal, RectExt as _},
@@ -37,9 +37,14 @@ pub struct MenuModal<'a> {
     areas: Vec<Rect>,
     input_focused: bool,
     width: u16,
+    id: Id,
 }
 
 impl Modal for MenuModal<'_> {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let needed_height: usize = self.sections.iter().map(|section| section.len()).sum::<usize>()
             + 1
@@ -96,9 +101,9 @@ impl Modal for MenuModal<'_> {
                 ctx.render()?;
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
-                self.sections[self.current_section_idx].confirm(ctx);
+                self.sections[self.current_section_idx].confirm(ctx)?;
 
-                pop_modal!(ctx);
+                self.hide(ctx)?;
                 return Ok(());
             }
 
@@ -125,14 +130,14 @@ impl Modal for MenuModal<'_> {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
-                    self.input_focused = self.sections[self.current_section_idx].confirm(ctx);
+                    self.input_focused = self.sections[self.current_section_idx].confirm(ctx)?;
                     if self.input_focused {
                         ctx.render()?;
                     } else {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                 }
                 _ => {}
@@ -154,11 +159,11 @@ impl Modal for MenuModal<'_> {
             }
             MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.section_idx_at_position(event.into()) {
-                    self.input_focused = self.sections[idx].double_click(event.into(), ctx);
+                    self.input_focused = self.sections[idx].double_click(event.into(), ctx)?;
                     if self.input_focused {
                         ctx.render()?;
                     } else {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                 }
             }
@@ -185,6 +190,7 @@ impl<'a> MenuModal<'a> {
             areas: Vec::new(),
             input_focused: false,
             width: 40,
+            id: id::new(),
         }
     }
 
@@ -203,7 +209,7 @@ impl<'a> MenuModal<'a> {
         self
     }
 
-    pub fn add_list_section(
+    pub fn list_section(
         mut self,
         ctx: &Ctx,
         cb: impl FnOnce(ListSection) -> Option<ListSection>,
@@ -217,7 +223,7 @@ impl<'a> MenuModal<'a> {
         self
     }
 
-    pub fn add_multi_section(
+    pub fn multi_section(
         mut self,
         ctx: &Ctx,
         cb: impl FnOnce(MultiActionSection) -> Option<MultiActionSection<'_>>,
@@ -232,7 +238,7 @@ impl<'a> MenuModal<'a> {
         self
     }
 
-    pub fn add_input_section(
+    pub fn input_section(
         mut self,
         ctx: &Ctx,
         label: impl Into<Cow<'a, str>>,

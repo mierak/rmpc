@@ -13,16 +13,17 @@ use crate::{
     ctx::Ctx,
     mpd::mpd_client::MpdClient,
     shared::{
-        ext::mpd_client::{MpdClientExt, PartitionedOutput, PartitionedOutputKind},
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
+        mpd_client_ext::{MpdClientExt, PartitionedOutput, PartitionedOutputKind},
     },
     ui::{UiEvent, dirstack::DirState},
 };
 
 #[derive(Debug)]
 pub struct OutputsModal {
+    id: Id,
     scrolling_state: DirState<TableState>,
     outputs_table_area: Rect,
     outputs: Vec<PartitionedOutput>,
@@ -31,6 +32,7 @@ pub struct OutputsModal {
 impl OutputsModal {
     pub fn new(outputs: Vec<PartitionedOutput>) -> Self {
         let mut result = Self {
+            id: id::new(),
             outputs,
             scrolling_state: DirState::default(),
             outputs_table_area: Rect::default(),
@@ -81,6 +83,10 @@ impl OutputsModal {
 }
 
 impl Modal for OutputsModal {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut ratatui::Frame, ctx: &mut Ctx) -> anyhow::Result<()> {
         let popup_area = frame.area().centered_exact(70, 10);
         frame.render_widget(Clear, popup_area);
@@ -202,7 +208,7 @@ impl Modal for OutputsModal {
                     self.toggle_selected_output(ctx);
                 }
                 CommonAction::Close => {
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 _ => {}
             }

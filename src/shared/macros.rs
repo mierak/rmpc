@@ -61,12 +61,6 @@ macro_rules! modal {
     }};
 }
 
-macro_rules! pop_modal {
-    ( $i:ident ) => {{
-        $i.app_event_sender.send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::PopModal))?;
-    }};
-}
-
 macro_rules! csi_move {
     ( $buf:ident, $x:expr, $y:expr ) => {
         write!($buf, "\x1b[{};{}H", $y + 1, $x + 1)
@@ -75,7 +69,6 @@ macro_rules! csi_move {
 
 pub(crate) use csi_move;
 pub(crate) use modal;
-pub(crate) use pop_modal;
 pub(crate) use status_error;
 pub(crate) use status_info;
 pub(crate) use status_warn;

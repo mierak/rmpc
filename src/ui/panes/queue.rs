@@ -31,14 +31,11 @@ use crate::{
     ctx::Ctx,
     mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
     shared::{
-        ext::{
-            btreeset_ranges::BTreeSetRanges,
-            mpd_client::{Autoplay, Enqueue, MpdClientExt},
-            rect::RectExt,
-        },
+        ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
+        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
     },
     ui::{
         UiEvent,
@@ -47,7 +44,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
-            menu::create_add_modal,
+            menu::{create_add_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
     },
@@ -156,6 +153,114 @@ impl QueuePane {
                     acc
                 })
         }
+    }
+
+    fn open_context_menu(&mut self, ctx: &Ctx) -> Result<()> {
+        let selected_song =
+            self.scrolling_state.get_selected().and_then(|idx| ctx.queue.get(idx).cloned());
+        let selected_song_id = selected_song.as_ref().map(|s| s.id);
+
+        let modal = MenuModal::new(ctx)
+            .list_section(ctx, |mut section| {
+                section.add_item("Play", move |ctx| {
+                    if let Some(id) = selected_song_id {
+                        ctx.command(move |client| {
+                            client.play_id(id)?;
+                            Ok(())
+                        });
+                    }
+                    Ok(())
+                });
+                section.add_item("Show info", move |ctx| {
+                    if let Some(song) = selected_song {
+                        modal!(
+                            ctx,
+                            InfoListModal::builder()
+                                .items(&song)
+                                .title("Song info")
+                                .column_widths(&[30, 70])
+                                .build()
+                        );
+                    }
+                    Ok(())
+                });
+                Some(section)
+            })
+            .list_section(ctx, |mut section| {
+                section.add_item("Add queue to playlist", |ctx| {
+                    let playlists = ctx.query_sync(move |client| {
+                        Ok(client.list_playlists()?.into_iter().map(|p| p.name).collect_vec())
+                    })?;
+
+                    let items = ctx.queue.iter().map(|song| song.file.clone()).collect_vec();
+                    modal!(
+                        ctx,
+                        SelectModal::builder()
+                            .ctx(ctx)
+                            .options(playlists)
+                            .confirm_label("Add")
+                            .title("Select a playlist")
+                            .on_confirm(move |ctx, selected, _idx| {
+                                ctx.command(move |client| {
+                                    client.add_to_playlist_multiple(&selected, items)?;
+                                    Ok(())
+                                });
+                                Ok(())
+                            })
+                            .build()
+                    );
+                    Ok(())
+                });
+                section.add_item("Save queue as playlist", move |ctx| {
+                    modal!(
+                        ctx,
+                        InputModal::new(ctx)
+                            .title("Create new playlist")
+                            .confirm_label("Save")
+                            .input_label("Playlist name:")
+                            .on_confirm(move |ctx, value| {
+                                let value = value.to_owned();
+                                ctx.command(move |client| {
+                                    client.save_queue_as_playlist(&value, None)?;
+                                    Ok(())
+                                });
+                                Ok(())
+                            })
+                    );
+                    Ok(())
+                });
+
+                Some(section)
+            })
+            .list_section(ctx, |section| {
+                let section = section
+                    .item("Remove", move |ctx| {
+                        if let Some(id) = selected_song_id {
+                            ctx.command(move |client| {
+                                client.delete_id(id)?;
+                                Ok(())
+                            });
+                        }
+                        Ok(())
+                    })
+                    .item("Clear queue", |ctx| {
+                        ctx.command(|client| {
+                            client.clear()?;
+                            Ok(())
+                        });
+                        Ok(())
+                    });
+                Some(section)
+            })
+            .list_section(ctx, |section| {
+                let section = section.item("Cancel", |_ctx| Ok(()));
+                Some(section)
+            })
+            .build();
+
+        modal!(ctx, modal);
+
+        Ok(())
     }
 }
 
@@ -487,7 +592,15 @@ impl Pane for QueuePane {
                 self.scrolling_state.prev(ctx.config.scrolloff, false);
                 ctx.render()?;
             }
-            MouseEventKind::RightClick => {}
+            MouseEventKind::RightClick => {
+                let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
+                if let Some(idx) = self.scrolling_state.get_at_rendered_row(clicked_row) {
+                    self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+
+                    ctx.render()?;
+                }
+                self.open_context_menu(ctx)?;
+            }
         }
 
         Ok(())
@@ -960,6 +1073,9 @@ impl Pane for QueuePane {
                 CommonAction::PaneUp => {}
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
+                CommonAction::ContextMenu => {
+                    self.open_context_menu(ctx)?;
+                }
             }
         } else if let Some(action) = event.as_global_action(ctx) {
             match action {

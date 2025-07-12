@@ -195,14 +195,14 @@ fn main_task<B: Backend + std::io::Write>(
                     ctx.scheduler
                         .schedule(timeout, |(tx, _)| Ok(tx.send(AppEvent::RequestRender)?));
                 }
-                AppEvent::InfoModal { message, title, size, id } => {
+                AppEvent::InfoModal { message, title, size, replacement_id: id } => {
                     if let Err(err) = ui.on_ui_app_event(
                         UiAppEvent::Modal(Box::new(
                             InfoModal::builder()
                                 .ctx(&ctx)
                                 .maybe_title(title)
                                 .maybe_size(size)
-                                .maybe_id(id)
+                                .maybe_replacement_id(id)
                                 .message(message)
                                 .build(),
                         )),

@@ -19,8 +19,8 @@ use crate::{
     mpd::commands::Song,
     shared::{
         ext::duration::DurationExt,
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::dirstack::DirState,
@@ -28,6 +28,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct InfoListModal {
+    id: Id,
     scrolling_state: DirState<TableState>,
     table_area: Rect,
     items: KeyValues,
@@ -56,6 +57,7 @@ impl InfoListModal {
         let mut scrolling_state = DirState::default();
         scrolling_state.select(Some(0), 0);
         Self {
+            id: id::new(),
             scrolling_state,
             items: items.into(),
             table_area: Rect::default(),
@@ -90,6 +92,10 @@ impl InfoListModal {
 }
 
 impl Modal for InfoListModal {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(self.size.0, self.size.1);
         frame.render_widget(Clear, popup_area);
@@ -195,7 +201,7 @@ impl Modal for InfoListModal {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 _ => {}
             }

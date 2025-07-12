@@ -17,6 +17,8 @@ use notify_debouncer_full::{
 
 use crate::{AppEvent, config::ConfigFile, shared::macros::try_skip};
 
+pub const ERROR_CONFIG_MODAL_ID: &str = "config_error_modal";
+
 #[must_use = "Returns a drop guard for the config directory watcher"]
 pub(crate) fn init(
     config_path: PathBuf,
@@ -66,7 +68,7 @@ pub(crate) fn init(
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
                             message: vec![err.to_string()],
-                            id: Some("config_error_modal".into()),
+                            replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
                             title: None,
                             size: None,
                         }),
@@ -82,7 +84,7 @@ pub(crate) fn init(
                         try_skip!(
                             event_tx.send(AppEvent::InfoModal {
                                 message: vec![err.to_string()],
-                                id: Some("config_error_modal".into()),
+                                replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
                                 title: None,
                                 size: None,
                             }),

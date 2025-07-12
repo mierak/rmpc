@@ -18,8 +18,8 @@ use crate::{
     config::{Size, keys::CommonAction},
     ctx::Ctx,
     shared::{
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
@@ -27,10 +27,11 @@ use crate::{
 
 #[derive(Debug)]
 pub struct InfoModal<'a> {
+    id: Id,
     message: Vec<String>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
-    id: Option<Cow<'static, str>>,
+    replacement_id: Option<Cow<'static, str>>,
     size: Option<Size>,
     title: Option<Cow<'a, str>>,
 }
@@ -44,7 +45,7 @@ impl<'a> InfoModal<'a> {
         size: Option<impl Into<Size>>,
         confirm_label: Option<&'a str>,
         message: Vec<String>,
-        id: Option<impl Into<Cow<'static, str>>>,
+        replacement_id: Option<impl Into<Cow<'static, str>>>,
         title: Option<impl Into<Cow<'a, str>>>,
     ) -> Self {
         let mut button_group_state = ButtonGroupState::default();
@@ -62,17 +63,22 @@ impl<'a> InfoModal<'a> {
             );
 
         Self {
+            id: id::new(),
             message,
             button_group_state,
             button_group,
             size: size.map(|s| s.into()),
             title: title.map(|v| v.into()),
-            id: id.map(|i| i.into()),
+            replacement_id: replacement_id.map(|i| i.into()),
         }
     }
 }
 
 impl Modal for InfoModal<'_> {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let width = match (frame.area().width, self.size) {
             (fw, Some(Size { width, .. })) => width.min(fw),
@@ -132,7 +138,7 @@ impl Modal for InfoModal<'_> {
 
     fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
         if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(ctx) {
-            pop_modal!(ctx);
+            self.hide(ctx)?;
         }
 
         Ok(())
@@ -143,7 +149,7 @@ impl Modal for InfoModal<'_> {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
             }
             _ => {}
@@ -151,7 +157,7 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<Cow<'static, str>> {
-        self.id.clone()
+    fn replacement_id(&self) -> Option<&Cow<'static, str>> {
+        self.replacement_id.as_ref()
     }
 }

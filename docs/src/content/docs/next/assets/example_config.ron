@@ -92,6 +92,7 @@
             "K":         MoveUp,
             "D":         Delete,
             "B":         ShowInfo,
+            "<C-z>":     ContextMenu(),
         },
         queue: {
             "D":       DeleteAll,

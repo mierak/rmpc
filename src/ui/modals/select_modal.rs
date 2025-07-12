@@ -16,8 +16,8 @@ use crate::{
     config::keys::CommonAction,
     ctx::Ctx,
     shared::{
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
@@ -33,7 +33,8 @@ enum FocusedComponent {
 }
 
 #[derive(derive_more::Debug)]
-pub struct SelectModal<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> {
+pub struct SelectModal<'a, V: Display, Callback: FnOnce(&Ctx, V, usize) -> Result<()>> {
+    id: Id,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     scrolling_state: DirState<ListState>,
@@ -46,7 +47,7 @@ pub struct SelectModal<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result
 }
 
 #[bon]
-impl<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
+impl<'a, V: Display, Callback: FnOnce(&Ctx, V, usize) -> Result<()>> SelectModal<'a, V, Callback> {
     #[builder]
     pub fn new(
         ctx: &Ctx,
@@ -76,6 +77,7 @@ impl<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> SelectModal<
             );
 
         Self {
+            id: id::new(),
             button_group,
             button_group_state,
             scrolling_state,
@@ -88,9 +90,13 @@ impl<'a, V: Display, Callback: FnMut(&Ctx, V, usize) -> Result<()>> SelectModal<
     }
 }
 
-impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>> Modal
+impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()>> Modal
     for SelectModal<'_, V, Callback>
 {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(80, 15);
         frame.render_widget(Clear, popup_area);
@@ -214,22 +220,22 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>
                     }
                     FocusedComponent::Buttons if self.button_group_state.selected == 0 => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
-                            if let Some(ref mut callback) = self.callback {
+                            if let Some(callback) = self.callback.take() {
                                 (callback)(ctx, self.options.remove(idx), idx)?;
                             }
                         }
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                         ctx.render()?;
                     }
                     FocusedComponent::Buttons => {
                         self.button_group_state = ButtonGroupState::default();
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                         ctx.render()?;
                     }
                 },
                 CommonAction::Close => {
                     self.button_group_state = ButtonGroupState::default();
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                     ctx.render()?;
                 }
                 _ => {}
@@ -261,15 +267,15 @@ impl<V: Display + std::fmt::Debug, Callback: FnMut(&Ctx, V, usize) -> Result<()>
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         if let Some(idx) = self.scrolling_state.get_selected() {
-                            if let Some(ref mut callback) = self.callback {
+                            if let Some(callback) = self.callback.take() {
                                 (callback)(ctx, self.options.remove(idx), idx)?;
                             }
                         }
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                         ctx.render()?;
                     }
                     Some(_) => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     None => {}
                 }

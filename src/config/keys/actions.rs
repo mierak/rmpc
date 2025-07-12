@@ -7,7 +7,7 @@ use super::ToDescription;
 use crate::{
     config::{tabs::TabName, utils::tilde_expand},
     mpd::QueuePosition,
-    shared::ext::mpd_client::Autoplay,
+    shared::mpd_client_ext::Autoplay,
 };
 
 // Global actions
@@ -549,6 +549,7 @@ pub enum CommonActionFile {
         kind: AddKind,
     },
     ShowInfo,
+    ContextMenu {},
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
@@ -585,6 +586,7 @@ pub enum CommonAction {
         kind: AddKind,
     },
     ShowInfo,
+    ContextMenu,
 }
 
 impl ToDescription for CommonAction {
@@ -606,52 +608,53 @@ impl ToDescription for CommonAction {
             CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
             CommonAction::Select => {
-                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
-            }
+                        "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
+                    }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
             CommonAction::Delete => {
-                "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
-            }
+                        "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
+                    }
             CommonAction::Rename => "Rename. Currently only for playlists".into(),
             CommonAction::Close => {
-                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
-            }
+                        "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
+                    }
             CommonAction::Confirm => {
-                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
-            }
+                        "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
+                    }
             CommonAction::FocusInput => {
-                "Focuses textbox if any is on the screen and is not focused".into()
-            }
+                        "Focuses textbox if any is on the screen and is not focused".into()
+                    }
             CommonAction::PaneDown => "Focus the pane below the current one".into(),
             CommonAction::PaneUp => "Focus the pane above the current one".into(),
             CommonAction::PaneRight => "Focus the pane to the right of the current one".into(),
             CommonAction::PaneLeft => "Focus the pane to the left of the current one".into(),
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => format!("Open add menu modal with {} options", items.len()).into(),
             CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                let mut buf = String::from("Add");
-                if opts.all {
-                    buf.push_str(" all items");
-                } else {
-                    buf.push_str(" item");
-                }
-                buf.push_str(match opts.position {
-                    Position::AfterCurrentSong => " after the current song",
-                    Position::BeforeCurrentSong => " before the current song",
-                    Position::StartOfQueue => " at the start of the queue",
-                    Position::EndOfQueue => " at the end of the queue",
-                    Position::Replace => " and replace the queue",
-                });
+                        let mut buf = String::from("Add");
+                        if opts.all {
+                            buf.push_str(" all items");
+                        } else {
+                            buf.push_str(" item");
+                        }
+                        buf.push_str(match opts.position {
+                            Position::AfterCurrentSong => " after the current song",
+                            Position::BeforeCurrentSong => " before the current song",
+                            Position::StartOfQueue => " at the start of the queue",
+                            Position::EndOfQueue => " at the end of the queue",
+                            Position::Replace => " and replace the queue",
+                        });
 
-                buf.push_str(match opts.autoplay {
-                    AutoplayKind::First => " and play the first item",
-                    AutoplayKind::Hovered => " and play the hovered item",
-                    AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
-                    AutoplayKind::None => "",
-                });
+                        buf.push_str(match opts.autoplay {
+                            AutoplayKind::First => " and play the first item",
+                            AutoplayKind::Hovered => " and play the hovered item",
+                            AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
+                            AutoplayKind::None => "",
+                        });
 
-                buf.into()
-            },
+                        buf.into()
+                    },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
+            CommonAction::ContextMenu => "Show context menu".into(),
         }
     }
 }
@@ -729,6 +732,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::PaneRight => CommonAction::PaneRight,
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
+            CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
         }
     }
 }

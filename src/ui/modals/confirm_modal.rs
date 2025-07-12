@@ -18,14 +18,15 @@ use crate::{
     },
     ctx::Ctx,
     shared::{
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
 pub struct ConfirmModal<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> {
+    id: Id,
     message: Cow<'a, str>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
@@ -73,6 +74,7 @@ impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
             );
 
         Self {
+            id: id::new(),
             message: message.into(),
             button_group_state,
             button_group,
@@ -83,6 +85,10 @@ impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
 }
 
 impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered_exact(self.size.width, self.size.height);
         frame.render_widget(Clear, popup_area);
@@ -131,14 +137,14 @@ impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
                 }
                 CommonAction::Close => {
                     self.button_group_state = ButtonGroupState::default();
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
                         (self.on_confirm)(ctx)?;
                     }
                     self.button_group_state = ButtonGroupState::default();
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 _ => {}
             }
@@ -171,10 +177,10 @@ impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         (self.on_confirm)(ctx)?;
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     Some(_) => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     None => {}
                 }

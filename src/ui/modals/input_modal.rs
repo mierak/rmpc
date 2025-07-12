@@ -14,8 +14,8 @@ use crate::{
     config::keys::CommonAction,
     ctx::Ctx,
     shared::{
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::{
@@ -24,7 +24,8 @@ use crate::{
     },
 };
 
-pub struct InputModal<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> {
+pub struct InputModal<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> {
+    id: Id,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     input_focused: bool,
@@ -35,7 +36,7 @@ pub struct InputModal<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> {
     input_label: &'a str,
 }
 
-impl<Callback: FnMut(&Ctx, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
+impl<Callback: FnOnce(&Ctx, &str) -> Result<()>> std::fmt::Debug for InputModal<'_, Callback> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -45,7 +46,7 @@ impl<Callback: FnMut(&Ctx, &str) -> Result<()>> std::fmt::Debug for InputModal<'
     }
 }
 
-impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
+impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
     pub fn new(ctx: &Ctx) -> Self {
         let mut button_group_state = ButtonGroupState::default();
         let buttons = vec![Button::default().label("Save"), Button::default().label("Cancel")];
@@ -62,6 +63,7 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
             );
 
         Self {
+            id: id::new(),
             button_group_state,
             button_group,
             input_focused: true,
@@ -100,7 +102,11 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
     }
 }
 
-impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
+impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
@@ -156,11 +162,11 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
                 if self.button_group_state.selected == 0 {
-                    if let Some(ref mut callback) = self.callback {
+                    if let Some(callback) = self.callback.take() {
                         (callback)(ctx, &self.value)?;
                     }
                 }
-                pop_modal!(ctx);
+                self.hide(ctx)?;
                 return Ok(());
             }
 
@@ -190,15 +196,15 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
                     if self.button_group_state.selected == 0 {
-                        if let Some(ref mut callback) = self.callback {
+                        if let Some(callback) = self.callback.take() {
                             (callback)(ctx, &self.value)?;
                         }
                     }
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 CommonAction::FocusInput => {
                     self.input_focused = true;
@@ -224,13 +230,13 @@ impl<'a, C: FnMut(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        if let Some(ref mut callback) = self.callback {
+                        if let Some(callback) = self.callback.take() {
                             (callback)(ctx, &self.value)?;
                         }
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     Some(_) => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     None => {
                         if self.input_area.contains(event.into()) {
