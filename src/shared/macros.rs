@@ -61,7 +61,6 @@ macro_rules! modal {
     }};
 }
 
-
 macro_rules! csi_move {
     ( $buf:ident, $x:expr, $y:expr ) => {
         write!($buf, "\x1b[{};{}H", $y + 1, $x + 1)
