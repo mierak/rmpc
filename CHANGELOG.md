@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added interactive scrollbar support to browser panes (playlists, queue, etc.):
 - Added `rmpc remote keybind` command to emulate key presses in running instances
 - Added `rmpc remote switch-tab` command to switch tabs directly without relying on keybinds
 - Added new `Volume` pane with mouse control support.
