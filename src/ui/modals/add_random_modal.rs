@@ -19,8 +19,8 @@ use crate::{
     },
     ctx::Ctx,
     shared::{
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::{
@@ -31,6 +31,7 @@ use crate::{
 
 #[derive(derive_more::Debug)]
 pub struct AddRandomModal<'a> {
+    id: Id,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
     active_input: InputType,
@@ -83,6 +84,7 @@ impl AddRandomModal<'_> {
             );
 
         Self {
+            id: id::new(),
             button_group_state,
             button_group,
             active_input: InputType::Tag,
@@ -102,6 +104,10 @@ impl AddRandomModal<'_> {
 }
 
 impl Modal for AddRandomModal<'_> {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let block = Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
@@ -182,7 +188,7 @@ impl Modal for AddRandomModal<'_> {
                     return Ok(());
                 } else if let Some(CommonAction::Confirm) = action {
                     Self::add_random(self.selected_tag, &self.count, ctx)?;
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                     return Ok(());
                 }
 
@@ -219,7 +225,7 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     _ => {}
                 }
@@ -243,7 +249,7 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     _ => {}
                 }
@@ -274,13 +280,13 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     CommonAction::Confirm => {
                         if state.selected == 0 {
                             Self::add_random(self.selected_tag, &self.count, ctx)?;
                         }
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     _ => {}
                 }
@@ -328,10 +334,10 @@ impl Modal for AddRandomModal<'_> {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
                         Self::add_random(self.selected_tag, &self.count, ctx)?;
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     Some(_) => {
-                        pop_modal!(ctx);
+                        self.hide(ctx)?;
                     }
                     None => {}
                 }

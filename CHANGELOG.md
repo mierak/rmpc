@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - New `Partition` keybind to facilitate partition switching and management
 - New `Partition` status property to show rmpc's current partition
 - `PREV_SONG` and `PREV_ELAPSED` env variables in `on_song_change`
+- New `ContextMenu()` action
 
 ### Changed
 
@@ -35,6 +36,7 @@ continue to work.
 ### Fixed
 
 - Fixed `QueueTimeRemaining` not updating remaining time
+- `ModalClosed` event now correctly gets dispatched only after all modals were closed
 
 ## [0.9.0] - 2025-06-23
 

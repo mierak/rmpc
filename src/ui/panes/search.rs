@@ -29,16 +29,20 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         macros::{modal, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind},
+        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
         mpd_query::PreviewGroup,
     },
     ui::{
         UiEvent,
         dirstack::{Dir, DirStackItem},
-        modals::menu::create_add_modal,
+        modals::{
+            input_modal::InputModal,
+            menu::{create_add_modal, modal::MenuModal},
+            select_modal::SelectModal,
+        },
         widgets::{button::Button, input::Input},
     },
 };
@@ -84,37 +88,39 @@ impl SearchPane {
         }
     }
 
-    fn enqueue(&mut self, all: bool) -> (Vec<Enqueue>, Option<usize>) {
-        let hovered = self.songs_dir.selected().map(|s| s.file.as_str());
+    fn items<'a>(&'a self, all: bool) -> Box<dyn Iterator<Item = (usize, &'a Song)> + 'a> {
         if all {
-            self.songs_dir.items.iter().enumerate().fold(
-                (Vec::new(), None),
-                |mut acc, (idx, item)| {
-                    let path = item.file.clone();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
-                        acc.1 = Some(idx);
-                    }
-                    acc.0.push(Enqueue::File { path });
-                    acc
-                },
-            )
+            Box::new(self.songs_dir.items.iter().enumerate())
         } else if !self.songs_dir.marked().is_empty() {
-            self.songs_dir.marked().iter().map(|idx| &self.songs_dir.items[*idx]).enumerate().fold(
-                (Vec::new(), None),
-                |mut acc, (idx, item)| {
-                    let path = item.file.clone();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
-                        acc.1 = Some(idx);
-                    }
-                    acc.0.push(Enqueue::File { path });
-                    acc
-                },
-            )
-        } else if let Some(item) = self.songs_dir.selected() {
-            (vec![Enqueue::File { path: item.file.clone() }], Some(0))
+            Box::new(self.songs_dir.marked().iter().map(|idx| (*idx, &self.songs_dir.items[*idx])))
+        } else if let Some(item) = self.songs_dir.selected_with_idx() {
+            Box::new(std::iter::once(item))
         } else {
-            (Vec::new(), None)
+            Box::new(std::iter::empty())
         }
+    }
+
+    fn enqueue(&self, all: bool) -> (Option<usize>, Vec<Enqueue>) {
+        let items = self
+            .items(all)
+            .map(|(_, item)| Enqueue::File { path: item.file.clone() })
+            .collect_vec();
+
+        let hovered = self.songs_dir.selected().map(|s| s.file.as_str());
+        let hovered_idx = if let Some(hovered) = hovered {
+            items
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, item)| {
+                    if let Enqueue::File { path } = item { Some((idx, path)) } else { None }
+                })
+                .find(|(_, path)| path == &hovered)
+                .map(|(idx, _)| idx)
+        } else {
+            None
+        };
+
+        (hovered_idx, items)
     }
 
     fn render_song_column(
@@ -426,6 +432,489 @@ impl SearchPane {
 
         None
     }
+
+    fn handle_search_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let config = &ctx.config;
+        if let Some(action) = event.as_global_action(ctx) {
+            if let GlobalAction::ExternalCommand { command, .. } = action {
+                let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
+                run_external(command.clone(), create_env(ctx, songs));
+            } else {
+                event.abandon();
+            }
+        } else if let Some(action) = event.as_common_action(ctx) {
+            match action.to_owned() {
+                CommonAction::Down => {
+                    if config.wrap_navigation {
+                        self.inputs.next();
+                    } else {
+                        self.inputs.next_non_wrapping();
+                    }
+
+                    ctx.render()?;
+                }
+                CommonAction::Up => {
+                    if config.wrap_navigation {
+                        self.inputs.prev();
+                    } else {
+                        self.inputs.prev_non_wrapping();
+                    }
+
+                    ctx.render()?;
+                }
+                CommonAction::MoveDown => {}
+                CommonAction::MoveUp => {}
+                CommonAction::DownHalf => {}
+                CommonAction::UpHalf => {}
+                CommonAction::PageDown => {}
+                CommonAction::PageUp => {}
+                CommonAction::Right if !self.songs_dir.items.is_empty() => {
+                    self.phase = Phase::BrowseResults { filter_input_on: false };
+                    self.preview = None;
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::Right => {}
+                CommonAction::Left => {}
+                CommonAction::Top => {
+                    self.inputs.first();
+
+                    ctx.render()?;
+                }
+                CommonAction::Bottom => {
+                    self.inputs.last();
+
+                    ctx.render()?;
+                }
+                CommonAction::EnterSearch => {}
+                CommonAction::NextResult => {}
+                CommonAction::PreviousResult => {}
+                CommonAction::Select => {}
+                CommonAction::InvertSelection => {}
+                CommonAction::Rename => {}
+                CommonAction::Close => {}
+                CommonAction::Confirm => {
+                    self.activate_input(ctx);
+                    ctx.render()?;
+                }
+                CommonAction::FocusInput
+                    if matches!(self.inputs.focused(), FocusedInputGroup::Textboxes(_)) =>
+                {
+                    self.phase = Phase::SearchTextboxInput;
+
+                    ctx.render()?;
+                }
+                // Modal while we are on search column does not support all options. It can
+                // be implemented later.
+                CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
+                CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
+                    let (_, enqueue) = self.enqueue(opts.all);
+                    if !enqueue.is_empty() {
+                        let queue_len = ctx.queue.len();
+                        let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+
+                        ctx.command(move |client| {
+                            let autoplay = opts.autoplay(queue_len, current_song_idx, None);
+                            client.enqueue_multiple(enqueue, opts.position, autoplay)?;
+
+                            Ok(())
+                        });
+                    }
+                }
+                // This action only makes sense when opts.all is true while we are on the
+                // search column.
+                CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
+                CommonAction::FocusInput => {}
+                CommonAction::Delete => match self.inputs.focused_mut() {
+                    FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
+                        textbox.value.clear();
+                        self.search(ctx);
+
+                        ctx.render()?;
+                    }
+                    _ => {}
+                },
+                CommonAction::PaneDown => {}
+                CommonAction::PaneUp => {}
+                CommonAction::PaneRight => {}
+                CommonAction::PaneLeft => {}
+                CommonAction::ShowInfo => {}
+                CommonAction::ContextMenu => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn handle_result_phase_search(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
+            return Ok(());
+        };
+        let config = &ctx.config;
+        match event.as_common_action(ctx) {
+            Some(CommonAction::Close) => {
+                *filter_input_on = false;
+                self.songs_dir.set_filter(None, config);
+                self.prepare_preview(ctx);
+
+                ctx.render()?;
+            }
+            Some(CommonAction::Confirm) => {
+                *filter_input_on = false;
+
+                ctx.render()?;
+            }
+            _ => {
+                event.stop_propagation();
+                match event.code() {
+                    KeyCode::Char(c) => {
+                        self.songs_dir.push_filter(c, config);
+                        self.songs_dir.jump_first_matching(config);
+                        self.prepare_preview(ctx);
+
+                        ctx.render()?;
+                    }
+                    KeyCode::Backspace => {
+                        self.songs_dir.pop_filter(config);
+
+                        ctx.render()?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn handle_result_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
+            return Ok(());
+        };
+        let config = &ctx.config;
+        if let Some(action) = event.as_global_action(ctx) {
+            match action {
+                GlobalAction::ExternalCommand { command, .. }
+                    if !self.songs_dir.marked().is_empty() =>
+                {
+                    let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
+                    run_external(command.clone(), create_env(ctx, songs));
+                }
+                GlobalAction::ExternalCommand { command, .. } => {
+                    let selected = self.songs_dir.selected().map(|s| s.file.as_str());
+                    run_external(command.clone(), create_env(ctx, selected));
+                }
+                _ => {
+                    event.abandon();
+                }
+            }
+        } else if let Some(action) = event.as_common_action(ctx) {
+            match action.to_owned() {
+                CommonAction::Down => {
+                    self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::Up => {
+                    self.songs_dir.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::MoveDown => {}
+                CommonAction::MoveUp => {}
+                CommonAction::DownHalf => {
+                    self.songs_dir.next_half_viewport(ctx.config.scrolloff);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::UpHalf => {
+                    self.songs_dir.prev_half_viewport(ctx.config.scrolloff);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::PageDown => {
+                    self.songs_dir.next_viewport(ctx.config.scrolloff);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::PageUp => {
+                    self.songs_dir.prev_viewport(ctx.config.scrolloff);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::Right => {
+                    let items = self.songs_dir.selected().map_or_else(Vec::new, |item| {
+                        vec![Enqueue::File { path: item.file.clone() }]
+                    });
+                    if !items.is_empty() {
+                        ctx.command(move |client| {
+                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::None)?;
+                            Ok(())
+                        });
+                    }
+                }
+                CommonAction::Left => {
+                    self.phase = Phase::Search;
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::Top => {
+                    self.songs_dir.first();
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::Bottom => {
+                    self.songs_dir.last();
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::EnterSearch => {
+                    self.songs_dir.set_filter(Some(String::new()), config);
+                    *filter_input_on = true;
+
+                    ctx.render()?;
+                }
+                CommonAction::NextResult => {
+                    self.songs_dir.jump_next_matching(config);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::PreviousResult => {
+                    self.songs_dir.jump_previous_matching(config);
+                    self.prepare_preview(ctx);
+
+                    ctx.render()?;
+                }
+                CommonAction::Select => {
+                    self.songs_dir.toggle_mark_selected();
+                    self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
+
+                    ctx.render()?;
+                }
+                CommonAction::InvertSelection => {
+                    self.songs_dir.invert_marked();
+
+                    ctx.render()?;
+                }
+                CommonAction::Close if !self.songs_dir.marked().is_empty() => {
+                    self.songs_dir.marked_mut().clear();
+                    ctx.render()?;
+                }
+                CommonAction::Rename => {}
+                CommonAction::Close => {}
+                CommonAction::Confirm if self.songs_dir.marked().is_empty() => {
+                    let (hovered_song_idx, items) = self.enqueue(true);
+                    let queue_len = ctx.queue.len();
+                    let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+
+                    if !items.is_empty() {
+                        ctx.command(move |client| {
+                            client.enqueue_multiple(
+                                items,
+                                Position::Replace,
+                                Autoplay::Hovered { queue_len, current_song_idx, hovered_song_idx },
+                            )?;
+                            Ok(())
+                        });
+                    }
+
+                    ctx.render()?;
+                }
+                CommonAction::Confirm => {}
+                CommonAction::FocusInput => {}
+                CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
+                    let (hovered_song_idx, enqueue) = self.enqueue(opts.all);
+
+                    if !enqueue.is_empty() {
+                        let queue_len = ctx.queue.len();
+                        let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+
+                        ctx.command(move |client| {
+                            let autoplay =
+                                opts.autoplay(queue_len, current_song_idx, hovered_song_idx);
+
+                            client.enqueue_multiple(enqueue, opts.position, autoplay)?;
+
+                            Ok(())
+                        });
+                    }
+                }
+                CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
+                    let opts = opts
+                        .iter()
+                        .map(|(label, opts)| {
+                            let (hovered_song_idx, enqueue) = self.enqueue(opts.all);
+
+                            (label.to_owned(), *opts, (enqueue, hovered_song_idx))
+                        })
+                        .collect_vec();
+
+                    modal!(ctx, create_add_modal(opts, ctx));
+                }
+                CommonAction::Delete => {}
+                CommonAction::PaneDown => {}
+                CommonAction::PaneUp => {}
+                CommonAction::PaneRight => {}
+                CommonAction::PaneLeft => {}
+                CommonAction::ShowInfo => {}
+                CommonAction::ContextMenu => {
+                    self.open_result_phase_context_menu(ctx)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn open_result_phase_context_menu(&self, ctx: &Ctx) -> Result<()> {
+        let modal = MenuModal::new(ctx)
+            .list_section(ctx, move |mut section| {
+                if !self.songs_dir.items.is_empty() {
+                    let (_, enqueue) = self.enqueue(true);
+                    if !enqueue.is_empty() {
+                        let enqueue_clone = enqueue.clone();
+                        section.add_item("Add all to queue", move |ctx| {
+                            ctx.command(move |client| {
+                                client.enqueue_multiple(
+                                    enqueue_clone,
+                                    Position::EndOfQueue,
+                                    Autoplay::None,
+                                )?;
+                                Ok(())
+                            });
+                            Ok(())
+                        });
+                        section.add_item("Replace queue with all", move |ctx| {
+                            ctx.command(move |client| {
+                                client.enqueue_multiple(
+                                    enqueue,
+                                    Position::Replace,
+                                    Autoplay::None,
+                                )?;
+                                Ok(())
+                            });
+                            Ok(())
+                        });
+
+                        let song_files =
+                            self.items(true).map(|(_, item)| item.file.clone()).collect();
+                        section.add_item("Create playlist from all", move |ctx| {
+                            modal!(
+                                ctx,
+                                InputModal::new(ctx)
+                                    .title("Create new playlist")
+                                    .confirm_label("Save")
+                                    .input_label("Playlist name:")
+                                    .on_confirm(move |ctx, value| {
+                                        let value = value.to_owned();
+                                        ctx.command(move |client| {
+                                            client.create_playlist(&value, song_files)?;
+                                            Ok(())
+                                        });
+                                        Ok(())
+                                    })
+                            );
+                            Ok(())
+                        });
+
+                        let song_files =
+                            self.items(true).map(|(_, item)| item.file.clone()).collect();
+                        section.add_item("Add all to playlist", move |ctx| {
+                            let playlists = ctx.query_sync(move |client| {
+                                Ok(client
+                                    .list_playlists()?
+                                    .into_iter()
+                                    .map(|p| p.name)
+                                    .collect_vec())
+                            })?;
+                            modal!(
+                                ctx,
+                                SelectModal::builder()
+                                    .ctx(ctx)
+                                    .options(playlists)
+                                    .confirm_label("Add")
+                                    .title("Select a playlist")
+                                    .on_confirm(move |ctx, selected, _idx| {
+                                        ctx.command(move |client| {
+                                            client
+                                                .add_to_playlist_multiple(&selected, song_files)?;
+                                            Ok(())
+                                        });
+                                        Ok(())
+                                    })
+                                    .build()
+                            );
+                            Ok(())
+                        });
+                    }
+                }
+                Some(section)
+            })
+            .list_section(ctx, |mut section| {
+                let song_files = self.items(false).map(|(_, item)| item.file.clone()).collect();
+                section.add_item("Create playlist", move |ctx| {
+                    modal!(
+                        ctx,
+                        InputModal::new(ctx)
+                            .title("Create new playlist")
+                            .confirm_label("Save")
+                            .input_label("Playlist name:")
+                            .on_confirm(move |ctx, value| {
+                                let value = value.to_owned();
+                                ctx.command(move |client| {
+                                    client.create_playlist(&value, song_files)?;
+                                    Ok(())
+                                });
+                                Ok(())
+                            })
+                    );
+                    Ok(())
+                });
+
+                let song_files = self.items(false).map(|(_, item)| item.file.clone()).collect();
+                section.add_item("Add to playlist", move |ctx| {
+                    let playlists = ctx.query_sync(move |client| {
+                        Ok(client.list_playlists()?.into_iter().map(|p| p.name).collect_vec())
+                    })?;
+                    modal!(
+                        ctx,
+                        SelectModal::builder()
+                            .ctx(ctx)
+                            .options(playlists)
+                            .confirm_label("Add")
+                            .title("Select a playlist")
+                            .on_confirm(move |ctx, selected, _idx| {
+                                ctx.command(move |client| {
+                                    client.add_to_playlist_multiple(&selected, song_files)?;
+                                    Ok(())
+                                });
+                                Ok(())
+                            })
+                            .build()
+                    );
+                    Ok(())
+                });
+                Some(section)
+            })
+            .list_section(ctx, |mut section| {
+                section.add_item("Cancel", |_| Ok(()));
+                Some(section)
+            })
+            .build();
+        modal!(ctx, modal);
+        Ok(())
+    }
 }
 
 impl Pane for SearchPane {
@@ -612,7 +1101,7 @@ impl Pane for SearchPane {
                         }
                     }
                     Phase::BrowseResults { .. } => {
-                        let (items, _hovered_idx) = self.enqueue(false);
+                        let (_, items) = self.enqueue(false);
                         if !items.is_empty() {
                             ctx.command(move |client| {
                                 client.enqueue_multiple(
@@ -660,7 +1149,7 @@ impl Pane for SearchPane {
                     }
                 }
                 Phase::BrowseResults { .. } => {
-                    let (items, _hovered_idx) = self.enqueue(false);
+                    let (_, items) = self.enqueue(false);
                     if !items.is_empty() {
                         ctx.command(move |client| {
                             client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::None)?;
@@ -728,6 +1217,20 @@ impl Pane for SearchPane {
                     ctx.render()?;
                 }
             },
+            MouseEventKind::RightClick => match self.phase {
+                Phase::BrowseResults { filter_input_on: false } => {
+                    let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
+                    if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
+                        self.songs_dir.select_idx(idx, ctx.config.scrolloff);
+                        self.prepare_preview(ctx);
+
+                        ctx.render()?;
+                    }
+
+                    self.open_result_phase_context_menu(ctx)?;
+                }
+                _ => {}
+            },
             _ => {}
         }
 
@@ -735,7 +1238,6 @@ impl Pane for SearchPane {
     }
 
     fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        let config = &ctx.config;
         match &mut self.phase {
             Phase::SearchTextboxInput => match event.as_common_action(ctx) {
                 Some(CommonAction::Close) => {
@@ -774,340 +1276,13 @@ impl Pane for SearchPane {
                 }
             },
             Phase::Search => {
-                if let Some(action) = event.as_global_action(ctx) {
-                    if let GlobalAction::ExternalCommand { command, .. } = action {
-                        let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                        run_external(command.clone(), create_env(ctx, songs));
-                    } else {
-                        event.abandon();
-                    }
-                } else if let Some(action) = event.as_common_action(ctx) {
-                    match action.to_owned() {
-                        CommonAction::Down => {
-                            if config.wrap_navigation {
-                                self.inputs.next();
-                            } else {
-                                self.inputs.next_non_wrapping();
-                            }
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Up => {
-                            if config.wrap_navigation {
-                                self.inputs.prev();
-                            } else {
-                                self.inputs.prev_non_wrapping();
-                            }
-
-                            ctx.render()?;
-                        }
-                        CommonAction::MoveDown => {}
-                        CommonAction::MoveUp => {}
-                        CommonAction::DownHalf => {}
-                        CommonAction::UpHalf => {}
-                        CommonAction::PageDown => {}
-                        CommonAction::PageUp => {}
-                        CommonAction::Right if !self.songs_dir.items.is_empty() => {
-                            self.phase = Phase::BrowseResults { filter_input_on: false };
-                            self.preview = None;
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Right => {}
-                        CommonAction::Left => {}
-                        CommonAction::Top => {
-                            self.inputs.first();
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Bottom => {
-                            self.inputs.last();
-
-                            ctx.render()?;
-                        }
-                        CommonAction::EnterSearch => {}
-                        CommonAction::NextResult => {}
-                        CommonAction::PreviousResult => {}
-                        CommonAction::Select => {}
-                        CommonAction::InvertSelection => {}
-                        CommonAction::Rename => {}
-                        CommonAction::Close => {}
-                        CommonAction::Confirm => {
-                            self.activate_input(ctx);
-                            ctx.render()?;
-                        }
-                        CommonAction::FocusInput
-                            if matches!(self.inputs.focused(), FocusedInputGroup::Textboxes(_)) =>
-                        {
-                            self.phase = Phase::SearchTextboxInput;
-
-                            ctx.render()?;
-                        }
-                        // Modal while we are on search column does not support all options. It can
-                        // be implemented later.
-                        CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
-                        CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
-                            let (enqueue, _hovered_idx) = self.enqueue(opts.all);
-                            if !enqueue.is_empty() {
-                                let queue_len = ctx.queue.len();
-                                let current_song_idx =
-                                    ctx.find_current_song_in_queue().map(|(i, _)| i);
-
-                                ctx.command(move |client| {
-                                    let autoplay = opts.autoplay(queue_len, current_song_idx, None);
-                                    client.enqueue_multiple(enqueue, opts.position, autoplay)?;
-
-                                    Ok(())
-                                });
-                            }
-                        }
-                        // This action only makes sense when opts.all is true while we are on the
-                        // search column.
-                        CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
-                        CommonAction::FocusInput => {}
-                        CommonAction::Delete => match self.inputs.focused_mut() {
-                            FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
-                                textbox.value.clear();
-                                self.search(ctx);
-
-                                ctx.render()?;
-                            }
-                            _ => {}
-                        },
-                        CommonAction::PaneDown => {}
-                        CommonAction::PaneUp => {}
-                        CommonAction::PaneRight => {}
-                        CommonAction::PaneLeft => {}
-                        CommonAction::ShowInfo => {}
-                    }
-                }
+                self.handle_search_phase_action(event, ctx)?;
             }
-            Phase::BrowseResults { filter_input_on: filter_input_on @ true } => {
-                match event.as_common_action(ctx) {
-                    Some(CommonAction::Close) => {
-                        *filter_input_on = false;
-                        self.songs_dir.set_filter(None, config);
-                        self.prepare_preview(ctx);
-
-                        ctx.render()?;
-                    }
-                    Some(CommonAction::Confirm) => {
-                        *filter_input_on = false;
-
-                        ctx.render()?;
-                    }
-                    _ => {
-                        event.stop_propagation();
-                        match event.code() {
-                            KeyCode::Char(c) => {
-                                self.songs_dir.push_filter(c, config);
-                                self.songs_dir.jump_first_matching(config);
-                                self.prepare_preview(ctx);
-
-                                ctx.render()?;
-                            }
-                            KeyCode::Backspace => {
-                                self.songs_dir.pop_filter(config);
-
-                                ctx.render()?;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
+            Phase::BrowseResults { filter_input_on: true } => {
+                self.handle_result_phase_search(event, ctx)?;
             }
-            Phase::BrowseResults { filter_input_on: filter_input_mode @ false } => {
-                if let Some(action) = event.as_global_action(ctx) {
-                    match action {
-                        GlobalAction::ExternalCommand { command, .. }
-                            if !self.songs_dir.marked().is_empty() =>
-                        {
-                            let songs =
-                                self.songs_dir.marked_items().map(|song| song.file.as_str());
-                            run_external(command.clone(), create_env(ctx, songs));
-                        }
-                        GlobalAction::ExternalCommand { command, .. } => {
-                            let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                            run_external(command.clone(), create_env(ctx, selected));
-                        }
-                        _ => {
-                            event.abandon();
-                        }
-                    }
-                } else if let Some(action) = event.as_common_action(ctx) {
-                    match action.to_owned() {
-                        CommonAction::Down => {
-                            self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Up => {
-                            self.songs_dir.prev(ctx.config.scrolloff, ctx.config.wrap_navigation);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::MoveDown => {}
-                        CommonAction::MoveUp => {}
-                        CommonAction::DownHalf => {
-                            self.songs_dir.next_half_viewport(ctx.config.scrolloff);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::UpHalf => {
-                            self.songs_dir.prev_half_viewport(ctx.config.scrolloff);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::PageDown => {
-                            self.songs_dir.next_viewport(ctx.config.scrolloff);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::PageUp => {
-                            self.songs_dir.prev_viewport(ctx.config.scrolloff);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Right => {
-                            let items = self.songs_dir.selected().map_or_else(Vec::new, |item| {
-                                vec![Enqueue::File { path: item.file.clone() }]
-                            });
-                            if !items.is_empty() {
-                                ctx.command(move |client| {
-                                    client.enqueue_multiple(
-                                        items,
-                                        Position::EndOfQueue,
-                                        Autoplay::None,
-                                    )?;
-                                    Ok(())
-                                });
-                            }
-                        }
-                        CommonAction::Left => {
-                            self.phase = Phase::Search;
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Top => {
-                            self.songs_dir.first();
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Bottom => {
-                            self.songs_dir.last();
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::EnterSearch => {
-                            self.songs_dir.set_filter(Some(String::new()), config);
-                            *filter_input_mode = true;
-
-                            ctx.render()?;
-                        }
-                        CommonAction::NextResult => {
-                            self.songs_dir.jump_next_matching(config);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::PreviousResult => {
-                            self.songs_dir.jump_previous_matching(config);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Select => {
-                            self.songs_dir.toggle_mark_selected();
-                            self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
-
-                            ctx.render()?;
-                        }
-                        CommonAction::InvertSelection => {
-                            self.songs_dir.invert_marked();
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Close if !self.songs_dir.marked().is_empty() => {
-                            self.songs_dir.marked_mut().clear();
-                            ctx.render()?;
-                        }
-                        CommonAction::Rename => {}
-                        CommonAction::Close => {}
-                        CommonAction::Confirm if self.songs_dir.marked().is_empty() => {
-                            let (items, hovered_song_idx) = self.enqueue(true);
-                            let queue_len = ctx.queue.len();
-                            let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
-
-                            if !items.is_empty() {
-                                ctx.command(move |client| {
-                                    client.enqueue_multiple(
-                                        items,
-                                        Position::Replace,
-                                        Autoplay::Hovered {
-                                            queue_len,
-                                            current_song_idx,
-                                            hovered_song_idx,
-                                        },
-                                    )?;
-                                    Ok(())
-                                });
-                            }
-
-                            ctx.render()?;
-                        }
-                        CommonAction::Confirm => {}
-                        CommonAction::FocusInput => {}
-                        CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                            let (enqueue, hovered_song_idx) = self.enqueue(opts.all);
-
-                            if !enqueue.is_empty() {
-                                let queue_len = ctx.queue.len();
-                                let current_song_idx =
-                                    ctx.find_current_song_in_queue().map(|(i, _)| i);
-
-                                ctx.command(move |client| {
-                                    let autoplay = opts.autoplay(
-                                        queue_len,
-                                        current_song_idx,
-                                        hovered_song_idx,
-                                    );
-
-                                    client.enqueue_multiple(enqueue, opts.position, autoplay)?;
-
-                                    Ok(())
-                                });
-                            }
-                        }
-                        CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
-                            let opts = opts
-                                .iter()
-                                .map(|(label, opts)| {
-                                    let (enqueue, hovered_song_idx) = self.enqueue(opts.all);
-
-                                    (label.to_owned(), *opts, (enqueue, hovered_song_idx))
-                                })
-                                .collect_vec();
-
-                            modal!(ctx, create_add_modal(opts, ctx));
-                        }
-                        CommonAction::Delete => {}
-                        CommonAction::PaneDown => {}
-                        CommonAction::PaneUp => {}
-                        CommonAction::PaneRight => {}
-                        CommonAction::PaneLeft => {}
-                        CommonAction::ShowInfo => {}
-                    }
-                }
+            Phase::BrowseResults { filter_input_on: false } => {
+                self.handle_result_phase_action(event, ctx)?;
             }
         }
         Ok(())

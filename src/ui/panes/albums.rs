@@ -14,9 +14,9 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
-        ext::mpd_client::{Autoplay, Enqueue, MpdClientExt},
         key_event::KeyEvent,
         mouse_event::MouseEvent,
+        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
         mpd_query::PreviewGroup,
     },
     ui::{
@@ -239,6 +239,13 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         &mut self.stack
     }
 
+    fn initial_playlist_name(&self) -> Option<String> {
+        self.stack().current().selected().and_then(|item| match item {
+            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
+            DirOrSong::Song(_) => None,
+        })
+    }
+
     fn set_filter_input_mode_active(&mut self, active: bool) {
         self.filter_input_mode = active;
     }
@@ -250,7 +257,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
     fn list_songs_in_item(
         &self,
         item: DirOrSong,
-    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Clone + 'static {
         move |client| match item {
             DirOrSong::Dir { name, .. } => Ok(client.find(&[Filter::new(Tag::Album, &name)])?),
             DirOrSong::Song(song) => Ok(vec![song.clone()]),

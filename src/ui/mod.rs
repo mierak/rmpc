@@ -31,7 +31,10 @@ use crate::{
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
-    core::command::{create_env, run_external},
+    core::{
+        command::{create_env, run_external},
+        config_watcher::ERROR_CONFIG_MODAL_ID,
+    },
     ctx::Ctx,
     mpd::{
         commands::{State, idle::IdleEvent},
@@ -42,10 +45,11 @@ use crate::{
     },
     shared::{
         events::{Level, WorkRequest},
-        ext::mpd_client::MpdClientExt,
+        id::Id,
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
+        mpd_client_ext::MpdClientExt,
     },
 };
 
@@ -232,22 +236,22 @@ impl<'ui> Ui<'ui> {
                     })?;
                     let modal = MenuModal::new(ctx)
                         .width(60)
-                        .add_list_section(ctx, |section| {
+                        .list_section(ctx, |section| {
                             if ctx.status.partition == "default" {
                                 None
                             } else {
-                                let section =
-                                    section.add_item("Switch to default partition", |ctx| {
-                                        ctx.command(move |client| {
-                                            client.switch_to_partition("default")?;
-                                            Ok(())
-                                        });
+                                let section = section.item("Switch to default partition", |ctx| {
+                                    ctx.command(move |client| {
+                                        client.switch_to_partition("default")?;
+                                        Ok(())
                                     });
+                                    Ok(())
+                                });
 
                                 Some(section)
                             }
                         })
-                        .add_multi_section(ctx, |section| {
+                        .multi_section(ctx, |section| {
                             let mut section = section
                                 .add_action("Switch", |ctx, label| {
                                     ctx.command(move |client| {
@@ -272,7 +276,7 @@ impl<'ui> Ui<'ui> {
 
                             if any_non_default { Some(section) } else { None }
                         })
-                        .add_input_section(ctx, "New partition:", |section| {
+                        .input_section(ctx, "New partition:", |section| {
                             section.action(|ctx, value| {
                                 if !value.is_empty() {
                                     ctx.command(move |client| {
@@ -286,11 +290,7 @@ impl<'ui> Ui<'ui> {
                                 }
                             })
                         })
-                        .add_list_section(ctx, |section| {
-                            Some(section.add_item("Cancel", |ctx| {
-                                ctx.command(|_| Ok(()));
-                            }))
-                        })
+                        .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
                         .build();
 
                     modal!(ctx, modal);
@@ -550,31 +550,43 @@ impl<'ui> Ui<'ui> {
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
-                if let Some(id) = modal.get_id() {
-                    if let Some(existing) =
-                        self.modals.iter_mut().find(|m| m.get_id().as_ref() == Some(&id))
-                    {
-                        *existing = modal;
-                    } else {
-                        self.modals.push(modal);
-                    }
+                let existing_modal = modal.replacement_id().and_then(|id| {
+                    self.modals
+                        .iter_mut()
+                        .find(|m| m.replacement_id().as_ref().is_some_and(|m_id| *m_id == id))
+                });
+
+                if let Some(existing_modal) = existing_modal {
+                    *existing_modal = modal;
                 } else {
                     self.modals.push(modal);
                 }
+
                 self.on_event(UiEvent::ModalOpened, ctx)?;
                 ctx.render()?;
             }
             UiAppEvent::PopConfigErrorModal => {
-                if let Some(config_modal) = self.modals.last() {
-                    if config_modal.get_id() == Some("config_error_modal".into()) {
-                        let _ = self.on_ui_app_event(UiAppEvent::PopModal, ctx);
-                    }
+                let original_len = self.modals.len();
+                self.modals
+                    .retain(|m| m.replacement_id().is_none_or(|id| id != ERROR_CONFIG_MODAL_ID));
+                let new_len = self.modals.len();
+                if new_len == 0 {
+                    self.on_event(UiEvent::ModalClosed, ctx)?;
+                }
+                if original_len != new_len {
+                    ctx.render()?;
                 }
             }
-            UiAppEvent::PopModal => {
-                self.modals.pop();
-                self.on_event(UiEvent::ModalClosed, ctx)?;
-                ctx.render()?;
+            UiAppEvent::PopModal(id) => {
+                let original_len = self.modals.len();
+                self.modals.retain(|m| m.id() != id);
+                let new_len = self.modals.len();
+                if new_len == 0 {
+                    self.on_event(UiEvent::ModalClosed, ctx)?;
+                }
+                if original_len != new_len {
+                    ctx.render()?;
+                }
             }
             UiAppEvent::ChangeTab(tab_name) => {
                 self.change_tab(tab_name, ctx)?;
@@ -751,7 +763,7 @@ impl<'ui> Ui<'ui> {
 #[derive(Debug)]
 pub enum UiAppEvent {
     Modal(Box<dyn Modal + Send + Sync>),
-    PopModal,
+    PopModal(Id),
     PopConfigErrorModal,
     ChangeTab(TabName),
 }

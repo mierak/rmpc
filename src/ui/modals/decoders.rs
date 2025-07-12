@@ -16,8 +16,8 @@ use crate::{
     mpd::commands::Decoder,
     shared::{
         ext::iter::IntoZipLongest2,
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::dirstack::DirState,
@@ -25,6 +25,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct DecodersModal {
+    id: Id,
     scrolling_state: DirState<TableState>,
     table_area: Rect,
     decoders: Vec<(String, String, String)>,
@@ -41,8 +42,12 @@ impl DecodersModal {
                 (name, mime, suffixes)
             })
             .collect();
-        let mut result =
-            Self { decoders, scrolling_state: DirState::default(), table_area: Rect::default() };
+        let mut result = Self {
+            id: id::new(),
+            decoders,
+            scrolling_state: DirState::default(),
+            table_area: Rect::default(),
+        };
         result.scrolling_state.set_content_len(Some(result.decoders.len()));
         result.scrolling_state.first();
 
@@ -75,6 +80,10 @@ impl DecodersModal {
 }
 
 impl Modal for DecodersModal {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(80, 80);
         frame.render_widget(Clear, popup_area);
@@ -199,7 +208,7 @@ impl Modal for DecodersModal {
                 }
                 CommonAction::Confirm => {}
                 CommonAction::Close => {
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 _ => {}
             }

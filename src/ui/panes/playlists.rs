@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
@@ -15,13 +15,11 @@ use crate::{
         mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
-        ext::{
-            btreeset_ranges::BTreeSetRanges,
-            mpd_client::{Autoplay, Enqueue, MpdClientExt},
-        },
+        ext::btreeset_ranges::BTreeSetRanges,
         key_event::KeyEvent,
         macros::{modal, status_info},
         mouse_event::MouseEvent,
+        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt, MpdDelete},
         mpd_query::PreviewGroup,
     },
     status_warn,
@@ -30,11 +28,7 @@ use crate::{
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
-        modals::{
-            confirm_modal::ConfirmModal,
-            info_list_modal::InfoListModal,
-            input_modal::InputModal,
-        },
+        modals::{info_list_modal::InfoListModal, input_modal::InputModal},
         widgets::browser::Browser,
     },
 };
@@ -346,6 +340,13 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         &mut self.stack
     }
 
+    fn initial_playlist_name(&self) -> Option<String> {
+        self.stack().current().selected().and_then(|item| match item {
+            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
+            DirOrSong::Song(_) => None,
+        })
+    }
+
     fn set_filter_input_mode_active(&mut self, active: bool) {
         self.filter_input_mode = active;
     }
@@ -375,7 +376,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     fn list_songs_in_item(
         &self,
         item: DirOrSong,
-    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + 'static {
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Clone + 'static {
         move |client| {
             Ok(match item {
                 DirOrSong::Dir { name, .. } => client.list_playlist_info(&name, None)?,
@@ -384,46 +385,28 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         }
     }
 
-    fn delete(&self, item: &DirOrSong, index: usize, ctx: &Ctx) -> Result<()> {
-        match item {
-            DirOrSong::Dir { name: d, .. } => {
-                let d = d.clone();
-                modal!(
-                    ctx,
-                    ConfirmModal::builder()
-                    .ctx(ctx)
-                        .message("Are you sure you want to delete this playlist? This action cannot be undone.")
-                        .on_confirm(move |ctx| {
-                            let d = d.clone();
-                            ctx.command(move |client| {
-                                client.delete_playlist(&d)?;
-                                status_info!("Playlist '{d}' deleted");
-                                Ok(())
-                            });
-                            Ok(())
-                        })
-                        .confirm_label("Delete")
-                        .size((45, 6))
-                        .build()
-                );
+    fn delete<'a>(&self, items: impl Iterator<Item = (usize, &'a DirOrSong)>) -> Vec<MpdDelete> {
+        match self.stack().path() {
+            [playlist] => {
+                let playlist: Arc<str> = Arc::from(playlist.as_str());
+                items
+                    .filter_map(|(idx, item)| match item {
+                        DirOrSong::Dir { .. } => None,
+                        DirOrSong::Song(_) => Some(MpdDelete::SongInPlaylist {
+                            playlist: Arc::clone(&playlist),
+                            range: SingleOrRange::single(idx),
+                        }),
+                    })
+                    .collect_vec()
             }
-            DirOrSong::Song(s) => {
-                let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected()
-                else {
-                    return Ok(());
-                };
-                let playlist = playlist.clone();
-                let file = s.file.clone();
-                ctx.command(move |client| {
-                    client.delete_from_playlist(&playlist, &SingleOrRange::single(index))?;
-                    status_info!("File '{file}' deleted from playlist '{playlist}'");
-                    Ok(())
-                });
-
-                ctx.render()?;
-            }
+            [] => items
+                .filter_map(|(_, item)| match item {
+                    DirOrSong::Dir { name, .. } => Some(MpdDelete::Playlist { name: name.clone() }),
+                    DirOrSong::Song(_) => None,
+                })
+                .collect_vec(),
+            _ => Vec::new(),
         }
-        Ok(())
     }
 
     fn enqueue<'a>(
@@ -448,7 +431,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         })
     }
 
-    fn rename(&self, item: &DirOrSong, ctx: &Ctx) -> Result<()> {
+    fn can_rename(&self, item: &DirOrSong) -> bool {
+        matches!(item, DirOrSong::Dir { .. })
+    }
+
+    fn rename(item: &DirOrSong, ctx: &Ctx) -> Result<()> {
         match item {
             DirOrSong::Dir { name: d, .. } => {
                 let current_name = d.clone();

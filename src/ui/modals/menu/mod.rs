@@ -13,8 +13,8 @@ use crate::{
     config::keys::actions::AddOpts,
     ctx::Ctx,
     shared::{
-        ext::mpd_client::{Enqueue, MpdClientExt as _},
         key_event::KeyEvent,
+        mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
 };
 
@@ -35,7 +35,7 @@ trait Section {
     fn unselect(&mut self);
     fn unfocus(&mut self) {}
 
-    fn confirm(&mut self, ctx: &Ctx) -> bool;
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool>;
     fn key_input(&mut self, _key: &mut KeyEvent, _ctx: &Ctx) -> Result<()> {
         Ok(())
     }
@@ -44,7 +44,7 @@ trait Section {
     fn render(&mut self, area: Rect, buf: &mut Buffer);
 
     fn left_click(&mut self, pos: ratatui::layout::Position);
-    fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> bool;
+    fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> Result<bool>;
 }
 
 #[derive(Debug)]
@@ -103,7 +103,7 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> bool {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         match self {
             SectionType::Menu(s) => s.confirm(ctx),
             SectionType::Multi(s) => s.confirm(ctx),
@@ -143,7 +143,7 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn double_click(&mut self, pos: Position, ctx: &Ctx) -> bool {
+    fn double_click(&mut self, pos: Position, ctx: &Ctx) -> Result<bool> {
         match self {
             SectionType::Menu(s) => s.double_click(pos, ctx),
             SectionType::Multi(s) => s.double_click(pos, ctx),
@@ -157,13 +157,13 @@ pub fn create_add_modal<'a>(
     ctx: &Ctx,
 ) -> MenuModal<'a> {
     MenuModal::new(ctx)
-        .add_list_section(ctx, |section| {
+        .list_section(ctx, |section| {
             let queue_len = ctx.queue.len();
             let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
             let mut section = section;
 
             for (label, options, (enqueue, hovered_idx)) in opts {
-                section = section.add_item(label, move |ctx| {
+                section = section.item(label, move |ctx| {
                     if !enqueue.is_empty() {
                         ctx.command(move |client| {
                             let autoplay =
@@ -173,10 +173,11 @@ pub fn create_add_modal<'a>(
                             Ok(())
                         });
                     }
+                    Ok(())
                 });
             }
             Some(section)
         })
-        .add_list_section(ctx, |section| Some(section.add_item("Cancel", |_ctx| {})))
+        .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
         .build()
 }

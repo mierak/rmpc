@@ -644,6 +644,10 @@ impl MpdClient for TestMpdClient {
     fn send_message(&mut self, _channel: &str, _content: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
+
+    fn clear_playlist(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
 }
 
 impl SocketClient for TestMpdClient {

@@ -11,7 +11,7 @@ use super::UiEvent;
 use crate::{
     MpdQueryResult,
     ctx::Ctx,
-    shared::{key_event::KeyEvent, mouse_event::MouseEvent},
+    shared::{id::Id, key_event::KeyEvent, mouse_event::MouseEvent},
 };
 
 pub mod add_random_modal;
@@ -27,6 +27,8 @@ pub mod select_modal;
 
 #[allow(unused)]
 pub(crate) trait Modal: std::fmt::Debug {
+    fn id(&self) -> Id;
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut crate::ctx::Ctx) -> Result<()>;
 
     fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
@@ -46,8 +48,14 @@ pub(crate) trait Modal: std::fmt::Debug {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<Cow<'static, str>> {
+    fn replacement_id(&self) -> Option<&Cow<'static, str>> {
         None
+    }
+
+    fn hide(&mut self, ctx: &mut Ctx) -> Result<()> {
+        ctx.app_event_sender
+            .send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::PopModal(self.id())))?;
+        Ok(())
     }
 }
 

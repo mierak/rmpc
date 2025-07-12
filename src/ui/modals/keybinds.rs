@@ -19,8 +19,8 @@ use crate::{
     ctx::Ctx,
     shared::{
         ext::iter::IntoZipLongest2,
+        id::{self, Id},
         key_event::KeyEvent,
-        macros::pop_modal,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     status_warn,
@@ -29,6 +29,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct KeybindsModal {
+    id: Id,
     scrolling_state: DirState<TableState>,
     table_area: Rect,
     filter: Option<String>,
@@ -63,6 +64,7 @@ impl KeybindsModal {
         scrolling_state.select(Some(0), 0);
 
         Self {
+            id: id::new(),
             scrolling_state,
             table_area: Rect::default(),
             filter: None,
@@ -204,6 +206,10 @@ fn row<'a>(
 }
 
 impl Modal for KeybindsModal {
+    fn id(&self) -> Id {
+        self.id
+    }
+
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let popup_area = frame.area().centered(90, 90);
         frame.render_widget(Clear, popup_area);
@@ -395,7 +401,7 @@ impl Modal for KeybindsModal {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    pop_modal!(ctx);
+                    self.hide(ctx)?;
                 }
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;

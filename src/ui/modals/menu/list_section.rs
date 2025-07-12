@@ -1,4 +1,5 @@
 #![allow(clippy::cast_possible_truncation)]
+use anyhow::Result;
 use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
@@ -22,7 +23,7 @@ pub struct ListSection {
 pub struct MenuItem {
     pub label: String,
     #[debug(skip)]
-    pub on_confirm: Option<Box<dyn FnOnce(&Ctx) + Send + Sync + 'static>>,
+    pub on_confirm: Option<Box<dyn FnOnce(&Ctx) -> Result<()> + Send + Sync + 'static>>,
 }
 
 impl ListSection {
@@ -30,11 +31,20 @@ impl ListSection {
         Self { items: Vec::new(), area: Rect::default(), selected_idx: None, current_item_style }
     }
 
-    pub fn add_item(
+    pub fn item(
         mut self,
         label: impl Into<String>,
-        on_confirm: impl FnOnce(&Ctx) + Send + Sync + 'static,
+        on_confirm: impl FnOnce(&Ctx) -> Result<()> + Send + Sync + 'static,
     ) -> Self {
+        self.items.push(MenuItem { label: label.into(), on_confirm: Some(Box::new(on_confirm)) });
+        self
+    }
+
+    pub fn add_item(
+        &mut self,
+        label: impl Into<String>,
+        on_confirm: impl FnOnce(&Ctx) -> Result<()> + Send + Sync + 'static,
+    ) -> &mut Self {
         self.items.push(MenuItem { label: label.into(), on_confirm: Some(Box::new(on_confirm)) });
         self
     }
@@ -87,13 +97,13 @@ impl Section for ListSection {
         self.selected_idx = None;
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> bool {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if let Some(selected_idx) = self.selected_idx {
             if let Some(cb) = self.items[selected_idx].on_confirm.take() {
-                (cb)(ctx);
+                (cb)(ctx)?;
             }
         }
-        false
+        Ok(false)
     }
 
     fn len(&self) -> usize {
@@ -108,9 +118,9 @@ impl Section for ListSection {
         self.select_item_at_position(position);
     }
 
-    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> bool {
-        self.confirm(ctx);
-        false
+    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
+        self.confirm(ctx)?;
+        Ok(false)
     }
 }
 

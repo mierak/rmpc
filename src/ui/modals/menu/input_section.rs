@@ -63,15 +63,15 @@ impl Section for InputSection<'_> {
         self.is_current = false;
     }
 
-    fn confirm(&mut self, ctx: &crate::ctx::Ctx) -> bool {
+    fn confirm(&mut self, ctx: &crate::ctx::Ctx) -> Result<bool> {
         if self.is_focused {
             if let Some(cb) = self.action.take() {
                 (cb)(ctx, std::mem::take(&mut self.value));
             }
-            false
+            Ok(false)
         } else {
             self.is_focused = true;
-            true
+            Ok(true)
         }
     }
 
@@ -91,15 +91,15 @@ impl Section for InputSection<'_> {
         self.is_current = true;
     }
 
-    fn double_click(&mut self, pos: Position, _ctx: &Ctx) -> bool {
+    fn double_click(&mut self, pos: Position, _ctx: &Ctx) -> Result<bool> {
         if self.is_focused || !self.area.contains(pos) {
-            return false;
+            return Ok(false);
         }
 
         self.is_current = true;
         self.is_focused = true;
 
-        true
+        Ok(true)
     }
 
     fn key_input(&mut self, key: &mut KeyEvent, ctx: &Ctx) -> Result<()> {

@@ -57,7 +57,7 @@ pub(crate) enum AppEvent {
         message: Vec<String>,
         title: Option<String>,
         size: Option<Size>,
-        id: Option<String>,
+        replacement_id: Option<String>,
     },
     Log(Vec<u8>),
     IdleEvent(IdleEvent),

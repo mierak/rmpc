@@ -136,15 +136,8 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Enter,     modifiers: M::NONE    }, C::Confirm),
                 (Key { key: K::Char('i'), modifiers: M::NONE    }, C::FocusInput),
                 (Key { key: K::Char('B'), modifiers: M::SHIFT   }, C::ShowInfo),
+                (Key { key: K::Char('z'), modifiers: M::CONTROL }, C::ContextMenu {}),
             ]),
-            // albums: HashMap::from([
-            // ]),
-            // artists: HashMap::from([
-            // ]),
-            // directories: HashMap::from([
-            // ]),
-            // playlists: HashMap::from([
-            // ]),
             #[cfg(debug_assertions)]
             logs: HashMap::from([
                 (Key { key: K::Char('D'), modifiers: M::SHIFT   }, L::Clear),

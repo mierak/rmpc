@@ -5,7 +5,7 @@ use bon::Builder;
 use crossbeam::channel::Sender;
 use ratatui::{style::Style, widgets::ListItem};
 
-use super::{events::AppEvent, ext::mpd_client::PartitionedOutput};
+use super::{events::AppEvent, mpd_client_ext::PartitionedOutput};
 use crate::{
     config::tabs::PaneType,
     mpd::{

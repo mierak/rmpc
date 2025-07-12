@@ -154,6 +154,7 @@ pub trait MpdCommand {
     fn send_load_playlist(&mut self, name: &str, position: Option<QueuePosition>) -> MpdResult<()>;
     fn send_rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     fn send_delete_playlist(&mut self, name: &str) -> MpdResult<()>;
+    fn send_clear_playlist(&mut self, name: &str) -> MpdResult<()>;
     fn send_delete_from_playlist(
         &mut self,
         playlist_name: &str,
@@ -270,6 +271,7 @@ pub trait MpdClient: Sized {
     fn load_playlist(&mut self, name: &str, position: Option<QueuePosition>) -> MpdResult<()>;
     fn rename_playlist(&mut self, name: &str, new_name: &str) -> MpdResult<()>;
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()>;
+    fn clear_playlist(&mut self, name: &str) -> MpdResult<()>;
     fn delete_from_playlist(&mut self, name: &str, songs: &SingleOrRange) -> MpdResult<()>;
     fn move_in_playlist(
         &mut self,
@@ -666,6 +668,10 @@ impl MpdClient for Client<'_> {
     }
 
     fn delete_playlist(&mut self, name: &str) -> MpdResult<()> {
+        self.send_delete_playlist(name).and_then(|()| self.read_ok())
+    }
+
+    fn clear_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.send_delete_playlist(name).and_then(|()| self.read_ok())
     }
 
@@ -1157,6 +1163,10 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_delete_playlist(&mut self, name: &str) -> MpdResult<()> {
         self.execute(&format!("rm {}", name.quote_and_escape()))
+    }
+
+    fn send_clear_playlist(&mut self, name: &str) -> MpdResult<()> {
+        self.execute(&format!("playlistclear {}", name.quote_and_escape()))
     }
 
     fn send_delete_from_playlist(
