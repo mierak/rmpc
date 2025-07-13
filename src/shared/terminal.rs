@@ -25,7 +25,7 @@ use ratatui::{
     prelude::{Backend, CrosstermBackend},
 };
 
-use crate::shared::tmux::{IS_TMUX, tmux_write};
+use crate::shared::tmux::IS_TMUX;
 
 #[allow(dead_code)]
 pub struct Terminal {
