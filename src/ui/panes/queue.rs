@@ -544,7 +544,12 @@ impl Pane for QueuePane {
         let position = event.into();
 
         if ctx.config.theme.scrollbar.is_some()
-            && crate::shared::mouse_event::is_scrollbar_interaction(event, self.areas[Areas::Scrollbar], event.drag_start_position) {
+            && crate::shared::mouse_event::is_scrollbar_interaction(
+                event,
+                self.areas[Areas::Scrollbar],
+                event.drag_start_position,
+            )
+        {
             match event.kind {
                 MouseEventKind::LeftClick | MouseEventKind::Drag => {
                     let content_len = ctx.queue.len();

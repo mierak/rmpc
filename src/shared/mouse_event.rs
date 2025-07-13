@@ -43,25 +43,52 @@ impl MouseEventTracker {
         match value.kind {
             CTMouseEventKind::Down(MouseButton::Left) => {
                 if self.last_left_click.is_some_and(|c| c.is_doubled(x, y)) {
-                    Some(MouseEvent { x, y, kind: MouseEventKind::DoubleClick, drag_start_position: self.drag_start_position })
+                    Some(MouseEvent {
+                        x,
+                        y,
+                        kind: MouseEventKind::DoubleClick,
+                        drag_start_position: self.drag_start_position,
+                    })
                 } else {
-                    Some(MouseEvent { x, y, kind: MouseEventKind::LeftClick, drag_start_position: self.drag_start_position })
+                    Some(MouseEvent {
+                        x,
+                        y,
+                        kind: MouseEventKind::LeftClick,
+                        drag_start_position: self.drag_start_position,
+                    })
                 }
             }
-            CTMouseEventKind::Down(MouseButton::Right) => {
-                Some(MouseEvent { x, y, kind: MouseEventKind::RightClick, drag_start_position: self.drag_start_position })
-            }
-            CTMouseEventKind::Down(MouseButton::Middle) => {
-                Some(MouseEvent { x, y, kind: MouseEventKind::MiddleClick, drag_start_position: self.drag_start_position })
-            }
-            CTMouseEventKind::ScrollDown => {
-                Some(MouseEvent { x, y, kind: MouseEventKind::ScrollDown, drag_start_position: self.drag_start_position })
-            }
-            CTMouseEventKind::ScrollUp => Some(MouseEvent { x, y, kind: MouseEventKind::ScrollUp, drag_start_position: self.drag_start_position }),
+            CTMouseEventKind::Down(MouseButton::Right) => Some(MouseEvent {
+                x,
+                y,
+                kind: MouseEventKind::RightClick,
+                drag_start_position: self.drag_start_position,
+            }),
+            CTMouseEventKind::Down(MouseButton::Middle) => Some(MouseEvent {
+                x,
+                y,
+                kind: MouseEventKind::MiddleClick,
+                drag_start_position: self.drag_start_position,
+            }),
+            CTMouseEventKind::ScrollDown => Some(MouseEvent {
+                x,
+                y,
+                kind: MouseEventKind::ScrollDown,
+                drag_start_position: self.drag_start_position,
+            }),
+            CTMouseEventKind::ScrollUp => Some(MouseEvent {
+                x,
+                y,
+                kind: MouseEventKind::ScrollUp,
+                drag_start_position: self.drag_start_position,
+            }),
             CTMouseEventKind::Up(_) => None,
-            CTMouseEventKind::Drag(MouseButton::Left) => {
-                Some(MouseEvent { x, y, kind: MouseEventKind::Drag, drag_start_position: self.drag_start_position })
-            }
+            CTMouseEventKind::Drag(MouseButton::Left) => Some(MouseEvent {
+                x,
+                y,
+                kind: MouseEventKind::Drag,
+                drag_start_position: self.drag_start_position,
+            }),
             CTMouseEventKind::Drag(_) => None,
             CTMouseEventKind::Moved => None,
             CTMouseEventKind::ScrollLeft => None,
@@ -122,7 +149,8 @@ impl From<MouseEvent> for Position {
     }
 }
 
-/// calculate the target index for scrollbar interaction based on mouse position.
+/// calculate the target index for scrollbar interaction based on mouse
+/// position.
 pub fn calculate_scrollbar_index(
     event: MouseEvent,
     scrollbar_area: Rect,
@@ -130,11 +158,11 @@ pub fn calculate_scrollbar_index(
 ) -> Option<usize> {
     let clicked_y = event.y.saturating_sub(scrollbar_area.y);
     let scrollbar_height = scrollbar_area.height;
-    
+
     if content_len <= scrollbar_height as usize || scrollbar_height == 0 {
         return None;
     }
-    
+
     let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
         // clicking at the bottom selects the last item
         content_len.saturating_sub(1)
@@ -148,25 +176,27 @@ pub fn calculate_scrollbar_index(
         let target = (position_ratio * (content_len.saturating_sub(1)) as f64).round() as usize;
         target.min(content_len.saturating_sub(1))
     };
-    
+
     Some(target_idx)
 }
 
-/// check if a mouse event should interact with the scrollbar, considering drag start position
+/// check if a mouse event should interact with the scrollbar, considering drag
+/// start position
 pub fn is_scrollbar_interaction(
     event: MouseEvent,
     scrollbar_area: Rect,
     drag_start_position: Option<Position>,
 ) -> bool {
     let scrollbar_x = scrollbar_area.right().saturating_sub(1);
-    
+
     match event.kind {
         MouseEventKind::LeftClick => {
             // For clicks, require exact x position on scrollbar
             event.x == scrollbar_x && scrollbar_area.contains(event.into())
         }
         MouseEventKind::Drag => {
-            // For drags, check if drag started on scrollbar or current position is on scrollbar
+            // For drags, check if drag started on scrollbar or current position is on
+            // scrollbar
             if let Some(drag_start) = drag_start_position {
                 (drag_start.x == scrollbar_x && scrollbar_area.contains(drag_start))
                     || (event.x == scrollbar_x && scrollbar_area.contains(event.into()))
@@ -186,62 +216,93 @@ mod tests {
     fn test_calculate_scrollbar_index_basic() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
         let content_len = 20;
-        
-        let event = MouseEvent { x: 10, y: 5, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let event =
+            MouseEvent { x: 10, y: 5, kind: MouseEventKind::LeftClick, drag_start_position: None };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), Some(0));
-        
-        let event = MouseEvent { x: 10, y: 14, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let event =
+            MouseEvent { x: 10, y: 14, kind: MouseEventKind::LeftClick, drag_start_position: None };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), Some(19));
-        
-        let event = MouseEvent { x: 10, y: 9, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let event =
+            MouseEvent { x: 10, y: 9, kind: MouseEventKind::LeftClick, drag_start_position: None };
         let result = calculate_scrollbar_index(event, scrollbar_area, content_len);
         assert!(result.is_some());
         let index = result.expect("result should be Some as confirmed by assertion");
         assert!(index > 0 && index < 19);
     }
-    
+
     #[test]
     fn test_calculate_scrollbar_index_content_fits() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
         let content_len = 8; // Less than scrollbar height
-        
-        let event = MouseEvent { x: 10, y: 7, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let event =
+            MouseEvent { x: 10, y: 7, kind: MouseEventKind::LeftClick, drag_start_position: None };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), None);
     }
-    
+
     #[test]
     fn test_calculate_scrollbar_index_edge_cases() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
         let content_len = 15;
-        
-        let event = MouseEvent { x: 10, y: 20, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let event =
+            MouseEvent { x: 10, y: 20, kind: MouseEventKind::LeftClick, drag_start_position: None };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), Some(14));
-        
+
         let zero_height_area = Rect::new(10, 5, 1, 0);
-        let event = MouseEvent { x: 10, y: 5, kind: MouseEventKind::LeftClick, drag_start_position: None };
+        let event =
+            MouseEvent { x: 10, y: 5, kind: MouseEventKind::LeftClick, drag_start_position: None };
         assert_eq!(calculate_scrollbar_index(event, zero_height_area, content_len), None);
     }
-    
+
     #[test]
     fn test_scrollbar_interaction_detection() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
         let scrollbar_x = scrollbar_area.right().saturating_sub(1); // x = 10
-        
-        let click_event = MouseEvent { x: scrollbar_x, y: 7, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let click_event = MouseEvent {
+            x: scrollbar_x,
+            y: 7,
+            kind: MouseEventKind::LeftClick,
+            drag_start_position: None,
+        };
         assert!(is_scrollbar_interaction(click_event, scrollbar_area, None));
-        
-        let click_event = MouseEvent { x: scrollbar_x + 1, y: 7, kind: MouseEventKind::LeftClick, drag_start_position: None };
+
+        let click_event = MouseEvent {
+            x: scrollbar_x + 1,
+            y: 7,
+            kind: MouseEventKind::LeftClick,
+            drag_start_position: None,
+        };
         assert!(!is_scrollbar_interaction(click_event, scrollbar_area, None));
-        
+
         let drag_start = Position { x: scrollbar_x, y: 7 };
-        let drag_event = MouseEvent { x: scrollbar_x + 1, y: 9, kind: MouseEventKind::Drag, drag_start_position: None };
+        let drag_event = MouseEvent {
+            x: scrollbar_x + 1,
+            y: 9,
+            kind: MouseEventKind::Drag,
+            drag_start_position: None,
+        };
         assert!(is_scrollbar_interaction(drag_event, scrollbar_area, Some(drag_start)));
-        
+
         let drag_start_off = Position { x: scrollbar_x + 1, y: 7 };
-        let drag_event = MouseEvent { x: scrollbar_x + 1, y: 9, kind: MouseEventKind::Drag, drag_start_position: None };
+        let drag_event = MouseEvent {
+            x: scrollbar_x + 1,
+            y: 9,
+            kind: MouseEventKind::Drag,
+            drag_start_position: None,
+        };
         assert!(!is_scrollbar_interaction(drag_event, scrollbar_area, Some(drag_start_off)));
-        
-        let drag_event = MouseEvent { x: scrollbar_x, y: 9, kind: MouseEventKind::Drag, drag_start_position: None };
+
+        let drag_event = MouseEvent {
+            x: scrollbar_x,
+            y: 9,
+            kind: MouseEventKind::Drag,
+            drag_start_position: None,
+        };
         assert!(is_scrollbar_interaction(drag_event, scrollbar_area, None));
     }
 
@@ -249,8 +310,9 @@ mod tests {
     fn test_calculate_scrollbar_index_drag_behavior() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
         let content_len = 20;
-        
-        let drag_event = MouseEvent { x: 10, y: 9, kind: MouseEventKind::Drag, drag_start_position: None };
+
+        let drag_event =
+            MouseEvent { x: 10, y: 9, kind: MouseEventKind::Drag, drag_start_position: None };
         let result = calculate_scrollbar_index(drag_event, scrollbar_area, content_len);
         assert!(result.is_some());
         let index = result.expect("result should be Some as confirmed by assertion");
