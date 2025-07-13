@@ -22,7 +22,7 @@ use actions::{
     PlaylistsActionsFile,
     QueueActionsFile,
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyModifiers};
 pub use key::Key;
 use serde::{Deserialize, Serialize};
 
@@ -169,12 +169,6 @@ impl From<KeyConfigFile> for KeyConfig {
             logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
             queue: value.queue.into_iter().map(|(k, v)| (k, v.into())).collect(),
         }
-    }
-}
-
-impl From<KeyEvent> for Key {
-    fn from(value: KeyEvent) -> Self {
-        Self { key: value.code, modifiers: value.modifiers }
     }
 }
 

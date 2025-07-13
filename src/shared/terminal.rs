@@ -1,11 +1,20 @@
 use std::{
     io::{BufWriter, Read, Stdout, Write},
-    sync::{Arc, LazyLock},
+    sync::{
+        Arc,
+        LazyLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use anyhow::Result;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
+    event::{
+        DisableMouseCapture,
+        EnableMouseCapture,
+        KeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -15,6 +24,8 @@ use ratatui::{
     layout::Position,
     prelude::{Backend, CrosstermBackend},
 };
+
+use crate::shared::tmux::IS_TMUX;
 
 #[allow(dead_code)]
 pub struct Terminal {
@@ -136,26 +147,96 @@ impl Backend for CrosstermLockingBackend {
     }
 }
 
+static KITTY_KEYBOARD_PROTO_SUPPORTED: AtomicBool = AtomicBool::new(false);
+
 pub fn restore<B: Backend + std::io::Write>(
     terminal: &mut ratatui::Terminal<B>,
     enable_mouse: bool,
 ) -> Result<()> {
+    let mut writer = TERMINAL.writer();
     if enable_mouse {
-        execute!(std::io::stdout(), DisableMouseCapture)?;
+        execute!(writer, DisableMouseCapture)?;
+    }
+    if KITTY_KEYBOARD_PROTO_SUPPORTED.load(Ordering::Relaxed) {
+        execute!(
+            writer,
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS,
+            )
+        )?;
     }
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(writer, LeaveAlternateScreen)?;
     Ok(terminal.show_cursor()?)
 }
 
 pub fn setup(enable_mouse: bool) -> Result<ratatui::Terminal<CrosstermLockingBackend>> {
+    let is_kitty_keyboard_proto_supported =
+        if *IS_TMUX { false } else { query_device_attrs("\x1b[?u")?.contains("\x1b[?0u") };
+
+    KITTY_KEYBOARD_PROTO_SUPPORTED.store(is_kitty_keyboard_proto_supported, Ordering::Relaxed);
+    log::debug!(is_kitty_keyboard_proto_supported:?; "Kitty keyboard protocol support");
+
     enable_raw_mode()?;
     let mut writer = TERMINAL.writer();
     execute!(writer, EnterAlternateScreen)?;
     if enable_mouse {
         execute!(writer, EnableMouseCapture)?;
     }
+    if is_kitty_keyboard_proto_supported {
+        execute!(
+            writer,
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS,
+            )
+        )?;
+    }
     let mut terminal = ratatui::Terminal::new(CrosstermLockingBackend::new(writer))?;
     terminal.clear()?;
     Ok(terminal)
+}
+
+pub fn query_device_attrs(query: &str) -> Result<String> {
+    let query = if *IS_TMUX {
+        format!("\x1bPtmux;{}\x1b\x1b[0c\x1b\\", query.replace('\x1b', "\x1b\x1b"))
+    } else {
+        format!("{query}\x1b[0c")
+    };
+
+    let stdin = rustix::stdio::stdin();
+    let termios_orig = rustix::termios::tcgetattr(stdin)?;
+    let mut termios = termios_orig.clone();
+
+    termios.local_modes &= !rustix::termios::LocalModes::ICANON;
+    termios.local_modes &= !rustix::termios::LocalModes::ECHO;
+    termios.special_codes[rustix::termios::SpecialCodeIndex::VTIME] = 1;
+    termios.special_codes[rustix::termios::SpecialCodeIndex::VMIN] = 0;
+
+    rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Drain, &termios)?;
+
+    rustix::io::write(rustix::stdio::stdout(), query.as_bytes())?;
+
+    let mut buf: String = String::new();
+    loop {
+        let mut charbuffer = [0; 1];
+        rustix::io::read(stdin, &mut charbuffer)?;
+
+        buf.push(charbuffer[0].into());
+
+        if charbuffer[0] == b'c'
+            && buf.contains('\x1b')
+            && buf.rsplit('\x1b').next().is_some_and(|s| s.starts_with("[?"))
+            || charbuffer[0] == b'\0'
+        {
+            break;
+        }
+    }
+
+    rustix::termios::tcsetattr(stdin, rustix::termios::OptionalActions::Now, &termios_orig)?;
+
+    log::debug!(buf:?; "devattr response");
+
+    Ok(buf)
 }

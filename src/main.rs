@@ -292,7 +292,6 @@ fn main() -> Result<()> {
                 event_tx.clone(),
                 Arc::clone(&ctx.config),
             )?;
-            core::input::init(event_tx.clone())?;
             let _sock_guard =
                 core::socket::init(event_tx.clone(), worker_tx.clone(), Arc::clone(&ctx.config))
                     .context("Failed to initialize socket listener")?;
@@ -309,6 +308,7 @@ fn main() -> Result<()> {
             let enable_mouse = ctx.config.enable_mouse;
             let terminal =
                 shared::terminal::setup(enable_mouse).context("Failed to setup terminal")?;
+            core::input::init(event_tx.clone())?;
 
             let event_loop_handle = core::event_loop::init(ctx, event_rx, terminal)?;
 

@@ -176,7 +176,11 @@ impl FromStr for Key {
                     modifiers |= KeyModifiers::SHIFT;
                 }
 
-                KeyCode::Char(key_part[0])
+                KeyCode::Char(if modifiers.contains(KeyModifiers::SHIFT) {
+                    key_part[0].to_ascii_uppercase()
+                } else {
+                    key_part[0]
+                })
             }
         };
 
