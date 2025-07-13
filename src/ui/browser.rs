@@ -43,7 +43,12 @@ where
 {
     fn stack(&self) -> &DirStack<T>;
     fn stack_mut(&mut self) -> &mut DirStack<T>;
-    fn browser_areas(&self) -> [Rect; 3];
+    fn browser_areas(&self) -> [Rect; 4];
+    fn scrollbar_area(&self) -> Option<Rect> {
+        let areas = self.browser_areas();
+        let scrollbar = areas[3];
+        if scrollbar.width > 0 { Some(scrollbar) } else { None }
+    }
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
     fn next(&mut self, ctx: &Ctx) -> Result<()>;
@@ -160,61 +165,46 @@ where
     /// checks if a mouse click is on the scrollbar area and also handles
     /// scrollbar interactions
     fn handle_scrollbar_interaction(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<bool> {
-        let [prev_area, current_area, _] = self.browser_areas();
-
-        let Some(_) = ctx.config.theme.scrollbar else {
+        let areas = self.browser_areas();
+        let scrollbar_area = self.scrollbar_area();
+        if scrollbar_area.is_none() {
             return Ok(false);
-        };
-
-        let position: ratatui::layout::Position = event.into();
-
-        // calculate scrollbar areas, scrollbar is considered to be on the right edge of
-        // each column
-        let scrollbar_margin = match ctx.config.theme.scrollbar.as_ref() {
-            Some(scrollbar) if ctx.config.theme.draw_borders => {
-                let scrollbar_track = &scrollbar.symbols[0];
-                ratatui::layout::Margin {
-                    vertical: 0,
-                    horizontal: scrollbar_track.is_empty().into(),
-                }
-            }
-            Some(_) | None => ratatui::layout::Margin { vertical: 0, horizontal: 0 },
-        };
-
+        }
+        let scrollbar_area =
+            scrollbar_area.expect("Expected scrollbar_area to be Some, but it was None");
         match event.kind {
-            MouseEventKind::LeftClick | MouseEventKind::Drag => {
-                // only handle scrollbar interaction for the current area (middle column)
-                // The previous area (left column) should not be scrollable as it would break
-                // navigation
-                if current_area.width > 0 {
-                    let scrollbar_area = current_area.inner(scrollbar_margin);
-
-                    if crate::shared::mouse_event::is_scrollbar_interaction(
+            MouseEventKind::LeftClick => {
+                if crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area) {
+                    let content_len = self.stack().current().items.len();
+                    if let Some(target_idx) = crate::shared::mouse_event::calculate_scrollbar_index(
                         event,
                         scrollbar_area,
-                        event.drag_start_position,
+                        content_len,
                     ) {
-                        let content_len = self.stack().current().items.len();
-                        if let Some(target_idx) =
-                            crate::shared::mouse_event::calculate_scrollbar_index(
-                                event,
-                                scrollbar_area,
-                                content_len,
-                            )
-                        {
-                            self.stack_mut()
-                                .current_mut()
-                                .select_idx(target_idx, ctx.config.scrolloff);
-                            self.prepare_preview(ctx)?;
-                            ctx.render()?;
-                            return Ok(true);
-                        }
+                        self.stack_mut().current_mut().select_idx(target_idx, ctx.config.scrolloff);
+                        self.prepare_preview(ctx)?;
+                        ctx.render()?;
+                        return Ok(true);
+                    }
+                }
+            }
+            MouseEventKind::Drag { drag_start_position } => {
+                if crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area) {
+                    let content_len = self.stack().current().items.len();
+                    if let Some(target_idx) = crate::shared::mouse_event::calculate_scrollbar_index(
+                        event,
+                        scrollbar_area,
+                        content_len,
+                    ) {
+                        self.stack_mut().current_mut().select_idx(target_idx, ctx.config.scrolloff);
+                        self.prepare_preview(ctx)?;
+                        ctx.render()?;
+                        return Ok(true);
                     }
                 }
             }
             _ => {}
         }
-
         Ok(false)
     }
 
@@ -223,9 +213,16 @@ where
             return Ok(());
         }
 
-        let [prev_area, current_area, preview_area] = self.browser_areas();
+        let areas = self.browser_areas();
+        let prev_area = areas[0];
+        let current_area = areas[1];
+        let preview_area = areas[2];
 
         let position = event.into();
+        let drag_start_position = match event.kind {
+            MouseEventKind::Drag { drag_start_position } => Some(drag_start_position),
+            _ => None,
+        };
         match event.kind {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick
                 if prev_area.contains(position) =>
@@ -318,6 +315,7 @@ where
 
                 self.open_context_menu(ctx)?;
             }
+            MouseEventKind::Drag { .. } => {}
             _ => {}
         }
 
@@ -693,18 +691,15 @@ mod scrollbar_tests {
         let total_items = 20;
 
         // Click at the top of the scrollbar (should go to first item)
-        let event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 1, drag_start_position: None };
+        let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 1 };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, total_items), Some(0));
 
         // Click at the bottom of the scrollbar (should go to last item)
-        let event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 8, drag_start_position: None };
+        let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 8 };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, total_items), Some(19));
 
         // Click in the middle
-        let event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 4, drag_start_position: None };
+        let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 4 };
         let result = calculate_scrollbar_index(event, scrollbar_area, total_items);
         assert!(result.is_some());
         let target = result.expect("result should be Some as verified by assert above");
@@ -716,27 +711,24 @@ mod scrollbar_tests {
     fn test_mouse_event_in_scrollbar_area() {
         let scrollbar_area = Rect::new(29, 1, 1, 8);
 
-        let inside_event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 3, drag_start_position: None };
-
+        let inside_event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 3 };
         assert!(scrollbar_area.contains(inside_event.into()));
 
-        let outside_event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 28, y: 3, drag_start_position: None };
-
+        let outside_event = MouseEvent { kind: MouseEventKind::LeftClick, x: 28, y: 3 };
         assert!(!scrollbar_area.contains(outside_event.into()));
     }
 
     #[test]
     fn test_scrollbar_drag_events() {
         let scrollbar_area = Rect::new(29, 1, 1, 8);
-
-        let drag_event =
-            MouseEvent { kind: MouseEventKind::Drag, x: 29, y: 5, drag_start_position: None };
-
+        let drag_start = ratatui::layout::Position { x: 29, y: 1 };
+        let drag_event = MouseEvent {
+            kind: MouseEventKind::Drag { drag_start_position: drag_start },
+            x: 29,
+            y: 5,
+        };
         assert!(scrollbar_area.contains(drag_event.into()));
-
-        assert!(matches!(drag_event.kind, MouseEventKind::Drag));
+        assert!(matches!(drag_event.kind, MouseEventKind::Drag { .. }));
     }
 
     #[test]
@@ -745,8 +737,7 @@ mod scrollbar_tests {
         let small_content_len: usize = 5;
         let large_content_len: usize = 20;
 
-        let event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 5, drag_start_position: None };
+        let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 5 };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, small_content_len), None);
         assert!(calculate_scrollbar_index(event, scrollbar_area, large_content_len).is_some());
     }
@@ -757,13 +748,11 @@ mod scrollbar_tests {
         let total_items: usize = 50;
 
         // Click at the bottom of the scrollbar
-        let event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 10, drag_start_position: None };
+        let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 10 };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, total_items), Some(49));
 
         // Click beyond the bottom of the scrollbar
-        let event =
-            MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 15, drag_start_position: None };
+        let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: 15 };
         assert_eq!(calculate_scrollbar_index(event, scrollbar_area, total_items), Some(49));
     }
 
@@ -782,12 +771,7 @@ mod scrollbar_tests {
         ];
 
         for (click_y, expected_target) in test_cases {
-            let event = MouseEvent {
-                kind: MouseEventKind::LeftClick,
-                x: 29,
-                y: click_y,
-                drag_start_position: None,
-            };
+            let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: click_y };
             let result = calculate_scrollbar_index(event, scrollbar_area, total_items);
             assert!(result.is_some());
             assert_eq!(

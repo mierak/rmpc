@@ -233,7 +233,7 @@ impl Modal for InfoListModal {
                 self.scrolling_state.prev(ctx.config.scrolloff, false);
                 ctx.render()?;
             }
-            MouseEventKind::Drag => {}
+            MouseEventKind::Drag { drag_start_position: _ } => {}
         }
 
         Ok(())

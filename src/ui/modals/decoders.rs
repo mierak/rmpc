@@ -239,7 +239,7 @@ impl Modal for DecodersModal {
             MouseEventKind::LeftClick => {}
             MouseEventKind::ScrollDown => {}
             MouseEventKind::ScrollUp => {}
-            MouseEventKind::Drag => {}
+            MouseEventKind::Drag { drag_start_position: _ } => {}
         }
 
         Ok(())

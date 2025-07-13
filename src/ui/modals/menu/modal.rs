@@ -177,7 +177,7 @@ impl Modal for MenuModal<'_> {
                 self.next();
                 ctx.render()?;
             }
-            MouseEventKind::Drag => {}
+            MouseEventKind::Drag { drag_start_position: _ } => {}
         }
         Ok(())
     }

@@ -393,7 +393,7 @@ impl Modal for AddRandomModal<'_> {
                 }
                 ctx.render()?;
             }
-            MouseEventKind::Drag => {}
+            MouseEventKind::Drag { .. } => {}
         }
         Ok(())
     }

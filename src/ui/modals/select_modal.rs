@@ -308,7 +308,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
             }
             MouseEventKind::ScrollDown => {}
             MouseEventKind::ScrollUp => {}
-            MouseEventKind::Drag => {}
+            MouseEventKind::Drag { drag_start_position: _ } => {}
         }
         Ok(())
     }

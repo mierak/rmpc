@@ -356,7 +356,16 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         Ok(())
     }
 
-    fn browser_areas(&self) -> [Rect; 3] {
-        self.browser.areas
+    fn browser_areas(&self) -> [Rect; 4] {
+        let mut areas = [Rect::default(); 4];
+        let browser_areas = self.browser.areas;
+        for (i, area) in browser_areas.iter().enumerate().take(areas.len()) {
+            areas[i] = *area;
+        }
+        areas
+    }
+
+    fn scrollbar_area(&self) -> Option<Rect> {
+        self.browser.areas.get(2).copied()
     }
 }

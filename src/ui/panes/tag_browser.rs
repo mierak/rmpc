@@ -648,8 +648,9 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         Ok(())
     }
 
-    fn browser_areas(&self) -> [Rect; 3] {
-        self.browser.areas
+    fn browser_areas(&self) -> [Rect; 4] {
+        let [a, b, c] = self.browser.areas;
+        [a, b, c, Rect::default()]
     }
 }
 

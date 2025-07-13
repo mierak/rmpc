@@ -916,37 +916,24 @@ impl SearchPane {
         Ok(())
     }
 
+    fn scrollbar_area(&self) -> Option<Rect> {
+        let area = self.column_areas[1];
+        if area.width > 0 { Some(area) } else { None }
+    }
+
     fn handle_scrollbar_interaction(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<bool> {
         if !matches!(self.phase, Phase::BrowseResults { .. }) {
             return Ok(false);
         }
-
         let Some(_) = ctx.config.theme.scrollbar else {
             return Ok(false);
         };
-
-        let _position: ratatui::layout::Position = event.into();
-
-        let song_column_area = self.column_areas[1];
-
-        // the scrollbar is rendered on the original area (before inner), so we need to
-        // use the area that includes borders/padding
-        let scrollbar_area = if ctx.config.theme.draw_borders {
-            let border_margin = ratatui::layout::Margin { vertical: 1, horizontal: 1 };
-            song_column_area.inner(border_margin)
-        } else {
-            song_column_area
+        let Some(scrollbar_area) = self.scrollbar_area() else {
+            return Ok(false);
         };
-
-        let _scrollbar_x = scrollbar_area.right().saturating_sub(1);
-
         match event.kind {
-            MouseEventKind::LeftClick | MouseEventKind::Drag => {
-                if crate::shared::mouse_event::is_scrollbar_interaction(
-                    event,
-                    scrollbar_area,
-                    event.drag_start_position,
-                ) {
+            MouseEventKind::LeftClick | MouseEventKind::Drag { .. } => {
+                if crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area) {
                     let content_len = self.songs_dir.items.len();
                     if let Some(target_idx) = crate::shared::mouse_event::calculate_scrollbar_index(
                         event,
@@ -962,7 +949,6 @@ impl SearchPane {
             }
             _ => {}
         }
-
         Ok(false)
     }
 }
@@ -1247,13 +1233,7 @@ impl Pane for SearchPane {
                         ctx.render()?;
                     }
                     Phase::BrowseResults { .. } => {
-                        let clicked_row = event.y.saturating_sub(self.column_areas[1].y).into();
-                        if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
-                            self.songs_dir.select_idx(idx, ctx.config.scrolloff);
-                            self.prepare_preview(ctx);
-
-                            ctx.render()?;
-                        }
+                        ctx.render()?;
                     }
                 }
             }
@@ -1261,7 +1241,6 @@ impl Pane for SearchPane {
                 Phase::SearchTextboxInput | Phase::Search => {
                     if self.get_clicked_input(event).is_some() {
                         self.activate_input(ctx);
-
                         ctx.render()?;
                     }
                 }
@@ -1283,7 +1262,6 @@ impl Pane for SearchPane {
                         if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
                             self.songs_dir.select_idx(idx, ctx.config.scrolloff);
                             self.prepare_preview(ctx);
-
                             self.songs_dir.select_idx(idx, ctx.config.scrolloff);
                             if let Some(item) = self.songs_dir.selected() {
                                 let item = item.file.clone();
@@ -1306,13 +1284,11 @@ impl Pane for SearchPane {
                         self.search(ctx);
                     }
                     self.inputs.next_non_wrapping();
-
                     ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
                     self.songs_dir.next(ctx.config.scrolloff, false);
                     self.prepare_preview(ctx);
-
                     ctx.render()?;
                 }
             },
@@ -1322,15 +1298,12 @@ impl Pane for SearchPane {
                         self.phase = Phase::Search;
                         self.search(ctx);
                     }
-
                     self.inputs.prev_non_wrapping();
-
                     ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
                     self.songs_dir.prev(ctx.config.scrolloff, false);
                     self.prepare_preview(ctx);
-
                     ctx.render()?;
                 }
             },
@@ -1340,15 +1313,13 @@ impl Pane for SearchPane {
                     if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
                         self.songs_dir.select_idx(idx, ctx.config.scrolloff);
                         self.prepare_preview(ctx);
-
                         ctx.render()?;
                     }
-
                     self.open_result_phase_context_menu(ctx)?;
                 }
                 _ => {}
             },
-            MouseEventKind::Drag => {
+            MouseEventKind::Drag { .. } => {
                 // drag events are handled by scrollbar interaction, no
                 // additional action needed
             }
