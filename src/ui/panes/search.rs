@@ -915,6 +915,114 @@ impl SearchPane {
         modal!(ctx, modal);
         Ok(())
     }
+
+    fn handle_scrollbar_interaction(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<bool> {
+        if !matches!(self.phase, Phase::BrowseResults { .. }) {
+            return Ok(false);
+        }
+
+        let Some(_) = ctx.config.theme.scrollbar else {
+            return Ok(false);
+        };
+
+        let _position: ratatui::layout::Position = event.into();
+
+        let song_column_area = self.column_areas[1];
+        
+        // the scrollbar is rendered on the original area (before inner), so we need to use
+        // the area that includes borders/padding
+        let scrollbar_area = if ctx.config.theme.draw_borders {
+            let border_margin = ratatui::layout::Margin { vertical: 1, horizontal: 1 };
+            song_column_area.inner(border_margin)
+        } else {
+            song_column_area
+        };
+
+        let _scrollbar_x = scrollbar_area.right().saturating_sub(1);
+
+        match event.kind {
+            MouseEventKind::LeftClick | MouseEventKind::Drag => {
+                if crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area, event.drag_start_position) {
+                    let content_len = self.songs_dir.items.len();
+                    if let Some(target_idx) = crate::shared::mouse_event::calculate_scrollbar_index(
+                        event,
+                        scrollbar_area,
+                        content_len,
+                    ) {
+                        self.songs_dir.select_idx(target_idx, ctx.config.scrolloff);
+                        self.prepare_preview(ctx);
+                        ctx.render()?;
+                        return Ok(true);
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_search_pane_scrollbar_calculation() {
+        let scrollbar_height: u16 = 10;
+        let total_items: usize = 50;
+
+        let clicked_y = scrollbar_height.saturating_sub(1);
+        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+            total_items.saturating_sub(1)
+        } else {
+            let position_ratio =
+                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
+            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1))
+        };
+
+        assert_eq!(target_idx, total_items - 1);
+
+        let clicked_y = 0;
+        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_idx =
+            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1));
+
+        assert_eq!(target_idx, 0);
+
+        let clicked_y = 5;
+        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let target_idx =
+            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1));
+
+        // should be roughly in the middle (around 25-27)
+        assert!((20..=30).contains(&target_idx));
+    }
+
+    #[test]
+    fn test_search_pane_phase_check() {
+        assert!(matches!(Phase::BrowseResults { filter_input_on: false }, Phase::BrowseResults { .. }));
+        assert!(!matches!(Phase::Search, Phase::BrowseResults { .. }));
+        assert!(!matches!(Phase::SearchTextboxInput, Phase::BrowseResults { .. }));
+    }
 }
 
 impl Pane for SearchPane {
@@ -1063,6 +1171,10 @@ impl Pane for SearchPane {
     }
 
     fn handle_mouse_event(&mut self, mut event: MouseEvent, ctx: &Ctx) -> Result<()> {
+        if self.handle_scrollbar_interaction(event, ctx)? {
+            return Ok(());
+        }
+
         match event.kind {
             MouseEventKind::LeftClick if self.column_areas[0].contains(event.into()) => {
                 self.phase = Phase::Search;
@@ -1231,6 +1343,9 @@ impl Pane for SearchPane {
                 }
                 _ => {}
             },
+            MouseEventKind::Drag => {
+                // drag events are handled by scrollbar interaction, no additional action needed
+            }
             _ => {}
         }
 

@@ -543,29 +543,16 @@ impl Pane for QueuePane {
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         let position = event.into();
 
-        if self.areas[Areas::Scrollbar].contains(position) && ctx.config.theme.scrollbar.is_some() {
+        if ctx.config.theme.scrollbar.is_some()
+            && crate::shared::mouse_event::is_scrollbar_interaction(event, self.areas[Areas::Scrollbar], event.drag_start_position) {
             match event.kind {
                 MouseEventKind::LeftClick | MouseEventKind::Drag => {
-                    let clicked_y = event.y.saturating_sub(self.areas[Areas::Scrollbar].y);
-                    let scrollbar_height = self.areas[Areas::Scrollbar].height;
                     let content_len = ctx.queue.len();
-
-                    if content_len > scrollbar_height as usize && scrollbar_height > 0 {
-                        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
-                            content_len.saturating_sub(1)
-                        } else {
-                            let position_ratio = f64::from(clicked_y)
-                                / f64::from(scrollbar_height.saturating_sub(1));
-                            #[allow(
-                                clippy::cast_precision_loss,
-                                clippy::cast_possible_truncation,
-                                clippy::cast_sign_loss
-                            )]
-                            let target = (position_ratio * (content_len.saturating_sub(1)) as f64)
-                                .round() as usize;
-                            target.min(content_len.saturating_sub(1))
-                        };
-
+                    if let Some(target_idx) = crate::shared::mouse_event::calculate_scrollbar_index(
+                        event,
+                        self.areas[Areas::Scrollbar],
+                        content_len,
+                    ) {
                         self.scrolling_state.select(Some(target_idx), ctx.config.scrolloff);
                         ctx.render()?;
                     }
