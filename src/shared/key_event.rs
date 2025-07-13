@@ -1,9 +1,9 @@
-use crossterm::event::{KeyCode, KeyEvent as CKeyEvent};
+use crossterm::event::{KeyCode, KeyEvent as CKeyEvent, KeyModifiers};
 
 #[cfg(debug_assertions)]
 use crate::config::keys::LogsActions;
 use crate::{
-    config::keys::{CommonAction, GlobalAction, QueueActions},
+    config::keys::{CommonAction, GlobalAction, Key, QueueActions},
     ctx::Ctx,
 };
 
@@ -16,6 +16,29 @@ pub struct KeyEvent {
 impl From<CKeyEvent> for KeyEvent {
     fn from(value: CKeyEvent) -> Self {
         Self { inner: value, already_handled: false }
+    }
+}
+
+impl From<CKeyEvent> for Key {
+    fn from(value: CKeyEvent) -> Self {
+        let should_insert_shift = matches!(value.code, KeyCode::Char(c) if c.is_uppercase());
+
+        let mut modifiers = value.modifiers;
+        if should_insert_shift {
+            modifiers.insert(KeyModifiers::SHIFT);
+        }
+
+        let key = if modifiers.contains(KeyModifiers::SHIFT) {
+            if let KeyCode::Char(c) = value.code {
+                KeyCode::Char(c.to_ascii_uppercase())
+            } else {
+                value.code
+            }
+        } else {
+            value.code
+        };
+
+        Self { key, modifiers }
     }
 }
 

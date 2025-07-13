@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - New `Partition` status property to show rmpc's current partition
 - `PREV_SONG` and `PREV_ELAPSED` env variables in `on_song_change`
 - New `ContextMenu()` action
+- Support Kitty's keyboard protocol
 
 ### Changed
 
