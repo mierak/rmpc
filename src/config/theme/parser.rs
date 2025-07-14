@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 
 use super::{
@@ -42,9 +43,9 @@ pub fn string_parser<'a>() -> impl Parser<'a, &'a str, String, extra::Err<Rich<'
         .ignored()
         .boxed();
 
-    let escape_single_queoted_str =
+    let escape_single_quoted_str =
         choice((
-            just('\\').then(just('\'')).to('a').ignored(),
+            just('\\').then(just('\'')).ignored(),
             just('\\')
                 .then(choice((
                     just('\\'),
@@ -81,23 +82,19 @@ pub fn string_parser<'a>() -> impl Parser<'a, &'a str, String, extra::Err<Rich<'
 
     let single_quoted_string = none_of("\\'")
         .ignored()
-        .or(escape_single_queoted_str)
+        .or(escape_single_quoted_str)
         .repeated()
         .to_slice()
         .try_map(|v, span| unescape(v, '\'', span))
         .delimited_by(just("'"), just("'"))
         .boxed();
 
-    double_quoted_string.clone().or(single_quoted_string.clone()).labelled("string")
+    double_quoted_string.clone().or(single_quoted_string.clone()).labelled("string value")
 }
 
-pub fn parser<'a>()
--> impl Parser<'a, &'a str, Vec<PropertyFile<PropertyKindFile>>, extra::Err<Rich<'a, char>>> {
-    let ident = text::ascii::ident();
-
-    let string = string_parser();
-
-    let modifiers = choice((
+pub fn modifiers_parser<'a>()
+-> impl Parser<'a, &'a str, Modifiers, extra::Err<Rich<'a, char>>> + Clone {
+    choice((
         just("bold"),
         just("dim"),
         just("italic"),
@@ -108,10 +105,6 @@ pub fn parser<'a>()
     .separated_by(just(',').padded())
     .collect::<Vec<_>>()
     .map(|val| {
-        if val.is_empty() {
-            return None;
-        }
-
         let mut res = Modifiers::empty();
         for modifier in val {
             res = match modifier {
@@ -125,22 +118,61 @@ pub fn parser<'a>()
             };
         }
 
-        Some(res)
-    });
+        res
+    })
+    .labelled("modifiers")
+}
 
-    let color = choice((
-        ident.map(|c: &str| StringOrModifiers::String(c.to_owned())),
+pub fn color_str_parser<'a>() -> impl Parser<'a, &'a str, String, extra::Err<Rich<'a, char>>> + Clone
+{
+    let ident = text::ascii::ident();
+    choice((
+        // RBG color
+        just("rgb(")
+            .padded()
+            .ignore_then(
+                text::int(10)
+                    .separated_by(just(',').padded())
+                    .exactly(3)
+                    .collect_exactly::<[_; 3]>()
+                    .validate(|c: [&str; 3], e, emitter| {
+                        for c in c {
+                            if c.parse::<u8>().is_err() {
+                                emitter.emit(Rich::custom(
+                                    e.span(),
+                                    format!("{c} must be between 0 and 255."),
+                                ));
+                            }
+                        }
+                        c
+                    })
+                    .map(|[r, g, b]| format!("rgb({r},{g},{b})")),
+            )
+            .then_ignore(just(')').padded()),
+        // HEX color
         just('#').then(ident).map(|(_, hex): (_, &str)| {
             let mut hex = hex.to_owned();
             hex.insert(0, '#');
-            StringOrModifiers::String(hex)
+            hex
         }),
-        text::int(10).map(|n: &str| StringOrModifiers::String(n.to_owned())),
-    ));
+        // ANSI color
+        text::int(10).map(|n: &str| n.to_owned()),
+        // Color by name
+        ident.map(|c: &str| c.to_owned()),
+    ))
+    .labelled("color")
+}
 
-    let style_file = choice((
-        just("fg").then_ignore(just(':').padded()).then(color),
-        just("bg").then_ignore(just(':').padded()).then(color),
+pub fn style_parser<'a>() -> impl Parser<'a, &'a str, StyleFile, extra::Err<Rich<'a, char>>> + Clone
+{
+    let modifiers = modifiers_parser();
+    let color = color_str_parser();
+
+    choice((
+        just("fg")
+            .then_ignore(just(':').padded())
+            .then(color.clone().map(StringOrModifiers::String)),
+        just("bg").then_ignore(just(':').padded()).then(color.map(StringOrModifiers::String)),
         just("mods")
             .then_ignore(just(':').padded())
             .then(modifiers.map(StringOrModifiers::Modifiers)),
@@ -153,10 +185,14 @@ pub fn parser<'a>()
         modifiers: m.remove("mods").get_modifiers(),
     })
     .delimited_by(just('{'), just('}'))
-    .boxed();
-
-    let label = string.clone().map(|v: String| StyleOrLabel::Label(v));
-    let style = style_file.clone().map(StyleOrLabel::Style);
+    .labelled("style")
+    .boxed()
+}
+pub fn property_parser<'a>()
+-> impl Parser<'a, &'a str, PropertyKindFile, extra::Err<Rich<'a, char>>> + Clone {
+    let ident = text::ascii::ident();
+    let label = string_parser().map(StyleOrLabel::Label);
+    let style = style_parser().map(StyleOrLabel::Style);
 
     let generic_property = ident
         .then(
@@ -270,8 +306,15 @@ pub fn parser<'a>()
         })
         .boxed();
 
-    let property =
-        choice((status_property, song_property, widget_property)).labelled("property").boxed();
+    choice((status_property, song_property, widget_property)).labelled("property").boxed()
+}
+
+pub fn parser<'a>()
+-> impl Parser<'a, &'a str, Vec<PropertyFile<PropertyKindFile>>, extra::Err<Rich<'a, char>>> {
+    let string = string_parser();
+    let style_file = style_parser();
+
+    let property = property_parser();
 
     let sticker = just("sticker")
         .ignored()
@@ -319,6 +362,7 @@ pub fn parser<'a>()
     })
     .padded()
     .repeated()
+    .at_most(100)
     .collect::<Vec<_>>()
     .boxed()
 }
@@ -382,6 +426,28 @@ impl StyleOrLabelMapExt for Option<HashMap<&str, StyleOrLabel>> {
     }
 }
 
+pub fn make_error_report<'a>(err: Vec<Rich<'a, char>>, source: &'a str) -> String {
+    let mut buf = Vec::new();
+    for e in err {
+        Report::build(ReportKind::Error, ((), e.span().into_range()))
+            .with_config(
+                ariadne::Config::new()
+                    .with_color(false)
+                    .with_tab_width(1)
+                    .with_index_type(ariadne::IndexType::Byte),
+            )
+            .with_message(e.to_string())
+            .with_label(
+                Label::new(((), e.span().into_range())).with_message(e.reason().to_string()),
+            )
+            .finish()
+            .write_for_stdout(Source::from(&source), &mut buf)
+            .expect("Write to String buffer should always succeed");
+    }
+
+    String::from_utf8_lossy(&buf).into_owned()
+}
+
 #[derive(Debug)]
 enum StyleOrLabel {
     Style(StyleFile),
@@ -391,7 +457,7 @@ enum StyleOrLabel {
 #[derive(Debug)]
 enum StringOrModifiers {
     String(String),
-    Modifiers(Option<Modifiers>),
+    Modifiers(Modifiers),
 }
 
 trait StringOrModifiersExt {
@@ -405,7 +471,7 @@ impl StringOrModifiersExt for Option<StringOrModifiers> {
     }
 
     fn get_modifiers(self) -> Option<Modifiers> {
-        if let Some(StringOrModifiers::Modifiers(val)) = self { val } else { None }
+        if let Some(StringOrModifiers::Modifiers(val)) = self { Some(val) } else { None }
     }
 }
 
@@ -649,7 +715,7 @@ mod parser2 {
     }
 
     #[test]
-    fn mutliple_modifiers() {
+    fn multiple_modifiers() {
         let result = parser().parse("$'sup'{mods: bold, underlined}");
 
         assert_eq!(
@@ -660,6 +726,31 @@ mod parser2 {
                     bg: None,
                     modifiers: Some(Modifiers::Bold | Modifiers::Underlined)
                 }),
+                default: None,
+            },
+            result.unwrap().pop().unwrap()
+        );
+    }
+
+    #[rstest]
+    #[case("red", "red")]
+    #[case("blue", "blue")]
+    #[case("11", "11")]
+    #[case("#ff0000", "#ff0000")]
+    #[case("rgb( 255, 1 ,1 )", "rgb(255,1,1)")]
+    #[case("rgb(255,255,255)", "rgb(255,255,255)")]
+    fn colors(#[case] input: &str, #[case] expected: String) {
+        let input = format!("$'sup'{{fg: {input}}}");
+        dbg!(&input);
+        let result = parser()
+            .parse(&input)
+            .into_result()
+            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &input)));
+
+        assert_eq!(
+            PropertyFile {
+                kind: PropertyKindFileOrText::Text("sup".to_owned()),
+                style: Some(StyleFile { fg: Some(expected), bg: None, modifiers: None }),
                 default: None,
             },
             result.unwrap().pop().unwrap()
@@ -725,7 +816,7 @@ mod parser2 {
 
         #[test_case(r#""hello world""#,                  "hello world";              "simple")]
         #[test_case(r#""hello \" world""#,               r#"hello " world"#;         "quotes")]
-        #[test_case(r#""hello \" \"\" \"\"\"world""#,    r#"hello " "" """world"#;   "mutliple quotes")]
+        #[test_case(r#""hello \" \"\" \"\"\"world""#,    r#"hello " "" """world"#;   "multiple quotes")]
         #[test_case(r#""^{()}$~#:-_;@`!+<>%/""#,         r#"^{()}$~#:-_;@`!+<>%/"#;  "random special chars")]
         #[test_case(r#""\\ \\\\ \\\\\\ \\\\\\\\""#,      r#"\ \\ \\\ \\\\"#;         "backslashes")]
         fn double_quoted_string(input: &str, expected: &str) {
@@ -740,7 +831,7 @@ mod parser2 {
 
         #[test_case(r#"'hello world'"#,                 r#"hello world"#;            "simple")]
         #[test_case(r#"'hello \' world'"#,              r#"hello ' world"#;          "quotes")]
-        #[test_case(r#"'hello \' \'\' \'\'\'world'"#,   r#"hello ' '' '''world"#;    "mutliple quotes")]
+        #[test_case(r#"'hello \' \'\' \'\'\'world'"#,   r#"hello ' '' '''world"#;    "multiple quotes")]
         #[test_case(r#"'^{()}$~#:-_;@`!+<>%/'"#,        r#"^{()}$~#:-_;@`!+<>%/"#;   "random special chars")]
         #[test_case(r#"'\\ \\\\ \\\\\\ \\\\\\\\'"#,     r#"\ \\ \\\ \\\\"#;          "backslashes")]
         fn single_quoted_string(input: &str, expected: &str) {

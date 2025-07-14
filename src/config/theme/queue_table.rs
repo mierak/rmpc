@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use super::{
     StyleFile,
-    parser,
+    parser::{self, make_error_report},
     properties::{
         Alignment,
         Property,
@@ -25,6 +25,7 @@ use super::{
     },
     style::ToConfigOr,
 };
+use crate::config::tabs::PaneConversionError;
 
 #[derive(Debug, Clone, Copy)]
 pub enum PercentOrLength {
@@ -179,27 +180,27 @@ impl Default for QueueTableColumnsFile {
 }
 
 impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
-    type Error = anyhow::Error;
+    type Error = PaneConversionError;
 
     fn try_from(value: QueueTableColumnsFile) -> Result<Self, Self::Error> {
         Ok(QueueTableColumns(
             value
                 .0
                 .into_iter()
-                .map(|v| -> Result<_> {
+                .map(|v| -> Result<_, PaneConversionError> {
                     let prop: Property<SongProperty> = match (v.format, v.prop) {
                         (Some(format), Some(_)) | (Some(format), None) => parser::parser()
                             .parse(&format)
                             .into_result()
-                            .map_err(|e| {
-                                anyhow::anyhow!("Failed to parse property format: {:?}", e)
+                            .map_err(|errs| {
+                                PaneConversionError::FormatError(make_error_report(errs, &format))
                             })?
                             .into_iter()
                             .next()
                             .context("A song property must be specified")?
                             .try_into()?,
                         (None, Some(prop)) => prop.try_into()?,
-                        (None, None) => panic!(""),
+                        (None, None) => return Err(PaneConversionError::MissingFormat),
                     };
                     let label = v.label.unwrap_or_else(|| match &prop.kind {
                         PropertyKindOrText::Text { .. } => String::new(),
