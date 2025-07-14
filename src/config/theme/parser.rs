@@ -764,6 +764,11 @@ mod parser2 {
                 StatusPropertyFileDiscriminants::Bitrate => {
                     ("$bitrate", StatusPropertyFile::Bitrate)
                 }
+                StatusPropertyFileDiscriminants::Partition => todo!(),
+                StatusPropertyFileDiscriminants::QueueLength => todo!(),
+                StatusPropertyFileDiscriminants::QueueTimeTotal => todo!(),
+                StatusPropertyFileDiscriminants::QueueTimeRemaining => todo!(),
+                StatusPropertyFileDiscriminants::ActiveTab => todo!(),
             };
 
             let result = parser()
@@ -796,6 +801,7 @@ mod parser2 {
                 WidgetPropertyFileDiscriminants::Volume => {
                     ("$w:volume", WidgetPropertyFile::Volume)
                 }
+                WidgetPropertyFileDiscriminants::ScanStatus => todo!(),
             };
 
             let result = parser()
@@ -837,6 +843,7 @@ mod parser2 {
                 SongPropertyFileDiscriminants::Other => {
                     ("$s:tag(value: \"sometag\")", SongPropertyFile::Other("sometag".to_owned()))
                 }
+                SongPropertyFileDiscriminants::Position => todo!(),
             };
 
             let result = parser()
