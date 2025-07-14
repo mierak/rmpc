@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
@@ -24,7 +25,7 @@ use crate::{
         browser::BrowserPane,
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
-        widgets::browser::Browser,
+        widgets::browser::{Browser, BrowserArea},
     },
 };
 
@@ -356,16 +357,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         Ok(())
     }
 
-    fn browser_areas(&self) -> [Rect; 4] {
-        let mut areas = [Rect::default(); 4];
-        let browser_areas = self.browser.areas;
-        for (i, area) in browser_areas.iter().enumerate().take(areas.len()) {
-            areas[i] = *area;
-        }
-        areas
-    }
-
-    fn scrollbar_area(&self) -> Option<Rect> {
-        self.browser.areas.get(2).copied()
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
+        self.browser.areas
     }
 }

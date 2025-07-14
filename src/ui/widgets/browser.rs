@@ -1,3 +1,4 @@
+use enum_map::{Enum, EnumMap};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, Padding},
@@ -9,10 +10,18 @@ use crate::{
     ui::dirstack::{Dir, DirStack, DirStackItem},
 };
 
+#[derive(Copy, Clone, Debug, Enum, Eq, PartialEq, Hash)]
+pub enum BrowserArea {
+    Main = 0,
+    List = 1,
+    Preview = 2,
+    Scrollbar = 3,
+}
+
 #[derive(Debug)]
 pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     state_type_marker: std::marker::PhantomData<T>,
-    pub areas: [Rect; 3],
+    pub areas: EnumMap<BrowserArea, Rect>,
     filter_input_active: bool,
 }
 
@@ -20,7 +29,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
         Self {
             state_type_marker: std::marker::PhantomData,
-            areas: [Rect::default(); 3],
+            areas: EnumMap::default(),
             filter_input_active: false,
         }
     }
@@ -76,7 +85,7 @@ where
         };
 
         if config.theme.column_widths[2] > 0 {
-            self.areas[2] = preview_area;
+            self.areas[BrowserArea::Preview] = preview_area;
 
             let mut result = Vec::new();
             for group in preview.unwrap_or_default() {
@@ -118,7 +127,7 @@ where
             previous = previous.highlight_style(config.theme.current_item_style);
 
             let inner_block = block.inner(previous_area);
-            self.areas[0] = inner_block;
+            self.areas[BrowserArea::Main] = inner_block;
             ratatui::widgets::StatefulWidget::render(
                 previous,
                 inner_block,
@@ -167,12 +176,14 @@ where
                 buf,
                 state.as_render_state_ref(),
             );
-            self.areas[1] = inner_block;
+            self.areas[BrowserArea::List] = inner_block;
+            let scrollbar_area = current_area.inner(scrollbar_margin);
+            self.areas[BrowserArea::Scrollbar] = scrollbar_area;
             ratatui::widgets::Widget::render(block, current_area, buf);
             if let Some(scrollbar) = config.as_styled_scrollbar() {
                 ratatui::widgets::StatefulWidget::render(
                     scrollbar,
-                    current_area.inner(scrollbar_margin),
+                    scrollbar_area,
                     buf,
                     state.as_scrollbar_state_ref(),
                 );

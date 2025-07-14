@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
+use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::prelude::Rect;
 
@@ -23,10 +24,13 @@ use crate::{
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt, MpdDelete},
         mpd_query::EXTERNAL_COMMAND,
     },
-    ui::modals::{
-        input_modal::InputModal,
-        menu::{create_add_modal, modal::MenuModal},
-        select_modal::SelectModal,
+    ui::{
+        modals::{
+            input_modal::InputModal,
+            menu::{create_add_modal, modal::MenuModal},
+            select_modal::SelectModal,
+        },
+        widgets::browser::BrowserArea,
     },
 };
 
@@ -43,10 +47,10 @@ where
 {
     fn stack(&self) -> &DirStack<T>;
     fn stack_mut(&mut self) -> &mut DirStack<T>;
-    fn browser_areas(&self) -> [Rect; 4];
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect>;
     fn scrollbar_area(&self) -> Option<Rect> {
         let areas = self.browser_areas();
-        let scrollbar = areas[3];
+        let scrollbar = areas[BrowserArea::Scrollbar];
         if scrollbar.width > 0 { Some(scrollbar) } else { None }
     }
     fn set_filter_input_mode_active(&mut self, active: bool);
@@ -214,9 +218,9 @@ where
         }
 
         let areas = self.browser_areas();
-        let prev_area = areas[0];
-        let current_area = areas[1];
-        let preview_area = areas[2];
+        let prev_area = areas[BrowserArea::Main];
+        let current_area = areas[BrowserArea::List];
+        let preview_area = areas[BrowserArea::Preview];
 
         let position = event.into();
         let drag_start_position = match event.kind {
