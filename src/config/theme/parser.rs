@@ -412,16 +412,10 @@ impl StringOrModifiersExt for Option<StringOrModifiers> {
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod parser2 {
-    use anyhow::{Context, Result};
     use chumsky::Parser;
-    use strum::IntoEnumIterator;
+    use rstest::rstest;
 
     use super::*;
-    use crate::config::theme::properties::{
-        SongPropertyFileDiscriminants,
-        StatusPropertyFileDiscriminants,
-        WidgetPropertyFileDiscriminants,
-    };
 
     #[test]
     fn group() {
@@ -672,223 +666,56 @@ mod parser2 {
         );
     }
 
-    #[test]
-    fn all_status_properties() -> Result<()> {
-        for prop in StatusPropertyFileDiscriminants::iter() {
-            let (input, expected) = match prop {
-                StatusPropertyFileDiscriminants::Volume => ("$volume", StatusPropertyFile::Volume),
-                StatusPropertyFileDiscriminants::Repeat => {
-                    ("$repeat", StatusPropertyFile::RepeatV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::Random => {
-                    ("$random", StatusPropertyFile::RandomV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::Single => {
-                    ("$single", StatusPropertyFile::SingleV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        oneshot_label: "Oneshot".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                        oneshot_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::Consume => {
-                    ("$consume", StatusPropertyFile::ConsumeV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        oneshot_label: "Oneshot".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                        oneshot_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::State => ("$state", StatusPropertyFile::StateV2 {
-                    playing_label: "Playing".to_owned(),
-                    paused_label: "Paused".to_owned(),
-                    stopped_label: "Stopped".to_owned(),
-                    playing_style: None,
-                    paused_style: None,
-                    stopped_style: None,
-                }),
-                StatusPropertyFileDiscriminants::RepeatV2 => {
-                    ("$repeat", StatusPropertyFile::RepeatV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::RandomV2 => {
-                    ("$random", StatusPropertyFile::RandomV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::SingleV2 => {
-                    ("$single", StatusPropertyFile::SingleV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        oneshot_label: "Oneshot".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                        oneshot_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::ConsumeV2 => {
-                    ("$consume", StatusPropertyFile::ConsumeV2 {
-                        on_label: "On".to_owned(),
-                        off_label: "Off".to_owned(),
-                        oneshot_label: "Oneshot".to_owned(),
-                        on_style: None,
-                        off_style: None,
-                        oneshot_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::StateV2 => {
-                    ("$state", StatusPropertyFile::StateV2 {
-                        playing_label: "Playing".to_owned(),
-                        paused_label: "Paused".to_owned(),
-                        stopped_label: "Stopped".to_owned(),
-                        playing_style: None,
-                        paused_style: None,
-                        stopped_style: None,
-                    })
-                }
-                StatusPropertyFileDiscriminants::Elapsed => {
-                    ("$elapsed", StatusPropertyFile::Elapsed)
-                }
-                StatusPropertyFileDiscriminants::Duration => {
-                    ("$duration", StatusPropertyFile::Duration)
-                }
-                StatusPropertyFileDiscriminants::Crossfade => {
-                    ("$crossfade", StatusPropertyFile::Crossfade)
-                }
-                StatusPropertyFileDiscriminants::Bitrate => {
-                    ("$bitrate", StatusPropertyFile::Bitrate)
-                }
-                StatusPropertyFileDiscriminants::Partition => {
-                    ("$partition", StatusPropertyFile::Partition)
-                }
-                StatusPropertyFileDiscriminants::QueueLength => {
-                    ("$queuelength", StatusPropertyFile::QueueLength {
-                        thousands_separator: ",".to_owned(),
-                    })
-                }
-                StatusPropertyFileDiscriminants::QueueTimeTotal => {
-                    ("$queuetotal", StatusPropertyFile::QueueTimeTotal { separator: None })
-                }
-                StatusPropertyFileDiscriminants::QueueTimeRemaining => {
-                    ("$queueremaining", StatusPropertyFile::QueueTimeRemaining { separator: None })
-                }
-                StatusPropertyFileDiscriminants::ActiveTab => {
-                    ("$activetab", StatusPropertyFile::ActiveTab)
-                }
-            };
-
-            let result = parser()
-                .parse(input)
-                .into_output()
-                .context(format!("failed to parse '{input}'"))?
-                .pop()
-                .unwrap()
-                .kind;
-
-            assert_eq!(
-                result,
-                PropertyKindFileOrText::Property(PropertyKindFile::Status(expected))
-            );
-        }
-
-        Ok(())
+    #[rstest]
+    #[case("$activetab", StatusPropertyFile::ActiveTab)]
+    #[case("$queueremaining", StatusPropertyFile::QueueTimeRemaining { separator: None })]
+    #[case("$queuetotal", StatusPropertyFile::QueueTimeTotal { separator: None })]
+    #[case("$queuelength", StatusPropertyFile::QueueLength { thousands_separator: ",".to_owned() })]
+    #[case("$partition", StatusPropertyFile::Partition)]
+    #[case("$bitrate", StatusPropertyFile::Bitrate)]
+    #[case("$crossfade", StatusPropertyFile::Crossfade)]
+    #[case("$duration", StatusPropertyFile::Duration)]
+    #[case("$elapsed", StatusPropertyFile::Elapsed)]
+    #[case("$state", StatusPropertyFile::StateV2 { playing_label: "Playing".to_owned(), paused_label: "Paused".to_owned(), stopped_label: "Stopped".to_owned(), playing_style: None, paused_style: None, stopped_style: None })]
+    #[case("$consume", StatusPropertyFile::ConsumeV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
+    #[case("$single", StatusPropertyFile::SingleV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
+    #[case("$random", StatusPropertyFile::RandomV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
+    #[case("$repeat", StatusPropertyFile::RepeatV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
+    #[case("$state", StatusPropertyFile::StateV2 { playing_label: "Playing".to_owned(), paused_label: "Paused".to_owned(), stopped_label: "Stopped".to_owned(), playing_style: None, paused_style: None, stopped_style: None })]
+    #[case("$consume", StatusPropertyFile::ConsumeV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
+    #[case("$single", StatusPropertyFile::SingleV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
+    #[case("$random", StatusPropertyFile::RandomV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
+    #[case("$repeat", StatusPropertyFile::RepeatV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
+    #[case("$volume", StatusPropertyFile::Volume)]
+    fn all_status_properties(#[case] input: &str, #[case] expected: StatusPropertyFile) {
+        let result = parser().parse(input).unwrap().pop().unwrap().kind;
+        assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Status(expected)));
     }
 
-    #[test]
-    fn all_widget_properties() -> Result<()> {
-        for prop in WidgetPropertyFileDiscriminants::iter() {
-            let (input, expected) = match &prop {
-                WidgetPropertyFileDiscriminants::States => {
-                    ("$w:states", WidgetPropertyFile::States {
-                        active_style: None,
-                        separator_style: None,
-                    })
-                }
-                WidgetPropertyFileDiscriminants::Volume => {
-                    ("$w:volume", WidgetPropertyFile::Volume)
-                }
-                WidgetPropertyFileDiscriminants::ScanStatus => {
-                    ("$w:scanstatus", WidgetPropertyFile::ScanStatus)
-                }
-            };
-
-            let result = parser()
-                .parse(input)
-                .into_output()
-                .context(format!("failed to parse '{input}'"))?
-                .pop()
-                .unwrap()
-                .kind;
-
-            assert_eq!(
-                result,
-                PropertyKindFileOrText::Property(PropertyKindFile::Widget(expected))
-            );
-        }
-
-        Ok(())
+    #[rstest]
+    #[case("$w:states", WidgetPropertyFile::States { active_style: None, separator_style: None })]
+    #[case("$w:volume", WidgetPropertyFile::Volume)]
+    #[case("$w:scanstatus", WidgetPropertyFile::ScanStatus)]
+    fn all_widget_properties(#[case] input: &str, #[case] expected: WidgetPropertyFile) {
+        let result = parser().parse(input).unwrap().pop().unwrap().kind;
+        assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Widget(expected)));
     }
 
-    #[test]
-    fn all_song_properties() -> Result<()> {
-        for prop in SongPropertyFileDiscriminants::iter() {
-            let (input, expected) = match prop {
-                SongPropertyFileDiscriminants::Filename => {
-                    ("$s:filename", SongPropertyFile::Filename)
-                }
-                SongPropertyFileDiscriminants::File => ("$s:file", SongPropertyFile::File),
-                SongPropertyFileDiscriminants::FileExtension => {
-                    ("$s:fileextension", SongPropertyFile::FileExtension)
-                }
-                SongPropertyFileDiscriminants::Title => ("$s:title", SongPropertyFile::Title),
-                SongPropertyFileDiscriminants::Artist => ("$s:artist", SongPropertyFile::Artist),
-                SongPropertyFileDiscriminants::Album => ("$s:album", SongPropertyFile::Album),
-                SongPropertyFileDiscriminants::Duration => {
-                    ("$s:duration", SongPropertyFile::Duration)
-                }
-                SongPropertyFileDiscriminants::Track => ("$s:track", SongPropertyFile::Track),
-                SongPropertyFileDiscriminants::Disc => ("$s:disc", SongPropertyFile::Disc),
-                SongPropertyFileDiscriminants::Other => {
-                    ("$s:tag(value: \"sometag\")", SongPropertyFile::Other("sometag".to_owned()))
-                }
-                SongPropertyFileDiscriminants::Position => {
-                    ("$s:position", SongPropertyFile::Position)
-                }
-            };
-
-            let result = parser()
-                .parse(input)
-                .into_output()
-                .context(format!("failed to parse '{input}'"))?
-                .pop()
-                .unwrap()
-                .kind;
-
-            assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Song(expected)));
-        }
-
-        Ok(())
+    #[rstest]
+    #[case("$s:filename", SongPropertyFile::Filename)]
+    #[case("$s:file", SongPropertyFile::File)]
+    #[case("$s:fileextension", SongPropertyFile::FileExtension)]
+    #[case("$s:title", SongPropertyFile::Title)]
+    #[case("$s:artist", SongPropertyFile::Artist)]
+    #[case("$s:album", SongPropertyFile::Album)]
+    #[case("$s:duration", SongPropertyFile::Duration)]
+    #[case("$s:track", SongPropertyFile::Track)]
+    #[case("$s:disc", SongPropertyFile::Disc)]
+    #[case("$s:position", SongPropertyFile::Position)]
+    #[case("$s:tag(value: \"sometag\")", SongPropertyFile::Other("sometag".to_owned()))]
+    fn all_song_properties(#[case] input: &str, #[case] expected: SongPropertyFile) {
+        let result = parser().parse(input).unwrap().pop().unwrap().kind;
+        assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Song(expected)));
     }
 
     #[allow(clippy::needless_raw_string_hashes)]
