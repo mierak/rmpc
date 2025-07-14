@@ -1,7 +1,7 @@
 #![allow(deprecated)] // TODO remove after cleanup
 use std::collections::HashMap;
 
-use anyhow::{Result, bail, ensure};
+use anyhow::{Result, ensure};
 use chumsky::Parser;
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
@@ -12,7 +12,7 @@ use unicase::UniCase;
 
 use super::theme::{
     PercentOrLength,
-    parser,
+    parser::{self, make_error_report},
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
     queue_table::ParseSizeError,
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
@@ -166,7 +166,7 @@ impl Pane {
 }
 
 impl TryFrom<PaneTypeFile> for PaneType {
-    type Error = anyhow::Error;
+    type Error = PaneConversionError;
 
     fn try_from(value: PaneTypeFile) -> Result<PaneType, Self::Error> {
         Ok(match value {
@@ -198,8 +198,8 @@ impl TryFrom<PaneTypeFile> for PaneType {
                         (Some(format), Some(_)) | (Some(format), None) => parser::parser()
                             .parse(&format)
                             .into_result()
-                            .map_err(|e| {
-                                anyhow::anyhow!("Failed to parse property format: {:?}", e)
+                            .map_err(|errs| {
+                                PaneConversionError::FormatError(make_error_report(errs, &format))
                             })?
                             .into_iter()
                             .map(|prop| -> Result<_> { prop.try_into() })
@@ -209,7 +209,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
                             .map(|prop| -> Result<_> { prop.try_into() })
                             .try_collect()?,
                         (None, None) => {
-                            bail!("One of config or format has to be specified for a Property pane")
+                            return Err(PaneConversionError::MissingFormat);
                         }
                     }
                 },
@@ -404,6 +404,10 @@ pub enum PaneConversionError {
     ParseError(#[from] ParseSizeError),
     #[error("Failed to parse pane: {0}")]
     Generic(#[from] anyhow::Error),
+    #[error("Missing pane format or content")]
+    MissingFormat,
+    #[error("Invalid property format: {0}")]
+    FormatError(String),
 }
 
 impl PaneOrSplitFile {

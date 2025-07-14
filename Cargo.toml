@@ -53,6 +53,7 @@ thiserror = "2.0.12"
 parking_lot = { version = "0.12.4", features = [] }
 unicode-segmentation = "1.12.0"
 chumsky = "0.10.1"
+ariadne = "0.5.1"
 
 [build-dependencies]
 clap = { workspace = true }

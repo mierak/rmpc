@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use cava::{CavaTheme, CavaThemeFile};
 use chumsky::Parser;
 use itertools::Itertools;
 use level_styles::{LevelStyles, LevelStylesFile};
+use parser::make_error_report;
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 
@@ -330,7 +331,7 @@ fn convert_components(
                     i += 1;
                 }
                 err @ Err(_) => {
-                    err?;
+                    err.with_context(|| format!("In component: '{name}'"))?;
                 }
             },
             None => break,
@@ -423,7 +424,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     parser::parser()
                         .parse(&v2)
                         .into_result()
-                        .map_err(|e| anyhow::anyhow!("Failed to parse property format: {:?}", e))?
+                        .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &v2)))?
                         .into_iter()
                         .map(|v| v.try_into())
                         .try_collect()?,
