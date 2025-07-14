@@ -214,6 +214,19 @@ pub fn parser<'a>()
             "duration" => Ok(PropertyKindFile::Status(StatusPropertyFile::Duration)),
             "crossfade" => Ok(PropertyKindFile::Status(StatusPropertyFile::Crossfade)),
             "bitrate" => Ok(PropertyKindFile::Status(StatusPropertyFile::Bitrate)),
+            "partition" => Ok(PropertyKindFile::Status(StatusPropertyFile::Partition)),
+            "activetab" => Ok(PropertyKindFile::Status(StatusPropertyFile::ActiveTab)),
+            "queuelength" => Ok(PropertyKindFile::Status(StatusPropertyFile::QueueLength {
+                thousands_separator: properties.get_label("thousandsSeparator", ","),
+            })),
+            "queuetotal" => Ok(PropertyKindFile::Status(StatusPropertyFile::QueueTimeTotal {
+                separator: properties.get_label_opt("separator"),
+            })),
+            "queueremaining" => {
+                Ok(PropertyKindFile::Status(StatusPropertyFile::QueueTimeRemaining {
+                    separator: properties.get_label_opt("separator"),
+                }))
+            }
             _ => Err(Rich::custom(span, "invalid status property type")),
         })
         .boxed();
@@ -239,6 +252,7 @@ pub fn parser<'a>()
                 };
                 Ok(PropertyKindFile::Song(SongPropertyFile::Other(value)))
             }
+            "position" => Ok(PropertyKindFile::Song(SongPropertyFile::Position)),
             _ => Err(Rich::custom(span, "invalid song property type")),
         })
         .boxed();
@@ -251,6 +265,7 @@ pub fn parser<'a>()
                 active_style: properties.get_style("activeStyle"),
                 separator_style: properties.get_style("separatorStyle"),
             })),
+            "scanstatus" => Ok(PropertyKindFile::Widget(WidgetPropertyFile::ScanStatus)),
             _ => Err(Rich::custom(span, "invalid widget type")),
         })
         .boxed();
@@ -764,11 +779,23 @@ mod parser2 {
                 StatusPropertyFileDiscriminants::Bitrate => {
                     ("$bitrate", StatusPropertyFile::Bitrate)
                 }
-                StatusPropertyFileDiscriminants::Partition => todo!(),
-                StatusPropertyFileDiscriminants::QueueLength => todo!(),
-                StatusPropertyFileDiscriminants::QueueTimeTotal => todo!(),
-                StatusPropertyFileDiscriminants::QueueTimeRemaining => todo!(),
-                StatusPropertyFileDiscriminants::ActiveTab => todo!(),
+                StatusPropertyFileDiscriminants::Partition => {
+                    ("$partition", StatusPropertyFile::Partition)
+                }
+                StatusPropertyFileDiscriminants::QueueLength => {
+                    ("$queuelength", StatusPropertyFile::QueueLength {
+                        thousands_separator: ",".to_owned(),
+                    })
+                }
+                StatusPropertyFileDiscriminants::QueueTimeTotal => {
+                    ("$queuetotal", StatusPropertyFile::QueueTimeTotal { separator: None })
+                }
+                StatusPropertyFileDiscriminants::QueueTimeRemaining => {
+                    ("$queueremaining", StatusPropertyFile::QueueTimeRemaining { separator: None })
+                }
+                StatusPropertyFileDiscriminants::ActiveTab => {
+                    ("$activetab", StatusPropertyFile::ActiveTab)
+                }
             };
 
             let result = parser()
@@ -801,7 +828,9 @@ mod parser2 {
                 WidgetPropertyFileDiscriminants::Volume => {
                     ("$w:volume", WidgetPropertyFile::Volume)
                 }
-                WidgetPropertyFileDiscriminants::ScanStatus => todo!(),
+                WidgetPropertyFileDiscriminants::ScanStatus => {
+                    ("$w:scanstatus", WidgetPropertyFile::ScanStatus)
+                }
             };
 
             let result = parser()
@@ -843,7 +872,9 @@ mod parser2 {
                 SongPropertyFileDiscriminants::Other => {
                     ("$s:tag(value: \"sometag\")", SongPropertyFile::Other("sometag".to_owned()))
                 }
-                SongPropertyFileDiscriminants::Position => todo!(),
+                SongPropertyFileDiscriminants::Position => {
+                    ("$s:position", SongPropertyFile::Position)
+                }
             };
 
             let result = parser()
