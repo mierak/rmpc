@@ -254,6 +254,15 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<SongProperty> {
         Ok(Self {
             kind: match value.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Transform(TransformFile::Truncate {
+                    content,
+                    length,
+                    from_start,
+                }) => PropertyKindOrText::Transform(Transform::Truncate {
+                    content: Box::new((*content).try_into()?),
+                    length,
+                    from_start,
+                }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(PropertyKindFile::Song(prop)) => {
                     PropertyKindOrText::Property(prop.into())
@@ -280,6 +289,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<SongProperty> {
         })
     }
 }
+
 impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
     type Error = anyhow::Error;
 
