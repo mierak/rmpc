@@ -170,12 +170,9 @@ where
     /// scrollbar interactions
     fn handle_scrollbar_interaction(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<bool> {
         let areas = self.browser_areas();
-        let scrollbar_area = self.scrollbar_area();
-        if scrollbar_area.is_none() {
+        let Some(scrollbar_area) = self.scrollbar_area() else {
             return Ok(false);
-        }
-        let scrollbar_area =
-            scrollbar_area.expect("Expected scrollbar_area to be Some, but it was None");
+        };
         match event.kind {
             MouseEventKind::LeftClick => {
                 if crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area) {
@@ -218,8 +215,8 @@ where
         }
 
         let areas = self.browser_areas();
-        let prev_area = areas[BrowserArea::Main];
-        let current_area = areas[BrowserArea::List];
+        let prev_area = areas[BrowserArea::Previous];
+        let current_area = areas[BrowserArea::Current];
         let preview_area = areas[BrowserArea::Preview];
 
         let position = event.into();

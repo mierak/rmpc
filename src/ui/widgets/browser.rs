@@ -12,8 +12,8 @@ use crate::{
 
 #[derive(Copy, Clone, Debug, Enum, Eq, PartialEq, Hash)]
 pub enum BrowserArea {
-    Main = 0,
-    List = 1,
+    Previous = 0,
+    Current = 1,
     Preview = 2,
     Scrollbar = 3,
 }
@@ -127,7 +127,7 @@ where
             previous = previous.highlight_style(config.theme.current_item_style);
 
             let inner_block = block.inner(previous_area);
-            self.areas[BrowserArea::Main] = inner_block;
+            self.areas[BrowserArea::Previous] = inner_block;
             ratatui::widgets::StatefulWidget::render(
                 previous,
                 inner_block,
@@ -176,7 +176,7 @@ where
                 buf,
                 state.as_render_state_ref(),
             );
-            self.areas[BrowserArea::List] = inner_block;
+            self.areas[BrowserArea::Current] = inner_block;
             let scrollbar_area = current_area.inner(scrollbar_margin);
             self.areas[BrowserArea::Scrollbar] = scrollbar_area;
             ratatui::widgets::Widget::render(block, current_area, buf);
