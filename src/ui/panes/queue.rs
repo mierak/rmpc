@@ -541,7 +541,32 @@ impl Pane for QueuePane {
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
-        if !self.areas[Areas::Table].contains(event.into()) {
+        let position = event.into();
+
+        if let Some(scrollbar_area) = self.scrollbar_area() {
+            if ctx.config.theme.scrollbar.is_some()
+                && crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area)
+            {
+                match event.kind {
+                    MouseEventKind::LeftClick | MouseEventKind::Drag { .. } => {
+                        let content_len = ctx.queue.len();
+                        if let Some(target_idx) =
+                            crate::shared::mouse_event::calculate_scrollbar_index(
+                                event,
+                                scrollbar_area,
+                                content_len,
+                            )
+                        {
+                            self.scrolling_state.select(Some(target_idx), ctx.config.scrolloff);
+                            ctx.render()?;
+                        }
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if !self.areas[Areas::Table].contains(position) {
             return Ok(());
         }
 
@@ -601,6 +626,7 @@ impl Pane for QueuePane {
                 }
                 self.open_context_menu(ctx)?;
             }
+            MouseEventKind::Drag { .. } => {}
         }
 
         Ok(())
@@ -1098,6 +1124,11 @@ impl Pane for QueuePane {
 }
 
 impl QueuePane {
+    fn scrollbar_area(&self) -> Option<Rect> {
+        let area = self.areas[Areas::Scrollbar];
+        if area.width > 0 { Some(area) } else { None }
+    }
+
     pub fn jump_forward(&mut self, queue: &[Song], scrolloff: usize) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");

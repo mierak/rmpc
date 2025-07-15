@@ -1,4 +1,5 @@
 use anyhow::Result;
+use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
@@ -23,7 +24,7 @@ use crate::{
         browser::BrowserPane,
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
-        widgets::browser::Browser,
+        widgets::browser::{Browser, BrowserArea},
     },
 };
 
@@ -409,7 +410,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         Ok(())
     }
 
-    fn browser_areas(&self) -> [Rect; 3] {
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
         self.browser.areas
     }
 }

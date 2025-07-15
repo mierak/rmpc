@@ -449,6 +449,7 @@ impl Modal for KeybindsModal {
                 self.scrolling_state.prev(ctx.config.scrolloff, false);
                 ctx.render()?;
             }
+            MouseEventKind::Drag { drag_start_position: _ } => {}
         }
 
         Ok(())

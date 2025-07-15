@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
+use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect};
 
@@ -29,7 +30,7 @@ use crate::{
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
         modals::{info_list_modal::InfoListModal, input_modal::InputModal},
-        widgets::browser::Browser,
+        widgets::browser::{Browser, BrowserArea},
     },
 };
 
@@ -597,7 +598,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn browser_areas(&self) -> [Rect; 3] {
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
         self.browser.areas
     }
 }

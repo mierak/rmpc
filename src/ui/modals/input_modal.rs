@@ -262,6 +262,7 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     ctx.render()?;
                 }
             }
+            MouseEventKind::Drag { drag_start_position: _ } => {}
         }
         Ok(())
     }
