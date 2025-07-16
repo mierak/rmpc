@@ -249,7 +249,7 @@ pub fn property_parser<'a>(
                     on_label: properties.optional_string_default("on_label", "On", span)?,
                     off_label: properties.optional_string_default("off_label", "Off", span)?,
                     oneshot_label: properties.optional_string_default(
-                        "oneshotLabel",
+                        "oneshot_label",
                         "Oneshot",
                         span,
                     )?,
@@ -261,7 +261,7 @@ pub fn property_parser<'a>(
                     on_label: properties.optional_string_default("on_label", "On", span)?,
                     off_label: properties.optional_string_default("off_label", "Off", span)?,
                     oneshot_label: properties.optional_string_default(
-                        "oneshotLabel",
+                        "oneshot_label",
                         "Oneshot",
                         span,
                     )?,
@@ -271,7 +271,7 @@ pub fn property_parser<'a>(
                 }),
                 "st" | "state" => PropertyKindFile::Status(StatusPropertyFile::StateV2 {
                     playing_label: properties.optional_string_default(
-                        "playingLabel",
+                        "playing_label",
                         "Playing",
                         span,
                     )?,
@@ -281,7 +281,7 @@ pub fn property_parser<'a>(
                         span,
                     )?,
                     stopped_label: properties.optional_string_default(
-                        "stoppedLabel",
+                        "stopped_label",
                         "Stopped",
                         span,
                     )?,
@@ -300,7 +300,7 @@ pub fn property_parser<'a>(
                 "qlen" | "queuelength" => {
                     PropertyKindFile::Status(StatusPropertyFile::QueueLength {
                         thousands_separator: properties.optional_string_default(
-                            "thousandsSeparator",
+                            "thousands_separator",
                             defaults::default_thousands_separator(),
                             span,
                         )?,
@@ -875,7 +875,7 @@ mod parser2 {
 
     #[test]
     fn truncate() {
-        let input = r#"%trunc(content: $s:artist, length: 4, from_start: false){fg: black, bg: red, mods: bold}"#;
+        let input = "%trunc(content: $s:artist, length: 4, from_start: false){fg: black, bg: red, mods: bold}";
         let result = parser()
             .parse(input)
             .into_result()
@@ -1117,9 +1117,9 @@ mod parser2 {
     #[case("$st:volume", StatusPropertyFile::Volume)]
     fn all_status_properties(#[case] input: &str, #[case] expected: StatusPropertyFile) {
         let result = parser()
-            .parse(&input)
+            .parse(input)
             .into_result()
-            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &input)))
+            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, input)))
             .unwrap()
             .pop()
             .unwrap()
@@ -1133,9 +1133,9 @@ mod parser2 {
     #[case("$w:scanstatus", WidgetPropertyFile::ScanStatus)]
     fn all_widget_properties(#[case] input: &str, #[case] expected: WidgetPropertyFile) {
         let result = parser()
-            .parse(&input)
+            .parse(input)
             .into_result()
-            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &input)))
+            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, input)))
             .unwrap()
             .pop()
             .unwrap()
