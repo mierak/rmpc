@@ -194,7 +194,6 @@ pub struct AlignedArea {
 /// provided by [`image_size`]. Constrains area by [`max_size_px`].
 /// Returns the input [`available_area`] and [`max_size_px`] if terminal's size
 /// cannot be determined properly. Also returns resulting area size in pixels.
-#[allow(clippy::cast_lossless, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub fn create_aligned_area(
     available_area: Rect,
     image_size: (u32, u32),

@@ -7,7 +7,7 @@ description = "A beautiful and configurable TUI client for MPD"
 homepage = "https://mierak.github.io/rmpc/"
 repository = "https://github.com/mierak/rmpc"
 readme = "README.md"
-rust-version = "1.85.0"
+rust-version = "1.88.0"
 exclude = ["/docs/**/*", "!/docs/src/content/docs/next/assets/example_theme.ron", "!/docs/src/content/docs/next/assets/example_config.ron"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -84,6 +84,10 @@ match_single_binding = "allow"
 struct_field_names = "allow"
 redundant_closure_for_method_calls = "allow"
 unwrap_used = "deny"
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_lossless = "allow"
+cast_sign_loss = "allow"
 
 [lints.rust]
 unused_macros = "allow"

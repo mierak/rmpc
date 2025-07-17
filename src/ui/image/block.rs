@@ -123,7 +123,6 @@ impl Block {
 const UPPER_HALF_BLOCK: &str = "\u{2580}";
 const LOWER_HALF_BLOCK: &str = "\u{2584}";
 
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn display(
     w: &mut impl Write,
     img: &DynamicImage,

@@ -1,4 +1,3 @@
-#![allow(clippy::cast_possible_truncation)]
 use anyhow::Result;
 use ratatui::{
     buffer::Buffer,

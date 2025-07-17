@@ -82,7 +82,6 @@ impl CavaPane {
         Ok(())
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_lossless)]
     #[inline]
     pub fn read_cava_data(
         height: u16,
@@ -106,7 +105,6 @@ impl CavaPane {
         Ok(())
     }
 
-    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     #[inline]
     pub fn render_cava(
         writer: &TtyWriter,

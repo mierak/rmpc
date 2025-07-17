@@ -108,7 +108,6 @@ impl TestMpdClient {
 }
 
 type MpdResult<T> = Result<T, MpdError>;
-#[allow(clippy::cast_possible_truncation)]
 impl MpdClient for TestMpdClient {
     fn version(&mut self) -> crate::mpd::version::Version {
         todo!("Not yet implemented")

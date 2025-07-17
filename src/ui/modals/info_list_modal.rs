@@ -67,7 +67,6 @@ impl InfoListModal {
         }
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn row<'a>(
         key: &'a str,
         key_width: u16,

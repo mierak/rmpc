@@ -144,11 +144,6 @@ pub fn calculate_scrollbar_index(
         content_len.saturating_sub(1)
     } else {
         let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-        #[allow(
-            clippy::cast_precision_loss,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss
-        )]
         let target = (position_ratio * (content_len.saturating_sub(1)) as f64).round() as usize;
         target.min(content_len.saturating_sub(1))
     };

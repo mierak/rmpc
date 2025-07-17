@@ -975,11 +975,6 @@ mod tests {
         } else {
             let position_ratio =
                 f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-            #[allow(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                clippy::cast_precision_loss
-            )]
             ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
                 .min(total_items.saturating_sub(1))
         };
@@ -988,11 +983,6 @@ mod tests {
 
         let clicked_y = 0;
         let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            clippy::cast_precision_loss
-        )]
         let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
             .min(total_items.saturating_sub(1));
 
@@ -1000,11 +990,6 @@ mod tests {
 
         let clicked_y = 5;
         let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-        #[allow(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            clippy::cast_precision_loss
-        )]
         let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
             .min(total_items.saturating_sub(1));
 

@@ -76,7 +76,6 @@ impl Pane for VolumePane {
                     f32::from(event.x.saturating_sub(self.area.x)) / f32::from(self.area.width);
 
                 // Safe conversion: clamped to 0-100 range and rounded, so cast is always valid
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
                 ctx.command(move |client| {

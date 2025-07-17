@@ -50,7 +50,6 @@ impl Geometry {
         Point { x: self.x, y: self.y }
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn take_chunk_horiz(&mut self, size_percent: Percent) -> Geometry {
         let size = ((u32::from(self.width) * 100) * u32::from(size_percent) / 10000) as u16;
 
@@ -60,7 +59,6 @@ impl Geometry {
         result
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn take_chunk_vert(&mut self, size_percent: Percent) -> Geometry {
         let size = ((u32::from(self.height) * 100) * u32::from(size_percent) / 10000) as u16;
 
