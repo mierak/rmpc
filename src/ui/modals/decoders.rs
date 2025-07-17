@@ -54,7 +54,6 @@ impl DecodersModal {
         result
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     fn row<'a>(
         name: &'a str,
         name_width: u16,

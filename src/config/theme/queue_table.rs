@@ -31,7 +31,6 @@ pub enum PercentOrLength {
 }
 
 impl PercentOrLength {
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn into_constraint(self, parent_size: u16) -> Constraint {
         match self {
             PercentOrLength::Percent(val) => Constraint::Percentage(val),

@@ -146,7 +146,6 @@ fn row_header<'a>(
     }
 }
 
-#[allow(clippy::cast_possible_truncation)]
 fn row<'a>(
     keys: &'a [(String, String, Cow<'a, str>)],
     key_width: u16,
