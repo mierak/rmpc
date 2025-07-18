@@ -36,14 +36,9 @@ pub fn parser<'a>()
             sticker.map(PropertyKindFileOrText::Sticker),
         ));
 
-        prop_kind_or_text
-            .then(style_file.clone().or_not())
-            .then(just('|').ignore_then(prop).or_not())
-            .map(|((kind, style), default)| PropertyFile {
-                kind,
-                style,
-                default: default.map(Box::new),
-            })
+        prop_kind_or_text.then(style_file.or_not()).then(just('|').ignore_then(prop).or_not()).map(
+            |((kind, style), default)| PropertyFile { kind, style, default: default.map(Box::new) },
+        )
     })
     .padded()
     .repeated()
@@ -89,7 +84,7 @@ mod parser2 {
     #[test]
     fn group() {
         let result = parser().parse(
-            r#"[ $filename{fg: black, bg: red, mods: bold} " - " $file ]{fg: blue, bg: yellow, mods: crossedout}"#,
+            r#"[ $filename{fg: black, bg: red, mods: b} " - " $file ]{fg: blue, bg: yellow, mods: x}"#,
         );
 
         assert_eq!(
@@ -132,7 +127,7 @@ mod parser2 {
 
     #[test]
     fn filename_with_style_and_default() {
-        let input = "$filename{fg: black, bg: red, mods: bold}|$file{fg: black, bg: red, mods: bold}|$bitrate{fg: #FF0000, bg: 1, mods: underlined}";
+        let input = "$filename{fg: black, bg: red, mods: b}|$file{fg: black, bg: red, mods: b}|$bitrate{fg: #FF0000, bg: 1, mods: u}";
         let result = parser()
             .parse(input)
             .into_result()
@@ -176,7 +171,8 @@ mod parser2 {
 
     #[test]
     fn truncate() {
-        let input = "%trunc(content: $artist, length: 4, from_start: false){fg: black, bg: red, mods: bold}";
+        let input =
+            "%trunc(content: $artist, length: 4, from_start: false){fg: black, bg: red, mods: b}";
         let result = parser()
             .parse(input)
             .into_result()
@@ -208,7 +204,7 @@ mod parser2 {
 
     #[test]
     fn sticker_with_style() {
-        let result = parser().parse(r#"$sticker(name: "artist"){fg: black, bg: red, mods: bold}"#);
+        let result = parser().parse(r#"$sticker(name: "artist"){fg: black, bg: red, mods: b}"#);
 
         assert_eq!(
             PropertyFile {
@@ -226,7 +222,7 @@ mod parser2 {
 
     #[test]
     fn filename_with_style() {
-        let result = parser().parse("$filename{fg: black, bg: red, mods: bold}");
+        let result = parser().parse("$filename{fg: black, bg: red, mods: b}");
 
         assert_eq!(
             PropertyFile {
@@ -281,7 +277,7 @@ mod parser2 {
     #[test]
     fn consume() {
         let result = parser().parse(
-            r#"$consume(on_label: "test", off_label: "im off boi",off_style: {fg: black, bg: red, mods: bold})"#,
+            r#"$consume(on_label: "test", off_label: "im off boi",off_style: {fg: black, bg: red, mods: b})"#,
         );
 
         assert_eq!(
@@ -355,7 +351,7 @@ mod parser2 {
 
     #[test]
     fn multiple_modifiers() {
-        let result = parser().parse("'sup'{mods: bold, underlined}");
+        let result = parser().parse("'sup'{mods: bu}");
 
         assert_eq!(
             PropertyFile {
