@@ -1,0 +1,129 @@
+---
+title: Properties
+description: Configuration of properties
+sidebar:
+    order: 90
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
+
+You can use the so called properties in various places in rmpc. These allow you to customize what
+information is shown and how the program looks as a whole. These properties are usable in
+the <a href={path("configuration/layout")}>layout</a>, <a href={path("configuration/tabs")}>tabs</a>, <a href={path("configuration/theme/#browser_song_format")}>browser_song_format</a>
+and <a href={path("configuration/layout#components")}>components</a>.
+
+## Definition
+
+Properties can be defined by either composing struct using the `ron` format or via a custom
+templating syntax. These two types of definition are equivalent and you are free to choose which one
+you prefer but using templates is advised for convenience and future extensibility.
+
+## Available property types
+
+The properties are divided into a few categories:
+
+- `Text` - Displays a raw text value.
+- `Sticker` - Display sicker value of a song. These stickers can be used to for example track
+    <a href={path("guides/on_song_change/#track-song-play-count")}>play count</a> of songs.
+- `Property` - Display song's metadata values or information about rmpc's and MPD's status. These
+  properties are further divided into three categories:
+    - `Song` - Display metadata of either the currently playing song or controls format of songs in
+      lists and tables depending on the context.
+    - `Status` - Display rmpc's or MPD's status like the playback state, volume, currently active tab
+      and others.
+    - `Widget` - A bit more involved properties with custom display options, these are mostly
+      obsolete nowadays and kept for backwards compatibility.
+- `Group` - Groups one or more properties together. If any of the properties resolves to an empty value
+  the whole group will not be shown.
+- `Transform` - Applies a tranformation on the properties in question like truncating the value to
+  a specified number of characters.
+
+## Template definition syntax
+
+Text is simply a string surrounded by either double or single quotes. If you want to put literal
+quotes symbol inside your text you can do so by escaping it with `\`.
+
+Properties and stickers are denoted by a leading `$` followed by its name. Some of these
+properties take parameters which are defined inside parentheses by first specifying the parameter
+name followed by a `:` and then its value. These parameters can be of several types: simple string
+values, styles, numbers, booleans and other properties.
+
+Groups are denoted by square brackets `[]` inside which you can put one or more other properties.
+
+Transforms are similar to properties except they use `%` instead of `$`.
+
+Styles are denoted using curly braces `{}` inside which you can specify one of `fg`, `bg` or `mods`
+which set the foreground color, background color and text modifiers respectively. Supported colors
+are the same as everywhere else, meaning the 16 terminal colors, ANSI colors, RGB and HEX values.
+Modifiers are also the same and possible values are `bold`, `dim`, `italic`, `underlined`, `reversed`
+and `crossedout`. Multiple modifiers can be combined by separating them with a comma.
+
+Fallback values can also be configured by putting a pipe symbol `|` after the property definition
+followed by another property which is to be used if the first one does not exist. For example to
+fallback to filename when song's metadata is missing a title.
+
+### Examples
+
+|                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'Hello rmpc'`<br/> "Hello rmpc" with default styles                                                                                                                                                                 |
+| `'Hello rmpc'{fg: black, bg: #FF0000, mods: bold, underlined}`<br/> black, bold and underlined "Hello rmpc" on red background                                                                                        |
+| `$title\|$filename`<br/> song's title, if song is missing the title metadata show its filename instead                                                                                                               |
+| `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title, if song is missing the title metadata show its artist in blue instead, and if that does not exist either, display "No song" in red |
+| `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title, if song is missing the title metadata show its artist in blue instead, and if that does not exist either, display "No song" in red |
+| `%truncate(content: $tag('date'), length: 4, from_start: true)`<br/> shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025                                                      |
+| `$st:elapsed ' / ' $st:duration [' (' $st:bitrate ' kbps)']`<br/> displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined                                                    |
+
+## Ron definition
+
+### Available song properties
+
+| Property      | Descripiton                                         | Ron             | Template                   | Parameters |
+| ------------- | --------------------------------------------------- | --------------- | -------------------------- | ---------- |
+| File          | song's full path from MPD's music directory         | `File`          | `$f` or `$file`            |            |
+| Filename      | song's filename                                     | `Filename`      | `$fn` or `$filename`       |            |
+| FileExtension | song's file extension                               | `FileExtension` | `$ext` or `$fileextension` |            |
+| Title         | value of the title tag                              | `Title`         | `$t` or `$title`           |            |
+| Artist        | value of the artist tag                             | `Artist`        | `$ar` or `$artist`         |            |
+| Album         | value of the album tag                              | `Album`         | `$al` or `$album`          |            |
+| Duration      | song's duration                                     | `Duration`      | `$dur` or `$duration`      |            |
+| Track         | value of the track tag                              | `Track`         | `$tr` or `$track`          |            |
+| Disc          | value of the disc tag                               | `Disc`          | `$disc`                    |            |
+| Position      | value of the position tag                           | `Position`      | `$pos` or `$position`      |            |
+| Other(String) | display any arbitrary metadata tag supported by MPD | `Other("tag")`  | `$tag`                     |            |
+
+### Available status properties
+
+| Property           | Descripiton                                                   | Ron                       | Template                   | Parameters |
+| ------------------ | ------------------------------------------------------------- | ------------------------- | -------------------------- | ---------- |
+| Volume             | current volume as number from 0 to 100                        | `Volume`                  | `$f` or `$file`            |            |
+| State              | current playback state, one of `Playing`, `Paused`, `Stopped` | `StateV2(...)`            | `$f` or `$file`            |            |
+| Partition          | currently active partititon                                   | `Partition`               | `$f` or `$file`            |            |
+| Repeat             | repeat status                                                 | `RepeatV2(...)`           | `$f` or `$file`            |            |
+| Random             | random status                                                 | `RandomV2(...)`           | `$f` or `$file`            |            |
+| Single             | single status                                                 | `SingleV2(...)`           | `$fn` or `$filename`       |            |
+| Consume            | consume status                                                | `ConsumeV2(...)`          | `$fn` or `$filename`       |            |
+| Elapsed            | how much of the currently playing song has elpased            | `Elapsed`                 | `$ext` or `$fileextension` |            |
+| Duration           | total duration of the currently playing song                  | `Duration`                | `$t` or `$title`           |            |
+| Crossfade          | number of crossfade seconds                                   | `Crossfade`               | `$ar` or `$artist`         |            |
+| Bitrate            | currently playing song's bitrate                              | `Bitrate`                 | `$al` or `$album`          |            |
+| QueueLength        | number of songs in the queue                                  | `QueueLength(...)`        | `$dur` or `$duration`      |            |
+| QueueTimeTotal     | total duration of songs in the queue                          | `QueueTimeTotal(...)`     | `$tr` or `$track`          |            |
+| QueueTimeRemaining | total duration of songs remaining in the queue                | `QueueTimeRemaining(...)` | `$disc`                    |            |
+| ActiveTab          | currently active tab                                          | `ActiveTab`               | `$tab` or `$activetab`     |            |
+
+### Available widget properties
+
+| Property   | Descripiton                                                       | Ron           | Template                 |
+| ---------- | ----------------------------------------------------------------- | ------------- | ------------------------ |
+| ScanStatus | displays a spinner when MPD's database update is in progress      | `ScanStatus`  | `$scan` or `$scanstatus` |
+| States     | playback modifiers in format `Repeat / Random / Consume / Single` | `States(...)` | `$st` or `$states`       |
+| Volume     | current volume in format: `Volume: ▁▂▃▄▅▆▇ 100%`                  | `Volume`      | `$vol` or `$volume`      |
+
+### Available transforms
+
+| Transform | Descripiton                                          | Ron             | Template                |
+| --------- | ---------------------------------------------------- | --------------- | ----------------------- |
+| Truncate  | truncate the value to specified number of characters | `Truncate(...)` | `$trunc` or `$truncate` |
