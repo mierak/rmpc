@@ -57,8 +57,9 @@ Transforms are similar to properties except they use `%` instead of `$`.
 Styles are denoted using curly braces `{}` inside which you can specify one of `fg`, `bg` or `mods`
 which set the foreground color, background color and text modifiers respectively. Supported colors
 are the same as everywhere else, meaning the 16 terminal colors, ANSI colors, RGB and HEX values.
-Modifiers are also the same and possible values are `bold`, `dim`, `italic`, `underlined`, `reversed`
-and `crossedout`. Multiple modifiers can be combined by separating them with a comma.
+Modifiers are also the same and possible values are `b`, `d`, `i`, `u`, `r` and `x` for bold, dim,
+italic, underlined, reversed and crossed out respectively. Multiple modifiers can be specified at
+once, ie. `mods: biu` for bold, italic and underlined.
 
 Fallback values can also be configured by putting a pipe symbol `|` after the property definition
 followed by another property which is to be used if the first one does not exist. For example to
@@ -69,7 +70,7 @@ fallback to filename when song's metadata is missing a title.
 |                                                                                                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `'Hello rmpc'`<br/> "Hello rmpc" with default styles                                                                                                                                                                 |
-| `'Hello rmpc'{fg: black, bg: #FF0000, mods: bold, underlined}`<br/> black, bold and underlined "Hello rmpc" on red background                                                                                        |
+| `'Hello rmpc'{fg: black, bg: #FF0000, mods: bu}`<br/> black, bold and underlined "Hello rmpc" on red background                                                                                                      |
 | `$title\|$filename`<br/> song's title, if song is missing the title metadata show its filename instead                                                                                                               |
 | `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title, if song is missing the title metadata show its artist in blue instead, and if that does not exist either, display "No song" in red |
 | `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title, if song is missing the title metadata show its artist in blue instead, and if that does not exist either, display "No song" in red |

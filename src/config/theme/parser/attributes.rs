@@ -31,7 +31,7 @@ pub fn attribute_parser<'a>(
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, strum::EnumDiscriminants)]
+#[derive(Debug, strum::EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(strum::Display))]
 pub(super) enum Attribute {
     Style(StyleFile),
@@ -271,6 +271,75 @@ impl AttrExt for Option<HashMap<&str, Attribute>> {
                 format!("Unknown attributes found: [{}]", v.keys().join(", ")),
             )),
             None => Ok(()),
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod test {
+    use chumsky::prelude::*;
+    use rstest::rstest;
+
+    use super::attribute_parser;
+    use crate::config::theme::{
+        Modifiers,
+        StyleFile,
+        parser::Attribute,
+        properties::{PropertyFile, PropertyKindFile, PropertyKindFileOrText},
+    };
+
+    fn dummy_property_parser<'a>()
+    -> impl Parser<'a, &'a str, PropertyFile<PropertyKindFile>, extra::Err<Rich<'a, char>>> + Clone + 'a
+    {
+        just("$dummy").to(PropertyFile::<PropertyKindFile> {
+            kind: PropertyKindFileOrText::Text(String::new()),
+            style: None,
+            default: None,
+        })
+    }
+
+    #[rstest]
+    // bool
+    #[case("name: true", "name", Ok(Attribute::Bool(true)))]
+    #[case("name: false", "name", Ok(Attribute::Bool(false)))]
+    #[case("name:false", "name", Ok(Attribute::Bool(false)))]
+    #[case("name : false", "name", Ok(Attribute::Bool(false)))]
+    // uint
+    #[case("name: 0", "name", Ok(Attribute::UInt(0)))]
+    #[case("name: 1", "name", Ok(Attribute::UInt(1)))]
+    #[case("name: 999", "name", Ok(Attribute::UInt(999)))]
+    #[case("name : 999", "name", Ok(Attribute::UInt(999)))]
+    #[case("name:999", "name", Ok(Attribute::UInt(999)))]
+    #[case("name: 000", "name", Err(()))]
+    #[case("name: -1", "name", Err(()))]
+    // style
+    #[case("st: {fg: red, bg: blue, mods: bu}", "st", Ok(Attribute::Style(StyleFile { fg: Some("red".to_string()), bg: Some("blue".to_string()), modifiers: Some(Modifiers::Bold | Modifiers::Underlined) })))]
+    #[case("st: { mods: bu, bg: blue, fg: red }", "st", Ok(Attribute::Style(StyleFile { fg: Some("red".to_string()), bg: Some("blue".to_string()), modifiers: Some(Modifiers::Bold | Modifiers::Underlined) })))]
+    #[case("st: {fg: red}", "st", Ok(Attribute::Style(StyleFile { fg: Some("red".to_string()), bg: None, modifiers: None })))]
+    #[case("st: {bg: red}", "st", Ok(Attribute::Style(StyleFile { fg: None, bg: Some("red".to_string()), modifiers: None })))]
+    #[case("st: {mods: x}", "st", Ok(Attribute::Style(StyleFile { fg: None, bg: None, modifiers: Some(Modifiers::CrossedOut) })))]
+    // prop
+    #[case("dummy: $dummy", "dummy", Ok(Attribute::Prop(PropertyFile { kind: PropertyKindFileOrText::Text(String::new()), style: None, default: None })))]
+    #[case("dummy : $dummy", "dummy", Ok(Attribute::Prop(PropertyFile { kind: PropertyKindFileOrText::Text(String::new()), style: None, default: None })))]
+    #[case("dummy:$dummy", "dummy", Ok(Attribute::Prop(PropertyFile { kind: PropertyKindFileOrText::Text(String::new()), style: None, default: None })))]
+    // string
+    #[case("name: \"42\"", "name", Ok(Attribute::String("42".to_string())))]
+    #[case("name:\"42\"", "name", Ok(Attribute::String("42".to_string())))]
+    #[case("name :\"4    2\" ", "name", Ok(Attribute::String("4    2".to_string())))]
+    #[case("name: \"some string\"", "name", Ok(Attribute::String("some string".to_string())))]
+    #[case("name: some string", "name", Err(()))]
+    // invalid
+    #[case("invalid: something else", "name", Err(()))]
+    fn bool_attr(#[case] input: &str, #[case] key: &str, #[case] expected: Result<Attribute, ()>) {
+        let parser = attribute_parser(dummy_property_parser());
+        let result = parser.parse(input).into_result();
+
+        match (expected, result) {
+            (Ok(attr), Ok(result)) => assert_eq!(result, (key, attr)),
+            (Ok(attr), Err(err)) => panic!("Expected {key}: {attr:?} but got error: {err:?}"),
+            (Err(()), Ok(result)) => panic!("Expected error but got: {result:?}"),
+            (Err(()), Err(_)) => {}
         }
     }
 }

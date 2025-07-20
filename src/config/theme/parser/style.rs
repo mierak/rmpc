@@ -38,7 +38,7 @@ pub fn style_parser<'a>() -> impl Parser<'a, &'a str, StyleFile, extra::Err<Rich
         bg: m.remove("bg").get_string(),
         modifiers: m.remove("mods").get_modifiers(),
     })
-    .delimited_by(just('{'), just('}'))
+    .delimited_by(just('{').padded(), just('}').padded())
     .labelled("style")
     .boxed()
 }
@@ -79,6 +79,8 @@ pub fn modifiers_parser<'a>()
             }
             res
         })
+        .labelled("modifiers")
+        .boxed()
 }
 
 pub fn color_str_parser<'a>() -> impl Parser<'a, &'a str, String, extra::Err<Rich<'a, char>>> + Clone
@@ -119,6 +121,7 @@ pub fn color_str_parser<'a>() -> impl Parser<'a, &'a str, String, extra::Err<Ric
         ident.map(|c: &str| c.to_owned()),
     ))
     .labelled("color")
+    .boxed()
 }
 
 #[derive(Debug)]
@@ -234,6 +237,7 @@ mod test {
     #[case("{}", Ok(StyleFile { fg: None, bg: None, modifiers: None }))]
     #[case("{fg:red,bg:blue,mods:bdiurx}", Ok(StyleFile { fg: Some("red".to_string()), bg: Some("blue".to_string()), modifiers: Some(Modifiers::Bold | Modifiers::Dim | Modifiers::Italic | Modifiers::Underlined | Modifiers::Reversed | Modifiers::CrossedOut) }))]
     #[case("{fg:red,mods:bdiurx,bg:blue}", Ok(StyleFile { fg: Some("red".to_string()), bg: Some("blue".to_string()), modifiers: Some(Modifiers::Bold | Modifiers::Dim | Modifiers::Italic | Modifiers::Underlined | Modifiers::Reversed | Modifiers::CrossedOut) }))]
+    #[case("{ fg : red , mods : bdiurx , bg : blue }", Ok(StyleFile { fg: Some("red".to_string()), bg: Some("blue".to_string()), modifiers: Some(Modifiers::Bold | Modifiers::Dim | Modifiers::Italic | Modifiers::Underlined | Modifiers::Reversed | Modifiers::CrossedOut) }))]
     #[case("{fg:red,bg:blue,mods:b,extra:val}", Err(()))]
     fn test_style_parser(#[case] input: &str, #[case] expected: Result<StyleFile, ()>) {
         let result = style_parser().parse(input).into_result();
