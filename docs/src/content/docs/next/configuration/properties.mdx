@@ -37,7 +37,7 @@ The properties are divided into a few categories:
       obsolete nowadays and kept for backwards compatibility.
 - `Group` - Groups one or more properties together. If any of the properties resolves to an empty value
   the whole group will not be shown.
-- `Transform` - Applies a tranformation on the properties in question like truncating the value to
+- `Transform` - Applies a transformation on the properties in question like truncating the value to
   a specified number of characters.
 
 ## Template definition syntax
@@ -81,7 +81,7 @@ fallback to filename when song's metadata is missing a title.
 
 ### Available song properties
 
-| Property      | Descripiton                                         | Ron             | Template                   | Parameters |
+| Property      | Description                                         | Ron             | Template                   | Parameters |
 | ------------- | --------------------------------------------------- | --------------- | -------------------------- | ---------- |
 | File          | song's full path from MPD's music directory         | `File`          | `$f` or `$file`            |            |
 | Filename      | song's filename                                     | `Filename`      | `$fn` or `$filename`       |            |
@@ -97,11 +97,11 @@ fallback to filename when song's metadata is missing a title.
 
 ### Available status properties
 
-| Property           | Descripiton                                                   | Ron                       | Template                   | Parameters |
+| Property           | Description                                                   | Ron                       | Template                   | Parameters |
 | ------------------ | ------------------------------------------------------------- | ------------------------- | -------------------------- | ---------- |
 | Volume             | current volume as number from 0 to 100                        | `Volume`                  | `$f` or `$file`            |            |
 | State              | current playback state, one of `Playing`, `Paused`, `Stopped` | `StateV2(...)`            | `$f` or `$file`            |            |
-| Partition          | currently active partititon                                   | `Partition`               | `$f` or `$file`            |            |
+| Partition          | currently active partition                                    | `Partition`               | `$f` or `$file`            |            |
 | Repeat             | repeat status                                                 | `RepeatV2(...)`           | `$f` or `$file`            |            |
 | Random             | random status                                                 | `RandomV2(...)`           | `$f` or `$file`            |            |
 | Single             | single status                                                 | `SingleV2(...)`           | `$fn` or `$filename`       |            |
@@ -117,7 +117,7 @@ fallback to filename when song's metadata is missing a title.
 
 ### Available widget properties
 
-| Property   | Descripiton                                                       | Ron           | Template                 |
+| Property   | Description                                                       | Ron           | Template                 |
 | ---------- | ----------------------------------------------------------------- | ------------- | ------------------------ |
 | ScanStatus | displays a spinner when MPD's database update is in progress      | `ScanStatus`  | `$scan` or `$scanstatus` |
 | States     | playback modifiers in format `Repeat / Random / Consume / Single` | `States(...)` | `$st` or `$states`       |
@@ -125,6 +125,6 @@ fallback to filename when song's metadata is missing a title.
 
 ### Available transforms
 
-| Transform | Descripiton                                          | Ron             | Template                |
+| Transform | Description                                          | Ron             | Template                |
 | --------- | ---------------------------------------------------- | --------------- | ----------------------- |
 | Truncate  | truncate the value to specified number of characters | `Truncate(...)` | `$trunc` or `$truncate` |
