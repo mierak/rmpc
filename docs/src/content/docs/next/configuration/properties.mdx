@@ -2,129 +2,264 @@
 title: Properties
 description: Configuration of properties
 sidebar:
-    order: 90
+order: 90
 ---
 
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
 import ConfigValue from "../../../../components/ConfigValue.tsx";
 import { path } from "../data.ts";
+import { ExpandableTable } from "../../../../components/Table.tsx";
 
-You can use the so called properties in various places in rmpc. These allow you to customize what
-information is shown and how the program looks as a whole. These properties are usable in
-the <a href={path("configuration/layout")}>layout</a>, <a href={path("configuration/tabs")}>tabs</a>, <a href={path("configuration/theme/#browser_song_format")}>browser_song_format</a>
-and <a href={path("configuration/layout#components")}>components</a>.
+You can use the so-called properties in various places in rmpc. These allow you to customize what information is shown
+and how the program looks as a whole. These properties are usable in the <a href={path("configuration/layout")}>layout</a>, <a href={path("configuration/tabs")}>tabs</a>, <a href={path("configuration/theme/#browser_song_format")}>browser_song_format</a>, and <a href={path("configuration/layout#components")}>components</a>.
 
 ## Definition
 
-Properties can be defined by either composing struct using the `ron` format or via a custom
-templating syntax. These two types of definition are equivalent and you are free to choose which one
-you prefer but using templates is advised for convenience and future extensibility.
+Properties can be defined by either composing structs using the `ron` format or via a custom
+templating syntax. These two types of definition are equivalent, and you are free to choose which one
+you prefer, but using templates is advised for convenience and future extensibility. Most of these
+properties do not take any arguments, but some of them do, and you can see them by expanding the
+table rows below.
 
 ## Available property types
 
 The properties are divided into a few categories:
 
 - `Text` - Displays a raw text value.
-- `Sticker` - Display sicker value of a song. These stickers can be used to for example track
+- `Sticker` - Displays sticker value of a song. These stickers can be used to, for example, track
     <a href={path("guides/on_song_change/#track-song-play-count")}>play count</a> of songs.
-- `Property` - Display song's metadata values or information about rmpc's and MPD's status. These
+- `Property` - Displays song's metadata values or information about rmpc's and MPD's status. These
   properties are further divided into three categories:
-    - `Song` - Display metadata of either the currently playing song or controls format of songs in
+    - `Song` - Displays metadata of either the currently playing song or controls format of songs in
       lists and tables depending on the context.
-    - `Status` - Display rmpc's or MPD's status like the playback state, volume, currently active tab
+    - `Status` - Displays rmpc's or MPD's status like the playback state, volume, currently active tab,
       and others.
-    - `Widget` - A bit more involved properties with custom display options, these are mostly
-      obsolete nowadays and kept for backwards compatibility.
-- `Group` - Groups one or more properties together. If any of the properties resolves to an empty value
+    - `Widget` - More involved properties with custom display options; these are mostly
+      obsolete nowadays and kept for backward compatibility.
+- `Group` - Groups one or more properties together. If any of the properties resolves to an empty value,
   the whole group will not be shown.
-- `Transform` - Applies a transformation on the properties in question like truncating the value to
+- `Transform` - Applies a transformation on the properties in question, like truncating the value to
   a specified number of characters.
 
 ## Template definition syntax
 
-Text is simply a string surrounded by either double or single quotes. If you want to put literal
-quotes symbol inside your text you can do so by escaping it with `\`.
+Text is simply a string surrounded by either double or single quotes. If you want to put a literal
+quote symbol inside your text, you can do so by escaping it with `\`.
 
-Properties and stickers are denoted by a leading `$` followed by its name. Some of these
-properties take parameters which are defined inside parentheses by first specifying the parameter
-name followed by a `:` and then its value. These parameters can be of several types: simple string
-values, styles, numbers, booleans and other properties.
+Properties and stickers are denoted by a leading `$` followed by their name. Some of these
+properties take parameters, which are defined inside parentheses by first specifying the parameter
+name followed by a `:`, and then its value. These parameters can be of several types: simple string
+values, styles, numbers, booleans, and other properties.
 
 Groups are denoted by square brackets `[]` inside which you can put one or more other properties.
 
 Transforms are similar to properties except they use `%` instead of `$`.
 
-Styles are denoted using curly braces `{}` inside which you can specify one of `fg`, `bg` or `mods`
-which set the foreground color, background color and text modifiers respectively. Supported colors
-are the same as everywhere else, meaning the 16 terminal colors, ANSI colors, RGB and HEX values.
-Modifiers are also the same and possible values are `b`, `d`, `i`, `u`, `r` and `x` for bold, dim,
-italic, underlined, reversed and crossed out respectively. Multiple modifiers can be specified at
-once, ie. `mods: biu` for bold, italic and underlined.
+Styles are denoted using curly braces `{}` inside which you can specify one of `fg`, `bg`, or `mods`,
+which set the foreground color, background color, and text modifiers respectively. Supported colors
+are the same as everywhere else, meaning the 16 terminal colors, ANSI colors, RGB, and HEX values.
+Modifiers are also the same, and possible values are `b`, `d`, `i`, `u`, `r`, and `x` for bold, dim,
+italic, underlined, reversed, and crossed out respectively. Multiple modifiers can be specified at
+once, i.e., `mods: biu` for bold, italic, and underlined.
 
-Fallback values can also be configured by putting a pipe symbol `|` after the property definition
-followed by another property which is to be used if the first one does not exist. For example to
-fallback to filename when song's metadata is missing a title.
+Fallback values can also be configured by putting a pipe symbol `|` after the property definition,
+followed by another property which is to be used if the first one does not exist. For example, to
+fallback to filename when a song's metadata is missing a title.
 
 ### Examples
 
-|                                                                                                                                                                                                                      |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `'Hello rmpc'`<br/> "Hello rmpc" with default styles                                                                                                                                                                 |
-| `'Hello rmpc'{fg: black, bg: #FF0000, mods: bu}`<br/> black, bold and underlined "Hello rmpc" on red background                                                                                                      |
-| `$title\|$filename`<br/> song's title, if song is missing the title metadata show its filename instead                                                                                                               |
-| `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title, if song is missing the title metadata show its artist in blue instead, and if that does not exist either, display "No song" in red |
-| `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title, if song is missing the title metadata show its artist in blue instead, and if that does not exist either, display "No song" in red |
-| `%truncate(content: $tag('date'), length: 4, from_start: true)`<br/> shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025                                                      |
-| `$st:elapsed ' / ' $st:duration [' (' $st:bitrate ' kbps)']`<br/> displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined                                                    |
+|                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'Hello rmpc'`<br/> "Hello rmpc" with default styles                                                                                                                                                                      |
+| `'Hello rmpc'{fg: black, bg: #FF0000, mods: bu}`<br/> black, bold, and underlined "Hello rmpc" on red background                                                                                                          |
+| `$title\|$filename`<br/> song's title; if the song is missing the title metadata, show its filename instead                                                                                                               |
+| `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title; if the song is missing the title metadata, show its artist in blue instead, and if that does not exist either, display "No song" in red |
+| `%truncate(content: $tag(value: 'date'), length: 4, from_start: false)`<br/> shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025                                                   |
+| `$elapsed ' / ' $cduration [' (' $bitrate ' kbps)']`<br/> displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined                                                                 |
 
 ## Ron definition
 
+The ron definition is a bit more verbose and has a tendency to be deeply nested. There are some
+variations in the ron definition as opposed to the template syntax; for example, the `Property` panes
+allow you to specify `Status` properties, but the `song_table_format` does not.
+
+Every definition is a struct which contains `kind`, `style`, and `default`. The default is simply
+another definition struct which is used as a fallback value if the first property
+could not be resolved.
+
+Style is a struct with three properties: `fg`, `bg`, and `modifiers`, and is described in more detail <a href={path("configuration/style-color")}>here</a>.
+
+The `kind` is an enum and can be one of `Text`, `Sticker`, `Property`, `Group`, or `Transform`.
+The `Property` kind can then be either `Song`, `Status`, or `Widget`. Or, in the case of `song_table_format`,
+just the `Song` type is available.
+
+### Examples
+
+|                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `(kind: Text("Hello rmpc"))`<br/> "Hello rmpc" with default styles                                                                                                                                                                                                                                                                       |
+| `(kind: Text("Hello rmpc"), style: (fg: "black", modifiers: "Bold \| Underlined"))`<br/> black, bold, and underlined "Hello rmpc" on red background                                                                                                                                                                                      |
+| `(kind: Property(Song(Title)), default: (kind: Property(Song(Filename))))`<br/> song's title; if the song is missing the title metadata, show its filename instead                                                                                                                                                                       |
+| `(kind: Property(Song(Title)), style: (fg: "blue"), default: (kind: Property(Song(Artist)), style: (fg: "blue"), default: (kind: Text("No song"), style: (fg: "red"))))`<br/> blue song's title; if the song is missing the title metadata, show its artist in blue instead, and if that does not exist either, display "No song" in red |
+| `(kind: Transform(Truncate(content: (kind: Property(Song(Other("date")))),length: 4, from_start: false)))`<br/> shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025                                                                                                                               |
+| `[(kind: Property(Status(Elapsed))), (kind: Text(" / ")), (kind: Property(Status(Duration))), (kind: Group([(kind: Text(" (")), (kind: Property(Status(Bitrate))), (kind: Text(" kbps)"))]))]`<br/> displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined                                      |
+| `(kind: Property(Title), default: (kind: Property(Filename)))`<br/> in the case of `browser_song_format` you skip the `Song` enum definition and instead define the property directly                                                                                                                                                    |
+
+## Table of all available properties
+
+Below are tables showing all available properties, their Ron definition, and template syntax. Some
+rows are expandable to show what parameters are available for the property.
+
 ### Available song properties
 
-| Property      | Description                                         | Ron             | Template                   | Parameters |
-| ------------- | --------------------------------------------------- | --------------- | -------------------------- | ---------- |
-| File          | song's full path from MPD's music directory         | `File`          | `$f` or `$file`            |            |
-| Filename      | song's filename                                     | `Filename`      | `$fn` or `$filename`       |            |
-| FileExtension | song's file extension                               | `FileExtension` | `$ext` or `$fileextension` |            |
-| Title         | value of the title tag                              | `Title`         | `$t` or `$title`           |            |
-| Artist        | value of the artist tag                             | `Artist`        | `$ar` or `$artist`         |            |
-| Album         | value of the album tag                              | `Album`         | `$al` or `$album`          |            |
-| Duration      | song's duration                                     | `Duration`      | `$dur` or `$duration`      |            |
-| Track         | value of the track tag                              | `Track`         | `$tr` or `$track`          |            |
-| Disc          | value of the disc tag                               | `Disc`          | `$disc`                    |            |
-| Position      | value of the position tag                           | `Position`      | `$pos` or `$position`      |            |
-| Other(String) | display any arbitrary metadata tag supported by MPD | `Other("tag")`  | `$tag`                     |            |
+{/* <!-- prettier-ignore-start --> */}
+
+<ExpandableTable
+    client:load
+    headers={["Property", "Description", "Ron", "Template"]}
+    rows={[
+        { cells: ["File", "song's full path from MPD's music directory", "`File`", " `$f` or `$file`"] },
+        { cells: ["Filename", "song's filename", "`Filename`", "`$fn` or `$filename`"] },
+        { cells: ["FileExtension", "song's file extension", "`FileExtension`", "`$ext` or `$fileextension`"] },
+        { cells: ["Title", "value of the title tag", "`Title`", "`$t` or `$title`"] },
+        { cells: ["Artist", "value of the artist tag", "`Artist`", "`$ar` or `$artist`"] },
+        { cells: ["Album", "value of the album tag", "`Album`", "`$al` or `$album`"] },
+        { cells: ["Duration", "song's duration", "`Duration`", "`$dur` or `$duration`"] },
+        { cells: ["Track", "value of the track tag", "`Track`", "`$tr` or `$track`"] },
+        { cells: ["Disc", "value of the disc tag", "`Disc`", "`$disc`"] },
+        { cells: ["Position", "value of the position tag", "`Position`", "`$pos` or `$position`"] },
+        {
+            cells: ["Other(String)", "display any arbitrary metadata tag supported by MPD", "`Other(...)`", " `$tag`"],
+            expandedContent: ["value: String, required"],
+        },
+    ]}
+/>
+{/* <!-- prettier-ignore-end --> */}
 
 ### Available status properties
 
-| Property           | Description                                                   | Ron                       | Template                   | Parameters |
-| ------------------ | ------------------------------------------------------------- | ------------------------- | -------------------------- | ---------- |
-| Volume             | current volume as number from 0 to 100                        | `Volume`                  | `$f` or `$file`            |            |
-| State              | current playback state, one of `Playing`, `Paused`, `Stopped` | `StateV2(...)`            | `$f` or `$file`            |            |
-| Partition          | currently active partition                                    | `Partition`               | `$f` or `$file`            |            |
-| Repeat             | repeat status                                                 | `RepeatV2(...)`           | `$f` or `$file`            |            |
-| Random             | random status                                                 | `RandomV2(...)`           | `$f` or `$file`            |            |
-| Single             | single status                                                 | `SingleV2(...)`           | `$fn` or `$filename`       |            |
-| Consume            | consume status                                                | `ConsumeV2(...)`          | `$fn` or `$filename`       |            |
-| Elapsed            | how much of the currently playing song has elpased            | `Elapsed`                 | `$ext` or `$fileextension` |            |
-| Duration           | total duration of the currently playing song                  | `Duration`                | `$t` or `$title`           |            |
-| Crossfade          | number of crossfade seconds                                   | `Crossfade`               | `$ar` or `$artist`         |            |
-| Bitrate            | currently playing song's bitrate                              | `Bitrate`                 | `$al` or `$album`          |            |
-| QueueLength        | number of songs in the queue                                  | `QueueLength(...)`        | `$dur` or `$duration`      |            |
-| QueueTimeTotal     | total duration of songs in the queue                          | `QueueTimeTotal(...)`     | `$tr` or `$track`          |            |
-| QueueTimeRemaining | total duration of songs remaining in the queue                | `QueueTimeRemaining(...)` | `$disc`                    |            |
-| ActiveTab          | currently active tab                                          | `ActiveTab`               | `$tab` or `$activetab`     |            |
+{/* <!-- prettier-ignore-start --> */}
+
+<ExpandableTable
+    client:load
+    headers={["Property", "Description", "Ron", "Template"]}
+    rows={[
+        { cells: ["Volume", "current volume as number from 0 to 100", "`Volume`", "`$vol` or `$volume`"] },
+        {
+            cells: ["State", "current playback state, one of `Playing`, `Paused`, `Stopped`", "`StateV2(...)`", "`$st` or `$state`"],
+            expandedContent: [
+                "`playing_label`: String, optional, defaults to `Playing`",
+                "`paused_label`: String, optional, defaults to `Paused`",
+                "`stopped_label`: String, optional, defaults to `Stopped`",
+                "`playing_style`: Style, optional",
+                "`paused_style`: Style, optional",
+                "`stopped_style`: Style, optional",
+            ],
+        },
+        { cells: ["Partition", "currently active partition", "`Partition`", "`$part` or `$partition`"] },
+        {
+            cells: ["Repeat", "repeat status", "`RepeatV2(...)`", "`$rep` or `$repeat`"],
+            expandedContent: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+            ],
+        },
+        {
+            cells: ["Random", "random status", "`RandomV2(...)`", "`$rand` or `$random`"],
+            expandedContent: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+            ],
+        },
+        {
+            cells: ["Single", "single status", "`SingleV2(...)`", "`$sin` or `$single`"],
+            expandedContent: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`oneshot_label`: String, optional, defaults to `Oneshot`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+                "`oneshot_style`: Style, optional",
+            ],
+        },
+        {
+            cells: ["Consume", "consume status", "`ConsumeV2(...)`", "`$cons` or `$consume`"],
+            expandedContent: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`oneshot_label`: String, optional, defaults to `Oneshot`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+                "`oneshot_style`: Style, optional",
+            ],
+        },
+        { cells: ["Elapsed", "how much of the currently playing song has elapsed", "`Elapsed`", "`$el` or `$elapsed`"] },
+        { cells: ["Duration", "total duration of the currently playing song", "`Duration`", "`$cdur` or `$cduration` or `$currentduration`"] },
+        { cells: ["Crossfade", "number of crossfade seconds", "`Crossfade`", "`$xf` or `$xfade` or `$crossfade`"] },
+        { cells: ["Bitrate", "currently playing song's bitrate in kbps", "`Bitrate`", "`$br` or `$bitrate`"] },
+        {
+            cells: ["QueueLength", "number of songs in the queue", "`QueueLength(...)`", "`$qlen` or `$queuelength`"],
+            expandedContent: [
+                "`thousands_separator`: String, optional, defaults to `,`",
+            ],
+        },
+        {
+            cells: ["QueueTimeTotal", "total duration of songs in the queue", "`QueueTimeTotal(...)`", "`$qtot` or `$queuetotal`"],
+            expandedContent: [
+                "`separator`: String, optional",
+                 "When `separator` is `None` (default): Uses standard time format (e.g., `4:06`, `1:23:45`)",
+                 "When `separator` is provided (`,` in the example): Uses verbose format with abbreviated units (e.g., `4m, 6s`, `1h, 23m, 45s`)"
+            ],
+        },
+        {
+            cells: ["QueueTimeRemaining", "total time left in the queue (remainder of current song + the rest of the queue)", "`QueueTimeRemaining(...)`", "`$qrem` or `$queueremaining`"],
+            expandedContent: [
+                "`separator`: String, optional",
+                 "When `separator` is `None` (default): Uses standard time format (e.g., `4:06`, `1:23:45`)",
+                 "When `separator` is provided (`,` in the example): Uses verbose format with abbreviated units (e.g., `4m, 6s`, `1h, 23m, 45s`)"
+            ],
+        },
+        { cells: ["ActiveTab", "currently active tab", "`ActiveTab`", "`$tab` or `$activetab`"] },
+    ]}
+/>
+{/* <!-- prettier-ignore-end --> */}
 
 ### Available widget properties
 
-| Property   | Description                                                       | Ron           | Template                 |
-| ---------- | ----------------------------------------------------------------- | ------------- | ------------------------ |
-| ScanStatus | displays a spinner when MPD's database update is in progress      | `ScanStatus`  | `$scan` or `$scanstatus` |
-| States     | playback modifiers in format `Repeat / Random / Consume / Single` | `States(...)` | `$st` or `$states`       |
-| Volume     | current volume in format: `Volume: ▁▂▃▄▅▆▇ 100%`                  | `Volume`      | `$vol` or `$volume`      |
+All widget property templates are prefixed with `$w:` instead of just `$`.
+
+{/* <!-- prettier-ignore-start --> */}
+
+<ExpandableTable
+    client:load
+    headers={["Property", "Description", "Ron", "Template"]}
+    rows={[
+        { cells: ["ScanStatus", "displays a spinner when MPD's database update is in progress", "`ScanStatus`", "`$w:scan` or `$w:scanstatus`"] },
+        {
+            cells: ["States", "playback modifiers in format `Repeat / Random / Consume / Single`", "`States(...)`", "`$w:st` or `$w:states`"],
+            expandedContent: [
+                "`active_style`: Style, optional",
+                "`separator_style`: Style, optional",
+            ],
+        },
+        { cells: ["Volume", "current volume in format: `Volume: ▁▂▃▄▅▆▇ 100%`", "`Volume`", "`$w:vol` or `$w:volume`"] },
+    ]}
+/>
+{/* <!-- prettier-ignore-end --> */}
 
 ### Available transforms
 
-| Transform | Description                                          | Ron             | Template                |
-| --------- | ---------------------------------------------------- | --------------- | ----------------------- |
-| Truncate  | truncate the value to specified number of characters | `Truncate(...)` | `$trunc` or `$truncate` |
+{/* <!-- prettier-ignore-start --> */}
+
+<ExpandableTable
+    client:load
+    headers={["Transform", "Description", "Ron", "Template"]}
+    rows={[
+        { cells: ["Truncate", "truncate the value to specified number of characters", "`Truncate(...)`", "`%trunc` or `%truncate`"] },
+    ]}
+/>
+{/* <!-- prettier-ignore-end --> */}

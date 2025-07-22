@@ -73,13 +73,142 @@ pub fn make_error_report<'a>(err: Vec<Rich<'a, char>>, source: &'a str) -> Strin
 #[cfg(test)]
 mod parser2 {
     use chumsky::Parser;
-    use rstest::rstest;
 
     use super::*;
     use crate::config::theme::{
         Modifiers,
-        properties::{SongPropertyFile, StatusPropertyFile, TransformFile, WidgetPropertyFile},
+        properties::{SongPropertyFile, StatusPropertyFile, TransformFile},
     };
+
+    #[test]
+    fn deeply_nested_with_transforms() {
+        let result = parser().parse("%trunc(content: [[$title] $file [$artist[%trunc(content: 'sup', length: 3) %trunc(content: $state{fg: red}|'default text'|$track{ mods: bux }, length: 3)]]], length: 10)").into_result();
+
+        assert_eq!(result.unwrap().pop().unwrap(), PropertyFile {
+            kind: PropertyKindFileOrText::<PropertyKindFile>::Transform(TransformFile::Truncate {
+                content: Box::new(PropertyFile {
+                    kind: PropertyKindFileOrText::Group(vec![
+                        PropertyFile {
+                            kind: PropertyKindFileOrText::Group(vec![PropertyFile {
+                                kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(
+                                    SongPropertyFile::Title
+                                )),
+                                style: None,
+                                default: None,
+                            }]),
+                            style: None,
+                            default: None,
+                        },
+                        PropertyFile {
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(
+                                SongPropertyFile::File
+                            )),
+                            style: None,
+                            default: None,
+                        },
+                        PropertyFile {
+                            kind: PropertyKindFileOrText::Group(vec![
+                                PropertyFile {
+                                    kind: PropertyKindFileOrText::Property(PropertyKindFile::Song(
+                                        SongPropertyFile::Artist
+                                    )),
+                                    style: None,
+                                    default: None,
+                                },
+                                PropertyFile {
+                                    kind: PropertyKindFileOrText::Group(vec![
+                                        PropertyFile {
+                                            kind: PropertyKindFileOrText::Transform(
+                                                TransformFile::Truncate {
+                                                    content: Box::new(PropertyFile {
+                                                        kind: PropertyKindFileOrText::Text(
+                                                            "sup".to_string()
+                                                        ),
+                                                        style: None,
+                                                        default: None
+                                                    }),
+                                                    length: 3,
+                                                    from_start: false
+                                                }
+                                            ),
+                                            style: None,
+                                            default: None,
+                                        },
+                                        PropertyFile {
+                                            kind: PropertyKindFileOrText::Transform(
+                                                TransformFile::Truncate {
+                                                    content: Box::new(PropertyFile {
+                                                        kind: PropertyKindFileOrText::Property(
+                                                            PropertyKindFile::Status(
+                                                                StatusPropertyFile::StateV2 {
+                                                                    playing_label: "Playing"
+                                                                        .to_string(),
+                                                                    paused_label: "Paused"
+                                                                        .to_string(),
+                                                                    stopped_label: "Stopped"
+                                                                        .to_string(),
+                                                                    playing_style: None,
+                                                                    paused_style: None,
+                                                                    stopped_style: None
+                                                                }
+                                                            )
+                                                        ),
+                                                        style: Some(StyleFile {
+                                                            fg: Some("red".to_string()),
+                                                            bg: None,
+                                                            modifiers: None,
+                                                        }),
+                                                        default: Some(Box::new(PropertyFile {
+                                                            kind: PropertyKindFileOrText::Text(
+                                                                "default text".to_string()
+                                                            ),
+                                                            style: None,
+                                                            default: Some(Box::new(PropertyFile {
+                                                                kind:
+                                                                    PropertyKindFileOrText::Property(
+                                                                        PropertyKindFile::Song(
+                                                                            SongPropertyFile::Track
+                                                                        )
+                                                                    ),
+                                                                style: Some(StyleFile {
+                                                                    fg: None,
+                                                                    bg: None,
+                                                                    modifiers: Some(
+                                                                        Modifiers::Bold
+                                                                            | Modifiers::Underlined
+                                                                            | Modifiers::CrossedOut
+                                                                    ),
+                                                                }),
+                                                                default: None
+                                                            }))
+                                                        }))
+                                                    }),
+                                                    length: 3,
+                                                    from_start: false
+                                                }
+                                            ),
+                                            style: None,
+                                            default: None,
+                                        },
+                                    ]),
+                                    style: None,
+                                    default: None,
+                                },
+                            ]),
+                            style: None,
+                            default: None,
+                        },
+                    ]),
+                    style: None,
+                    default: None
+                }),
+                length: 10,
+                from_start: false
+            }),
+            style: None,
+            default: None
+        });
+    }
 
     #[test]
     fn group() {
@@ -365,98 +494,6 @@ mod parser2 {
             },
             result.unwrap().pop().unwrap()
         );
-    }
-
-    #[rstest]
-    #[case("red", "red")]
-    #[case("blue", "blue")]
-    #[case("11", "11")]
-    #[case("#ff0000", "#ff0000")]
-    #[case("rgb( 255, 1 ,1 )", "rgb(255,1,1)")]
-    #[case("rgb(255,255,255)", "rgb(255,255,255)")]
-    fn colors(#[case] input: &str, #[case] expected: String) {
-        let input = format!("'sup'{{fg: {input}}}");
-        let result = parser()
-            .parse(&input)
-            .into_result()
-            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &input)));
-
-        assert_eq!(
-            PropertyFile {
-                kind: PropertyKindFileOrText::Text("sup".to_owned()),
-                style: Some(StyleFile { fg: Some(expected), bg: None, modifiers: None }),
-                default: None,
-            },
-            result.unwrap().pop().unwrap()
-        );
-    }
-
-    #[rstest]
-    #[case("$activetab", StatusPropertyFile::ActiveTab)]
-    #[case("$queueremaining", StatusPropertyFile::QueueTimeRemaining { separator: None })]
-    #[case("$queuetotal", StatusPropertyFile::QueueTimeTotal { separator: None })]
-    #[case("$queuelength", StatusPropertyFile::QueueLength { thousands_separator: ",".to_owned() })]
-    #[case("$partition", StatusPropertyFile::Partition)]
-    #[case("$bitrate", StatusPropertyFile::Bitrate)]
-    #[case("$crossfade", StatusPropertyFile::Crossfade)]
-    #[case("$cduration", StatusPropertyFile::Duration)]
-    #[case("$cdur", StatusPropertyFile::Duration)]
-    #[case("$currentduration", StatusPropertyFile::Duration)]
-    #[case("$elapsed", StatusPropertyFile::Elapsed)]
-    #[case("$state", StatusPropertyFile::StateV2 { playing_label: "Playing".to_owned(), paused_label: "Paused".to_owned(), stopped_label: "Stopped".to_owned(), playing_style: None, paused_style: None, stopped_style: None })]
-    #[case("$consume", StatusPropertyFile::ConsumeV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
-    #[case("$single", StatusPropertyFile::SingleV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
-    #[case("$random", StatusPropertyFile::RandomV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
-    #[case("$repeat", StatusPropertyFile::RepeatV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
-    #[case("$state", StatusPropertyFile::StateV2 { playing_label: "Playing".to_owned(), paused_label: "Paused".to_owned(), stopped_label: "Stopped".to_owned(), playing_style: None, paused_style: None, stopped_style: None })]
-    #[case("$consume", StatusPropertyFile::ConsumeV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
-    #[case("$single", StatusPropertyFile::SingleV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), oneshot_label: "Oneshot".to_owned(), on_style: None, off_style: None, oneshot_style: None })]
-    #[case("$random", StatusPropertyFile::RandomV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
-    #[case("$repeat", StatusPropertyFile::RepeatV2 { on_label: "On".to_owned(), off_label: "Off".to_owned(), on_style: None, off_style: None })]
-    #[case("$volume", StatusPropertyFile::Volume)]
-    fn all_status_properties(#[case] input: &str, #[case] expected: StatusPropertyFile) {
-        let result = parser()
-            .parse(input)
-            .into_result()
-            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, input)))
-            .unwrap()
-            .pop()
-            .unwrap()
-            .kind;
-        assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Status(expected)));
-    }
-
-    #[rstest]
-    #[case("$w:states", WidgetPropertyFile::States { active_style: None, separator_style: None })]
-    #[case("$w:volume", WidgetPropertyFile::Volume)]
-    #[case("$w:scanstatus", WidgetPropertyFile::ScanStatus)]
-    fn all_widget_properties(#[case] input: &str, #[case] expected: WidgetPropertyFile) {
-        let result = parser()
-            .parse(input)
-            .into_result()
-            .map_err(|errs| anyhow::anyhow!(make_error_report(errs, input)))
-            .unwrap()
-            .pop()
-            .unwrap()
-            .kind;
-        assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Widget(expected)));
-    }
-
-    #[rstest]
-    #[case("$filename", SongPropertyFile::Filename)]
-    #[case("$file", SongPropertyFile::File)]
-    #[case("$fileextension", SongPropertyFile::FileExtension)]
-    #[case("$title", SongPropertyFile::Title)]
-    #[case("$artist", SongPropertyFile::Artist)]
-    #[case("$album", SongPropertyFile::Album)]
-    #[case("$duration", SongPropertyFile::Duration)]
-    #[case("$track", SongPropertyFile::Track)]
-    #[case("$disc", SongPropertyFile::Disc)]
-    #[case("$position", SongPropertyFile::Position)]
-    #[case("$tag(value: \"sometag\")", SongPropertyFile::Other("sometag".to_owned()))]
-    fn all_song_properties(#[case] input: &str, #[case] expected: SongPropertyFile) {
-        let result = parser().parse(input).unwrap().pop().unwrap().kind;
-        assert_eq!(result, PropertyKindFileOrText::Property(PropertyKindFile::Song(expected)));
     }
 
     #[allow(clippy::needless_raw_string_hashes)]

@@ -5,7 +5,7 @@ use itertools::Itertools;
 use strum::IntoDiscriminant;
 
 use super::{StyleFile, string::string_parser, style::style_parser};
-use crate::config::theme::properties::{PropertyFile, PropertyKindFile};
+use crate::config::theme::properties::{PropertyFile, PropertyKindFile, PropertyKindFileOrText};
 
 pub fn attribute_parser<'a>(
     prop_parser: impl Parser<'a, &'a str, PropertyFile<PropertyKindFile>, extra::Err<Rich<'a, char>>>
@@ -16,7 +16,7 @@ pub fn attribute_parser<'a>(
 
     let style = style_parser().map(Attribute::Style);
     let prop = prop_parser.map(Attribute::Prop);
-    let label = string_parser().map(Attribute::String);
+    let string = string_parser().map(Attribute::String);
     let bool = just("true").or(just("false")).from_str::<bool>().unwrapped().map(Attribute::Bool);
     let decimal = text::int(10).try_map(|v: &str, span| match v.parse() {
         Ok(v) => Ok(Attribute::UInt(v)),
@@ -26,7 +26,7 @@ pub fn attribute_parser<'a>(
     ident
         .padded()
         .then_ignore(just(':').padded())
-        .then(label.or(prop).or(decimal).or(bool).or(style).padded())
+        .then(prop.or(string).or(decimal).or(bool).or(style).padded())
         .boxed()
 }
 
@@ -70,6 +70,13 @@ pub(super) trait AttrExt {
     ) -> Result<String, chumsky::error::Rich<'a, char>> {
         match self.required_attribute(key, span)? {
             Attribute::String(v) => Ok(v),
+            // Syntactically there is no difference between a string and a text property without any
+            // styling/default so we have to look here as well
+            Attribute::Prop(PropertyFile {
+                kind: PropertyKindFileOrText::Text(v),
+                style: None,
+                default: None,
+            }) => Ok(v),
             attr => Err(attr.to_err(AttributeDiscriminants::String, span)),
         }
     }
@@ -125,6 +132,13 @@ pub(super) trait AttrExt {
     ) -> Result<Option<String>, chumsky::error::Rich<'a, char>> {
         match self.optional_attribute(key) {
             Some(Attribute::String(v)) => Ok(Some(v)),
+            // Syntactically there is no difference between a string and a text property without any
+            // styling/default so we have to look here as well
+            Some(Attribute::Prop(PropertyFile {
+                kind: PropertyKindFileOrText::Text(v),
+                style: None,
+                default: None,
+            })) => Ok(Some(v)),
             Some(attr) => Err(attr.to_err(AttributeDiscriminants::String, span)),
             None => Ok(None),
         }
@@ -186,7 +200,16 @@ pub(super) trait AttrExt {
     ) -> Result<String, chumsky::error::Rich<'a, char>> {
         match self.optional_string(key, span)? {
             Some(val) => Ok(val),
-            None => Ok(default.into()),
+            // Syntactically there is no difference between a string and a text property without any
+            // styling/default so we have to look here as well
+            None => match self.optional_prop(key, span)? {
+                Some(PropertyFile {
+                    kind: PropertyKindFileOrText::Text(v),
+                    style: None,
+                    default: None,
+                }) => Ok(v),
+                _ => Ok(default.into()),
+            },
         }
     }
 
@@ -328,6 +351,10 @@ mod test {
     #[case("name:\"42\"", "name", Ok(Attribute::String("42".to_string())))]
     #[case("name :\"4    2\" ", "name", Ok(Attribute::String("4    2".to_string())))]
     #[case("name: \"some string\"", "name", Ok(Attribute::String("some string".to_string())))]
+    #[case("name: '42'", "name", Ok(Attribute::String("42".to_string())))]
+    #[case("name:'42'", "name", Ok(Attribute::String("42".to_string())))]
+    #[case("name :'4    2' ", "name", Ok(Attribute::String("4    2".to_string())))]
+    #[case("name: 'some string'", "name", Ok(Attribute::String("some string".to_string())))]
     #[case("name: some string", "name", Err(()))]
     // invalid
     #[case("invalid: something else", "name", Err(()))]
