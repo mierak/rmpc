@@ -64,6 +64,31 @@ After that you need to setup Cava, MPD and rmpc to talk to each other.
     ),
     ```
 
+3.  Configure the pane layout to include Cava. This goes in your `config.ron` under the tabs section. Below is
+    an example of how to add a Cava pane split alongside the queue and album art: 
+
+    ```rust
+    tabs: [
+        (
+            name: "Queue",
+            pane: Split(
+                direction: Horizontal,
+                panes: [
+                    (size: "40%", pane: Pane(AlbumArt)),
+                    (size: "60%", pane: Split(
+                        direction: Vertical,
+                        panes: [
+                            (size: "50%", pane: Pane(Queue)),
+                            (size: "50%", pane: Pane(Cava)),
+                        ],
+                    )),
+                ],
+            ),
+        ),
+    ],
+    ```
+    See <a href={path("configuration/tabs#panes")}>Panes documentation</a> for more information about configuring panes.
+
 </Steps>
 
 ## Theming
