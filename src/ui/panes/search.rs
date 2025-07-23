@@ -1052,18 +1052,26 @@ impl Pane for SearchPane {
                 self.render_input_column(frame, current_area, config);
 
                 // Render preview at offset to allow click to select
-                if let Some(preview) = &self
-                    .preview
-                    .as_ref()
-                    .and_then(|preview| preview.get(self.songs_dir.state.offset()..))
-                {
+                if let Some(preview) = &self.preview {
+                    let offset = self.songs_dir.state.offset();
+                    let mut skipped = 0;
                     let mut result = Vec::new();
-                    for group in *preview {
+                    for group in preview {
                         if let Some(name) = group.name {
+                            // TODO color should be corrected
                             result.push(ListItem::new(name).yellow().bold());
                         }
-                        result.extend(group.items.clone());
-                        result.push(ListItem::new(Span::raw("")));
+                        let mut added_any = false;
+                        if skipped < offset {
+                            result.extend(group.items.iter().skip(offset - skipped).cloned());
+                            skipped += offset - skipped;
+                            added_any = true;
+                        } else {
+                            result.extend(group.items.clone());
+                        }
+                        if added_any {
+                            result.push(ListItem::new(Span::raw("")));
+                        }
                     }
                     let preview = List::new(result).style(config.as_text_style());
                     frame.render_widget(preview, preview_area);
