@@ -39,6 +39,8 @@ continue to work.
 
 - Fixed `QueueTimeRemaining` not updating remaining time
 - `ModalClosed` event now correctly gets dispatched only after all modals were closed
+- Preview no longer disappears in search when returning to the search form while the results are
+scrolled down
 
 ## [0.9.0] - 2025-06-23
 
