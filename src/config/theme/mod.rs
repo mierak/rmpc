@@ -208,11 +208,11 @@ impl Default for UiConfigFile {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum SongFormatOrProps<T> {
-    Props(T),
+pub enum SongFormatOrProps<T: Clone> {
     Format(String),
+    Props(T),
 }
 
 impl Default for SongFormatOrProps<SongFormatFile> {

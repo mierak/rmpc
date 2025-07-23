@@ -12,6 +12,7 @@ use unicase::UniCase;
 
 use super::theme::{
     PercentOrLength,
+    SongFormatOrProps,
     parser::{self, make_error_report},
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
     queue_table::ParseSizeError,
@@ -78,10 +79,7 @@ pub enum PaneTypeFile {
     #[cfg(debug_assertions)]
     FrameCount,
     Property {
-        #[serde(default)]
-        content: Option<Vec<PropertyFile<PropertyKindFile>>>,
-        #[serde(default)]
-        format: Option<String>,
+        content: SongFormatOrProps<PropertyFormatFile>,
         #[serde(default)]
         align: super::theme::properties::Alignment,
         #[serde(default)]
@@ -93,6 +91,9 @@ pub enum PaneTypeFile {
     },
     Cava,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PropertyFormatFile(pub Vec<PropertyFile<PropertyKindFile>>);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(strum::Display, Hash))]
@@ -192,26 +193,22 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
-            PaneTypeFile::Property { content, align, scroll_speed, format } => PaneType::Property {
-                content: {
-                    match (format, content) {
-                        (Some(format), Some(_)) | (Some(format), None) => parser::parser()
-                            .parse(&format)
-                            .into_result()
-                            .map_err(|errs| {
-                                PaneConversionError::FormatError(make_error_report(errs, &format))
-                            })?
-                            .into_iter()
+            PaneTypeFile::Property { content, align, scroll_speed } => PaneType::Property {
+                content: match content {
+                    SongFormatOrProps::Props(p) => {
+                        p.0.into_iter()
                             .map(|prop| -> Result<_> { prop.try_into() })
-                            .try_collect()?,
-                        (None, Some(content)) => content
-                            .into_iter()
-                            .map(|prop| -> Result<_> { prop.try_into() })
-                            .try_collect()?,
-                        (None, None) => {
-                            return Err(PaneConversionError::MissingFormat);
-                        }
+                            .try_collect()?
                     }
+                    SongFormatOrProps::Format(s) => parser::parser()
+                        .parse(&s)
+                        .into_result()
+                        .map_err(|errs| {
+                            PaneConversionError::FormatError(make_error_report(errs, &s))
+                        })?
+                        .into_iter()
+                        .map(|prop| -> Result<_> { prop.try_into() })
+                        .try_collect()?,
                 },
                 align: align.into(),
                 scroll_speed,
@@ -404,8 +401,6 @@ pub enum PaneConversionError {
     ParseError(#[from] ParseSizeError),
     #[error("Failed to parse pane: {0}")]
     Generic(#[from] anyhow::Error),
-    #[error("Missing pane format or content")]
-    MissingFormat,
     #[error("Invalid property format: {0}")]
     FormatError(String),
 }
