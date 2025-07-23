@@ -36,9 +36,14 @@ pub fn parser<'a>()
             sticker.map(PropertyKindFileOrText::Sticker),
         ));
 
-        prop_kind_or_text.then(style_file.or_not()).then(just('|').ignore_then(prop).or_not()).map(
-            |((kind, style), default)| PropertyFile { kind, style, default: default.map(Box::new) },
-        )
+        prop_kind_or_text
+            .then(style_file.or_not())
+            .then(just('|').padded().ignore_then(prop).or_not())
+            .map(|((kind, style), default)| PropertyFile {
+                kind,
+                style,
+                default: default.map(Box::new),
+            })
     })
     .padded()
     .repeated()
@@ -82,7 +87,7 @@ mod parser2 {
 
     #[test]
     fn deeply_nested_with_transforms() {
-        let result = parser().parse("%trunc(content: [[$title] $file [$artist[%trunc(content: 'sup', length: 3) %trunc(content: $state{fg: red}|'default text'|$track{ mods: bux }, length: 3)]]], length: 10)").into_result();
+        let result = parser().parse("%trunc(content: [[$title] $file [$artist[%trunc(content: 'sup', length: 3) %trunc(content: $state{fg: red} | 'default text'|$track{ mods: bux }, length: 3)]]], length: 10)").into_result();
 
         assert_eq!(result.unwrap().pop().unwrap(), PropertyFile {
             kind: PropertyKindFileOrText::<PropertyKindFile>::Transform(TransformFile::Truncate {

@@ -373,6 +373,12 @@ Defaults to `Track Artist - Title`:
 <summary>Click to expand</summary>
 
 ```rust
+browser_song_format: "[$track ' '][$artist ' - ' $title]|$filename",
+```
+
+or equivalent:
+
+```rust
 browser_song_format: [
     (
         kind: Group([

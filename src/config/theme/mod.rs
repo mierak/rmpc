@@ -82,6 +82,13 @@ pub struct UiConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum SongFormatOrProps {
+    Props(SongFormatFile),
+    Format(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UiConfigFile {
     #[serde(default = "defaults::bool::<true>")]
     pub(super) draw_borders: bool,
@@ -94,8 +101,7 @@ pub struct UiConfigFile {
     pub(super) browser_column_widths: Vec<u16>,
     #[serde(default)]
     // deprecated?
-    pub(super) browser_song_format: Option<SongFormatFile>,
-    pub(super) browser_song_format_v2: Option<String>,
+    pub(super) browser_song_format: Option<SongFormatOrProps>,
     pub(super) background_color: Option<String>,
     pub(super) text_color: Option<String>,
     #[serde(default = "defaults::default_preview_label_style")]
@@ -189,8 +195,7 @@ impl Default for UiConfigFile {
             },
             song_table_format: QueueTableColumnsFile::default(),
             song_table_album_separator: AlbumSeparator::default(),
-            browser_song_format: Some(SongFormatFile::default()),
-            browser_song_format_v2: None,
+            browser_song_format: Some(SongFormatOrProps::Props(SongFormatFile::default())),
             format_tag_separator: " | ".to_owned(),
             multiple_tag_resolution_strategy: TagResolutionStrategy::default(),
             preview_label_style: StyleFile {
@@ -419,18 +424,18 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     Ok(std::fs::read(path.as_ref())?.leak())
                 },
             )?,
-            browser_song_format: match (value.browser_song_format_v2, value.browser_song_format) {
-                (Some(v2), Some(_)) | (Some(v2), None) => SongFormat(
+            browser_song_format: match value.browser_song_format {
+                Some(SongFormatOrProps::Props(props)) => TryInto::<SongFormat>::try_into(props)?,
+                Some(SongFormatOrProps::Format(s)) => SongFormat(
                     parser::parser()
-                        .parse(&v2)
+                        .parse(&s)
                         .into_result()
-                        .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &v2)))?
+                        .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &s)))?
                         .into_iter()
                         .map(|v| v.try_into())
                         .try_collect()?,
                 ),
-                (None, Some(v1)) => TryInto::<SongFormat>::try_into(v1)?,
-                (None, None) => SongFormat::default(),
+                None => TryInto::<SongFormat>::try_into(SongFormatFile::default())?,
             },
             preview_label_style: value.preview_label_style.to_config_or(None, None)?,
             preview_metadata_group_style: value
