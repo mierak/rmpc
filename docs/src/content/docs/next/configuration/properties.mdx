@@ -2,7 +2,7 @@
 title: Properties
 description: Configuration of properties
 sidebar:
-order: 90
+    order: 16
 ---
 
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
@@ -11,7 +11,7 @@ import { path } from "../data.ts";
 import { ExpandableTable } from "../../../../components/Table.tsx";
 
 You can use the so-called properties in various places in rmpc. These allow you to customize what information is shown
-and how the program looks as a whole. These properties are usable in the <a href={path("configuration/layout")}>layout</a>, <a href={path("configuration/tabs")}>tabs</a>, <a href={path("configuration/theme/#browser_song_format")}>browser_song_format</a>, and <a href={path("configuration/layout#components")}>components</a>.
+and how the program looks as a whole. These properties are usable in the <a href={path("configuration/layout")}>layout</a>, <a href={path("configuration/tabs")}>tabs</a>, <a href={path("configuration/theme/#browser_song_format")}>browser_song_format</a>, <a href={path("configuration/theme/#song_table_format")}>song_table_format</a>, and <a href={path("configuration/layout#components")}>components</a>.
 
 ## Definition
 
@@ -68,20 +68,47 @@ fallback to filename when a song's metadata is missing a title.
 
 ### Examples
 
-|                                                                                                                                                                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `'Hello rmpc'`<br/> "Hello rmpc" with default styles                                                                                                                                                                      |
-| `'Hello rmpc'{fg: black, bg: #FF0000, mods: bu}`<br/> black, bold, and underlined "Hello rmpc" on red background                                                                                                          |
-| `$title\|$filename`<br/> song's title; if the song is missing the title metadata, show its filename instead                                                                                                               |
-| `$title{fg: blue}\|$artist{fg: blue}\|'No song'{fg: red}`<br/> blue song's title; if the song is missing the title metadata, show its artist in blue instead, and if that does not exist either, display "No song" in red |
-| `%truncate(content: $tag(value: 'date'), length: 4, from_start: false)`<br/> shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025                                                   |
-| `$elapsed ' / ' $cduration [' (' $bitrate ' kbps)']`<br/> displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined                                                                 |
+###### "Hello rmpc" with default styles
+
+```text showLineNumbers=false frame=none
+'Hello rmpc'
+```
+
+###### black, bold, and underlined "Hello rmpc" on red background
+
+```text showLineNumbers=false frame=none
+'Hello rmpc'{fg: black, bg: #FF0000, mods: bu}
+```
+
+###### song's title; if the song is missing the title metadata, show its filename instead
+
+```text showLineNumbers=false frame=none
+$title|$filename
+```
+
+###### blue song's title; if the song is missing the title metadata, show its artist in blue instead, and if that does not exist either, display "No song" in red
+
+```text showLineNumbers=false frame=none
+$title{fg: blue}|$artist{fg: blue}|'No song'{fg: red}
+```
+
+###### shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025
+
+```text showLineNumbers=false frame=none
+%truncate(content: $tag(value: 'date'), length: 4, from_start: false)
+```
+
+###### displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined
+
+```text showLineNumbers=false frame=none
+$elapsed ' / ' $cduration [' (' $bitrate ' kbps)']
+```
 
 ## Ron definition
 
 The ron definition is a bit more verbose and has a tendency to be deeply nested. There are some
 variations in the ron definition as opposed to the template syntax; for example, the `Property` panes
-allow you to specify `Status` properties, but the `song_table_format` does not.
+allow you to specify `Status` properties, but the `song_table_format` and `browser_song_format` do not.
 
 Every definition is a struct which contains `kind`, `style`, and `default`. The default is simply
 another definition struct which is used as a fallback value if the first property
@@ -90,20 +117,62 @@ could not be resolved.
 Style is a struct with three properties: `fg`, `bg`, and `modifiers`, and is described in more detail <a href={path("configuration/style-color")}>here</a>.
 
 The `kind` is an enum and can be one of `Text`, `Sticker`, `Property`, `Group`, or `Transform`.
-The `Property` kind can then be either `Song`, `Status`, or `Widget`. Or, in the case of `song_table_format`,
-just the `Song` type is available.
+The `Property` kind can then be either `Song`, `Status`, or `Widget`. Or, in the case of `song_table_format`
+or `browser_song_format`, just the `Song` type is available.
 
 ### Examples
 
-|                                                                                                                                                                                                                                                                                                                                          |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `(kind: Text("Hello rmpc"))`<br/> "Hello rmpc" with default styles                                                                                                                                                                                                                                                                       |
-| `(kind: Text("Hello rmpc"), style: (fg: "black", modifiers: "Bold \| Underlined"))`<br/> black, bold, and underlined "Hello rmpc" on red background                                                                                                                                                                                      |
-| `(kind: Property(Song(Title)), default: (kind: Property(Song(Filename))))`<br/> song's title; if the song is missing the title metadata, show its filename instead                                                                                                                                                                       |
-| `(kind: Property(Song(Title)), style: (fg: "blue"), default: (kind: Property(Song(Artist)), style: (fg: "blue"), default: (kind: Text("No song"), style: (fg: "red"))))`<br/> blue song's title; if the song is missing the title metadata, show its artist in blue instead, and if that does not exist either, display "No song" in red |
-| `(kind: Transform(Truncate(content: (kind: Property(Song(Other("date")))),length: 4, from_start: false)))`<br/> shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025                                                                                                                               |
-| `[(kind: Property(Status(Elapsed))), (kind: Text(" / ")), (kind: Property(Status(Duration))), (kind: Group([(kind: Text(" (")), (kind: Property(Status(Bitrate))), (kind: Text(" kbps)"))]))]`<br/> displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined                                      |
-| `(kind: Property(Title), default: (kind: Property(Filename)))`<br/> in the case of `browser_song_format` you skip the `Song` enum definition and instead define the property directly                                                                                                                                                    |
+###### "Hello rmpc" with default styles
+
+```rust showLineNumbers=false frame=none
+(kind: Text("Hello rmpc"))
+```
+
+###### black, bold, and underlined "Hello rmpc" on red background
+
+```rust showLineNumbers=false frame=none
+(kind: Text("Hello rmpc"), style: (fg: "black", modifiers: "Bold | Underlined"))
+```
+
+###### song's title; if the song is missing the title metadata, show its filename instead
+
+```rust showLineNumbers=false frame=none
+(kind: Property(Song(Title)), default: (kind: Property(Song(Filename))))
+```
+
+###### blue song's title; if the song is missing the title metadata, show its artist in blue instead, and if that does not exist either, display "No song" in red
+
+```rust showLineNumbers=false frame=none
+(kind: Property(Song(Title)), style: (fg: "blue"), default: (kind: Property(Song(Artist)), style: (fg: "blue"), default: (kind: Text("No song"), style: (fg: "red"))))
+```
+
+###### shows value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025
+
+```rust showLineNumbers=false frame=none
+(kind: Transform(Truncate(content: (kind: Property(Song(Other("date")))),length: 4, from_start: false)))
+```
+
+###### replaces content of the "like" sticker with a heart symbol
+
+```rust showLineNumbers=false frame=none
+(kind: Transform(Replace(content: (kind: Sticker("like")), replacements: [
+    (match: "0", replace: (kind: Text(" "), style: (fg: "blue"))), // Replace "disliked" with a blue broken heart
+    (match: "1", replace: (kind: Text(" "), style: (fg: "white"))), // Replace "neutral" with a white heart outline
+    (match: "2", replace: (kind: Text(" "), style: (fg: "red"))), // Replace "liked" with a red heart
+])))
+```
+
+###### displays `0:30 / 3:00 (999 kbps)` and only `0:30 / 3:00` if song's bitrate cannot be determined
+
+```rust showLineNumbers=false frame=none
+[(kind: Property(Status(Elapsed))), (kind: Text(" / ")), (kind: Property(Status(Duration))), (kind: Group([(kind: Text(" (")), (kind: Property(Status(Bitrate))), (kind: Text(" kbps)"))]))]
+```
+
+###### in the case of `browser_song_format` you skip the `Song` enum definition and instead define the property directly
+
+```rust showLineNumbers=false frame=none
+(kind: Property(Title), default: (kind: Property(Filename)))
+```
 
 ## Table of all available properties
 
@@ -130,7 +199,7 @@ rows are expandable to show what parameters are available for the property.
         { cells: ["Position", "value of the position tag", "`Position`", "`$pos` or `$position`"] },
         {
             cells: ["Other(String)", "display any arbitrary metadata tag supported by MPD", "`Other(...)`", " `$tag`"],
-            expandedContent: ["value: String, required"],
+            expandedContent: ["`value`: String, required"],
         },
     ]}
 />
@@ -259,7 +328,21 @@ All widget property templates are prefixed with `$w:` instead of just `$`.
     client:load
     headers={["Transform", "Description", "Ron", "Template"]}
     rows={[
-        { cells: ["Truncate", "truncate the value to specified number of characters", "`Truncate(...)`", "`%trunc` or `%truncate`"] },
+        {
+            cells: ["Truncate", "truncate the value to specified number of characters", "`Truncate(...)`", "`%trunc` or `%truncate`"],
+            expandedContent: [
+                "`content`: Property, content that is to be truncated",
+                "`from_start`: bool, optional, whether to truncate from the start of the input",
+                "`length`: bool, length in characters to truncate to",
+            ],
+        },
+        {
+            cells: ["Replace", "replace the value with another property if matched", "`Replace(...)`", "`%replace`"],
+            expandedContent: [
+                "`content`: Property, content that is to be replaced if matched",
+                "`replacements`: array of objects to defining one or more replacements",
+            ],
+        },
     ]}
 />
 {/* <!-- prettier-ignore-end --> */}
