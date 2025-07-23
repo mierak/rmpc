@@ -82,13 +82,6 @@ pub struct UiConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum SongFormatOrProps {
-    Props(SongFormatFile),
-    Format(String),
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UiConfigFile {
     #[serde(default = "defaults::bool::<true>")]
     pub(super) draw_borders: bool,
@@ -100,8 +93,7 @@ pub struct UiConfigFile {
     #[serde(default = "defaults::default_column_widths")]
     pub(super) browser_column_widths: Vec<u16>,
     #[serde(default)]
-    // deprecated?
-    pub(super) browser_song_format: Option<SongFormatOrProps>,
+    pub(super) browser_song_format: SongFormatOrProps<SongFormatFile>,
     pub(super) background_color: Option<String>,
     pub(super) text_color: Option<String>,
     #[serde(default = "defaults::default_preview_label_style")]
@@ -195,7 +187,7 @@ impl Default for UiConfigFile {
             },
             song_table_format: QueueTableColumnsFile::default(),
             song_table_album_separator: AlbumSeparator::default(),
-            browser_song_format: Some(SongFormatOrProps::Props(SongFormatFile::default())),
+            browser_song_format: SongFormatOrProps::default(),
             format_tag_separator: " | ".to_owned(),
             multiple_tag_resolution_strategy: TagResolutionStrategy::default(),
             preview_label_style: StyleFile {
@@ -213,6 +205,19 @@ impl Default for UiConfigFile {
             lyrics: LyricsConfigFile::default(),
             cava: CavaThemeFile::default(),
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum SongFormatOrProps<T> {
+    Props(T),
+    Format(String),
+}
+
+impl Default for SongFormatOrProps<SongFormatFile> {
+    fn default() -> Self {
+        Self::Props(SongFormatFile::default())
     }
 }
 
@@ -425,8 +430,8 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 },
             )?,
             browser_song_format: match value.browser_song_format {
-                Some(SongFormatOrProps::Props(props)) => TryInto::<SongFormat>::try_into(props)?,
-                Some(SongFormatOrProps::Format(s)) => SongFormat(
+                SongFormatOrProps::Props(props) => TryInto::<SongFormat>::try_into(props)?,
+                SongFormatOrProps::Format(s) => SongFormat(
                     parser::parser()
                         .parse(&s)
                         .into_result()
@@ -435,7 +440,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
                         .map(|v| v.try_into())
                         .try_collect()?,
                 ),
-                None => TryInto::<SongFormat>::try_into(SongFormatFile::default())?,
             },
             preview_label_style: value.preview_label_style.to_config_or(None, None)?,
             preview_metadata_group_style: value

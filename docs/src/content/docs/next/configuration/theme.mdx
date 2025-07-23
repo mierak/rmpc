@@ -325,6 +325,30 @@ Defaults to 4 columns: Artist, Title, Album and Duration:
 ```rust
 song_table_format: [
     (
+        prop: "$artist|'Unknown'",
+        width: "20%",
+    ),
+    (
+        prop: "$title|'Unknown'",
+        width: "35%",
+    ),
+    (
+        prop: "$album{fg: white}|'Unknown Album'{fg: white}",
+        width: "30%",
+    ),
+    (
+        prop: "$duration|'-'",
+        width: "15%",
+        alignment: Right,
+    ),
+],
+```
+
+or equivalent:
+
+```rust
+song_table_format: [
+    (
         prop: (kind: Property(Artist),
             default: (kind: Text("Unknown"))
         ),
