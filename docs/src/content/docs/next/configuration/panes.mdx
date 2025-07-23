@@ -58,6 +58,16 @@ The text will also wrap scroll if the pane is not big enough for the content.
 
 ```rust
 Pane(Property(
+    content: "$elapsed ' / ' $cduration [' (' $bitrate ' kbps)']",
+    align: Right,
+    scroll_speed: 1,
+)),
+```
+
+or equivalent:
+
+```rust
+Pane(Property(
     content: [
         (kind: Property(Status(Elapsed))),
         (kind: Text(" / ")),
