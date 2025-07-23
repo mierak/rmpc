@@ -1061,17 +1061,13 @@ impl Pane for SearchPane {
                             // TODO color should be corrected
                             result.push(ListItem::new(name).yellow().bold());
                         }
-                        let mut added_any = false;
                         if skipped < offset {
                             result.extend(group.items.iter().skip(offset - skipped).cloned());
                             skipped += offset - skipped;
-                            added_any = true;
                         } else {
                             result.extend(group.items.clone());
                         }
-                        if added_any {
-                            result.push(ListItem::new(Span::raw("")));
-                        }
+                        result.push(ListItem::new(Span::raw("")));
                     }
                     let preview = List::new(result).style(config.as_text_style());
                     frame.render_widget(preview, preview_area);
