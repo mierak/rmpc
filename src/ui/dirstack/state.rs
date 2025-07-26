@@ -19,17 +19,67 @@ impl<T: ScrollingState> DirState<T> {
         self.viewport_len
     }
 
-    pub fn set_viewport_len(&mut self, viewport_len: Option<usize>) -> &Self {
-        self.viewport_len = viewport_len;
-        self.scrollbar_state =
-            self.scrollbar_state.viewport_content_length(viewport_len.unwrap_or(0));
-        self
+    pub fn set_viewport_len(&mut self, viewport_len: Option<usize>) {
+        match (self.content_len, viewport_len) {
+            (Some(content_len), Some(viewport_len)) => {
+                self.set_content_and_viewport_len(content_len, viewport_len);
+            }
+            (None, Some(viewport_len)) => {
+                self.viewport_len = Some(viewport_len);
+            }
+            (_, None) => {
+                self.viewport_len = None;
+            }
+        }
     }
 
-    pub fn set_content_len(&mut self, content_len: Option<usize>) -> &Self {
-        self.content_len = content_len;
-        self.scrollbar_state = self.scrollbar_state.content_length(content_len.unwrap_or(0));
-        self
+    pub fn set_content_len(&mut self, content_len: Option<usize>) {
+        match (content_len, self.viewport_len) {
+            (Some(content_len), Some(viewport_len)) => {
+                self.set_content_and_viewport_len(content_len, viewport_len);
+            }
+            (Some(content_len), None) => {
+                self.content_len = Some(content_len);
+            }
+            (None, _) => {
+                self.content_len = None;
+            }
+        }
+    }
+
+    pub fn set_content_and_viewport_len(&mut self, content_len: usize, viewport_len: usize) {
+        self.content_len = Some(content_len);
+        self.viewport_len = Some(viewport_len);
+
+        if content_len <= viewport_len {
+            self.scrollbar_state =
+                self.scrollbar_state.viewport_content_length(1).content_length(1);
+        } else {
+            self.scrollbar_state = self
+                .scrollbar_state
+                .viewport_content_length(viewport_len)
+                .content_length(1 + content_len - viewport_len);
+        }
+    }
+
+    /// Scrolls to a specific percentage of the content.
+    /// `perc` must be between 0.0 and 1.0
+    pub fn scroll_to(&mut self, perc: f64, scrolloff: usize) {
+        debug_assert!((0.0..=1.0).contains(&perc), "Percentage must be between 0.0 and 1.0");
+
+        let Some(viewport_len) = self.viewport_len else {
+            return;
+        };
+        let Some(content_len) = self.content_len else {
+            return;
+        };
+
+        let max_offset = content_len.saturating_sub(viewport_len) as f64;
+        let new_offset = (perc * max_offset).floor() as usize;
+
+        self.inner.set_offset(new_offset);
+        self.scrollbar_state = self.scrollbar_state.position(new_offset);
+        self.clamp_to_offset(scrolloff);
     }
 
     pub fn content_len(&self) -> Option<usize> {
@@ -204,12 +254,66 @@ impl<T: ScrollingState> DirState<T> {
         }
     }
 
+    pub fn scroll_up(&mut self, amount: usize, scrolloff: usize) {
+        let Some(_content_len) = self.content_len else {
+            return;
+        };
+
+        let old_offset = self.offset();
+        let new_offset = self.offset().saturating_sub(amount);
+        if old_offset == new_offset && new_offset == 0 {
+            return;
+        }
+
+        self.inner.set_offset(new_offset);
+        self.scrollbar_state = self.scrollbar_state.position(new_offset);
+        self.clamp_to_offset(scrolloff);
+    }
+
+    pub fn clamp_to_offset(&mut self, scrolloff: usize) {
+        let Some(viewport_len) = self.viewport_len else {
+            return;
+        };
+
+        let offset = self.offset();
+        let Some(selected) = self.get_selected() else {
+            return;
+        };
+
+        if selected > (offset + viewport_len).saturating_sub(scrolloff + 1) {
+            self.select(Some(offset + viewport_len - scrolloff - 1), scrolloff);
+        } else if selected < offset + scrolloff {
+            self.select(Some(offset + scrolloff), scrolloff);
+        }
+    }
+
+    pub fn scroll_down(&mut self, amount: usize, scrolloff: usize) {
+        let Some(viewport_len) = self.viewport_len else {
+            return;
+        };
+        let Some(content_len) = self.content_len else {
+            return;
+        };
+
+        let old_offset = self.offset();
+        let new_offset = old_offset + amount;
+
+        if new_offset + viewport_len > content_len {
+            return;
+        }
+
+        self.inner.set_offset(new_offset);
+        self.scrollbar_state = self.scrollbar_state.position(new_offset);
+        self.clamp_to_offset(scrolloff);
+    }
+
     pub fn select(&mut self, idx: Option<usize>, scrolloff: usize) {
         let content_len = self.content_len.unwrap_or_default();
         let idx = idx.map(|idx| idx.max(0).min(content_len.saturating_sub(1)));
         self.inner.select_scrolling(idx);
         self.apply_scrolloff(scrolloff);
-        self.scrollbar_state = self.scrollbar_state.position(idx.unwrap_or(0));
+
+        self.scrollbar_state = self.scrollbar_state.position(self.offset());
     }
 
     fn apply_scrolloff(&mut self, scrolloff: usize) {
@@ -917,6 +1021,59 @@ mod tests {
 
             subject.select(Some(99), scrolloff);
             assert_eq!(subject.inner.offset(), 80);
+        }
+    }
+
+    mod scroll {
+        use ratatui::widgets::ListState;
+        use rstest::rstest;
+
+        use crate::ui::dirstack::DirState;
+
+        #[rstest]
+        #[case(1, 0, 0, 1, 1)]
+        #[case(3, 0, 0, 3, 3)]
+        #[case(3, 0, 6, 3, 6)]
+        #[case(1, 3, 0, 1, 4)]
+        fn scroll_down(
+            #[case] amount: usize,
+            #[case] scrolloff: usize,
+            #[case] initial_selected: usize,
+            #[case] expected_offset: usize,
+            #[case] expected_selected: usize,
+        ) {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(initial_selected), scrolloff);
+
+            subject.scroll_down(amount, scrolloff);
+
+            assert_eq!(subject.offset(), expected_offset);
+            assert_eq!(subject.get_selected(), Some(expected_selected));
+        }
+
+        #[rstest]
+        #[case(1, 0, 99, 89, 98)]
+        #[case(3, 0, 99, 87, 96)]
+        #[case(3, 0, 96, 84, 93)]
+        #[case(1, 3, 99, 89, 95)]
+        fn scroll_up(
+            #[case] amount: usize,
+            #[case] scrolloff: usize,
+            #[case] initial_selected: usize,
+            #[case] expected_offset: usize,
+            #[case] expected_selected: usize,
+        ) {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(initial_selected), scrolloff);
+
+            subject.scroll_up(amount, scrolloff);
+
+            assert_eq!(subject.offset(), expected_offset);
+            assert_eq!(subject.get_selected(), Some(expected_selected));
         }
     }
 }

@@ -73,8 +73,7 @@ impl Pane for LogsPane {
             .collect();
 
         let content_len = lines.len();
-        self.scrolling_state.set_content_len(Some(content_len));
-        self.scrolling_state.set_viewport_len(Some(logs_area.height.into()));
+        self.scrolling_state.set_content_and_viewport_len(content_len, logs_area.height.into());
         if self.scroll_enabled
             && (self.scrolling_state.get_selected().is_none() || self.should_scroll_to_last)
         {
@@ -125,12 +124,12 @@ impl Pane for LogsPane {
 
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
 
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
 
                 ctx.render()?;
             }

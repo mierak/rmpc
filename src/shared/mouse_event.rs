@@ -125,27 +125,22 @@ impl From<MouseEvent> for Position {
     }
 }
 
-/// calculate the target index for scrollbar interaction based on mouse
-/// position.
-pub fn calculate_scrollbar_index(
-    event: MouseEvent,
-    scrollbar_area: Rect,
-    content_len: usize,
-) -> Option<usize> {
-    let clicked_y = event.y.saturating_sub(scrollbar_area.y);
-    let scrollbar_height = scrollbar_area.height;
-
-    if content_len <= scrollbar_height as usize || scrollbar_height == 0 {
+/// Calculates the percentage of how far down the viewport is scrolled
+/// returns `None` if the event is not considered a scrollbar interaction
+/// meaning it
+pub fn calculate_scrollbar_position(event: MouseEvent, scrollbar_area: Rect) -> Option<f64> {
+    if !is_scrollbar_interaction(event, scrollbar_area) {
         return None;
     }
 
+    let clicked_y = event.y.saturating_sub(scrollbar_area.y);
+    let scrollbar_height = scrollbar_area.height;
+
     let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
         // clicking at the bottom selects the last item
-        content_len.saturating_sub(1)
+        1.0
     } else {
-        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-        let target = (position_ratio * (content_len.saturating_sub(1)) as f64).round() as usize;
-        target.min(content_len.saturating_sub(1))
+        f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1))
     };
 
     Some(target_idx)
@@ -153,7 +148,11 @@ pub fn calculate_scrollbar_index(
 
 /// check if a mouse event should interact with the scrollbar, considering drag
 /// start position
-pub fn is_scrollbar_interaction(event: MouseEvent, scrollbar_area: Rect) -> bool {
+fn is_scrollbar_interaction(event: MouseEvent, scrollbar_area: Rect) -> bool {
+    if scrollbar_area.height == 0 {
+        return false;
+    }
+
     let scrollbar_x = scrollbar_area.right().saturating_sub(1);
 
     match event.kind {
@@ -178,41 +177,30 @@ mod tests {
     #[test]
     fn test_calculate_scrollbar_index_basic() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
-        let content_len = 20;
 
         let event = MouseEvent { x: 10, y: 5, kind: MouseEventKind::LeftClick };
-        assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), Some(0));
+        assert_eq!(calculate_scrollbar_position(event, scrollbar_area,), Some(0.0));
 
         let event = MouseEvent { x: 10, y: 14, kind: MouseEventKind::LeftClick };
-        assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), Some(19));
+        assert_eq!(calculate_scrollbar_position(event, scrollbar_area,), Some(1.0));
 
         let event = MouseEvent { x: 10, y: 9, kind: MouseEventKind::LeftClick };
-        let result = calculate_scrollbar_index(event, scrollbar_area, content_len);
-        assert!(result.is_some());
-        let index = result.expect("result should be Some as confirmed by assertion");
-        assert!(index > 0 && index < 19);
-    }
-
-    #[test]
-    fn test_calculate_scrollbar_index_content_fits() {
-        let scrollbar_area = Rect::new(10, 5, 1, 10);
-        let content_len = 8; // Less than scrollbar height
-
-        let event = MouseEvent { x: 10, y: 7, kind: MouseEventKind::LeftClick };
-        assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), None);
+        assert_eq!(
+            calculate_scrollbar_position(event, scrollbar_area,),
+            Some(4.0 / 9.0) // 0.4444...
+        );
     }
 
     #[test]
     fn test_calculate_scrollbar_index_edge_cases() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
-        let content_len = 15;
 
         let event = MouseEvent { x: 10, y: 20, kind: MouseEventKind::LeftClick };
-        assert_eq!(calculate_scrollbar_index(event, scrollbar_area, content_len), Some(14));
+        assert_eq!(calculate_scrollbar_position(event, scrollbar_area,), None);
 
         let zero_height_area = Rect::new(10, 5, 1, 0);
         let event = MouseEvent { x: 10, y: 5, kind: MouseEventKind::LeftClick };
-        assert_eq!(calculate_scrollbar_index(event, zero_height_area, content_len), None);
+        assert_eq!(calculate_scrollbar_position(event, zero_height_area,), None);
     }
 
     #[test]
@@ -253,16 +241,15 @@ mod tests {
     #[test]
     fn test_calculate_scrollbar_index_drag_behavior() {
         let scrollbar_area = Rect::new(10, 5, 1, 10);
-        let content_len = 20;
 
         let drag_event = MouseEvent {
             x: 10,
             y: 9,
             kind: MouseEventKind::Drag { drag_start_position: Position { x: 10, y: 9 } },
         };
-        let result = calculate_scrollbar_index(drag_event, scrollbar_area, content_len);
+        let result = calculate_scrollbar_position(drag_event, scrollbar_area);
         assert!(result.is_some());
         let index = result.expect("result should be Some as confirmed by assertion");
-        assert!(index > 0 && index < 19);
+        assert!(index > 0.0 && index < 1.0);
     }
 }

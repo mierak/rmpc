@@ -34,6 +34,9 @@ directory.
 - Removed `Add`, `Insert`, `AddAndReplace`, `AddAll`, `InsertAll` and `AddAllReplace` from the code.
 They are now mapped to the new `AddOptions` action. Existing configs are not affected and will
 continue to work.
+- Scrolling behavior to be more natural - scrolling now actually scrolls the area instead of simply
+going to the next item
+- Scrollbars now represent the viewport position instead of the currently selected item position
 
 ### Fixed
 

@@ -5,7 +5,11 @@ use super::Pane;
 use crate::{
     config::tabs::TabName,
     ctx::Ctx,
-    shared::{events::AppEvent, key_event::KeyEvent, mouse_event::MouseEvent},
+    shared::{
+        events::AppEvent,
+        key_event::KeyEvent,
+        mouse_event::{MouseEvent, MouseEventKind},
+    },
     ui::{UiAppEvent, UiEvent, widgets::tabs::Tabs},
 };
 
@@ -102,6 +106,10 @@ impl Pane for TabsPane<'_> {
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         if !self.area.contains(event.into()) {
+            return Ok(());
+        }
+
+        if !matches!(event.kind, MouseEventKind::LeftClick | MouseEventKind::DoubleClick) {
             return Ok(());
         }
 
