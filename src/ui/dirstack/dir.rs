@@ -191,6 +191,18 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.state.prev_viewport(scrolloff);
     }
 
+    pub fn scroll_to(&mut self, perc: f64, scrolloff: usize) {
+        self.state.scroll_to(perc, scrolloff);
+    }
+
+    pub fn scroll_down(&mut self, amount: usize, scrolloff: usize) {
+        self.state.scroll_down(amount, scrolloff);
+    }
+
+    pub fn scroll_up(&mut self, amount: usize, scrolloff: usize) {
+        self.state.scroll_up(amount, scrolloff);
+    }
+
     pub fn last(&mut self) {
         self.state.last();
     }
@@ -265,8 +277,7 @@ mod tests {
             filter: None,
             matched_item_count: 0,
         };
-        res.state.set_content_len(Some(res.items.len()));
-        res.state.set_viewport_len(Some(res.items.len()));
+        res.state.set_content_and_viewport_len(res.items.len(), res.items.len());
         res
     }
 
@@ -430,8 +441,7 @@ mod tests {
                 items: vec!["aa", "ab", "c", "ad"].into_iter().map(ToOwned::to_owned).collect(),
                 ..Default::default()
             };
-            val.state.set_viewport_len(Some(2));
-            val.state.set_content_len(Some(val.items.len()));
+            val.state.set_content_and_viewport_len(val.items.len(), 2);
             val.state.select(Some(0), 0);
 
             val.filter = Some("a".to_string());
@@ -456,8 +466,7 @@ mod tests {
                     .collect(),
                 ..Default::default()
             };
-            val.state.set_content_len(Some(val.items.len()));
-            val.state.set_viewport_len(Some(2));
+            val.state.set_content_and_viewport_len(val.items.len(), 2);
             val.state.select(Some(4), 0);
 
             val.filter = Some("a".to_string());

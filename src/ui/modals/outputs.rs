@@ -31,14 +31,16 @@ pub struct OutputsModal {
 
 impl OutputsModal {
     pub fn new(outputs: Vec<PartitionedOutput>) -> Self {
+        let len = outputs.len();
         let mut result = Self {
             id: id::new(),
             outputs,
             scrolling_state: DirState::default(),
             outputs_table_area: Rect::default(),
         };
-        result.scrolling_state.set_content_len(Some(result.outputs.len()));
-        result.scrolling_state.first();
+        if len > 0 {
+            result.scrolling_state.select(Some(0), 0);
+        }
 
         result
     }
@@ -118,7 +120,8 @@ impl Modal for OutputsModal {
             ]),
         });
 
-        self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
+        self.scrolling_state
+            .set_content_and_viewport_len(self.outputs.len(), table_area.height.into());
 
         let table = Table::new(rows, [
             Constraint::Percentage(80),
@@ -233,11 +236,11 @@ impl Modal for OutputsModal {
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown if self.outputs_table_area.contains(event.into()) => {
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp if self.outputs_table_area.contains(event.into()) => {
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::LeftClick => {}

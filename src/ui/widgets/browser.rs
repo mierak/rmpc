@@ -107,8 +107,7 @@ where
         if config.theme.column_widths[0] > 0 {
             let title = state.previous().filter().as_ref().map(|v| format!("[FILTER]: {v} "));
             let prev_state = &mut state.previous_mut().state;
-            prev_state.set_content_len(Some(previous.len()));
-            prev_state.set_viewport_len(Some(previous_area.height.into()));
+            prev_state.set_content_and_viewport_len(previous.len(), previous_area.height.into());
 
             let mut previous = List::new(previous).style(config.as_text_style());
             let mut block = if config.theme.draw_borders {
@@ -135,7 +134,9 @@ where
                 prev_state.as_render_state_ref(),
             );
             ratatui::widgets::Widget::render(block, previous_area, buf);
-            if let Some(scrollbar) = config.as_styled_scrollbar() {
+            if let Some(scrollbar) = config.as_styled_scrollbar()
+                && prev_state.content_len().is_some_and(|l| l > 0)
+            {
                 ratatui::widgets::StatefulWidget::render(
                     scrollbar,
                     previous_area.inner(scrollbar_margin),
@@ -149,8 +150,7 @@ where
                 format!("[FILTER]: {v}{} ", if self.filter_input_active { "█" } else { "" })
             });
             let Dir { items, state, .. } = state.current_mut();
-            state.set_content_len(Some(items.len()));
-            state.set_viewport_len(Some(current_area.height.into()));
+            state.set_content_and_viewport_len(items.len(), current_area.height.into());
 
             let block = {
                 let mut b = Block::default();

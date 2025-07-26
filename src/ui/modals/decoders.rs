@@ -128,8 +128,7 @@ impl Modal for DecodersModal {
             })
             .collect_vec();
 
-        self.scrolling_state.set_content_len(Some(rows.len()));
-        self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
+        self.scrolling_state.set_content_and_viewport_len(rows.len(), table_area.height.into());
 
         let header_table = Table::new(
             vec![Row::new([
@@ -228,11 +227,11 @@ impl Modal for DecodersModal {
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown if self.table_area.contains(event.into()) => {
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp if self.table_area.contains(event.into()) => {
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::LeftClick => {}

@@ -34,7 +34,7 @@ use crate::{
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
-        mouse_event::{MouseEvent, MouseEventKind},
+        mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
     },
     ui::{
@@ -267,7 +267,6 @@ impl QueuePane {
 impl Pane for QueuePane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         let Ctx { queue, config, .. } = ctx;
-        let queue_len = queue.len();
         self.calculate_areas(area, ctx)?;
 
         let filter_text = self.filter_text();
@@ -286,7 +285,10 @@ impl Pane for QueuePane {
             b
         };
 
-        self.scrolling_state.set_content_len(Some(queue_len));
+        self.scrolling_state.set_content_and_viewport_len(
+            ctx.queue.len(),
+            self.areas[Areas::Table].height as usize,
+        );
 
         let widths = Layout::horizontal(self.column_widths.as_slice())
             .flex(Flex::Start)
@@ -395,7 +397,6 @@ impl Pane for QueuePane {
             self.scrolling_state.as_render_state_ref(),
         );
 
-        self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height.into()));
         if let Some(scrollbar) = config.as_styled_scrollbar() {
             if self.areas[Areas::Scrollbar].width > 0 {
                 frame.render_stateful_widget(
@@ -470,8 +471,10 @@ impl Pane for QueuePane {
     }
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
-        self.scrolling_state.set_content_len(Some(ctx.queue.len()));
-        self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
+        self.scrolling_state.set_content_and_viewport_len(
+            ctx.queue.len(),
+            self.areas[Areas::Table].height as usize,
+        );
 
         if self.should_center_cursor_on_current {
             let to_select = ctx
@@ -493,7 +496,10 @@ impl Pane for QueuePane {
     }
 
     fn resize(&mut self, _area: Rect, ctx: &Ctx) -> Result<()> {
-        self.scrolling_state.set_viewport_len(Some(self.areas[Areas::Table].height as usize));
+        self.scrolling_state.set_content_and_viewport_len(
+            ctx.queue.len(),
+            self.areas[Areas::Table].height as usize,
+        );
         let to_select = self
             .scrolling_state
             .get_selected()
@@ -543,29 +549,16 @@ impl Pane for QueuePane {
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         let position = event.into();
 
-        if let Some(scrollbar_area) = self.scrollbar_area() {
-            if ctx.config.theme.scrollbar.is_some()
-                && crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area)
-            {
-                match event.kind {
-                    MouseEventKind::LeftClick | MouseEventKind::Drag { .. } => {
-                        let content_len = ctx.queue.len();
-                        if let Some(target_idx) =
-                            crate::shared::mouse_event::calculate_scrollbar_index(
-                                event,
-                                scrollbar_area,
-                                content_len,
-                            )
-                        {
-                            self.scrolling_state.select(Some(target_idx), ctx.config.scrolloff);
-                            ctx.render()?;
-                        }
-                        return Ok(());
-                    }
-                    _ => {}
-                }
-            }
+        if let Some(scrollbar_area) = self.scrollbar_area()
+            && ctx.config.theme.scrollbar.is_some()
+            && matches!(event.kind, MouseEventKind::LeftClick | MouseEventKind::Drag { .. })
+            && let Some(perc) = calculate_scrollbar_position(event, scrollbar_area)
+        {
+            self.scrolling_state.scroll_to(perc, ctx.config.scrolloff);
+            ctx.render()?;
+            return Ok(());
         }
+
         if !self.areas[Areas::Table].contains(position) {
             return Ok(());
         }
@@ -610,11 +603,11 @@ impl Pane for QueuePane {
                 }
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::RightClick => {

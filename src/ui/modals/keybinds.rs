@@ -296,8 +296,7 @@ impl Modal for KeybindsModal {
         self.filter_rows.push(None);
         self.filter_rows.extend(queue_rows.0.into_iter().map(Some));
 
-        self.scrolling_state.set_content_len(Some(rows.len()));
-        self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
+        self.scrolling_state.set_content_and_viewport_len(rows.len(), table_area.height.into());
 
         let header_table = Table::new(
             vec![Row::new([Cell::from("Key"), Cell::from("Action"), Cell::from("Description")])],
@@ -441,11 +440,11 @@ impl Modal for KeybindsModal {
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::Drag { drag_start_position: _ } => {}

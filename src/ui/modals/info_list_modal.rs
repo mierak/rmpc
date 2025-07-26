@@ -134,8 +134,7 @@ impl Modal for InfoListModal {
             })
             .collect_vec();
 
-        self.scrolling_state.set_content_len(Some(rows.len()));
-        self.scrolling_state.set_viewport_len(Some(table_area.height.into()));
+        self.scrolling_state.set_content_and_viewport_len(rows.len(), table_area.height.into());
 
         let header_table = Table::new(
             vec![Row::new([Cell::from("Tag"), Cell::from("Value")])],
@@ -225,11 +224,11 @@ impl Modal for InfoListModal {
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::Drag { drag_start_position: _ } => {}

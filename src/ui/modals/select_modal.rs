@@ -105,28 +105,28 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
         }
 
         let [list_area, buttons_area] =
-            Layout::vertical([Constraint::Length(12), Constraint::Max(3)]).areas(popup_area);
-
-        let content_len = self.options.len();
-        self.scrolling_state.set_content_len(Some(content_len));
-        self.scrolling_state.set_viewport_len(Some(list_area.height.into()));
+            Layout::vertical([Constraint::Length(12), Constraint::Length(3)]).areas(popup_area);
 
         let options =
             self.options.iter().enumerate().map(|(idx, v)| format!("{:>3}: {v}", idx + 1));
+        let list_block = Block::default()
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .border_set(symbols::border::ROUNDED)
+            .border_style(ctx.config.as_border_style())
+            .title_alignment(ratatui::prelude::Alignment::Center)
+            .title(self.title.bold());
+
+        self.options_area = list_block.inner(list_area);
+        self.scrolling_state
+            .set_content_and_viewport_len(self.options.len(), self.options_area.height.into());
+
         let playlists = List::new(options)
             .style(ctx.config.as_text_style())
             .highlight_style(match self.focused {
                 FocusedComponent::Buttons => Style::default().reversed(),
                 FocusedComponent::List => ctx.config.theme.current_item_style,
             })
-            .block(
-                Block::default()
-                    .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-                    .border_set(symbols::border::ROUNDED)
-                    .border_style(ctx.config.as_border_style())
-                    .title_alignment(ratatui::prelude::Alignment::Center)
-                    .title(self.title.bold()),
-            );
+            .block(list_block);
 
         self.button_group.set_active_style(match self.focused {
             FocusedComponent::List => Style::default().reversed(),
@@ -135,8 +135,6 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
 
         let scrollbar_area =
             Block::default().padding(ratatui::widgets::Padding::new(0, 0, 1, 0)).inner(list_area);
-
-        self.options_area = list_area;
 
         frame.render_stateful_widget(
             playlists,
@@ -298,12 +296,12 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
             }
             MouseEventKind::ScrollUp if self.options_area.contains(event.into()) => {
                 self.focused = FocusedComponent::List;
-                self.scrolling_state.prev(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown if self.options_area.contains(event.into()) => {
                 self.focused = FocusedComponent::List;
-                self.scrolling_state.next(ctx.config.scrolloff, false);
+                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown => {}

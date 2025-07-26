@@ -32,7 +32,7 @@ use crate::{
     shared::{
         key_event::KeyEvent,
         macros::{modal, status_info, status_warn},
-        mouse_event::{MouseEvent, MouseEventKind},
+        mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
         mpd_query::PreviewGroup,
     },
@@ -153,8 +153,7 @@ impl SearchPane {
             .highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
-        directory.state.set_content_len(Some(directory.items.len()));
-        directory.state.set_viewport_len(Some(area.height.into()));
+        directory.state.set_content_and_viewport_len(directory.items.len(), area.height.into());
         if !directory.items.is_empty() && directory.state.get_selected().is_none() {
             directory.state.select(Some(0), 0);
         }
@@ -938,24 +937,17 @@ impl SearchPane {
         let Some(scrollbar_area) = self.scrollbar_area() else {
             return Ok(false);
         };
-        match event.kind {
-            MouseEventKind::LeftClick | MouseEventKind::Drag { .. } => {
-                if crate::shared::mouse_event::is_scrollbar_interaction(event, scrollbar_area) {
-                    let content_len = self.songs_dir.items.len();
-                    if let Some(target_idx) = crate::shared::mouse_event::calculate_scrollbar_index(
-                        event,
-                        scrollbar_area,
-                        content_len,
-                    ) {
-                        self.songs_dir.select_idx(target_idx, ctx.config.scrolloff);
-                        self.prepare_preview(ctx);
-                        ctx.render()?;
-                        return Ok(true);
-                    }
-                }
-            }
-            _ => {}
+        if !matches!(event.kind, MouseEventKind::LeftClick | MouseEventKind::Drag { .. }) {
+            return Ok(false);
         }
+
+        if let Some(perc) = calculate_scrollbar_position(event, scrollbar_area) {
+            self.songs_dir.scroll_to(perc, ctx.config.scrolloff);
+            self.prepare_preview(ctx);
+            ctx.render()?;
+            return Ok(true);
+        }
+
         Ok(false)
     }
 }
@@ -1194,9 +1186,10 @@ impl Pane for SearchPane {
                             if let Some(idx_to_select) =
                                 self.songs_dir.state.get_at_rendered_row(clicked_row)
                             {
-                                self.songs_dir.state.set_viewport_len(Some(
+                                self.songs_dir.state.set_content_and_viewport_len(
+                                    self.songs_dir.items.len(),
                                     self.column_areas[BrowserArea::Preview].height as usize,
-                                ));
+                                );
                                 self.songs_dir.select_idx(idx_to_select, ctx.config.scrolloff);
                             }
 
@@ -1307,7 +1300,7 @@ impl Pane for SearchPane {
                     ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
-                    self.songs_dir.next(ctx.config.scrolloff, false);
+                    self.songs_dir.scroll_down(1, ctx.config.scrolloff);
                     self.prepare_preview(ctx);
                     ctx.render()?;
                 }
@@ -1322,7 +1315,7 @@ impl Pane for SearchPane {
                     ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
-                    self.songs_dir.prev(ctx.config.scrolloff, false);
+                    self.songs_dir.scroll_up(1, ctx.config.scrolloff);
                     self.prepare_preview(ctx);
                     ctx.render()?;
                 }

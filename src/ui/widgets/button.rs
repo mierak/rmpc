@@ -66,6 +66,10 @@ impl Widget for &mut Button<'_> {
             None => area,
         };
 
+        if area.height == 0 {
+            return;
+        }
+
         buf.set_string(
             area.left()
                 + get_line_offset(self.label.len() as u16, area.width, self.label_alignment),
