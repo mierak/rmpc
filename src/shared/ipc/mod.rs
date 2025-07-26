@@ -1,7 +1,13 @@
-use std::{io::Write, os::unix::net::UnixStream, path::PathBuf};
+use std::{
+    io::{BufRead, BufReader, Write},
+    os::unix::net::UnixStream,
+    path::PathBuf,
+};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+use commands::query_tab::QueryCommand;
 use crossbeam::channel::Sender;
+use ipc_stream::{IPC_RESPONSE_FINISH, IpcStream};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +26,7 @@ use crate::{
 };
 
 pub mod commands;
+pub mod ipc_stream;
 
 pub fn get_socket_path(pid: u32) -> PathBuf {
     let mut temp = std::env::temp_dir();
@@ -53,6 +60,7 @@ pub(crate) trait SocketCommandExecute {
         self,
         event_tx: &Sender<AppEvent>,
         work_tx: &Sender<WorkRequest>,
+        stream: IpcStream,
         config: &Config,
     ) -> Result<()>;
 }
@@ -65,6 +73,7 @@ pub(crate) enum SocketCommand {
     Set(Box<SetIpcCommand>),
     Keybind(KeybindCommand),
     SwitchTab(SwitchTabCommand),
+    Query(QueryCommand),
 }
 
 impl SocketCommandExecute for SocketCommand {
@@ -72,25 +81,49 @@ impl SocketCommandExecute for SocketCommand {
         self,
         event_tx: &Sender<AppEvent>,
         work_tx: &Sender<WorkRequest>,
+        stream: IpcStream,
         config: &Config,
     ) -> Result<()> {
         match self {
-            SocketCommand::IndexLrc(cmd) => cmd.execute(event_tx, work_tx, config),
-            SocketCommand::StatusMessage(cmd) => cmd.execute(event_tx, work_tx, config),
-            SocketCommand::TmuxHook(cmd) => cmd.execute(event_tx, work_tx, config),
-            SocketCommand::Set(cmd) => cmd.execute(event_tx, work_tx, config),
-            SocketCommand::Keybind(cmd) => cmd.execute(event_tx, work_tx, config),
-            SocketCommand::SwitchTab(cmd) => cmd.execute(event_tx, work_tx, config),
+            SocketCommand::IndexLrc(cmd) => cmd.execute(event_tx, work_tx, stream, config),
+            SocketCommand::StatusMessage(cmd) => cmd.execute(event_tx, work_tx, stream, config),
+            SocketCommand::TmuxHook(cmd) => cmd.execute(event_tx, work_tx, stream, config),
+            SocketCommand::Set(cmd) => cmd.execute(event_tx, work_tx, stream, config),
+            SocketCommand::Keybind(cmd) => cmd.execute(event_tx, work_tx, stream, config),
+            SocketCommand::SwitchTab(cmd) => cmd.execute(event_tx, work_tx, stream, config),
+            SocketCommand::Query(cmd) => cmd.execute(event_tx, work_tx, stream, config),
         }
     }
 }
 
 impl RemoteCmd {
     pub fn write_to_socket(self, path: &PathBuf) -> Result<()> {
-        let cmd = SocketCommand::try_from(self)?;
+        let cmd = SocketCommand::try_from(&self)?;
         let cmd = serde_json::to_string(&cmd).context("Failed to serialize command.")?;
 
         let mut stream = UnixStream::connect(path).context("Failed to connect to socket")?;
-        stream.write_all(cmd.as_bytes()).context("Failed to write command to socket.")
+        stream.write_all(cmd.as_bytes()).context("Failed to write command to socket.")?;
+        stream.write_all(b"\n")?;
+
+        let mut read = BufReader::new(stream);
+        let mut buf = String::new();
+
+        match self {
+            RemoteCmd::Query { targets } => {
+                for target in targets {
+                    read.read_line(&mut buf)?;
+                    print!("{target}: {buf}");
+                    buf.clear();
+                }
+            }
+            _ => {}
+        }
+
+        read.read_line(&mut buf)?;
+        if buf.strip_suffix("\n").is_none_or(|v| v != IPC_RESPONSE_FINISH) {
+            bail!("Expected '{IPC_RESPONSE_FINISH}' response, got: {}", buf);
+        }
+
+        Ok(())
     }
 }

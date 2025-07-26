@@ -7,7 +7,7 @@ use crate::{
     AppEvent,
     WorkRequest,
     config::{Config, keys::key::Key},
-    shared::ipc::SocketCommandExecute,
+    shared::ipc::{IpcStream, SocketCommandExecute},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -20,6 +20,7 @@ impl SocketCommandExecute for KeybindCommand {
         self,
         event_tx: &Sender<AppEvent>,
         _work_tx: &Sender<WorkRequest>,
+        _stream: IpcStream,
         _config: &Config,
     ) -> Result<()> {
         match self.key.parse::<Key>() {

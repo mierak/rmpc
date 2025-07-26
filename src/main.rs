@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::{DeserError, cli_config::CliConfigFile};
+use config::{DeserError, cli::RemoteCmd, cli_config::CliConfigFile};
 use crossbeam::channel::unbounded;
 use ctx::Ctx;
 use log::info;
@@ -158,6 +158,14 @@ fn main() -> Result<()> {
             );
         }
         Some(Command::Remote { command, pid }) => {
+            if matches!(command, RemoteCmd::Query { .. })
+                && pid.is_none()
+                && list_all_socket_paths()?.count() > 1
+            {
+                eprintln!("Remote query requires a PID to be specified.");
+                std::process::exit(1);
+            }
+
             if let Some(pid) = pid {
                 let path = get_socket_path(pid);
                 command.write_to_socket(&path)?;

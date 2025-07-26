@@ -32,7 +32,7 @@ pub(crate) fn init(
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             let stream = try_cont!(stream, "Failed to connect to socket client");
-            let mut reader = BufReader::new(stream);
+            let mut reader = BufReader::new(&stream);
 
             let mut buf = String::new();
             try_cont!(reader.read_line(&mut buf), "Failed to read from socket client");
@@ -41,7 +41,7 @@ pub(crate) fn init(
 
             log::debug!(command:?, addr:?; "Got command from unix socket");
             try_skip!(
-                command.execute(&event_tx, &work_tx, &config),
+                command.execute(&event_tx, &work_tx, stream.into(), &config),
                 "Socket command execution failed"
             );
         }
