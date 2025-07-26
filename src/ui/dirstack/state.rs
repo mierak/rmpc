@@ -1039,7 +1039,7 @@ mod tests {
             #[case] amount: usize,
             #[case] scrolloff: usize,
             #[case] initial_selected: usize,
-            #[case] expected_offest: usize,
+            #[case] expected_offset: usize,
             #[case] expected_selected: usize,
         ) {
             let mut subject: DirState<ListState> = DirState::default();
@@ -1049,7 +1049,7 @@ mod tests {
 
             subject.scroll_down(amount, scrolloff);
 
-            assert_eq!(subject.offset(), expected_offest);
+            assert_eq!(subject.offset(), expected_offset);
             assert_eq!(subject.get_selected(), Some(expected_selected));
         }
 
@@ -1062,7 +1062,7 @@ mod tests {
             #[case] amount: usize,
             #[case] scrolloff: usize,
             #[case] initial_selected: usize,
-            #[case] expected_offest: usize,
+            #[case] expected_offset: usize,
             #[case] expected_selected: usize,
         ) {
             let mut subject: DirState<ListState> = DirState::default();
@@ -1072,7 +1072,7 @@ mod tests {
 
             subject.scroll_up(amount, scrolloff);
 
-            assert_eq!(subject.offset(), expected_offest);
+            assert_eq!(subject.offset(), expected_offset);
             assert_eq!(subject.get_selected(), Some(expected_selected));
         }
     }
