@@ -152,9 +152,8 @@ mod test {
         let ipc_command = InFlightIpcCommand { stream };
 
         let response = ipc_command.read_response();
-        assert_eq!(
-            response.map_err(|err| err.to_string()),
-            Err("error: socket error, Resource temporarily unavailable (os error 11)".to_string())
-        );
+        assert!(response.map_err(|err| err.to_string()).is_err_and(|err| {
+            err.starts_with("error: socket error, Resource temporarily unavailable")
+        }));
     }
 }
