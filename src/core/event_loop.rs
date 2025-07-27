@@ -481,7 +481,7 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::IpcQuery { mut stream, targets } => {
                     for target in targets {
                         match target {
-                            RemoteCommandQuery::Tab => {
+                            RemoteCommandQuery::ActiveTab => {
                                 stream
                                     .append_response_line(format!("{target}: {}", ctx.active_tab));
                             }

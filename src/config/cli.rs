@@ -313,7 +313,7 @@ pub enum RemoteCmd {
 #[strum(serialize_all = "kebab-case")]
 pub enum RemoteCommandQuery {
     /// Query the currently active tab name
-    Tab,
+    ActiveTab,
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]
