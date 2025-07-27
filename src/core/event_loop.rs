@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    io::Write,
     ops::Sub,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
@@ -483,10 +482,10 @@ fn main_task<B: Backend + std::io::Write>(
                     for target in targets {
                         match target {
                             RemoteCommandQuery::Tab => {
-                                stream.write_all(ctx.active_tab.as_bytes()).unwrap();
+                                stream
+                                    .append_response_line(format!("{target}: {}", ctx.active_tab));
                             }
                         }
-                        stream.write_all(b"\n").unwrap();
                     }
                 }
                 AppEvent::Reconnected => {

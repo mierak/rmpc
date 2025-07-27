@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashSet, time::Instant};
+use std::{cell::Cell, collections::HashSet, os::unix::net::UnixStream, time::Instant};
 
 use crossbeam::channel::{Receiver, Sender, unbounded};
 use ratatui::{Terminal, backend::TestBackend};
@@ -11,12 +11,19 @@ use crate::{
     mpd::commands::Status,
     shared::{
         events::{ClientRequest, WorkRequest},
+        ipc::ipc_stream::IpcStream,
         lrc::LrcIndex,
         ring_vec::RingVec,
     },
 };
 
 pub mod mpd_client;
+
+#[fixture]
+pub fn ipc_stream() -> IpcStream {
+    let pair = UnixStream::pair().expect("UnixStream pair should not fail");
+    pair.0.into()
+}
 
 #[fixture]
 pub fn status() -> Status {

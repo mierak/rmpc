@@ -271,8 +271,9 @@ pub enum Command {
     },
 }
 
-#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[derive(Subcommand, Clone, Debug, PartialEq, strum::EnumDiscriminants, strum::Display)]
 #[clap(rename_all = "lower")]
+#[strum(serialize_all = "lowercase")]
 pub enum RemoteCmd {
     /// Notify rmpc that a new lyrics file has been added
     IndexLrc {
@@ -304,7 +305,6 @@ pub enum RemoteCmd {
     /// Switch to a specific tab by name
     #[clap(name = "switch-tab")]
     SwitchTab { tab: String },
-
     /// Query the currently active tab name
     Query { targets: Vec<RemoteCommandQuery> },
 }

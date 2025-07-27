@@ -1,20 +1,22 @@
-use std::{
-    io::{BufRead, BufReader, Write},
-    os::unix::net::UnixStream,
-    path::PathBuf,
-};
+use std::{io::Write, os::unix::net::UnixStream, path::PathBuf, time::Duration};
 
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
 use commands::query_tab::QueryCommand;
 use crossbeam::channel::Sender;
-use ipc_stream::{IPC_RESPONSE_FINISH, IpcStream};
+use in_flight_ipc::{InFlightIpcCommand, IpcCommandError};
+use ipc_stream::IpcStream;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use strum::IntoDiscriminant;
 
+use super::exit_code::ExitCode;
 use crate::{
     AppEvent,
     WorkRequest,
-    config::{Config, cli::RemoteCmd},
+    config::{
+        Config,
+        cli::{RemoteCmd, RemoteCmdDiscriminants},
+    },
     shared::ipc::commands::{
         index_lrc::IndexLrcCommand,
         keybind::KeybindCommand,
@@ -26,6 +28,7 @@ use crate::{
 };
 
 pub mod commands;
+pub mod in_flight_ipc;
 pub mod ipc_stream;
 
 pub fn get_socket_path(pid: u32) -> PathBuf {
@@ -97,33 +100,79 @@ impl SocketCommandExecute for SocketCommand {
 }
 
 impl RemoteCmd {
-    pub fn write_to_socket(self, path: &PathBuf) -> Result<()> {
-        let cmd = SocketCommand::try_from(&self)?;
-        let cmd = serde_json::to_string(&cmd).context("Failed to serialize command.")?;
+    pub(crate) fn write_to_socket(
+        self,
+        path: &PathBuf,
+    ) -> Result<InFlightIpcCommand, IpcCommandError> {
+        let cmd = SocketCommand::try_from(&self).map_err(IpcCommandError::CommandCreate)?;
+        let cmd = serde_json::to_string(&cmd)?;
 
-        let mut stream = UnixStream::connect(path).context("Failed to connect to socket")?;
-        stream.write_all(cmd.as_bytes()).context("Failed to write command to socket.")?;
+        let mut stream = UnixStream::connect(path)?;
+        stream.set_read_timeout(Some(Duration::from_secs(3)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+
+        stream.write_all(cmd.as_bytes())?;
         stream.write_all(b"\n")?;
 
-        let mut read = BufReader::new(stream);
-        let mut buf = String::new();
+        return Ok(InFlightIpcCommand { stream });
+    }
 
-        match self {
-            RemoteCmd::Query { targets } => {
-                for target in targets {
-                    read.read_line(&mut buf)?;
-                    print!("{target}: {buf}");
-                    buf.clear();
+    pub(crate) fn handle(self, pid: Option<u32>) -> ExitCode {
+        if pid.is_none() && [RemoteCmdDiscriminants::Query].contains(&self.discriminant()) {
+            match list_all_socket_paths().map(|p| p.count()) {
+                Ok(1) => {} // only one path found, we don't need PID
+                Ok(0) => {
+                    eprintln!("No socket paths found. Please start rmpc TUI instance first");
+                    return ExitCode::from(1);
+                }
+                Ok(_) => {
+                    eprintln!("Remote command '{self}' requires a PID to be specified",);
+                    return ExitCode::from(1);
+                }
+                Err(err) => {
+                    eprintln!("Failed to list socket paths: {err}");
+                    return ExitCode::from(1);
                 }
             }
-            _ => {}
         }
 
-        read.read_line(&mut buf)?;
-        if buf.strip_suffix("\n").is_none_or(|v| v != IPC_RESPONSE_FINISH) {
-            bail!("Expected '{IPC_RESPONSE_FINISH}' response, got: {}", buf);
+        if let Some(pid) = pid {
+            let path = get_socket_path(pid);
+            self.run(&path)
+        } else {
+            match list_all_socket_paths() {
+                Ok(paths) => {
+                    let mut exit_code = ExitCode::from(0);
+                    for path in paths {
+                        exit_code |= self.clone().run(&path);
+                    }
+                    exit_code
+                }
+                Err(err) => {
+                    eprintln!("Failed to list socket paths: {err}");
+                    ExitCode::from(1)
+                }
+            }
+        }
+    }
+
+    fn run(self, path: &PathBuf) -> ExitCode {
+        let ipc = match self.write_to_socket(path) {
+            Ok(ipc) => ipc,
+            Err(err) => {
+                eprintln!("{err}");
+                return ExitCode::from(1);
+            }
+        };
+        match ipc.read_response() {
+            Ok(Some(resp)) => println!("{resp}"),
+            Ok(None) => {}
+            Err(err) => {
+                eprintln!("{err}");
+                return ExitCode::from(1);
+            }
         }
 
-        Ok(())
+        ExitCode::from(0)
     }
 }
