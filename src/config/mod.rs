@@ -42,7 +42,11 @@ use self::{
     theme::{ConfigColor, UiConfig, UiConfigFile},
 };
 use crate::{
-    shared::{image, image::ImageProtocol, macros::status_warn},
+    shared::{
+        image::{self, ImageProtocol},
+        lrc::LrcOffset,
+        macros::status_warn,
+    },
     tmux,
 };
 
@@ -53,6 +57,7 @@ pub struct Config {
     pub password: Option<MpdPassword>,
     pub cache_dir: Option<PathBuf>,
     pub lyrics_dir: Option<String>,
+    pub lyrics_offset: LrcOffset,
     pub volume_step: u8,
     pub max_fps: u32,
     pub scrolloff: usize,
@@ -102,6 +107,8 @@ pub struct ConfigFile {
     cache_dir: Option<PathBuf>,
     #[serde(default)]
     lyrics_dir: Option<String>,
+    #[serde(default = "defaults::i64::<0>")]
+    lyrics_offset_ms: i64,
     #[serde(default)]
     pub theme: Option<String>,
     #[serde(default = "defaults::u8::<5>")]
@@ -193,6 +200,7 @@ impl Default for ConfigFile {
             theme: None,
             cache_dir: None,
             lyrics_dir: None,
+            lyrics_offset_ms: 0,
             image_method: None,
             select_current_song_on_change: false,
             center_current_song_on_change: false,
@@ -365,6 +373,7 @@ impl ConfigFile {
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
             }),
+            lyrics_offset: LrcOffset::from_millis(self.lyrics_offset_ms),
             tabs,
             active_panes,
             address,
