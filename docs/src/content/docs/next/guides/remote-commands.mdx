@@ -230,9 +230,8 @@ rmpc remote --pid 12345 status "Hello from specific instance"
 
 Remote commands will fail silently if:
 
-- No rmpc instance is running
+- If no PID was specified and no rmpc instance is running
 - The specified PID doesn't exist
-- Invalid key format is provided
 - Tab name doesn't exist in your configuration (for switch-tab commands)
 
 **Note**: Command execution errors (like invalid tab names) are logged in the running rmpc instance at the warn level, not displayed to the CLI caller. Check the rmpc logs for detailed error messages if commands aren't working as expected.

@@ -306,7 +306,10 @@ pub enum RemoteCmd {
     #[clap(name = "switch-tab")]
     SwitchTab { tab: String },
     /// Query the currently active tab name
-    Query { targets: Vec<RemoteCommandQuery> },
+    Query {
+        #[arg(required = true)]
+        targets: Vec<RemoteCommandQuery>,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Serialize, Deserialize, strum::Display)]
