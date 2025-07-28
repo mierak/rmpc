@@ -7,7 +7,7 @@ use crate::{
     AppEvent,
     WorkRequest,
     config::{Config, keys::key::Key},
-    shared::ipc::SocketCommandExecute,
+    shared::ipc::{IpcStream, SocketCommandExecute},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -20,6 +20,7 @@ impl SocketCommandExecute for KeybindCommand {
         self,
         event_tx: &Sender<AppEvent>,
         _work_tx: &Sender<WorkRequest>,
+        stream: IpcStream,
         _config: &Config,
     ) -> Result<()> {
         match self.key.parse::<Key>() {
@@ -28,8 +29,9 @@ impl SocketCommandExecute for KeybindCommand {
                 event_tx.send(AppEvent::UserKeyInput(crossterm_event))?;
             }
             Err(err) => {
-                log::error!("Failed to parse key '{}': {}", self.key, err);
-                return Err(anyhow::anyhow!("Failed to parse key '{}': {}", self.key, err));
+                let err = anyhow::anyhow!("Failed to parse key '{}': {}", self.key, err);
+                stream.error(err.to_string());
+                return Err(err);
             }
         }
         Ok(())

@@ -12,6 +12,7 @@ mod remote_ipc_tests {
             SocketCommandExecute,
             commands::{keybind::KeybindCommand, switch_tab::SwitchTabCommand},
         },
+        tests::fixtures::ipc_stream,
     };
 
     fn setup_test() -> (Sender<AppEvent>, Receiver<AppEvent>, Sender<WorkRequest>, Config) {
@@ -60,7 +61,7 @@ mod remote_ipc_tests {
         let (event_tx, event_rx, work_tx, config) = setup_test();
         let keybind_cmd = KeybindCommand { key: "p".to_string() };
 
-        let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
+        let result = keybind_cmd.execute(&event_tx, &work_tx, ipc_stream(), &config);
         assert!(result.is_ok());
 
         expect_key_event(&event_rx, 'p');
@@ -71,7 +72,7 @@ mod remote_ipc_tests {
         let (event_tx, event_rx, work_tx, config) = setup_test();
         let switch_tab_cmd = SwitchTabCommand { tab: "Queue".to_string() };
 
-        let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
+        let result = switch_tab_cmd.execute(&event_tx, &work_tx, ipc_stream(), &config);
         assert!(result.is_ok());
 
         expect_remote_switch_tab(&event_rx, "Queue");
@@ -84,7 +85,7 @@ mod remote_ipc_tests {
 
         for test_case in test_cases {
             let switch_tab_cmd = SwitchTabCommand { tab: test_case.to_string() };
-            let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
+            let result = switch_tab_cmd.execute(&event_tx, &work_tx, ipc_stream(), &config);
             assert!(result.is_ok(), "Switch tab should work case-insensitively for '{test_case}'");
 
             expect_remote_switch_tab(&event_rx, test_case);
@@ -97,7 +98,7 @@ mod remote_ipc_tests {
         let config = Config::default(); // Use minimal config for error test
         let switch_tab_cmd = SwitchTabCommand { tab: "NonExistentTab".to_string() };
 
-        let result = switch_tab_cmd.execute(&event_tx, &work_tx, &config);
+        let result = switch_tab_cmd.execute(&event_tx, &work_tx, ipc_stream(), &config);
         assert!(result.is_ok(), "Command execution should always succeed at socket level");
 
         // Checking that a RemoteSwitchTab event was sent (since validation happens in
@@ -110,7 +111,7 @@ mod remote_ipc_tests {
         let (event_tx, _event_rx, work_tx, config) = setup_test();
         let keybind_cmd = KeybindCommand { key: "invalid_key_format".to_string() };
 
-        let result = keybind_cmd.execute(&event_tx, &work_tx, &config);
+        let result = keybind_cmd.execute(&event_tx, &work_tx, ipc_stream(), &config);
         assert!(result.is_err());
     }
 
@@ -118,7 +119,7 @@ mod remote_ipc_tests {
     fn test_remote_cmd_to_socket_command_conversion() {
         let keybind_cmd = RemoteCmd::Keybind { key: "p".to_string() };
         let socket_cmd =
-            SocketCommand::try_from(keybind_cmd).expect("Keybind conversion should succeed");
+            SocketCommand::try_from(&keybind_cmd).expect("Keybind conversion should succeed");
 
         match socket_cmd {
             SocketCommand::Keybind(cmd) => {
@@ -129,7 +130,7 @@ mod remote_ipc_tests {
 
         let switch_tab_cmd = RemoteCmd::SwitchTab { tab: "Queue".to_string() };
         let socket_cmd =
-            SocketCommand::try_from(switch_tab_cmd).expect("SwitchTab conversion should succeed");
+            SocketCommand::try_from(&switch_tab_cmd).expect("SwitchTab conversion should succeed");
 
         match socket_cmd {
             SocketCommand::SwitchTab(cmd) => {

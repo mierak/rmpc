@@ -14,7 +14,6 @@ use log::info;
 use rustix::path::Arg;
 use shared::{
     dependencies::CAVA,
-    ipc::{get_socket_path, list_all_socket_paths},
     macros::{status_warn, try_skip},
 };
 
@@ -158,19 +157,17 @@ fn main() -> Result<()> {
             );
         }
         Some(Command::Remote { command, pid }) => {
-            if let Some(pid) = pid {
-                let path = get_socket_path(pid);
-                command.write_to_socket(&path)?;
-                eprintln!("Successfully sent remote command to {}", path.display());
-            } else {
-                for path in list_all_socket_paths()? {
-                    if let Err(err) = command.clone().write_to_socket(&path) {
-                        eprintln!("Failed to send remote command. Error: '{err:?}'");
-                        continue;
-                    }
-                    eprintln!("Successfully sent remote command to {}", path.display());
-                }
-            }
+            let pid = pid.or_else(|| {
+                std::env::var("PID")
+                    .context("Failed to read PID from environment variable 'PID'")
+                    .and_then(|p| {
+                        p.parse().context("Failed to parse PID from environment variable 'PID'")
+                    })
+                    .ok()
+            });
+
+            let exit_code = command.handle(pid);
+            std::process::exit(exit_code.into());
         }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");

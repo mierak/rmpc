@@ -2,7 +2,12 @@ use anyhow::Result;
 use crossbeam::channel::Sender;
 use serde::{Deserialize, Serialize};
 
-use crate::{AppEvent, WorkRequest, config::Config, shared::ipc::SocketCommandExecute};
+use crate::{
+    AppEvent,
+    WorkRequest,
+    config::Config,
+    shared::ipc::{IpcStream, SocketCommandExecute},
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct SwitchTabCommand {
@@ -14,6 +19,7 @@ impl SocketCommandExecute for SwitchTabCommand {
         self,
         event_tx: &Sender<AppEvent>,
         _work_tx: &Sender<WorkRequest>,
+        _stream: IpcStream,
         _config: &Config,
     ) -> Result<()> {
         // Skipping validation here due to config hot reload, the config passed here

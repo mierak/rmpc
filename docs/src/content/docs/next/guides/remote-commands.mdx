@@ -20,6 +20,7 @@ the remote command system allows you to:
 - **send status messages** - display custom messages in the status bar
 - **update configuration** - modify theme and other settings remotely
 - **target specific instances** - send commands to a particular rmpc process by pid
+- **query rmpc's state** - check which tab is currently active and more in the future
 
 ## usage
 
@@ -29,11 +30,12 @@ all remote commands follow this pattern:
 rmpc remote [--pid <pid>] <command> <args>
 ```
 
-if `--pid` is not specified, the command will be sent to all running rmpc instances.
+If `--pid` is not specified and `$PID` environment variable(usually set by rmpc in triggered scripts)
+is not found, the command will be sent to all running rmpc instances.
 
 ## keybind command
 
-the `keybind` command emulates pressing a key combination in the running rmpc interface.
+The `keybind` command emulates pressing a key combination in the running rmpc interface.
 
 ### syntax
 
@@ -150,6 +152,26 @@ If you try to switch to a non-existent tab, the command will fail with an error 
 
 You can check your available tabs by looking at your configuration file or using `rmpc config` to see the configured tabs.
 
+## query command
+
+The `query` command gets information from a running rmpc instance and prints it as a result. You
+can specify more than one thing to query and the result will be concatenation of all the responses.
+
+Response is in a `key: value` format where key is the thing that was queried.
+
+### Queryable information
+
+#### active-tab
+
+Query rmpc's currently active tab name.
+
+```bash
+rmpc remote query active-tab
+
+# which responnds with
+active-tab: Queue
+```
+
 ## Other Remote Commands
 
 Besides `keybind`, rmpc supports several other remote commands:
@@ -208,9 +230,8 @@ rmpc remote --pid 12345 status "Hello from specific instance"
 
 Remote commands will fail silently if:
 
-- No rmpc instance is running
+- If no PID was specified and no rmpc instance is running
 - The specified PID doesn't exist
-- Invalid key format is provided
 - Tab name doesn't exist in your configuration (for switch-tab commands)
 
 **Note**: Command execution errors (like invalid tab names) are logged in the running rmpc instance at the warn level, not displayed to the CLI caller. Check the rmpc logs for detailed error messages if commands aren't working as expected.

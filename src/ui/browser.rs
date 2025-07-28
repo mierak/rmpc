@@ -739,9 +739,10 @@ mod scrollbar_tests {
             let event = MouseEvent { kind: MouseEventKind::LeftClick, x: 29, y: click_y };
             let result = calculate_scrollbar_position(event, scrollbar_area);
             assert!(result.is_some());
-            assert_eq!(
-                result.expect("scrollbar calculation should return a value"),
-                expected_target
+            assert!(
+                (result.expect("scrollbar calculation should return a value") - expected_target)
+                    .abs()
+                    < 0.0001
             );
         }
     }

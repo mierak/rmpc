@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - `PREV_SONG` and `PREV_ELAPSED` env variables in `on_song_change`
 - New `ContextMenu()` action
 - Support Kitty's keyboard protocol
+- Remote query command
 
 ### Changed
 
@@ -37,6 +38,8 @@ continue to work.
 - Scrolling behavior to be more natural - scrolling now actually scrolls the area instead of simply
 going to the next item
 - Scrollbars now represent the viewport position instead of the currently selected item position
+- Remote commands now check for `$PID` env variable, meaning `--pid` argument is no longer needed for
+remote commands inside scripts triggered by rmpc
 
 ### Fixed
 

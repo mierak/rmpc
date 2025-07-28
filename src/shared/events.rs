@@ -5,12 +5,19 @@ use crossterm::event::KeyEvent;
 use serde::{Deserialize, Serialize};
 
 use super::{
+    ipc::ipc_stream::IpcStream,
     lrc::{LrcIndex, LrcIndexEntry},
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
 };
 use crate::{
-    config::{Config, Size, cli::Command, tabs::PaneType, theme::UiConfig},
+    config::{
+        Config,
+        Size,
+        cli::{Command, RemoteCommandQuery},
+        tabs::PaneType,
+        theme::UiConfig,
+    },
     mpd::commands::IdleEvent,
     ui::UiAppEvent,
 };
@@ -86,6 +93,10 @@ pub(crate) enum AppEvent {
     },
     RemoteSwitchTab {
         tab_name: String,
+    },
+    IpcQuery {
+        stream: IpcStream,
+        targets: Vec<RemoteCommandQuery>,
     },
 }
 

@@ -6,7 +6,7 @@ use crate::{
     AppEvent,
     WorkRequest,
     config::{Config, ConfigFile, theme::UiConfigFile},
-    shared::ipc::SocketCommandExecute,
+    shared::ipc::{IpcStream, SocketCommandExecute},
 };
 
 // Enum values only exist for the short time and are not constructed often, so
@@ -23,6 +23,7 @@ impl SocketCommandExecute for SetIpcCommand {
         self,
         event_tx: &Sender<AppEvent>,
         _work_tx: &Sender<WorkRequest>,
+        _stream: IpcStream,
         _config: &Config,
     ) -> Result<()> {
         match self {

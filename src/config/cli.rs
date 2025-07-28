@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum, ValueHint};
+use serde::{Deserialize, Serialize};
 use strum::IntoStaticStr;
 
 use crate::mpd::QueuePosition;
@@ -270,8 +271,9 @@ pub enum Command {
     },
 }
 
-#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[derive(Subcommand, Clone, Debug, PartialEq, strum::EnumDiscriminants, strum::Display)]
 #[clap(rename_all = "lower")]
+#[strum(serialize_all = "lowercase")]
 pub enum RemoteCmd {
     /// Notify rmpc that a new lyrics file has been added
     IndexLrc {
@@ -303,6 +305,18 @@ pub enum RemoteCmd {
     /// Switch to a specific tab by name
     #[clap(name = "switch-tab")]
     SwitchTab { tab: String },
+    /// Query the currently active tab name
+    Query {
+        #[arg(required = true)]
+        targets: Vec<RemoteCommandQuery>,
+    },
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Serialize, Deserialize, strum::Display)]
+#[strum(serialize_all = "kebab-case")]
+pub enum RemoteCommandQuery {
+    /// Query the currently active tab name
+    ActiveTab,
 }
 
 #[derive(Subcommand, Clone, Debug, PartialEq)]

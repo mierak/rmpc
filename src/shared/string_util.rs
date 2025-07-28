@@ -5,6 +5,7 @@ pub(crate) trait CharExt {
 pub(crate) trait StringExt {
     fn escape_regex_chars(&self) -> String;
     fn from_utf8_lossy_as_owned(v: Vec<u8>) -> String;
+    fn trim_end_in_place(&mut self);
 }
 
 impl StringExt for String {
@@ -26,6 +27,13 @@ impl StringExt for String {
             // SAFETY: `String::from_utf8_lossy`'s guaranteec valid utf8 when a borrowed
             // variant is returned. Owned value, meaning invalid utf8, is handled above.
             unsafe { String::from_utf8_unchecked(v) }
+        }
+    }
+
+    fn trim_end_in_place(&mut self) {
+        let trimmed_len = str::trim_end(self).len();
+        if trimmed_len < self.len() {
+            self.truncate(trimmed_len);
         }
     }
 }

@@ -10,6 +10,7 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
+    config::cli::RemoteCommandQuery,
     ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
@@ -476,6 +477,16 @@ fn main_task<B: Backend + std::io::Write>(
                         );
                     }
                     render_wanted = true;
+                }
+                AppEvent::IpcQuery { mut stream, targets } => {
+                    for target in targets {
+                        match target {
+                            RemoteCommandQuery::ActiveTab => {
+                                stream
+                                    .append_response_line(format!("{target}: {}", ctx.active_tab));
+                            }
+                        }
+                    }
                 }
                 AppEvent::Reconnected => {
                     for ev in [IdleEvent::Player, IdleEvent::Playlist, IdleEvent::Options] {
