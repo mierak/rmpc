@@ -63,6 +63,13 @@ Directory for rmpc's cache files. Used for files downloaded for youtube and migh
 
 Directory where rmpc should search for `lrc` files. Please see the <a href={path("configuration/lyrics")}>lyrics page</a> for more information.
 
+### lyrics_offset_ms
+
+<ConfigValue name="lyrics_offset_ms" type="number" optional />
+
+Offset to apply to all lyrics globally in milliseconds. Defaults to 0.
+Negative offset means that the lyrics will appear later and positive means they will appear sooner.
+
 ### mpd_read_timeout_ms
 
 <ConfigValue name="mpd_read_timeout_ms" type="number" />

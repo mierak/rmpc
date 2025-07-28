@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - New `ContextMenu()` action
 - Support Kitty's keyboard protocol
 - Remote query command
+- Config option for global lyrics offset - `lyrics_offset_ms`
 
 ### Changed
 

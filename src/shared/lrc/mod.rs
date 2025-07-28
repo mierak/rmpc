@@ -7,6 +7,22 @@ use anyhow::{Context, Result, bail};
 pub use index::{LrcIndex, LrcIndexEntry};
 pub use lyrics::{Lrc, parse_metadata_only};
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct LrcOffset {
+    negative: bool,
+    value: Duration,
+}
+
+impl LrcOffset {
+    pub fn from_millis(value: i64) -> Self {
+        if value < 0 {
+            Self { negative: true, value: Duration::from_millis(-value as u64) }
+        } else {
+            Self { negative: false, value: Duration::from_millis(value as u64) }
+        }
+    }
+}
+
 fn parse_length(input: &str) -> anyhow::Result<Duration> {
     let (minutes, seconds) = input.split_once(':').context("Invalid lrc length format")?;
     let minutes: u64 = minutes.parse().context("Invalid minutes format in lrc length")?;

@@ -2,7 +2,7 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Result;
 
-use super::parse_length;
+use super::{LrcOffset, parse_length};
 
 /// Result of parsing a single tag from an LRC line.
 #[derive(Debug, Clone)]
@@ -93,9 +93,19 @@ fn parse_timestamp(timestamp: &str, offset: Option<i64>) -> Option<Duration> {
 #[derive(Debug, Eq, PartialEq)]
 pub struct LrcLine {
     /// The timestamp when this line should be displayed
-    pub time: Duration,
+    time: Duration,
     /// The lyrics content for this line
     pub content: String,
+}
+
+impl LrcLine {
+    pub fn time(&self, offset: LrcOffset) -> Duration {
+        if offset.negative {
+            self.time.saturating_add(offset.value)
+        } else {
+            self.time.saturating_sub(offset.value)
+        }
+    }
 }
 
 /// Parsed LRC file containing metadata and timed lyrics lines.

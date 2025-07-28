@@ -35,14 +35,17 @@ impl LyricsPane {
 impl Pane for LyricsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         let Some(lrc) = &self.current_lyrics else { return Ok(()) };
+        let offset = ctx.config.lyrics_offset;
 
         let elapsed = ctx.status.elapsed;
         let (current_line_idx, first_line_reached) = lrc
             .lines
             .iter()
             .enumerate()
-            .filter(|line| elapsed >= line.1.time)
-            .min_by(|a, b| a.1.time.abs_diff(elapsed).cmp(&b.1.time.abs_diff(elapsed)))
+            .filter(|line| elapsed >= line.1.time(offset))
+            .min_by(|a, b| {
+                a.1.time(offset).abs_diff(elapsed).cmp(&b.1.time(offset).abs_diff(elapsed))
+            })
             .map_or((0, false), |result| (result.0, true));
 
         let rows = area.height;
@@ -64,7 +67,7 @@ impl Pane for LyricsPane {
             return Ok(());
         };
         let formatted_line = if timestamp && !current_line.content.is_empty() {
-            &format!("[{}] {}", current_line.time.to_string(), current_line.content)
+            &format!("[{}] {}", current_line.time(offset).to_string(), current_line.content)
         } else {
             &current_line.content
         };
@@ -85,7 +88,7 @@ impl Pane for LyricsPane {
                 break;
             };
             let formatted_line = if timestamp && !line.content.is_empty() {
-                &format!("[{}] {}", line.time.to_string(), line.content)
+                &format!("[{}] {}", line.time(offset).to_string(), line.content)
             } else {
                 &line.content
             };
@@ -114,7 +117,7 @@ impl Pane for LyricsPane {
                 break;
             };
             let formatted_line = if timestamp && !line.content.is_empty() {
-                &format!("[{}] {}", line.time.to_string(), line.content)
+                &format!("[{}] {}", line.time(offset).to_string(), line.content)
             } else {
                 &line.content
             };
@@ -132,8 +135,10 @@ impl Pane for LyricsPane {
         if self.last_requested_line_idx != current_line_idx + 1 {
             if let Some(line) = lrc.lines.get(current_line_idx + 1) {
                 self.last_requested_line_idx = current_line_idx + 1;
-                ctx.scheduler
-                    .schedule(line.time.saturating_sub(ctx.status.elapsed), run_status_update);
+                ctx.scheduler.schedule(
+                    line.time(offset).saturating_sub(ctx.status.elapsed),
+                    run_status_update,
+                );
             }
         }
 
