@@ -482,8 +482,7 @@ fn main_task<B: Backend + std::io::Write>(
                     for target in targets {
                         match target {
                             RemoteCommandQuery::ActiveTab => {
-                                stream
-                                    .append_response_line(format!("{target}: {}", ctx.active_tab));
+                                stream.insert_response("activeTab", ctx.active_tab.0.as_str());
                             }
                         }
                     }

@@ -157,7 +157,7 @@ You can check your available tabs by looking at your configuration file or using
 The `query` command gets information from a running rmpc instance and prints it as a result. You
 can specify more than one thing to query and the result will be concatenation of all the responses.
 
-Response is in a `key: value` format where key is the thing that was queried.
+Response is a json object where each queried item is a key and its value is the response.
 
 ### Queryable information
 
@@ -169,7 +169,7 @@ Query rmpc's currently active tab name.
 rmpc remote query active-tab
 
 # which responnds with
-active-tab: Queue
+{"activeTab": "Queue"}
 ```
 
 ## Other Remote Commands
