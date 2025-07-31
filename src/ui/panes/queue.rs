@@ -29,7 +29,11 @@ use crate::{
     },
     core::command::{create_env, run_external},
     ctx::Ctx,
-    mpd::{QueuePosition, commands::Song, mpd_client::MpdClient},
+    mpd::{
+        QueuePosition,
+        commands::Song,
+        mpd_client::{MpdClient, SingleOrRange},
+    },
     shared::{
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         key_event::KeyEvent,
@@ -72,6 +76,7 @@ enum Areas {
 }
 
 const ADD_TO_PLAYLIST: &str = "add_to_playlist";
+const ADD_TO_PLAYLIST_MULTIPLE: &str = "add_to_playlist_multiple";
 
 impl QueuePane {
     pub fn new(ctx: &Ctx) -> Self {
@@ -661,6 +666,39 @@ impl Pane for QueuePane {
                         .build()
                 );
             }
+            (
+                ADD_TO_PLAYLIST_MULTIPLE,
+                MpdQueryResult::AddToPlaylistMultiple { playlists, song_files },
+            ) => {
+                modal!(
+                    ctx,
+                    SelectModal::builder()
+                        .ctx(ctx)
+                        .options(playlists)
+                        .confirm_label("Add")
+                        .title("Select a playlist")
+                        .on_confirm(move |ctx, selected, _idx| {
+                            ctx.command(move |client| {
+                                let songs_len = song_files.len();
+                                for song_file in song_files {
+                                    if song_file.starts_with('/') {
+                                        client.add_to_playlist(
+                                            &selected,
+                                            &format!("file://{song_file}"),
+                                            None,
+                                        )?;
+                                    } else {
+                                        client.add_to_playlist(&selected, &song_file, None)?;
+                                    }
+                                }
+                                status_info!("{} songs added to playlist {}", songs_len, selected);
+                                Ok(())
+                            });
+                            Ok(())
+                        })
+                        .build()
+                );
+            }
             _ => {}
         }
         Ok(())
@@ -783,6 +821,39 @@ impl Pane for QueuePane {
                                 });
                                 Ok(())
                             })
+                    );
+                }
+                QueueActions::AddToPlaylist if !self.scrolling_state.marked.is_empty() => {
+                    let mut selected_uris: Vec<String> = Vec::new();
+
+                    self.scrolling_state.marked.ranges().for_each(|r| {
+                        let sor: SingleOrRange = r.into();
+
+                        if let Some(end) = sor.end {
+                            for idx in sor.start..end {
+                                if let Some(marked_song) = ctx.queue.get(idx) {
+                                    selected_uris.push(marked_song.file.clone());
+                                }
+                            }
+                        } else if let Some(marked_song) = ctx.queue.get(sor.start) {
+                            selected_uris.push(marked_song.file.clone());
+                        }
+                    });
+
+                    ctx.query().id(ADD_TO_PLAYLIST_MULTIPLE).target(PaneType::Queue).query(
+                        move |client| {
+                            let playlists = client
+                                .list_playlists()?
+                                .into_iter()
+                                .map(|v| v.name)
+                                .sorted()
+                                .collect_vec();
+
+                            Ok(MpdQueryResult::AddToPlaylistMultiple {
+                                playlists,
+                                song_files: selected_uris,
+                            })
+                        },
                     );
                 }
                 QueueActions::AddToPlaylist => {

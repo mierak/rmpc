@@ -92,6 +92,7 @@ pub(crate) enum MpdQueryResult {
     LsInfo { data: Vec<String>, origin_path: Option<Vec<String>> },
     DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },
     AddToPlaylist { playlists: Vec<String>, song_file: String },
+    AddToPlaylistMultiple { playlists: Vec<String>, song_files: Vec<String> },
     AlbumArt(Option<Vec<u8>>),
     Status { data: Status, source_event: Option<IdleEvent> },
     Queue(Option<Vec<Song>>),
