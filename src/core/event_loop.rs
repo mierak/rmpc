@@ -75,6 +75,19 @@ fn main_task<B: Backend + std::io::Write>(
         }
     };
 
+    // Check if there is a current song playing on startup
+    if let Some((_, song)) = ctx.find_current_song_in_queue() {
+        if let Some(command) = &ctx.config.on_song_change {
+            let mut env = create_env(&ctx, std::iter::empty());
+
+            if let Some(played) = ctx.song_played {
+                env.push(("PREV_ELAPSED".to_owned(), played.as_secs().to_string()));
+            }
+
+            run_external(command.clone(), env);
+        }
+    }
+
     match ctx.status.state {
         State::Play => {
             // Start update loop since a song is playing on startup
