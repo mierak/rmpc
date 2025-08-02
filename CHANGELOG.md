@@ -42,6 +42,7 @@ going to the next item
 - Remote commands now check for `$PID` env variable, meaning `--pid` argument is no longer needed for
 remote commands inside scripts triggered by rmpc
 - `AddToPlaylist` binding handles marked songs rather than only the one under your cursor.
+- `on_song_change` now run on rmpc startup
 
 ### Fixed
 
