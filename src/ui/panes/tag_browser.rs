@@ -199,7 +199,10 @@ impl TagBrowserPane {
                 let album = song.metadata.get("album").map_or("<no album>".to_string(), |v| {
                     v.join(&ctx.config.theme.format_tag_separator).to_string()
                 });
-                let song_date = ctx.config.artists.album_date_tags
+                let song_date = ctx
+                    .config
+                    .artists
+                    .album_date_tags
                     .iter()
                     .find_map(|tag| song.metadata.get(tag).map(|v| v.last().to_string()))
                     .unwrap_or_else(|| "<no date>".to_string());
@@ -801,8 +804,10 @@ mod tests {
         let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
         let songs = vec![
-            song_with_originaldate("album_a", "1987", "1969"), // remastered in 1987, original from 1969
-            song_with_originaldate("album_b", "1990", "1970"), // remastered in 1990, original from 1970
+            song_with_originaldate("album_a", "1987", "1969"), /* remastered in 1987, original
+                                                                * from 1969 */
+            song_with_originaldate("album_b", "1990", "1970"), /* remastered in 1990, original
+                                                                * from 1970 */
         ];
 
         let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
@@ -822,7 +827,7 @@ mod tests {
         let artist = String::from("artist");
         let songs = vec![
             song_with_originaldate("album_a", "1987", "1969"), // Has both originaldate and date
-            song("album_b", "1990"), // Only has date, not originaldate
+            song("album_b", "1990"),                           // Only has date, not originaldate
         ];
 
         let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
@@ -836,7 +841,8 @@ mod tests {
     fn albums_no_matching_tags(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        config.artists.album_date_tags = vec!["originaldate".to_string(), "releasedate".to_string()];
+        config.artists.album_date_tags =
+            vec!["originaldate".to_string(), "releasedate".to_string()];
         ctx.config = std::sync::Arc::new(config);
         let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
