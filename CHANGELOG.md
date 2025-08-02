@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Support Kitty's keyboard protocol
 - Remote query command
 - Config option for global lyrics offset - `lyrics_offset_ms`
+- add `exec_on_song_change_at_start` config option
 
 ### Changed
 
@@ -42,7 +43,6 @@ going to the next item
 - Remote commands now check for `$PID` env variable, meaning `--pid` argument is no longer needed for
 remote commands inside scripts triggered by rmpc
 - `AddToPlaylist` binding handles marked songs rather than only the one under your cursor.
-- `on_song_change` now run on rmpc startup
 
 ### Fixed
 

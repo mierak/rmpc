@@ -77,6 +77,7 @@ pub struct Config {
     pub theme_name: Option<String>,
     pub album_art: AlbumArtConfig,
     pub on_song_change: Option<Arc<Vec<String>>>,
+    pub exec_on_song_change_at_start: bool,
     pub on_resize: Option<Arc<Vec<String>>>,
     pub search: Search,
     pub artists: Artists,
@@ -150,6 +151,8 @@ pub struct ConfigFile {
     #[serde(default)]
     on_song_change: Option<Vec<String>>,
     #[serde(default)]
+    exec_on_song_change_at_start: bool,
+    #[serde(default)]
     on_resize: Option<Vec<String>>,
     #[serde(default)]
     search: SearchFile,
@@ -210,6 +213,7 @@ impl Default for ConfigFile {
                 ..Default::default()
             },
             on_song_change: None,
+            exec_on_song_change_at_start: false,
             on_resize: None,
             search: SearchFile::default(),
             tabs: TabsFile::default(),
@@ -397,6 +401,7 @@ impl ConfigFile {
             on_song_change: self.on_song_change.map(|arr| {
                 Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
+            exec_on_song_change_at_start: self.exec_on_song_change_at_start,
             on_resize: self.on_resize.map(|arr| {
                 Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
