@@ -199,10 +199,13 @@ impl TagBrowserPane {
                 let album = song.metadata.get("album").map_or("<no album>".to_string(), |v| {
                     v.join(&ctx.config.theme.format_tag_separator).to_string()
                 });
-                let song_date = song.metadata.get("date").map_or("<no date>", |v| v.last());
+                let song_date = ctx.config.artists.album_date_tags
+                    .iter()
+                    .find_map(|tag| song.metadata.get(tag).map(|v| v.last().to_string()))
+                    .unwrap_or_else(|| "<no date>".to_string());
                 let original_album = song.metadata.get("album").last().map(|v| v.to_owned());
 
-                (album, song_date.to_string(), original_album)
+                (album, song_date, original_album)
             })
             .into_iter()
             .sorted_by(|((album_a, date_a, _), _), ((album_b, date_b, _), _)| match sort_mode {
@@ -682,6 +685,26 @@ mod tests {
         }
     }
 
+    fn song_with_originaldate(
+        album: impl Into<String> + std::fmt::Debug,
+        date: impl Into<String> + std::fmt::Debug,
+        original_date: impl Into<String> + std::fmt::Debug,
+    ) -> Song {
+        Song {
+            id: 0,
+            file: format!("{date:?} {album:?}"),
+            duration: None,
+            metadata: HashMap::from([
+                ("album".to_string(), Into::<String>::into(album).into()),
+                ("date".to_string(), Into::<String>::into(date).into()),
+                ("originaldate".to_string(), Into::<String>::into(original_date).into()),
+            ]),
+            stickers: None,
+            last_modified: chrono::Utc::now(),
+            added: None,
+        }
+    }
+
     #[rstest]
     fn albums_no_date_sort_name(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::NameOnly;
@@ -767,5 +790,63 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].name, "album_b");
         assert_eq!(result[1].name, "album_a");
+    }
+
+    #[rstest]
+    fn albums_single_configured_tag(mut ctx: Ctx, mut config: Config) {
+        config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
+        config.artists.album_sort_by = AlbumSortMode::Date;
+        config.artists.album_date_tags = vec!["originaldate".to_string()];
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
+        let artist = String::from("artist");
+        let songs = vec![
+            song_with_originaldate("album_a", "1987", "1969"), // remastered in 1987, original from 1969
+            song_with_originaldate("album_b", "1990", "1970"), // remastered in 1990, original from 1970
+        ];
+
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name, "(1969) album_a"); // Uses originaldate, not date
+        assert_eq!(result[1].name, "(1970) album_b"); // Uses originaldate, not date
+    }
+
+    #[rstest]
+    fn albums_tag_fallback(mut ctx: Ctx, mut config: Config) {
+        config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
+        config.artists.album_sort_by = AlbumSortMode::Date;
+        config.artists.album_date_tags = vec!["originaldate".to_string(), "date".to_string()];
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
+        let artist = String::from("artist");
+        let songs = vec![
+            song_with_originaldate("album_a", "1987", "1969"), // Has both originaldate and date
+            song("album_b", "1990"), // Only has date, not originaldate
+        ];
+
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name, "(1969) album_a"); // Uses originaldate (first in list)
+        assert_eq!(result[1].name, "(1990) album_b"); // Falls back to date (second in list)
+    }
+
+    #[rstest]
+    fn albums_no_matching_tags(mut ctx: Ctx, mut config: Config) {
+        config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
+        config.artists.album_sort_by = AlbumSortMode::Date;
+        config.artists.album_date_tags = vec!["originaldate".to_string(), "releasedate".to_string()];
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
+        let artist = String::from("artist");
+        let songs = vec![
+            song("album_a", "1987"), // Only has "date", not in our list
+        ];
+
+        let CachedRootTag(result) = pane.process_songs(artist, songs, &ctx);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "(<no date>) album_a"); // Falls back to default
     }
 }
