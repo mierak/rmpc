@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Support Kitty's keyboard protocol
 - Remote query command
 - Config option for global lyrics offset - `lyrics_offset_ms`
+- add `exec_on_song_change_at_start` config option
 - Added `album_date_tags` config option to specify priority order of metadata tags for album dates
 
 ### Changed

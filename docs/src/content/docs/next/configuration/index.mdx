@@ -208,6 +208,12 @@ Execute given command when the song changes. First element of the array is the c
 arguments passed to the command. Nothing will be executed if left empty. Can be used to
 send <a href={path("guides/on_song_change")}>notifications</a> when the song changes.
 
+### exec_on_song_change_at_start
+
+<ConfigValue name="exec_on_song_change_at_start" type="bool"/>
+
+Execute the command provided to `on_song_change` at rmpc startup, matching the behavior of `execute_on_song_change` in ncmpcpp.
+
 ### on_resize
 
 <ConfigValue name="on_resize" type="other" customText={'["notify-send", "rmpc resized!"]'} />
