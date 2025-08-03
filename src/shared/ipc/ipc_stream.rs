@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     os::unix::net::UnixStream,
     time::Duration,
@@ -12,7 +13,7 @@ pub const IPC_RESPONSE_ERROR: &str = "error";
 #[derive(Debug)]
 pub(crate) struct IpcStream {
     inner: UnixStream,
-    response: Vec<String>,
+    response: HashMap<String, serde_json::Value>,
     error: Option<String>,
 }
 
@@ -25,14 +26,18 @@ impl IpcStream {
         self.error = Some(error);
     }
 
-    pub fn append_response_line(&mut self, response: String) {
-        self.response.push(response);
+    pub fn insert_response(
+        &mut self,
+        key: impl Into<String>,
+        response: impl Into<serde_json::Value>,
+    ) {
+        self.response.insert(key.into(), response.into());
     }
 }
 
 impl From<UnixStream> for IpcStream {
     fn from(stream: UnixStream) -> Self {
-        IpcStream { inner: stream, response: Vec::new(), error: None }
+        IpcStream { inner: stream, response: HashMap::new(), error: None }
     }
 }
 
@@ -61,22 +66,38 @@ impl Drop for IpcStream {
 
         if let Some(err) = &self.error {
             if let Err(err) = self.inner.write_all(b"error: ") {
-                log::error!(err:?; "Failed to error response start to IPC stream on drop");
+                log::error!(err:?; "Failed to write error response start to IPC stream on drop");
                 return;
             }
             if let Err(err) = self.inner.write_all(err.as_bytes()) {
-                log::error!(err:?; "Failed to error response to IPC stream on drop");
+                log::error!(err:?; "Failed to write error response to IPC stream on drop");
                 return;
             }
         } else {
-            for response in &self.response {
-                if let Err(err) = self.inner.write_all(response.as_bytes()) {
-                    log::error!(err:?; "Failed to write response to IPC stream on drop");
-                    return;
-                }
-                if let Err(err) = self.inner.write_all(b"\n") {
-                    log::error!(err:?; "Failed to write newline to IPC stream on drop");
-                    return;
+            if !self.response.is_empty() {
+                match serde_json::to_string(&self.response) {
+                    Ok(serialized) => {
+                        if let Err(err) = self.inner.write_all(serialized.as_bytes()) {
+                            log::error!(err:?; "Failed to write response to IPC stream on drop");
+                            return;
+                        }
+                        if let Err(err) = self.inner.write_all(b"\n") {
+                            log::error!(err:?; "Failed to write newline to IPC stream on drop");
+                            return;
+                        }
+                    }
+                    Err(err) => {
+                        log::error!(err:?; "Failed to serialize response to IPC stream. This should not ever happen, please report this.");
+
+                        if let Err(err) = self.inner.write_all(b"error: ") {
+                            log::error!(err:?; "Failed to write error response start to IPC stream on drop");
+                            return;
+                        }
+                        if let Err(err) = self.inner.write_all(err.to_string().as_bytes()) {
+                            log::error!(err:?; "Failed to write error response to IPC stream on drop");
+                            return;
+                        }
+                    }
                 }
             }
             if let Err(err) = self.inner.write_all(IPC_RESPONSE_SUCCESS.as_bytes()) {
@@ -96,9 +117,12 @@ impl Drop for IpcStream {
 #[allow(clippy::unwrap_used)]
 mod test {
     use std::{
+        collections::HashMap,
         io::{BufRead, BufReader, Read},
         os::unix::net::UnixStream,
     };
+
+    use serde_json::json;
 
     use crate::shared::ipc::ipc_stream::{IPC_RESPONSE_SUCCESS, IpcStream};
 
@@ -119,8 +143,8 @@ mod test {
         let stream = UnixStream::pair().expect("Failed to create UnixStream pair");
         let mut ipc_stream = IpcStream::from(stream.0);
 
-        ipc_stream.append_response_line("Hello".to_string());
-        ipc_stream.append_response_line("World".to_string());
+        ipc_stream.insert_response("hi", "Hello");
+        ipc_stream.insert_response("bye", "World");
 
         drop(ipc_stream);
 
@@ -128,11 +152,11 @@ mod test {
         let mut reader = BufReader::new(stream.1);
 
         reader.read_line(&mut buf).unwrap();
-        assert_eq!(buf.trim(), "Hello");
 
-        buf.clear();
-        reader.read_line(&mut buf).unwrap();
-        assert_eq!(buf.trim(), "World");
+        assert_eq!(
+            serde_json::from_str::<HashMap<String, serde_json::Value>>(buf.trim()).unwrap(),
+            HashMap::from([("hi".to_owned(), json!("Hello")), ("bye".to_owned(), json!("World"))])
+        );
 
         buf.clear();
         reader.read_line(&mut buf).unwrap();
@@ -144,8 +168,8 @@ mod test {
         let stream = UnixStream::pair().expect("Failed to create UnixStream pair");
         let mut ipc_stream = IpcStream::from(stream.0);
 
-        ipc_stream.append_response_line("Hello".to_string());
-        ipc_stream.append_response_line("World".to_string());
+        ipc_stream.insert_response("hi", "Hello");
+        ipc_stream.insert_response("bye", "World");
         ipc_stream.error("An error occurred".to_string());
 
         let mut buf = String::new();

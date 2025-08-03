@@ -22,7 +22,7 @@ mod cli_integration_tests {
 
     #[test]
     fn test_cli_switch_tab_parsing() {
-        let args = Args::try_parse_from(["rmpc", "remote", "switch-tab", "Queue"])
+        let args = Args::try_parse_from(["rmpc", "remote", "switchtab", "Queue"])
             .expect("Failed to parse CLI arguments");
 
         match args.command {
@@ -60,7 +60,7 @@ mod cli_integration_tests {
         let tab_names = vec!["Queue", "Directories", "Artists", "Albums", "Playlists", "Search"];
 
         for tab_name in tab_names {
-            let args = Args::try_parse_from(["rmpc", "remote", "switch-tab", tab_name])
+            let args = Args::try_parse_from(["rmpc", "remote", "switchtab", tab_name])
                 .expect("Failed to parse CLI arguments");
             match args.command {
                 Some(crate::config::cli::Command::Remote {
@@ -79,7 +79,7 @@ mod cli_integration_tests {
         let test_cases = vec!["queue", "QUEUE", "Queue", "QuEuE", "directories", "ARTISTS"];
 
         for tab_name in test_cases {
-            let args = Args::try_parse_from(["rmpc", "remote", "switch-tab", tab_name])
+            let args = Args::try_parse_from(["rmpc", "remote", "switchtab", tab_name])
                 .unwrap_or_else(|_| panic!("Failed to parse CLI arguments for tab: {tab_name}"));
             match args.command {
                 Some(crate::config::cli::Command::Remote {
@@ -95,9 +95,8 @@ mod cli_integration_tests {
 
     #[test]
     fn test_cli_with_pid() {
-        let args =
-            Args::try_parse_from(["rmpc", "remote", "--pid", "12345", "switch-tab", "Queue"])
-                .expect("Failed to parse CLI arguments");
+        let args = Args::try_parse_from(["rmpc", "remote", "--pid", "12345", "switchtab", "Queue"])
+            .expect("Failed to parse CLI arguments");
 
         match args.command {
             Some(crate::config::cli::Command::Remote {

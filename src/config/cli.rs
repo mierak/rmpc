@@ -303,7 +303,6 @@ pub enum RemoteCmd {
     /// Emulate a keybind press in the running rmpc instance
     Keybind { key: String },
     /// Switch to a specific tab by name
-    #[clap(name = "switch-tab")]
     SwitchTab { tab: String },
     /// Query the currently active tab name
     Query {
@@ -313,7 +312,8 @@ pub enum RemoteCmd {
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Serialize, Deserialize, strum::Display)]
-#[strum(serialize_all = "kebab-case")]
+#[strum(serialize_all = "lowercase")]
+#[clap(rename_all = "lower")]
 pub enum RemoteCommandQuery {
     /// Query the currently active tab name
     ActiveTab,
