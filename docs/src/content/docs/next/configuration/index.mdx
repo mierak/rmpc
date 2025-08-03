@@ -243,6 +243,7 @@ Default:
 artists: (
     album_display_mode: SplitByDate,
     album_sort_by: Date,
+    album_date_tags: [Date],
 ),
 ```
 
@@ -261,9 +262,14 @@ Can be one of the following:
 - `Name` - albums are sorted by their name first and date second if their names are identical
 - `Date` - albums will be simply sorted by date.
 
+#### album_date_tags
+
+List of metadata tags to search for album dates, in order of preference. Can be one of `Date` or `OriginalDate`.
+When determining an album's date, rmpc will check each tag in order and use the first one found.
+
 :::caution
 
-Rmpc does not do any processing on the `date` metadata tag on the song. It gets sorted lexicographically.
+Rmpc does not do any processing on the date metadata tags. They get sorted lexicographically.
 
 :::
 
