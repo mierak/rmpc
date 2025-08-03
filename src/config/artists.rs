@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct Artists {
     pub album_display_mode: AlbumDisplayMode,
     pub album_sort_by: AlbumSortMode,
-    pub album_date_tags: Vec<String>,
+    pub album_date_tags: Vec<AlbumDateTag>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -13,8 +13,8 @@ pub struct ArtistsFile {
     pub album_display_mode: AlbumDisplayMode,
     #[serde(default)]
     pub album_sort_by: AlbumSortMode,
-    #[serde(default = "default_album_date_tags")]
-    pub album_date_tags: Vec<String>,
+    #[serde(default)]
+    pub album_date_tags: Vec<AlbumDateTag>,
 }
 
 impl Default for ArtistsFile {
@@ -22,7 +22,7 @@ impl Default for ArtistsFile {
         Self {
             album_display_mode: AlbumDisplayMode::default(),
             album_sort_by: AlbumSortMode::default(),
-            album_date_tags: default_album_date_tags(),
+            album_date_tags: vec![AlbumDateTag::Date],
         }
     }
 }
@@ -41,17 +41,19 @@ pub enum AlbumSortMode {
     Date,
 }
 
-fn default_album_date_tags() -> Vec<String> {
-    vec!["date".to_string()]
+#[derive(
+    Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, strum::IntoStaticStr,
+)]
+#[strum(serialize_all = "lowercase")]
+pub enum AlbumDateTag {
+    #[default]
+    Date,
+    OriginalDate,
 }
 
 impl Default for Artists {
     fn default() -> Self {
-        Self {
-            album_display_mode: AlbumDisplayMode::default(),
-            album_sort_by: AlbumSortMode::default(),
-            album_date_tags: default_album_date_tags(),
-        }
+        ArtistsFile::default().into()
     }
 }
 

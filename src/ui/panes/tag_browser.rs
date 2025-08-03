@@ -204,7 +204,11 @@ impl TagBrowserPane {
                     .artists
                     .album_date_tags
                     .iter()
-                    .find_map(|tag| song.metadata.get(tag).map(|v| v.last().to_string()))
+                    .find_map(|tag| {
+                        song.metadata
+                            .get(Into::<&'static str>::into(tag))
+                            .map(|v| v.last().to_string())
+                    })
                     .unwrap_or_else(|| "<no date>".to_string());
                 let original_album = song.metadata.get("album").last().map(|v| v.to_owned());
 
@@ -666,7 +670,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::Config,
+        config::{Config, artists::AlbumDateTag},
         tests::fixtures::{config, ctx},
     };
 
@@ -799,7 +803,7 @@ mod tests {
     fn albums_single_configured_tag(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        config.artists.album_date_tags = vec!["originaldate".to_string()];
+        config.artists.album_date_tags = vec![AlbumDateTag::OriginalDate];
         ctx.config = std::sync::Arc::new(config);
         let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
@@ -821,7 +825,7 @@ mod tests {
     fn albums_tag_fallback(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        config.artists.album_date_tags = vec!["originaldate".to_string(), "date".to_string()];
+        config.artists.album_date_tags = vec![AlbumDateTag::OriginalDate, AlbumDateTag::Date];
         ctx.config = std::sync::Arc::new(config);
         let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
@@ -841,8 +845,7 @@ mod tests {
     fn albums_no_matching_tags(mut ctx: Ctx, mut config: Config) {
         config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
         config.artists.album_sort_by = AlbumSortMode::Date;
-        config.artists.album_date_tags =
-            vec!["originaldate".to_string(), "releasedate".to_string()];
+        config.artists.album_date_tags = vec![AlbumDateTag::OriginalDate];
         ctx.config = std::sync::Arc::new(config);
         let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
         let artist = String::from("artist");
