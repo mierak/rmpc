@@ -13,8 +13,12 @@ pub struct ArtistsFile {
     pub album_display_mode: AlbumDisplayMode,
     #[serde(default)]
     pub album_sort_by: AlbumSortMode,
-    #[serde(default)]
+    #[serde(default = "default_album_date_tags")]
     pub album_date_tags: Vec<AlbumDateTag>,
+}
+
+fn default_album_date_tags() -> Vec<AlbumDateTag> {
+    vec![AlbumDateTag::Date]
 }
 
 impl Default for ArtistsFile {
@@ -22,7 +26,7 @@ impl Default for ArtistsFile {
         Self {
             album_display_mode: AlbumDisplayMode::default(),
             album_sort_by: AlbumSortMode::default(),
-            album_date_tags: vec![AlbumDateTag::Date],
+            album_date_tags: default_album_date_tags(),
         }
     }
 }
