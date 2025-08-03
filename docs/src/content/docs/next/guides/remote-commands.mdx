@@ -16,7 +16,7 @@ rmpc provides powerful remote command capabilities that allow you to control a r
 the remote command system allows you to:
 
 - **emulate key presses** (`keybind`) - trigger any keybind as if pressed in the interface
-- **switch tabs directly** (`switch-tab`) - change to a specific tab without relying on keybinds
+- **switch tabs directly** (`switchtab`) - change to a specific tab without relying on keybinds
 - **send status messages** - display custom messages in the status bar
 - **update configuration** - modify theme and other settings remotely
 - **target specific instances** - send commands to a particular rmpc process by pid
@@ -113,40 +113,40 @@ rmpc remote keybind "<S-CR>"   # Shift+Enter
 rmpc remote keybind "<A-h>"    # Alt+h
 ```
 
-## switch-tab command
+## switchtab command
 
-The `switch-tab` command provides a direct way to switch between tabs without relying on keybind configuration.
+The `switchtab` command provides a direct way to switch between tabs without relying on keybind configuration.
 
 ### Syntax
 
 ```bash
-rmpc remote switch-tab <tab-name>
+rmpc remote switchtab <tab-name>
 ```
 
 ### Examples
 
 ```bash
 # Switch to specific tabs
-rmpc remote switch-tab "Queue"
-rmpc remote switch-tab "Directories"
-rmpc remote switch-tab "Artists"
-rmpc remote switch-tab "Albums"
-rmpc remote switch-tab "Playlists"
-rmpc remote switch-tab "Search"
-rmpc remote switch-tab "Lyrics"
+rmpc remote switchtab "Queue"
+rmpc remote switchtab "Directories"
+rmpc remote switchtab "Artists"
+rmpc remote switchtab "Albums"
+rmpc remote switchtab "Playlists"
+rmpc remote switchtab "Search"
+rmpc remote switchtab "Lyrics"
 
 # Works with custom tab names too
-rmpc remote switch-tab "My Custom Tab"
+rmpc remote switchtab "My Custom Tab"
 
 # Tab names are case-insensitive
-rmpc remote switch-tab "queue"     # same as "Queue"
-rmpc remote switch-tab "ARTISTS"   # same as "Artists"
-rmpc remote switch-tab "playlists" # same as "Playlists"
+rmpc remote switchtab "queue"     # same as "Queue"
+rmpc remote switchtab "ARTISTS"   # same as "Artists"
+rmpc remote switchtab "playlists" # same as "Playlists"
 ```
 
 ### Tab Name Validation
 
-The `switch-tab` command validates that the specified tab exists in your configuration using **case-insensitive matching**. This means you can use any capitalization you prefer - `queue`, `Queue`, `QUEUE`, etc. will all match the same tab.
+The `switchtab` command validates that the specified tab exists in your configuration using **case-insensitive matching**. This means you can use any capitalization you prefer - `queue`, `Queue`, `QUEUE`, etc. will all match the same tab.
 
 If you try to switch to a non-existent tab, the command will fail with an error message listing all available tabs.
 
@@ -161,7 +161,7 @@ Response is a json object where each queried item is a key and its value is the 
 
 ### Queryable information
 
-#### active-tab
+#### activetab
 
 Query rmpc's currently active tab name.
 
@@ -169,7 +169,7 @@ Query rmpc's currently active tab name.
 rmpc remote query active-tab
 
 # which responnds with
-{"activeTab": "Queue"}
+{"activetab": "Queue"}
 ```
 
 ## Other Remote Commands
@@ -222,7 +222,7 @@ ps aux | grep rmpc
 
 # Send command to specific instance
 rmpc remote --pid 12345 keybind p
-rmpc remote --pid 12345 switch-tab "Queue"
+rmpc remote --pid 12345 switchtab "Queue"
 rmpc remote --pid 12345 status "Hello from specific instance"
 ```
 
@@ -232,7 +232,7 @@ Remote commands will fail silently if:
 
 - If no PID was specified and no rmpc instance is running
 - The specified PID doesn't exist
-- Tab name doesn't exist in your configuration (for switch-tab commands)
+- Tab name doesn't exist in your configuration (for switchtab commands)
 
 **Note**: Command execution errors (like invalid tab names) are logged in the running rmpc instance at the warn level, not displayed to the CLI caller. Check the rmpc logs for detailed error messages if commands aren't working as expected.
 
