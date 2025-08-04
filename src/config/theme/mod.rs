@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use cava::{CavaTheme, CavaThemeFile};
+use chumsky::Parser;
 use itertools::Itertools;
 use level_styles::{LevelStyles, LevelStylesFile};
+use parser::make_error_report;
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 
@@ -22,6 +24,7 @@ pub mod cava;
 mod header;
 pub mod level_styles;
 mod lyrics;
+pub mod parser;
 mod progress_bar;
 pub mod properties;
 pub mod queue_table;
@@ -90,7 +93,7 @@ pub struct UiConfigFile {
     #[serde(default = "defaults::default_column_widths")]
     pub(super) browser_column_widths: Vec<u16>,
     #[serde(default)]
-    pub(super) browser_song_format: SongFormatFile,
+    pub(super) browser_song_format: SongFormatOrProps<SongFormatFile>,
     pub(super) background_color: Option<String>,
     pub(super) text_color: Option<String>,
     #[serde(default = "defaults::default_preview_label_style")]
@@ -184,7 +187,7 @@ impl Default for UiConfigFile {
             },
             song_table_format: QueueTableColumnsFile::default(),
             song_table_album_separator: AlbumSeparator::default(),
-            browser_song_format: SongFormatFile::default(),
+            browser_song_format: SongFormatOrProps::default(),
             format_tag_separator: " | ".to_owned(),
             multiple_tag_resolution_strategy: TagResolutionStrategy::default(),
             preview_label_style: StyleFile {
@@ -202,6 +205,19 @@ impl Default for UiConfigFile {
             lyrics: LyricsConfigFile::default(),
             cava: CavaThemeFile::default(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum SongFormatOrProps<T: Clone> {
+    Format(String),
+    Props(T),
+}
+
+impl Default for SongFormatOrProps<SongFormatFile> {
+    fn default() -> Self {
+        Self::Props(SongFormatFile::default())
     }
 }
 
@@ -324,7 +340,7 @@ fn convert_components(
                     i += 1;
                 }
                 err @ Err(_) => {
-                    err?;
+                    err.with_context(|| format!("In component: '{name}'"))?;
                 }
             },
             None => break,
@@ -412,7 +428,18 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     Ok(std::fs::read(path.as_ref())?.leak())
                 },
             )?,
-            browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
+            browser_song_format: match value.browser_song_format {
+                SongFormatOrProps::Props(props) => TryInto::<SongFormat>::try_into(props)?,
+                SongFormatOrProps::Format(s) => SongFormat(
+                    parser::parser()
+                        .parse(&s)
+                        .into_result()
+                        .map_err(|errs| anyhow::anyhow!(make_error_report(errs, &s)))?
+                        .into_iter()
+                        .map(|v| v.try_into())
+                        .try_collect()?,
+                ),
+            },
             preview_label_style: value.preview_label_style.to_config_or(None, None)?,
             preview_metadata_group_style: value
                 .preview_metadata_group_style
