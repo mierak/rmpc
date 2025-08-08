@@ -15,6 +15,11 @@ export default defineConfig({
     integrations: [
         starlight({
             title: "rmpc",
+            expressiveCode: {
+                frames: {
+                    removeCommentsWhenCopyingTerminalFrames: false,
+                },
+            },
             plugins: [
                 starlightLinksValidator({
                     exclude: [
