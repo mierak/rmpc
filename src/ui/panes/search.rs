@@ -1167,11 +1167,11 @@ impl Pane for SearchPane {
                     log::trace!("Dropping preview because no item was selected");
                     return Ok(());
                 };
-                if let Some(origin_path) = origin_path {
-                    if origin_path != selected {
-                        log::trace!(origin_path:?, current_path:? = selected; "Dropping preview because it does not belong to this path");
-                        return Ok(());
-                    }
+                if let Some(origin_path) = origin_path
+                    && origin_path != selected
+                {
+                    log::trace!(origin_path:?, current_path:? = selected; "Dropping preview because it does not belong to this path");
+                    return Ok(());
                 }
                 self.preview = data;
                 ctx.render()?;

@@ -282,10 +282,10 @@ impl Pane for QueuePane {
             if config.theme.show_song_table_header {
                 b = b.borders(Borders::TOP);
             }
-            if self.areas[Areas::FilterArea].height == 0 {
-                if let Some(ref title) = filter_text {
-                    b = b.title(title.clone().set_style(border_style));
-                }
+            if self.areas[Areas::FilterArea].height == 0
+                && let Some(ref title) = filter_text
+            {
+                b = b.title(title.clone().set_style(border_style));
             }
             b
         };
@@ -402,25 +402,25 @@ impl Pane for QueuePane {
             self.scrolling_state.as_render_state_ref(),
         );
 
-        if let Some(scrollbar) = config.as_styled_scrollbar() {
-            if self.areas[Areas::Scrollbar].width > 0 {
-                frame.render_stateful_widget(
-                    scrollbar,
-                    self.areas[Areas::Scrollbar],
-                    self.scrolling_state.as_scrollbar_state_ref(),
-                );
-            }
+        if let Some(scrollbar) = config.as_styled_scrollbar()
+            && self.areas[Areas::Scrollbar].width > 0
+        {
+            frame.render_stateful_widget(
+                scrollbar,
+                self.areas[Areas::Scrollbar],
+                self.scrolling_state.as_scrollbar_state_ref(),
+            );
         }
 
-        if let Some(filter_text) = filter_text {
-            if self.areas[Areas::FilterArea].height > 0 {
-                frame.render_widget(
-                    Text::from(filter_text).style(
-                        config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
-                    ),
-                    self.areas[Areas::FilterArea],
-                );
-            }
+        if let Some(filter_text) = filter_text
+            && self.areas[Areas::FilterArea].height > 0
+        {
+            frame.render_widget(
+                Text::from(filter_text).style(
+                    config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+                ),
+                self.areas[Areas::FilterArea],
+            );
         }
 
         Ok(())
@@ -517,23 +517,23 @@ impl Pane for QueuePane {
     fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged => {
-                if let Some((idx, _)) = ctx.find_current_song_in_queue() {
-                    if ctx.config.select_current_song_on_change {
-                        match (is_visible, ctx.config.center_current_song_on_change) {
-                            (true, true) => {
-                                self.scrolling_state.select(Some(idx), usize::MAX);
-                            }
-                            (false, true) => {
-                                self.scrolling_state.select(Some(idx), usize::MAX);
-                                self.should_center_cursor_on_current = true;
-                            }
-                            (true, false) | (false, false) => {
-                                self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
-                            }
+                if let Some((idx, _)) = ctx.find_current_song_in_queue()
+                    && ctx.config.select_current_song_on_change
+                {
+                    match (is_visible, ctx.config.center_current_song_on_change) {
+                        (true, true) => {
+                            self.scrolling_state.select(Some(idx), usize::MAX);
                         }
-
-                        ctx.render()?;
+                        (false, true) => {
+                            self.scrolling_state.select(Some(idx), usize::MAX);
+                            self.should_center_cursor_on_current = true;
+                        }
+                        (true, false) | (false, false) => {
+                            self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
+                        }
                     }
+
+                    ctx.render()?;
                 }
             }
             UiEvent::Reconnected => {
@@ -952,10 +952,10 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    if let Some(last_idx) = self.scrolling_state.marked.last() {
-                        if *last_idx == ctx.queue.len() - 1 {
-                            return Ok(());
-                        }
+                    if let Some(last_idx) = self.scrolling_state.marked.last()
+                        && *last_idx == ctx.queue.len() - 1
+                    {
+                        return Ok(());
                     }
 
                     for range in self.scrolling_state.marked.ranges().rev() {

@@ -6,7 +6,6 @@ use std::{
 };
 
 use anyhow::Result;
-use derive_more::Deref;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use strum::{AsRefStr, Display};
@@ -1428,9 +1427,6 @@ impl From<Range<usize>> for SingleOrRange {
         Self::range(value.start, value.end)
     }
 }
-
-#[derive(Deref)]
-pub struct Ranges(Vec<SingleOrRange>);
 
 #[allow(dead_code)]
 impl SingleOrRange {

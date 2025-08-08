@@ -530,7 +530,7 @@ pub mod utils {
 
     use crate::shared::env::ENV;
 
-    pub fn tilde_expand(inp: &str) -> Cow<str> {
+    pub fn tilde_expand(inp: &str) -> Cow<'_, str> {
         let Ok(home) = ENV.var("HOME") else {
             return Cow::Borrowed(inp);
         };

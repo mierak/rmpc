@@ -190,7 +190,7 @@ impl<'name> Client<'name> {
         Ok(client)
     }
 
-    pub fn reconnect(&mut self) -> MpdResult<&Client> {
+    pub fn reconnect(&mut self) -> MpdResult<&Client<'_>> {
         debug!(name = self.name, addr:? = self.addr; "trying to reconnect");
         let mut stream = match &self.addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),

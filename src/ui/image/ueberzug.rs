@@ -143,16 +143,16 @@ impl Ueberzug {
                                 try_skip!(proc.wait(), "Ueberzugpp process failed to die");
                             }
 
-                            if let Some(pid) = daemon.pid {
-                                if let Some(pid) = rustix::process::Pid::from_raw(pid.0) {
-                                    try_skip!(
-                                        rustix::process::kill_process(
-                                            pid,
-                                            rustix::process::Signal::TERM
-                                        ),
-                                        "Failed to send SIGTERM to ueberzugpp pid file"
-                                    );
-                                }
+                            if let Some(pid) = daemon.pid
+                                && let Some(pid) = rustix::process::Pid::from_raw(pid.0)
+                            {
+                                try_skip!(
+                                    rustix::process::kill_process(
+                                        pid,
+                                        rustix::process::Signal::TERM
+                                    ),
+                                    "Failed to send SIGTERM to ueberzugpp pid file"
+                                );
                             }
 
                             try_skip!(
@@ -213,10 +213,10 @@ impl UeberzugDaemon {
 
     fn spawn_daemon(&self) -> Result<(Pid, Child)> {
         let mut cmd = Command::new("ueberzugpp");
-        if let Err(err) = std::fs::remove_file(&self.pid_file) {
-            if err.kind() != ErrorKind::NotFound {
-                log::warn!(err:?; "Failed to delete pid file");
-            }
+        if let Err(err) = std::fs::remove_file(&self.pid_file)
+            && err.kind() != ErrorKind::NotFound
+        {
+            log::warn!(err:?; "Failed to delete pid file");
         }
         cmd.args(["layer", "-so", self.layer.as_str(), "--no-stdin", "--pid-file", &self.pid_file]);
 

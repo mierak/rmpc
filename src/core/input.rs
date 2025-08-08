@@ -15,10 +15,10 @@ fn input_poll_task(event_tx: &Sender<AppEvent>) {
         match crossterm::event::poll(Duration::from_millis(250)) {
             Ok(true) => match crossterm::event::read() {
                 Ok(Event::Mouse(mouse)) => {
-                    if let Some(ev) = mouse_event_tracker.track_and_get(mouse) {
-                        if let Err(err) = event_tx.send(AppEvent::UserMouseInput(ev)) {
-                            log::error!(error:? = err; "Failed to send user mouse input");
-                        }
+                    if let Some(ev) = mouse_event_tracker.track_and_get(mouse)
+                        && let Err(err) = event_tx.send(AppEvent::UserMouseInput(ev))
+                    {
+                        log::error!(error:? = err; "Failed to send user mouse input");
                     }
                 }
                 Ok(Event::Key(key)) => {

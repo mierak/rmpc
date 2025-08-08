@@ -97,10 +97,10 @@ impl Section for ListSection {
     }
 
     fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
-        if let Some(selected_idx) = self.selected_idx {
-            if let Some(cb) = self.items[selected_idx].on_confirm.take() {
-                (cb)(ctx)?;
-            }
+        if let Some(selected_idx) = self.selected_idx
+            && let Some(cb) = self.items[selected_idx].on_confirm.take()
+        {
+            (cb)(ctx)?;
         }
         Ok(false)
     }

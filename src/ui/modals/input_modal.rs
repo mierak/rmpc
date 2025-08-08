@@ -161,10 +161,10 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                 ctx.render()?;
                 return Ok(());
             } else if let Some(CommonAction::Confirm) = action {
-                if self.button_group_state.selected == 0 {
-                    if let Some(callback) = self.callback.take() {
-                        (callback)(ctx, &self.value)?;
-                    }
+                if self.button_group_state.selected == 0
+                    && let Some(callback) = self.callback.take()
+                {
+                    (callback)(ctx, &self.value)?;
                 }
                 self.hide(ctx)?;
                 return Ok(());
@@ -199,10 +199,10 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
-                    if self.button_group_state.selected == 0 {
-                        if let Some(callback) = self.callback.take() {
-                            (callback)(ctx, &self.value)?;
-                        }
+                    if self.button_group_state.selected == 0
+                        && let Some(callback) = self.callback.take()
+                    {
+                        (callback)(ctx, &self.value)?;
                     }
                     self.hide(ctx)?;
                 }
