@@ -28,6 +28,7 @@ use crate::{
     mpd::{
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
+        version::Version,
     },
     shared::{
         key_event::KeyEvent,
@@ -50,12 +51,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct SearchPane {
-    inputs: InputGroups<2, 1>,
+    inputs: InputGroups<1>,
     phase: Phase,
     preview: Option<Vec<PreviewGroup>>,
     songs_dir: Dir<Song>,
     input_areas: Rc<[Rect]>,
     column_areas: EnumMap<BrowserArea, Rect>,
+    initial_ignore_diacritics: bool,
 }
 
 const PREVIEW: &str = "preview";
@@ -64,28 +66,40 @@ const SEARCH: &str = "search";
 impl SearchPane {
     pub fn new(ctx: &Ctx) -> Self {
         let config = &ctx.config;
+        let mut filter_inputs = vec![
+            FilterInput {
+                label: " Search mode       :".to_string(),
+                variant: FilterInputVariant::FilterKind { value: config.search.mode },
+            },
+            FilterInput {
+                label: " Case sensitive    :".to_string(),
+                variant: FilterInputVariant::CaseSensitive,
+            },
+        ];
+
+        let mut ignore_diacritics = false;
+        if ctx.mpd_version >= Version::new(0, 25, 0) {
+            filter_inputs.push(FilterInput {
+                label: " Ignore diacritics :".to_string(),
+                variant: FilterInputVariant::IgnoreDiacritics,
+            });
+            ignore_diacritics = ctx.config.search.ignore_diacritics;
+        }
+
         Self {
             preview: None,
             phase: Phase::Search,
             songs_dir: Dir::default(),
             inputs: InputGroups::new(
                 &config.search,
-                [
-                    FilterInput {
-                        label: " Search mode     :".to_string(),
-                        variant: FilterInputVariant::SelectFilterKind { value: config.search.mode },
-                    },
-                    FilterInput {
-                        label: " Case sensitive  :".to_string(),
-                        variant: FilterInputVariant::SelectFilterCaseSensitive {
-                            value: config.search.case_sensitive,
-                        },
-                    },
-                ],
+                filter_inputs,
                 [ButtonInput { label: " Reset", variant: ButtonInputVariant::Reset }],
+                !ctx.config.search.case_sensitive,
+                ignore_diacritics,
             ),
             input_areas: Rc::default(),
             column_areas: EnumMap::default(),
+            initial_ignore_diacritics: ignore_diacritics,
         }
     }
 
@@ -273,18 +287,24 @@ impl SearchPane {
 
         for input in &self.inputs.filter_inputs {
             let mut inp = match input.variant {
-                FilterInputVariant::SelectFilterKind { value } => Input::default()
+                FilterInputVariant::FilterKind { value } => Input::default()
                     .set_borderless(true)
                     .set_label_style(config.as_text_style())
                     .set_input_style(config.as_text_style())
                     .set_label(&input.label)
                     .set_text(Into::into(&value)),
-                FilterInputVariant::SelectFilterCaseSensitive { value } => Input::default()
+                FilterInputVariant::CaseSensitive => Input::default()
                     .set_borderless(true)
                     .set_label_style(config.as_text_style())
                     .set_input_style(config.as_text_style())
                     .set_label(&input.label)
-                    .set_text(if value { "Yes" } else { "No" }),
+                    .set_text(if self.inputs.ignore_case { "No" } else { "Yes" }),
+                FilterInputVariant::IgnoreDiacritics => Input::default()
+                    .set_borderless(true)
+                    .set_label_style(config.as_text_style())
+                    .set_input_style(config.as_text_style())
+                    .set_label(&input.label)
+                    .set_text(if self.inputs.ignore_diacritics { "Yes" } else { "No" }),
             };
 
             let is_focused = matches!(self.inputs.focused(),
@@ -324,22 +344,19 @@ impl SearchPane {
         }
     }
 
-    fn filter_type(&self) -> (FilterKind, bool) {
-        self.inputs.filter_inputs.iter().fold((FilterKind::Contains, false), |mut acc, val| {
-            match val.variant {
-                FilterInputVariant::SelectFilterKind { value } => {
-                    acc.0 = value;
-                }
-                FilterInputVariant::SelectFilterCaseSensitive { value } => {
-                    acc.1 = value;
-                }
-            }
-            acc
-        })
+    fn filter_type(&self) -> FilterKind {
+        self.inputs
+            .filter_inputs
+            .iter()
+            .find_map(|f| match f.variant {
+                FilterInputVariant::FilterKind { value } => Some(value),
+                _ => None,
+            })
+            .unwrap_or(FilterKind::Contains)
     }
 
     fn search(&mut self, ctx: &Ctx) {
-        let (filter_kind, case_sensitive) = self.filter_type();
+        let filter_kind = self.filter_type();
         let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
             Textbox { value, filter_key, .. } if !value.is_empty() => {
                 Some((filter_key.to_owned(), value.to_owned(), filter_kind))
@@ -355,6 +372,8 @@ impl SearchPane {
             return;
         }
 
+        let ignore_case = self.inputs.ignore_case;
+        let ignore_diacritics = self.inputs.ignore_diacritics;
         ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(move |client| {
             let filter = filter
                 .iter_mut()
@@ -362,8 +381,12 @@ impl SearchPane {
                     Filter::new(std::mem::take(key), value).with_type(*kind)
                 })
                 .collect_vec();
-            let result =
-                if case_sensitive { client.find(&filter) } else { client.search(&filter) }?;
+
+            let result = if ignore_case {
+                client.search(&filter, ignore_diacritics)
+            } else {
+                client.find(&filter)
+            }?;
 
             Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
         });
@@ -376,14 +399,15 @@ impl SearchPane {
         }
         for val in &mut self.inputs.filter_inputs {
             match val.variant {
-                FilterInputVariant::SelectFilterKind { ref mut value } => {
+                FilterInputVariant::FilterKind { ref mut value } => {
                     *value = search_config.mode;
                 }
-                FilterInputVariant::SelectFilterCaseSensitive { ref mut value } => {
-                    *value = search_config.case_sensitive;
-                }
+                FilterInputVariant::CaseSensitive => {}
+                FilterInputVariant::IgnoreDiacritics => {}
             }
         }
+        self.inputs.ignore_case = search_config.case_sensitive;
+        self.inputs.ignore_diacritics = self.initial_ignore_diacritics;
     }
 
     fn activate_input(&mut self, ctx: &Ctx) {
@@ -396,17 +420,34 @@ impl SearchPane {
                 self.prepare_preview(ctx);
             }
             FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::SelectFilterKind { value },
+                variant: FilterInputVariant::FilterKind { value },
                 ..
             }) => {
                 value.cycle();
                 self.search(ctx);
             }
             FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::SelectFilterCaseSensitive { value },
+                variant: FilterInputVariant::CaseSensitive,
                 ..
             }) => {
-                *value = !*value;
+                self.inputs.ignore_case = !self.inputs.ignore_case;
+                // Ignore case and ignore diacritics cannot exist at the same time because they
+                // are different MPD commands (search vs find).
+                if !self.inputs.ignore_case {
+                    self.inputs.ignore_diacritics = false;
+                }
+                self.search(ctx);
+            }
+            FocusedInputGroup::Filters(FilterInput {
+                variant: FilterInputVariant::IgnoreDiacritics,
+                ..
+            }) => {
+                self.inputs.ignore_diacritics = !self.inputs.ignore_diacritics;
+                // Ignore case and ignore diacritics cannot exist at the same time because they
+                // are different MPD commands (search vs find).
+                if self.inputs.ignore_diacritics {
+                    self.inputs.ignore_case = true;
+                }
                 self.search(ctx);
             }
         }
@@ -1409,18 +1450,22 @@ enum FocusedInput {
 }
 
 #[derive(Debug)]
-struct InputGroups<const N2: usize, const N3: usize> {
+struct InputGroups<const N3: usize> {
     textbox_inputs: Vec<Textbox>,
-    filter_inputs: [FilterInput; N2],
+    filter_inputs: Vec<FilterInput>,
     button_inputs: [ButtonInput; N3],
     focused_idx: FocusedInput,
+    ignore_case: bool,
+    ignore_diacritics: bool,
 }
 
-impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
+impl<const N3: usize> InputGroups<N3> {
     pub fn new(
         search_config: &Search,
-        filter_inputs: [FilterInput; N2],
+        filter_inputs: Vec<FilterInput>,
         button_inputs: [ButtonInput; N3],
+        initial_case_sensitive: bool,
+        initial_ignore_diacritics: bool,
     ) -> Self {
         Self {
             textbox_inputs: search_config
@@ -1428,13 +1473,15 @@ impl<const N2: usize, const N3: usize> InputGroups<N2, N3> {
                 .iter()
                 .map(|tag| Textbox {
                     filter_key: tag.value.clone(),
-                    label: format!(" {:<16}:", tag.label),
+                    label: format!(" {:<18}:", tag.label),
                     value: String::new(),
                 })
                 .collect_vec(),
             filter_inputs,
             button_inputs,
             focused_idx: FocusedInput::Textboxes(0),
+            ignore_case: initial_case_sensitive,
+            ignore_diacritics: initial_ignore_diacritics,
         }
     }
 
@@ -1577,8 +1624,9 @@ struct FilterInput {
 
 #[derive(Debug, PartialEq)]
 enum FilterInputVariant {
-    SelectFilterKind { value: FilterKind },
-    SelectFilterCaseSensitive { value: bool },
+    FilterKind { value: FilterKind },
+    CaseSensitive,
+    IgnoreDiacritics,
 }
 
 #[derive(Debug)]

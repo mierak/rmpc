@@ -258,12 +258,15 @@ impl<T: SocketClient> ProtoClient for T {
         }
 
         if line.starts_with("OK") || line.starts_with("list_OK") {
+            log::trace!(line = line.as_str().trim(); "Read MPD line OK");
             return Ok(MpdLine::Ok);
         }
         if line.starts_with("ACK") {
+            log::error!(line = line.as_str(); "Read MPD line with error");
             return Err(MpdError::Mpd(MpdFailureResponse::from_str(&line)?));
         }
         line.pop(); // pop the new line
+        log::trace!(line = line.as_str(); "Read MPD line");
         Ok(MpdLine::Value(line))
     }
 }

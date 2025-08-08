@@ -28,7 +28,15 @@ use crate::mpd::{
         volume::Bound,
     },
     errors::MpdError,
-    mpd_client::{Filter, MpdClient, SaveMode, SingleOrRange, Tag, ValueChange},
+    mpd_client::{
+        Filter,
+        MpdClient,
+        SaveMode,
+        SingleOrRange,
+        StringNormalizationFeature,
+        Tag,
+        ValueChange,
+    },
     proto_client::SocketClient,
     version::Version,
 };
@@ -349,7 +357,7 @@ impl MpdClient for TestMpdClient {
             .collect())
     }
 
-    fn search(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
+    fn search(&mut self, filter: &[Filter<'_>], _ignore_diacritics: bool) -> MpdResult<Vec<Song>> {
         Ok(self
             .songs
             .iter()
@@ -645,6 +653,28 @@ impl MpdClient for TestMpdClient {
     }
 
     fn clear_playlist(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn string_normalization_enable(
+        &mut self,
+        _features: &[StringNormalizationFeature],
+    ) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn string_normalization_disable(
+        &mut self,
+        _features: &[StringNormalizationFeature],
+    ) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn string_normalization_all(&mut self) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn string_normalization_clear(&mut self) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 }

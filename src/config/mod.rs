@@ -395,7 +395,7 @@ impl ConfigFile {
             keybinds: self.keybinds.into(),
             select_current_song_on_change: self.select_current_song_on_change,
             center_current_song_on_change: self.center_current_song_on_change,
-            search: self.search.into(),
+            search: self.search.try_into()?,
             artists: self.artists.into(),
             album_art: self.album_art.into(),
             on_song_change: self.on_song_change.map(|arr| {
