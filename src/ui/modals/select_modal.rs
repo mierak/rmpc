@@ -217,10 +217,10 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
                         ctx.render()?;
                     }
                     FocusedComponent::Buttons if self.button_group_state.selected == 0 => {
-                        if let Some(idx) = self.scrolling_state.get_selected() {
-                            if let Some(callback) = self.callback.take() {
-                                (callback)(ctx, self.options.remove(idx), idx)?;
-                            }
+                        if let Some(idx) = self.scrolling_state.get_selected()
+                            && let Some(callback) = self.callback.take()
+                        {
+                            (callback)(ctx, self.options.remove(idx), idx)?;
                         }
                         self.hide(ctx)?;
                         ctx.render()?;
@@ -264,10 +264,10 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        if let Some(idx) = self.scrolling_state.get_selected() {
-                            if let Some(callback) = self.callback.take() {
-                                (callback)(ctx, self.options.remove(idx), idx)?;
-                            }
+                        if let Some(idx) = self.scrolling_state.get_selected()
+                            && let Some(callback) = self.callback.take()
+                        {
+                            (callback)(ctx, self.options.remove(idx), idx)?;
                         }
                         self.hide(ctx)?;
                         ctx.render()?;

@@ -459,7 +459,7 @@ impl<'a> Iterator for PaneIter<'a> {
 }
 
 impl SizedPaneOrSplit {
-    pub fn panes_iter(&self) -> PaneIter {
+    pub fn panes_iter(&self) -> PaneIter<'_> {
         PaneIter {
             queue: match self {
                 p @ SizedPaneOrSplit::Pane { .. } => vec![p],

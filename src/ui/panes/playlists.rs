@@ -210,21 +210,21 @@ impl Pane for PlaylistsPane {
                 ctx.render()?;
             }
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
-                if let Some(origin_path) = origin_path {
-                    if origin_path != self.stack().path() {
-                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
-                        return Ok(());
-                    }
+                if let Some(origin_path) = origin_path
+                    && origin_path != self.stack().path()
+                {
+                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+                    return Ok(());
                 }
                 self.stack_mut().set_preview(data);
                 ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
-                if let Some(origin_path) = origin_path {
-                    if origin_path != self.stack().path() {
-                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
-                        return Ok(());
-                    }
+                if let Some(origin_path) = origin_path
+                    && origin_path != self.stack().path()
+                {
+                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
+                    return Ok(());
                 }
                 self.stack_mut().replace(data.into_iter().map(DirOrSong::Song).collect());
                 self.prepare_preview(ctx)?;
@@ -510,10 +510,10 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     }
                 }
                 MoveDirection::Down => {
-                    if let Some(last_idx) = self.stack().current().marked().last() {
-                        if *last_idx == self.stack().current().items.len() - 1 {
-                            return Ok(());
-                        }
+                    if let Some(last_idx) = self.stack().current().marked().last()
+                        && *last_idx == self.stack().current().items.len() - 1
+                    {
+                        return Ok(());
                     }
                 }
             }

@@ -737,26 +737,6 @@ impl From<CommonActionFile> for CommonAction {
     }
 }
 
-// Playlist actions
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
-pub enum PlaylistsActionsFile {}
-
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum PlaylistsActions {}
-
-impl ToDescription for PlaylistsActions {
-    fn to_description(&self) -> Cow<'static, str> {
-        "".into()
-    }
-}
-
-impl From<PlaylistsActionsFile> for PlaylistsActions {
-    fn from(_value: PlaylistsActionsFile) -> Self {
-        unreachable!()
-    }
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum SearchActionsFile {}
 

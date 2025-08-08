@@ -95,7 +95,7 @@ impl MetadataTag {
         }
     }
 
-    pub fn iter(&self) -> MetadataTagIterator {
+    pub fn iter(&self) -> MetadataTagIterator<'_> {
         MetadataTagIterator { inner: self, current: 0 }
     }
 }

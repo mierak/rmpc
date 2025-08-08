@@ -449,11 +449,11 @@ impl Song {
         self.metadata.get("artist").map_or(Cow::Borrowed("Unknown"), |v| v.join(separator))
     }
 
-    pub fn file_name(&self) -> Option<Cow<str>> {
+    pub fn file_name(&self) -> Option<Cow<'_, str>> {
         std::path::Path::new(&self.file).file_stem().map(|file_name| file_name.to_string_lossy())
     }
 
-    pub fn file_ext(&self) -> Option<Cow<str>> {
+    pub fn file_ext(&self) -> Option<Cow<'_, str>> {
         std::path::Path::new(&self.file).extension().map(|ext| ext.to_string_lossy())
     }
 
@@ -1166,11 +1166,11 @@ impl SizedPaneOrSplit {
 }
 
 pub(crate) trait StringExt {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str>;
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str>;
 }
 
 impl StringExt for Cow<'_, str> {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str> {
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}{}",
@@ -1186,7 +1186,7 @@ impl StringExt for Cow<'_, str> {
 }
 
 impl StringExt for &str {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str> {
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}{}",
@@ -1202,7 +1202,7 @@ impl StringExt for &str {
 }
 
 impl StringExt for String {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<str> {
+    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str> {
         if self.chars().count() > max_len {
             Cow::Owned(format!(
                 "{}{}",

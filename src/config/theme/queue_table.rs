@@ -68,8 +68,8 @@ impl std::str::FromStr for PercentOrLength {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SongTableColumnFile {
     /// Property to display in the column
-    /// Can be one of: Duration, Filename, Artist, AlbumArtist, Title, Album,
-    /// Date, Genre or Comment
+    /// Can be one of: `Duration`, `Filename`, `Artist`, `AlbumArtist`, `Title`,
+    /// `Album`, `Date`, `Genre` or `Comment`
     pub(super) prop: PropertyFile<SongPropertyFile>,
     /// Label to display in the column header
     /// If not set, the property name will be used

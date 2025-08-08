@@ -299,10 +299,10 @@ impl<'ui> Ui<'ui> {
                     let cmd = command.parse();
                     log::debug!("executing {cmd:?}");
 
-                    if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                        if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err() {
-                            log::error!("Failed to send command");
-                        }
+                    if let Ok(Args { command: Some(cmd), .. }) = cmd
+                        && ctx.work_sender.send(WorkRequest::Command(cmd)).is_err()
+                    {
+                        log::error!("Failed to send command");
                     }
                 }
                 GlobalAction::CommandMode => {
@@ -315,10 +315,10 @@ impl<'ui> Ui<'ui> {
                                 let cmd = value.parse();
                                 log::debug!("executing {cmd:?}");
 
-                                if let Ok(Args { command: Some(cmd), .. }) = cmd {
-                                    if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err() {
-                                        log::error!("Failed to send command");
-                                    }
+                                if let Ok(Args { command: Some(cmd), .. }) = cmd
+                                    && ctx.work_sender.send(WorkRequest::Command(cmd)).is_err()
+                                {
+                                    log::error!("Failed to send command");
                                 }
                                 Ok(())
                             })
@@ -892,7 +892,7 @@ impl Config {
             .clone()
     }
 
-    fn as_header_table_block(&self) -> ratatui::widgets::Block {
+    fn as_header_table_block(&self) -> ratatui::widgets::Block<'_> {
         if !self.theme.draw_borders {
             return ratatui::widgets::Block::default();
         }
@@ -922,7 +922,7 @@ impl Config {
         self.theme.text_color.map(|color| Style::default().fg(color)).unwrap_or_default()
     }
 
-    fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar {
+    fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar<'_> {
         let progress_bar_colors = &self.theme.progress_bar;
         widgets::progress_bar::ProgressBar::default()
             .elapsed_style(progress_bar_colors.elapsed_style)
@@ -935,7 +935,7 @@ impl Config {
             .end_char(&self.theme.progress_bar.symbols[4])
     }
 
-    fn as_styled_scrollbar(&self) -> Option<ratatui::widgets::Scrollbar> {
+    fn as_styled_scrollbar(&self) -> Option<ratatui::widgets::Scrollbar<'_>> {
         let scrollbar = self.theme.scrollbar.as_ref()?;
         let symbols = &scrollbar.symbols;
         Some(

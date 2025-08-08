@@ -19,7 +19,6 @@ use actions::{
     CommonActionFile,
     DirectoriesActionsFile,
     GlobalActionFile,
-    PlaylistsActionsFile,
     QueueActionsFile,
 };
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -64,7 +63,6 @@ impl Default for KeyConfigFile {
         use AlbumsActionsFile as Al;
         use ArtistsActionsFile as Ar;
         use DirectoriesActionsFile  as D;
-        use PlaylistsActionsFile as P;
         use KeyCode as K;
         use KeyModifiers as M;
         #[cfg(debug_assertions)]
@@ -207,7 +205,6 @@ mod tests {
             // albums: HashMap::from([]),
             // artists: HashMap::from([]),
             // directories: HashMap::from([]),
-            // playlists: HashMap::from([]),
             navigation: HashMap::from([
                 (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonActionFile::Up),
                 (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonActionFile::Up)

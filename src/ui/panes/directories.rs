@@ -211,11 +211,11 @@ impl Pane for DirectoriesPane {
     ) -> Result<()> {
         match (id, data) {
             (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
-                if let Some(origin_path) = origin_path {
-                    if origin_path != self.stack().path() {
-                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
-                        return Ok(());
-                    }
+                if let Some(origin_path) = origin_path
+                    && origin_path != self.stack().path()
+                {
+                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+                    return Ok(());
                 }
                 self.stack_mut().set_preview(data);
                 ctx.render()?;
@@ -226,11 +226,11 @@ impl Pane for DirectoriesPane {
                 ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
-                if let Some(origin_path) = origin_path {
-                    if origin_path != self.stack().path() {
-                        log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
-                        return Ok(());
-                    }
+                if let Some(origin_path) = origin_path
+                    && origin_path != self.stack().path()
+                {
+                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
+                    return Ok(());
                 }
                 self.stack_mut().replace(data);
                 self.prepare_preview(ctx)?;

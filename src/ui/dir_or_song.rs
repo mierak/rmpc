@@ -35,7 +35,7 @@ impl DirOrSong {
         }
     }
 
-    pub fn dir_name_or_file_name(&self) -> Cow<str> {
+    pub fn dir_name_or_file_name(&self) -> Cow<'_, str> {
         match self {
             DirOrSong::Dir { name, .. } => Cow::Borrowed(name),
             DirOrSong::Song(song) => Cow::Borrowed(&song.file),

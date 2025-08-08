@@ -132,14 +132,12 @@ impl Pane for LyricsPane {
         }
 
         // Try to schedule the next line to be displayed on time
-        if self.last_requested_line_idx != current_line_idx + 1 {
-            if let Some(line) = lrc.lines.get(current_line_idx + 1) {
-                self.last_requested_line_idx = current_line_idx + 1;
-                ctx.scheduler.schedule(
-                    line.time(offset).saturating_sub(ctx.status.elapsed),
-                    run_status_update,
-                );
-            }
+        if self.last_requested_line_idx != current_line_idx + 1
+            && let Some(line) = lrc.lines.get(current_line_idx + 1)
+        {
+            self.last_requested_line_idx = current_line_idx + 1;
+            ctx.scheduler
+                .schedule(line.time(offset).saturating_sub(ctx.status.elapsed), run_status_update);
         }
 
         Ok(())

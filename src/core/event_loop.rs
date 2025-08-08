@@ -276,17 +276,16 @@ fn main_task<B: Backend + std::io::Write>(
                                 // before and after the update
                                 if let (Some(current_playlist), Some(new_playlist)) =
                                     (current_playlist, new_playlist)
+                                    && &current_playlist == new_playlist
                                 {
-                                    if &current_playlist == new_playlist {
-                                        let playlist_name = current_playlist.clone();
-                                        ctx.command(move |client| {
-                                            client.save_queue_as_playlist(
-                                                &playlist_name,
-                                                Some(SaveMode::Replace),
-                                            )?;
-                                            Ok(())
-                                        });
-                                    }
+                                    let playlist_name = current_playlist.clone();
+                                    ctx.command(move |client| {
+                                        client.save_queue_as_playlist(
+                                            &playlist_name,
+                                            Some(SaveMode::Replace),
+                                        )?;
+                                        Ok(())
+                                    });
                                 }
                             }
 
@@ -319,12 +318,11 @@ fn main_task<B: Backend + std::io::Write>(
                                 _ => {}
                             }
 
-                            if previous_state != ctx.status.state {
-                                if let Err(err) =
+                            if previous_state != ctx.status.state
+                                && let Err(err) =
                                     ui.on_event(UiEvent::PlaybackStateChanged, &mut ctx)
-                                {
-                                    status_error!(error:? = err; "UI failed to handle playback state changed event, error: '{}'", err.to_status());
-                                }
+                            {
+                                status_error!(error:? = err; "UI failed to handle playback state changed event, error: '{}'", err.to_status());
                             }
 
                             match ctx.status.state {
@@ -353,45 +351,45 @@ fn main_task<B: Backend + std::io::Write>(
                                 }
                             }
 
-                            if let Some((_, song)) = ctx.find_current_song_in_queue() {
-                                if Some(song.id) != current_song_id {
-                                    if let Some(command) = &ctx.config.on_song_change {
-                                        let mut env = create_env(&ctx, std::iter::empty());
+                            if let Some((_, song)) = ctx.find_current_song_in_queue()
+                                && Some(song.id) != current_song_id
+                            {
+                                if let Some(command) = &ctx.config.on_song_change {
+                                    let mut env = create_env(&ctx, std::iter::empty());
 
-                                        let prev_song_file = (previous_status.state != State::Stop)
-                                            .then_some(
-                                                previous_status
-                                                    .songid
-                                                    .and_then(|id| {
-                                                        ctx.queue
-                                                            .iter()
-                                                            .enumerate()
-                                                            .find(|(_, song)| song.id == id)
-                                                    })
-                                                    .map(|(_, s)| s.file.clone()),
-                                            )
-                                            .flatten();
+                                    let prev_song_file = (previous_status.state != State::Stop)
+                                        .then_some(
+                                            previous_status
+                                                .songid
+                                                .and_then(|id| {
+                                                    ctx.queue
+                                                        .iter()
+                                                        .enumerate()
+                                                        .find(|(_, song)| song.id == id)
+                                                })
+                                                .map(|(_, s)| s.file.clone()),
+                                        )
+                                        .flatten();
 
-                                        if let (Some(prev_song), Some(played)) =
-                                            (prev_song_file, ctx.song_played)
-                                        {
-                                            env.push(("PREV_SONG".to_owned(), prev_song));
-                                            env.push((
-                                                "PREV_ELAPSED".to_owned(),
-                                                played.as_secs().to_string(),
-                                            ));
-                                        }
-
-                                        run_external(command.clone(), env);
+                                    if let (Some(prev_song), Some(played)) =
+                                        (prev_song_file, ctx.song_played)
+                                    {
+                                        env.push(("PREV_SONG".to_owned(), prev_song));
+                                        env.push((
+                                            "PREV_ELAPSED".to_owned(),
+                                            played.as_secs().to_string(),
+                                        ));
                                     }
-                                    song_changed = true;
-                                    ctx.song_played = Some(Duration::ZERO);
+
+                                    run_external(command.clone(), env);
                                 }
+                                song_changed = true;
+                                ctx.song_played = Some(Duration::ZERO);
                             }
-                            if song_changed {
-                                if let Err(err) = ui.on_event(UiEvent::SongChanged, &mut ctx) {
-                                    status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
-                                }
+                            if song_changed
+                                && let Err(err) = ui.on_event(UiEvent::SongChanged, &mut ctx)
+                            {
+                                status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
                             }
 
                             ctx.last_status_update = Instant::now();

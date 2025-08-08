@@ -198,16 +198,17 @@ impl LrcIndexEntry {
             // We are looking for lines that start with [ and have a timestamp in them
             // reading all the way to the end of the file is not necessary
             let trimmed = line.trim();
-            if !trimmed.is_empty() && trimmed.starts_with('[') {
-                if let Some(bracket_end) = trimmed.find(']') {
-                    let tag_content = &trimmed[1..bracket_end];
-                    if tag_content.chars().next().is_some_and(|c| c.is_numeric())
-                        && tag_content.contains(':')
-                    {
-                        // timestamp found, add this line and stop
-                        content.push_str(&line);
-                        break;
-                    }
+            if !trimmed.is_empty()
+                && trimmed.starts_with('[')
+                && let Some(bracket_end) = trimmed.find(']')
+            {
+                let tag_content = &trimmed[1..bracket_end];
+                if tag_content.chars().next().is_some_and(|c| c.is_numeric())
+                    && tag_content.contains(':')
+                {
+                    // timestamp found, add this line and stop
+                    content.push_str(&line);
+                    break;
                 }
             }
             content.push_str(&line);

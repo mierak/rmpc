@@ -86,11 +86,12 @@ impl KeybindsModal {
         let length = self.filter_rows.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if let Some(row) = &self.filter_rows[i] {
-                if !row.is_empty() && row.contains(filter) {
-                    self.scrolling_state.select(Some(i), scrolloff);
-                    break;
-                }
+            if let Some(row) = &self.filter_rows[i]
+                && !row.is_empty()
+                && row.contains(filter)
+            {
+                self.scrolling_state.select(Some(i), scrolloff);
+                break;
             }
         }
     }
@@ -108,11 +109,12 @@ impl KeybindsModal {
         let length = self.filter_rows.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if let Some(row) = &self.filter_rows[i] {
-                if !row.is_empty() && row.contains(filter) {
-                    self.scrolling_state.select(Some(i), scrolloff);
-                    break;
-                }
+            if let Some(row) = &self.filter_rows[i]
+                && !row.is_empty()
+                && row.contains(filter)
+            {
+                self.scrolling_state.select(Some(i), scrolloff);
+                break;
             }
         }
     }
