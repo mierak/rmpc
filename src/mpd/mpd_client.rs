@@ -1638,7 +1638,7 @@ mod filter_tests {
         let input: &[Filter<'_>] =
             &[Filter::new_with_kind(Tag::Artist, "mrs singer", FilterKind::StartsWith)];
 
-        assert_eq!(input.to_query_str(), "(Artist =~ '^mrs singer')");
+        assert_eq!(input.to_query_str(), "(Artist starts_with 'mrs singer')");
     }
 
     #[test]
@@ -1654,7 +1654,7 @@ mod filter_tests {
         let input: &[Filter<'_>] =
             &[Filter::new_with_kind(Tag::Album, "the greatest", FilterKind::Contains)];
 
-        assert_eq!(input.to_query_str(), "(Album =~ '.*the greatest.*')");
+        assert_eq!(input.to_query_str(), "(Album contains 'the greatest')");
     }
 
     #[test]
