@@ -14,6 +14,24 @@ import { path } from "../data.ts";
 
 Whether the filter should be case sensitive by default. Default is `false`.
 
+:::note
+Cannot be enabled at the same time as [ignore_diacritics](#ignore_diacritics).
+:::
+
+## ignore_diacritics
+
+<ConfigValue name="ignore_diacritics" type="bool" />
+
+Whether the filter should ignore diacritics by default. Default is `false`.
+
+:::note
+Cannot be enabled at the same time as [case_sensitive](#case_sensitive).
+:::
+
+:::note
+This option requires MPD version 0.25.0 and newer to work
+:::
+
 ## mode
 
 <ConfigValue name="mode" type={["Exact", "StartsWith", "Contains", "Regex"]} />

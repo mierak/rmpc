@@ -8,7 +8,7 @@ use crate::{
     config::{Config, ConfigFile, tabs::TabName},
     core::scheduler::Scheduler,
     ctx::Ctx,
-    mpd::commands::Status,
+    mpd::{commands::Status, version::Version},
     shared::{
         events::{ClientRequest, WorkRequest},
         ipc::ipc_stream::IpcStream,
@@ -53,6 +53,7 @@ pub fn ctx(
     let chan1 = Box::leak(Box::new(chan1));
     let scheduler = Scheduler::new((chan1.0.clone(), unbounded().0));
     Ctx {
+        mpd_version: Version::new(1, 0, 0),
         status: Status::default(),
         config: std::sync::Arc::new(config),
         queue: Vec::default(),
