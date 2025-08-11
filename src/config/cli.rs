@@ -201,12 +201,24 @@ pub enum Command {
     },
     /// Add a song from youtube to the current queue.
     AddYt {
-        url: String,
+        #[arg(
+            required_unless_present = "name",
+            value_parser = clap::builder::NonEmptyStringValueParser::new()
+        )]
+        url: Option<String>,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and
         /// +<number> or -<number> (relative)
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
+        /// If provided search by name and use the first result
+        #[arg(
+            short = 'n',
+            long = "name",
+            conflicts_with = "url",
+            value_parser = clap::builder::NonEmptyStringValueParser::new()
+        )]
+        name: Option<String>,
     },
     /// List MPD outputs
     Outputs,
