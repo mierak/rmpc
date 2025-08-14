@@ -505,42 +505,23 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
             }
             [tag_value] => {
                 let tag_value = tag_value.clone();
-                let root_tag = self.root_tag.clone();
-                let separator = self.separator.clone();
                 let Some(albums) = self.cache.0.get(&tag_value) else {
                     return (Vec::new(), None);
                 };
 
-                (
-                    items
-                        .filter_map(|item| {
-                            let name = item.dir_name_or_file_name();
-                            albums
-                                .0
-                                .iter()
-                                .find(|a| a.name == name)
-                                .map(|a| a.original_name.clone())
+                let items = items
+                    .filter_map(|item| {
+                        let name = item.dir_name_or_file_name();
+                        albums.0.iter().find(|a| a.name == name)
+                    })
+                    .flat_map(|album| {
+                        album.songs.iter().map(|song| Enqueue::Find {
+                            filter: vec![(Tag::File, FilterKind::Exact, song.file.clone())],
                         })
-                        .map(|album| {
-                            let mut root_tag_filter = Self::root_tag_filter(
-                                root_tag.clone(),
-                                separator.as_deref(),
-                                &tag_value,
-                            );
-                            Enqueue::Find {
-                                filter: vec![
-                                    (
-                                        root_tag_filter.tag,
-                                        root_tag_filter.kind,
-                                        std::mem::take(&mut root_tag_filter.value).into_owned(),
-                                    ),
-                                    (Tag::Album, FilterKind::Exact, album),
-                                ],
-                            }
-                        })
-                        .collect_vec(),
-                    None,
-                )
+                    })
+                    .collect_vec();
+
+                (items, None)
             }
             [] => {
                 let root_tag = self.root_tag.clone();

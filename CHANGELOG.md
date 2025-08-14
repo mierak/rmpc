@@ -51,6 +51,7 @@ remote commands inside scripts triggered by rmpc
 - `ModalClosed` event now correctly gets dispatched only after all modals were closed
 - Preview no longer disappears in search when returning to the search form while the results are
 scrolled down
+- Adding entries without album adding not intended songs when using split by date
 
 ## [0.9.0] - 2025-06-23
 
