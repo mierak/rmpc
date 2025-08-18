@@ -171,9 +171,9 @@ impl MpdClient for TestMpdClient {
 
     fn volume(&mut self, change: ValueChange) -> MpdResult<()> {
         match change {
-            ValueChange::Increase(val) => self.volume.inc_by(val as u8),
-            ValueChange::Decrease(val) => self.volume.dec_by(val as u8),
-            ValueChange::Set(val) => self.volume.set_value(val as u8),
+            ValueChange::Increase(val) => self.volume.inc_by(val),
+            ValueChange::Decrease(val) => self.volume.dec_by(val),
+            ValueChange::Set(val) => self.volume.set_value(val),
         };
         Ok(())
     }
