@@ -6,7 +6,7 @@ use ratatui::{
 
 #[derive(Clone)]
 pub struct VolumeSlider<'a> {
-    value: f32,
+    value: f64,
     start_char: &'a str,
     filled_char: &'a str,
     thumb_char: &'a str,
@@ -19,7 +19,7 @@ pub struct VolumeSlider<'a> {
 
 #[allow(dead_code)]
 impl<'a> VolumeSlider<'a> {
-    pub fn value(mut self, val: f32) -> Self {
+    pub fn value(mut self, val: f64) -> Self {
         self.value = val.clamp(0.0, 1.0);
         self
     }
@@ -91,7 +91,7 @@ impl Widget for VolumeSlider<'_> {
 
         buf.set_string(left, top, self.empty_char.repeat(len as usize), self.empty_style);
 
-        let filled_len = (len as f32 * self.value) as usize;
+        let filled_len = (f64::from(len) * self.value) as usize;
 
         if filled_len > 0 {
             buf.set_string(left, top, self.filled_char.repeat(filled_len), self.filled_style);

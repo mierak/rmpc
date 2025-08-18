@@ -52,6 +52,7 @@ remote commands inside scripts triggered by rmpc
 - Preview no longer disappears in search when returning to the search form while the results are
 scrolled down
 - Adding entries without album adding not intended songs when using split by date
+- Volume parsing if MPD's volume was set to higher value than 255 via external means
 
 ## [0.9.0] - 2025-06-23
 

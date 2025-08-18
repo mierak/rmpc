@@ -47,7 +47,7 @@ impl Pane for VolumePane {
         match &self.config {
             VolumeType::Slider(config) => {
                 let volume_slider = as_styled_volume_slider(config)
-                    .value(f32::from(*ctx.status.volume.value()) / 100.0);
+                    .value(f64::from(*ctx.status.volume.value()) / 100.0);
 
                 frame.render_widget(volume_slider, self.area);
             }
