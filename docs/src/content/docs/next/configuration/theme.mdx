@@ -13,6 +13,14 @@ import { path } from "../data.ts";
 A theme determines the look of rmpc. You can customize it by creating a custom theme file placed in the themes
 directory and then configuring the `theme` property in the config file filename of the theme.
 
+The following paths are checked in order they are listed here:
+
+- `<rmpc config dir>/themes/<theme>.ron`
+- `<rmpc config dir>/<theme>.ron`
+- `<rmpc config dir>/<theme>`
+- `<theme>`
+- `Specific path specified by the --theme flag`
+
 ## Bootstrapping a theme file
 
 <Steps>
