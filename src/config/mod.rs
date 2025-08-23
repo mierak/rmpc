@@ -313,13 +313,13 @@ impl ConfigFile {
         self.theme.as_ref()
         .and_then(|theme| {
             let theme_paths = [
-                PathBuf::from(theme),
-                config_dir.join(theme),
+                config_dir.join("themes").join(format!("{theme}.ron")),
                 config_dir.join(format!("{theme}.ron")),
-                config_dir.join("themes").join(format!("{theme}.ron"))
+                config_dir.join(theme),
+                PathBuf::from(tilde_expand(theme).into_owned())
             ];
 
-            theme_paths.into_iter().rfind(|theme_path| theme_path.is_file())
+            theme_paths.into_iter().find(|theme_path| theme_path.is_file())
         })
     }
 
