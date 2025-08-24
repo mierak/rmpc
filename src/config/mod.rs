@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::Read,
     path::{Path, PathBuf},
     str::FromStr,
@@ -42,6 +43,7 @@ use self::{
     theme::{ConfigColor, UiConfig, UiConfigFile},
 };
 use crate::{
+    config::tabs::{SizedPaneOrSplit, Tab, TabName},
     shared::{
         image::{self, ImageProtocol},
         lrc::LrcOffset,
@@ -236,6 +238,17 @@ impl Config {
     pub fn validate(&self) -> Result<()> {
         validate_tabs(&self.theme.layout, &self.tabs)
     }
+
+    pub fn calc_active_panes(
+        tabs: &HashMap<TabName, Tab>,
+        layout: &SizedPaneOrSplit,
+    ) -> Vec<PaneType> {
+        tabs.iter()
+            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane.clone()))
+            .chain(layout.panes_iter().map(|pane| pane.pane.clone()))
+            .unique()
+            .collect_vec()
+    }
 }
 
 #[derive(Debug)]
@@ -313,6 +326,7 @@ impl ConfigFile {
         self.theme.as_ref().and_then(|theme| {
             let theme_paths = [
                 config_dir.join("themes").join(format!("{theme}.ron")),
+                config_dir.join("themes").join(theme),
                 config_dir.join(format!("{theme}.ron")),
                 config_dir.join(theme),
                 PathBuf::from(tilde_expand(theme).into_owned()),
@@ -365,13 +379,7 @@ impl ConfigFile {
         let theme = UiConfig::try_from(theme)?;
 
         let tabs: Tabs = self.tabs.convert(&theme.components)?;
-        let active_panes = tabs
-            .tabs
-            .iter()
-            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane.clone()))
-            .chain(theme.layout.panes_iter().map(|pane| pane.pane.clone()))
-            .unique()
-            .collect_vec();
+        let active_panes = Config::calc_active_panes(&tabs.tabs, &theme.layout);
 
         let (address, password) =
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
