@@ -310,8 +310,14 @@ impl ConfigFile {
     }
 
     pub fn theme_path(&self, config_dir: &Path) -> Option<PathBuf> {
-        self.theme.as_ref().map(|theme_name| {
-            PathBuf::from(config_dir).join("themes").join(format!("{theme_name}.ron"))
+        self.theme.as_ref().and_then(|theme| {
+            let theme_paths = [
+                config_dir.join("themes").join(format!("{theme}.ron")),
+                config_dir.join(format!("{theme}.ron")),
+                config_dir.join(theme),
+                PathBuf::from(tilde_expand(theme).into_owned()),
+            ];
+            theme_paths.into_iter().find(|theme_path| theme_path.is_file())
         })
     }
 

@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Config option for global lyrics offset - `lyrics_offset_ms`
 - add `exec_on_song_change_at_start` config option
 - Added `album_date_tags` config option to specify priority order of metadata tags for album dates
+- Added an ability to specify relative/absolute theme path in config file.
 
 ### Changed
 
