@@ -10,7 +10,7 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    config::cli::RemoteCommandQuery,
+    config::{Config, cli::RemoteCommandQuery},
     ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
@@ -133,6 +133,8 @@ fn main_task<B: Backend + std::io::Write>(
                         continue;
                     }
 
+                    new_config.active_panes =
+                        Config::calc_active_panes(&new_config.tabs.tabs, &new_config.theme.layout);
                     ctx.config = Arc::new(*new_config);
                     let max_fps = f64::from(ctx.config.max_fps);
                     min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
@@ -158,6 +160,8 @@ fn main_task<B: Backend + std::io::Write>(
                         status_error!(error:? = err; "Cannot change theme, invalid config: '{err}'");
                         continue;
                     }
+                    config.active_panes =
+                        Config::calc_active_panes(&config.tabs.tabs, &config.theme.layout);
                     ctx.config = Arc::new(config);
 
                     if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &mut ctx) {
