@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Config option for global lyrics offset - `lyrics_offset_ms`
 - add `exec_on_song_change_at_start` config option
 - Added `album_date_tags` config option to specify priority order of metadata tags for album dates
+- Added an ability to specify relative/absolute theme path in config file.
 
 ### Changed
 
@@ -52,6 +53,9 @@ remote commands inside scripts triggered by rmpc
 - `ModalClosed` event now correctly gets dispatched only after all modals were closed
 - Preview no longer disappears in search when returning to the search form while the results are
 scrolled down
+- Adding entries without album adding not intended songs when using split by date
+- Volume parsing if MPD's volume was set to higher value than 255 via external means
+- Fix improper handling of remote theme change
 
 ## [0.9.0] - 2025-06-23
 
