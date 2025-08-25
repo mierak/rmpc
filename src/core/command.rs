@@ -256,17 +256,25 @@ impl Command {
 
                 Ok(())
             })),
-            Command::AddYt { url, position, name } => {
-                let chosen_url = match (url, name) {
-                    (Some(u), None) => u.trim().to_owned(),
-                    (None, Some(n)) => YtDlp::search_youtube_single(n.trim())?,
-                    _ => unreachable!("Clap enforces exactly one of URL or --name"),
-                };
-                let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
+            Command::AddYt { url, position } => {
+                let file_paths = YtDlp::init_and_download(config, &url)?;
                 Ok(Box::new(move |client| {
                     client.send_start_cmd_list()?;
                     for file in file_paths {
                         client.send_add(&file, position)?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+                    Ok(())
+                }))
+            }
+            Command::SearchYt { query, position } => {
+                let chosen_url = YtDlp::search_youtube_single(query.trim())?;
+                let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
+                Ok(Box::new(move |client| {
+                    client.send_start_cmd_list()?;
+                    for file in &file_paths {
+                        client.send_add(file, position)?;
                     }
                     client.send_execute_cmd_list()?;
                     client.read_ok()?;

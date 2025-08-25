@@ -201,24 +201,19 @@ pub enum Command {
     },
     /// Add a song from youtube to the current queue.
     AddYt {
-        #[arg(
-            required_unless_present = "name",
-            value_parser = clap::builder::NonEmptyStringValueParser::new()
-        )]
-        url: Option<String>,
+        url: String,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and
         /// +<number> or -<number> (relative)
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
-        /// If provided search by name and use the first result
-        #[arg(
-            short = 'n',
-            long = "name",
-            conflicts_with = "url",
-            value_parser = clap::builder::NonEmptyStringValueParser::new()
-        )]
-        name: Option<String>,
+    },
+    SearchYt {
+        /// Search query (song/artist/title…)
+        #[arg(value_name = "QUERY")]
+        query: String,
+        #[arg(short, long, allow_negative_numbers = true)]
+        position: Option<QueuePosition>,
     },
     /// List MPD outputs
     Outputs,
@@ -450,8 +445,8 @@ impl Args {
     /// Supports single `'...'` and double `"..."` quotes and backslash escapes.
     ///
     /// # Errors
-    /// Returns `Err` if the input contains an **unclosed quote** or a **dangling backslash**
-    /// escape at the end of the string.
+    /// Returns `Err` if the input contains an **unclosed quote** or a
+    /// **dangling backslash** escape at the end of the string.
     ///
     /// # Examples
     /// ```
@@ -505,7 +500,8 @@ impl Args {
     /// Returns a [`clap::Error`] when:
     /// - tokenization fails (e.g., **unclosed quote**, **dangling backslash**),
     /// - the input is **empty**,
-    /// - or Clap rejects the arguments (e.g., unknown subcommand/flag, missing required args).
+    /// - or Clap rejects the arguments (e.g., unknown subcommand/flag, missing
+    ///   required args).
     ///
     /// # Examples
     /// ```
