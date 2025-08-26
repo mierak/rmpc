@@ -312,13 +312,15 @@ impl<'ui> Ui<'ui> {
                             .title("Execute a command")
                             .confirm_label("Execute")
                             .on_confirm(|ctx, value| {
-                                let cmd = value.parse();
-                                log::debug!("executing {cmd:?}");
-
-                                if let Ok(Args { command: Some(cmd), .. }) = cmd
-                                    && ctx.work_sender.send(WorkRequest::Command(cmd)).is_err()
-                                {
-                                    log::error!("Failed to send command");
+                                match Args::parse_cli_line(value) {
+                                    Ok(Args { command: Some(cmd), .. }) => {
+                                        if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err()
+                                        {
+                                            log::error!("Failed to send command");
+                                        }
+                                    }
+                                    Ok(_) => log::warn!("No subcommand provided"),
+                                    Err(e) => log::error!("Parse error: {e}"),
                                 }
                                 Ok(())
                             })

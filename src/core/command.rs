@@ -268,6 +268,19 @@ impl Command {
                     Ok(())
                 }))
             }
+            Command::SearchYt { query, position } => {
+                let chosen_url = YtDlp::search_youtube_single(query.trim())?;
+                let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
+                Ok(Box::new(move |client| {
+                    client.send_start_cmd_list()?;
+                    for file in &file_paths {
+                        client.send_add(file, position)?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+                    Ok(())
+                }))
+            }
             Command::Decoders => Ok(Box::new(|client| {
                 println!("{}", serde_json::ser::to_string(&client.decoders()?)?);
                 Ok(())

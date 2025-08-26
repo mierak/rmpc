@@ -20,7 +20,12 @@ and cannot be stopped except by terminating rmpc.
     2. Install [yt-dlp's dependencies](https://github.com/yt-dlp/yt-dlp?tab=readme-ov-file#dependencies): ffmpeg, ffprobe, python3 and python's mutagen library.
     3. Configure rmpc's cache directory <a href={path("configuration/#cache_dir")}>in your config file</a>
     4. Connect to MPD with a local socket and not IP address.
-    5. Execute `rmpc addyt <youtube-url>` or in tui `addyt <youtube-url>` to add a song to the queue.
+    5. Add music to the queue:
+       <ul>
+          <li><strong>From a URL:</strong> <code>rmpc addyt &lt;youtube-url&gt;</code> (TUI: <code>addyt &lt;youtube-url&gt;</code>)</li>
+          <li><strong>Search by name (first result):</strong> <code>rmpc searchyt "search terms"</code> (TUI: <code>searchyt "search terms"</code>)</li>
+          <li><strong>Optional position:</strong> add <code>--position &lt;n|+n|-n&gt;</code> to enqueue at an absolute or relative position</li>
+       </ul>
 
 </Steps>
 

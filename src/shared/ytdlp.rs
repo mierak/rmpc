@@ -9,6 +9,7 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use itertools::Itertools;
 use rustix::path::Arg;
+use serde::Deserialize;
 
 use super::dependencies;
 use crate::{
@@ -19,6 +20,15 @@ use crate::{
 #[derive(Debug)]
 pub struct YtDlp<'a> {
     pub cache_dir: &'a Path,
+}
+#[derive(Debug, Deserialize)]
+struct YtdlpSearchJson {
+    entries: Vec<YtdlpSearchEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct YtdlpSearchEntry {
+    id: String,
 }
 
 impl<'a> YtDlp<'a> {
@@ -49,6 +59,48 @@ impl<'a> YtDlp<'a> {
         let file_path = ytdlp.download(url)?;
 
         Ok(file_path)
+    }
+
+    pub fn search_youtube_single(query: &str) -> Result<String> {
+        let search_expr = format!("ytsearch1:{query}");
+
+        let mut command = Command::new("yt-dlp");
+        command.arg("-J");
+        command.arg("--flat-playlist");
+        command.arg(&search_expr);
+
+        let args = command.get_args().map(|arg| format!("\"{}\"", arg.to_string_lossy())).join(" ");
+        log::debug!(args = args.as_str(); "Executing yt-dlp search");
+
+        let out = command.output()?;
+        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        let exit_code = out.status.code();
+
+        if exit_code != Some(0) {
+            log::error!(stderr = stderr.as_str().trim(); "yt-dlp search failed");
+            bail!(
+                "yt-dlp search failed with exit code: {}",
+                exit_code.map_or_else(|| "None".to_string(), |c| c.to_string())
+            );
+        }
+
+        let parsed: YtdlpSearchJson =
+            serde_json::from_str(&stdout).context("Failed to parse yt-dlp search JSON")?;
+
+        let entry = parsed
+            .entries
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("No results for query: {query}"))?;
+
+        let host = YtDlpHost {
+            id: entry.id.clone(),
+            filename: entry.id.clone(),
+            kind: YtDlpHostKind::Youtube,
+        };
+
+        Ok(host.to_url())
     }
 
     pub fn download(&self, url: &str) -> Result<Vec<String>> {
