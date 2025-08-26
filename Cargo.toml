@@ -97,4 +97,5 @@ unused_macros = "allow"
 [profile.release]
 strip = "symbols"
 lto = "fat"
+opt-level = "s"
 
