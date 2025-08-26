@@ -3,8 +3,12 @@ use std::collections::HashMap;
 use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use modals::{
-    add_random_modal::AddRandomModal, decoders::DecodersModal, info_list_modal::InfoListModal,
-    input_modal::InputModal, keybinds::KeybindsModal, menu::modal::MenuModal,
+    add_random_modal::AddRandomModal,
+    decoders::DecodersModal,
+    info_list_modal::InfoListModal,
+    input_modal::InputModal,
+    keybinds::KeybindsModal,
+    menu::modal::MenuModal,
     outputs::OutputsModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
