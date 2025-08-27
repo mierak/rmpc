@@ -1,6 +1,5 @@
 use std::{
-    io::ErrorKind,
-    os::unix::ffi::OsStrExt,
+    ffi::OsStr,
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
@@ -10,6 +9,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use itertools::Itertools;
 use rustix::path::Arg;
 use serde::Deserialize;
+use walkdir::WalkDir;
 
 use super::dependencies;
 use crate::{
@@ -158,7 +158,7 @@ impl<'a> YtDlp<'a> {
     }
 
     fn download_single(&self, id: &YtDlpHost) -> Result<String> {
-        if let Some(cached_file) = id.get_cached(self.cache_dir)? {
+        if let Some(cached_file) = id.get_cached(self.cache_dir) {
             status_info!(file:? = cached_file.as_str(); "Youtube video id '{}' already downloaded", id.id);
             return Ok(cached_file.as_str()?.to_string());
         }
@@ -209,10 +209,10 @@ impl<'a> YtDlp<'a> {
         // having different extensions than the one specified so we work
         // around it by trying to find the file in the cache directory as that
         // should still be reliable.
-        id.get_cached(self.cache_dir)?
+        id.get_cached(self.cache_dir)
             .map(|v| -> Result<_> { Ok(v.as_str()?.to_string()) })
             .transpose()?
-            .ok_or_else(|| anyhow!("yt-dlp failed to download video"))
+            .ok_or_else(|| anyhow!("Did not find file downloadid by yt-dlp in cache directory"))
     }
 }
 
@@ -251,56 +251,29 @@ impl YtDlpHost {
         })
     }
 
-    pub fn get_cached(&self, cache_dir: &Path) -> Result<Option<PathBuf>> {
-        Ok(match std::fs::read_dir(self.cache_subdir(cache_dir)) {
-            Ok(result) => {
-                result.filter_map(std::result::Result::ok).map(|v| v.path()).find(|v| {
-                    v.is_file()
-                        && v.file_name().as_ref().is_some_and(|v| {
-                            v.as_bytes()
-                                .windows(self.filename.len())
-                                // NOTE this will likely be a problem if we ever decide to support
-                                // windows at some point
-                                .any(|window| window == self.filename.as_bytes())
-                        })
-                })
-            }
-            Err(err) if matches!(err.kind(), ErrorKind::NotFound) => None,
-            Err(err) => {
-                Err(anyhow!("Encountered error when reading cached yt-dlp file. Error: {}", err))?
-            }
-        })
+    pub fn get_cached(&self, cache_dir: &Path) -> Option<PathBuf> {
+        WalkDir::new(self.cache_subdir(Path::new(cache_dir)))
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
+            .find(|e| e.path().file_stem().is_some_and(|stem| stem == OsStr::new(&self.filename)))
+            .map(|entry| entry.into_path())
     }
 
-    pub fn delete_cached(&self, cache_dir: &Path) -> Result<Vec<PathBuf>> {
-        let files = match std::fs::read_dir(self.cache_subdir(cache_dir)) {
-            Ok(result) => {
-                result
-                    .filter_map(std::result::Result::ok)
-                    .map(|v| v.path())
-                    .filter(|v| {
-                        v.is_file()
-                            && v.file_name().as_ref().is_some_and(|v| {
-                                v.as_bytes()
-                                    .windows(self.filename.len())
-                                    // NOTE this will likely be a problem if we ever decide to
-                                    // support windows at some point
-                                    .any(|window| window == self.filename.as_bytes())
-                            })
-                    })
-                    .collect()
-            }
-            Err(err) if matches!(err.kind(), ErrorKind::NotFound) => Vec::new(),
-            Err(err) => {
-                Err(anyhow!("Encountered error when deleting cached yt-dlp file. Error: {}", err))?
-            }
-        };
+    pub fn delete_cached(&self, cache_dir: &Path) -> Result<()> {
+        let files = WalkDir::new(self.cache_subdir(Path::new(cache_dir)))
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
+            .filter(|e| e.path().file_stem().is_some_and(|stem| stem == OsStr::new(&self.filename)))
+            .map(|entry| entry.into_path());
 
-        for file in &files {
+        for file in files {
+            log::debug!(file:? = file.as_str(); "Deleting cached file");
             std::fs::remove_file(file)?;
         }
 
-        Ok(files)
+        Ok(())
     }
 }
 
