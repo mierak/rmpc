@@ -56,6 +56,7 @@ scrolled down
 - Adding entries without album adding not intended songs when using split by date
 - Volume parsing if MPD's volume was set to higher value than 255 via external means
 - Fix improper handling of remote theme change
+- Attempted to fix yt-dlp cache on non linux platforms
 
 ## [0.9.0] - 2025-06-23
 
