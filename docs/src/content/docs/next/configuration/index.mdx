@@ -100,6 +100,13 @@ Do not set this option. Only reason to use this is if you are experiencing conne
 `PreviousTrack` will rewind to start if elapsed time is past the configured value. `PreviousTrack` will always switch to
 the previous track if not configured or set to `None`.
 
+### keep_state_on_song_change
+
+<ConfigValue name="keep_state_on_song_change" type="bool" />
+
+Whether to keep paused the current playback state when using the `NextTrack/PreviousTrack` actions.
+Defaults to `false`.
+
 ### theme
 
 <ConfigValue optional name="theme" type="string" />
@@ -210,7 +217,7 @@ send <a href={path("guides/on_song_change")}>notifications</a> when the song cha
 
 ### exec_on_song_change_at_start
 
-<ConfigValue name="exec_on_song_change_at_start" type="bool"/>
+<ConfigValue name="exec_on_song_change_at_start" type="bool" />
 
 Execute the command provided to `on_song_change` at rmpc startup, matching the behavior of `execute_on_song_change` in ncmpcpp.
 

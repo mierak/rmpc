@@ -125,7 +125,11 @@ pub enum Command {
     /// Stops playback
     Stop,
     /// Plays the next song in the playlist
-    Next,
+    Next {
+        /// Keep the current playback state
+        #[arg(short, long = "keep-state", default_value_t = false)]
+        keep_state: bool,
+    },
     /// Plays the previous song in the playlist
     Prev {
         /// Go back to the start of the song if more than 5 seconds elapsed
@@ -136,6 +140,9 @@ pub enum Command {
             num_args = 0..=1
         )]
         rewind_to_start: Option<u64>,
+        /// Keep the current playback state
+        #[arg(short, long = "keep-state", default_value_t = false)]
+        keep_state: bool,
     },
     /// Sets volume, relative if prefixed by + or -. Prints current volume if no
     /// arguments is given.

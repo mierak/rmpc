@@ -27,7 +27,8 @@ All notable changes to this project will be documented in this file.
 - Config option for global lyrics offset - `lyrics_offset_ms`
 - add `exec_on_song_change_at_start` config option
 - Added `album_date_tags` config option to specify priority order of metadata tags for album dates
-- Added an ability to specify relative/absolute theme path in config file.
+- Added an ability to specify relative/absolute theme path in config file
+- Added `keep_state_on_song_change` and equivalent flag to cli
 
 ### Changed
 
@@ -46,6 +47,8 @@ going to the next item
 - Remote commands now check for `$PID` env variable, meaning `--pid` argument is no longer needed for
 remote commands inside scripts triggered by rmpc
 - `AddToPlaylist` binding handles marked songs rather than only the one under your cursor.
+- Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use 
+`keep_state_on_song_change` to disable this 
 
 ### Fixed
 

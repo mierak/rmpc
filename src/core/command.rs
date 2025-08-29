@@ -21,6 +21,7 @@ use crate::{
         ext::duration::DurationExt,
         lrc::{LrcIndex, get_lrc_path},
         macros::status_error,
+        mpd_client_ext::MpdClientExt,
         ytdlp::YtDlp,
     },
 };
@@ -130,19 +131,22 @@ impl Command {
                 println!("{}", client.get_status()?.volume.value());
                 Ok(())
             })),
-            Command::Next => Ok(Box::new(|client| Ok(client.next()?))),
-            Command::Prev { rewind_to_start } => Ok(Box::new(move |client| {
+            Command::Next { keep_state } => Ok(Box::new(move |client| {
+                let status = client.get_status()?;
+                Ok(client.next_keep_state(keep_state, status.state)?)
+            })),
+            Command::Prev { rewind_to_start, keep_state } => Ok(Box::new(move |client| {
+                let status = client.get_status()?;
                 match rewind_to_start {
                     Some(value) => {
-                        let status = client.get_status()?;
                         if status.elapsed.as_secs() >= value {
                             client.seek_current(ValueChange::Set(0))?;
                         } else {
-                            client.prev()?;
+                            client.prev_keep_state(keep_state, status.state)?;
                         }
                     }
                     None => {
-                        client.prev()?;
+                        client.prev_keep_state(keep_state, status.state)?;
                     }
                 }
                 Ok(())
