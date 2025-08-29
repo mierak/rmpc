@@ -327,25 +327,29 @@ impl<'ui> Ui<'ui> {
                     );
                 }
                 GlobalAction::NextTrack if ctx.status.state != State::Stop => {
+                    let keep_state = ctx.config.keep_state_on_song_change;
+                    let state = ctx.status.state;
                     ctx.command(move |client| {
-                        client.next()?;
+                        client.next_keep_state(keep_state, state)?;
                         Ok(())
                     });
                 }
                 GlobalAction::PreviousTrack if ctx.status.state != State::Stop => {
                     let rewind_to_start = ctx.config.rewind_to_start_sec;
                     let elapsed_sec = ctx.status.elapsed.as_secs();
+                    let keep_state = ctx.config.keep_state_on_song_change;
+                    let state = ctx.status.state;
                     ctx.command(move |client| {
                         match rewind_to_start {
                             Some(value) => {
                                 if elapsed_sec >= value {
                                     client.seek_current(ValueChange::Set(0))?;
                                 } else {
-                                    client.prev()?;
+                                    client.prev_keep_state(keep_state, state)?;
                                 }
                             }
                             None => {
-                                client.prev()?;
+                                client.prev_keep_state(keep_state, state)?;
                             }
                         }
                         Ok(())

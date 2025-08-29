@@ -6,7 +6,7 @@ use crate::{
     config::keys::actions::Position,
     mpd::{
         QueuePosition,
-        commands::outputs::Outputs,
+        commands::{State, outputs::Outputs},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{Filter, FilterKind, MpdClient, MpdCommand, SingleOrRange, Tag},
         proto_client::ProtoClient,
@@ -34,6 +34,8 @@ pub trait MpdClientExt {
         current_partition: &str,
     ) -> Result<Vec<PartitionedOutput>, MpdError>;
     fn create_playlist(&mut self, name: &str, items: Vec<String>) -> Result<(), MpdError>;
+    fn next_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
+    fn prev_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
 }
 
 #[derive(Debug, Clone)]
@@ -362,6 +364,42 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         status_info!("Created playlist {name} with {} items", items.len());
 
         Ok(())
+    }
+
+    fn next_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError> {
+        if !keep {
+            return self.next();
+        }
+
+        match state {
+            State::Play => self.next(),
+            State::Stop => Ok(()),
+            State::Pause => {
+                self.send_start_cmd_list()?;
+                self.send_next()?;
+                self.send_pause()?;
+                self.send_execute_cmd_list()?;
+                self.read_ok()
+            }
+        }
+    }
+
+    fn prev_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError> {
+        if !keep {
+            return self.prev();
+        }
+
+        match state {
+            State::Play => self.prev(),
+            State::Stop => Ok(()),
+            State::Pause => {
+                self.send_start_cmd_list()?;
+                self.send_prev()?;
+                self.send_pause()?;
+                self.send_execute_cmd_list()?;
+                self.read_ok()
+            }
+        }
     }
 }
 

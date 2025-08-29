@@ -15,6 +15,7 @@
     enable_config_hot_reload: true,
     status_update_interval_ms: 1000,
     rewind_to_start_sec: None,
+    keep_state_on_song_change: true,
     reflect_changes_to_playlist: false,
     select_current_song_on_change: false,
     browser_song_sort: [Disc, Track, Artist, Title],

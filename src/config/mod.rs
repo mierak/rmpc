@@ -72,6 +72,7 @@ pub struct Config {
     pub center_current_song_on_change: bool,
     pub reflect_changes_to_playlist: bool,
     pub rewind_to_start_sec: Option<u64>,
+    pub keep_state_on_song_change: bool,
     pub mpd_read_timeout: Duration,
     pub mpd_write_timeout: Duration,
     pub mpd_idle_read_timeout_ms: Option<Duration>,
@@ -132,6 +133,8 @@ pub struct ConfigFile {
     reflect_changes_to_playlist: bool,
     #[serde(default)]
     rewind_to_start_sec: Option<u64>,
+    #[serde(default = "defaults::bool::<true>")]
+    keep_state_on_song_change: bool,
     #[serde(default = "defaults::u64::<10_000>")]
     mpd_read_timeout_ms: u64,
     #[serde(default = "defaults::u64::<5_000>")]
@@ -227,6 +230,7 @@ impl Default for ConfigFile {
             browser_song_sort: defaults::default_song_sort(),
             directories_sort: SortModeFile::SortFormat { group_by_type: true, reverse: false },
             rewind_to_start_sec: None,
+            keep_state_on_song_change: true,
             reflect_changes_to_playlist: false,
             cava: CavaFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
@@ -453,6 +457,7 @@ impl ConfigFile {
             }),
             theme,
             rewind_to_start_sec: self.rewind_to_start_sec,
+            keep_state_on_song_change: self.keep_state_on_song_change,
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
         };
