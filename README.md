@@ -4,6 +4,8 @@ Rmpc is a beautiful, modern and configurable terminal based Music Player Daemon 
 heavily inspired by [ncmpcpp](https://github.com/ncmpcpp/ncmpcpp) and
 [ranger](https://github.com/ranger/ranger)/[lf](https://github.com/gokcehan/lf) file managers.
 
+![preview](docs/public/preview.png)
+
 ## Get started
 
 Description, configuration and installation methods can be found on [the rmpc website](https://mierak.github.io/rmpc/)
@@ -11,6 +13,8 @@ Description, configuration and installation methods can be found on [the rmpc we
 ## Main Features
 
 - Album cover art display if your terminal supports either of Kitty, Sixel, Iterm2 protocols, or via ueberzuggpp
+- Cava integration for music visualisation
+- Support for [synchronized lyrics](https://en.wikipedia.org/wiki/LRC_(file_format))
 - Ability to play music from youtube
 - Configurable (T)UI
   - Configure what information(if any!) is displayed in the header
