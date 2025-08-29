@@ -482,9 +482,24 @@ impl Default for TabsFile {
                     borders: BordersFile::NONE,
                     panes: vec![
                         SubPaneFile {
-                            pane: PaneOrSplitFile::Pane(PaneTypeFile::AlbumArt),
                             size: "40%".to_string(),
                             borders: BordersFile::NONE,
+                            pane: PaneOrSplitFile::Split {
+                                direction: DirectionFile::Vertical,
+                                borders: BordersFile::NONE,
+                                panes: vec![
+                                    SubPaneFile {
+                                        pane: PaneOrSplitFile::Pane(PaneTypeFile::Lyrics),
+                                        size: "3".to_string(),
+                                        borders: BordersFile::NONE,
+                                    },
+                                    SubPaneFile {
+                                        pane: PaneOrSplitFile::Pane(PaneTypeFile::AlbumArt),
+                                        size: "100%".to_string(),
+                                        borders: BordersFile::NONE,
+                                    },
+                                ],
+                            },
                         },
                         SubPaneFile {
                             pane: PaneOrSplitFile::Pane(PaneTypeFile::Queue),

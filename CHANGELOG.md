@@ -49,6 +49,7 @@ remote commands inside scripts triggered by rmpc
 - `AddToPlaylist` binding handles marked songs rather than only the one under your cursor.
 - Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use 
 `keep_state_on_song_change` to disable this 
+- Default theme now includes lyrics pane above the album art on queue tab
 
 ### Fixed
 
