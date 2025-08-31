@@ -14,7 +14,6 @@
     preview_label_style: (fg: "yellow"),
     preview_metadata_group_style: (fg: "yellow", modifiers: "Bold"),
     tab_bar: (
-        enabled: true,
         active_style: (fg: "black", bg: "blue", modifiers: "Bold"),
         inactive_style: (),
     ),

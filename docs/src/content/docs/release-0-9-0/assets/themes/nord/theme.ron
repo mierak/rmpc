@@ -14,7 +14,6 @@
     preview_label_style: (fg: "#b48ead"),
     preview_metadata_group_style: (fg: "#88c0d0"),
     tab_bar: (
-        enabled: true,
         active_style: (fg: "#2e3440", bg: "#81A1C1", modifiers: "Bold"),
         inactive_style: (fg: "#d8dee9", bg: "#2e3440", modifiers: ""),
     ),
