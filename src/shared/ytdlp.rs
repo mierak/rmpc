@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use itertools::Itertools;
 use rustix::path::Arg;
 use serde::Deserialize;
@@ -13,7 +13,7 @@ use walkdir::WalkDir;
 
 use super::dependencies;
 use crate::{
-    config::cli_config::CliConfig,
+    config::{cli_config::CliConfig, utils::tilde_expand},
     shared::macros::{status_error, status_info, status_warn},
 };
 
@@ -212,7 +212,7 @@ impl<'a> YtDlp<'a> {
         id.get_cached(self.cache_dir)
             .map(|v| -> Result<_> { Ok(v.as_str()?.to_string()) })
             .transpose()?
-            .ok_or_else(|| anyhow!("Did not find file downloadid by yt-dlp in cache directory"))
+            .ok_or_else(|| anyhow!("Did not find file downloaded by yt-dlp in cache directory"))
     }
 }
 
@@ -252,7 +252,9 @@ impl YtDlpHost {
     }
 
     pub fn get_cached(&self, cache_dir: &Path) -> Option<PathBuf> {
-        WalkDir::new(self.cache_subdir(Path::new(cache_dir)))
+        let raw_path = cache_dir.as_str();
+        let expanded_dir = tilde_expand(raw_path.ok()?);
+        WalkDir::new(self.cache_subdir(Path::new(&expanded_dir.as_ref())))
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
@@ -261,7 +263,9 @@ impl YtDlpHost {
     }
 
     pub fn delete_cached(&self, cache_dir: &Path) -> Result<()> {
-        let files = WalkDir::new(self.cache_subdir(Path::new(cache_dir)))
+        let raw_path = cache_dir.as_str();
+        let expanded_dir = tilde_expand(raw_path?);
+        let files = WalkDir::new(self.cache_subdir(Path::new(&expanded_dir.as_ref())))
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
