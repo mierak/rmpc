@@ -161,7 +161,7 @@ impl Default for UiConfigFile {
                 modifiers: None,
             }),
             tab_bar: TabBarFile {
-                enabled: Some(true),
+                enabled: false,
                 active_style: Some(StyleFile {
                     fg: Some("black".to_string()),
                     bg: Some("blue".to_string()),
@@ -215,7 +215,8 @@ pub enum AlbumSeparator {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TabBarFile {
     // deprecated
-    pub(super) enabled: Option<bool>,
+    #[serde(default = "defaults::bool::<false>")]
+    pub(super) enabled: bool,
     pub(super) active_style: Option<StyleFile>,
     pub(super) inactive_style: Option<StyleFile>,
 }

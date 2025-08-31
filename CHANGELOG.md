@@ -61,6 +61,7 @@ scrolled down
 - Volume parsing if MPD's volume was set to higher value than 255 via external means
 - Fix improper handling of remote theme change
 - Tilde not being expanded for yt-dlp on non-linux platforms
+- Remove mention of `tab_bar.enabled` from docs
 
 ## [0.9.0] - 2025-06-23
 
