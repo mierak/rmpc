@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use config::{DeserError, cli_config::CliConfigFile};
+use config::{cli_config::CliConfigFile, DeserError};
 use crossbeam::channel::unbounded;
 use ctx::Ctx;
 use log::info;
@@ -19,8 +19,8 @@ use shared::{
 
 use crate::{
     config::{
-        ConfigFile,
         cli::{Args, Command},
+        ConfigFile,
     },
     mpd::client::Client,
     shared::{
@@ -125,6 +125,7 @@ fn main() -> Result<()> {
             );
             println!("\n{:<20} {}", "Config path", config_path.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
+            println!("{:<20} {}", "Temp path", std::env::temp_dir().display());
 
             println!("\nMPD:");
             println!("{:<20} {:?}", "Address", config_file.address);
