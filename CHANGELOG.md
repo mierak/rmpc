@@ -36,19 +36,19 @@ All notable changes to this project will be documented in this file.
 - Improved `.lrc` lyrics files parser performance and fixed parsing issues
 - Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
 - Confirm action in browsers, which either opens a directory or adds the hovered song to the queue
-  no longer exhibits the latter behavior. It now instead replaces the queue with all songs in the
-  directory.
+no longer exhibits the latter behavior. It now instead replaces the queue with all songs in the
+directory.
 - Removed `Add`, `Insert`, `AddAndReplace`, `AddAll`, `InsertAll` and `AddAllReplace` from the code.
-  They are now mapped to the new `AddOptions` action. Existing configs are not affected and will
-  continue to work.
+They are now mapped to the new `AddOptions` action. Existing configs are not affected and will
+continue to work.
 - Scrolling behavior to be more natural - scrolling now actually scrolls the area instead of simply
-  going to the next item
+going to the next item
 - Scrollbars now represent the viewport position instead of the currently selected item position
 - Remote commands now check for `$PID` env variable, meaning `--pid` argument is no longer needed for
-  remote commands inside scripts triggered by rmpc
+remote commands inside scripts triggered by rmpc
 - `AddToPlaylist` binding handles marked songs rather than only the one under your cursor.
-- Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use
-  `keep_state_on_song_change` to disable this
+- Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use 
+`keep_state_on_song_change` to disable this 
 - Default theme now includes lyrics pane above the album art on queue tab
 
 ### Fixed
@@ -56,11 +56,11 @@ All notable changes to this project will be documented in this file.
 - Fixed `QueueTimeRemaining` not updating remaining time
 - `ModalClosed` event now correctly gets dispatched only after all modals were closed
 - Preview no longer disappears in search when returning to the search form while the results are
-  scrolled down
+scrolled down
 - Adding entries without album adding not intended songs when using split by date
 - Volume parsing if MPD's volume was set to higher value than 255 via external means
 - Fix improper handling of remote theme change
-- Tilde not being expanded for yt-dlp on non-linux platforms
+- Attempted to fix yt-dlp cache on non linux platforms
 
 ## [0.9.0] - 2025-06-23
 
