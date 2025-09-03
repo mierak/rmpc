@@ -15,6 +15,7 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
+        cmp::StringCompare,
         key_event::KeyEvent,
         mouse_event::MouseEvent,
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
@@ -180,7 +181,13 @@ impl Pane for AlbumsPane {
                 ctx.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
-                let root = data.into_iter().map(DirOrSong::name_only).collect_vec();
+                let root = data
+                    .into_iter()
+                    .sorted_by(|a, b| {
+                        StringCompare::from(ctx.config.browser_song_sort.as_ref()).compare(a, b)
+                    })
+                    .map(DirOrSong::name_only)
+                    .collect_vec();
                 self.stack = DirStack::new(root);
                 self.prepare_preview(ctx)?;
             }
