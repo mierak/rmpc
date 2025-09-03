@@ -68,7 +68,7 @@ mod test {
     #[case("", "")]
     #[case("a", "a")]
     #[case("A", "a")]
-    #[case("somErAnDomStuFff", "somerandomstufff")]
+    #[case("soMerAnDomStuFff", "somerandomstufff")]
     fn fold_case_ordering_equal_fold_case(#[case] a: &str, #[case] b: &str) {
         let cmp = StringCompare::builder().fold_case(true).build();
 
@@ -78,7 +78,7 @@ mod test {
     #[rstest]
     #[case("a", "b")]
     #[case("A", "b")]
-    #[case("somErAnDomStuFff", "somerandomstuffg")]
+    #[case("soMerAnDomStuFff", "somerandomstuffg")]
     pub fn fold_case_ordering_less_fold_case(#[case] a: &str, #[case] b: &str) {
         let cmp = StringCompare::builder().fold_case(true).build();
 
@@ -88,7 +88,7 @@ mod test {
     #[rstest]
     #[case("b", "a")]
     #[case("B", "a")]
-    #[case("somerandomstuffg", "somErAnDomStuFff")]
+    #[case("somerandomstuffg", "soMerAnDomStuFff")]
     pub fn fold_case_ordering_greater_fold_case(#[case] a: &str, #[case] b: &str) {
         let cmp = StringCompare::builder().fold_case(true).build();
 
@@ -99,7 +99,7 @@ mod test {
     #[case("", "")]
     #[case("a", "a")]
     #[case("A", "A")]
-    #[case("somErAnDomStuFff", "somErAnDomStuFff")]
+    #[case("soMerAnDomStuFff", "soMerAnDomStuFff")]
     fn no_fold_case_ordering_equal(#[case] a: &str, #[case] b: &str) {
         let cmp = StringCompare::builder().fold_case(false).build();
 
@@ -110,7 +110,7 @@ mod test {
     #[case("a", "b")]
     #[case("A", "B")]
     #[case("A", "a")]
-    #[case("somErAnDomStuFff", "somErAnDomStuFfg")]
+    #[case("soMerAnDomStuFff", "soMerAnDomStuFfg")]
     pub fn no_fold_case_ordering_less(#[case] a: &str, #[case] b: &str) {
         let cmp = StringCompare::builder().fold_case(false).build();
 
