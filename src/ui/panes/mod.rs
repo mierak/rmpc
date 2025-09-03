@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    cmp::Ordering,
     collections::{HashMap, VecDeque},
     time::Duration,
 };
@@ -28,7 +27,6 @@ use search::SearchPane;
 use strum::Display;
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
-use unicase::UniCase;
 use volume::VolumePane;
 
 #[cfg(debug_assertions)]
@@ -494,118 +492,6 @@ impl Song {
                         .map_or_else(|_| v.last().to_owned(), |v| format!("{v:0>2}")),
                 )
             }),
-        }
-    }
-
-    pub fn cmp_by_prop(&self, other: &Self, property: &SongProperty) -> Ordering {
-        match property {
-            SongProperty::Filename => match (self.file_name(), other.file_name()) {
-                (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
-                (_, Some(_)) => Ordering::Greater,
-                (Some(_), _) => Ordering::Less,
-                (None, None) => Ordering::Equal,
-            },
-            SongProperty::FileExtension => match (self.file_ext(), other.file_ext()) {
-                (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
-                (_, Some(_)) => Ordering::Greater,
-                (Some(_), _) => Ordering::Less,
-                (None, None) => Ordering::Equal,
-            },
-            SongProperty::File => UniCase::new(&self.file).cmp(&UniCase::new(&other.file)),
-            SongProperty::Title => {
-                match (
-                    self.metadata.get("title").map(|v| v.join("")),
-                    other.metadata.get("title").map(|v| v.join("")),
-                ) {
-                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Artist => {
-                match (
-                    self.metadata.get("artist").map(|v| v.join("")),
-                    other.metadata.get("artist").map(|v| v.join("")),
-                ) {
-                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Album => {
-                match (
-                    self.metadata.get("album").map(|v| v.join("")),
-                    other.metadata.get("album").map(|v| v.join("")),
-                ) {
-                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Track => {
-                let self_track = self.metadata.get("track");
-                let self_track = self_track.map(|v| v.join(""));
-                let other_track = other.metadata.get("track");
-                let other_track = other_track.map(|v| v.join(""));
-                match (self_track, other_track) {
-                    (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
-                        (Ok(a), Ok(b)) => a.cmp(&b),
-                        _ => UniCase::new(a).cmp(&UniCase::new(b)),
-                    },
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Position => {
-                // last() is fine because position should never have multiple values
-                let self_pos = self.metadata.get("pos").map(|v| v.last());
-                let other_pos = other.metadata.get("pos").map(|v| v.last());
-                match (self_pos, other_pos) {
-                    (Some(a), Some(b)) => match (a.parse::<usize>(), b.parse::<usize>()) {
-                        (Ok(a), Ok(b)) => a.cmp(&b),
-                        _ => UniCase::new(a).cmp(&UniCase::new(b)),
-                    },
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Disc => {
-                let self_disc = self.metadata.get("disc");
-                let self_disc = self_disc.map(|v| v.join(""));
-                let other_disc = other.metadata.get("disc");
-                let other_disc = other_disc.map(|v| v.join(""));
-                match (self_disc, other_disc) {
-                    (Some(a), Some(b)) => match (a.parse::<i32>(), b.parse::<i32>()) {
-                        (Ok(a), Ok(b)) => a.cmp(&b),
-                        _ => UniCase::new(a).cmp(&UniCase::new(b)),
-                    },
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Other(prop_name) => {
-                match (
-                    self.metadata.get(prop_name).map(|v| v.join("")),
-                    other.metadata.get(prop_name).map(|v| v.join("")),
-                ) {
-                    (Some(a), Some(b)) => UniCase::new(a).cmp(&UniCase::new(b)),
-                    (_, Some(_)) => Ordering::Greater,
-                    (Some(_), _) => Ordering::Less,
-                    (None, None) => Ordering::Equal,
-                }
-            }
-            SongProperty::Duration => match (self.duration, other.duration) {
-                (Some(a), Some(b)) => a.as_millis().cmp(&b.as_millis()),
-                (_, Some(_)) => Ordering::Greater,
-                (Some(_), _) => Ordering::Less,
-                (None, None) => Ordering::Equal,
-            },
         }
     }
 

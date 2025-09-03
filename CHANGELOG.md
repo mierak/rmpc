@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - Added `album_date_tags` config option to specify priority order of metadata tags for album dates
 - Added an ability to specify relative/absolute theme path in config file
 - Added `keep_state_on_song_change` and equivalent flag to cli
+- Added `ignore_leading_the` when sorting entries in browsers
 
 ### Changed
 
@@ -50,6 +51,7 @@ remote commands inside scripts triggered by rmpc
 - Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use 
 `keep_state_on_song_change` to disable this 
 - Default theme now includes lyrics pane above the album art on queue tab
+- Browsers now properly use case insensitive sorting
 
 ### Fixed
 

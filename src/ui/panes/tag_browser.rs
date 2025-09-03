@@ -20,6 +20,7 @@ use crate::{
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
+        cmp::StringCompare,
         key_event::KeyEvent,
         mouse_event::MouseEvent,
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
@@ -399,15 +400,20 @@ impl Pane for TagBrowserPane {
                 ctx.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
+                let sort_opts = ctx.config.browser_song_sort.as_ref();
+
                 let data = if let Some(sep) = &self.unescaped_separator {
                     data.into_iter()
                         .flat_map(|item| item.split(sep.as_str()).map(str::to_string).collect_vec())
                         .unique()
-                        .sorted()
+                        .sorted_by(|a, b| StringCompare::from(sort_opts).compare(a, b))
                         .map(DirOrSong::name_only)
                         .collect_vec()
                 } else {
-                    data.into_iter().sorted().map(DirOrSong::name_only).collect_vec()
+                    data.into_iter()
+                        .sorted_by(|a, b| StringCompare::from(sort_opts).compare(a, b))
+                        .map(DirOrSong::name_only)
+                        .collect_vec()
                 };
 
                 self.stack = DirStack::new(data);

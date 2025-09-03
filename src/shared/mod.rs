@@ -1,3 +1,4 @@
+pub mod cmp;
 pub mod dependencies;
 pub mod env;
 pub mod events;

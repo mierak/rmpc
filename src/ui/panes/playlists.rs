@@ -16,6 +16,7 @@ use crate::{
         mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
+        cmp::StringCompare,
         ext::btreeset_ranges::BTreeSetRanges,
         key_event::KeyEvent,
         macros::{modal, status_info},
@@ -127,13 +128,14 @@ impl Pane for PlaylistsPane {
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
+            let compare = StringCompare::from(ctx.config.browser_song_sort.as_ref());
             ctx.query().id(INIT).target(PaneType::Playlists).replace_id(INIT).query(
                 move |client| {
                     let result: Vec<_> = client
                         .list_playlists()
                         .context("Cannot list playlists")?
                         .into_iter()
-                        .sorted_by(|a, b| a.name.cmp(&b.name))
+                        .sorted_by(|a, b| compare.compare(&a.name, &b.name))
                         .map(|playlist| DirOrSong::name_only(playlist.name))
                         .collect();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
@@ -146,27 +148,29 @@ impl Pane for PlaylistsPane {
     }
 
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
-        let id = match event {
-            UiEvent::Database => Some(INIT),
-            UiEvent::StoredPlaylist => Some(REINIT),
-            _ => None,
-        };
         match event {
             UiEvent::Database | UiEvent::StoredPlaylist => {
-                if let Some(id) = id {
-                    ctx.query().id(id).replace_id(id).target(PaneType::Playlists).query(
-                        move |client| {
-                            let result: Vec<_> = client
-                                .list_playlists()
-                                .context("Cannot list playlists")?
-                                .into_iter()
-                                .sorted_by(|a, b| a.name.cmp(&b.name))
-                                .map(|playlist| DirOrSong::name_only(playlist.name))
-                                .collect();
-                            Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
-                        },
-                    );
-                }
+                let id = match event {
+                    UiEvent::Database => INIT,
+                    UiEvent::StoredPlaylist => REINIT,
+                    _ => return Ok(()),
+                };
+
+                let sort_opts = ctx.config.browser_song_sort.clone();
+                ctx.query().id(id).replace_id(id).target(PaneType::Playlists).query(
+                    move |client| {
+                        let result: Vec<_> = client
+                            .list_playlists()
+                            .context("Cannot list playlists")?
+                            .into_iter()
+                            .sorted_by(|a, b| {
+                                StringCompare::from(sort_opts.as_ref()).compare(&a.name, &b.name)
+                            })
+                            .map(|playlist| DirOrSong::name_only(playlist.name))
+                            .collect();
+                        Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
+                    },
+                );
             }
             UiEvent::Reconnected => {
                 self.initialized = false;

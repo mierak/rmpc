@@ -166,6 +166,8 @@ pub struct ConfigFile {
     #[serde(default)]
     tabs: TabsFile,
     #[serde(default)]
+    pub ignore_leading_the: bool,
+    #[serde(default)]
     pub browser_song_sort: Vec<SongPropertyFile>,
     #[serde(default)]
     pub show_playlists_in_browser: ShowPlaylistsMode,
@@ -227,6 +229,7 @@ impl Default for ConfigFile {
             wrap_navigation: false,
             password: None,
             artists: ArtistsFile::default(),
+            ignore_leading_the: false,
             browser_song_sort: defaults::default_song_sort(),
             directories_sort: SortModeFile::SortFormat { group_by_type: true, reverse: false },
             rewind_to_start_sec: None,
@@ -423,14 +426,16 @@ impl ConfigFile {
             on_resize: self.on_resize.map(|arr| {
                 Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
+            show_playlists_in_browser: self.show_playlists_in_browser,
             browser_song_sort: Arc::new(SortOptions {
                 mode: SortMode::Format(
                     self.browser_song_sort.iter().cloned().map(SongProperty::from).collect_vec(),
                 ),
                 group_by_type: true,
                 reverse: false,
+                ignore_leading_the: self.ignore_leading_the,
+                fold_case: true,
             }),
-            show_playlists_in_browser: self.show_playlists_in_browser,
             directories_sort: Arc::new(match self.directories_sort {
                 SortModeFile::Format { group_by_type, reverse } => SortOptions {
                     mode: SortMode::Format(
@@ -443,6 +448,8 @@ impl ConfigFile {
                     ),
                     group_by_type,
                     reverse,
+                    ignore_leading_the: self.ignore_leading_the,
+                    fold_case: true,
                 },
                 SortModeFile::SortFormat { group_by_type, reverse } => SortOptions {
                     mode: SortMode::Format(
@@ -450,10 +457,16 @@ impl ConfigFile {
                     ),
                     group_by_type,
                     reverse,
+                    ignore_leading_the: self.ignore_leading_the,
+                    fold_case: true,
                 },
-                SortModeFile::ModifiedTime { group_by_type, reverse } => {
-                    SortOptions { mode: SortMode::ModifiedTime, group_by_type, reverse }
-                }
+                SortModeFile::ModifiedTime { group_by_type, reverse } => SortOptions {
+                    mode: SortMode::ModifiedTime,
+                    group_by_type,
+                    reverse,
+                    ignore_leading_the: self.ignore_leading_the,
+                    fold_case: true,
+                },
             }),
             theme,
             rewind_to_start_sec: self.rewind_to_start_sec,
