@@ -8,7 +8,6 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use itertools::Itertools;
 use rustix::path::Arg;
-use serde::Deserialize;
 use walkdir::WalkDir;
 
 use super::dependencies;
@@ -21,14 +20,16 @@ use crate::{
 pub struct YtDlp<'a> {
     pub cache_dir: &'a Path,
 }
-#[derive(Debug, Deserialize)]
-struct YtdlpSearchJson {
-    entries: Vec<YtdlpSearchEntry>,
+
+#[derive(serde::Deserialize)]
+struct SearchEntry {
+    id: Option<String>,
+    url: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct YtdlpSearchEntry {
-    id: String,
+#[derive(serde::Deserialize)]
+struct SearchJson {
+    entries: Vec<SearchEntry>,
 }
 
 impl<'a> YtDlp<'a> {
@@ -61,46 +62,34 @@ impl<'a> YtDlp<'a> {
         Ok(file_path)
     }
 
-    pub fn search_youtube_single(query: &str) -> Result<String> {
-        let search_expr = format!("ytsearch1:{query}");
+    /// Search the chosen host (soundCloud flags) or youTube by
+    /// default and return a canonical URL for the first result.
+    pub fn search_single_auto(query: &str, soundcloud: bool) -> anyhow::Result<String> {
+        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
+        Self::search_single(kind, query)
+    }
 
-        let mut command = Command::new("yt-dlp");
-        command.arg("-J");
-        command.arg("--flat-playlist");
-        command.arg(&search_expr);
-
-        let args = command.get_args().map(|arg| format!("\"{}\"", arg.to_string_lossy())).join(" ");
-        log::debug!(args = args.as_str(); "Executing yt-dlp search");
-
-        let out = command.output()?;
-        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-        let exit_code = out.status.code();
-
-        if exit_code != Some(0) {
-            log::error!(stderr = stderr.as_str().trim(); "yt-dlp search failed");
-            bail!(
-                "yt-dlp search failed with exit code: {}",
-                exit_code.map_or_else(|| "None".to_string(), |c| c.to_string())
-            );
+    fn search_single(kind: YtDlpHostKind, query: &str) -> anyhow::Result<String> {
+        let expr = format!("{}1:{query}", kind.search_key());
+        let out =
+            std::process::Command::new("yt-dlp").args(["-J", "--flat-playlist", &expr]).output()?;
+        if !out.status.success() {
+            anyhow::bail!("yt-dlp search failed: {}", String::from_utf8_lossy(&out.stderr));
         }
-
-        let parsed: YtdlpSearchJson =
-            serde_json::from_str(&stdout).context("Failed to parse yt-dlp search JSON")?;
-
-        let entry = parsed
+        let parsed: SearchJson = serde_json::from_slice(&out.stdout)?;
+        let e = parsed
             .entries
             .into_iter()
             .next()
-            .ok_or_else(|| anyhow!("No results for query: {query}"))?;
+            .ok_or_else(|| anyhow::anyhow!("No results for query: {query}"))?;
 
-        let host = YtDlpHost {
-            id: entry.id.clone(),
-            filename: entry.id.clone(),
-            kind: YtDlpHostKind::Youtube,
-        };
-
-        Ok(host.to_url())
+        if let Some(u) = e.url {
+            return Ok(u);
+        }
+        if let Some(id) = e.id {
+            return Ok(kind.watch_url(&id));
+        }
+        anyhow::bail!("Search returned no usable URL");
     }
 
     pub fn download(&self, url: &str) -> Result<Vec<String>> {
@@ -236,19 +225,11 @@ struct YtDlpHost {
 
 impl YtDlpHost {
     fn to_url(&self) -> String {
-        match self.kind {
-            YtDlpHostKind::Youtube => format!("https://www.youtube.com/watch?v={}", self.id),
-            YtDlpHostKind::Soundcloud => format!("https://soundcloud.com/{}", self.id),
-            YtDlpHostKind::NicoVideo => format!("https://www.nicovideo.jp/watch/{}", self.id),
-        }
+        self.kind.watch_url(&self.id)
     }
 
-    fn cache_subdir(&self, path: &Path) -> PathBuf {
-        path.join(match self.kind {
-            YtDlpHostKind::Youtube => "youtube",
-            YtDlpHostKind::Soundcloud => "soundcloud",
-            YtDlpHostKind::NicoVideo => "nicovideo",
-        })
+    fn cache_subdir(&self, root: &Path) -> PathBuf {
+        root.join(self.kind.cache_dir_name())
     }
 
     pub fn get_cached(&self, cache_dir: &Path) -> Option<PathBuf> {
@@ -343,19 +324,34 @@ impl FromStr for YtDlpPlaylistOrHost {
                 })
                 .ok_or_else(|| anyhow!("No video id found in url"))
                 .map(YtDlpPlaylistOrHost::Single),
-            "soundcloud.com" => {
+            "soundcloud.com" | "api.soundcloud.com" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
-                let Some(username) = path_segments.next() else {
-                    bail!("Invalid soundcloud url, no username: '{}'", s);
+                let Some(first) = path_segments.next() else {
+                    bail!("Invalid soundcloud url: '{}'", s);
                 };
-                let Some(track_name) = path_segments.next() else {
-                    bail!("Invalid soundcloud url, no track name: '{}'", s);
-                };
-                Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
-                    id: format!("{username}/{track_name}"),
-                    filename: format!("{username}-{track_name}"),
-                    kind: YtDlpHostKind::Soundcloud,
-                }))
+
+                if first == "tracks" {
+                    // API form: https://api.soundcloud.com/tracks/<id>
+                    let Some(track_id) = path_segments.next() else {
+                        bail!("Invalid soundcloud api url, no track id: '{}'", s);
+                    };
+                    Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
+                        id: track_id.to_string(),
+                        filename: track_id.to_string(),
+                        kind: YtDlpHostKind::Soundcloud,
+                    }))
+                } else {
+                    // Web form: https://soundcloud.com/<user>/<track>
+                    let username = first;
+                    let Some(track_name) = path_segments.next() else {
+                        bail!("Invalid soundcloud url, no track name: '{}'", s);
+                    };
+                    Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
+                        id: format!("{username}/{track_name}"),
+                        filename: format!("{username}-{track_name}"),
+                        kind: YtDlpHostKind::Soundcloud,
+                    }))
+                }
             }
             "nicovideo.jp" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
@@ -372,6 +368,41 @@ impl FromStr for YtDlpPlaylistOrHost {
                 }))
             }
             _ => bail!("Invalid yt-dlp url: '{}'. Received hostname: '{}'", s, host),
+        }
+    }
+}
+
+impl YtDlpHostKind {
+    fn cache_dir_name(self) -> &'static str {
+        match self {
+            Self::Youtube => "youtube",
+            Self::Soundcloud => "soundcloud",
+            Self::NicoVideo => "nicovideo",
+        }
+    }
+
+    fn watch_url(self, id: &str) -> String {
+        match self {
+            Self::Youtube => format!("https://www.youtube.com/watch?v={id}"),
+            Self::NicoVideo => format!("https://www.nicovideo.jp/watch/{id}"),
+            Self::Soundcloud => {
+                if id.contains('/') {
+                    format!("https://soundcloud.com/{id}")
+                } else if id.chars().all(|c| c.is_ascii_digit()) {
+                    format!("https://api.soundcloud.com/tracks/{id}")
+                } else {
+                    // fallback to web
+                    format!("https://soundcloud.com/{id}")
+                }
+            }
+        }
+    }
+
+    fn search_key(self) -> &'static str {
+        match self {
+            Self::Youtube => "ytsearch",
+            Self::Soundcloud => "scsearch",
+            Self::NicoVideo => "nicosearch",
         }
     }
 }

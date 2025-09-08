@@ -215,12 +215,15 @@ pub enum Command {
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
-    /// Search youtube song by name and add the first result to the current
-    /// queue.
+    /// Search and add the first match to the current queue (youTube by
+    /// default).
     SearchYt {
         /// Search query (song/artist/title…)
         #[arg(value_name = "QUERY")]
         query: String,
+        /// Search soundCloud instead of youTube
+        #[arg(short = 's', long = "soundcloud")]
+        soundcloud: bool,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and
         /// +<number> or -<number> (relative)
