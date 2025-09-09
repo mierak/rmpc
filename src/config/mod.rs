@@ -44,11 +44,7 @@ use self::{
 };
 use crate::{
     config::tabs::{SizedPaneOrSplit, Tab, TabName},
-    shared::{
-        image::{self, ImageProtocol},
-        lrc::LrcOffset,
-        macros::status_warn,
-    },
+    shared::{lrc::LrcOffset, macros::status_warn, terminal::TERMINAL},
     tmux,
 };
 
@@ -147,6 +143,7 @@ pub struct ConfigFile {
     pub enable_config_hot_reload: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
+    // Deprecated
     #[serde(default)]
     image_method: Option<ImageMethodFile>,
     #[serde(default)]
@@ -484,47 +481,16 @@ impl ConfigFile {
             tmux::enable_passthrough()?;
         }
 
-        config.album_art.method = match self.image_method.unwrap_or(album_art_method) {
-            ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
-            ImageMethodFile::Kitty => ImageMethod::Kitty,
-            ImageMethodFile::UeberzugWayland if image::is_ueberzug_wayland_supported() => {
-                ImageMethod::UeberzugWayland
-            }
-            ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
-            ImageMethodFile::UeberzugX11 if image::is_ueberzug_x11_supported() => {
-                ImageMethod::UeberzugX11
-            }
-            ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
-            ImageMethodFile::Sixel => ImageMethod::Sixel,
-            ImageMethodFile::Block => ImageMethod::Block,
-            ImageMethodFile::None => ImageMethod::None,
-            ImageMethodFile::Auto => match image::determine_image_support(is_tmux)? {
-                ImageProtocol::Kitty => ImageMethod::Kitty,
-                ImageProtocol::UeberzugWayland => ImageMethod::UeberzugWayland,
-                ImageProtocol::UeberzugX11 => ImageMethod::UeberzugX11,
-                ImageProtocol::Iterm2 => ImageMethod::Iterm2,
-                ImageProtocol::Sixel => ImageMethod::Sixel,
-                ImageProtocol::Block => ImageMethod::Block,
-                ImageProtocol::None => ImageMethod::Unsupported,
-            },
-        };
+        let image_backend =
+            TERMINAL.resolve_image_backend(self.image_method.unwrap_or(album_art_method));
 
-        match config.album_art.method {
-            ImageMethod::Unsupported => {
-                status_warn!(
-                    "Album art is enabled but no image protocol is supported by your terminal, disabling album art"
-                );
-            }
-            ImageMethod::None => {}
-            ImageMethod::Kitty
-            | ImageMethod::UeberzugWayland
-            | ImageMethod::UeberzugX11
-            | ImageMethod::Iterm2
-            | ImageMethod::Sixel
-            | ImageMethod::Block => {
-                log::debug!(resolved:? = config.album_art.method, requested:? = album_art_method, is_tmux; "Image method resolved");
-            }
+        if image_backend == ImageMethod::Unsupported {
+            status_warn!(
+                "The requested image backend is not supported in your current environment. Album art will be disabled."
+            );
         }
+
+        config.album_art.method = image_backend;
 
         Ok(config)
     }

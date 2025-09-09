@@ -30,6 +30,7 @@ Some of the terminals do not correctly report their size, thus some tweaking is 
 | Tabby     | ITerm2               | yes  | Needs to set max_size_px                                                                                                                                             |
 | Foot      | Sixel                | yes  | Limited image size [in tmux](#sixel)                                                                                                                                 |
 | Alacritty | Ueberzug             | yes  | Needs [ueberzugpp](https://github.com/jstkdng/ueberzugpp)                                                                                                            |
+| Konsole   | Ueberzug             | yes  | Has support for other protocols but they are either incomplete or have severe issues                                                                                 |
 | Others    | Ueberzug/Sixel/Kitty | yes  | Untested/unsupported. Might need [ueberzugpp](https://github.com/jstkdng/ueberzugpp). Try other backends or disabling album_art altogether if you experience issues. |
 
 ## Configuration
@@ -120,3 +121,8 @@ Cons:
 - Much lower image size can be transmitted through tmux due to sixel being a very size inefficient protocol.
   Tmux supports only 1MB of data due to its internal buffering limitations. See [more info here](https://github.com/tmux/tmux/issues/1502#issuecomment-429710887).
   You can limit your image size with [max_size_px](#max_size_px).
+
+### Block
+
+Displays images using ASCII blocks. Results in a very pixelated/low resolution image but should be
+supported pretty much everywhere.

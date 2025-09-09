@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - Added an ability to specify relative/absolute theme path in config file
 - Added `keep_state_on_song_change` and equivalent flag to cli
 - Added `ignore_leading_the` when sorting entries in browsers
+- More information about the system to debuginfo
 
 ### Changed
 
@@ -52,6 +53,7 @@ remote commands inside scripts triggered by rmpc
 `keep_state_on_song_change` to disable this 
 - Default theme now includes lyrics pane above the album art on queue tab
 - Browsers now properly use case insensitive sorting
+- Refactored and improved image backend detection
 
 ### Fixed
 
@@ -64,6 +66,8 @@ scrolled down
 - Fix improper handling of remote theme change
 - Tilde not being expanded for yt-dlp on non-linux platforms
 - Remove mention of `tab_bar.enabled` from docs
+- Konsole terminal now does not autodetect to Kitty image protocol, it instead uses ueberzugpp if
+available and Block if not
 
 ## [0.9.0] - 2025-06-23
 

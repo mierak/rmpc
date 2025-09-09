@@ -14,10 +14,7 @@ use super::{
     sixel::Sixel,
     ueberzug::{Layer, Ueberzug},
 };
-use crate::{
-    config::{Config, album_art::ImageMethod},
-    shared::image::ImageProtocol,
-};
+use crate::config::{Config, album_art::ImageMethod};
 
 pub static IS_SHOWING: AtomicBool = AtomicBool::new(false);
 
@@ -42,14 +39,14 @@ enum ImageState {
 
 impl AlbumArtFacade {
     pub fn new(config: &Config) -> Self {
-        let image_state = match config.album_art.method.into() {
-            ImageProtocol::Kitty => ImageState::Kitty(Kitty::new(config.into())),
-            ImageProtocol::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new(Layer::Wayland)),
-            ImageProtocol::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11)),
-            ImageProtocol::Iterm2 => ImageState::Iterm2(Iterm2::new(config.into())),
-            ImageProtocol::Sixel => ImageState::Sixel(Sixel::new(config.into())),
-            ImageProtocol::Block => ImageState::Block(Block::new(config.into())),
-            ImageProtocol::None => ImageState::None,
+        let image_state = match config.album_art.method {
+            ImageMethod::Kitty => ImageState::Kitty(Kitty::new(config.into())),
+            ImageMethod::UeberzugWayland => ImageState::Ueberzug(Ueberzug::new(Layer::Wayland)),
+            ImageMethod::UeberzugX11 => ImageState::Ueberzug(Ueberzug::new(Layer::X11)),
+            ImageMethod::Iterm2 => ImageState::Iterm2(Iterm2::new(config.into())),
+            ImageMethod::Sixel => ImageState::Sixel(Sixel::new(config.into())),
+            ImageMethod::Block => ImageState::Block(Block::new(config.into())),
+            ImageMethod::None | ImageMethod::Unsupported => ImageState::None,
         };
         Self {
             image_state,
@@ -142,19 +139,5 @@ impl AlbumArtFacade {
             ImageState::None => {}
         }
         Ok(())
-    }
-}
-
-impl From<ImageMethod> for ImageProtocol {
-    fn from(value: ImageMethod) -> Self {
-        match value {
-            ImageMethod::Kitty => ImageProtocol::Kitty,
-            ImageMethod::UeberzugWayland => ImageProtocol::UeberzugWayland,
-            ImageMethod::UeberzugX11 => ImageProtocol::UeberzugX11,
-            ImageMethod::Iterm2 => ImageProtocol::Iterm2,
-            ImageMethod::Sixel => ImageProtocol::Sixel,
-            ImageMethod::Block => ImageProtocol::Block,
-            ImageMethod::None | ImageMethod::Unsupported => ImageProtocol::None,
-        }
     }
 }
