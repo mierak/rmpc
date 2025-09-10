@@ -22,6 +22,7 @@ pub enum Emulator {
 
 impl Emulator {
     pub fn detect() -> Result<Emulator> {
+        // XTVERSION - https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
         let response = Tty::query_device_attrs("\x1b[>q")?;
         let from_dev_attr = if response.contains("ghostty") {
             Some(Emulator::Ghostty)

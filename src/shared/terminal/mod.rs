@@ -144,10 +144,12 @@ impl Terminal {
             _ => all_backends.retain(|b| !matches!(b, B::Iterm2)),
         }
 
-        // Ueberzugpp should be tested for for all terminals if no other backend was
-        // found before it.
-        all_backends.push(B::UeberzugWayland);
-        all_backends.push(B::UeberzugX11);
+        // Ueberzugpp should be tested for for all terminals except Konsole(size and
+        // position issues) if no other backend was found before it.
+        if !matches!(self.emulator, Emulator::Konsole) {
+            all_backends.push(B::UeberzugWayland);
+            all_backends.push(B::UeberzugX11);
+        }
 
         for backend in all_backends {
             if self.is_backend_supported(backend) {

@@ -68,6 +68,7 @@ scrolled down
 - Remove mention of `tab_bar.enabled` from docs
 - Konsole terminal now does not autodetect to Kitty image protocol, it instead uses ueberzugpp if
 available and Block if not
+- Fix Iterm2 image protocol sometimes rendering too late
 
 ## [0.9.0] - 2025-06-23
 

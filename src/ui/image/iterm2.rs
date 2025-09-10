@@ -153,6 +153,7 @@ fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
         "\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n"
     )?;
     queue!(w, RestorePosition)?;
+    w.flush()?;
 
     Ok(())
 }
