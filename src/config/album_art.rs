@@ -78,9 +78,8 @@ pub enum ImageMethod {
     Iterm2,
     Sixel,
     None,
-    Block,
     #[default]
-    Unsupported,
+    Block,
 }
 
 impl From<AlbumArtConfigFile> for AlbumArtConfig {

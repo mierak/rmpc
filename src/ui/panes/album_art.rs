@@ -183,7 +183,6 @@ mod tests {
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::Unsupported, false)]
     #[case(ImageMethod::None, false)]
     fn searches_for_album_art_before_show(
         #[case] method: ImageMethod,
@@ -224,7 +223,6 @@ mod tests {
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::Unsupported, false)]
     #[case(ImageMethod::None, false)]
     fn searches_for_album_art_on_event(
         #[case] method: ImageMethod,

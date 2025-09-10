@@ -103,9 +103,15 @@ impl Terminal {
             ImageMethodFile::UeberzugWayland if self.ueberzug_wayland() => {
                 ImageMethod::UeberzugWayland
             }
-            ImageMethodFile::UeberzugWayland => ImageMethod::Unsupported,
+            ImageMethodFile::UeberzugWayland => {
+                log::warn!("UeberzugWayland requested but not supported, falling back to Block");
+                ImageMethod::Block
+            }
             ImageMethodFile::UeberzugX11 if self.ueberzug_x11() => ImageMethod::UeberzugX11,
-            ImageMethodFile::UeberzugX11 => ImageMethod::Unsupported,
+            ImageMethodFile::UeberzugX11 => {
+                log::warn!("UeberzugX11 requested but not supported, falling back to Block");
+                ImageMethod::Block
+            }
             ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
             ImageMethodFile::Kitty => ImageMethod::Kitty,
             ImageMethodFile::Sixel => ImageMethod::Sixel,

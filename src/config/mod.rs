@@ -8,7 +8,7 @@ use std::{
 };
 
 use address::MpdPassword;
-use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethod, ImageMethodFile};
+use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethodFile};
 use anyhow::{Context, Result};
 use artists::{Artists, ArtistsFile};
 use cava::{Cava, CavaFile};
@@ -44,7 +44,7 @@ use self::{
 };
 use crate::{
     config::tabs::{SizedPaneOrSplit, Tab, TabName},
-    shared::{lrc::LrcOffset, macros::status_warn, terminal::TERMINAL},
+    shared::{lrc::LrcOffset, terminal::TERMINAL},
     tmux,
 };
 
@@ -481,16 +481,8 @@ impl ConfigFile {
             tmux::enable_passthrough()?;
         }
 
-        let image_backend =
+        config.album_art.method =
             TERMINAL.resolve_image_backend(self.image_method.unwrap_or(album_art_method));
-
-        if image_backend == ImageMethod::Unsupported {
-            status_warn!(
-                "The requested image backend is not supported in your current environment. Album art will be disabled."
-            );
-        }
-
-        config.album_art.method = image_backend;
 
         Ok(config)
     }

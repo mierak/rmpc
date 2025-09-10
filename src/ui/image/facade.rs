@@ -46,7 +46,7 @@ impl AlbumArtFacade {
             ImageMethod::Iterm2 => ImageState::Iterm2(Iterm2::new(config.into())),
             ImageMethod::Sixel => ImageState::Sixel(Sixel::new(config.into())),
             ImageMethod::Block => ImageState::Block(Block::new(config.into())),
-            ImageMethod::None | ImageMethod::Unsupported => ImageState::None,
+            ImageMethod::None => ImageState::None,
         };
         Self {
             image_state,
