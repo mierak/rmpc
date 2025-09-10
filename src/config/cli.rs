@@ -224,6 +224,12 @@ pub enum Command {
         /// Search soundCloud instead of youTube
         #[arg(short = 's', long = "soundcloud")]
         soundcloud: bool,
+        /// Show a pick-list of the first N results and let you choose
+        #[arg(short = 'l', long = "list")]
+        list: bool,
+        /// How many results to show with --list
+        #[arg(long = "limit", default_value_t = 5)]
+        limit: usize,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and
         /// +<number> or -<number> (relative)

@@ -25,11 +25,21 @@ pub struct YtDlp<'a> {
 struct SearchEntry {
     id: Option<String>,
     url: Option<String>,
+    #[serde(default)]
+    webpage_url: Option<String>,
+    #[serde(default)]
+    title: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
 struct SearchJson {
     entries: Vec<SearchEntry>,
+}
+
+#[derive(Debug, Clone)]
+struct SearchItem {
+    title: Option<String>,
+    url: String,
 }
 
 impl<'a> YtDlp<'a> {
@@ -62,34 +72,123 @@ impl<'a> YtDlp<'a> {
         Ok(file_path)
     }
 
-    /// Search the chosen host (soundCloud flags) or youTube by
-    /// default and return a canonical URL for the first result.
+    fn search_single(kind: YtDlpHostKind, query: &str) -> anyhow::Result<String> {
+        Ok(Self::search_many(kind, query, 1)?[0].url.clone())
+    }
+
     pub fn search_single_auto(query: &str, soundcloud: bool) -> anyhow::Result<String> {
         let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
         Self::search_single(kind, query)
     }
 
-    fn search_single(kind: YtDlpHostKind, query: &str) -> anyhow::Result<String> {
-        let expr = format!("{}1:{query}", kind.search_key());
+    fn search_pick_auto<F>(
+        query: &str,
+        soundcloud: bool,
+        limit: usize,
+        picker: F,
+    ) -> anyhow::Result<String>
+    where
+        F: FnOnce(&[SearchItem]) -> anyhow::Result<usize>,
+    {
+        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
+        Self::search_pick_with(kind, query, limit, picker)
+    }
+
+    pub fn search_pick_stdin_auto(
+        query: &str,
+        soundcloud: bool,
+        limit: usize,
+    ) -> anyhow::Result<String> {
+        Self::search_pick_auto(query, soundcloud, limit, |items| {
+            use std::io::{self, Write};
+
+            eprintln!("Select a track (1-{}):", items.len());
+            for (i, it) in items.iter().enumerate() {
+                eprintln!(
+                    "[{}] {}  {}",
+                    i + 1,
+                    it.title.as_deref().unwrap_or("<no title>"),
+                    it.url
+                );
+            }
+
+            loop {
+                eprint!("> ");
+                io::stderr().flush().ok();
+
+                let mut s = String::new();
+                let n = io::stdin().read_line(&mut s)?;
+                if n == 0 {
+                    // EOF (Ctrl-D) -> cancel
+                    return Err(anyhow::anyhow!("Selection canceled"));
+                }
+                let input = s.trim();
+
+                if input.eq_ignore_ascii_case("q") {
+                    return Err(anyhow::anyhow!("Selection canceled"));
+                }
+
+                match input.parse::<usize>() {
+                    Ok(idx) if (1..=items.len()).contains(&idx) => {
+                        return Ok(idx - 1); // 0-based index
+                    }
+                    _ => {
+                        eprintln!(
+                            "Invalid choice. Enter a number from 1 to {} (or 'q' to cancel).",
+                            items.len()
+                        );
+                        // loop and ask again
+                    }
+                }
+            }
+        })
+    }
+
+    fn search_many(
+        kind: YtDlpHostKind,
+        query: &str,
+        limit: usize,
+    ) -> anyhow::Result<Vec<SearchItem>> {
+        let expr = format!("{}{}:{query}", kind.search_key(), limit.max(1));
         let out =
             std::process::Command::new("yt-dlp").args(["-J", "--flat-playlist", &expr]).output()?;
         if !out.status.success() {
             anyhow::bail!("yt-dlp search failed: {}", String::from_utf8_lossy(&out.stderr));
         }
         let parsed: SearchJson = serde_json::from_slice(&out.stdout)?;
-        let e = parsed
+        let items = parsed
             .entries
             .into_iter()
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("No results for query: {query}"))?;
+            .filter_map(|e| {
+                let url = e
+                    .url
+                    .or(e.webpage_url)
+                    .or_else(|| e.id.clone().map(|id| kind.watch_url(&id)))?;
+                Some(SearchItem { title: e.title, url })
+            })
+            .collect::<Vec<_>>();
+        if items.is_empty() {
+            anyhow::bail!("No results for query: {query}");
+        }
+        Ok(items)
+    }
 
-        if let Some(u) = e.url {
-            return Ok(u);
+    /// Generic picker: caller supplies how to choose an index.
+    fn search_pick_with<F>(
+        kind: YtDlpHostKind,
+        query: &str,
+        limit: usize,
+        picker: F,
+    ) -> anyhow::Result<String>
+    where
+        F: FnOnce(&[SearchItem]) -> anyhow::Result<usize>,
+    {
+        let items = Self::search_many(kind, query, limit)?;
+        let idx = picker(&items)?;
+        if idx >= items.len() {
+            anyhow::bail!("Choice out of range");
         }
-        if let Some(id) = e.id {
-            return Ok(kind.watch_url(&id));
-        }
-        anyhow::bail!("Search returned no usable URL");
+        Ok(items[idx].url.clone())
     }
 
     pub fn download(&self, url: &str) -> Result<Vec<String>> {
