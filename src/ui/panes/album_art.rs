@@ -4,10 +4,10 @@ use ratatui::{Frame, layout::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{album_art::ImageMethod, tabs::PaneType},
     ctx::Ctx,
     mpd::mpd_client::MpdClient,
-    shared::{image::ImageProtocol, key_event::KeyEvent},
+    shared::key_event::KeyEvent,
     ui::{UiEvent, image::facade::AlbumArtFacade},
 };
 
@@ -31,7 +31,7 @@ impl AlbumArtPane {
 
     /// returns none if album art is supposed to be hidden
     fn fetch_album_art(ctx: &Ctx) -> Option<()> {
-        if matches!(ctx.config.album_art.method.into(), ImageProtocol::None) {
+        if matches!(ctx.config.album_art.method, ImageMethod::None) {
             return None;
         }
 
@@ -183,7 +183,6 @@ mod tests {
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::Unsupported, false)]
     #[case(ImageMethod::None, false)]
     fn searches_for_album_art_before_show(
         #[case] method: ImageMethod,
@@ -224,7 +223,6 @@ mod tests {
 
     #[rstest]
     #[case(ImageMethod::Kitty, true)]
-    #[case(ImageMethod::Unsupported, false)]
     #[case(ImageMethod::None, false)]
     fn searches_for_album_art_on_event(
         #[case] method: ImageMethod,

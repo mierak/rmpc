@@ -29,7 +29,8 @@ use crate::{
         events::{AppEvent, ClientRequest, WorkRequest},
         logging,
         mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
-        tmux,
+        terminal::{TERMINAL, Terminal},
+        tmux::{self, IS_TMUX},
     },
 };
 
@@ -118,13 +119,41 @@ fn main() -> Result<()> {
             }
             let mpd_port = ENV.var("MPD_PORT").unwrap_or_else(|_| "unset".to_string());
 
+            let term = ENV.var("TERM").unwrap_or_else(|_| "unset".to_string());
+            let term_program = if *IS_TMUX {
+                tmux::environment()?
+                    .into_iter()
+                    .find(|(k, _)| k == "TERM_PROGRAM")
+                    .map_or_else(|| "unset".to_owned(), |(_, v)| v)
+            } else {
+                ENV.var("TERM_PROGRAM").unwrap_or_else(|_| "unset".to_owned())
+            };
+
+            let tmux_passthrough = match tmux::is_passthrough_enabled() {
+                Ok(v) => v,
+                Err(err) => {
+                    println!("Failed to check if tmux passthrough is enabled: {err}");
+                    false
+                }
+            };
+            let tmux_version = match tmux::version() {
+                Ok(v) => v,
+                Err(err) => {
+                    println!("Failed to get tmux version: {err}");
+                    None
+                }
+            };
+
             println!(
                 "rmpc {}{}",
                 env!("CARGO_PKG_VERSION"),
                 option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
             );
-            println!("\n{:<20} {}", "Config path", config_path.as_str()?);
+
+            println!("\nrmpc:");
+            println!("{:<20} {}", "Config path", config_path.as_str()?);
             println!("{:<20} {:?}", "Theme path", config_file.theme);
+            println!("{:<20} {:?}", "Debug mode", cfg!(debug_assertions));
 
             println!("\nMPD:");
             println!("{:<20} {:?}", "Address", config_file.address);
@@ -143,8 +172,14 @@ fn main() -> Result<()> {
             println!("\nImage protocol:");
             println!("{:<20} {}", "Requested", config_file.album_art.method);
             println!("{:<20} {}", "Resolved", config.album_art.method);
-            println!("{:<20} {}", "TMUX", tmux::is_inside_tmux());
             println!("{}", UEBERZUGPP.display());
+
+            println!("\nSystem:");
+            println!("{:<20} {:<15} {:?}", "TMUX", *IS_TMUX, tmux_version);
+            println!("{:<20} {tmux_passthrough}", "TMUX passthrough");
+            println!("{:<20} {term}", "$TERM");
+            println!("{:<20} {term_program}", "$TERM_PROGRAM");
+            println!("{:<20} {}", "Emulator", TERMINAL.emulator());
 
             println!("\nVisualizer:");
             println!("{}", CAVA.display());
@@ -303,8 +338,7 @@ fn main() -> Result<()> {
             );
 
             let enable_mouse = ctx.config.enable_mouse;
-            let terminal =
-                shared::terminal::setup(enable_mouse).context("Failed to setup terminal")?;
+            let terminal = Terminal::setup(enable_mouse).context("Failed to setup terminal")?;
             core::input::init(event_tx.clone())?;
 
             let event_loop_handle = core::event_loop::init(ctx, event_rx, terminal)?;
@@ -321,7 +355,7 @@ fn main() -> Result<()> {
 
             let mut terminal = event_loop_handle.join().expect("event loop to not panic");
 
-            shared::terminal::restore(&mut terminal, enable_mouse)
+            Terminal::restore(&mut terminal, enable_mouse)
                 .context("Terminal restore to succeed")?;
         }
     }

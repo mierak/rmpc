@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use strum::Display;
 
 use super::Size;
+use crate::shared::terminal::ImageBackend;
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AlbumArtConfigFile {
@@ -77,9 +78,8 @@ pub enum ImageMethod {
     Iterm2,
     Sixel,
     None,
-    Block,
     #[default]
-    Unsupported,
+    Block,
 }
 
 impl From<AlbumArtConfigFile> for AlbumArtConfig {
@@ -114,6 +114,19 @@ impl From<HorizontalAlignFile> for HorizontalAlign {
             HorizontalAlignFile::Left => HorizontalAlign::Left,
             HorizontalAlignFile::Center => HorizontalAlign::Center,
             HorizontalAlignFile::Right => HorizontalAlign::Right,
+        }
+    }
+}
+
+impl From<ImageBackend> for ImageMethod {
+    fn from(value: ImageBackend) -> Self {
+        match value {
+            ImageBackend::Kitty => ImageMethod::Kitty,
+            ImageBackend::Iterm2 => ImageMethod::Iterm2,
+            ImageBackend::Sixel => ImageMethod::Sixel,
+            ImageBackend::UeberzugWayland => ImageMethod::UeberzugWayland,
+            ImageBackend::UeberzugX11 => ImageMethod::UeberzugX11,
+            ImageBackend::Block => ImageMethod::Block,
         }
     }
 }

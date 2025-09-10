@@ -109,7 +109,42 @@ impl TmuxHooks {
     }
 }
 
+pub fn environment() -> Result<Vec<(String, String)>> {
+    if !*IS_TMUX {
+        return Ok(Vec::new());
+    }
+
+    let mut cmd = std::process::Command::new("tmux");
+    let cmd = cmd.args(["show-environment", "-g"]);
+    let stdout = cmd.output()?.stdout;
+    let stdout = String::from_utf8_lossy(&stdout);
+
+    Ok(stdout
+        .lines()
+        .filter_map(|line| line.trim().split_once('=').map(|(k, v)| (k.to_owned(), v.to_owned())))
+        .collect())
+}
+
+pub fn version() -> anyhow::Result<Option<String>> {
+    if !*IS_TMUX {
+        return Ok(None);
+    }
+
+    let mut cmd = std::process::Command::new("tmux");
+    let cmd = cmd.args(["display-message", "-p", "-t", &TMUX_PANE, "-F", "#{version}"]);
+    let stdout = cmd.output()?.stdout;
+    let stdout = String::from_utf8(stdout)?;
+    let stdout = stdout.trim();
+    log::trace!(stdout; "got tmux version");
+
+    Ok(Some(String::from_utf8_lossy(stdout.as_bytes()).to_string()))
+}
+
 pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
+    if !*IS_TMUX {
+        return Ok(false);
+    }
+
     let mut cmd = std::process::Command::new("tmux");
     let cmd = cmd.args(["show", "-Ap", "allow-passthrough"]);
     let stdout = cmd.output()?.stdout;
@@ -118,6 +153,10 @@ pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
 }
 
 pub fn enable_passthrough() -> anyhow::Result<()> {
+    if !*IS_TMUX {
+        return Ok(());
+    }
+
     let mut cmd = std::process::Command::new("tmux");
     let cmd = cmd.args(["set", "-p", "allow-passthrough"]);
     match cmd.output() {
@@ -126,7 +165,7 @@ pub fn enable_passthrough() -> anyhow::Result<()> {
     }
 }
 
-pub fn is_in_visible_pane() -> Result<bool> {
+fn is_in_visible_pane() -> Result<bool> {
     let mut cmd = std::process::Command::new("tmux");
     let cmd = cmd.args(["display-message", "-p", "-t", &TMUX_PANE, "-F", "#F"]);
     let stdout = cmd.output()?.stdout;
@@ -137,7 +176,7 @@ pub fn is_in_visible_pane() -> Result<bool> {
     Ok(stdout.starts_with('*'))
 }
 
-pub fn session_has_attached_client() -> Result<bool> {
+fn session_has_attached_client() -> Result<bool> {
     let mut cmd = std::process::Command::new("tmux");
     let cmd = cmd.args(["list-panes", "-F", "#{session_attached}", "-t", &TMUX_PANE]);
     let stdout = cmd.output()?.stdout;
