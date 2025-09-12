@@ -65,7 +65,7 @@ After that you need to setup Cava, MPD and rmpc to talk to each other.
     ```
 
 3.  Configure the pane layout to include Cava. This goes in your `config.ron` under the tabs section. Below is
-    an example of how to add a Cava pane split alongside the queue and album art: 
+    an example of how to add a Cava pane split alongside the queue and album art:
 
     ```rust
     tabs: [
@@ -87,14 +87,19 @@ After that you need to setup Cava, MPD and rmpc to talk to each other.
         ),
     ],
     ```
+
     See <a href={path("configuration/tabs#panes")}>Panes documentation</a> for more information about configuring panes.
 
 </Steps>
 
 ## Theming
 
-The look of visualiser can be configured. Below are possible options. Please read the comments
-carefully as the example does not work copy/paste out of the box.
+The look of visualiser can be configured in your <a href={path("configuration/theme#cava")}>theme</a>
+(not in `config.ron`). Below are possible options.
+
+:::caution
+Please read the comments carefully as the example does not work copy/paste out of the box.
+:::
 
 ```rust
 cava: (
