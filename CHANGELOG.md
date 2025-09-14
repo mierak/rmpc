@@ -54,6 +54,7 @@ remote commands inside scripts triggered by rmpc
 - Default theme now includes lyrics pane above the album art on queue tab
 - Browsers now properly use case insensitive sorting
 - Refactored and improved image backend detection
+- `JumpToCurrent` now jumps to last playing song in stopped state
 
 ### Fixed
 
