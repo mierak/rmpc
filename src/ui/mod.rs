@@ -10,6 +10,7 @@ use modals::{
     keybinds::KeybindsModal,
     menu::modal::MenuModal,
     outputs::OutputsModal,
+    select_modal::SelectModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
@@ -26,7 +27,7 @@ use crate::{
     MpdQueryResult,
     config::{
         Config,
-        cli::Args,
+        cli::{Args, Command},
         keys::GlobalAction,
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
@@ -37,6 +38,7 @@ use crate::{
     },
     ctx::Ctx,
     mpd::{
+        QueuePosition,
         commands::{State, idle::IdleEvent},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{FilterKind, MpdClient, MpdCommand, ValueChange},
@@ -50,6 +52,7 @@ use crate::{
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
         mpd_client_ext::MpdClientExt,
+        ytdlp::{YtDlp, YtDlpHostKind},
     },
 };
 
@@ -308,22 +311,53 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::CommandMode => {
                     modal!(
                         ctx,
-                        InputModal::new(ctx)
-                            .title("Execute a command")
-                            .confirm_label("Execute")
-                            .on_confirm(|ctx, value| {
-                                match Args::parse_cli_line(value) {
-                                    Ok(Args { command: Some(cmd), .. }) => {
+                        InputModal::new(ctx).title("Execute a command").on_confirm(|ctx, value| {
+                            match Args::parse_cli_line(value) {
+                                Ok(Args {
+                                    command:
+                                        Some(Command::SearchYt {
+                                            query,
+                                            soundcloud,
+                                            limit,
+                                            interactive,
+                                            position,
+                                        }),
+                                    ..
+                                }) => {
+                                    if let Some(cmd) = Self::resolve_searchyt(
+                                        ctx,
+                                        &query,
+                                        soundcloud,
+                                        limit,
+                                        interactive,
+                                        position,
+                                    )? {
                                         if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err()
                                         {
                                             log::error!("Failed to send command");
                                         }
                                     }
-                                    Ok(_) => log::warn!("No subcommand provided"),
-                                    Err(e) => log::error!("Parse error: {e}"),
+                                    Ok(())
                                 }
-                                Ok(())
-                            })
+
+                                Ok(Args { command: Some(cmd), .. }) => {
+                                    if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err() {
+                                        log::error!("Failed to send command");
+                                    }
+                                    Ok(())
+                                }
+
+                                Ok(_) => {
+                                    log::warn!("No subcommand provided");
+                                    Ok(())
+                                }
+
+                                Err(e) => {
+                                    log::error!("Parse error: {e}");
+                                    Ok(())
+                                }
+                            }
+                        })
                     );
                 }
                 GlobalAction::NextTrack if ctx.status.state != State::Stop => {
@@ -534,6 +568,52 @@ impl<'ui> Ui<'ui> {
         }
 
         Ok(KeyHandleResult::None)
+    }
+
+    fn resolve_searchyt(
+        ctx: &Ctx,
+        query: &str,
+        soundcloud: bool,
+        limit: usize,
+        interactive: bool,
+        position: Option<QueuePosition>,
+    ) -> anyhow::Result<Option<Command>> {
+        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
+
+        if interactive {
+            let items = YtDlp::search_many(kind, query.trim(), limit)?;
+            let labels: Vec<String> = items
+                .iter()
+                .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
+                .collect();
+            let items_cloned = items.clone();
+
+            modal!(
+                ctx,
+                SelectModal::builder()
+                    .ctx(ctx)
+                    .title("Search results")
+                    .confirm_label("Select")
+                    .options(labels)
+                    .on_confirm(move |ctx, _label, idx| {
+                        let url = items_cloned[idx].url.clone();
+                        if ctx
+                            .work_sender
+                            .send(WorkRequest::Command(Command::AddYt { url, position }))
+                            .is_err()
+                        {
+                            log::error!("Failed to send enqueue command");
+                        }
+                        Ok(())
+                    })
+                    .build()
+            );
+
+            return Ok(None);
+        }
+
+        let url = YtDlp::search_single_auto(query.trim(), soundcloud)?;
+        Ok(Some(Command::AddYt { url, position }))
     }
 
     pub fn before_show(&mut self, area: Rect, ctx: &mut Ctx) -> Result<()> {
