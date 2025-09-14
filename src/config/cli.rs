@@ -224,9 +224,9 @@ pub enum Command {
         /// Search soundCloud instead of youTube
         #[arg(short = 's', long = "soundcloud")]
         soundcloud: bool,
-        /// Show a pick-list of the first N results and let you choose
-        #[arg(short = 'l', long = "list")]
-        list: bool,
+        /// Show an interactive list to pick a result
+        #[arg(short = 'i', long = "interactive")]
+        interactive: bool,
         /// How many results to show with --list
         #[arg(long = "limit", default_value_t = 5)]
         limit: usize,

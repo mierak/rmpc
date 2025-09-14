@@ -37,9 +37,9 @@ struct SearchJson {
 }
 
 #[derive(Debug, Clone)]
-struct SearchItem {
-    title: Option<String>,
-    url: String,
+pub struct SearchItem {
+    pub title: Option<String>,
+    pub url: String,
 }
 
 impl<'a> YtDlp<'a> {
@@ -81,70 +81,36 @@ impl<'a> YtDlp<'a> {
         Self::search_single(kind, query)
     }
 
-    fn search_pick_auto<F>(
-        query: &str,
-        soundcloud: bool,
-        limit: usize,
-        picker: F,
-    ) -> anyhow::Result<String>
-    where
-        F: FnOnce(&[SearchItem]) -> anyhow::Result<usize>,
-    {
-        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
-        Self::search_pick_with(kind, query, limit, picker)
-    }
-
-    pub fn search_pick_stdin_auto(
+    pub fn search_pick_cli_auto(
         query: &str,
         soundcloud: bool,
         limit: usize,
     ) -> anyhow::Result<String> {
-        Self::search_pick_auto(query, soundcloud, limit, |items| {
-            use std::io::{self, Write};
+        use dialoguer::{Select, theme::ColorfulTheme};
 
-            eprintln!("Select a track (1-{}):", items.len());
-            for (i, it) in items.iter().enumerate() {
-                eprintln!(
-                    "[{}] {}  {}",
-                    i + 1,
-                    it.title.as_deref().unwrap_or("<no title>"),
-                    it.url
-                );
-            }
+        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
+        let items = Self::search_many(kind, query, limit)?;
 
-            loop {
-                eprint!("> ");
-                io::stderr().flush().ok();
+        let mut labels: Vec<String> = items
+            .iter()
+            .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
+            .collect();
+        labels.push("⟲ Cancel".to_string());
 
-                let mut s = String::new();
-                let n = io::stdin().read_line(&mut s)?;
-                if n == 0 {
-                    // EOF (Ctrl-D) -> cancel
-                    return Err(anyhow::anyhow!("Selection canceled"));
-                }
-                let input = s.trim();
+        let sel = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Select a track")
+            .items(&labels)
+            .default(0)
+            .interact_opt()?;
 
-                if input.eq_ignore_ascii_case("q") {
-                    return Err(anyhow::anyhow!("Selection canceled"));
-                }
-
-                match input.parse::<usize>() {
-                    Ok(idx) if (1..=items.len()).contains(&idx) => {
-                        return Ok(idx - 1); // 0-based index
-                    }
-                    _ => {
-                        eprintln!(
-                            "Invalid choice. Enter a number from 1 to {} (or 'q' to cancel).",
-                            items.len()
-                        );
-                        // loop and ask again
-                    }
-                }
-            }
-        })
+        match sel {
+            Some(idx) if idx + 1 == labels.len() => anyhow::bail!("Selection canceled"),
+            Some(idx) => Ok(items[idx].url.clone()),
+            None => anyhow::bail!("Selection canceled"),
+        }
     }
 
-    fn search_many(
+    pub fn search_many(
         kind: YtDlpHostKind,
         query: &str,
         limit: usize,
@@ -171,24 +137,6 @@ impl<'a> YtDlp<'a> {
             anyhow::bail!("No results for query: {query}");
         }
         Ok(items)
-    }
-
-    /// Generic picker: caller supplies how to choose an index.
-    fn search_pick_with<F>(
-        kind: YtDlpHostKind,
-        query: &str,
-        limit: usize,
-        picker: F,
-    ) -> anyhow::Result<String>
-    where
-        F: FnOnce(&[SearchItem]) -> anyhow::Result<usize>,
-    {
-        let items = Self::search_many(kind, query, limit)?;
-        let idx = picker(&items)?;
-        if idx >= items.len() {
-            anyhow::bail!("Choice out of range");
-        }
-        Ok(items[idx].url.clone())
     }
 
     pub fn download(&self, url: &str) -> Result<Vec<String>> {
@@ -362,7 +310,7 @@ impl YtDlpHost {
 }
 
 #[derive(Clone, Copy)]
-enum YtDlpHostKind {
+pub enum YtDlpHostKind {
     Youtube,
     Soundcloud,
     NicoVideo,

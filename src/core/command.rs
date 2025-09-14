@@ -272,9 +272,9 @@ impl Command {
                     Ok(())
                 }))
             }
-            Command::SearchYt { query, soundcloud, list, limit, position } => {
-                let chosen_url = if list {
-                    YtDlp::search_pick_stdin_auto(query.trim(), soundcloud, limit)?
+            Command::SearchYt { query, soundcloud, interactive, limit, position } => {
+                let chosen_url = if interactive {
+                    YtDlp::search_pick_cli_auto(query.trim(), soundcloud, limit)?
                 } else {
                     YtDlp::search_single_auto(query.trim(), soundcloud)?
                 };
