@@ -792,7 +792,11 @@ impl Pane for QueuePane {
                     }
                 }
                 QueueActions::JumpToCurrent => {
-                    if let Some((idx, _)) = ctx.find_current_song_in_queue() {
+                    if let Some((idx, _)) = ctx
+                        .status
+                        .songid
+                        .and_then(|id| ctx.queue.iter().enumerate().find(|(_, song)| song.id == id))
+                    {
                         self.scrolling_state.select(Some(idx), ctx.config.scrolloff);
                         ctx.render()?;
                     } else {
