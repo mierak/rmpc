@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added --interactive: interactive picker (TUI list / CLI prompt) with --limit N for `searchyt`.
 - Added youtube song by name support: `searchyt "query"` (uses first YouTube result; TUI supported).
 - Added interactive scrollbar support to browser panes and search pane results:
 - Added `rmpc remote keybind` command to emulate key presses in running instances
@@ -33,6 +34,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Add support for soundcloud on `searchyt`
 - **Breaking**: TabName equality comparison is now case-insensitive.
 - Improved `.lrc` lyrics files parser performance and fixed parsing issues
 - Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
