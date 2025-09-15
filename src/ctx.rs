@@ -236,7 +236,6 @@ impl Ctx {
 }
 
 impl Config {
-    // TODO get rid of this completely?
     fn sticker_support_needed(&self) -> bool {
         self.theme.song_table_format.iter().any(|column| column.prop.kind.contains_stickers())
             || self.theme.browser_song_format.0.iter().any(|prop| prop.kind.contains_stickers())

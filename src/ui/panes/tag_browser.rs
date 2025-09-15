@@ -24,7 +24,6 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::MouseEvent,
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
-        mpd_query::PreviewGroup,
         string_util::StringExt,
     },
     ui::{
@@ -357,18 +356,13 @@ impl Pane for TagBrowserPane {
                     return Ok(());
                 }
 
-                let preview = vec![PreviewGroup::from(
-                    None,
-                    None,
-                    cached_artist
-                        .0
-                        .iter()
-                        .map(|album| {
-                            DirOrSong::name_only(album.name.clone()).to_list_item_simple(ctx)
-                        })
-                        .collect(),
-                )];
-                self.stack.set_preview(Some(preview));
+                let songs = cached_artist
+                    .0
+                    .iter()
+                    .map(|album| DirOrSong::name_only(album.name.clone()))
+                    .collect();
+                self.stack_mut().set_preview(Some(songs));
+
                 ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
@@ -505,20 +499,9 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
         self.stack_mut().clear_preview();
         match self.stack.path() {
-            [artist, album] => {
-                let key_style = ctx.config.theme.preview_label_style;
-                let group_style = ctx.config.theme.preview_metadata_group_style;
-                let Some(albums) = self.cache.get(artist) else {
-                    return Ok(());
-                };
-                let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|a| &a.name == album)
-                else {
-                    return Ok(());
-                };
-                let song = songs.iter().find(|song| song.file == current).map(|song| {
-                    song.to_preview(key_style, group_style, ctx.stickers.get(&song.file))
-                });
-                self.stack_mut().set_preview(song);
+            [_artist, _album] => {
+                // No need to do anything except request render, the song data is already
+                // present in the current item
                 ctx.render()?;
             }
             [artist] => {
@@ -530,28 +513,19 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 else {
                     return Ok(());
                 };
-                let songs = vec![PreviewGroup::from(
-                    None,
-                    None,
-                    songs.iter().map(|song| song.to_list_item_simple(ctx)).collect_vec(),
-                )];
 
+                let songs = songs.iter().map(|s| DirOrSong::Song(s.clone())).collect();
                 self.stack_mut().set_preview(Some(songs));
                 ctx.render()?;
             }
             [] => {
                 if let Some(albums) = self.cache.get(&current) {
-                    self.stack.set_preview(Some(vec![PreviewGroup::from(
-                        None,
-                        None,
-                        albums
-                            .0
-                            .iter()
-                            .map(|CachedAlbum { name, .. }| {
-                                DirOrSong::name_only(name.to_owned()).to_list_item_simple(ctx)
-                            })
-                            .collect(),
-                    )]));
+                    let albums: Vec<_> = albums
+                        .0
+                        .iter()
+                        .map(|CachedAlbum { name, .. }| DirOrSong::name_only(name.to_owned()))
+                        .collect();
+                    self.stack.set_preview(Some(albums));
                     ctx.render()?;
                 } else {
                     let root_tag = self.root_tag.clone();

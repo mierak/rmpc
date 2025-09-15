@@ -442,7 +442,9 @@ pub(crate) mod browser {
 
             let mut result = vec![info_group, tags_group];
 
-            if let Some(stickers) = stickers {
+            if let Some(stickers) = stickers
+                && !stickers.is_empty()
+            {
                 let mut stickers_group =
                     PreviewGroup::new(Some(" --- [Stickers]"), Some(group_style));
 

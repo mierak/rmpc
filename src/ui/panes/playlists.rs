@@ -22,7 +22,6 @@ use crate::{
         macros::{modal, status_info},
         mouse_event::MouseEvent,
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt, MpdDelete},
-        mpd_query::PreviewGroup,
     },
     status_warn,
     ui::{
@@ -214,7 +213,7 @@ impl Pane for PlaylistsPane {
                 );
                 ctx.render()?;
             }
-            (PREVIEW, MpdQueryResult::DirOrSong { mut data, origin_path }) => {
+            (PREVIEW, MpdQueryResult::DirOrSong { data, origin_path }) => {
                 if let Some(origin_path) = origin_path
                     && origin_path != self.stack().path()
                 {
@@ -239,35 +238,7 @@ impl Pane for PlaylistsPane {
                     });
                 }
 
-                match self.stack().current().selected() {
-                    Some(DirOrSong::Dir { .. }) => {
-                        let res = PreviewGroup::from(
-                            None,
-                            None,
-                            data.into_iter().map(|v| v.to_list_item_simple(ctx)).collect(),
-                        );
-
-                        self.stack_mut().set_preview(Some(vec![res]));
-                    }
-                    Some(DirOrSong::Song(_)) => {
-                        let key_style = ctx.config.theme.preview_label_style;
-                        let group_style = ctx.config.theme.preview_metadata_group_style;
-                        let preview = data.pop().and_then(|song| match song {
-                            DirOrSong::Dir { .. } => None,
-                            DirOrSong::Song(song) => Some(song.to_preview(
-                                key_style,
-                                group_style,
-                                ctx.stickers.get(&song.file),
-                            )),
-                        });
-
-                        self.stack_mut().set_preview(preview);
-                    }
-                    None => {
-                        self.stack_mut().set_preview(None);
-                    }
-                }
-
+                self.stack_mut().set_preview(Some(data));
                 ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {

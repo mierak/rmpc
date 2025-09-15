@@ -17,14 +17,13 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::MouseEvent,
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
-        mpd_query::PreviewGroup,
     },
     ui::{
         FETCH_SONG_STICKERS,
         UiEvent,
         browser::BrowserPane,
         dir_or_song::DirOrSong,
-        dirstack::{DirStack, DirStackItem},
+        dirstack::DirStack,
         widgets::browser::{Browser, BrowserArea},
     },
 };
@@ -211,7 +210,7 @@ impl Pane for DirectoriesPane {
         ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::DirOrSong { mut data, origin_path }) => {
+            (PREVIEW, MpdQueryResult::DirOrSong { data, origin_path }) => {
                 if let Some(origin_path) = origin_path
                     && origin_path != self.stack().path()
                 {
@@ -234,39 +233,7 @@ impl Pane for DirectoriesPane {
                     });
                 }
 
-                match self.stack().current().selected() {
-                    Some(DirOrSong::Dir { .. }) => {
-                        let sort = ctx.config.directories_sort.clone();
-                        let res = PreviewGroup::from(
-                            None,
-                            None,
-                            data.into_iter()
-                                .sorted_by(|a, b| {
-                                    a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
-                                })
-                                .map(|v| v.to_list_item_simple(ctx))
-                                .collect(),
-                        );
-                        self.stack_mut().set_preview(Some(vec![res]));
-                    }
-                    Some(DirOrSong::Song(_)) => {
-                        let key_style = ctx.config.theme.preview_label_style;
-                        let group_style = ctx.config.theme.preview_metadata_group_style;
-                        let preview = data.pop().and_then(|song| match song {
-                            DirOrSong::Dir { .. } => None,
-                            DirOrSong::Song(song) => Some(song.to_preview(
-                                key_style,
-                                group_style,
-                                ctx.stickers.get(&song.file),
-                            )),
-                        });
-
-                        self.stack_mut().set_preview(preview);
-                    }
-                    None => {
-                        self.stack_mut().set_preview(None);
-                    }
-                }
+                self.stack_mut().set_preview(Some(data));
 
                 ctx.render()?;
             }
@@ -346,6 +313,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 let playlist_display_mode = ctx.config.show_playlists_in_browser;
 
                 self.stack_mut().clear_preview();
+                let sort = ctx.config.directories_sort.clone();
                 ctx.query()
                     .id(PREVIEW)
                     .replace_id("directories_preview")
@@ -371,6 +339,9 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             .0
                             .into_iter()
                             .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
+                            .sorted_by(|a, b| {
+                                a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
+                            })
                             .collect()
                         };
 

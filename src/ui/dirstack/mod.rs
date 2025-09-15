@@ -14,10 +14,12 @@ pub use stack::DirStack;
 pub use state::DirState;
 
 use super::dir_or_song::DirOrSong;
-use crate::{ctx::Ctx, mpd::commands::Song};
+use crate::{ctx::Ctx, mpd::commands::Song, shared::mpd_query::PreviewGroup};
 
 pub trait DirStackItem {
     fn as_path(&self) -> &str;
+    fn is_file(&self) -> bool;
+    fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup>;
     fn matches(&self, ctx: &Ctx, filter: &str) -> bool;
     fn to_list_item<'a>(
         &self,
@@ -36,6 +38,20 @@ impl DirStackItem for DirOrSong {
         match self {
             DirOrSong::Dir { name, .. } => name,
             DirOrSong::Song(s) => &s.file,
+        }
+    }
+
+    fn is_file(&self) -> bool {
+        match self {
+            DirOrSong::Dir { .. } => false,
+            DirOrSong::Song(_) => true,
+        }
+    }
+
+    fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup> {
+        match self {
+            DirOrSong::Dir { .. } => Vec::new(),
+            DirOrSong::Song(s) => s.to_file_preview(ctx),
         }
     }
 
@@ -109,6 +125,17 @@ impl DirStackItem for DirOrSong {
 impl DirStackItem for Song {
     fn as_path(&self) -> &str {
         &self.file
+    }
+
+    fn is_file(&self) -> bool {
+        true
+    }
+
+    fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup> {
+        let key_style = ctx.config.theme.preview_label_style;
+        let group_style = ctx.config.theme.preview_metadata_group_style;
+        let stickers = ctx.stickers.get(&self.file);
+        self.to_preview(key_style, group_style, stickers)
     }
 
     fn matches(&self, ctx: &Ctx, filter: &str) -> bool {
@@ -211,6 +238,14 @@ impl ScrollingState for ListState {
 impl DirStackItem for String {
     fn as_path(&self) -> &str {
         self
+    }
+
+    fn is_file(&self) -> bool {
+        true
+    }
+
+    fn to_file_preview(&self, _ctx: &Ctx) -> Vec<PreviewGroup> {
+        Vec::new()
     }
 
     fn matches(&self, _ctx: &Ctx, filter: &str) -> bool {
