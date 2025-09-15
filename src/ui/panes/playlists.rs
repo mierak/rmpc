@@ -26,6 +26,7 @@ use crate::{
     },
     status_warn,
     ui::{
+        FETCH_SONG_STICKERS,
         UiEvent,
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
@@ -120,7 +121,7 @@ impl Pane for PlaylistsPane {
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &ctx.config,
+            ctx,
         );
 
         Ok(())
@@ -213,14 +214,60 @@ impl Pane for PlaylistsPane {
                 );
                 ctx.render()?;
             }
-            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+            (PREVIEW, MpdQueryResult::DirOrSong { mut data, origin_path }) => {
                 if let Some(origin_path) = origin_path
                     && origin_path != self.stack().path()
                 {
                     log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
                     return Ok(());
                 }
-                self.stack_mut().set_preview(data);
+
+                let songs = data
+                    .iter()
+                    .filter_map(|ds| match ds {
+                        DirOrSong::Dir { .. } => None,
+                        DirOrSong::Song(song) => Some(song.file.clone()),
+                    })
+                    .filter(|file| !ctx.stickers.contains_key(file))
+                    .collect_vec();
+
+                log::debug!("Fetching stickers for {} songs", songs.len());
+                if !songs.is_empty() && ctx.should_fetch_stickers {
+                    log::debug!("Fetching 2 stickers for {} songs", songs.len());
+                    ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
+                        Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
+                    });
+                }
+
+                match self.stack().current().selected() {
+                    Some(DirOrSong::Dir { .. }) => {
+                        let res = PreviewGroup::from(
+                            None,
+                            None,
+                            data.into_iter().map(|v| v.to_list_item_simple(ctx)).collect(),
+                        );
+
+                        self.stack_mut().set_preview(Some(vec![res]));
+                    }
+                    Some(DirOrSong::Song(_)) => {
+                        let key_style = ctx.config.theme.preview_label_style;
+                        let group_style = ctx.config.theme.preview_metadata_group_style;
+                        let preview = data.pop().and_then(|song| match song {
+                            DirOrSong::Dir { .. } => None,
+                            DirOrSong::Song(song) => Some(song.to_preview(
+                                key_style,
+                                group_style,
+                                ctx.stickers.get(&song.file),
+                            )),
+                        });
+
+                        self.stack_mut().set_preview(preview);
+                    }
+                    None => {
+                        self.stack_mut().set_preview(None);
+                    }
+                }
+
                 ctx.render()?;
             }
             (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
@@ -345,11 +392,8 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         &mut self.stack
     }
 
-    fn initial_playlist_name(&self) -> Option<String> {
-        self.stack().current().selected().and_then(|item| match item {
-            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
-            DirOrSong::Song(_) => None,
-        })
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
+        self.browser.areas
     }
 
     fn set_filter_input_mode_active(&mut self, active: bool) {
@@ -358,6 +402,85 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
 
     fn is_filter_input_mode_active(&self) -> bool {
         self.filter_input_mode
+    }
+
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
+    }
+
+    fn list_songs_in_item(
+        &self,
+        item: DirOrSong,
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Clone + 'static {
+        move |client| {
+            Ok(match item {
+                DirOrSong::Dir { name, .. } => client.list_playlist_info(&name, None)?,
+                DirOrSong::Song(song) => vec![song.clone()],
+            })
+        }
+    }
+
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
+        let s = self.stack().current().selected().cloned();
+        self.stack_mut().clear_preview();
+        let origin_path = Some(self.stack().path().to_vec());
+        ctx.query().id(PREVIEW).replace_id("playlists_preview").target(PaneType::Playlists).query(
+            move |client| {
+                let data = s.as_ref().map_or(Ok(Vec::new()), move |current| -> Result<_> {
+                    let response = match current {
+                        DirOrSong::Dir { name: d, .. } => client
+                            .list_playlist_info(d, None)?
+                            .into_iter()
+                            .map(DirOrSong::Song)
+                            .collect_vec(),
+                        DirOrSong::Song(song) => {
+                            match client
+                                .lsinfo(Some(&song.file))
+                                .context(anyhow!("File '{}' was listed but not found", song.file))?
+                                .0
+                                .pop()
+                            {
+                                Some(LsInfoEntry::File(song)) => {
+                                    vec![DirOrSong::Song(song)]
+                                }
+                                _ => Vec::new(),
+                            }
+                        }
+                    };
+
+                    Ok(response)
+                })?;
+
+                Ok(MpdQueryResult::DirOrSong { data, origin_path })
+            },
+        );
+        Ok(())
+    }
+
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
+        items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+            match item {
+                DirOrSong::Dir { name, .. } => {
+                    acc.0.push(Enqueue::Playlist { name: name.to_owned() });
+                }
+                DirOrSong::Song(song) => {
+                    let filename = song.file.clone();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::File { path: song.file.clone() });
+                }
+            }
+            acc
+        })
+    }
+
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
     }
 
     fn show_info(&self, item: &DirOrSong, ctx: &Ctx) -> Result<()> {
@@ -378,16 +501,11 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn list_songs_in_item(
-        &self,
-        item: DirOrSong,
-    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Clone + 'static {
-        move |client| {
-            Ok(match item {
-                DirOrSong::Dir { name, .. } => client.list_playlist_info(&name, None)?,
-                DirOrSong::Song(song) => vec![song.clone()],
-            })
-        }
+    fn initial_playlist_name(&self) -> Option<String> {
+        self.stack().current().selected().and_then(|item| match item {
+            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
+            DirOrSong::Song(_) => None,
+        })
     }
 
     fn delete<'a>(&self, items: impl Iterator<Item = (usize, &'a DirOrSong)>) -> Vec<MpdDelete> {
@@ -412,28 +530,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                 .collect_vec(),
             _ => Vec::new(),
         }
-    }
-
-    fn enqueue<'a>(
-        &self,
-        items: impl Iterator<Item = &'a DirOrSong>,
-    ) -> (Vec<Enqueue>, Option<usize>) {
-        let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file_name());
-        items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
-            match item {
-                DirOrSong::Dir { name, .. } => {
-                    acc.0.push(Enqueue::Playlist { name: name.to_owned() });
-                }
-                DirOrSong::Song(song) => {
-                    let filename = song.file.clone();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
-                        acc.1 = Some(idx);
-                    }
-                    acc.0.push(Enqueue::File { path: song.file.clone() });
-                }
-            }
-            acc
-        })
     }
 
     fn can_rename(&self, item: &DirOrSong) -> bool {
@@ -473,14 +569,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         }
 
         Ok(())
-    }
-
-    fn open(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(true, ctx)
-    }
-
-    fn next(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(false, ctx)
     }
 
     fn move_selected(&mut self, direction: MoveDirection, ctx: &Ctx) -> Result<()> {
@@ -557,52 +645,5 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         ctx.render()?;
 
         Ok(())
-    }
-
-    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
-        let config = std::sync::Arc::clone(&ctx.config);
-        let s = self.stack().current().selected().cloned();
-        self.stack_mut().clear_preview();
-        let origin_path = Some(self.stack().path().to_vec());
-        ctx.query().id(PREVIEW).replace_id("playlists_preview").target(PaneType::Playlists).query(
-            move |client| {
-                let data = s.as_ref().map_or(Ok(None), move |current| -> Result<_> {
-                    let response = match current {
-                        DirOrSong::Dir { name: d, .. } => Some(vec![PreviewGroup::from(
-                            None,
-                            None,
-                            client
-                                .list_playlist_info(d, None)?
-                                .into_iter()
-                                .map(DirOrSong::Song)
-                                .map(|s| s.to_list_item_simple(&config))
-                                .collect_vec(),
-                        )]),
-                        DirOrSong::Song(song) => {
-                            match client
-                                .lsinfo(Some(&song.file))
-                                .context(anyhow!("File '{}' was listed but not found", song.file))?
-                                .0
-                                .first()
-                            {
-                                Some(LsInfoEntry::File(song)) => Some(song.to_preview(
-                                    config.theme.preview_label_style,
-                                    config.theme.preview_metadata_group_style,
-                                )),
-                                _ => None,
-                            }
-                        }
-                    };
-                    Ok(response)
-                })?;
-
-                Ok(MpdQueryResult::Preview { data, origin_path })
-            },
-        );
-        Ok(())
-    }
-
-    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
-        self.browser.areas
     }
 }

@@ -1,4 +1,9 @@
-use std::{cell::Cell, collections::HashSet, os::unix::net::UnixStream, time::Instant};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+    os::unix::net::UnixStream,
+    time::Instant,
+};
 
 use crossbeam::channel::{Receiver, Sender, unbounded};
 use ratatui::{Terminal, backend::TestBackend};
@@ -57,6 +62,7 @@ pub fn ctx(
         status: Status::default(),
         config: std::sync::Arc::new(config),
         queue: Vec::default(),
+        stickers: HashMap::new(),
         active_tab: TabName::from("test_tab"),
         app_event_sender: chan1.0.clone(),
         work_sender: work_request_channel.0.clone(),

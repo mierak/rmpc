@@ -6,7 +6,7 @@ use ratatui::{
 use style::Styled;
 
 use crate::{
-    config::Config,
+    ctx::Ctx,
     ui::dirstack::{Dir, DirStack, DirStackItem},
 };
 
@@ -60,8 +60,9 @@ where
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut DirStack<T>,
-        config: &Config,
+        ctx: &Ctx,
     ) {
+        let config = &ctx.config;
         let scrollbar_margin = match config.theme.scrollbar.as_ref() {
             Some(scrollbar) if config.theme.draw_borders => {
                 let scrollbar_track = &scrollbar.symbols[0];
@@ -71,8 +72,8 @@ where
         };
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
 
-        let previous = state.previous().to_list_items(config);
-        let current = state.current().to_list_items(config);
+        let previous = state.previous().to_list_items(ctx);
+        let current = state.current().to_list_items(ctx);
         let preview = state.preview().cloned();
 
         let [previous_area, current_area, preview_area] = *Layout::horizontal([

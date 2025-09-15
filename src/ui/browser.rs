@@ -16,7 +16,12 @@ use crate::{
         actions::{AddKind, Position},
     },
     ctx::Ctx,
-    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{
+        client::Client,
+        commands::Song,
+        mpd_client::{Filter, MpdClient, MpdCommand},
+        proto_client::ProtoClient,
+    },
     shared::{
         key_event::KeyEvent,
         macros::modal,
@@ -92,7 +97,7 @@ where
         match event.as_common_action(ctx) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().set_filter(None, config);
+                self.stack_mut().current_mut().set_filter(None, ctx);
                 self.prepare_preview(ctx);
             }
             Some(CommonAction::Confirm) => {
@@ -103,12 +108,12 @@ where
                 event.stop_propagation();
                 match event.code() {
                     KeyCode::Char(c) => {
-                        self.stack_mut().current_mut().push_filter(c, config);
-                        self.stack_mut().current_mut().jump_first_matching(config);
+                        self.stack_mut().current_mut().push_filter(c, ctx);
+                        self.stack_mut().current_mut().jump_first_matching(ctx);
                         self.prepare_preview(ctx);
                     }
                     KeyCode::Backspace => {
-                        self.stack_mut().current_mut().pop_filter(config);
+                        self.stack_mut().current_mut().pop_filter(ctx);
                         ctx.render()?;
                     }
                     _ => {}
@@ -371,17 +376,17 @@ where
             }
             CommonAction::EnterSearch => {
                 self.set_filter_input_mode_active(true);
-                self.stack_mut().current_mut().set_filter(Some(String::new()), config);
+                self.stack_mut().current_mut().set_filter(Some(String::new()), ctx);
 
                 ctx.render()?;
             }
             CommonAction::NextResult => {
-                self.stack_mut().current_mut().jump_next_matching(config);
+                self.stack_mut().current_mut().jump_next_matching(ctx);
                 self.prepare_preview(ctx);
                 ctx.render()?;
             }
             CommonAction::PreviousResult => {
-                self.stack_mut().current_mut().jump_previous_matching(config);
+                self.stack_mut().current_mut().jump_previous_matching(ctx);
                 self.prepare_preview(ctx);
                 ctx.render()?;
             }
@@ -460,6 +465,97 @@ where
             }
             CommonAction::ContextMenu => {
                 self.open_context_menu(ctx)?;
+            }
+            CommonAction::Rating { value: Some(value) } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+
+                ctx.command(move |client| {
+                    let mut uris = Vec::new();
+                    for item in items {
+                        match item {
+                            Enqueue::File { path } => uris.push(path),
+                            Enqueue::Playlist { name } => {
+                                let playlist = client.list_playlist(&name)?.0;
+                                uris.extend(playlist);
+                            }
+                            Enqueue::Find { filter } => {
+                                let songs = client.find(
+                                    &filter
+                                        .into_iter()
+                                        .map(|(tag, kind, value)| {
+                                            Filter::new_with_kind(tag, value, kind)
+                                        })
+                                        .collect_vec(),
+                                )?;
+                                uris.extend(songs.into_iter().map(|song| song.file));
+                            }
+                        }
+                    }
+
+                    client.send_start_cmd_list()?;
+                    for uri in uris {
+                        client.send_set_sticker(&uri, "rating", &value.to_string())?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+
+                    Ok(())
+                });
+            }
+            CommonAction::Rating { value: None } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+
+                let modal = MenuModal::new(ctx)
+                    .select_section(ctx, move |mut section| {
+                        for i in 0..=10 {
+                            section.add_item(i.to_string(), i.to_string());
+                        }
+
+                        section.action(move |ctx, value| {
+                            ctx.command(move |client| {
+                                let mut uris = Vec::new();
+                                for item in items {
+                                    match item {
+                                        Enqueue::File { path } => uris.push(path),
+                                        Enqueue::Playlist { name } => {
+                                            let playlist = client.list_playlist(&name)?.0;
+                                            uris.extend(playlist);
+                                        }
+                                        Enqueue::Find { filter } => {
+                                            let songs = client.find(
+                                                &filter
+                                                    .into_iter()
+                                                    .map(|(tag, kind, value)| {
+                                                        Filter::new_with_kind(tag, value, kind)
+                                                    })
+                                                    .collect_vec(),
+                                            )?;
+                                            uris.extend(songs.into_iter().map(|song| song.file));
+                                        }
+                                    }
+                                }
+
+                                client.send_start_cmd_list()?;
+                                for uri in uris {
+                                    client.send_set_sticker(&uri, "rating", &value.to_string())?;
+                                }
+                                client.send_execute_cmd_list()?;
+                                client.read_ok()?;
+
+                                Ok(())
+                            });
+                            Ok(())
+                        });
+
+                        Some(section)
+                    })
+                    .list_section(ctx, |section| {
+                        let section = section.item("Cancel", |_ctx| Ok(()));
+                        Some(section)
+                    })
+                    .build();
+
+                modal!(ctx, modal);
             }
         }
 

@@ -13,7 +13,6 @@ pub struct Song {
     pub file: String,
     pub duration: Option<Duration>,
     pub metadata: HashMap<String, MetadataTag>,
-    pub stickers: Option<HashMap<String, String>>,
     pub last_modified: DateTime<Utc>,
     // Option because it is present from mpd 0.24 onwards
     pub added: Option<DateTime<Utc>>,

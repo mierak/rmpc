@@ -1,4 +1,4 @@
-use std::{any::Any, sync::Arc};
+use std::{any::Any, collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use bon::Builder;
@@ -21,6 +21,7 @@ pub const EXTERNAL_COMMAND: &str = "external_command";
 pub const GLOBAL_STATUS_UPDATE: &str = "global_status_update";
 pub const GLOBAL_VOLUME_UPDATE: &str = "global_volume_update";
 pub const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
+pub const GLOBAL_STICKERS_UPDATE: &str = "global_stickers_update";
 
 #[derive(derive_more::Debug, Builder)]
 pub(crate) struct MpdQuery {
@@ -87,8 +88,8 @@ impl PreviewGroup {
 #[derive(Debug)]
 #[allow(unused, clippy::large_enum_variant)]
 pub(crate) enum MpdQueryResult {
-    Preview { data: Option<Vec<PreviewGroup>>, origin_path: Option<Vec<String>> },
     SongsList { data: Vec<Song>, origin_path: Option<Vec<String>> },
+    Song { data: Song, origin_path: Option<Vec<String>> },
     LsInfo { data: Vec<String>, origin_path: Option<Vec<String>> },
     DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },
     AddToPlaylist { playlists: Vec<String>, song_file: String },
@@ -100,6 +101,7 @@ pub(crate) enum MpdQueryResult {
     Outputs(Vec<PartitionedOutput>),
     Decoders(Vec<Decoder>),
     ExternalCommand(Arc<Vec<String>>, Vec<Song>),
+    SongStickers(HashMap<String, HashMap<String, String>>),
     Any(Box<dyn Any + Send + Sync>),
 }
 

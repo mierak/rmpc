@@ -28,6 +28,7 @@ use crate::{
         string_util::StringExt,
     },
     ui::{
+        FETCH_SONG_STICKERS,
         UiEvent,
         browser::BrowserPane,
         dir_or_song::DirOrSong,
@@ -46,15 +47,12 @@ pub struct TagBrowserPane {
     target_pane: PaneType,
     browser: Browser<DirOrSong>,
     initialized: bool,
-    cache: TagBrowserCache,
+    cache: HashMap<String, CachedRootTag>,
 }
 
 const INIT: &str = "init";
 const OPEN_OR_PLAY: &str = "open_or_play";
 const PREVIEW: &str = "preview";
-
-#[derive(Debug, Default)]
-struct TagBrowserCache(HashMap<String, CachedRootTag>);
 
 #[derive(Debug, Default)]
 struct CachedRootTag(Vec<CachedAlbum>);
@@ -82,7 +80,7 @@ impl TagBrowserPane {
             filter_input_mode: false,
             browser: Browser::new(),
             initialized: false,
-            cache: TagBrowserCache::default(),
+            cache: HashMap::default(),
         }
     }
 
@@ -137,7 +135,7 @@ impl TagBrowserPane {
                 }
             }
             [artist] => {
-                let Some(albums) = self.cache.0.get(artist) else {
+                let Some(albums) = self.cache.get(artist) else {
                     return Ok(());
                 };
                 let Some(CachedAlbum { songs, .. }) =
@@ -153,7 +151,7 @@ impl TagBrowserPane {
             }
             [] => {
                 let current = current.as_path().to_owned();
-                if let Some(albums) = self.cache.0.get(&current) {
+                if let Some(albums) = self.cache.get(&current) {
                     let albums = albums
                         .0
                         .iter()
@@ -192,7 +190,7 @@ impl TagBrowserPane {
         let display_mode = ctx.config.artists.album_display_mode;
         let sort_mode = ctx.config.artists.album_sort_by;
 
-        let cached_artist = self.cache.0.entry(artist).or_default();
+        let cached_artist = self.cache.entry(artist).or_default();
 
         let albums = data
             .into_iter()
@@ -270,7 +268,7 @@ impl Pane for TagBrowserPane {
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &ctx.config,
+            ctx,
         );
 
         Ok(())
@@ -296,7 +294,7 @@ impl Pane for TagBrowserPane {
             UiEvent::Database => {
                 let root_tag = self.root_tag.clone();
                 let target = self.target_pane.clone();
-                self.cache = TagBrowserCache::default();
+                self.cache = HashMap::default();
                 ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
                     let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                     Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
@@ -347,6 +345,12 @@ impl Pane for TagBrowserPane {
                     true
                 };
 
+                let files = data.iter().map(|s| s.file.clone()).collect_vec();
+                ctx.query().id(FETCH_SONG_STICKERS).query(|client| {
+                    let stickers = client.fetch_song_stickers(files)?;
+                    Ok(MpdQueryResult::SongStickers(stickers))
+                });
+
                 let cached_artist = self.process_songs(artist, data, ctx);
 
                 if cache_only {
@@ -360,8 +364,7 @@ impl Pane for TagBrowserPane {
                         .0
                         .iter()
                         .map(|album| {
-                            DirOrSong::name_only(album.name.clone())
-                                .to_list_item_simple(&ctx.config)
+                            DirOrSong::name_only(album.name.clone()).to_list_item_simple(ctx)
                         })
                         .collect(),
                 )];
@@ -383,6 +386,12 @@ impl Pane for TagBrowserPane {
                     log::trace!(artist:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
                     true
                 };
+
+                let files = data.iter().map(|s| s.file.clone()).collect_vec();
+                ctx.query().id(FETCH_SONG_STICKERS).query(|client| {
+                    let stickers = client.fetch_song_stickers(files)?;
+                    Ok(MpdQueryResult::SongStickers(stickers))
+                });
 
                 if cache_only {
                     return Ok(());
@@ -435,11 +444,8 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         &mut self.stack
     }
 
-    fn initial_playlist_name(&self) -> Option<String> {
-        self.stack().current().selected().and_then(|item| match item {
-            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
-            DirOrSong::Song(_) => None,
-        })
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
+        self.browser.areas
     }
 
     fn set_filter_input_mode_active(&mut self, active: bool) {
@@ -448,6 +454,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
     fn is_filter_input_mode_active(&self) -> bool {
         self.filter_input_mode
+    }
+
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
     }
 
     fn list_songs_in_item(
@@ -460,7 +470,6 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         let album_name = match (self.stack().path(), &item) {
             ([artist], DirOrSong::Dir { name, .. }) => self
                 .cache
-                .0
                 .get(artist)
                 .and_then(|albums| {
                     albums.0.iter().find(|a| &a.name == name).map(|a| a.original_name.clone())
@@ -488,84 +497,6 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         }
     }
 
-    fn enqueue<'a>(
-        &self,
-        items: impl Iterator<Item = &'a DirOrSong>,
-    ) -> (Vec<Enqueue>, Option<usize>) {
-        match self.stack.path() {
-            [_tag_value, _album] => {
-                let hovered =
-                    self.stack.current().selected().map(|item| item.dir_name_or_file_name());
-
-                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
-                    let filename = item.dir_name_or_file_name().into_owned();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
-                        acc.1 = Some(idx);
-                    }
-                    acc.0.push(Enqueue::Find {
-                        filter: vec![(Tag::File, FilterKind::Exact, filename)],
-                    });
-
-                    acc
-                })
-            }
-            [tag_value] => {
-                let tag_value = tag_value.clone();
-                let Some(albums) = self.cache.0.get(&tag_value) else {
-                    return (Vec::new(), None);
-                };
-
-                let items = items
-                    .filter_map(|item| {
-                        let name = item.dir_name_or_file_name();
-                        albums.0.iter().find(|a| a.name == name)
-                    })
-                    .flat_map(|album| {
-                        album.songs.iter().map(|song| Enqueue::Find {
-                            filter: vec![(Tag::File, FilterKind::Exact, song.file.clone())],
-                        })
-                    })
-                    .collect_vec();
-
-                (items, None)
-            }
-            [] => {
-                let root_tag = self.root_tag.clone();
-                let separator = self.separator.clone();
-
-                (
-                    items
-                        .map(|item| item.dir_name_or_file_name().into_owned())
-                        .map(|name| {
-                            let mut filter = Self::root_tag_filter(
-                                root_tag.clone(),
-                                separator.as_deref(),
-                                &name,
-                            );
-                            Enqueue::Find {
-                                filter: vec![(
-                                    filter.tag,
-                                    filter.kind,
-                                    std::mem::take(&mut filter.value).into_owned(),
-                                )],
-                            }
-                        })
-                        .collect_vec(),
-                    None,
-                )
-            }
-            _ => (Vec::new(), None),
-        }
-    }
-
-    fn open(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(true, ctx)
-    }
-
-    fn next(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(false, ctx)
-    }
-
     fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
         let Some(current) = self.stack.current().selected().map(DirStackItem::as_path) else {
             return Ok(());
@@ -577,22 +508,21 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
             [artist, album] => {
                 let key_style = ctx.config.theme.preview_label_style;
                 let group_style = ctx.config.theme.preview_metadata_group_style;
-                let Some(albums) = self.cache.0.get(artist) else {
+                let Some(albums) = self.cache.get(artist) else {
                     return Ok(());
                 };
                 let Some(CachedAlbum { songs, .. }) = albums.0.iter().find(|a| &a.name == album)
                 else {
                     return Ok(());
                 };
-                let song = songs
-                    .iter()
-                    .find(|song| song.file == current)
-                    .map(|song| song.to_preview(key_style, group_style));
+                let song = songs.iter().find(|song| song.file == current).map(|song| {
+                    song.to_preview(key_style, group_style, ctx.stickers.get(&song.file))
+                });
                 self.stack_mut().set_preview(song);
                 ctx.render()?;
             }
             [artist] => {
-                let Some(albums) = self.cache.0.get(artist) else {
+                let Some(albums) = self.cache.get(artist) else {
                     return Ok(());
                 };
                 let Some(CachedAlbum { songs, .. }) =
@@ -603,13 +533,14 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                 let songs = vec![PreviewGroup::from(
                     None,
                     None,
-                    songs.iter().map(|song| song.to_list_item_simple(&ctx.config)).collect_vec(),
+                    songs.iter().map(|song| song.to_list_item_simple(ctx)).collect_vec(),
                 )];
+
                 self.stack_mut().set_preview(Some(songs));
                 ctx.render()?;
             }
             [] => {
-                if let Some(albums) = self.cache.0.get(&current) {
+                if let Some(albums) = self.cache.get(&current) {
                     self.stack.set_preview(Some(vec![PreviewGroup::from(
                         None,
                         None,
@@ -617,8 +548,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                             .0
                             .iter()
                             .map(|CachedAlbum { name, .. }| {
-                                DirOrSong::name_only(name.to_owned())
-                                    .to_list_item_simple(&ctx.config)
+                                DirOrSong::name_only(name.to_owned()).to_list_item_simple(ctx)
                             })
                             .collect(),
                     )]));
@@ -646,8 +576,84 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         Ok(())
     }
 
-    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
-        self.browser.areas
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        match self.stack.path() {
+            [_tag_value, _album] => {
+                let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
+
+                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
+                    let filename = item.dir_name_or_file().into_owned();
+                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
+                        acc.1 = Some(idx);
+                    }
+                    acc.0.push(Enqueue::Find {
+                        filter: vec![(Tag::File, FilterKind::Exact, filename)],
+                    });
+
+                    acc
+                })
+            }
+            [tag_value] => {
+                let tag_value = tag_value.clone();
+                let Some(albums) = self.cache.get(&tag_value) else {
+                    return (Vec::new(), None);
+                };
+
+                let items = items
+                    .filter_map(|item| {
+                        let name = item.dir_name_or_file();
+                        albums.0.iter().find(|a| a.name == name)
+                    })
+                    .flat_map(|album| {
+                        album.songs.iter().map(|song| Enqueue::Find {
+                            filter: vec![(Tag::File, FilterKind::Exact, song.file.clone())],
+                        })
+                    })
+                    .collect_vec();
+
+                (items, None)
+            }
+            [] => {
+                let root_tag = self.root_tag.clone();
+                let separator = self.separator.clone();
+
+                (
+                    items
+                        .map(|item| item.dir_name_or_file().into_owned())
+                        .map(|name| {
+                            let mut filter = Self::root_tag_filter(
+                                root_tag.clone(),
+                                separator.as_deref(),
+                                &name,
+                            );
+                            Enqueue::Find {
+                                filter: vec![(
+                                    filter.tag,
+                                    filter.kind,
+                                    std::mem::take(&mut filter.value).into_owned(),
+                                )],
+                            }
+                        })
+                        .collect_vec(),
+                    None,
+                )
+            }
+            _ => (Vec::new(), None),
+        }
+    }
+
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
+    }
+
+    fn initial_playlist_name(&self) -> Option<String> {
+        self.stack().current().selected().and_then(|item| match item {
+            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
+            DirOrSong::Song(_) => None,
+        })
     }
 }
 
@@ -673,7 +679,6 @@ mod tests {
                 ("album".to_string(), Into::<String>::into(album).into()),
                 ("date".to_string(), Into::<String>::into(date).into()),
             ]),
-            stickers: None,
             last_modified: chrono::Utc::now(),
             added: None,
         }
@@ -693,7 +698,6 @@ mod tests {
                 ("date".to_string(), Into::<String>::into(date).into()),
                 ("originaldate".to_string(), Into::<String>::into(original_date).into()),
             ]),
-            stickers: None,
             last_modified: chrono::Utc::now(),
             added: None,
         }

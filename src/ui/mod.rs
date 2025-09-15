@@ -81,6 +81,7 @@ pub struct Ui<'ui> {
 
 const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
 const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
+const FETCH_SONG_STICKERS: &str = "fetch_song_stickers";
 
 macro_rules! active_tab_call {
     ($self:ident, $ctx:ident, $fn:ident($($param:expr),+)) => {
@@ -752,6 +753,14 @@ impl<'ui> Ui<'ui> {
                 }
                 (OPEN_DECODERS_MODAL, MpdQueryResult::Decoders(decoders)) => {
                     modal!(ctx, DecodersModal::new(decoders));
+                }
+                (FETCH_SONG_STICKERS, MpdQueryResult::SongStickers(stickers)) => {
+                    for (k, v) in stickers {
+                        // Assume all stickers were fetched for each song so simple replace is
+                        // enough
+                        ctx.stickers.insert(k, v);
+                    }
+                    ctx.render()?;
                 }
                 (id, mut data) => {
                     // TODO a proper modal target

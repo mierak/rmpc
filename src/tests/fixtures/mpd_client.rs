@@ -63,7 +63,6 @@ pub fn client() -> TestMpdClient {
                     ("title".to_owned(), format!("{}_{}_file_{i}", *artist, *album).into()),
                 ]),
                 duration: Some(Duration::from_secs(i.into())),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             })
@@ -306,7 +305,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn playlist_info(&mut self, _: bool) -> MpdResult<Option<Vec<Song>>> {
+    fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         Ok(Some(self.queue.iter().map(|idx| self.songs[*idx].clone()).collect_vec()))
     }
 
@@ -517,7 +516,6 @@ impl MpdClient for TestMpdClient {
                         id: *idx as u32,
                         duration: None,
                         metadata: HashMap::default(),
-                        stickers: None,
                         last_modified: chrono::Utc::now(),
                         added: None,
                     })

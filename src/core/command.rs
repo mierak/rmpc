@@ -100,7 +100,7 @@ impl Command {
                 }))
             }
             Command::Queue => Ok(Box::new(|client| {
-                let queue = client.playlist_info(false)?;
+                let queue = client.playlist_info()?;
                 if let Some(queue) = queue {
                     println!("{}", serde_json::ser::to_string(&queue)?);
                     Ok(())

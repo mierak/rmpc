@@ -1,6 +1,6 @@
 use std::{
     cell::Cell,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ops::AddAssign,
     time::{Duration, Instant},
 };
@@ -31,6 +31,7 @@ use crate::{
         events::ClientRequest,
         lrc::{Lrc, LrcIndex, get_lrc_path},
         macros::status_warn,
+        mpd_client_ext::MpdClientExt,
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
     },
@@ -43,6 +44,7 @@ pub struct Ctx {
     pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
+    pub(crate) stickers: HashMap<String, HashMap<String, String>>,
     pub(crate) active_tab: TabName,
     pub(crate) supported_commands: HashSet<String>,
     pub(crate) db_update_start: Option<Instant>,
@@ -85,7 +87,12 @@ impl Ctx {
         }
 
         let status = client.get_status()?;
-        let queue = client.playlist_info(sticker_support_needed)?.unwrap_or_default();
+        let queue = client.playlist_info()?.unwrap_or_default();
+        let stickers = if sticker_support_needed {
+            client.fetch_song_stickers(queue.iter().map(|song| song.file.clone()).collect())?
+        } else {
+            HashMap::new()
+        };
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
             config.album_art.method = ImageMethod::None;
@@ -102,6 +109,7 @@ impl Ctx {
             config: std::sync::Arc::new(config),
             status,
             queue,
+            stickers,
             active_tab,
             supported_commands,
             db_update_start: None,
@@ -228,6 +236,7 @@ impl Ctx {
 }
 
 impl Config {
+    // TODO get rid of this completely?
     fn sticker_support_needed(&self) -> bool {
         self.theme.song_table_format.iter().any(|column| column.prop.kind.contains_stickers())
             || self.theme.browser_song_format.0.iter().any(|prop| prop.kind.contains_stickers())

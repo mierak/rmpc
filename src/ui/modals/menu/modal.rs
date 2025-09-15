@@ -25,7 +25,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::modals::{Modal, RectExt as _},
+    ui::modals::{Modal, RectExt as _, menu::select_section::SelectSection},
 };
 
 #[derive(Debug)]
@@ -247,6 +247,20 @@ impl<'a> MenuModal<'a> {
         let section = cb(section);
         self.sections.push(SectionType::Input(section));
         self.areas.push(Rect::default());
+        self
+    }
+
+    pub fn select_section(
+        mut self,
+        ctx: &Ctx,
+        cb: impl FnOnce(SelectSection) -> Option<SelectSection>,
+    ) -> Self {
+        let section = SelectSection::new(ctx.config.theme.current_item_style);
+        let section = cb(section);
+        if let Some(section) = section {
+            self.sections.push(SectionType::Select(section));
+            self.areas.push(Rect::default());
+        }
         self
     }
 

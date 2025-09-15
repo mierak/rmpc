@@ -21,10 +21,12 @@ use crate::{
         ext::error::ErrorExt,
         id::{self, Id},
         macros::{status_error, status_warn},
+        mpd_client_ext::MpdClientExt,
         mpd_query::{
             EXTERNAL_COMMAND,
             GLOBAL_QUEUE_UPDATE,
             GLOBAL_STATUS_UPDATE,
+            GLOBAL_STICKERS_UPDATE,
             GLOBAL_VOLUME_UPDATE,
             MpdQueryResult,
             run_status_update,
@@ -259,6 +261,10 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
+                        (GLOBAL_STICKERS_UPDATE, None, MpdQueryResult::SongStickers(stickers)) => {
+                            ctx.stickers = stickers;
+                            render_wanted = true;
+                        }
                         (
                             GLOBAL_STATUS_UPDATE,
                             None,
@@ -601,10 +607,10 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Ui
             });
         }
         IdleEvent::Playlist => {
-            let fetch_stickers = ctx.should_fetch_stickers;
-            ctx.query().id(GLOBAL_QUEUE_UPDATE).replace_id("playlist").query(move |client| {
-                Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?))
-            });
+            ctx.query()
+                .id(GLOBAL_QUEUE_UPDATE)
+                .replace_id("playlist")
+                .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?)));
             if ctx.config.reflect_changes_to_playlist {
                 // Do not replace because we want to update currently loaded playlist if any
                 ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status_from_playlist").query(
@@ -618,10 +624,14 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Ui
             }
         }
         IdleEvent::Sticker => {
-            let fetch_stickers = ctx.should_fetch_stickers;
-            ctx.query().id(GLOBAL_QUEUE_UPDATE).replace_id("playlist").query(move |client| {
-                Ok(MpdQueryResult::Queue(client.playlist_info(fetch_stickers)?))
-            });
+            if ctx.should_fetch_stickers {
+                let songs: Vec<_> = ctx.stickers.keys().cloned().collect();
+                ctx.query().id(GLOBAL_STICKERS_UPDATE).replace_id("global_stickers_update").query(
+                    move |client| {
+                        Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
+                    },
+                );
+            }
         }
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {

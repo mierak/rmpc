@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use enum_map::{Enum, EnumMap, enum_map};
@@ -322,6 +324,7 @@ impl Pane for QueuePane {
                 .map(|(_, song)| song.id)
                 .is_some_and(|v| v == song.id);
 
+            let song_stickers = ctx.stickers.get(&song.file);
             let is_marked = self.scrolling_state.get_marked().contains(&idx);
             let columns = (0..formats.len()).map(|i| {
                 let mut max_len: usize = widths[i].width.into();
@@ -335,6 +338,7 @@ impl Pane for QueuePane {
                 let mut line = song
                     .as_line_ellipsized(
                         &formats[i].prop,
+                        song_stickers,
                         max_len,
                         &config.theme.symbols,
                         &config.theme.format_tag_separator,
@@ -355,10 +359,9 @@ impl Pane for QueuePane {
             });
 
             let is_matching_search = is_current
-                || self
-                    .filter
-                    .as_ref()
-                    .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter));
+                || self.filter.as_ref().is_some_and(|filter| {
+                    song.matches(self.column_formats.as_slice(), song_stickers, filter)
+                });
 
             let mut row = QueueRow::default();
             if is_matching_search {
@@ -725,7 +728,7 @@ impl Pane for QueuePane {
                             if let Some(ref mut f) = self.filter {
                                 f.push(c);
                             }
-                            self.jump_first(&ctx.queue, ctx.config.scrolloff);
+                            self.jump_first(&ctx.queue, &ctx.stickers, ctx.config.scrolloff);
 
                             ctx.render()?;
                         }
@@ -1090,12 +1093,12 @@ impl Pane for QueuePane {
                     ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(&ctx.queue, ctx.config.scrolloff);
+                    self.jump_forward(&ctx.queue, &ctx.stickers, ctx.config.scrolloff);
 
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(&ctx.queue, ctx.config.scrolloff);
+                    self.jump_back(&ctx.queue, &ctx.stickers, ctx.config.scrolloff);
 
                     ctx.render()?;
                 }
@@ -1170,6 +1173,7 @@ impl Pane for QueuePane {
                 CommonAction::ContextMenu => {
                     self.open_context_menu(ctx)?;
                 }
+                CommonAction::Rating { .. } => {}
             }
         } else if let Some(action) = event.as_global_action(ctx) {
             match action {
@@ -1197,7 +1201,12 @@ impl QueuePane {
         if area.width > 0 { Some(area) } else { None }
     }
 
-    pub fn jump_forward(&mut self, queue: &[Song], scrolloff: usize) {
+    pub fn jump_forward(
+        &mut self,
+        queue: &[Song],
+        stickers: &HashMap<String, HashMap<String, String>>,
+        scrolloff: usize,
+    ) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -1210,14 +1219,20 @@ impl QueuePane {
         let length = queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if queue[i].matches(self.column_formats.as_slice(), filter) {
+            let song_stickers = stickers.get(&queue[i].file);
+            if queue[i].matches(self.column_formats.as_slice(), song_stickers, filter) {
                 self.scrolling_state.select(Some(i), scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self, queue: &[Song], scrolloff: usize) {
+    pub fn jump_back(
+        &mut self,
+        queue: &[Song],
+        stickers: &HashMap<String, HashMap<String, String>>,
+        scrolloff: usize,
+    ) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -1230,14 +1245,20 @@ impl QueuePane {
         let length = queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if queue[i].matches(self.column_formats.as_slice(), filter) {
+            let song_stickers = stickers.get(&queue[i].file);
+            if queue[i].matches(self.column_formats.as_slice(), song_stickers, filter) {
                 self.scrolling_state.select(Some(i), scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_first(&mut self, queue: &[Song], scrolloff: usize) {
+    pub fn jump_first(
+        &mut self,
+        queue: &[Song],
+        stickers: &HashMap<String, HashMap<String, String>>,
+        scrolloff: usize,
+    ) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -1246,7 +1267,10 @@ impl QueuePane {
         queue
             .iter()
             .enumerate()
-            .find(|(_, item)| item.matches(self.column_formats.as_slice(), filter))
+            .find(|(_, item)| {
+                let song_stickers = stickers.get(&item.file);
+                item.matches(self.column_formats.as_slice(), song_stickers, filter)
+            })
             .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx), scrolloff));
     }
 }

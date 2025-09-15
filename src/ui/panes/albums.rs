@@ -113,7 +113,7 @@ impl Pane for AlbumsPane {
             area,
             frame.buffer_mut(),
             &mut self.stack,
-            &ctx.config,
+            ctx,
         );
 
         Ok(())
@@ -170,14 +170,43 @@ impl Pane for AlbumsPane {
         ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+            (PREVIEW, MpdQueryResult::DirOrSong { mut data, origin_path }) => {
                 if let Some(origin_path) = origin_path
                     && origin_path != self.stack().path()
                 {
                     log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
                     return Ok(());
                 }
-                self.stack_mut().set_preview(data);
+
+                match self.stack().current().selected() {
+                    Some(DirOrSong::Dir { .. }) => {
+                        let res = PreviewGroup::from(
+                            None,
+                            None,
+                            data.into_iter().map(|v| v.to_list_item_simple(ctx)).collect(),
+                        );
+
+                        self.stack_mut().set_preview(Some(vec![res]));
+                    }
+                    Some(DirOrSong::Song(_)) => {
+                        let key_style = ctx.config.theme.preview_label_style;
+                        let group_style = ctx.config.theme.preview_metadata_group_style;
+                        let preview = data.pop().and_then(|song| match song {
+                            DirOrSong::Dir { .. } => None,
+                            DirOrSong::Song(song) => Some(song.to_preview(
+                                key_style,
+                                group_style,
+                                ctx.stickers.get(&song.file),
+                            )),
+                        });
+
+                        self.stack_mut().set_preview(preview);
+                    }
+                    None => {
+                        self.stack_mut().set_preview(None);
+                    }
+                }
+
                 ctx.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
@@ -220,7 +249,7 @@ fn list_titles(
         .map(DirOrSong::Song))
 }
 
-fn find_songs(
+fn find_song(
     client: &mut impl MpdClient,
     album: &str,
     file: &str,
@@ -247,11 +276,8 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         &mut self.stack
     }
 
-    fn initial_playlist_name(&self) -> Option<String> {
-        self.stack().current().selected().and_then(|item| match item {
-            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
-            DirOrSong::Song(_) => None,
-        })
+    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
+        self.browser.areas
     }
 
     fn set_filter_input_mode_active(&mut self, active: bool) {
@@ -260,6 +286,10 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
 
     fn is_filter_input_mode_active(&self) -> bool {
         self.filter_input_mode
+    }
+
+    fn next(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(false, ctx)
     }
 
     fn list_songs_in_item(
@@ -272,12 +302,46 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn open(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(true, ctx)
-    }
+    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
+        let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
+            return Ok(());
+        };
+        let current = current.to_owned();
+        let origin_path = Some(self.stack().path().to_vec());
 
-    fn next(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(false, ctx)
+        self.stack_mut().clear_preview();
+        match self.stack.path() {
+            [album] => {
+                let album = album.clone();
+                let sort_order = ctx.config.browser_song_sort.clone();
+                ctx.query()
+                    .id(PREVIEW)
+                    .replace_id("albums_preview")
+                    .target(PaneType::Albums)
+                    .query(move |client| {
+                        let song = find_song(client, &album, &current, &sort_order)?;
+                        Ok(MpdQueryResult::DirOrSong {
+                            data: vec![DirOrSong::Song(song)],
+                            origin_path,
+                        })
+                    });
+            }
+            [] => {
+                let sort_order = ctx.config.browser_song_sort.clone();
+                ctx.query()
+                    .id(PREVIEW)
+                    .replace_id("albums_preview")
+                    .target(PaneType::Albums)
+                    .query(move |client| {
+                        let data = list_titles(client, &current, &sort_order)?.collect();
+                        Ok(MpdQueryResult::DirOrSong { data, origin_path })
+                    });
+            }
+
+            _ => {}
+        }
+
+        Ok(())
     }
 
     fn enqueue<'a>(
@@ -286,10 +350,9 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
     ) -> (Vec<Enqueue>, Option<usize>) {
         match self.stack.path() {
             [album] => {
-                let hovered =
-                    self.stack.current().selected().map(|item| item.dir_name_or_file_name());
+                let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
                 items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
-                    let filename = item.dir_name_or_file_name().into_owned();
+                    let filename = item.dir_name_or_file().into_owned();
                     if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
                         acc.1 = Some(idx);
                     }
@@ -305,7 +368,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             }
             [] => (
                 items
-                    .map(|item| item.dir_name_or_file_name().into_owned())
+                    .map(|item| item.dir_name_or_file().into_owned())
                     .map(|name| Enqueue::Find {
                         filter: vec![(Tag::Album, FilterKind::Exact, name)],
                     })
@@ -316,55 +379,14 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
-        let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
-            return Ok(());
-        };
-        let current = current.to_owned();
-        let config = std::sync::Arc::clone(&ctx.config);
-        let origin_path = Some(self.stack().path().to_vec());
-
-        self.stack_mut().clear_preview();
-        match self.stack.path() {
-            [album] => {
-                let album = album.clone();
-                let sort_order = ctx.config.browser_song_sort.clone();
-                ctx.query()
-                    .id(PREVIEW)
-                    .replace_id("albums_preview")
-                    .target(PaneType::Albums)
-                    .query(move |client| {
-                        let data =
-                            Some(find_songs(client, &album, &current, &sort_order)?.to_preview(
-                                config.theme.preview_label_style,
-                                config.theme.preview_metadata_group_style,
-                            ));
-                        Ok(MpdQueryResult::Preview { data, origin_path })
-                    });
-            }
-            [] => {
-                let sort_order = ctx.config.browser_song_sort.clone();
-                ctx.query()
-                    .id(PREVIEW)
-                    .replace_id("albums_preview")
-                    .target(PaneType::Albums)
-                    .query(move |client| {
-                        let data = list_titles(client, &current, &sort_order)?
-                            .map(|v| v.to_list_item_simple(&config))
-                            .collect_vec();
-                        let data = PreviewGroup::from(None, None, data);
-                        let data = Some(vec![data]);
-                        Ok(MpdQueryResult::Preview { data, origin_path })
-                    });
-            }
-
-            _ => {}
-        }
-
-        Ok(())
+    fn open(&mut self, ctx: &Ctx) -> Result<()> {
+        self.open_or_play(true, ctx)
     }
 
-    fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
-        self.browser.areas
+    fn initial_playlist_name(&self) -> Option<String> {
+        self.stack().current().selected().and_then(|item| match item {
+            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
+            DirOrSong::Song(_) => None,
+        })
     }
 }

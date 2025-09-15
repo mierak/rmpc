@@ -142,8 +142,9 @@ impl SearchPane {
         &mut self,
         frame: &mut ratatui::prelude::Frame<'_>,
         area: ratatui::prelude::Rect,
-        config: &Config,
+        ctx: &Ctx,
     ) {
+        let config = &ctx.config;
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
         let title = self.songs_dir.filter().as_ref().map(|v| {
             format!(
@@ -163,7 +164,7 @@ impl SearchPane {
             }
             b.padding(Padding::new(0, column_right_padding, 0, 0))
         };
-        let current = List::new(self.songs_dir.to_list_items(config))
+        let current = List::new(self.songs_dir.to_list_items(ctx))
             .highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
@@ -195,33 +196,25 @@ impl SearchPane {
         match &self.phase {
             Phase::SearchTextboxInput => {}
             Phase::Search => {
-                let data = Some(vec![PreviewGroup::from(
-                    None,
-                    None,
-                    self.songs_dir.to_list_items(&ctx.config),
-                )]);
-                ctx.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
-                    |_| Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) }),
-                );
+                let data =
+                    Some(vec![PreviewGroup::from(None, None, self.songs_dir.to_list_items(ctx))]);
+
+                self.preview = data;
             }
             Phase::BrowseResults { .. } => {
                 let Some(current) = self.songs_dir.selected() else {
                     return;
                 };
                 let file = current.file.clone();
-                let key_style = ctx.config.theme.preview_label_style;
-                let group_style = ctx.config.theme.preview_metadata_group_style;
 
                 ctx.query().id(PREVIEW).replace_id("preview").target(PaneType::Search).query(
                     move |client| {
-                        let data = Some(
-                            client
-                                .find(&[Filter::new(Tag::File, &file)])?
-                                .first()
-                                .context("Expected to find exactly one song")?
-                                .to_preview(key_style, group_style),
-                        );
-                        Ok(MpdQueryResult::Preview { data, origin_path: Some(origin_path) })
+                        let data = client
+                            .find(&[Filter::new(Tag::File, &file)])?
+                            .pop()
+                            .context("Expected to find exactly one song")?;
+
+                        Ok(MpdQueryResult::Song { data, origin_path: Some(origin_path) })
                     },
                 );
             }
@@ -588,6 +581,7 @@ impl SearchPane {
                 CommonAction::PaneLeft => {}
                 CommonAction::ShowInfo => {}
                 CommonAction::ContextMenu => {}
+                CommonAction::Rating { .. } => {}
             }
         }
 
@@ -598,11 +592,10 @@ impl SearchPane {
         let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
             return Ok(());
         };
-        let config = &ctx.config;
         match event.as_common_action(ctx) {
             Some(CommonAction::Close) => {
                 *filter_input_on = false;
-                self.songs_dir.set_filter(None, config);
+                self.songs_dir.set_filter(None, ctx);
                 self.prepare_preview(ctx);
 
                 ctx.render()?;
@@ -616,14 +609,14 @@ impl SearchPane {
                 event.stop_propagation();
                 match event.code() {
                     KeyCode::Char(c) => {
-                        self.songs_dir.push_filter(c, config);
-                        self.songs_dir.jump_first_matching(config);
+                        self.songs_dir.push_filter(c, ctx);
+                        self.songs_dir.jump_first_matching(ctx);
                         self.prepare_preview(ctx);
 
                         ctx.render()?;
                     }
                     KeyCode::Backspace => {
-                        self.songs_dir.pop_filter(config);
+                        self.songs_dir.pop_filter(ctx);
 
                         ctx.render()?;
                     }
@@ -639,7 +632,6 @@ impl SearchPane {
         let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
             return Ok(());
         };
-        let config = &ctx.config;
         if let Some(action) = event.as_global_action(ctx) {
             match action {
                 GlobalAction::ExternalCommand { command, .. }
@@ -726,19 +718,19 @@ impl SearchPane {
                     ctx.render()?;
                 }
                 CommonAction::EnterSearch => {
-                    self.songs_dir.set_filter(Some(String::new()), config);
+                    self.songs_dir.set_filter(Some(String::new()), ctx);
                     *filter_input_on = true;
 
                     ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.songs_dir.jump_next_matching(config);
+                    self.songs_dir.jump_next_matching(ctx);
                     self.prepare_preview(ctx);
 
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.songs_dir.jump_previous_matching(config);
+                    self.songs_dir.jump_previous_matching(ctx);
                     self.prepare_preview(ctx);
 
                     ctx.render()?;
@@ -818,6 +810,7 @@ impl SearchPane {
                 CommonAction::ContextMenu => {
                     self.open_result_phase_context_menu(ctx)?;
                 }
+                CommonAction::Rating { .. } => {}
             }
         }
 
@@ -1046,9 +1039,9 @@ impl Pane for SearchPane {
         &mut self,
         frame: &mut ratatui::prelude::Frame,
         area: ratatui::prelude::Rect,
-        Ctx { config, .. }: &Ctx,
+        ctx: &Ctx,
     ) -> anyhow::Result<()> {
-        let widths = &config.theme.column_widths;
+        let widths = &ctx.config.theme.column_widths;
         let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
             Constraint::Percentage(widths[0]),
             Constraint::Percentage(widths[1]),
@@ -1059,11 +1052,11 @@ impl Pane for SearchPane {
         };
 
         frame.render_widget(
-            Block::default().borders(Borders::RIGHT).border_style(config.theme.borders_style),
+            Block::default().borders(Borders::RIGHT).border_style(ctx.config.theme.borders_style),
             previous_area,
         );
         frame.render_widget(
-            Block::default().borders(Borders::RIGHT).border_style(config.theme.borders_style),
+            Block::default().borders(Borders::RIGHT).border_style(ctx.config.theme.borders_style),
             current_area_init,
         );
         let previous_area = Rect {
@@ -1082,7 +1075,7 @@ impl Pane for SearchPane {
         match self.phase {
             Phase::Search | Phase::SearchTextboxInput => {
                 self.column_areas[BrowserArea::Current] = current_area;
-                self.render_input_column(frame, current_area, config);
+                self.render_input_column(frame, current_area, &ctx.config);
 
                 // Render preview at offset to allow click to select
                 if let Some(preview) = &self.preview {
@@ -1102,13 +1095,13 @@ impl Pane for SearchPane {
                         }
                         result.push(ListItem::new(Span::raw("")));
                     }
-                    let preview = List::new(result).style(config.as_text_style());
+                    let preview = List::new(result).style(ctx.config.as_text_style());
                     frame.render_widget(preview, preview_area);
                 }
             }
             Phase::BrowseResults { filter_input_on: _ } => {
-                self.render_song_column(frame, current_area, config);
-                self.render_input_column(frame, previous_area, config);
+                self.render_song_column(frame, current_area, ctx);
+                self.render_input_column(frame, previous_area, &ctx.config);
                 if let Some(preview) = &self.preview {
                     let mut result = Vec::new();
                     for group in preview {
@@ -1118,7 +1111,7 @@ impl Pane for SearchPane {
                         result.extend(group.items.clone());
                         result.push(ListItem::new(Span::raw("")));
                     }
-                    let preview = List::new(result).style(config.as_text_style());
+                    let preview = List::new(result).style(ctx.config.as_text_style());
                     frame.render_widget(preview, preview_area);
                 }
             }
@@ -1162,7 +1155,7 @@ impl Pane for SearchPane {
         ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::Preview { data, origin_path }) => {
+            (PREVIEW, MpdQueryResult::Song { data, origin_path }) => {
                 let Some(selected) = self.songs_dir.selected().map(|s| [s.as_path()]) else {
                     log::trace!("Dropping preview because no item was selected");
                     return Ok(());
@@ -1173,16 +1166,19 @@ impl Pane for SearchPane {
                     log::trace!(origin_path:?, current_path:? = selected; "Dropping preview because it does not belong to this path");
                     return Ok(());
                 }
-                self.preview = data;
+
+                let key_style = ctx.config.theme.preview_label_style;
+                let group_style = ctx.config.theme.preview_metadata_group_style;
+
+                self.preview =
+                    Some(data.to_preview(key_style, group_style, ctx.stickers.get(&data.file)));
+
                 ctx.render()?;
             }
             (SEARCH, MpdQueryResult::SongsList { data, origin_path: _ }) => {
                 self.songs_dir = Dir::new(data);
-                self.preview = Some(vec![PreviewGroup::from(
-                    None,
-                    None,
-                    self.songs_dir.to_list_items(&ctx.config),
-                )]);
+                self.preview =
+                    Some(vec![PreviewGroup::from(None, None, self.songs_dir.to_list_items(ctx))]);
                 ctx.render()?;
             }
             _ => {}

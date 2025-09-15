@@ -61,6 +61,7 @@ impl<'a> PropertyTemplates<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(
                 song,
+                song.and_then(|s| ctx.stickers.get(&s.file)),
                 ctx,
                 &config.theme.format_tag_separator,
                 config.theme.multiple_tag_resolution_strategy,

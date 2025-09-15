@@ -43,7 +43,7 @@ impl DirOrSong {
         }
     }
 
-    pub fn dir_name_or_file_name(&self) -> Cow<'_, str> {
+    pub fn dir_name_or_file(&self) -> Cow<'_, str> {
         match self {
             DirOrSong::Dir { name, .. } => Cow::Borrowed(name),
             DirOrSong::Song(song) => Cow::Borrowed(&song.file),
@@ -490,7 +490,6 @@ mod ordtest {
                 .iter()
                 .map(|(k, v)| ((*k).to_string(), MetadataTag::Single((*v).to_string())))
                 .collect(),
-            stickers: None,
             last_modified: mtime.parse().unwrap(),
             added: None,
         })
@@ -511,7 +510,7 @@ mod ordtest {
     fn assert_equivalent(actual: &[DirOrSong], expected: &[DirOrSong]) {
         assert_eq!(actual.len(), expected.len());
         for (a, b) in actual.iter().zip(expected.iter()) {
-            assert_eq!(a.dir_name_or_file_name(), b.dir_name_or_file_name());
+            assert_eq!(a.dir_name_or_file(), b.dir_name_or_file());
         }
     }
 

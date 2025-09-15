@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use itertools::Itertools;
 
@@ -6,7 +6,7 @@ use crate::{
     config::keys::actions::Position,
     mpd::{
         QueuePosition,
-        commands::{State, outputs::Outputs},
+        commands::{State, outputs::Outputs, stickers::Stickers},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{Filter, FilterKind, MpdClient, MpdCommand, SingleOrRange, Tag},
         proto_client::ProtoClient,
@@ -36,6 +36,10 @@ pub trait MpdClientExt {
     fn create_playlist(&mut self, name: &str, items: Vec<String>) -> Result<(), MpdError>;
     fn next_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
     fn prev_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
+    fn fetch_song_stickers(
+        &mut self,
+        song_uris: Vec<String>,
+    ) -> Result<HashMap<String, HashMap<String, String>>, MpdError>;
 }
 
 #[derive(Debug, Clone)]
@@ -49,7 +53,6 @@ pub enum MpdDelete {
 pub enum Enqueue {
     File { path: String },
     Playlist { name: String },
-    Search { filter: Vec<(Tag, FilterKind, String)> },
     Find { filter: Vec<(Tag, FilterKind, String)> },
 }
 
@@ -187,13 +190,6 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             match item {
                 Enqueue::File { path } => self.send_add(&path, position),
                 Enqueue::Playlist { name } => self.send_load_playlist(&name, position),
-                Enqueue::Search { filter } => self.send_search_add(
-                    &filter
-                        .into_iter()
-                        .map(|(tag, kind, value)| Filter::new_with_kind(tag, value, kind))
-                        .collect_vec(),
-                    position,
-                ),
                 Enqueue::Find { filter } => self.send_find_add(
                     &filter
                         .into_iter()
@@ -400,6 +396,52 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                 self.read_ok()
             }
         }
+    }
+
+    fn fetch_song_stickers(
+        &mut self,
+        mut song_uris: Vec<String>,
+    ) -> Result<HashMap<String, HashMap<String, String>>, MpdError> {
+        if song_uris.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut list_ended_with_err = false;
+        let mut i = 0;
+        let mut result = HashMap::new();
+
+        while i < song_uris.len() {
+            self.send_start_cmd_list_ok()?;
+            for uri in &song_uris[i..] {
+                self.send_list_stickers(uri)?;
+            }
+            self.send_execute_cmd_list()?;
+
+            for uri in &mut song_uris[i..] {
+                let res: Result<Stickers, _> = self.read_response();
+                match res {
+                    Ok(stickers) => {
+                        list_ended_with_err = false;
+                        result.insert(std::mem::take(uri), stickers.0);
+                        i += 1;
+                    }
+                    Err(error) => {
+                        log::warn!(error:?, file = uri.as_str(); "Tried to find stickers but unexpected error occurred");
+                        list_ended_with_err = true;
+                        i += 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // In case the last sticker was fetched successfully we have to read an
+        // OK as an ack for the whole command list
+        if !list_ended_with_err {
+            self.read_ok()?;
+        }
+
+        Ok(result)
     }
 }
 

@@ -16,12 +16,14 @@ use crate::{
         key_event::KeyEvent,
         mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
+    ui::modals::menu::select_section::SelectSection,
 };
 
 mod input_section;
 mod list_section;
 pub mod modal;
 mod multi_action_section;
+mod select_section;
 
 trait Section {
     fn down(&mut self) -> bool;
@@ -50,6 +52,7 @@ trait Section {
 #[derive(Debug)]
 enum SectionType<'a> {
     Menu(ListSection),
+    Select(SelectSection),
     Multi(MultiActionSection<'a>),
     Input(InputSection<'a>),
 }
@@ -60,6 +63,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.down(),
             SectionType::Multi(s) => s.down(),
             SectionType::Input(s) => s.down(),
+            SectionType::Select(s) => s.down(),
         }
     }
 
@@ -68,6 +72,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.up(),
             SectionType::Multi(s) => s.up(),
             SectionType::Input(s) => s.up(),
+            SectionType::Select(s) => s.up(),
         }
     }
 
@@ -76,6 +81,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.right(),
             SectionType::Multi(s) => s.right(),
             SectionType::Input(s) => s.right(),
+            SectionType::Select(s) => s.right(),
         }
     }
 
@@ -84,6 +90,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.left(),
             SectionType::Multi(s) => s.left(),
             SectionType::Input(s) => s.left(),
+            SectionType::Select(s) => s.left(),
         }
     }
 
@@ -92,6 +99,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.unselect(),
             SectionType::Multi(s) => s.unselect(),
             SectionType::Input(s) => s.unselect(),
+            SectionType::Select(s) => s.unselect(),
         }
     }
 
@@ -100,6 +108,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.unfocus(),
             SectionType::Multi(s) => s.unfocus(),
             SectionType::Input(s) => s.unfocus(),
+            SectionType::Select(s) => s.unfocus(),
         }
     }
 
@@ -108,6 +117,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.confirm(ctx),
             SectionType::Multi(s) => s.confirm(ctx),
             SectionType::Input(s) => s.confirm(ctx),
+            SectionType::Select(s) => s.confirm(ctx),
         }
     }
 
@@ -116,6 +126,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.len(),
             SectionType::Multi(s) => s.len(),
             SectionType::Input(s) => s.len(),
+            SectionType::Select(s) => s.len(),
         }
     }
 
@@ -124,6 +135,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => Widget::render(s, area, buf),
             SectionType::Multi(s) => Widget::render(s, area, buf),
             SectionType::Input(s) => Widget::render(s, area, buf),
+            SectionType::Select(s) => Widget::render(s, area, buf),
         }
     }
 
@@ -132,6 +144,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.key_input(key, ctx),
             SectionType::Multi(s) => s.key_input(key, ctx),
             SectionType::Input(s) => s.key_input(key, ctx),
+            SectionType::Select(s) => s.key_input(key, ctx),
         }
     }
 
@@ -140,6 +153,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.left_click(pos),
             SectionType::Multi(s) => s.left_click(pos),
             SectionType::Input(s) => s.left_click(pos),
+            SectionType::Select(s) => s.left_click(pos),
         }
     }
 
@@ -148,6 +162,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.double_click(pos, ctx),
             SectionType::Multi(s) => s.double_click(pos, ctx),
             SectionType::Input(s) => s.double_click(pos, ctx),
+            SectionType::Select(s) => s.double_click(pos, ctx),
         }
     }
 }
