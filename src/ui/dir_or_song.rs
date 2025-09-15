@@ -34,6 +34,15 @@ impl DirOrSong {
         }
     }
 
+    pub fn playlist_name_only(name: String) -> Self {
+        DirOrSong::Dir {
+            name,
+            full_path: String::new(),
+            last_modified: chrono::Utc::now(),
+            playlist: true,
+        }
+    }
+
     pub fn dir_name_or_file_name(&self) -> Cow<'_, str> {
         match self {
             DirOrSong::Dir { name, .. } => Cow::Borrowed(name),

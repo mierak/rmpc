@@ -136,7 +136,7 @@ impl Pane for PlaylistsPane {
                         .context("Cannot list playlists")?
                         .into_iter()
                         .sorted_by(|a, b| compare.compare(&a.name, &b.name))
-                        .map(|playlist| DirOrSong::name_only(playlist.name))
+                        .map(|playlist| DirOrSong::playlist_name_only(playlist.name))
                         .collect();
                     Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                 },
@@ -166,7 +166,7 @@ impl Pane for PlaylistsPane {
                             .sorted_by(|a, b| {
                                 StringCompare::from(sort_opts.as_ref()).compare(&a.name, &b.name)
                             })
-                            .map(|playlist| DirOrSong::name_only(playlist.name))
+                            .map(|playlist| DirOrSong::playlist_name_only(playlist.name))
                             .collect();
                         Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
                     },
