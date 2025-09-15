@@ -70,6 +70,7 @@ scrolled down
 - Konsole terminal now does not autodetect to Kitty image protocol, it instead uses ueberzugpp if
 available and Block if not
 - Fix Iterm2 image protocol sometimes rendering too late
+- Fix playlists not using playist style and icon in the Playlists pane
 
 ## [0.9.0] - 2025-06-23
 
