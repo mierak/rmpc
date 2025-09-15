@@ -272,8 +272,12 @@ impl Command {
                     Ok(())
                 }))
             }
-            Command::SearchYt { query, position } => {
-                let chosen_url = YtDlp::search_youtube_single(query.trim())?;
+            Command::SearchYt { query, soundcloud, interactive, limit, position } => {
+                let chosen_url = if interactive {
+                    YtDlp::search_pick_cli_auto(query.trim(), soundcloud, limit)?
+                } else {
+                    YtDlp::search_single_auto(query.trim(), soundcloud)?
+                };
                 let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
                 Ok(Box::new(move |client| {
                     client.send_start_cmd_list()?;
