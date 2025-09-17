@@ -13,15 +13,10 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, Position},
+        actions::{AddKind, Position, RatingKind},
     },
     ctx::Ctx,
-    mpd::{
-        client::Client,
-        commands::Song,
-        mpd_client::{Filter, MpdClient, MpdCommand},
-        proto_client::ProtoClient,
-    },
+    mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
         macros::modal,
@@ -32,7 +27,7 @@ use crate::{
     ui::{
         modals::{
             input_modal::InputModal,
-            menu::{create_add_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
         widgets::browser::BrowserArea,
@@ -466,96 +461,16 @@ where
             CommonAction::ContextMenu => {
                 self.open_context_menu(ctx)?;
             }
-            CommonAction::Rating { value: Some(value) } => {
+            CommonAction::Rating { kind: RatingKind::Value(value) } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-
                 ctx.command(move |client| {
-                    let mut uris = Vec::new();
-                    for item in items {
-                        match item {
-                            Enqueue::File { path } => uris.push(path),
-                            Enqueue::Playlist { name } => {
-                                let playlist = client.list_playlist(&name)?.0;
-                                uris.extend(playlist);
-                            }
-                            Enqueue::Find { filter } => {
-                                let songs = client.find(
-                                    &filter
-                                        .into_iter()
-                                        .map(|(tag, kind, value)| {
-                                            Filter::new_with_kind(tag, value, kind)
-                                        })
-                                        .collect_vec(),
-                                )?;
-                                uris.extend(songs.into_iter().map(|song| song.file));
-                            }
-                        }
-                    }
-
-                    client.send_start_cmd_list()?;
-                    for uri in uris {
-                        client.send_set_sticker(&uri, "rating", &value.to_string())?;
-                    }
-                    client.send_execute_cmd_list()?;
-                    client.read_ok()?;
-
+                    client.set_sticker_multiple("rating", value.to_string(), items)?;
                     Ok(())
                 });
             }
-            CommonAction::Rating { value: None } => {
+            CommonAction::Rating { kind: RatingKind::Modal { values, custom } } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-
-                let modal = MenuModal::new(ctx)
-                    .select_section(ctx, move |mut section| {
-                        for i in 0..=10 {
-                            section.add_item(i.to_string(), i.to_string());
-                        }
-
-                        section.action(move |ctx, value| {
-                            ctx.command(move |client| {
-                                let mut uris = Vec::new();
-                                for item in items {
-                                    match item {
-                                        Enqueue::File { path } => uris.push(path),
-                                        Enqueue::Playlist { name } => {
-                                            let playlist = client.list_playlist(&name)?.0;
-                                            uris.extend(playlist);
-                                        }
-                                        Enqueue::Find { filter } => {
-                                            let songs = client.find(
-                                                &filter
-                                                    .into_iter()
-                                                    .map(|(tag, kind, value)| {
-                                                        Filter::new_with_kind(tag, value, kind)
-                                                    })
-                                                    .collect_vec(),
-                                            )?;
-                                            uris.extend(songs.into_iter().map(|song| song.file));
-                                        }
-                                    }
-                                }
-
-                                client.send_start_cmd_list()?;
-                                for uri in uris {
-                                    client.send_set_sticker(&uri, "rating", &value.to_string())?;
-                                }
-                                client.send_execute_cmd_list()?;
-                                client.read_ok()?;
-
-                                Ok(())
-                            });
-                            Ok(())
-                        });
-
-                        Some(section)
-                    })
-                    .list_section(ctx, |section| {
-                        let section = section.item("Cancel", |_ctx| Ok(()));
-                        Some(section)
-                    })
-                    .build();
-
-                modal!(ctx, modal);
+                modal!(ctx, create_rating_modal(items, values.as_slice(), custom, ctx));
             }
         }
 

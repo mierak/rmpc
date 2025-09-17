@@ -1,4 +1,7 @@
-use std::collections::BTreeSet;
+use std::{
+    collections::BTreeSet,
+    ops::{Bound, RangeBounds},
+};
 
 use log::error;
 use ratatui::widgets::{ListItem, ListState};
@@ -77,12 +80,31 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         }
     }
 
-    pub fn to_list_items<'a>(&self, ctx: &Ctx) -> Vec<ListItem<'a>> {
+    pub fn to_list_items_range<'a>(
+        &self,
+        range: impl RangeBounds<usize>,
+        ctx: &Ctx,
+    ) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
         let current_item_idx = self.selected_with_idx().map(|(idx, _)| idx);
+
+        let start = match range.start_bound() {
+            Bound::Included(&start) => start,
+            Bound::Excluded(start) => start + 1,
+            Bound::Unbounded => 0,
+        };
+
+        let end = match range.end_bound() {
+            Bound::Included(end) => end + 1,
+            Bound::Excluded(&end) => end,
+            Bound::Unbounded => self.items.len(),
+        };
+
         self.items
             .iter()
             .enumerate()
+            .skip(start)
+            .take(end.saturating_sub(start))
             .map(|(i, item)| {
                 let matches = self.filter.as_ref().is_some_and(|v| item.matches(ctx, v));
                 let is_current = current_item_idx.is_some_and(|idx| i == idx);
@@ -97,6 +119,10 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
                 item.to_list_item(ctx, self.marked().contains(&i), matches, content)
             })
             .collect()
+    }
+
+    pub fn to_list_items<'a>(&self, ctx: &Ctx) -> Vec<ListItem<'a>> {
+        self.to_list_items_range(.., ctx)
     }
 
     pub fn selected(&self) -> Option<&T> {

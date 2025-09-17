@@ -167,6 +167,64 @@ impl Section for SectionType<'_> {
     }
 }
 
+pub fn create_rating_modal<'a>(
+    items: Vec<Enqueue>,
+    values: &[f32],
+    custom: bool,
+    ctx: &Ctx,
+) -> MenuModal<'a> {
+    let clone = items.clone();
+    let clone2 = items.clone();
+    MenuModal::new(ctx)
+        .select_section(ctx, move |mut section| {
+            if values.is_empty() {
+                return None;
+            }
+
+            for i in values {
+                section.add_item(i.to_string(), i.to_string());
+            }
+
+            section.action(move |ctx, value| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple("rating", value, clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+
+            Some(section)
+        })
+        .input_section(ctx, "Rating", move |section| {
+            if !custom {
+                return None;
+            }
+
+            let section = section.action(move |ctx, value| {
+                if !value.trim().is_empty() {
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple("rating", value, clone2)?;
+                        Ok(())
+                    });
+                }
+            });
+
+            Some(section)
+        })
+        .list_section(ctx, |section| {
+            let section = section.item("Clear rating", |ctx| {
+                ctx.command(move |client| {
+                    client.delete_sticker_multiple("rating", items)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+            let section = section.item("Cancel", |_ctx| Ok(()));
+            Some(section)
+        })
+        .build()
+}
+
 pub fn create_add_modal<'a>(
     opts: Vec<(String, AddOpts, (Vec<Enqueue>, Option<usize>))>,
     ctx: &Ctx,

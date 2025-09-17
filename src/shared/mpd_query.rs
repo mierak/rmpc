@@ -72,14 +72,6 @@ impl PreviewGroup {
         Self { name, items: Vec::new(), header_style }
     }
 
-    pub fn from(
-        name: Option<&'static str>,
-        header_style: Option<Style>,
-        items: Vec<ListItem<'static>>,
-    ) -> Self {
-        Self { name, items, header_style }
-    }
-
     pub fn push(&mut self, item: ListItem<'static>) {
         self.items.push(item);
     }

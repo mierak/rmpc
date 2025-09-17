@@ -21,7 +21,7 @@ use crate::{
         keys::{
             GlobalAction,
             QueueActions,
-            actions::{AddKind, AutoplayKind},
+            actions::{AddKind, AutoplayKind, RatingKind},
         },
         tabs::PaneType,
         theme::{
@@ -50,7 +50,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
-            menu::{create_add_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
     },
@@ -1173,7 +1173,17 @@ impl Pane for QueuePane {
                 CommonAction::ContextMenu => {
                     self.open_context_menu(ctx)?;
                 }
-                CommonAction::Rating { .. } => {}
+                CommonAction::Rating { kind: RatingKind::Value(value) } => {
+                    let items = self.enqueue_items(false, ctx).0;
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple("rating", value.to_string(), items)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Rating { kind: RatingKind::Modal { values, custom } } => {
+                    let items = self.enqueue_items(false, ctx).0;
+                    modal!(ctx, create_rating_modal(items, values.as_slice(), custom, ctx));
+                }
             }
         } else if let Some(action) = event.as_global_action(ctx) {
             match action {

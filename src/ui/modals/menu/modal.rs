@@ -241,12 +241,14 @@ impl<'a> MenuModal<'a> {
         mut self,
         ctx: &Ctx,
         label: impl Into<Cow<'a, str>>,
-        cb: impl FnOnce(InputSection) -> InputSection<'_>,
+        cb: impl FnOnce(InputSection) -> Option<InputSection<'_>>,
     ) -> Self {
         let section = InputSection::new(label, ctx.config.theme.current_item_style);
         let section = cb(section);
-        self.sections.push(SectionType::Input(section));
-        self.areas.push(Rect::default());
+        if let Some(section) = section {
+            self.sections.push(SectionType::Input(section));
+            self.areas.push(Rect::default());
+        }
         self
     }
 

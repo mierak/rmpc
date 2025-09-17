@@ -278,7 +278,7 @@ impl<'ui> Ui<'ui> {
                             if any_non_default { Some(section) } else { None }
                         })
                         .input_section(ctx, "New partition:", |section| {
-                            section.action(|ctx, value| {
+                            let section = section.action(|ctx, value| {
                                 if !value.is_empty() {
                                     ctx.command(move |client| {
                                         client.send_start_cmd_list()?;
@@ -289,7 +289,8 @@ impl<'ui> Ui<'ui> {
                                         Ok(())
                                     });
                                 }
-                            })
+                            });
+                            Some(section)
                         })
                         .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
                         .build();

@@ -107,7 +107,10 @@ where
                 result
             } else if state.current().selected().is_some() {
                 state.preview().map_or(Vec::new(), |p| {
-                    p.iter().map(|item| item.to_list_item_simple(ctx)).collect_vec()
+                    p.iter()
+                        .take(self.areas[BrowserArea::Preview].height as usize)
+                        .map(|item| item.to_list_item_simple(ctx))
+                        .collect_vec()
                 })
             } else {
                 Vec::new()

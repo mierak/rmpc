@@ -12,7 +12,7 @@ use crate::{
 
 // Global actions
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum GlobalAction {
     Quit,
@@ -57,9 +57,7 @@ pub enum GlobalAction {
     },
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum GlobalActionFile {
     Quit,
     ShowHelp,
@@ -209,10 +207,10 @@ impl ToDescription for GlobalAction {
 
 // Albums actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum AlbumsActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum AlbumsActions {}
 
 impl From<AlbumsActionsFile> for AlbumsActions {
@@ -229,10 +227,10 @@ impl ToDescription for AlbumsActions {
 
 // Artists actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum ArtistsActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum ArtistsActions {}
 
 impl ToDescription for ArtistsActions {
@@ -249,10 +247,10 @@ impl From<ArtistsActionsFile> for ArtistsActions {
 
 // Directories actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum DirectoriesActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum DirectoriesActions {}
 
 impl ToDescription for DirectoriesActions {
@@ -269,7 +267,7 @@ impl From<DirectoriesActionsFile> for DirectoriesActions {
 
 // Logs actions
 #[cfg(debug_assertions)]
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum LogsActionsFile {
     Clear,
     ToggleScroll,
@@ -277,7 +275,7 @@ pub enum LogsActionsFile {
 
 #[cfg(debug_assertions)]
 #[allow(dead_code)]
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum LogsActions {
     Clear,
     ToggleScroll,
@@ -306,7 +304,7 @@ impl ToDescription for LogsActions {
 
 // Queue actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
 pub enum QueueActionsFile {
     Delete,
     DeleteAll,
@@ -318,7 +316,7 @@ pub enum QueueActionsFile {
     Shuffle,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, Copy, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum QueueActions {
     Delete,
@@ -372,7 +370,6 @@ impl ToDescription for QueueActions {
     serde::Deserialize,
     PartialEq,
     Eq,
-    Hash,
     Clone,
     Copy,
     Ord,
@@ -399,9 +396,7 @@ impl From<Position> for Option<QueuePosition> {
     }
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
 pub enum AddKind {
     Modal(Vec<(String, AddOpts)>),
     Action(AddOpts),
@@ -460,7 +455,6 @@ impl Default for AddKind {
     serde::Deserialize,
     PartialEq,
     Eq,
-    Hash,
     Clone,
     Copy,
     Ord,
@@ -474,9 +468,7 @@ pub enum AutoplayKind {
     None,
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct AddOpts {
     #[serde(default)]
     pub autoplay: AutoplayKind,
@@ -506,11 +498,24 @@ impl AddOpts {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum RatingKind {
+    Modal { values: Vec<f32>, custom: bool },
+    Value(f32),
+}
+
+impl Default for RatingKind {
+    fn default() -> Self {
+        RatingKind::Modal {
+            values: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+            custom: true,
+        }
+    }
+}
+
 // Common actions
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum CommonActionFile {
     Down,
     Up,
@@ -551,11 +556,12 @@ pub enum CommonActionFile {
     ShowInfo,
     ContextMenu {},
     Rating {
-        value: Option<u8>,
+        #[serde(default)]
+        kind: RatingKind,
     },
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum CommonAction {
     Down,
@@ -591,7 +597,7 @@ pub enum CommonAction {
     ShowInfo,
     ContextMenu,
     Rating {
-        value: Option<u8>,
+        kind: RatingKind,
     },
 }
 
@@ -661,7 +667,7 @@ impl ToDescription for CommonAction {
                             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
-            CommonAction::Rating { value } => "".into(), // TODO
+            CommonAction::Rating { kind } => "".into(), // TODO
         }
     }
 }
@@ -740,15 +746,15 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
-            CommonActionFile::Rating { value } => CommonAction::Rating { value },
+            CommonActionFile::Rating { kind } => CommonAction::Rating { kind },
         }
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum SearchActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum SearchActions {}
 
 impl ToDescription for SearchActions {

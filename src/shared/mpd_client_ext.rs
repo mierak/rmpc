@@ -40,6 +40,13 @@ pub trait MpdClientExt {
         &mut self,
         song_uris: Vec<String>,
     ) -> Result<HashMap<String, HashMap<String, String>>, MpdError>;
+    fn set_sticker_multiple(
+        &mut self,
+        key: &str,
+        value: String,
+        items: Vec<Enqueue>,
+    ) -> Result<(), MpdError>;
+    fn delete_sticker_multiple(&mut self, key: &str, items: Vec<Enqueue>) -> Result<(), MpdError>;
 }
 
 #[derive(Debug, Clone)]
@@ -442,6 +449,74 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         }
 
         Ok(result)
+    }
+
+    fn set_sticker_multiple(
+        &mut self,
+        key: &str,
+        value: String,
+        items: Vec<Enqueue>,
+    ) -> Result<(), MpdError> {
+        let mut uris = Vec::new();
+        for item in items {
+            match item {
+                Enqueue::File { path } => uris.push(path),
+                Enqueue::Playlist { name } => {
+                    let playlist = self.list_playlist(&name)?.0;
+                    uris.extend(playlist);
+                }
+                Enqueue::Find { filter } => {
+                    let songs = self.find(
+                        &filter
+                            .into_iter()
+                            .map(|(tag, kind, value)| Filter::new_with_kind(tag, value, kind))
+                            .collect_vec(),
+                    )?;
+                    uris.extend(songs.into_iter().map(|song| song.file));
+                }
+            }
+        }
+
+        self.send_start_cmd_list()?;
+        for uri in uris {
+            self.send_set_sticker(&uri, key, &value.to_string())?;
+        }
+        self.send_execute_cmd_list()?;
+        self.read_ok()?;
+
+        Ok(())
+    }
+
+    fn delete_sticker_multiple(&mut self, key: &str, items: Vec<Enqueue>) -> Result<(), MpdError> {
+        let mut uris = Vec::new();
+        for item in items {
+            match item {
+                Enqueue::File { path } => uris.push(path),
+                Enqueue::Playlist { name } => {
+                    let playlist = self.list_playlist(&name)?.0;
+                    uris.extend(playlist);
+                }
+                Enqueue::Find { filter } => {
+                    let songs = self.find(
+                        &filter
+                            .into_iter()
+                            .map(|(tag, kind, value)| Filter::new_with_kind(tag, value, kind))
+                            .collect_vec(),
+                    )?;
+                    uris.extend(songs.into_iter().map(|song| song.file));
+                }
+            }
+        }
+
+        for uri in uris {
+            match self.delete_sticker(&uri, key) {
+                Ok(()) => {}
+                Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) => {}
+                err @ Err(_) => err?,
+            }
+        }
+
+        Ok(())
     }
 }
 
