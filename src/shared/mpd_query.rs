@@ -82,6 +82,7 @@ impl PreviewGroup {
 pub(crate) enum MpdQueryResult {
     SongsList { data: Vec<Song>, origin_path: Option<Vec<String>> },
     Song { data: Song, origin_path: Option<Vec<String>> },
+    SearchResult { data: Vec<Song> },
     LsInfo { data: Vec<String>, origin_path: Option<Vec<String>> },
     DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },
     AddToPlaylist { playlists: Vec<String>, song_file: String },

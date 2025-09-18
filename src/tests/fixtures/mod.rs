@@ -70,7 +70,7 @@ pub fn ctx(
         supported_commands: HashSet::new(),
         needs_render: Cell::new(false),
         lrc_index: LrcIndex::default(),
-        should_fetch_stickers: false,
+        stickers_supported: true,
         rendered_frames: 0,
         scheduler,
         db_update_start: None,

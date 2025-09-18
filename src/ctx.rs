@@ -58,12 +58,12 @@ pub struct Ctx {
     #[debug(skip)]
     pub(crate) lrc_index: LrcIndex,
     pub(crate) rendered_frames: u64,
-    pub(crate) should_fetch_stickers: bool,
     #[debug(skip)]
     pub(crate) scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
     pub(crate) messages: RingVec<10, StatusMessage>,
     pub(crate) last_status_update: Instant,
     pub(crate) song_played: Option<Duration>,
+    pub(crate) stickers_supported: bool,
 }
 
 #[bon]
@@ -78,9 +78,10 @@ impl Ctx {
     ) -> Result<Self> {
         let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
         let sticker_support_needed = config.sticker_support_needed();
+        let stickers_supported = supported_commands.contains("sticker");
         log::info!(supported_commands:? = supported_commands, sticker_support_needed; "Supported commands by server");
 
-        if sticker_support_needed && !supported_commands.contains("sticker") {
+        if sticker_support_needed && !stickers_supported {
             bail!(
                 "Rmpc was configured to display stickers but MPD did not report sticker support.\nCheck if you have 'sticker_file' configured your in mpd.conf."
             );
@@ -118,11 +119,11 @@ impl Ctx {
             scheduler,
             client_request_sender,
             needs_render: Cell::new(false),
-            should_fetch_stickers: sticker_support_needed,
             rendered_frames: 0,
             messages: RingVec::default(),
             song_played: None,
             last_status_update: Instant::now(),
+            stickers_supported,
         })
     }
 

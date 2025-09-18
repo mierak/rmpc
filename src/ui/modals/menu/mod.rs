@@ -169,7 +169,7 @@ impl Section for SectionType<'_> {
 
 pub fn create_rating_modal<'a>(
     items: Vec<Enqueue>,
-    values: &[f32],
+    values: &[i32],
     custom: bool,
     ctx: &Ctx,
 ) -> MenuModal<'a> {

@@ -227,7 +227,7 @@ impl Pane for DirectoriesPane {
                     .filter(|file| !ctx.stickers.contains_key(file))
                     .collect_vec();
 
-                if !songs.is_empty() && ctx.should_fetch_stickers {
+                if !songs.is_empty() && ctx.stickers_supported {
                     ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
                         Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
                     });

@@ -39,7 +39,7 @@ use crate::{
     mpd::{
         commands::{State, idle::IdleEvent},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
-        mpd_client::{FilterKind, MpdClient, MpdCommand, ValueChange},
+        mpd_client::{MpdClient, MpdCommand, ValueChange},
         proto_client::ProtoClient,
         version::Version,
     },
@@ -845,40 +845,6 @@ impl Level {
             Level::Error => config.error,
             Level::Info => config.info,
         }
-    }
-}
-
-impl From<&FilterKind> for &'static str {
-    fn from(value: &FilterKind) -> Self {
-        match value {
-            FilterKind::Exact => "Exact match",
-            FilterKind::Contains => "Contains value",
-            FilterKind::StartsWith => "Starts with value",
-            FilterKind::Regex => "Regex",
-        }
-    }
-}
-
-impl std::fmt::Display for FilterKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FilterKind::Exact => write!(f, "Exact match"),
-            FilterKind::Contains => write!(f, "Contains value"),
-            FilterKind::StartsWith => write!(f, "Starts with value"),
-            FilterKind::Regex => write!(f, "Regex"),
-        }
-    }
-}
-
-impl FilterKind {
-    fn cycle(&mut self) -> &mut Self {
-        *self = match self {
-            FilterKind::Exact => FilterKind::Contains,
-            FilterKind::Contains => FilterKind::StartsWith,
-            FilterKind::StartsWith => FilterKind::Regex,
-            FilterKind::Regex => FilterKind::Exact,
-        };
-        self
     }
 }
 

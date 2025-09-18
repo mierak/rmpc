@@ -231,7 +231,7 @@ impl Pane for PlaylistsPane {
                     .collect_vec();
 
                 log::debug!("Fetching stickers for {} songs", songs.len());
-                if !songs.is_empty() && ctx.should_fetch_stickers {
+                if !songs.is_empty() && ctx.stickers_supported {
                     log::debug!("Fetching 2 stickers for {} songs", songs.len());
                     ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
                         Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))

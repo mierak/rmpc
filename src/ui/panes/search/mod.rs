@@ -1,11 +1,11 @@
-use std::rc::Rc;
+use std::collections::HashSet;
 
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Rect},
     style::{Styled, Stylize},
     text::Span,
     widgets::{Block, Borders, List, ListItem, Padding},
@@ -15,8 +15,6 @@ use super::{CommonAction, Pane};
 use crate::{
     MpdQueryResult,
     config::{
-        Config,
-        Search,
         keys::{
             GlobalAction,
             actions::{AddKind, Position, RatingKind},
@@ -27,12 +25,12 @@ use crate::{
     ctx::Ctx,
     mpd::{
         commands::Song,
-        mpd_client::{Filter, FilterKind, MpdClient},
+        mpd_client::{Filter, MpdClient, StickerFilter},
         version::Version,
     },
     shared::{
         key_event::KeyEvent,
-        macros::{modal, status_info, status_warn},
+        macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
     },
@@ -45,18 +43,19 @@ use crate::{
             menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
-        widgets::{browser::BrowserArea, button::Button, input::Input},
+        panes::search::inputs::{InputGroups, InputType, RatingMode, TextboxInput},
+        widgets::browser::BrowserArea,
     },
 };
 
+mod inputs;
+
 #[derive(Debug)]
 pub struct SearchPane {
-    inputs: InputGroups<1>,
+    inputs: InputGroups,
     phase: Phase,
     songs_dir: Dir<Song>,
-    input_areas: Rc<[Rect]>,
     column_areas: EnumMap<BrowserArea, Rect>,
-    initial_ignore_diacritics: bool,
 }
 
 const SEARCH: &str = "search";
@@ -64,39 +63,24 @@ const SEARCH: &str = "search";
 impl SearchPane {
     pub fn new(ctx: &Ctx) -> Self {
         let config = &ctx.config;
-        let mut filter_inputs = vec![
-            FilterInput {
-                label: " Search mode       :".to_string(),
-                variant: FilterInputVariant::FilterKind { value: config.search.mode },
-            },
-            FilterInput {
-                label: " Case sensitive    :".to_string(),
-                variant: FilterInputVariant::CaseSensitive,
-            },
-        ];
 
-        let mut ignore_diacritics = false;
-        if ctx.mpd_version >= Version::new(0, 25, 0) {
-            filter_inputs.push(FilterInput {
-                label: " Ignore diacritics :".to_string(),
-                variant: FilterInputVariant::IgnoreDiacritics,
-            });
-            ignore_diacritics = ctx.config.search.ignore_diacritics;
-        }
+        let inputs = InputGroups::builder()
+            .search_config(&config.search)
+            .initial_fold_case(!config.search.case_sensitive)
+            .initial_strip_diacritics(config.search.ignore_diacritics)
+            .text_style(config.as_text_style())
+            .separator_style(config.theme.borders_style)
+            .current_item_style(config.theme.current_item_style)
+            .highlight_item_style(config.theme.highlighted_item_style)
+            .rating_supported(ctx.stickers_supported)
+            .strip_diacritics_supported(ctx.mpd_version >= Version::new(0, 25, 0))
+            .build();
 
         Self {
             phase: Phase::Search,
             songs_dir: Dir::default(),
-            inputs: InputGroups::new(
-                &config.search,
-                filter_inputs,
-                [ButtonInput { label: " Reset", variant: ButtonInputVariant::Reset }],
-                !ctx.config.search.case_sensitive,
-                ignore_diacritics,
-            ),
-            input_areas: Rc::default(),
+            inputs,
             column_areas: EnumMap::default(),
-            initial_ignore_diacritics: ignore_diacritics,
         }
     }
 
@@ -185,138 +169,13 @@ impl SearchPane {
         }
     }
 
-    fn render_input_column(
-        &mut self,
-        frame: &mut ratatui::prelude::Frame,
-        area: ratatui::prelude::Rect,
-        config: &Config,
-    ) {
-        let input_areas = Layout::vertical(
-            (0..self.inputs.textbox_inputs.len()
-                + self.inputs.filter_inputs.len()
-                + self.inputs.button_inputs.len()
-                + 2) // +2 for borders/separators
-                .map(|_| Constraint::Length(1)),
-        )
-        .split(area);
-
-        self.input_areas = Rc::clone(&input_areas);
-
-        let mut idx = 0;
-        for input in &self.inputs.textbox_inputs {
-            match input {
-                Textbox { value, label, filter_key } => {
-                    let is_focused = matches!(self.inputs.focused(),
-                        FocusedInputGroup::Textboxes(Textbox { filter_key: filter_key2, .. }) if filter_key == filter_key2);
-
-                    let mut widget = Input::default()
-                        .set_borderless(true)
-                        .set_label(label)
-                        .set_placeholder("<None>")
-                        .set_focused(is_focused && matches!(self.phase, Phase::SearchTextboxInput))
-                        .set_label_style(config.as_text_style())
-                        .set_input_style(config.as_text_style())
-                        .set_text(value);
-
-                    widget = if matches!(self.phase, Phase::SearchTextboxInput) && is_focused {
-                        widget.set_label_style(config.theme.highlighted_item_style)
-                    } else if is_focused {
-                        widget
-                            .set_label_style(config.theme.current_item_style)
-                            .set_input_style(config.theme.current_item_style)
-                    } else if !value.is_empty() {
-                        widget.set_input_style(config.theme.highlighted_item_style)
-                    } else {
-                        widget
-                    };
-
-                    frame.render_widget(widget, input_areas[idx]);
-                }
-            }
-            idx += 1;
-        }
-
-        frame.render_widget(
-            Block::default().borders(Borders::TOP).border_style(config.theme.borders_style),
-            input_areas[idx],
-        );
-        idx += 1;
-
-        for input in &self.inputs.filter_inputs {
-            let mut inp = match input.variant {
-                FilterInputVariant::FilterKind { value } => Input::default()
-                    .set_borderless(true)
-                    .set_label_style(config.as_text_style())
-                    .set_input_style(config.as_text_style())
-                    .set_label(&input.label)
-                    .set_text(Into::into(&value)),
-                FilterInputVariant::CaseSensitive => Input::default()
-                    .set_borderless(true)
-                    .set_label_style(config.as_text_style())
-                    .set_input_style(config.as_text_style())
-                    .set_label(&input.label)
-                    .set_text(if self.inputs.ignore_case { "No" } else { "Yes" }),
-                FilterInputVariant::IgnoreDiacritics => Input::default()
-                    .set_borderless(true)
-                    .set_label_style(config.as_text_style())
-                    .set_input_style(config.as_text_style())
-                    .set_label(&input.label)
-                    .set_text(if self.inputs.ignore_diacritics { "Yes" } else { "No" }),
-            };
-
-            let is_focused = matches!(self.inputs.focused(),
-                FocusedInputGroup::Filters(FilterInput { variant: variant2, .. }) if &input.variant == variant2);
-
-            if is_focused {
-                inp = inp
-                    .set_label_style(config.theme.current_item_style)
-                    .set_input_style(config.theme.current_item_style);
-            }
-            frame.render_widget(inp, input_areas[idx]);
-            idx += 1;
-        }
-
-        frame.render_widget(
-            Block::default().borders(Borders::TOP).border_style(config.theme.borders_style),
-            input_areas[idx],
-        );
-        idx += 1;
-
-        for input in &self.inputs.button_inputs {
-            let mut button = match input.variant {
-                ButtonInputVariant::Reset => {
-                    Button::default().label(input.label).label_alignment(Alignment::Left)
-                }
-            };
-
-            let is_focused = matches!(self.inputs.focused(),
-                FocusedInputGroup::Buttons(ButtonInput { variant, .. }) if &input.variant == variant);
-
-            if is_focused {
-                button = button.style(config.theme.current_item_style);
-            } else {
-                button = button.style(config.as_text_style());
-            }
-            frame.render_widget(button, input_areas[idx]);
-        }
-    }
-
-    fn filter_type(&self) -> FilterKind {
-        self.inputs
-            .filter_inputs
-            .iter()
-            .find_map(|f| match f.variant {
-                FilterInputVariant::FilterKind { value } => Some(value),
-                _ => None,
-            })
-            .unwrap_or(FilterKind::Contains)
-    }
-
     fn search(&mut self, ctx: &Ctx) {
-        let filter_kind = self.filter_type();
-        let filter = self.inputs.textbox_inputs.iter().filter_map(|input| match &input {
-            Textbox { value, filter_key, .. } if !value.is_empty() => {
-                Some((filter_key.to_owned(), value.to_owned(), filter_kind))
+        let filter_kind = self.inputs.search_mode();
+        let filter = self.inputs.inputs.iter().filter_map(|input| match &input {
+            InputType::Textbox(TextboxInput { value, filter_key: Some(key), .. })
+                if !value.is_empty() && !key.is_empty() =>
+            {
+                Some((key.to_owned(), value.to_owned(), filter_kind))
             }
             _ => None,
         });
@@ -328,111 +187,48 @@ impl SearchPane {
             return;
         }
 
-        let ignore_case = self.inputs.ignore_case;
-        let ignore_diacritics = self.inputs.ignore_diacritics;
+        let need_stickers_fetch = ctx.stickers_supported;
+        let rating_kind = self.inputs.rating_mode();
+        let Ok(rating_value) = self.inputs.rating_value().parse::<i32>() else {
+            status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value());
+            return;
+        };
+
+        let fold_case = self.inputs.fold_case();
+        let strip_diacritics = self.inputs.strip_diacritics();
         ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(move |client| {
             let filter = filter
                 .iter_mut()
                 .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                    Filter::new(std::mem::take(key), value).with_type(*kind)
+                    Filter::new(std::mem::take(key), value).with_type((*kind).into())
                 })
                 .collect_vec();
 
-            let result = if ignore_case {
-                client.search(&filter, ignore_diacritics)
+            let data = if fold_case {
+                client.search(&filter, strip_diacritics)
             } else {
                 client.find(&filter)
             }?;
 
-            Ok(MpdQueryResult::SongsList { data: result, origin_path: None })
+            if need_stickers_fetch && !matches!(rating_kind, RatingMode::Any) {
+                let filter: Option<StickerFilter> = match rating_kind {
+                    RatingMode::Equals => Some(StickerFilter::EqualsInt(rating_value)),
+                    RatingMode::GreaterThan => Some(StickerFilter::GreaterThanInt(rating_value)),
+                    RatingMode::LessThan => Some(StickerFilter::LessThanInt(rating_value)),
+                    RatingMode::Any => None,
+                };
+
+                // empty URI returns all songs with the sticker
+                let ratings = client.find_stickers("", "rating", filter)?;
+                let ratings: HashSet<_> = ratings.into_iter().map(|r| r.file).collect();
+
+                let data = data.into_iter().filter(|song| ratings.contains(&song.file)).collect();
+
+                Ok(MpdQueryResult::SearchResult { data })
+            } else {
+                Ok(MpdQueryResult::SearchResult { data })
+            }
         });
-    }
-
-    fn reset(&mut self, search_config: &Search) {
-        for val in &mut self.inputs.textbox_inputs {
-            let Textbox { value, .. } = val;
-            value.clear();
-        }
-        for val in &mut self.inputs.filter_inputs {
-            match val.variant {
-                FilterInputVariant::FilterKind { ref mut value } => {
-                    *value = search_config.mode;
-                }
-                FilterInputVariant::CaseSensitive => {}
-                FilterInputVariant::IgnoreDiacritics => {}
-            }
-        }
-        self.inputs.ignore_case = search_config.case_sensitive;
-        self.inputs.ignore_diacritics = self.initial_ignore_diacritics;
-    }
-
-    fn activate_input(&mut self, ctx: &Ctx) {
-        match self.inputs.focused_mut() {
-            FocusedInputGroup::Textboxes(_) => self.phase = Phase::SearchTextboxInput,
-            FocusedInputGroup::Buttons(_) => {
-                // Reset is the only button in this group at the moment
-                self.reset(&ctx.config.search);
-                self.songs_dir = Dir::default();
-            }
-            FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::FilterKind { value },
-                ..
-            }) => {
-                value.cycle();
-                self.search(ctx);
-            }
-            FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::CaseSensitive,
-                ..
-            }) => {
-                self.inputs.ignore_case = !self.inputs.ignore_case;
-                // Ignore case and ignore diacritics cannot exist at the same time because they
-                // are different MPD commands (search vs find).
-                if !self.inputs.ignore_case {
-                    self.inputs.ignore_diacritics = false;
-                }
-                self.search(ctx);
-            }
-            FocusedInputGroup::Filters(FilterInput {
-                variant: FilterInputVariant::IgnoreDiacritics,
-                ..
-            }) => {
-                self.inputs.ignore_diacritics = !self.inputs.ignore_diacritics;
-                // Ignore case and ignore diacritics cannot exist at the same time because they
-                // are different MPD commands (search vs find).
-                if self.inputs.ignore_diacritics {
-                    self.inputs.ignore_case = true;
-                }
-                self.search(ctx);
-            }
-        }
-    }
-
-    fn get_clicked_input(&self, event: MouseEvent) -> Option<FocusedInput> {
-        for i in 0..self.inputs.textbox_inputs.len() {
-            if self.input_areas[i].contains(event.into()) {
-                return Some(FocusedInput::Textboxes(i));
-            }
-        }
-
-        // have to account for the separator between inputs/filter config inputs
-        let start = self.inputs.textbox_inputs.len() + 1;
-        for i in start..start + self.inputs.filter_inputs.len() {
-            if self.input_areas[i].contains(event.into()) {
-                return Some(FocusedInput::Filters(i - start));
-            }
-        }
-
-        // have to account for the separator between filter config
-        // inputs/buttons
-        let start = start + self.inputs.filter_inputs.len() + 1;
-        for i in start..start + self.inputs.button_inputs.len() {
-            if self.input_areas[i].contains(event.into()) {
-                return Some(FocusedInput::Buttons(i - start));
-            }
-        }
-
-        None
     }
 
     fn handle_search_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
@@ -495,14 +291,13 @@ impl SearchPane {
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
                 CommonAction::Confirm => {
-                    self.activate_input(ctx);
+                    if self.inputs.activate_focused() {
+                        self.search(ctx);
+                    }
                     ctx.render()?;
                 }
-                CommonAction::FocusInput
-                    if matches!(self.inputs.focused(), FocusedInputGroup::Textboxes(_)) =>
-                {
-                    self.phase = Phase::SearchTextboxInput;
-
+                CommonAction::FocusInput => {
+                    self.inputs.enter_insert_mode();
                     ctx.render()?;
                 }
                 // Modal while we are on search column does not support all options. It can
@@ -525,16 +320,7 @@ impl SearchPane {
                 // This action only makes sense when opts.all is true while we are on the
                 // search column.
                 CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
-                CommonAction::FocusInput => {}
-                CommonAction::Delete => match self.inputs.focused_mut() {
-                    FocusedInputGroup::Textboxes(textbox) if !textbox.value.is_empty() => {
-                        textbox.value.clear();
-                        self.search(ctx);
-
-                        ctx.render()?;
-                    }
-                    _ => {}
-                },
+                CommonAction::Delete => self.inputs.reset_focused(),
                 CommonAction::PaneDown => {}
                 CommonAction::PaneUp => {}
                 CommonAction::PaneRight => {}
@@ -942,54 +728,6 @@ impl SearchPane {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_search_pane_scrollbar_calculation() {
-        let scrollbar_height: u16 = 10;
-        let total_items: usize = 50;
-
-        let clicked_y = scrollbar_height.saturating_sub(1);
-        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
-            total_items.saturating_sub(1)
-        } else {
-            let position_ratio =
-                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
-                .min(total_items.saturating_sub(1))
-        };
-
-        assert_eq!(target_idx, total_items - 1);
-
-        let clicked_y = 0;
-        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-        let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
-            .min(total_items.saturating_sub(1));
-
-        assert_eq!(target_idx, 0);
-
-        let clicked_y = 5;
-        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
-        let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
-            .min(total_items.saturating_sub(1));
-
-        // should be roughly in the middle (around 25-27)
-        assert!((20..=30).contains(&target_idx));
-    }
-
-    #[test]
-    fn test_search_pane_phase_check() {
-        assert!(matches!(
-            Phase::BrowseResults { filter_input_on: false },
-            Phase::BrowseResults { .. }
-        ));
-        assert!(!matches!(Phase::Search, Phase::BrowseResults { .. }));
-        assert!(!matches!(Phase::SearchTextboxInput, Phase::BrowseResults { .. }));
-    }
-}
-
 impl Pane for SearchPane {
     fn render(
         &mut self,
@@ -1029,9 +767,9 @@ impl Pane for SearchPane {
         };
 
         match self.phase {
-            Phase::Search | Phase::SearchTextboxInput => {
+            Phase::Search => {
                 self.column_areas[BrowserArea::Current] = current_area;
-                self.render_input_column(frame, current_area, &ctx.config);
+                frame.render_widget(&mut self.inputs, current_area);
 
                 // Render only the part of the preview that is actually supposed to be shown
                 let offset = self.songs_dir.state.offset();
@@ -1043,7 +781,7 @@ impl Pane for SearchPane {
             }
             Phase::BrowseResults { filter_input_on: _ } => {
                 self.render_song_column(frame, current_area, ctx);
-                self.render_input_column(frame, previous_area, &ctx.config);
+                frame.render_widget(&mut self.inputs, previous_area);
                 if let Some(song) = self.songs_dir.selected() {
                     let preview = song.to_preview(
                         ctx.config.theme.preview_label_style,
@@ -1100,15 +838,15 @@ impl Pane for SearchPane {
         ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
-            (SEARCH, MpdQueryResult::SongsList { data, origin_path: _ }) => {
-                log::debug!("fetching song stickers for search results");
+            (SEARCH, MpdQueryResult::SearchResult { data }) => {
+                log::debug!(len = data.len(); "fetching song stickers for search results");
                 let songs = data
                     .iter()
                     .map(|song| song.file.clone())
                     .filter(|file| !ctx.stickers.contains_key(file))
                     .collect_vec();
 
-                if !songs.is_empty() && ctx.should_fetch_stickers {
+                if !songs.is_empty() && ctx.stickers_supported {
                     log::debug!("fetching stickers for {} songs", songs.len());
                     ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
                         Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
@@ -1123,7 +861,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_mouse_event(&mut self, mut event: MouseEvent, ctx: &Ctx) -> Result<()> {
+    fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         if self.handle_scrollbar_interaction(event, ctx)? {
             return Ok(());
         }
@@ -1133,22 +871,14 @@ impl Pane for SearchPane {
                 if self.column_areas[BrowserArea::Previous].contains(event.into()) =>
             {
                 self.phase = Phase::Search;
-                // Modify x coord to belong to middle column in order to satisfy
-                // the condition inside get_clicked_input. This
-                // is fine because phase is switched to Search.
-                // A bit hacky, but wcyd.
-                event.x = self.input_areas[1].x;
-                if let Some(input) = self.get_clicked_input(event) {
-                    self.inputs.focused_idx = input;
-                }
-
+                self.inputs.focus_input_at(event.into());
                 ctx.render()?;
             }
             MouseEventKind::LeftClick
                 if self.column_areas[BrowserArea::Preview].contains(event.into()) =>
             {
                 match self.phase {
-                    Phase::SearchTextboxInput | Phase::Search => {
+                    Phase::Search => {
                         if !self.songs_dir.items.is_empty() {
                             self.phase = Phase::BrowseResults { filter_input_on: false };
 
@@ -1188,16 +918,14 @@ impl Pane for SearchPane {
                 if self.column_areas[BrowserArea::Current].contains(event.into()) =>
             {
                 match self.phase {
-                    Phase::SearchTextboxInput | Phase::Search => {
-                        if matches!(self.phase, Phase::SearchTextboxInput) {
+                    Phase::Search => {
+                        if self.inputs.insert_mode {
                             self.phase = Phase::Search;
+                            self.inputs.insert_mode = false;
                             self.search(ctx);
                         }
 
-                        if let Some(input) = self.get_clicked_input(event) {
-                            self.inputs.focused_idx = input;
-                        }
-
+                        self.inputs.focus_input_at(event.into());
                         ctx.render()?;
                     }
                     Phase::BrowseResults { .. } => {
@@ -1215,11 +943,13 @@ impl Pane for SearchPane {
                 }
             }
             MouseEventKind::DoubleClick => match self.phase {
-                Phase::SearchTextboxInput | Phase::Search => {
-                    if self.get_clicked_input(event).is_some() {
-                        self.activate_input(ctx);
-                        ctx.render()?;
+                Phase::Search => {
+                    if self.column_areas[BrowserArea::Current].contains(event.into())
+                        && self.inputs.activate_focused()
+                    {
+                        self.search(ctx);
                     }
+                    ctx.render()?;
                 }
                 Phase::BrowseResults { .. } => {
                     let (_, items) = self.enqueue(false);
@@ -1235,7 +965,7 @@ impl Pane for SearchPane {
                 if self.column_areas[BrowserArea::Current].contains(event.into()) =>
             {
                 match self.phase {
-                    Phase::SearchTextboxInput | Phase::Search => {}
+                    Phase::Search => {}
                     Phase::BrowseResults { .. } => {
                         let clicked_row = event
                             .y
@@ -1258,8 +988,9 @@ impl Pane for SearchPane {
                 }
             }
             MouseEventKind::ScrollDown => match self.phase {
-                Phase::SearchTextboxInput | Phase::Search => {
-                    if matches!(self.phase, Phase::SearchTextboxInput) {
+                Phase::Search => {
+                    if self.inputs.insert_mode {
+                        self.inputs.insert_mode = false;
                         self.phase = Phase::Search;
                         self.search(ctx);
                     }
@@ -1272,8 +1003,9 @@ impl Pane for SearchPane {
                 }
             },
             MouseEventKind::ScrollUp => match self.phase {
-                Phase::SearchTextboxInput | Phase::Search => {
-                    if matches!(self.phase, Phase::SearchTextboxInput) {
+                Phase::Search => {
+                    if self.inputs.insert_mode {
+                        self.inputs.insert_mode = false;
                         self.phase = Phase::Search;
                         self.search(ctx);
                     }
@@ -1309,15 +1041,17 @@ impl Pane for SearchPane {
 
     fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
         match &mut self.phase {
-            Phase::SearchTextboxInput => match event.as_common_action(ctx) {
+            Phase::Search if self.inputs.insert_mode => match event.as_common_action(ctx) {
                 Some(CommonAction::Close) => {
                     self.phase = Phase::Search;
+                    self.inputs.insert_mode = false;
                     self.search(ctx);
 
                     ctx.render()?;
                 }
                 Some(CommonAction::Confirm) => {
                     self.phase = Phase::Search;
+                    self.inputs.insert_mode = false;
                     self.search(ctx);
 
                     ctx.render()?;
@@ -1326,20 +1060,25 @@ impl Pane for SearchPane {
                     event.stop_propagation();
                     match event.code() {
                         KeyCode::Char(c) => match self.inputs.focused_mut() {
-                            FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
+                            InputType::Textbox(TextboxInput { value, .. }) => {
                                 value.push(c);
-
                                 ctx.render()?;
                             }
-                            FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
+                            InputType::Numberbox(TextboxInput { value, .. }) => {
+                                if c.is_numeric() {
+                                    value.push(c);
+                                    ctx.render()?;
+                                }
+                            }
+                            _ => {}
                         },
                         KeyCode::Backspace => match self.inputs.focused_mut() {
-                            FocusedInputGroup::Textboxes(Textbox { value, .. }) => {
+                            InputType::Textbox(TextboxInput { value, .. })
+                            | InputType::Numberbox(TextboxInput { value, .. }) => {
                                 value.pop();
-
                                 ctx.render()?;
                             }
-                            FocusedInputGroup::Filters(_) | FocusedInputGroup::Buttons(_) => {}
+                            _ => {}
                         },
                         _ => {}
                     }
@@ -1359,206 +1098,44 @@ impl Pane for SearchPane {
     }
 }
 
-enum FocusedInputGroup<T, F, B> {
-    Textboxes(T),
-    Filters(F),
-    Buttons(B),
-}
-
-#[derive(Debug)]
-enum FocusedInput {
-    Textboxes(usize),
-    Filters(usize),
-    Buttons(usize),
-}
-
-#[derive(Debug)]
-struct InputGroups<const N3: usize> {
-    textbox_inputs: Vec<Textbox>,
-    filter_inputs: Vec<FilterInput>,
-    button_inputs: [ButtonInput; N3],
-    focused_idx: FocusedInput,
-    ignore_case: bool,
-    ignore_diacritics: bool,
-}
-
-impl<const N3: usize> InputGroups<N3> {
-    pub fn new(
-        search_config: &Search,
-        filter_inputs: Vec<FilterInput>,
-        button_inputs: [ButtonInput; N3],
-        initial_case_sensitive: bool,
-        initial_ignore_diacritics: bool,
-    ) -> Self {
-        Self {
-            textbox_inputs: search_config
-                .tags
-                .iter()
-                .map(|tag| Textbox {
-                    filter_key: tag.value.clone(),
-                    label: format!(" {:<18}:", tag.label),
-                    value: String::new(),
-                })
-                .collect_vec(),
-            filter_inputs,
-            button_inputs,
-            focused_idx: FocusedInput::Textboxes(0),
-            ignore_case: initial_case_sensitive,
-            ignore_diacritics: initial_ignore_diacritics,
-        }
-    }
-
-    pub fn first(&mut self) {
-        self.focused_idx = FocusedInput::Textboxes(0);
-    }
-
-    pub fn last(&mut self) {
-        self.focused_idx = FocusedInput::Buttons(self.button_inputs.len() - 1);
-    }
-
-    pub fn focused_mut(
-        &mut self,
-    ) -> FocusedInputGroup<&mut Textbox, &mut FilterInput, &mut ButtonInput> {
-        match self.focused_idx {
-            FocusedInput::Textboxes(idx) => {
-                FocusedInputGroup::Textboxes(&mut self.textbox_inputs[idx])
-            }
-            FocusedInput::Filters(idx) => FocusedInputGroup::Filters(&mut self.filter_inputs[idx]),
-            FocusedInput::Buttons(idx) => FocusedInputGroup::Buttons(&mut self.button_inputs[idx]),
-        }
-    }
-
-    pub fn focused(&self) -> FocusedInputGroup<&Textbox, &FilterInput, &ButtonInput> {
-        match self.focused_idx {
-            FocusedInput::Textboxes(idx) => FocusedInputGroup::Textboxes(&self.textbox_inputs[idx]),
-            FocusedInput::Filters(idx) => FocusedInputGroup::Filters(&self.filter_inputs[idx]),
-            FocusedInput::Buttons(idx) => FocusedInputGroup::Buttons(&self.button_inputs[idx]),
-        }
-    }
-
-    pub fn next_non_wrapping(&mut self) {
-        match self.focused_idx {
-            FocusedInput::Textboxes(idx) if idx == self.textbox_inputs.len() - 1 => {
-                self.focused_idx = FocusedInput::Filters(0);
-            }
-            FocusedInput::Textboxes(ref mut idx) => {
-                *idx += 1;
-            }
-            FocusedInput::Filters(idx) if idx == self.filter_inputs.len() - 1 => {
-                self.focused_idx = FocusedInput::Buttons(0);
-            }
-            FocusedInput::Filters(ref mut idx) => {
-                *idx += 1;
-            }
-            FocusedInput::Buttons(idx) if idx == self.button_inputs.len() - 1 => {}
-            FocusedInput::Buttons(ref mut idx) => {
-                *idx += 1;
-            }
-        }
-    }
-
-    pub fn next(&mut self) {
-        match self.focused_idx {
-            FocusedInput::Textboxes(idx) if idx == self.textbox_inputs.len() - 1 => {
-                self.focused_idx = FocusedInput::Filters(0);
-            }
-            FocusedInput::Textboxes(ref mut idx) => {
-                *idx += 1;
-            }
-            FocusedInput::Filters(idx) if idx == self.filter_inputs.len() - 1 => {
-                self.focused_idx = FocusedInput::Buttons(0);
-            }
-            FocusedInput::Filters(ref mut idx) => {
-                *idx += 1;
-            }
-            FocusedInput::Buttons(idx) if idx == self.button_inputs.len() - 1 => {
-                self.focused_idx = FocusedInput::Textboxes(0);
-            }
-            FocusedInput::Buttons(ref mut idx) => {
-                *idx += 1;
-            }
-        }
-    }
-
-    pub fn prev_non_wrapping(&mut self) {
-        match self.focused_idx {
-            FocusedInput::Textboxes(0) => {}
-            FocusedInput::Textboxes(ref mut idx) => {
-                *idx -= 1;
-            }
-            FocusedInput::Filters(0) => {
-                self.focused_idx = FocusedInput::Textboxes(self.textbox_inputs.len() - 1);
-            }
-            FocusedInput::Filters(ref mut idx) => {
-                *idx -= 1;
-            }
-            FocusedInput::Buttons(0) => {
-                self.focused_idx = FocusedInput::Filters(self.filter_inputs.len() - 1);
-            }
-            FocusedInput::Buttons(ref mut idx) => {
-                *idx -= 1;
-            }
-        }
-    }
-
-    pub fn prev(&mut self) {
-        match self.focused_idx {
-            FocusedInput::Textboxes(0) => {
-                self.focused_idx = FocusedInput::Buttons(self.button_inputs.len() - 1);
-            }
-            FocusedInput::Textboxes(ref mut idx) => {
-                *idx -= 1;
-            }
-            FocusedInput::Filters(0) => {
-                self.focused_idx = FocusedInput::Textboxes(self.textbox_inputs.len() - 1);
-            }
-            FocusedInput::Filters(ref mut idx) => {
-                *idx -= 1;
-            }
-            FocusedInput::Buttons(0) => {
-                self.focused_idx = FocusedInput::Filters(self.filter_inputs.len() - 1);
-            }
-            FocusedInput::Buttons(ref mut idx) => {
-                *idx -= 1;
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 enum Phase {
-    SearchTextboxInput,
     Search,
     BrowseResults { filter_input_on: bool },
 }
 
-#[derive(Debug)]
-struct Textbox {
-    value: String,
-    label: String,
-    filter_key: String,
-}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_search_pane_scrollbar_calculation() {
+        let scrollbar_height: u16 = 10;
+        let total_items: usize = 50;
 
-#[derive(Debug)]
-struct FilterInput {
-    variant: FilterInputVariant,
-    label: String,
-}
+        let clicked_y = scrollbar_height.saturating_sub(1);
+        let target_idx = if clicked_y >= scrollbar_height.saturating_sub(1) {
+            total_items.saturating_sub(1)
+        } else {
+            let position_ratio =
+                f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+            ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+                .min(total_items.saturating_sub(1))
+        };
 
-#[derive(Debug, PartialEq)]
-enum FilterInputVariant {
-    FilterKind { value: FilterKind },
-    CaseSensitive,
-    IgnoreDiacritics,
-}
+        assert_eq!(target_idx, total_items - 1);
 
-#[derive(Debug)]
-struct ButtonInput {
-    variant: ButtonInputVariant,
-    label: &'static str,
-}
+        let clicked_y = 0;
+        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+        let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+            .min(total_items.saturating_sub(1));
 
-#[derive(Debug, PartialEq)]
-enum ButtonInputVariant {
-    Reset,
+        assert_eq!(target_idx, 0);
+
+        let clicked_y = 5;
+        let position_ratio = f64::from(clicked_y) / f64::from(scrollbar_height.saturating_sub(1));
+        let target_idx = ((position_ratio * (total_items.saturating_sub(1)) as f64) as usize)
+            .min(total_items.saturating_sub(1));
+
+        // should be roughly in the middle (around 25-27)
+        assert!((20..=30).contains(&target_idx));
+    }
 }

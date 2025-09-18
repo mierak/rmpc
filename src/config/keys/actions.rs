@@ -500,16 +500,13 @@ impl AddOpts {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum RatingKind {
-    Modal { values: Vec<f32>, custom: bool },
-    Value(f32),
+    Modal { values: Vec<i32>, custom: bool },
+    Value(i32),
 }
 
 impl Default for RatingKind {
     fn default() -> Self {
-        RatingKind::Modal {
-            values: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
-            custom: true,
-        }
+        RatingKind::Modal { values: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true }
     }
 }
 

@@ -182,7 +182,12 @@ pub trait MpdCommand {
     fn send_delete_sticker(&mut self, uri: &str, name: &str) -> MpdResult<()>;
     fn send_delete_all_stickers(&mut self, uri: &str) -> MpdResult<()>;
     fn send_list_stickers(&mut self, uri: &str) -> MpdResult<()>;
-    fn send_find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<()>;
+    fn send_find_stickers(
+        &mut self,
+        uri: &str,
+        name: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<()>;
     fn send_switch_to_partition(&mut self, name: &str) -> MpdResult<()>;
     fn send_new_partition(&mut self, name: &str) -> MpdResult<()>;
     fn send_delete_partition(&mut self, name: &str) -> MpdResult<()>;
@@ -323,7 +328,12 @@ pub trait MpdClient: Sized {
     fn list_stickers_multiple(&mut self, uris: &[&str]) -> MpdResult<Vec<Stickers>>;
     // Searches the sticker database for stickers with the specified name, below
     // the specified directory (URI).
-    fn find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<StickersWithFile>;
+    fn find_stickers(
+        &mut self,
+        uri: &str,
+        name: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<StickersWithFile>;
 
     // Partitions
     fn switch_to_partition(&mut self, name: &str) -> MpdResult<()>;
@@ -822,8 +832,13 @@ impl MpdClient for Client<'_> {
         Ok(result)
     }
 
-    fn find_stickers(&mut self, uri: &str, key: &str) -> MpdResult<StickersWithFile> {
-        self.send_find_stickers(uri, key).and_then(|()| self.read_response())
+    fn find_stickers(
+        &mut self,
+        uri: &str,
+        key: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<StickersWithFile> {
+        self.send_find_stickers(uri, key, filter).and_then(|()| self.read_response())
     }
 
     fn switch_to_partition(&mut self, name: &str) -> MpdResult<()> {
@@ -1301,12 +1316,26 @@ impl<T: SocketClient> MpdCommand for T {
         self.execute(&format!("sticker list song {}", uri.quote_and_escape()))
     }
 
-    fn send_find_stickers(&mut self, uri: &str, key: &str) -> MpdResult<()> {
-        self.execute(&format!(
-            "sticker find song {} {}",
-            uri.quote_and_escape(),
-            key.quote_and_escape()
-        ))
+    fn send_find_stickers(
+        &mut self,
+        uri: &str,
+        key: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<()> {
+        if let Some(filter) = filter {
+            self.execute(&format!(
+                "sticker find song {} {} {}",
+                uri.quote_and_escape(),
+                key.quote_and_escape(),
+                filter.as_mpd_str(),
+            ))
+        } else {
+            self.execute(&format!(
+                "sticker find song {} {}",
+                uri.quote_and_escape(),
+                key.quote_and_escape(),
+            ))
+        }
     }
 
     fn send_switch_to_partition(&mut self, name: &str) -> MpdResult<()> {
@@ -1371,6 +1400,35 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_string_normalization_clear(&mut self) -> MpdResult<()> {
         self.execute("stringnormalization clear")
+    }
+}
+
+/// Sticker operators for filtering stickers in `find_stickers`
+/// The *Int variants cast the sticker value to an integer before comparing.
+#[derive(Debug, PartialEq, Clone, Copy, strum::IntoStaticStr, strum::AsRefStr)]
+pub enum StickerFilter<'a> {
+    Equals(&'a str),
+    GreaterThan(&'a str),
+    LessThan(&'a str),
+    Contains(&'a str),
+    StartsWith(&'a str),
+    EqualsInt(i32),
+    GreaterThanInt(i32),
+    LessThanInt(i32),
+}
+
+impl StickerFilter<'_> {
+    fn as_mpd_str(&self) -> String {
+        match self {
+            StickerFilter::Equals(value) => format!("= {}", value.quote_and_escape()),
+            StickerFilter::GreaterThan(value) => format!("> {}", value.quote_and_escape()),
+            StickerFilter::LessThan(value) => format!("< {}", value.quote_and_escape()),
+            StickerFilter::Contains(value) => format!("contains {}", value.quote_and_escape()),
+            StickerFilter::StartsWith(value) => format!("starts_with {}", value.quote_and_escape()),
+            StickerFilter::EqualsInt(value) => format!("eq {value}"),
+            StickerFilter::GreaterThanInt(value) => format!("gt {value}"),
+            StickerFilter::LessThanInt(value) => format!("lt {value}"),
+        }
     }
 }
 

@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - Added `keep_state_on_song_change` and equivalent flag to cli
 - Added `ignore_leading_the` when sorting entries in browsers
 - More information about the system to debuginfo
+- Stickers are now usable in `browser_song_format`
 
 ### Changed
 

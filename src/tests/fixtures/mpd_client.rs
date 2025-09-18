@@ -33,6 +33,7 @@ use crate::mpd::{
         MpdClient,
         SaveMode,
         SingleOrRange,
+        StickerFilter,
         StringNormalizationFeature,
         Tag,
         ValueChange,
@@ -622,6 +623,7 @@ impl MpdClient for TestMpdClient {
         &mut self,
         _uri: &str,
         _name: &str,
+        _filter: Option<StickerFilter>,
     ) -> MpdResult<crate::mpd::commands::stickers::StickersWithFile> {
         todo!("Not yet implemented")
     }
