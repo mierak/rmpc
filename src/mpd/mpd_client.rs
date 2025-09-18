@@ -1405,19 +1405,19 @@ impl<T: SocketClient> MpdCommand for T {
 
 /// Sticker operators for filtering stickers in `find_stickers`
 /// The *Int variants cast the sticker value to an integer before comparing.
-#[derive(Debug, PartialEq, Clone, Copy, strum::IntoStaticStr, strum::AsRefStr)]
-pub enum StickerFilter<'a> {
-    Equals(&'a str),
-    GreaterThan(&'a str),
-    LessThan(&'a str),
-    Contains(&'a str),
-    StartsWith(&'a str),
+#[derive(Debug, PartialEq, Clone, strum::IntoStaticStr, strum::AsRefStr)]
+pub enum StickerFilter {
+    Equals(String),
+    GreaterThan(String),
+    LessThan(String),
+    Contains(String),
+    StartsWith(String),
     EqualsInt(i32),
     GreaterThanInt(i32),
     LessThanInt(i32),
 }
 
-impl StickerFilter<'_> {
+impl StickerFilter {
     fn as_mpd_str(&self) -> String {
         match self {
             StickerFilter::Equals(value) => format!("= {}", value.quote_and_escape()),

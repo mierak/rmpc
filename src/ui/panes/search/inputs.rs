@@ -9,7 +9,7 @@ use strum::{FromRepr, IntoStaticStr, VariantNames};
 
 use crate::{
     config::Search,
-    mpd::mpd_client::FilterKind,
+    mpd::mpd_client::{FilterKind, StickerFilter},
     ui::widgets::{button::Button, input::Input},
 };
 
@@ -133,12 +133,18 @@ impl InputGroups {
         self.search_mode
     }
 
-    pub fn rating_mode(&self) -> RatingMode {
-        self.rating_mode
-    }
-
     pub fn rating_value(&self) -> &str {
         self.textbox_value(RATING_VALUE_KEY).unwrap_or_default()
+    }
+
+    pub fn sticker_filter(&self) -> Result<Option<StickerFilter>, std::num::ParseIntError> {
+        let value = self.rating_value().trim().parse()?;
+        Ok(match self.rating_mode {
+            RatingMode::Equals => Some(StickerFilter::EqualsInt(value)),
+            RatingMode::GreaterThan => Some(StickerFilter::GreaterThanInt(value)),
+            RatingMode::LessThan => Some(StickerFilter::LessThanInt(value)),
+            RatingMode::Any => None,
+        })
     }
 
     pub fn fold_case(&self) -> bool {
@@ -358,9 +364,9 @@ pub(super) enum RatingMode {
     Any,
     #[strum(serialize = "Equals")]
     Equals,
-    #[strum(serialize = "Greater Than")]
+    #[strum(serialize = "Greater than")]
     GreaterThan,
-    #[strum(serialize = "Less Than")]
+    #[strum(serialize = "Less than")]
     LessThan,
 }
 

@@ -25,7 +25,8 @@ use crate::{
     ctx::Ctx,
     mpd::{
         commands::Song,
-        mpd_client::{Filter, MpdClient, StickerFilter},
+        mpd_client::{Filter, MpdClient, MpdCommand},
+        proto_client::ProtoClient,
         version::Version,
     },
     shared::{
@@ -43,7 +44,7 @@ use crate::{
             menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
-        panes::search::inputs::{InputGroups, InputType, RatingMode, TextboxInput},
+        panes::search::inputs::{InputGroups, InputType, TextboxInput},
         widgets::browser::BrowserArea,
     },
 };
@@ -170,65 +171,80 @@ impl SearchPane {
     }
 
     fn search(&mut self, ctx: &Ctx) {
-        let filter_kind = self.inputs.search_mode();
+        let search_mode = self.inputs.search_mode();
         let filter = self.inputs.inputs.iter().filter_map(|input| match &input {
             InputType::Textbox(TextboxInput { value, filter_key: Some(key), .. })
                 if !value.is_empty() && !key.is_empty() =>
             {
-                Some((key.to_owned(), value.to_owned(), filter_kind))
+                Some((key.to_owned(), value.to_owned(), search_mode))
             }
             _ => None,
         });
 
-        let mut filter = filter.collect_vec();
-
-        if filter.is_empty() {
-            let _ = std::mem::take(&mut self.songs_dir);
-            return;
-        }
-
-        let need_stickers_fetch = ctx.stickers_supported;
-        let rating_kind = self.inputs.rating_mode();
-        let Ok(rating_value) = self.inputs.rating_value().parse::<i32>() else {
+        let stickers_supported = ctx.stickers_supported;
+        let fold_case = self.inputs.fold_case();
+        let strip_diacritics = self.inputs.strip_diacritics();
+        let Ok(rating_filter) = self.inputs.sticker_filter() else {
             status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value());
             return;
         };
 
-        let fold_case = self.inputs.fold_case();
-        let strip_diacritics = self.inputs.strip_diacritics();
-        ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(move |client| {
-            let filter = filter
-                .iter_mut()
-                .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                    Filter::new(std::mem::take(key), value).with_type((*kind).into())
-                })
-                .collect_vec();
+        let mut filter = filter.collect_vec();
 
-            let data = if fold_case {
-                client.search(&filter, strip_diacritics)
-            } else {
-                client.find(&filter)
-            }?;
+        if filter.is_empty() && stickers_supported && rating_filter.is_some() {
+            // Filters are empty, but rating filters are set - show all songs with the
+            // wanted rating
+            ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
+                move |client| {
+                    // empty URI returns all songs with the sticker
+                    let ratings = client.find_stickers("", "rating", rating_filter)?;
 
-            if need_stickers_fetch && !matches!(rating_kind, RatingMode::Any) {
-                let filter: Option<StickerFilter> = match rating_kind {
-                    RatingMode::Equals => Some(StickerFilter::EqualsInt(rating_value)),
-                    RatingMode::GreaterThan => Some(StickerFilter::GreaterThanInt(rating_value)),
-                    RatingMode::LessThan => Some(StickerFilter::LessThanInt(rating_value)),
-                    RatingMode::Any => None,
-                };
+                    client.send_start_cmd_list()?;
+                    for sticker in ratings {
+                        client.send_lsinfo(Some(&sticker.file))?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    let data: Vec<Song> = client.read_response()?;
 
-                // empty URI returns all songs with the sticker
-                let ratings = client.find_stickers("", "rating", filter)?;
-                let ratings: HashSet<_> = ratings.into_iter().map(|r| r.file).collect();
+                    Ok(MpdQueryResult::SearchResult { data })
+                },
+            );
+        } else if filter.is_empty() {
+            // Filters are empty, stickers are either not supported or not set - clear
+            // current results
+            let _ = std::mem::take(&mut self.songs_dir);
+        } else {
+            // Search normally
+            ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
+                move |client| {
+                    let filter = filter
+                        .iter_mut()
+                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
+                            Filter::new(std::mem::take(key), value).with_type((*kind).into())
+                        })
+                        .collect_vec();
 
-                let data = data.into_iter().filter(|song| ratings.contains(&song.file)).collect();
+                    let data = if fold_case {
+                        client.search(&filter, strip_diacritics)
+                    } else {
+                        client.find(&filter)
+                    }?;
 
-                Ok(MpdQueryResult::SearchResult { data })
-            } else {
-                Ok(MpdQueryResult::SearchResult { data })
-            }
-        });
+                    if stickers_supported && rating_filter.is_some() {
+                        // empty URI returns all songs with the sticker
+                        let ratings = client.find_stickers("", "rating", rating_filter)?;
+                        let ratings: HashSet<_> = ratings.into_iter().map(|r| r.file).collect();
+
+                        let data =
+                            data.into_iter().filter(|song| ratings.contains(&song.file)).collect();
+
+                        Ok(MpdQueryResult::SearchResult { data })
+                    } else {
+                        Ok(MpdQueryResult::SearchResult { data })
+                    }
+                },
+            );
+        }
     }
 
     fn handle_search_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
