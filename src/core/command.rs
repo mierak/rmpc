@@ -413,7 +413,7 @@ impl Command {
             })),
             Command::Sticker { cmd: StickerCmd::Find { uri, key } } => {
                 Ok(Box::new(move |client| {
-                    let stickers = client.find_stickers(&uri, &key)?;
+                    let stickers = client.find_stickers(&uri, &key, None)?;
                     println!("{}", serde_json::ser::to_string(&stickers)?);
                     Ok(())
                 }))
