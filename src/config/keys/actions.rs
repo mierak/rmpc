@@ -664,7 +664,8 @@ impl ToDescription for CommonAction {
                             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
-            CommonAction::Rating { kind } => "".into(), // TODO
+            CommonAction::Rating { kind: RatingKind::Value(val)  } => format!("Set song rating to {val}").into(),
+            CommonAction::Rating { kind: RatingKind::Modal { .. } } => "Open a modal popup with song rating options".into(),
         }
     }
 }
