@@ -61,8 +61,7 @@ impl DirStackItem for DirOrSong {
                 .to_lowercase()
                 .contains(&filter.to_lowercase()),
             DirOrSong::Song(s) => {
-                let stickers = ctx.stickers.get(&s.file);
-                s.matches(ctx.config.theme.browser_song_format.0.as_slice(), stickers, filter)
+                s.matches(ctx.config.theme.browser_song_format.0.as_slice(), filter, ctx)
             }
         }
     }
@@ -134,13 +133,11 @@ impl DirStackItem for Song {
     fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup> {
         let key_style = ctx.config.theme.preview_label_style;
         let group_style = ctx.config.theme.preview_metadata_group_style;
-        let stickers = ctx.stickers.get(&self.file);
-        self.to_preview(key_style, group_style, stickers)
+        self.to_preview(key_style, group_style, ctx)
     }
 
     fn matches(&self, ctx: &Ctx, filter: &str) -> bool {
-        let song_stickers = ctx.stickers.get(&self.file);
-        self.matches(ctx.config.theme.browser_song_format.0.as_slice(), song_stickers, filter)
+        self.matches(ctx.config.theme.browser_song_format.0.as_slice(), filter, ctx)
     }
 
     fn to_list_item<'a>(
@@ -157,7 +154,6 @@ impl DirStackItem for Song {
             Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
-        let stickers = ctx.stickers.get(&self.file);
         let spans = [
             marker_span,
             Span::styled(
@@ -171,9 +167,9 @@ impl DirStackItem for Song {
             Span::from(
                 prop.as_string(
                     Some(self),
-                    stickers,
                     &config.theme.format_tag_separator,
                     config.theme.multiple_tag_resolution_strategy,
+                    ctx,
                 )
                 .unwrap_or_default(),
             )

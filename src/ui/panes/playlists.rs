@@ -25,7 +25,6 @@ use crate::{
     },
     status_warn,
     ui::{
-        FETCH_SONG_STICKERS,
         UiEvent,
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
@@ -219,23 +218,6 @@ impl Pane for PlaylistsPane {
                 {
                     log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
                     return Ok(());
-                }
-
-                let songs = data
-                    .iter()
-                    .filter_map(|ds| match ds {
-                        DirOrSong::Dir { .. } => None,
-                        DirOrSong::Song(song) => Some(song.file.clone()),
-                    })
-                    .filter(|file| !ctx.stickers.contains_key(file))
-                    .collect_vec();
-
-                log::debug!("Fetching stickers for {} songs", songs.len());
-                if !songs.is_empty() && ctx.stickers_supported {
-                    log::debug!("Fetching 2 stickers for {} songs", songs.len());
-                    ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
-                        Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
-                    });
                 }
 
                 self.stack_mut().set_preview(Some(data));

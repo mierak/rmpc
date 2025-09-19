@@ -35,7 +35,7 @@ use crate::{
         command::{create_env, run_external},
         config_watcher::ERROR_CONFIG_MODAL_ID,
     },
-    ctx::Ctx,
+    ctx::{Ctx, FETCH_SONG_STICKERS},
     mpd::{
         commands::{State, idle::IdleEvent},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
@@ -81,7 +81,6 @@ pub struct Ui<'ui> {
 
 const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
 const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
-const FETCH_SONG_STICKERS: &str = "fetch_song_stickers";
 
 macro_rules! active_tab_call {
     ($self:ident, $ctx:ident, $fn:ident($($param:expr),+)) => {
@@ -759,7 +758,7 @@ impl<'ui> Ui<'ui> {
                     for (k, v) in stickers {
                         // Assume all stickers were fetched for each song so simple replace is
                         // enough
-                        ctx.stickers.insert(k, v);
+                        ctx.set_song_stickers(k, v);
                     }
                     ctx.render()?;
                 }

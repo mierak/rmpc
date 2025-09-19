@@ -36,7 +36,6 @@ use crate::{
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
     },
     ui::{
-        FETCH_SONG_STICKERS,
         UiEvent,
         dirstack::Dir,
         modals::{
@@ -802,7 +801,7 @@ impl Pane for SearchPane {
                     let preview = song.to_preview(
                         ctx.config.theme.preview_label_style,
                         ctx.config.theme.preview_metadata_group_style,
-                        ctx.stickers.get(&song.file),
+                        ctx,
                     );
                     let mut result = Vec::new();
                     for group in preview {
@@ -855,20 +854,6 @@ impl Pane for SearchPane {
     ) -> Result<()> {
         match (id, data) {
             (SEARCH, MpdQueryResult::SearchResult { data }) => {
-                log::debug!(len = data.len(); "fetching song stickers for search results");
-                let songs = data
-                    .iter()
-                    .map(|song| song.file.clone())
-                    .filter(|file| !ctx.stickers.contains_key(file))
-                    .collect_vec();
-
-                if !songs.is_empty() && ctx.stickers_supported {
-                    log::debug!("fetching stickers for {} songs", songs.len());
-                    ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
-                        Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
-                    });
-                }
-
                 self.songs_dir = Dir::new(data);
                 ctx.render()?;
             }

@@ -27,7 +27,6 @@ use crate::{
         string_util::StringExt,
     },
     ui::{
-        FETCH_SONG_STICKERS,
         UiEvent,
         browser::BrowserPane,
         dir_or_song::DirOrSong,
@@ -344,12 +343,6 @@ impl Pane for TagBrowserPane {
                     true
                 };
 
-                let files = data.iter().map(|s| s.file.clone()).collect_vec();
-                ctx.query().id(FETCH_SONG_STICKERS).query(|client| {
-                    let stickers = client.fetch_song_stickers(files)?;
-                    Ok(MpdQueryResult::SongStickers(stickers))
-                });
-
                 let cached_artist = self.process_songs(artist, data, ctx);
 
                 if cache_only {
@@ -380,12 +373,6 @@ impl Pane for TagBrowserPane {
                     log::trace!(artist:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
                     true
                 };
-
-                let files = data.iter().map(|s| s.file.clone()).collect_vec();
-                ctx.query().id(FETCH_SONG_STICKERS).query(|client| {
-                    let stickers = client.fetch_song_stickers(files)?;
-                    Ok(MpdQueryResult::SongStickers(stickers))
-                });
 
                 if cache_only {
                     return Ok(());

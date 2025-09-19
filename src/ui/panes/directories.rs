@@ -19,7 +19,6 @@ use crate::{
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
     },
     ui::{
-        FETCH_SONG_STICKERS,
         UiEvent,
         browser::BrowserPane,
         dir_or_song::DirOrSong,
@@ -216,21 +215,6 @@ impl Pane for DirectoriesPane {
                 {
                     log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
                     return Ok(());
-                }
-
-                let songs = data
-                    .iter()
-                    .filter_map(|ds| match ds {
-                        DirOrSong::Dir { .. } => None,
-                        DirOrSong::Song(song) => Some(song.file.clone()),
-                    })
-                    .filter(|file| !ctx.stickers.contains_key(file))
-                    .collect_vec();
-
-                if !songs.is_empty() && ctx.stickers_supported {
-                    ctx.query().id(FETCH_SONG_STICKERS).query(move |client| {
-                        Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
-                    });
                 }
 
                 self.stack_mut().set_preview(Some(data));

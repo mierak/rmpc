@@ -262,7 +262,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     WorkDone::MpdCommandFinished { id, target, data } => match (id, target, data) {
                         (GLOBAL_STICKERS_UPDATE, None, MpdQueryResult::SongStickers(stickers)) => {
-                            ctx.stickers = stickers;
+                            ctx.set_stickers(stickers);
                             render_wanted = true;
                         }
                         (
@@ -625,7 +625,7 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Ui
         }
         IdleEvent::Sticker => {
             if ctx.stickers_supported {
-                let songs: Vec<_> = ctx.stickers.keys().cloned().collect();
+                let songs: Vec<_> = ctx.stickers().keys().cloned().collect();
                 ctx.query().id(GLOBAL_STICKERS_UPDATE).replace_id("global_stickers_update").query(
                     move |client| {
                         Ok(MpdQueryResult::SongStickers(client.fetch_song_stickers(songs)?))
