@@ -82,7 +82,7 @@ impl Ctx {
         client_request_sender: Sender<ClientRequest>,
         mut scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
     ) -> Result<Self> {
-        let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
+        let supported_commands: HashSet<String> = client.supported_commands.clone();
         let stickers_supported = supported_commands.contains("sticker");
         log::info!(supported_commands:? = supported_commands; "Supported commands by server");
 

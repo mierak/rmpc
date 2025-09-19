@@ -529,8 +529,9 @@ impl MpdClient for Client<'_> {
     /// Search the database for songs matching FILTER (see Filters).
     /// Parameters have the same meaning as for find, except that search is not
     /// case sensitive.
+    /// `ignore_diacritics` is ignored if not supported by MPD
     fn search(&mut self, filter: &[Filter<'_>], ignore_diacritics: bool) -> MpdResult<Vec<Song>> {
-        if ignore_diacritics {
+        if ignore_diacritics && self.supported_commands.contains("stringnormalization") {
             self.send_start_cmd_list()?;
             self.send_string_normalization_enable(&[StringNormalizationFeature::StripDiacritics])?;
             self.send_search(filter)?;
