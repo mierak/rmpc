@@ -539,7 +539,7 @@ impl<'ui> Ui<'ui> {
                 reason = "Future expansion, remove when adding other actions"
             )]
             match action {
-                CommonAction::Rating { kind, current: true } => {
+                CommonAction::Rate { kind, current: true } => {
                     if let Some((_, song)) = ctx.find_current_song_in_queue() {
                         match kind {
                             RatingKind::Modal { values, custom } => {

@@ -461,18 +461,18 @@ where
             CommonAction::ContextMenu => {
                 self.open_context_menu(ctx)?;
             }
-            CommonAction::Rating { kind: RatingKind::Value(value), current: false } => {
+            CommonAction::Rate { kind: RatingKind::Value(value), current: false } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
                 ctx.command(move |client| {
                     client.set_sticker_multiple("rating", value.to_string(), items)?;
                     Ok(())
                 });
             }
-            CommonAction::Rating { kind: RatingKind::Modal { values, custom }, current: false } => {
+            CommonAction::Rate { kind: RatingKind::Modal { values, custom }, current: false } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
                 modal!(ctx, create_rating_modal(items, values.as_slice(), custom, ctx));
             }
-            CommonAction::Rating { kind: _, current: true } => {
+            CommonAction::Rate { kind: _, current: true } => {
                 event.abandon();
             }
         }

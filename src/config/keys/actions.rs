@@ -500,7 +500,12 @@ impl AddOpts {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum RatingKind {
-    Modal { values: Vec<i32>, custom: bool },
+    Modal {
+        #[serde(default = "crate::config::defaults::rating_options")]
+        values: Vec<i32>,
+        #[serde(default = "crate::config::defaults::bool::<true>")]
+        custom: bool,
+    },
     Value(i32),
 }
 
@@ -552,7 +557,7 @@ pub enum CommonActionFile {
     },
     ShowInfo,
     ContextMenu {},
-    Rating {
+    Rate {
         #[serde(default)]
         kind: RatingKind,
         #[serde(default)]
@@ -595,7 +600,7 @@ pub enum CommonAction {
     },
     ShowInfo,
     ContextMenu,
-    Rating {
+    Rate {
         kind: RatingKind,
         current: bool,
     },
@@ -667,10 +672,10 @@ impl ToDescription for CommonAction {
                             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
-            CommonAction::Rating { kind: RatingKind::Value(val), current: false  } => format!("Set song rating to {val}").into(),
-            CommonAction::Rating { kind: RatingKind::Modal { .. }, current: false } => "Open a modal popup with song rating options".into(),
-            CommonAction::Rating { kind: RatingKind::Value(val), current: true  } => format!("Set currently plyaing song's rating to {val}").into(),
-            CommonAction::Rating { kind: RatingKind::Modal { .. }, current: true } => "Open a modal popup with song rating options for the currently playing song".into(),
+            CommonAction::Rate { kind: RatingKind::Value(val), current: false  } => format!("Set song rating to {val}").into(),
+            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: false } => "Open a modal popup with song rating options".into(),
+            CommonAction::Rate { kind: RatingKind::Value(val), current: true  } => format!("Set currently plyaing song's rating to {val}").into(),
+            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: true } => "Open a modal popup with song rating options for the currently playing song".into(),
         }
     }
 }
@@ -749,7 +754,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
-            CommonActionFile::Rating { kind, current } => CommonAction::Rating { kind, current },
+            CommonActionFile::Rate { kind, current } => CommonAction::Rate { kind, current },
         }
     }
 }

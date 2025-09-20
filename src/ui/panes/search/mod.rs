@@ -342,10 +342,10 @@ impl SearchPane {
                 CommonAction::PaneLeft => {}
                 CommonAction::ShowInfo => {}
                 CommonAction::ContextMenu => {}
-                CommonAction::Rating { kind: _, current: true } => {
+                CommonAction::Rate { kind: _, current: true } => {
                     event.abandon();
                 }
-                CommonAction::Rating { .. } => {}
+                CommonAction::Rate { .. } => {}
             }
         }
 
@@ -561,21 +561,21 @@ impl SearchPane {
                 CommonAction::ContextMenu => {
                     self.open_result_phase_context_menu(ctx)?;
                 }
-                CommonAction::Rating { kind: RatingKind::Value(value), current: false } => {
+                CommonAction::Rate { kind: RatingKind::Value(value), current: false } => {
                     let items = self.enqueue(false).1;
                     ctx.command(move |client| {
                         client.set_sticker_multiple("rating", value.to_string(), items)?;
                         Ok(())
                     });
                 }
-                CommonAction::Rating {
+                CommonAction::Rate {
                     kind: RatingKind::Modal { values, custom },
                     current: false,
                 } => {
                     let items = self.enqueue(false).1;
                     modal!(ctx, create_rating_modal(items, values.as_slice(), custom, ctx));
                 }
-                CommonAction::Rating { kind: _, current: true } => {
+                CommonAction::Rate { kind: _, current: true } => {
                     event.abandon();
                 }
             }

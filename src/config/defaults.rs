@@ -154,3 +154,7 @@ pub fn default_error_color() -> StyleFile {
 pub fn default_status_bar_background_color() -> StyleFile {
     StyleFile { fg: Some("black".to_string()), bg: Some("black".to_string()), modifiers: None }
 }
+
+pub fn rating_options() -> Vec<i32> {
+    vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+}

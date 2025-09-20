@@ -14,6 +14,7 @@ use crate::{
     ctx::Ctx,
     shared::{
         key_event::KeyEvent,
+        macros::status_error,
         mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
     ui::modals::menu::select_section::SelectSection,
@@ -175,7 +176,29 @@ pub fn create_rating_modal<'a>(
 ) -> MenuModal<'a> {
     let clone = items.clone();
     let clone2 = items.clone();
+
     MenuModal::new(ctx)
+        .input_section(ctx, "Rating", move |section| {
+            if !custom {
+                return None;
+            }
+
+            let section = section.action(move |ctx, value| {
+                let Ok(_) = value.trim().parse::<i32>() else {
+                    status_error!("Rating must be a valid number");
+                    return;
+                };
+
+                if !value.trim().is_empty() {
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple("rating", value, clone2)?;
+                        Ok(())
+                    });
+                }
+            });
+
+            Some(section)
+        })
         .select_section(ctx, move |mut section| {
             if values.is_empty() {
                 return None;
@@ -191,22 +214,6 @@ pub fn create_rating_modal<'a>(
                     Ok(())
                 });
                 Ok(())
-            });
-
-            Some(section)
-        })
-        .input_section(ctx, "Rating", move |section| {
-            if !custom {
-                return None;
-            }
-
-            let section = section.action(move |ctx, value| {
-                if !value.trim().is_empty() {
-                    ctx.command(move |client| {
-                        client.set_sticker_multiple("rating", value, clone2)?;
-                        Ok(())
-                    });
-                }
             });
 
             Some(section)
