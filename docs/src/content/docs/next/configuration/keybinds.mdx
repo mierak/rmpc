@@ -152,12 +152,13 @@ list and controlling search mode.
 #### Rate
 
 A configurable keybind used to rate songs. Allows you to rate either the currently playing song or
-the song(s) under cursor in the browser panes.
+the song(s) under cursor in the browser panes and the queue.
 
 A modal window with options to select is displayed instead when no configuration is provided or if
 the keybind is directly configured to display a modal.
 
-Please check <a href={path("configuration/stickers#rating")}>stickers</a> page for more information.
+Must have stickers configured, please check <a href={path("configuration/stickers#rating")}>stickers</a>
+page for more information.
 
 :::note
 It is highly advised to keep ratings in the 0-10 range. Other MPD clients or some other rmpc
@@ -178,13 +179,13 @@ The rating is applied to the currently plaing song if any when `current` is set 
 
 - Set currently rating of the currently playing song to 6
 
-```rust
+```rust showLineNumbers=false
 Rate(kind: Value(6), current: true),
 ```
 
 - Set currently rating of song(s) under the cursor in either queue or the browesr panes to 3.
 
-```rust
+```rust showLineNumbers=false
 Rate(kind: Value(3), current: false),
 // or equivalent
 Rate(kind: Value(3)),
@@ -193,7 +194,7 @@ Rate(kind: Value(3)),
 - Open a modal which shows options to set rating (0-10) of the currently playing song as well as
   input a custom value or clear the rating completely.
 
-```rust
+```rust showLineNumbers=false
 Rate(kind: Modal(values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true), current: false),
 // or equivalent
 Rate(kind: Modal(), current: false),
@@ -201,7 +202,7 @@ Rate(kind: Modal(), current: false),
 
 - Open a modal which shows only text input for rating
 
-```rust
+```rust showLineNumbers=false
 Rate(kind: Modal(values: [], custom: true), current: false),
 ```
 
@@ -243,33 +244,33 @@ Possible values for `all`:
 
 - Add a single item or the marked items at the end of the queue
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Action(all: false, autoplay: None, position: EndOfQueue))
 ```
 
 - Add a single item or the marked items at the start of the queue and start playing from the hovered
   item
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Action(all: false, autoplay: Hovered, position: StartOfQueue))
 ```
 
 - Add a single item or the marked items after the current and start playing from the hovered item
   or from the first item if no item was hovered.
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Action(all: false, autoplay: HoveredOrFirst, position: AfterCurrentSong))
 ```
 
 - Open a modal window with the default configuration
 
-```rust
+```rust showLineNumbers=false
 AddOptions()
 ```
 
 - Open a modal window with the configured options
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Modal([
     ("End of queue and play", (all: false, autoplay: First, position: EndOfQueue),
     ("After the current song", (all: false, autoplay: None, position: AfterCurrentSong),
