@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
     os::unix::net::UnixStream,
@@ -34,6 +35,7 @@ pub struct Client<'name> {
     password: Option<MpdPassword>,
     pub version: Version,
     pub config: Option<MpdConfig>,
+    pub supported_commands: HashSet<String>,
     partition: Option<String>,
     autocreate_partition: bool,
 }
@@ -162,6 +164,7 @@ impl<'name> Client<'name> {
             partition,
             autocreate_partition,
             config: None,
+            supported_commands: HashSet::new(),
         };
 
         if let Some(MpdPassword(ref password)) = client.password.clone() {
@@ -186,6 +189,7 @@ impl<'name> Client<'name> {
         // 2^18 seems to be max limit supported by MPD and higher values dont
         // have any effect
         client.binary_limit(2u64.pow(18))?;
+        client.supported_commands = client.commands()?.0.into_iter().collect();
 
         Ok(client)
     }
@@ -239,6 +243,8 @@ impl<'name> Client<'name> {
                 err @ Err(_) => err?,
             }
         }
+
+        self.supported_commands = self.commands()?.0.into_iter().collect();
 
         self.binary_limit(1024 * 1024 * 5)?;
 

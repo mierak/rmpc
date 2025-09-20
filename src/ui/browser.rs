@@ -13,7 +13,7 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, Position},
+        actions::{AddKind, Position, RatingKind},
     },
     ctx::Ctx,
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
@@ -27,7 +27,7 @@ use crate::{
     ui::{
         modals::{
             input_modal::InputModal,
-            menu::{create_add_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
         widgets::browser::BrowserArea,
@@ -92,7 +92,7 @@ where
         match event.as_common_action(ctx) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().set_filter(None, config);
+                self.stack_mut().current_mut().set_filter(None, ctx);
                 self.prepare_preview(ctx);
             }
             Some(CommonAction::Confirm) => {
@@ -103,12 +103,12 @@ where
                 event.stop_propagation();
                 match event.code() {
                     KeyCode::Char(c) => {
-                        self.stack_mut().current_mut().push_filter(c, config);
-                        self.stack_mut().current_mut().jump_first_matching(config);
+                        self.stack_mut().current_mut().push_filter(c, ctx);
+                        self.stack_mut().current_mut().jump_first_matching(ctx);
                         self.prepare_preview(ctx);
                     }
                     KeyCode::Backspace => {
-                        self.stack_mut().current_mut().pop_filter(config);
+                        self.stack_mut().current_mut().pop_filter(ctx);
                         ctx.render()?;
                     }
                     _ => {}
@@ -371,17 +371,17 @@ where
             }
             CommonAction::EnterSearch => {
                 self.set_filter_input_mode_active(true);
-                self.stack_mut().current_mut().set_filter(Some(String::new()), config);
+                self.stack_mut().current_mut().set_filter(Some(String::new()), ctx);
 
                 ctx.render()?;
             }
             CommonAction::NextResult => {
-                self.stack_mut().current_mut().jump_next_matching(config);
+                self.stack_mut().current_mut().jump_next_matching(ctx);
                 self.prepare_preview(ctx);
                 ctx.render()?;
             }
             CommonAction::PreviousResult => {
-                self.stack_mut().current_mut().jump_previous_matching(config);
+                self.stack_mut().current_mut().jump_previous_matching(ctx);
                 self.prepare_preview(ctx);
                 ctx.render()?;
             }
@@ -460,6 +460,20 @@ where
             }
             CommonAction::ContextMenu => {
                 self.open_context_menu(ctx)?;
+            }
+            CommonAction::Rating { kind: RatingKind::Value(value), current: false } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+                ctx.command(move |client| {
+                    client.set_sticker_multiple("rating", value.to_string(), items)?;
+                    Ok(())
+                });
+            }
+            CommonAction::Rating { kind: RatingKind::Modal { values, custom }, current: false } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+                modal!(ctx, create_rating_modal(items, values.as_slice(), custom, ctx));
+            }
+            CommonAction::Rating { kind: _, current: true } => {
+                event.abandon();
             }
         }
 

@@ -12,7 +12,7 @@ use crate::{
 
 // Global actions
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum GlobalAction {
     Quit,
@@ -57,9 +57,7 @@ pub enum GlobalAction {
     },
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum GlobalActionFile {
     Quit,
     ShowHelp,
@@ -209,10 +207,10 @@ impl ToDescription for GlobalAction {
 
 // Albums actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum AlbumsActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum AlbumsActions {}
 
 impl From<AlbumsActionsFile> for AlbumsActions {
@@ -229,10 +227,10 @@ impl ToDescription for AlbumsActions {
 
 // Artists actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum ArtistsActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum ArtistsActions {}
 
 impl ToDescription for ArtistsActions {
@@ -249,10 +247,10 @@ impl From<ArtistsActionsFile> for ArtistsActions {
 
 // Directories actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum DirectoriesActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum DirectoriesActions {}
 
 impl ToDescription for DirectoriesActions {
@@ -269,7 +267,7 @@ impl From<DirectoriesActionsFile> for DirectoriesActions {
 
 // Logs actions
 #[cfg(debug_assertions)]
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum LogsActionsFile {
     Clear,
     ToggleScroll,
@@ -277,7 +275,7 @@ pub enum LogsActionsFile {
 
 #[cfg(debug_assertions)]
 #[allow(dead_code)]
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum LogsActions {
     Clear,
     ToggleScroll,
@@ -306,7 +304,7 @@ impl ToDescription for LogsActions {
 
 // Queue actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
 pub enum QueueActionsFile {
     Delete,
     DeleteAll,
@@ -318,7 +316,7 @@ pub enum QueueActionsFile {
     Shuffle,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, Copy, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum QueueActions {
     Delete,
@@ -372,7 +370,6 @@ impl ToDescription for QueueActions {
     serde::Deserialize,
     PartialEq,
     Eq,
-    Hash,
     Clone,
     Copy,
     Ord,
@@ -399,9 +396,7 @@ impl From<Position> for Option<QueuePosition> {
     }
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
 pub enum AddKind {
     Modal(Vec<(String, AddOpts)>),
     Action(AddOpts),
@@ -460,7 +455,6 @@ impl Default for AddKind {
     serde::Deserialize,
     PartialEq,
     Eq,
-    Hash,
     Clone,
     Copy,
     Ord,
@@ -474,9 +468,7 @@ pub enum AutoplayKind {
     None,
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct AddOpts {
     #[serde(default)]
     pub autoplay: AutoplayKind,
@@ -506,11 +498,21 @@ impl AddOpts {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum RatingKind {
+    Modal { values: Vec<i32>, custom: bool },
+    Value(i32),
+}
+
+impl Default for RatingKind {
+    fn default() -> Self {
+        RatingKind::Modal { values: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true }
+    }
+}
+
 // Common actions
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum CommonActionFile {
     Down,
     Up,
@@ -550,9 +552,15 @@ pub enum CommonActionFile {
     },
     ShowInfo,
     ContextMenu {},
+    Rating {
+        #[serde(default)]
+        kind: RatingKind,
+        #[serde(default)]
+        current: bool,
+    },
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum CommonAction {
     Down,
@@ -587,6 +595,10 @@ pub enum CommonAction {
     },
     ShowInfo,
     ContextMenu,
+    Rating {
+        kind: RatingKind,
+        current: bool,
+    },
 }
 
 impl ToDescription for CommonAction {
@@ -608,53 +620,57 @@ impl ToDescription for CommonAction {
             CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
             CommonAction::Select => {
-                        "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
-                    }
+                                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
+                            }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
             CommonAction::Delete => {
-                        "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
-                    }
+                                "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
+                            }
             CommonAction::Rename => "Rename. Currently only for playlists".into(),
             CommonAction::Close => {
-                        "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
-                    }
+                                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
+                            }
             CommonAction::Confirm => {
-                        "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
-                    }
+                                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
+                            }
             CommonAction::FocusInput => {
-                        "Focuses textbox if any is on the screen and is not focused".into()
-                    }
+                                "Focuses textbox if any is on the screen and is not focused".into()
+                            }
             CommonAction::PaneDown => "Focus the pane below the current one".into(),
             CommonAction::PaneUp => "Focus the pane above the current one".into(),
             CommonAction::PaneRight => "Focus the pane to the right of the current one".into(),
             CommonAction::PaneLeft => "Focus the pane to the left of the current one".into(),
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => format!("Open add menu modal with {} options", items.len()).into(),
             CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                        let mut buf = String::from("Add");
-                        if opts.all {
-                            buf.push_str(" all items");
-                        } else {
-                            buf.push_str(" item");
-                        }
-                        buf.push_str(match opts.position {
-                            Position::AfterCurrentSong => " after the current song",
-                            Position::BeforeCurrentSong => " before the current song",
-                            Position::StartOfQueue => " at the start of the queue",
-                            Position::EndOfQueue => " at the end of the queue",
-                            Position::Replace => " and replace the queue",
-                        });
+                                let mut buf = String::from("Add");
+                                if opts.all {
+                                    buf.push_str(" all items");
+                                } else {
+                                    buf.push_str(" item");
+                                }
+                                buf.push_str(match opts.position {
+                                    Position::AfterCurrentSong => " after the current song",
+                                    Position::BeforeCurrentSong => " before the current song",
+                                    Position::StartOfQueue => " at the start of the queue",
+                                    Position::EndOfQueue => " at the end of the queue",
+                                    Position::Replace => " and replace the queue",
+                                });
 
-                        buf.push_str(match opts.autoplay {
-                            AutoplayKind::First => " and play the first item",
-                            AutoplayKind::Hovered => " and play the hovered item",
-                            AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
-                            AutoplayKind::None => "",
-                        });
+                                buf.push_str(match opts.autoplay {
+                                    AutoplayKind::First => " and play the first item",
+                                    AutoplayKind::Hovered => " and play the hovered item",
+                                    AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
+                                    AutoplayKind::None => "",
+                                });
 
-                        buf.into()
-                    },
+                                buf.into()
+                            },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
+            CommonAction::Rating { kind: RatingKind::Value(val), current: false  } => format!("Set song rating to {val}").into(),
+            CommonAction::Rating { kind: RatingKind::Modal { .. }, current: false } => "Open a modal popup with song rating options".into(),
+            CommonAction::Rating { kind: RatingKind::Value(val), current: true  } => format!("Set currently plyaing song's rating to {val}").into(),
+            CommonAction::Rating { kind: RatingKind::Modal { .. }, current: true } => "Open a modal popup with song rating options for the currently playing song".into(),
         }
     }
 }
@@ -733,14 +749,15 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
+            CommonActionFile::Rating { kind, current } => CommonAction::Rating { kind, current },
         }
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum SearchActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum SearchActions {}
 
 impl ToDescription for SearchActions {

@@ -182,7 +182,12 @@ pub trait MpdCommand {
     fn send_delete_sticker(&mut self, uri: &str, name: &str) -> MpdResult<()>;
     fn send_delete_all_stickers(&mut self, uri: &str) -> MpdResult<()>;
     fn send_list_stickers(&mut self, uri: &str) -> MpdResult<()>;
-    fn send_find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<()>;
+    fn send_find_stickers(
+        &mut self,
+        uri: &str,
+        name: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<()>;
     fn send_switch_to_partition(&mut self, name: &str) -> MpdResult<()>;
     fn send_new_partition(&mut self, name: &str) -> MpdResult<()>;
     fn send_delete_partition(&mut self, name: &str) -> MpdResult<()>;
@@ -244,7 +249,7 @@ pub trait MpdClient: Sized {
     fn clear(&mut self) -> MpdResult<()>;
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
-    fn playlist_info(&mut self, fetch_stickers: bool) -> MpdResult<Option<Vec<Song>>>;
+    fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
     fn search(&mut self, filter: &[Filter<'_>], ignore_diacritics: bool) -> MpdResult<Vec<Song>>;
     fn move_in_queue(&mut self, from: SingleOrRange, to: QueuePosition) -> MpdResult<()>;
@@ -323,7 +328,12 @@ pub trait MpdClient: Sized {
     fn list_stickers_multiple(&mut self, uris: &[&str]) -> MpdResult<Vec<Stickers>>;
     // Searches the sticker database for stickers with the specified name, below
     // the specified directory (URI).
-    fn find_stickers(&mut self, uri: &str, name: &str) -> MpdResult<StickersWithFile>;
+    fn find_stickers(
+        &mut self,
+        uri: &str,
+        name: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<StickersWithFile>;
 
     // Partitions
     fn switch_to_partition(&mut self, name: &str) -> MpdResult<()>;
@@ -507,38 +517,8 @@ impl MpdClient for Client<'_> {
         self.send_delete_from_queue(songs).and_then(|()| self.read_ok())
     }
 
-    fn playlist_info(&mut self, fetch_stickers: bool) -> MpdResult<Option<Vec<Song>>> {
-        let songs: Option<Vec<Song>> =
-            self.send_playlist_info().and_then(|()| self.read_opt_response())?;
-
-        if !fetch_stickers {
-            return Ok(songs);
-        }
-
-        let Some(mut songs) = songs else {
-            return Ok(songs);
-        };
-
-        let mut stickers = match self
-            .list_stickers_multiple(&songs.iter().map(|song| song.file.as_str()).collect_vec())
-        {
-            Ok(stickers) => stickers,
-            Err(err) => {
-                log::error!(err:?; "Failed to fetch stickers for playlist_info");
-                return Ok(Some(songs));
-            }
-        };
-
-        if songs.len() != stickers.len() {
-            log::error!(songs_len = songs.len(), stickers_len = stickers.len(); "Received different number of sticker responses than requested songs");
-            return Ok(Some(songs));
-        }
-
-        for (stickers, song) in stickers.iter_mut().zip(songs.iter_mut()) {
-            song.stickers = Some(std::mem::take(&mut stickers.0));
-        }
-
-        Ok(Some(songs))
+    fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
+        self.send_playlist_info().and_then(|()| self.read_opt_response())
     }
 
     /// Search the database for songs matching FILTER
@@ -549,8 +529,9 @@ impl MpdClient for Client<'_> {
     /// Search the database for songs matching FILTER (see Filters).
     /// Parameters have the same meaning as for find, except that search is not
     /// case sensitive.
+    /// `ignore_diacritics` is ignored if not supported by MPD
     fn search(&mut self, filter: &[Filter<'_>], ignore_diacritics: bool) -> MpdResult<Vec<Song>> {
-        if ignore_diacritics {
+        if ignore_diacritics && self.supported_commands.contains("stringnormalization") {
             self.send_start_cmd_list()?;
             self.send_string_normalization_enable(&[StringNormalizationFeature::StripDiacritics])?;
             self.send_search(filter)?;
@@ -852,8 +833,13 @@ impl MpdClient for Client<'_> {
         Ok(result)
     }
 
-    fn find_stickers(&mut self, uri: &str, key: &str) -> MpdResult<StickersWithFile> {
-        self.send_find_stickers(uri, key).and_then(|()| self.read_response())
+    fn find_stickers(
+        &mut self,
+        uri: &str,
+        key: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<StickersWithFile> {
+        self.send_find_stickers(uri, key, filter).and_then(|()| self.read_response())
     }
 
     fn switch_to_partition(&mut self, name: &str) -> MpdResult<()> {
@@ -1331,12 +1317,26 @@ impl<T: SocketClient> MpdCommand for T {
         self.execute(&format!("sticker list song {}", uri.quote_and_escape()))
     }
 
-    fn send_find_stickers(&mut self, uri: &str, key: &str) -> MpdResult<()> {
-        self.execute(&format!(
-            "sticker find song {} {}",
-            uri.quote_and_escape(),
-            key.quote_and_escape()
-        ))
+    fn send_find_stickers(
+        &mut self,
+        uri: &str,
+        key: &str,
+        filter: Option<StickerFilter>,
+    ) -> MpdResult<()> {
+        if let Some(filter) = filter {
+            self.execute(&format!(
+                "sticker find song {} {} {}",
+                uri.quote_and_escape(),
+                key.quote_and_escape(),
+                filter.as_mpd_str(),
+            ))
+        } else {
+            self.execute(&format!(
+                "sticker find song {} {}",
+                uri.quote_and_escape(),
+                key.quote_and_escape(),
+            ))
+        }
     }
 
     fn send_switch_to_partition(&mut self, name: &str) -> MpdResult<()> {
@@ -1401,6 +1401,35 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_string_normalization_clear(&mut self) -> MpdResult<()> {
         self.execute("stringnormalization clear")
+    }
+}
+
+/// Sticker operators for filtering stickers in `find_stickers`
+/// The *Int variants cast the sticker value to an integer before comparing.
+#[derive(Debug, PartialEq, Clone, strum::IntoStaticStr, strum::AsRefStr)]
+pub enum StickerFilter {
+    Equals(String),
+    GreaterThan(String),
+    LessThan(String),
+    Contains(String),
+    StartsWith(String),
+    EqualsInt(i32),
+    GreaterThanInt(i32),
+    LessThanInt(i32),
+}
+
+impl StickerFilter {
+    fn as_mpd_str(&self) -> String {
+        match self {
+            StickerFilter::Equals(value) => format!("= {}", value.quote_and_escape()),
+            StickerFilter::GreaterThan(value) => format!("> {}", value.quote_and_escape()),
+            StickerFilter::LessThan(value) => format!("< {}", value.quote_and_escape()),
+            StickerFilter::Contains(value) => format!("contains {}", value.quote_and_escape()),
+            StickerFilter::StartsWith(value) => format!("starts_with {}", value.quote_and_escape()),
+            StickerFilter::EqualsInt(value) => format!("eq {value}"),
+            StickerFilter::GreaterThanInt(value) => format!("gt {value}"),
+            StickerFilter::LessThanInt(value) => format!("lt {value}"),
+        }
     }
 }
 

@@ -41,7 +41,7 @@ pub struct KeyConfig {
     pub queue: HashMap<Key, QueueActions>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KeyConfigFile {
     #[serde(default)]
     pub global: HashMap<Key, GlobalActionFile>,

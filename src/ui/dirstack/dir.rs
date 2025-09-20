@@ -1,10 +1,13 @@
-use std::collections::BTreeSet;
+use std::{
+    collections::BTreeSet,
+    ops::{Bound, RangeBounds},
+};
 
 use log::error;
 use ratatui::widgets::{ListItem, ListState};
 
 use super::{DirStackItem, state::DirState};
-use crate::{config::Config, shared::macros::status_warn};
+use crate::{ctx::Ctx, shared::macros::status_warn};
 
 #[derive(Debug)]
 pub struct Dir<T: std::fmt::Debug + DirStackItem + Clone + Send> {
@@ -52,39 +55,58 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.filter.as_deref()
     }
 
-    pub fn set_filter(&mut self, value: Option<String>, config: &Config) {
+    pub fn set_filter(&mut self, value: Option<String>, ctx: &Ctx) {
         self.matched_item_count = if let Some(ref filter) = value {
-            self.items.iter().filter(|item| item.matches(config, filter)).count()
+            self.items.iter().filter(|item| item.matches(ctx, filter)).count()
         } else {
             0
         };
         self.filter = value;
     }
 
-    pub fn push_filter(&mut self, char: char, config: &Config) {
+    pub fn push_filter(&mut self, char: char, ctx: &Ctx) {
         if let Some(ref mut filter) = self.filter {
             filter.push(char);
             self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(config, filter)).count();
+                self.items.iter().filter(|item| item.matches(ctx, filter)).count();
         }
     }
 
-    pub fn pop_filter(&mut self, config: &Config) {
+    pub fn pop_filter(&mut self, ctx: &Ctx) {
         if let Some(ref mut filter) = self.filter {
             filter.pop();
             self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(config, filter)).count();
+                self.items.iter().filter(|item| item.matches(ctx, filter)).count();
         }
     }
 
-    pub fn to_list_items<'a>(&self, config: &Config) -> Vec<ListItem<'a>> {
+    pub fn to_list_items_range<'a>(
+        &self,
+        range: impl RangeBounds<usize>,
+        ctx: &Ctx,
+    ) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
         let current_item_idx = self.selected_with_idx().map(|(idx, _)| idx);
+
+        let start = match range.start_bound() {
+            Bound::Included(&start) => start,
+            Bound::Excluded(start) => start + 1,
+            Bound::Unbounded => 0,
+        };
+
+        let end = match range.end_bound() {
+            Bound::Included(end) => end + 1,
+            Bound::Excluded(&end) => end,
+            Bound::Unbounded => self.items.len(),
+        };
+
         self.items
             .iter()
             .enumerate()
+            .skip(start)
+            .take(end.saturating_sub(start))
             .map(|(i, item)| {
-                let matches = self.filter.as_ref().is_some_and(|v| item.matches(config, v));
+                let matches = self.filter.as_ref().is_some_and(|v| item.matches(ctx, v));
                 let is_current = current_item_idx.is_some_and(|idx| i == idx);
                 if matches {
                     already_matched = already_matched.saturating_add(1);
@@ -94,9 +116,13 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
                 } else {
                     None
                 };
-                item.to_list_item(config, self.marked().contains(&i), matches, content)
+                item.to_list_item(ctx, self.marked().contains(&i), matches, content)
             })
             .collect()
+    }
+
+    pub fn to_list_items<'a>(&self, ctx: &Ctx) -> Vec<ListItem<'a>> {
+        self.to_list_items_range(.., ctx)
     }
 
     pub fn selected(&self) -> Option<&T> {
@@ -211,7 +237,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.state.first();
     }
 
-    pub fn jump_next_matching(&mut self, config: &Config) {
+    pub fn jump_next_matching(&mut self, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -224,14 +250,14 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         let length = self.items.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.items[i].matches(config, filter) {
-                self.state.select(Some(i), config.scrolloff);
+            if self.items[i].matches(ctx, filter) {
+                self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_previous_matching(&mut self, config: &Config) {
+    pub fn jump_previous_matching(&mut self, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -244,14 +270,14 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         let length = self.items.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.items[i].matches(config, filter) {
-                self.state.select(Some(i), config.scrolloff);
+            if self.items[i].matches(ctx, filter) {
+                self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_first_matching(&mut self, config: &Config) {
+    pub fn jump_first_matching(&mut self, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -260,15 +286,19 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.items
             .iter()
             .enumerate()
-            .find(|(_, item)| item.matches(config, filter))
-            .inspect(|(idx, _)| self.state.select(Some(*idx), config.scrolloff));
+            .find(|(_, item)| item.matches(ctx, filter))
+            .inspect(|(idx, _)| self.state.select(Some(*idx), ctx.config.scrolloff));
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+
+    use rstest::rstest;
+
     use super::{Dir, DirState};
+    use crate::{ctx::Ctx, tests::fixtures::ctx};
 
     fn create_subject() -> Dir<String> {
         let mut res = Dir {
@@ -433,10 +463,10 @@ mod tests {
     }
 
     mod jump_next_matching {
-        use crate::{config::Config, ui::dirstack::Dir};
+        use super::*;
 
-        #[test]
-        fn jumps_by_half_viewport() {
+        #[rstest]
+        fn jumps_by_half_viewport(ctx: Ctx) {
             let mut val: Dir<String> = Dir {
                 items: vec!["aa", "ab", "c", "ad"].into_iter().map(ToOwned::to_owned).collect(),
                 ..Default::default()
@@ -446,19 +476,19 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_next_matching(&Config::default());
+            val.jump_next_matching(&ctx);
             assert_eq!(val.state.get_selected(), Some(1));
 
-            val.jump_next_matching(&Config::default());
+            val.jump_next_matching(&ctx);
             assert_eq!(val.state.get_selected(), Some(3));
         }
     }
 
     mod jump_previous_matching {
-        use crate::{config::Config, ui::dirstack::Dir};
+        use super::*;
 
-        #[test]
-        fn jumps_by_half_viewport() {
+        #[rstest]
+        fn jumps_by_half_viewport(ctx: Ctx) {
             let mut val: Dir<String> = Dir {
                 items: vec!["aa", "ab", "c", "ad", "padding"]
                     .into_iter()
@@ -471,19 +501,19 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_previous_matching(&Config::default());
+            val.jump_previous_matching(&ctx);
             assert_eq!(val.state.get_selected(), Some(3));
 
-            val.jump_previous_matching(&Config::default());
+            val.jump_previous_matching(&ctx);
             assert_eq!(val.state.get_selected(), Some(1));
         }
     }
 
     mod matched_item_count {
-        use crate::{config::Config, ui::dirstack::Dir};
+        use super::*;
 
-        #[test]
-        fn filter_changes_recounts_matched_items() {
+        #[rstest]
+        fn filter_changes_recounts_matched_items(ctx: Ctx) {
             let mut val: Dir<String> = Dir {
                 items: vec!["aa", "ab", "c", "ad", "padding"]
                     .into_iter()
@@ -492,19 +522,19 @@ mod tests {
                 filter: None,
                 ..Default::default()
             };
-            val.set_filter(Some("a".to_string()), &Config::default());
+            val.set_filter(Some("a".to_string()), &ctx);
             assert_eq!(val.matched_item_count, 4);
 
-            val.push_filter('d', &Config::default());
+            val.push_filter('d', &ctx);
             assert_eq!(val.matched_item_count, 2);
 
-            val.pop_filter(&Config::default());
+            val.pop_filter(&ctx);
             assert_eq!(val.matched_item_count, 4);
 
-            val.pop_filter(&Config::default());
+            val.pop_filter(&ctx);
             assert_eq!(val.matched_item_count, 5);
 
-            val.set_filter(None, &Config::default());
+            val.set_filter(None, &ctx);
             assert_eq!(val.matched_item_count, 0);
         }
     }
