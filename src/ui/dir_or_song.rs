@@ -213,7 +213,8 @@ impl Ord for DirOrSongCustomSort<'_, '_> {
                             }
                         }
                     }
-                    Ordering::Greater
+
+                    if matches!(a, DirOrSong::Song(_)) { Ordering::Greater } else { Ordering::Less }
                 }
             },
         };

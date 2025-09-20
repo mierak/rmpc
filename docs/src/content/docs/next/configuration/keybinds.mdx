@@ -173,7 +173,7 @@ attempts to stop you.
 Possible values for the action `<kind>` are either a `Modal` or `Value`. Where modal takes a list
 of values to show for rating selector and whether to show a text input for custom rating.
 
-The rating is applied to the currently plaing song if any when `current` is set to true.
+The rating is applied to the currently playing song if any when `current` is set to true.
 
 ##### Examples
 
@@ -183,7 +183,7 @@ The rating is applied to the currently plaing song if any when `current` is set 
 Rate(kind: Value(6), current: true),
 ```
 
-- Set currently rating of song(s) under the cursor in either queue or the browesr panes to 3.
+- Set rating of song(s) under the cursor in either queue or the browser panes to 3.
 
 ```rust showLineNumbers=false
 Rate(kind: Value(3), current: false),

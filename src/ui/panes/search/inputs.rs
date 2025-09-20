@@ -422,8 +422,13 @@ impl Widget for &mut InputGroups {
         Self: Sized,
     {
         self.area = area;
+        let mut remaining_height = area.height as usize;
         area.height = 1;
         for (idx, input) in self.inputs.iter().enumerate() {
+            if remaining_height == 0 {
+                break;
+            }
+
             let is_focused = idx == self.focused_idx;
 
             match input {
@@ -521,6 +526,7 @@ impl Widget for &mut InputGroups {
                 }
             }
             area.y += 1;
+            remaining_height = remaining_height.saturating_sub(1);
         }
     }
 }

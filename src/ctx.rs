@@ -138,8 +138,9 @@ impl Ctx {
         self.needs_render.replace(false);
         self.rendered_frames.add_assign(1);
 
-        if !self.stickers_to_fetch.borrow().is_empty() {
-            let uris = self.stickers_to_fetch.take().into_iter().collect();
+        let stickers = self.stickers_to_fetch.take();
+        if !stickers.is_empty() {
+            let uris = stickers.into_iter().collect();
             log::debug!(uris:?; "Fetching stickers after frame");
             self.query().id(FETCH_SONG_STICKERS).query(|client| {
                 let stickers = client.fetch_song_stickers(uris)?;
