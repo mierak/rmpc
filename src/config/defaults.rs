@@ -26,6 +26,10 @@ pub fn u64<const V: u64>() -> u64 {
     V
 }
 
+pub fn i32<const V: i32>() -> i32 {
+    V
+}
+
 pub fn i64<const V: i64>() -> i64 {
     V
 }

@@ -168,12 +168,14 @@ attempts to stop you.
 
 #### Syntax
 
-`Rate(kind: <kind>, current: <bool>)`
+`Rate(kind: <kind>, current: <bool>, min_rating: <number>, max_rating: <number>)`
 
 Possible values for the action `<kind>` are either a `Modal` or `Value`. Where modal takes a list
 of values to show for rating selector and whether to show a text input for custom rating.
 
 The rating is applied to the currently playing song if any when `current` is set to true.
+
+Min and max rating are 0 and 10 respectively by default if not provided.
 
 ##### Examples
 
@@ -204,6 +206,12 @@ Rate(kind: Modal(), current: false),
 
 ```rust showLineNumbers=false
 Rate(kind: Modal(values: [], custom: true), current: false),
+```
+
+- Open a modal which shows only text input for rating and allows you to set rating up to 100
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: true), current: false, max_rating: 100),
 ```
 
 #### AddOptions

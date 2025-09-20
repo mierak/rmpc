@@ -539,14 +539,21 @@ impl<'ui> Ui<'ui> {
                 reason = "Future expansion, remove when adding other actions"
             )]
             match action {
-                CommonAction::Rate { kind, current: true } => {
+                CommonAction::Rate { kind, current: true, min_rating, max_rating } => {
                     if let Some((_, song)) = ctx.find_current_song_in_queue() {
                         match kind {
                             RatingKind::Modal { values, custom } => {
                                 let items = vec![Enqueue::File { path: song.file.clone() }];
                                 modal!(
                                     ctx,
-                                    create_rating_modal(items, values.as_slice(), *custom, ctx)
+                                    create_rating_modal(
+                                        items,
+                                        values.as_slice(),
+                                        *min_rating,
+                                        *max_rating,
+                                        *custom,
+                                        ctx
+                                    )
                                 );
                             }
                             RatingKind::Value(value) => {

@@ -1,5 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
+use anyhow::bail;
 use itertools::Itertools;
 use strum::{Display, EnumDiscriminants, VariantArray};
 
@@ -562,6 +563,10 @@ pub enum CommonActionFile {
         kind: RatingKind,
         #[serde(default)]
         current: bool,
+        #[serde(default = "crate::config::defaults::i32::<0>")]
+        min_rating: i32,
+        #[serde(default = "crate::config::defaults::i32::<10>")]
+        max_rating: i32,
     },
 }
 
@@ -603,6 +608,8 @@ pub enum CommonAction {
     Rate {
         kind: RatingKind,
         current: bool,
+        min_rating: i32,
+        max_rating: i32,
     },
 }
 
@@ -672,17 +679,19 @@ impl ToDescription for CommonAction {
                             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
-            CommonAction::Rate { kind: RatingKind::Value(val), current: false  } => format!("Set song rating to {val}").into(),
-            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: false } => "Open a modal popup with song rating options".into(),
-            CommonAction::Rate { kind: RatingKind::Value(val), current: true  } => format!("Set currently plyaing song's rating to {val}").into(),
-            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: true } => "Open a modal popup with song rating options for the currently playing song".into(),
+            CommonAction::Rate { kind: RatingKind::Value(val), current: false, ..  } => format!("Set song rating to {val}").into(),
+            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: false, .. } => "Open a modal popup with song rating options".into(),
+            CommonAction::Rate { kind: RatingKind::Value(val), current: true, .. } => format!("Set currently plyaing song's rating to {val}").into(),
+            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: true, .. } => "Open a modal popup with song rating options for the currently playing song".into(),
         }
     }
 }
 
-impl From<CommonActionFile> for CommonAction {
-    fn from(value: CommonActionFile) -> Self {
-        match value {
+impl TryFrom<CommonActionFile> for CommonAction {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CommonActionFile) -> Result<Self, Self::Error> {
+        Ok(match value {
             CommonActionFile::Up => CommonAction::Up,
             CommonActionFile::Down => CommonAction::Down,
             CommonActionFile::UpHalf => CommonAction::UpHalf,
@@ -754,8 +763,37 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
-            CommonActionFile::Rate { kind, current } => CommonAction::Rate { kind, current },
-        }
+            CommonActionFile::Rate { kind, current, min_rating, max_rating } => {
+                match &kind {
+                    RatingKind::Modal { values, custom } => {
+                        if values.is_empty() && !custom {
+                            bail!(
+                                "At least one of 'values' or 'custom' must be set for rating modal"
+                            );
+                        }
+
+                        if !values.is_empty() {
+                            if let Some(min) = values.iter().min()
+                                && *min < min_rating
+                            {
+                                bail!("Rating must be at least {min_rating}");
+                            }
+                            if let Some(max) = values.iter().max()
+                                && *max > max_rating
+                            {
+                                bail!("Rating must be at most {max_rating}");
+                            }
+                        }
+                    }
+                    RatingKind::Value(v) => {
+                        if *v < min_rating || *v > max_rating {
+                            bail!("Rating must be between {min_rating} and {max_rating}");
+                        }
+                    }
+                }
+                CommonAction::Rate { kind, current, min_rating, max_rating }
+            }
+        })
     }
 }
 

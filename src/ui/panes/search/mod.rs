@@ -342,7 +342,7 @@ impl SearchPane {
                 CommonAction::PaneLeft => {}
                 CommonAction::ShowInfo => {}
                 CommonAction::ContextMenu => {}
-                CommonAction::Rate { kind: _, current: true } => {
+                CommonAction::Rate { kind: _, min_rating: _, max_rating: _, current: true } => {
                     event.abandon();
                 }
                 CommonAction::Rate { .. } => {}
@@ -561,7 +561,12 @@ impl SearchPane {
                 CommonAction::ContextMenu => {
                     self.open_result_phase_context_menu(ctx)?;
                 }
-                CommonAction::Rate { kind: RatingKind::Value(value), current: false } => {
+                CommonAction::Rate {
+                    kind: RatingKind::Value(value),
+                    current: false,
+                    min_rating: _,
+                    max_rating: _,
+                } => {
                     let items = self.enqueue(false).1;
                     ctx.command(move |client| {
                         client.set_sticker_multiple("rating", value.to_string(), items)?;
@@ -571,11 +576,23 @@ impl SearchPane {
                 CommonAction::Rate {
                     kind: RatingKind::Modal { values, custom },
                     current: false,
+                    min_rating,
+                    max_rating,
                 } => {
                     let items = self.enqueue(false).1;
-                    modal!(ctx, create_rating_modal(items, values.as_slice(), custom, ctx));
+                    modal!(
+                        ctx,
+                        create_rating_modal(
+                            items,
+                            values.as_slice(),
+                            min_rating,
+                            max_rating,
+                            custom,
+                            ctx
+                        )
+                    );
                 }
-                CommonAction::Rate { kind: _, current: true } => {
+                CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
                 }
             }

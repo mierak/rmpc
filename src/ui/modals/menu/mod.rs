@@ -171,6 +171,8 @@ impl Section for SectionType<'_> {
 pub fn create_rating_modal<'a>(
     items: Vec<Enqueue>,
     values: &[i32],
+    min_rating: i32,
+    max_rating: i32,
     custom: bool,
     ctx: &Ctx,
 ) -> MenuModal<'a> {
@@ -184,10 +186,20 @@ pub fn create_rating_modal<'a>(
             }
 
             let section = section.action(move |ctx, value| {
-                let Ok(_) = value.trim().parse::<i32>() else {
+                let Ok(v) = value.trim().parse::<i32>() else {
                     status_error!("Rating must be a valid number");
                     return;
                 };
+
+                if v < min_rating {
+                    status_error!("Rating must be at least {min_rating}");
+                    return;
+                }
+
+                if v > max_rating {
+                    status_error!("Rating must be at most {max_rating}");
+                    return;
+                }
 
                 if !value.trim().is_empty() {
                     ctx.command(move |client| {
