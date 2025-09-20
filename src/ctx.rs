@@ -1,6 +1,6 @@
 use std::{
-    cell::Cell,
-    collections::HashSet,
+    cell::{Cell, RefCell},
+    collections::{HashMap, HashSet},
     ops::AddAssign,
     time::{Duration, Instant},
 };
@@ -31,11 +31,14 @@ use crate::{
         events::ClientRequest,
         lrc::{Lrc, LrcIndex, get_lrc_path},
         macros::status_warn,
+        mpd_client_ext::MpdClientExt,
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
     },
     ui::StatusMessage,
 };
+
+pub const FETCH_SONG_STICKERS: &str = "fetch_song_stickers";
 
 #[derive(derive_more::Debug)]
 pub struct Ctx {
@@ -43,6 +46,10 @@ pub struct Ctx {
     pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
     pub(crate) queue: Vec<Song>,
+    #[cfg(test)]
+    pub(crate) stickers: HashMap<String, HashMap<String, String>>,
+    #[cfg(not(test))]
+    stickers: HashMap<String, HashMap<String, String>>,
     pub(crate) active_tab: TabName,
     pub(crate) supported_commands: HashSet<String>,
     pub(crate) db_update_start: Option<Instant>,
@@ -53,15 +60,16 @@ pub struct Ctx {
     #[debug(skip)]
     pub(crate) client_request_sender: Sender<ClientRequest>,
     pub(crate) needs_render: Cell<bool>,
+    pub(crate) stickers_to_fetch: RefCell<HashSet<String>>,
     #[debug(skip)]
     pub(crate) lrc_index: LrcIndex,
     pub(crate) rendered_frames: u64,
-    pub(crate) should_fetch_stickers: bool,
     #[debug(skip)]
     pub(crate) scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
     pub(crate) messages: RingVec<10, StatusMessage>,
     pub(crate) last_status_update: Instant,
     pub(crate) song_played: Option<Duration>,
+    pub(crate) stickers_supported: bool,
 }
 
 #[bon]
@@ -74,18 +82,12 @@ impl Ctx {
         client_request_sender: Sender<ClientRequest>,
         mut scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
     ) -> Result<Self> {
-        let supported_commands: HashSet<String> = client.commands()?.0.into_iter().collect();
-        let sticker_support_needed = config.sticker_support_needed();
-        log::info!(supported_commands:? = supported_commands, sticker_support_needed; "Supported commands by server");
-
-        if sticker_support_needed && !supported_commands.contains("sticker") {
-            bail!(
-                "Rmpc was configured to display stickers but MPD did not report sticker support.\nCheck if you have 'sticker_file' configured your in mpd.conf."
-            );
-        }
+        let supported_commands: HashSet<String> = client.supported_commands.clone();
+        let stickers_supported = supported_commands.contains("sticker");
+        log::info!(supported_commands:? = supported_commands; "Supported commands by server");
 
         let status = client.get_status()?;
-        let queue = client.playlist_info(sticker_support_needed)?.unwrap_or_default();
+        let queue = client.playlist_info()?.unwrap_or_default();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
             config.album_art.method = ImageMethod::None;
@@ -102,6 +104,7 @@ impl Ctx {
             config: std::sync::Arc::new(config),
             status,
             queue,
+            stickers: HashMap::new(),
             active_tab,
             supported_commands,
             db_update_start: None,
@@ -110,11 +113,12 @@ impl Ctx {
             scheduler,
             client_request_sender,
             needs_render: Cell::new(false),
-            should_fetch_stickers: sticker_support_needed,
+            stickers_to_fetch: RefCell::new(HashSet::new()),
             rendered_frames: 0,
             messages: RingVec::default(),
             song_played: None,
             last_status_update: Instant::now(),
+            stickers_supported,
         })
     }
 
@@ -133,6 +137,16 @@ impl Ctx {
     pub(crate) fn finish_frame(&mut self) {
         self.needs_render.replace(false);
         self.rendered_frames.add_assign(1);
+
+        let stickers = self.stickers_to_fetch.take();
+        if !stickers.is_empty() {
+            let uris = stickers.into_iter().collect();
+            log::debug!(uris:?; "Fetching stickers after frame");
+            self.query().id(FETCH_SONG_STICKERS).query(|client| {
+                let stickers = client.fetch_song_stickers(uris)?;
+                Ok(MpdQueryResult::SongStickers(stickers))
+            });
+        }
     }
 
     pub(crate) fn query_sync<T: Send + Sync + 'static>(
@@ -225,16 +239,30 @@ impl Ctx {
 
         Ok(None)
     }
-}
 
-impl Config {
-    fn sticker_support_needed(&self) -> bool {
-        self.theme.song_table_format.iter().any(|column| column.prop.kind.contains_stickers())
-            || self.theme.browser_song_format.0.iter().any(|prop| prop.kind.contains_stickers())
-            || self.theme.header.rows.iter().any(|row| {
-                row.left.iter().any(|left| left.kind.contains_stickers())
-                    || row.center.iter().any(|center| center.kind.contains_stickers())
-                    || row.right.iter().any(|right| right.kind.contains_stickers())
-            })
+    pub(crate) fn song_stickers(&self, uri: &str) -> Option<&HashMap<String, String>> {
+        let stickers = self.stickers.get(uri);
+
+        if stickers.is_none() {
+            self.stickers_to_fetch.borrow_mut().insert(uri.to_owned());
+        }
+
+        stickers
+    }
+
+    pub(crate) fn set_song_stickers(
+        &mut self,
+        uri: String,
+        stickers: HashMap<String, String>,
+    ) -> Option<HashMap<String, String>> {
+        self.stickers.insert(uri, stickers)
+    }
+
+    pub(crate) fn set_stickers(&mut self, stickers: HashMap<String, HashMap<String, String>>) {
+        self.stickers = stickers;
+    }
+
+    pub(crate) fn stickers(&self) -> &HashMap<String, HashMap<String, String>> {
+        &self.stickers
     }
 }

@@ -27,7 +27,7 @@ use crate::{
     config::{
         Config,
         cli::Args,
-        keys::GlobalAction,
+        keys::{CommonAction, GlobalAction, actions::RatingKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -35,11 +35,11 @@ use crate::{
         command::{create_env, run_external},
         config_watcher::ERROR_CONFIG_MODAL_ID,
     },
-    ctx::Ctx,
+    ctx::{Ctx, FETCH_SONG_STICKERS},
     mpd::{
         commands::{State, idle::IdleEvent},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
-        mpd_client::{FilterKind, MpdClient, MpdCommand, ValueChange},
+        mpd_client::{MpdClient, MpdCommand, ValueChange},
         proto_client::ProtoClient,
         version::Version,
     },
@@ -49,8 +49,9 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
-        mpd_client_ext::MpdClientExt,
+        mpd_client_ext::{Enqueue, MpdClientExt},
     },
+    ui::modals::menu::create_rating_modal,
 };
 
 pub mod browser;
@@ -277,7 +278,7 @@ impl<'ui> Ui<'ui> {
                             if any_non_default { Some(section) } else { None }
                         })
                         .input_section(ctx, "New partition:", |section| {
-                            section.action(|ctx, value| {
+                            let section = section.action(|ctx, value| {
                                 if !value.is_empty() {
                                     ctx.command(move |client| {
                                         client.send_start_cmd_list()?;
@@ -288,7 +289,8 @@ impl<'ui> Ui<'ui> {
                                         Ok(())
                                     });
                                 }
-                            })
+                            });
+                            Some(section)
                         })
                         .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
                         .build();
@@ -531,6 +533,44 @@ impl<'ui> Ui<'ui> {
                     modal!(ctx, AddRandomModal::new(ctx));
                 }
             }
+        } else if let Some(action) = key.as_common_action(ctx) {
+            #[allow(
+                clippy::collapsible_match,
+                reason = "Future expansion, remove when adding other actions"
+            )]
+            match action {
+                CommonAction::Rate { kind, current: true, min_rating, max_rating } => {
+                    if let Some((_, song)) = ctx.find_current_song_in_queue() {
+                        match kind {
+                            RatingKind::Modal { values, custom } => {
+                                let items = vec![Enqueue::File { path: song.file.clone() }];
+                                modal!(
+                                    ctx,
+                                    create_rating_modal(
+                                        items,
+                                        values.as_slice(),
+                                        *min_rating,
+                                        *max_rating,
+                                        *custom,
+                                        ctx
+                                    )
+                                );
+                            }
+                            RatingKind::Value(value) => {
+                                let uri = song.file.clone();
+                                let value = value.to_string();
+                                ctx.command(move |client| {
+                                    client.set_sticker(&uri, "rating", &value)?;
+                                    Ok(())
+                                });
+                            }
+                        }
+                    } else {
+                        status_error!("No song is currently playing");
+                    }
+                }
+                _ => {}
+            }
         }
 
         Ok(KeyHandleResult::None)
@@ -753,6 +793,14 @@ impl<'ui> Ui<'ui> {
                 (OPEN_DECODERS_MODAL, MpdQueryResult::Decoders(decoders)) => {
                     modal!(ctx, DecodersModal::new(decoders));
                 }
+                (FETCH_SONG_STICKERS, MpdQueryResult::SongStickers(stickers)) => {
+                    for (k, v) in stickers {
+                        // Assume all stickers were fetched for each song so simple replace is
+                        // enough
+                        ctx.set_song_stickers(k, v);
+                    }
+                    ctx.render()?;
+                }
                 (id, mut data) => {
                     // TODO a proper modal target
                     for modal in &mut self.modals {
@@ -835,40 +883,6 @@ impl Level {
             Level::Error => config.error,
             Level::Info => config.info,
         }
-    }
-}
-
-impl From<&FilterKind> for &'static str {
-    fn from(value: &FilterKind) -> Self {
-        match value {
-            FilterKind::Exact => "Exact match",
-            FilterKind::Contains => "Contains value",
-            FilterKind::StartsWith => "Starts with value",
-            FilterKind::Regex => "Regex",
-        }
-    }
-}
-
-impl std::fmt::Display for FilterKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FilterKind::Exact => write!(f, "Exact match"),
-            FilterKind::Contains => write!(f, "Contains value"),
-            FilterKind::StartsWith => write!(f, "Starts with value"),
-            FilterKind::Regex => write!(f, "Regex"),
-        }
-    }
-}
-
-impl FilterKind {
-    fn cycle(&mut self) -> &mut Self {
-        *self = match self {
-            FilterKind::Exact => FilterKind::Contains,
-            FilterKind::Contains => FilterKind::StartsWith,
-            FilterKind::StartsWith => FilterKind::Regex,
-            FilterKind::Regex => FilterKind::Exact,
-        };
-        self
     }
 }
 

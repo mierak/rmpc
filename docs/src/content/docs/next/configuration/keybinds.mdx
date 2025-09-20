@@ -7,6 +7,7 @@ sidebar:
 
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
 import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
 
 ## Keybinds
 
@@ -117,35 +118,101 @@ These keybinds are used to navigate the different tabs and to interact with the 
 some more advanced ones like moving the cursor up or down half a page, moving the cursor to the top or bottom of the
 list and controlling search mode.
 
-|   Default Key   | Action          | Info                                                                                                                               |
-| :-------------: | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `<C-c>` / `Esc` | Close           | Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.                                               |
-|       `k`       | Up              | Up                                                                                                                                 |
-|       `l`       | Right           | Right                                                                                                                              |
-|    `<Space>`    | Select          | Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist                 |
-|   `<C-Space>`   | InvertSelection | Inverts the current selected items                                                                                                 |
-|     `Enter`     | Confirm         | Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor |
-|       `K`       | MoveUp          | Move current item up, for example song in a queue                                                                                  |
-|       `J`       | MoveDown        | Move current item down, for example song in a queue                                                                                |
-|       `g`       | Top             | Jump all the way to the top                                                                                                        |
-|       `G`       | Bottom          | Jump all the way to the bottom                                                                                                     |
-|     `<C-n>`     | NextResult      | When a filter is active, jump to the next result                                                                                   |
-|       `N`       | PreviousResult  | When a filter is active, jump to the previous result                                                                               |
-|       `j`       | Down            | Down                                                                                                                               |
-|       `D`       | Delete          | Delete. For example a playlist, song from a playlist or wipe the current queue.                                                    |
-|     `<C-u>`     | UpHalf          | Jump by half a screen up                                                                                                           |
-|     `<C-d>`     | DownHalf        | Jump by half a screen down                                                                                                         |
-|                 | PageUp          | Jump a screen up                                                                                                                   |
-|                 | PageDown        | Jump a screen down                                                                                                                 |
-|       `i`       | FocusInput      | Focuses textbox if any is on the screen and is not focused                                                                         |
-|       `/`       | EnterSearch     | Enter search mode                                                                                                                  |
-|       `h`       | Left            | Left                                                                                                                               |
-|       `r`       | Rename          | Rename. Currently only for playlists                                                                                               |
-|       `a`       | Add             | Add item to queue                                                                                                                  |
-|       `A`       | AddAll          | Add all items to queue                                                                                                             |
-|       `B`       | ShowInfo        | Show info about the item under cursor in a modal popup                                                                             |
-|                 | AddOptions()    | Add item(s) to the queue with specified options. More info [in its section](#addoptions)                                           |
-|                 | ContextMenu()   | Show a context menu with select few actions that can be done on the current item(s)                                                |
+|   Default Key   | Action                      | Info                                                                                                                               |
+| :-------------: | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `<C-c>` / `Esc` | Close                       | Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.                                               |
+|       `k`       | Up                          | Up                                                                                                                                 |
+|       `l`       | Right                       | Right                                                                                                                              |
+|    `<Space>`    | Select                      | Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist                 |
+|   `<C-Space>`   | InvertSelection             | Inverts the current selected items                                                                                                 |
+|     `Enter`     | Confirm                     | Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor |
+|       `K`       | MoveUp                      | Move current item up, for example song in a queue                                                                                  |
+|       `J`       | MoveDown                    | Move current item down, for example song in a queue                                                                                |
+|       `g`       | Top                         | Jump all the way to the top                                                                                                        |
+|       `G`       | Bottom                      | Jump all the way to the bottom                                                                                                     |
+|     `<C-n>`     | NextResult                  | When a filter is active, jump to the next result                                                                                   |
+|       `N`       | PreviousResult              | When a filter is active, jump to the previous result                                                                               |
+|       `j`       | Down                        | Down                                                                                                                               |
+|       `D`       | Delete                      | Delete. For example a playlist, song from a playlist or wipe the current queue.                                                    |
+|     `<C-u>`     | UpHalf                      | Jump by half a screen up                                                                                                           |
+|     `<C-d>`     | DownHalf                    | Jump by half a screen down                                                                                                         |
+|                 | PageUp                      | Jump a screen up                                                                                                                   |
+|                 | PageDown                    | Jump a screen down                                                                                                                 |
+|       `i`       | FocusInput                  | Focuses textbox if any is on the screen and is not focused                                                                         |
+|       `/`       | EnterSearch                 | Enter search mode                                                                                                                  |
+|       `h`       | Left                        | Left                                                                                                                               |
+|       `r`       | Rename                      | Rename. Currently only for playlists                                                                                               |
+|       `a`       | Add                         | Add item to queue                                                                                                                  |
+|       `A`       | AddAll                      | Add all items to queue                                                                                                             |
+|       `B`       | ShowInfo                    | Show info about the item under cursor in a modal popup                                                                             |
+|                 | [AddOptions()](#addoptions) | Add item(s) to the queue with specified options. More info [in its section](#addoptions)                                           |
+|                 | ContextMenu()               | Show a context menu with select few actions that can be done on the current item(s)                                                |
+|                 | [Rate()](#rate)             | Set song rating, must have <a href={path("configuration/stickers#rating")}>stickers</a> configured                                 |
+
+#### Rate
+
+A configurable keybind used to rate songs. Allows you to rate either the currently playing song or
+the song(s) under cursor in the browser panes and the queue.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+Must have stickers configured, please check <a href={path("configuration/stickers#rating")}>stickers</a>
+page for more information.
+
+:::note
+It is highly advised to keep ratings in the 0-10 range. Other MPD clients or some other rmpc
+functionality might assume that this is the case and will not work otherwise but rmpc will make no
+attempts to stop you.
+:::
+
+#### Syntax
+
+`Rate(kind: <kind>, current: <bool>, min_rating: <number>, max_rating: <number>)`
+
+Possible values for the action `<kind>` are either a `Modal` or `Value`. Where modal takes a list
+of values to show for rating selector and whether to show a text input for custom rating.
+
+The rating is applied to the currently playing song if any when `current` is set to true.
+
+Min and max rating are 0 and 10 respectively by default if not provided.
+
+##### Examples
+
+- Set currently rating of the currently playing song to 6
+
+```rust showLineNumbers=false
+Rate(kind: Value(6), current: true),
+```
+
+- Set rating of song(s) under the cursor in either queue or the browser panes to 3.
+
+```rust showLineNumbers=false
+Rate(kind: Value(3), current: false),
+// or equivalent
+Rate(kind: Value(3)),
+```
+
+- Open a modal which shows options to set rating (0-10) of the currently playing song as well as
+  input a custom value or clear the rating completely.
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true), current: false),
+// or equivalent
+Rate(kind: Modal(), current: false),
+```
+
+- Open a modal which shows only text input for rating
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: true), current: false),
+```
+
+- Open a modal which shows only text input for rating and allows you to set rating up to 100
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: true), current: false, max_rating: 100),
+```
 
 #### AddOptions
 
@@ -158,7 +225,9 @@ the keybind is directly configured to display a modal.
 
 ##### Syntax
 
-Possible values for the action kind are either a `Modal` or `Action`. Where `Modal` takes a list of
+`AddOptions(kind: <kind>)`
+
+Possible values for the action `<kind>` are either a `Modal` or `Action`. Where `Modal` takes a list of
 tuples of a label and the action configuration and `Action` takes just a single action configuration.
 
 Possible `position`s are: `StartOfQueue`, `EndOfQueue`, `BeforeCurrentSong`, `AfterCurrentSong` and
@@ -183,33 +252,33 @@ Possible values for `all`:
 
 - Add a single item or the marked items at the end of the queue
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Action(all: false, autoplay: None, position: EndOfQueue))
 ```
 
 - Add a single item or the marked items at the start of the queue and start playing from the hovered
   item
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Action(all: false, autoplay: Hovered, position: StartOfQueue))
 ```
 
 - Add a single item or the marked items after the current and start playing from the hovered item
   or from the first item if no item was hovered.
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Action(all: false, autoplay: HoveredOrFirst, position: AfterCurrentSong))
 ```
 
 - Open a modal window with the default configuration
 
-```rust
+```rust showLineNumbers=false
 AddOptions()
 ```
 
 - Open a modal window with the configured options
 
-```rust
+```rust showLineNumbers=false
 AddOptions(kind: Modal([
     ("End of queue and play", (all: false, autoplay: First, position: EndOfQueue),
     ("After the current song", (all: false, autoplay: None, position: AfterCurrentSong),

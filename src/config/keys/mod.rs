@@ -41,7 +41,7 @@ pub struct KeyConfig {
     pub queue: HashMap<Key, QueueActions>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KeyConfigFile {
     #[serde(default)]
     pub global: HashMap<Key, GlobalActionFile>,
@@ -154,11 +154,17 @@ impl Default for KeyConfigFile {
     }
 }
 
-impl From<KeyConfigFile> for KeyConfig {
-    fn from(value: KeyConfigFile) -> Self {
-        KeyConfig {
+impl TryFrom<KeyConfigFile> for KeyConfig {
+    type Error = anyhow::Error;
+
+    fn try_from(value: KeyConfigFile) -> Result<Self, Self::Error> {
+        Ok(KeyConfig {
             global: value.global.into_iter().map(|(k, v)| (k, v.into())).collect(),
-            navigation: value.navigation.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            navigation: value
+                .navigation
+                .into_iter()
+                .map(|(k, v)| -> anyhow::Result<_> { Ok((k, v.try_into()?)) })
+                .collect::<anyhow::Result<_>>()?,
             albums: HashMap::new(),
             artists: HashMap::new(),
             directories: HashMap::new(),
@@ -166,7 +172,7 @@ impl From<KeyConfigFile> for KeyConfig {
             #[cfg(debug_assertions)]
             logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
             queue: value.queue.into_iter().map(|(k, v)| (k, v.into())).collect(),
-        }
+        })
     }
 }
 
@@ -175,6 +181,7 @@ pub trait ToDescription {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use std::collections::HashMap;
 
@@ -224,7 +231,7 @@ mod tests {
                                        (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up)]),
         };
 
-        let result: KeyConfig = input.into();
+        let result: KeyConfig = input.try_into().unwrap();
 
 
         assert_eq!(result, expected);

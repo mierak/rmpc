@@ -19,7 +19,7 @@ use crate::{
         keys::{
             GlobalAction,
             QueueActions,
-            actions::{AddKind, AutoplayKind},
+            actions::{AddKind, AutoplayKind, RatingKind},
         },
         tabs::PaneType,
         theme::{
@@ -48,7 +48,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
-            menu::{create_add_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
     },
@@ -339,6 +339,7 @@ impl Pane for QueuePane {
                         &config.theme.symbols,
                         &config.theme.format_tag_separator,
                         config.theme.multiple_tag_resolution_strategy,
+                        ctx,
                     )
                     .unwrap_or_default()
                     .alignment(formats[i].alignment.into());
@@ -355,10 +356,9 @@ impl Pane for QueuePane {
             });
 
             let is_matching_search = is_current
-                || self
-                    .filter
-                    .as_ref()
-                    .is_some_and(|filter| song.matches(self.column_formats.as_slice(), filter));
+                || self.filter.as_ref().is_some_and(|filter| {
+                    song.matches(self.column_formats.as_slice(), filter, ctx)
+                });
 
             let mut row = QueueRow::default();
             if is_matching_search {
@@ -725,7 +725,7 @@ impl Pane for QueuePane {
                             if let Some(ref mut f) = self.filter {
                                 f.push(c);
                             }
-                            self.jump_first(&ctx.queue, ctx.config.scrolloff);
+                            self.jump_first(&ctx.queue, ctx.config.scrolloff, ctx);
 
                             ctx.render()?;
                         }
@@ -1090,12 +1090,12 @@ impl Pane for QueuePane {
                     ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(&ctx.queue, ctx.config.scrolloff);
+                    self.jump_forward(&ctx.queue, ctx.config.scrolloff, ctx);
 
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(&ctx.queue, ctx.config.scrolloff);
+                    self.jump_back(&ctx.queue, ctx.config.scrolloff, ctx);
 
                     ctx.render()?;
                 }
@@ -1170,6 +1170,40 @@ impl Pane for QueuePane {
                 CommonAction::ContextMenu => {
                     self.open_context_menu(ctx)?;
                 }
+                CommonAction::Rate {
+                    kind: RatingKind::Value(value),
+                    current: false,
+                    min_rating: _,
+                    max_rating: _,
+                } => {
+                    let items = self.enqueue_items(false, ctx).0;
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple("rating", value.to_string(), items)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Rate {
+                    kind: RatingKind::Modal { values, custom },
+                    current: false,
+                    min_rating,
+                    max_rating,
+                } => {
+                    let items = self.enqueue_items(false, ctx).0;
+                    modal!(
+                        ctx,
+                        create_rating_modal(
+                            items,
+                            values.as_slice(),
+                            min_rating,
+                            max_rating,
+                            custom,
+                            ctx
+                        )
+                    );
+                }
+                CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
+                    event.abandon();
+                }
             }
         } else if let Some(action) = event.as_global_action(ctx) {
             match action {
@@ -1197,7 +1231,7 @@ impl QueuePane {
         if area.width > 0 { Some(area) } else { None }
     }
 
-    pub fn jump_forward(&mut self, queue: &[Song], scrolloff: usize) {
+    pub fn jump_forward(&mut self, queue: &[Song], scrolloff: usize, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -1210,14 +1244,14 @@ impl QueuePane {
         let length = queue.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if queue[i].matches(self.column_formats.as_slice(), filter) {
+            if queue[i].matches(self.column_formats.as_slice(), filter, ctx) {
                 self.scrolling_state.select(Some(i), scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_back(&mut self, queue: &[Song], scrolloff: usize) {
+    pub fn jump_back(&mut self, queue: &[Song], scrolloff: usize, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -1230,14 +1264,14 @@ impl QueuePane {
         let length = queue.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if queue[i].matches(self.column_formats.as_slice(), filter) {
+            if queue[i].matches(self.column_formats.as_slice(), filter, ctx) {
                 self.scrolling_state.select(Some(i), scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_first(&mut self, queue: &[Song], scrolloff: usize) {
+    pub fn jump_first(&mut self, queue: &[Song], scrolloff: usize, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -1246,7 +1280,7 @@ impl QueuePane {
         queue
             .iter()
             .enumerate()
-            .find(|(_, item)| item.matches(self.column_formats.as_slice(), filter))
+            .find(|(_, item)| item.matches(self.column_formats.as_slice(), filter, ctx))
             .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx), scrolloff));
     }
 }

@@ -307,10 +307,15 @@ pub(crate) mod browser {
         text::{Line, Span},
     };
 
-    use crate::{mpd::commands::Song, shared::mpd_query::PreviewGroup};
+    use crate::{ctx::Ctx, mpd::commands::Song, shared::mpd_query::PreviewGroup};
 
     impl Song {
-        pub(crate) fn to_preview(&self, key_style: Style, group_style: Style) -> Vec<PreviewGroup> {
+        pub(crate) fn to_preview(
+            &self,
+            key_style: Style,
+            group_style: Style,
+            ctx: &Ctx,
+        ) -> Vec<PreviewGroup> {
             let separator = Span::from(": ");
             let start_of_line_spacer = Span::from(" ");
 
@@ -433,7 +438,31 @@ pub(crate) mod browser {
                 });
             }
 
-            vec![info_group, tags_group]
+            let mut result = vec![info_group, tags_group];
+
+            let stickers = ctx.song_stickers(&self.file);
+            if let Some(stickers) = stickers
+                && !stickers.is_empty()
+            {
+                let mut stickers_group =
+                    PreviewGroup::new(Some(" --- [Stickers]"), Some(group_style));
+
+                for (k, v) in stickers.iter().sorted_by_key(|(key, _)| *key) {
+                    stickers_group.push(
+                        Line::from(vec![
+                            start_of_line_spacer.clone(),
+                            Span::styled(k.clone(), key_style),
+                            separator.clone(),
+                            Span::from(v.to_owned()),
+                        ])
+                        .into(),
+                    );
+                }
+
+                result.push(stickers_group);
+            }
+
+            result
         }
     }
 }
@@ -499,25 +528,22 @@ impl Song {
         &self,
         formats: impl IntoIterator<Item = &'a Property<SongProperty>>,
         filter: &str,
+        ctx: &Ctx,
     ) -> bool {
         for format in formats {
             let match_found = match &format.kind {
                 PropertyKindOrText::Text(value) => {
                     Some(value.to_lowercase().contains(&filter.to_lowercase()))
                 }
-                PropertyKindOrText::Sticker(key) => self
-                    .stickers
-                    .as_ref()
-                    .and_then(|stickers| {
-                        stickers
-                            .get(key)
-                            .map(|value| value.to_lowercase().contains(&filter.to_lowercase()))
-                    })
+                PropertyKindOrText::Sticker(key) => ctx
+                    .song_stickers(&self.file)
+                    .and_then(|s| s.get(key))
+                    .map(|value| value.to_lowercase().contains(&filter.to_lowercase()))
                     .or_else(|| {
                         format
                             .default
                             .as_ref()
-                            .map(|f| self.matches(std::iter::once(f.as_ref()), filter))
+                            .map(|f| self.matches(std::iter::once(f.as_ref()), filter, ctx))
                     }),
                 PropertyKindOrText::Property(property) => {
                     self.format(property, "", TagResolutionStrategy::All).map_or_else(
@@ -525,16 +551,16 @@ impl Song {
                             format
                                 .default
                                 .as_ref()
-                                .map(|f| self.matches(std::iter::once(f.as_ref()), filter))
+                                .map(|f| self.matches(std::iter::once(f.as_ref()), filter, ctx))
                         },
                         |p| Some(p.to_lowercase().contains(&filter.to_lowercase())),
                     )
                 }
                 PropertyKindOrText::Group(_) => format
-                    .as_string(Some(self), "", TagResolutionStrategy::All)
+                    .as_string(Some(self), "", TagResolutionStrategy::All, ctx)
                     .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
                 PropertyKindOrText::Transform(Transform::Truncate { .. }) => format
-                    .as_string(Some(self), "", TagResolutionStrategy::All)
+                    .as_string(Some(self), "", TagResolutionStrategy::All, ctx)
                     .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
             };
             if match_found.is_some_and(|v| v) {
@@ -544,36 +570,37 @@ impl Song {
         return false;
     }
 
-    fn default_as_line_ellipsized<'song>(
+    fn default_as_line_ellipsized<'song, 'stickers: 'song>(
         &'song self,
         format: &Property<SongProperty>,
         max_len: usize,
         symbols: &SymbolsConfig,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
+        ctx: &'stickers Ctx,
     ) -> Option<Line<'song>> {
         format.default.as_ref().and_then(|f| {
-            self.as_line_ellipsized(f.as_ref(), max_len, symbols, tag_separator, strategy)
+            self.as_line_ellipsized(f.as_ref(), max_len, symbols, tag_separator, strategy, ctx)
         })
     }
 
-    pub fn as_line_ellipsized<'song>(
+    pub fn as_line_ellipsized<'song, 'stickers: 'song>(
         &'song self,
         format: &Property<SongProperty>,
         max_len: usize,
         symbols: &SymbolsConfig,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
+        ctx: &'stickers Ctx,
     ) -> Option<Line<'song>> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
             PropertyKindOrText::Text(value) => {
                 Some(Line::styled((*value).ellipsize(max_len, symbols).to_string(), style))
             }
-            PropertyKindOrText::Sticker(key) => self
-                .stickers
-                .as_ref()
-                .and_then(|stickers| stickers.get(key))
+            PropertyKindOrText::Sticker(key) => ctx
+                .song_stickers(&self.file)
+                .and_then(|s| s.get(key))
                 .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style))
                 .or_else(|| {
                     format.default.as_ref().and_then(|format| {
@@ -583,6 +610,7 @@ impl Song {
                             symbols,
                             tag_separator,
                             strategy,
+                            ctx,
                         )
                     })
                 }),
@@ -595,6 +623,7 @@ impl Song {
                             symbols,
                             tag_separator,
                             strategy,
+                            ctx,
                         )
                     },
                     |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
@@ -603,9 +632,14 @@ impl Song {
             PropertyKindOrText::Group(group) => {
                 let mut buf = Line::default().style(style);
                 for grformat in group {
-                    if let Some(res) =
-                        self.as_line_ellipsized(grformat, max_len, symbols, tag_separator, strategy)
-                    {
+                    if let Some(res) = self.as_line_ellipsized(
+                        grformat,
+                        max_len,
+                        symbols,
+                        tag_separator,
+                        strategy,
+                        ctx,
+                    ) {
                         for span in res.spans {
                             let span_style = span.style;
                             buf.push_span(span.style(res.style).patch_style(span_style));
@@ -618,6 +652,7 @@ impl Song {
                                 symbols,
                                 tag_separator,
                                 strategy,
+                                ctx,
                             )
                         });
                     }
@@ -625,7 +660,7 @@ impl Song {
                 return Some(buf);
             }
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
-                self.as_line_ellipsized(content, max_len, symbols, tag_separator, strategy)
+                self.as_line_ellipsized(content, max_len, symbols, tag_separator, strategy, ctx)
                     .map(|mut line| {
                         let mut buf = VecDeque::new();
                         let mut remaining_len = *length;
@@ -658,6 +693,7 @@ impl Song {
                                 symbols,
                                 tag_separator,
                                 strategy,
+                                ctx,
                             )
                         })
                     })
@@ -672,8 +708,9 @@ impl Property<SongProperty> {
         song: Option<&Song>,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
+        ctx: &Ctx,
     ) -> Option<String> {
-        self.default.as_ref().and_then(|p| p.as_string(song, tag_separator, strategy))
+        self.default.as_ref().and_then(|p| p.as_string(song, tag_separator, strategy, ctx))
     }
 
     pub fn as_string(
@@ -681,45 +718,42 @@ impl Property<SongProperty> {
         song: Option<&Song>,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
+        ctx: &Ctx,
     ) -> Option<String> {
         match &self.kind {
             PropertyKindOrText::Text(value) => Some((*value).to_string()),
-            PropertyKindOrText::Sticker(key) => {
-                if let Some(sticker) =
-                    song.map(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(key)))
-                {
-                    sticker.cloned()
-                } else {
-                    self.default(song, tag_separator, strategy)
-                }
-            }
+            PropertyKindOrText::Sticker(key) => song
+                .and_then(|s| ctx.song_stickers(&s.file))
+                .and_then(|s| s.get(key))
+                .cloned()
+                .or_else(|| self.default(song, tag_separator, strategy, ctx)),
             PropertyKindOrText::Property(property) => {
                 if let Some(song) = song {
                     song.format(property, tag_separator, strategy).map_or_else(
-                        || self.default(Some(song), tag_separator, strategy),
+                        || self.default(Some(song), tag_separator, strategy, ctx),
                         |v| Some(v.into_owned()),
                     )
                 } else {
-                    self.default(song, tag_separator, strategy)
+                    self.default(song, tag_separator, strategy, ctx)
                 }
             }
             PropertyKindOrText::Group(group) => {
                 let mut buf = String::new();
                 for format in group {
-                    if let Some(res) = format.as_string(song, tag_separator, strategy) {
+                    if let Some(res) = format.as_string(song, tag_separator, strategy, ctx) {
                         buf.push_str(&res);
                     } else {
                         return self
                             .default
                             .as_ref()
-                            .and_then(|d| d.as_string(song, tag_separator, strategy));
+                            .and_then(|d| d.as_string(song, tag_separator, strategy, ctx));
                     }
                 }
                 return Some(buf);
             }
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
                 content
-                    .as_string(song, tag_separator, strategy)
+                    .as_string(song, tag_separator, strategy, ctx)
                     .map(|mut result| {
                         if *from_start {
                             result.truncate_start(*length);
@@ -731,7 +765,7 @@ impl Property<SongProperty> {
                     .or_else(|| {
                         self.default
                             .as_ref()
-                            .and_then(|d| d.as_string(song, tag_separator, strategy))
+                            .and_then(|d| d.as_string(song, tag_separator, strategy, ctx))
                     })
             }
         }
@@ -739,7 +773,7 @@ impl Property<SongProperty> {
 }
 
 impl Property<PropertyKind> {
-    fn default_as_span<'song: 's, 's>(
+    fn default_as_span<'song: 's, 'stickers: 'song, 's>(
         &'s self,
         song: Option<&'song Song>,
         ctx: &'song Ctx,
@@ -749,7 +783,7 @@ impl Property<PropertyKind> {
         self.default.as_ref().and_then(|p| p.as_span(song, ctx, tag_separator, strategy))
     }
 
-    pub fn as_span<'song: 's, 's>(
+    pub fn as_span<'song: 's, 'stickers: 'song, 's>(
         &'s self,
         song: Option<&'song Song>,
         ctx: &'song Ctx,
@@ -762,7 +796,7 @@ impl Property<PropertyKind> {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),
             PropertyKindOrText::Sticker(key) => {
                 if let Some(sticker) =
-                    song.and_then(|s| s.stickers.as_ref().and_then(|stickers| stickers.get(key)))
+                    song.and_then(|s| ctx.song_stickers(&s.file)).and_then(|s| s.get(key))
                 {
                     Some(Either::Left(Span::styled(sticker, style)))
                 } else {
@@ -1266,6 +1300,7 @@ mod format_tests {
             #[case] length: usize,
             #[case] from_start: bool,
             #[case] expected: &str,
+            ctx: Ctx,
         ) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Transform(Transform::Truncate {
@@ -1277,7 +1312,7 @@ mod format_tests {
                 default: None,
             };
 
-            let result = format.as_string(None, "", TagResolutionStrategy::All);
+            let result = format.as_string(None, "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some(expected.to_string()));
         }
@@ -1332,6 +1367,7 @@ mod format_tests {
             #[case] length: usize,
             #[case] from_start: bool,
             #[case] expected: Either<&str, Vec<&str>>,
+            ctx: Ctx,
         ) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Transform(Transform::Truncate {
@@ -1350,6 +1386,7 @@ mod format_tests {
                 &SymbolsConfig::default(),
                 "",
                 TagResolutionStrategy::All,
+                &ctx,
             );
 
             assert_eq!(
@@ -1364,17 +1401,20 @@ mod format_tests {
     }
 
     mod correct_values {
-        use test_case::test_case;
-
         use super::*;
 
-        #[test_case(SongProperty::Title, "title")]
-        #[test_case(SongProperty::Artist, "artist")]
-        #[test_case(SongProperty::Album, "album")]
-        #[test_case(SongProperty::Track, "123")]
-        #[test_case(SongProperty::Duration, "2:03")]
-        #[test_case(SongProperty::Other("track".to_string()), "123")]
-        fn song_property_resolves_correctly(prop: SongProperty, expected: &str) {
+        #[rstest]
+        #[case(SongProperty::Title, "title")]
+        #[case(SongProperty::Artist, "artist")]
+        #[case(SongProperty::Album, "album")]
+        #[case(SongProperty::Track, "123")]
+        #[case(SongProperty::Duration, "2:03")]
+        #[case(SongProperty::Other("track".to_string()), "123")]
+        fn song_property_resolves_correctly(
+            #[case] prop: SongProperty,
+            #[case] expected: &str,
+            ctx: Ctx,
+        ) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(prop),
                 style: None,
@@ -1391,12 +1431,11 @@ mod format_tests {
                     ("track".to_string(), "123".into()),
                     ("artist".to_string(), "artist".into()),
                 ]),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some(expected.to_string()));
         }
@@ -1428,7 +1467,6 @@ mod format_tests {
                     ("title".to_string(), "title".into()),
                     ("track".to_string(), "123".into()),
                 ]),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             };
@@ -1488,7 +1526,6 @@ mod format_tests {
                     ("title".to_string(), "Current Song".into()),
                     ("artist".to_string(), "Artist".into()),
                 ]),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             };
@@ -1500,7 +1537,6 @@ mod format_tests {
                 file: "song1.mp3".to_owned(),
                 duration: Some(Duration::from_secs(123)),
                 metadata: HashMap::from([("title".to_string(), "Song 1".into())]),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             });
@@ -1509,7 +1545,6 @@ mod format_tests {
                 file: "song2.mp3".to_owned(),
                 duration: Some(Duration::from_secs(123)),
                 metadata: HashMap::from([("title".to_string(), "Song 2".into())]),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             });
@@ -1581,7 +1616,6 @@ mod format_tests {
                 file: "no_duration.mp3".to_owned(),
                 duration: None,
                 metadata: HashMap::from([("title".to_string(), "No Duration".into())]),
-                stickers: None,
                 last_modified: chrono::Utc::now(),
                 added: None,
             };
@@ -1714,8 +1748,8 @@ mod format_tests {
     mod property {
         use super::*;
 
-        #[test]
-        fn works() {
+        #[rstest]
+        fn works(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(SongProperty::Title),
                 style: None,
@@ -1730,13 +1764,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("title".to_owned()));
         }
 
-        #[test]
-        fn falls_back() {
+        #[rstest]
+        fn falls_back(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(SongProperty::Track),
                 style: None,
@@ -1758,13 +1792,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("fallback".to_owned()));
         }
 
-        #[test]
-        fn falls_back_to_none() {
+        #[rstest]
+        fn falls_back_to_none(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Property(SongProperty::Track),
                 style: None,
@@ -1779,7 +1813,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, None);
         }
@@ -1788,8 +1822,8 @@ mod format_tests {
     mod text {
         use super::*;
 
-        #[test]
-        fn works() {
+        #[rstest]
+        fn works(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Text("test".into()),
                 style: None,
@@ -1804,13 +1838,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("test".to_owned()));
         }
 
-        #[test]
-        fn fallback_is_ignored() {
+        #[rstest]
+        fn fallback_is_ignored(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Text("test".into()),
                 style: None,
@@ -1832,7 +1866,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("test".to_owned()));
         }
@@ -1841,8 +1875,8 @@ mod format_tests {
     mod group {
         use super::*;
 
-        #[test]
-        fn group_no_fallback() {
+        #[rstest]
+        fn group_no_fallback(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Group(vec![
                     Property {
@@ -1868,13 +1902,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, None);
         }
 
-        #[test]
-        fn group_fallback() {
+        #[rstest]
+        fn group_fallback(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Group(vec![
                     Property {
@@ -1907,13 +1941,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("fallback".to_owned()));
         }
 
-        #[test]
-        fn group_resolved() {
+        #[rstest]
+        fn group_resolved(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Group(vec![
                     Property {
@@ -1946,13 +1980,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("titletext".to_owned()));
         }
 
-        #[test]
-        fn group_fallback_in_group() {
+        #[rstest]
+        fn group_fallback_in_group(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Group(vec![
                     Property {
@@ -1985,13 +2019,13 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("fallbacktext".to_owned()));
         }
 
-        #[test]
-        fn group_nesting() {
+        #[rstest]
+        fn group_nesting(ctx: Ctx) {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Group(vec![
                     Property {
@@ -2032,7 +2066,7 @@ mod format_tests {
                 ..Default::default()
             };
 
-            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All);
+            let result = format.as_string(Some(&song), "", TagResolutionStrategy::All, &ctx);
 
             assert_eq!(result, Some("innerfallbackouter".to_owned()));
         }
