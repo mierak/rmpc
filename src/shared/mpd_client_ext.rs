@@ -434,6 +434,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                     }
                     Err(error) => {
                         log::warn!(error:?, file = uri.as_str(); "Tried to find stickers but unexpected error occurred");
+                        result.insert(std::mem::take(uri), HashMap::new());
                         list_ended_with_err = true;
                         i += 1;
                         break;
@@ -448,6 +449,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             self.read_ok()?;
         }
 
+        log::debug!(count = result.len(); "Fetched stickers for songs");
         Ok(result)
     }
 
