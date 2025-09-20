@@ -17,12 +17,12 @@ use crate::{
     config::{
         keys::{
             GlobalAction,
-            actions::{AddKind, Position, RatingKind},
+            actions::{AddKind, Position, RateKind},
         },
         tabs::PaneType,
     },
     core::command::{create_env, run_external},
-    ctx::Ctx,
+    ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{
         commands::Song,
         mpd_client::{Filter, MpdClient, MpdCommand},
@@ -72,7 +72,7 @@ impl SearchPane {
             .separator_style(config.theme.borders_style)
             .current_item_style(config.theme.current_item_style)
             .highlight_item_style(config.theme.highlighted_item_style)
-            .rating_supported(ctx.stickers_supported)
+            .stickers_supported(ctx.stickers_supported)
             .strip_diacritics_supported(ctx.mpd_version >= Version::new(0, 25, 0))
             .build();
 
@@ -183,24 +183,61 @@ impl SearchPane {
         let stickers_supported = ctx.stickers_supported;
         let fold_case = self.inputs.fold_case();
         let strip_diacritics = self.inputs.strip_diacritics();
-        let Ok(rating_filter) = self.inputs.sticker_filter() else {
+        let Ok(rating_filter) = self.inputs.rating_filter() else {
             status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value());
             return;
         };
+        let liked_filter = self.inputs.liked_filter();
 
         let mut filter = filter.collect_vec();
 
-        if filter.is_empty() && stickers_supported && rating_filter.is_some() {
+        if filter.is_empty()
+            && stickers_supported
+            && (rating_filter.is_some() || liked_filter.is_some())
+        {
             // Filters are empty, but rating filters are set - show all songs with the
             // wanted rating
             ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
                 move |client| {
                     // empty URI returns all songs with the sticker
-                    let ratings = client.find_stickers("", "rating", rating_filter)?;
+                    let uris = match (rating_filter, liked_filter) {
+                        (Some(rf), Some(lf)) => {
+                            let mut ratings: HashSet<_> = client
+                                .find_stickers("", RATING_STICKER, Some(rf))?
+                                .0
+                                .into_iter()
+                                .map(|s| s.file)
+                                .collect();
+                            let liked: HashSet<_> = client
+                                .find_stickers("", LIKE_STICKER, Some(lf))?
+                                .0
+                                .into_iter()
+                                .map(|s| s.file)
+                                .collect();
+
+                            // Do an intersection of both sets
+                            ratings.retain(|uri| liked.contains(uri));
+
+                            ratings
+                        }
+                        (Some(rf), None) => client
+                            .find_stickers("", RATING_STICKER, Some(rf))?
+                            .0
+                            .into_iter()
+                            .map(|s| s.file)
+                            .collect(),
+                        (None, Some(lf)) => client
+                            .find_stickers("", LIKE_STICKER, Some(lf))?
+                            .0
+                            .into_iter()
+                            .map(|s| s.file)
+                            .collect(),
+                        (None, None) => HashSet::new(),
+                    };
 
                     client.send_start_cmd_list()?;
-                    for sticker in ratings {
-                        client.send_lsinfo(Some(&sticker.file))?;
+                    for uri in uris {
+                        client.send_lsinfo(Some(&uri))?;
                     }
                     client.send_execute_cmd_list()?;
                     let data: Vec<Song> = client.read_response()?;
@@ -229,18 +266,25 @@ impl SearchPane {
                         client.find(&filter)
                     }?;
 
-                    if stickers_supported && rating_filter.is_some() {
+                    let data = if stickers_supported && rating_filter.is_some() {
                         // empty URI returns all songs with the sticker
-                        let ratings = client.find_stickers("", "rating", rating_filter)?;
+                        let ratings = client.find_stickers("", RATING_STICKER, rating_filter)?;
                         let ratings: HashSet<_> = ratings.into_iter().map(|r| r.file).collect();
-
-                        let data =
-                            data.into_iter().filter(|song| ratings.contains(&song.file)).collect();
-
-                        Ok(MpdQueryResult::SearchResult { data })
+                        data.into_iter().filter(|song| ratings.contains(&song.file)).collect()
                     } else {
-                        Ok(MpdQueryResult::SearchResult { data })
-                    }
+                        data
+                    };
+
+                    let data = if stickers_supported && liked_filter.is_some() {
+                        // empty URI returns all songs with the sticker
+                        let liked = client.find_stickers("", LIKE_STICKER, liked_filter)?;
+                        let liked: HashSet<_> = liked.into_iter().map(|r| r.file).collect();
+                        data.into_iter().filter(|song| liked.contains(&song.file)).collect()
+                    } else {
+                        data
+                    };
+
+                    Ok(MpdQueryResult::SearchResult { data })
                 },
             );
         }
@@ -562,19 +606,19 @@ impl SearchPane {
                     self.open_result_phase_context_menu(ctx)?;
                 }
                 CommonAction::Rate {
-                    kind: RatingKind::Value(value),
+                    kind: RateKind::Value(value),
                     current: false,
                     min_rating: _,
                     max_rating: _,
                 } => {
                     let items = self.enqueue(false).1;
                     ctx.command(move |client| {
-                        client.set_sticker_multiple("rating", value.to_string(), items)?;
+                        client.set_sticker_multiple(RATING_STICKER, value.to_string(), items)?;
                         Ok(())
                     });
                 }
                 CommonAction::Rate {
-                    kind: RatingKind::Modal { values, custom },
+                    kind: RateKind::Modal { values, custom, like },
                     current: false,
                     min_rating,
                     max_rating,
@@ -588,9 +632,31 @@ impl SearchPane {
                             min_rating,
                             max_rating,
                             custom,
+                            like,
                             ctx
                         )
                     );
+                }
+                CommonAction::Rate { kind: RateKind::Like(), current: false, .. } => {
+                    let items = self.enqueue(false).1;
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), items)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Rate { kind: RateKind::Neutral(), current: false, .. } => {
+                    let items = self.enqueue(false).1;
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), items)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Rate { kind: RateKind::Dislike(), current: false, .. } => {
+                    let items = self.enqueue(false).1;
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), items)?;
+                        Ok(())
+                    });
                 }
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();

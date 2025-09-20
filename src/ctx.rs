@@ -39,6 +39,8 @@ use crate::{
 };
 
 pub const FETCH_SONG_STICKERS: &str = "fetch_song_stickers";
+pub const LIKE_STICKER: &str = "like";
+pub const RATING_STICKER: &str = "rating";
 
 #[derive(derive_more::Debug)]
 pub struct Ctx {

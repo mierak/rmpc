@@ -13,9 +13,9 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, Position, RatingKind},
+        actions::{AddKind, Position, RateKind},
     },
-    ctx::Ctx,
+    ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
@@ -462,19 +462,19 @@ where
                 self.open_context_menu(ctx)?;
             }
             CommonAction::Rate {
-                kind: RatingKind::Value(value),
+                kind: RateKind::Value(value),
                 current: false,
                 min_rating: _,
                 max_rating: _,
             } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
                 ctx.command(move |client| {
-                    client.set_sticker_multiple("rating", value.to_string(), items)?;
+                    client.set_sticker_multiple(RATING_STICKER, value.to_string(), items)?;
                     Ok(())
                 });
             }
             CommonAction::Rate {
-                kind: RatingKind::Modal { values, custom },
+                kind: RateKind::Modal { values, custom, like },
                 current: false,
                 min_rating,
                 max_rating,
@@ -488,9 +488,31 @@ where
                         min_rating,
                         max_rating,
                         custom,
+                        like,
                         ctx
                     )
                 );
+            }
+            CommonAction::Rate { kind: RateKind::Like(), current: false, .. } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), items)?;
+                    Ok(())
+                });
+            }
+            CommonAction::Rate { kind: RateKind::Neutral(), current: false, .. } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), items)?;
+                    Ok(())
+                });
+            }
+            CommonAction::Rate { kind: RateKind::Dislike(), current: false, .. } => {
+                let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), items)?;
+                    Ok(())
+                });
             }
             CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                 event.abandon();

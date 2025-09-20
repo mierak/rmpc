@@ -500,19 +500,24 @@ impl AddOpts {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
-pub enum RatingKind {
+pub enum RateKind {
     Modal {
         #[serde(default = "crate::config::defaults::rating_options")]
         values: Vec<i32>,
         #[serde(default = "crate::config::defaults::bool::<true>")]
         custom: bool,
+        #[serde(default = "crate::config::defaults::bool::<true>")]
+        like: bool,
     },
     Value(i32),
+    Like(),
+    Dislike(),
+    Neutral(),
 }
 
-impl Default for RatingKind {
+impl Default for RateKind {
     fn default() -> Self {
-        RatingKind::Modal { values: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true }
+        RateKind::Modal { values: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true, like: true }
     }
 }
 
@@ -560,7 +565,7 @@ pub enum CommonActionFile {
     ContextMenu {},
     Rate {
         #[serde(default)]
-        kind: RatingKind,
+        kind: RateKind,
         #[serde(default)]
         current: bool,
         #[serde(default = "crate::config::defaults::i32::<0>")]
@@ -606,7 +611,7 @@ pub enum CommonAction {
     ShowInfo,
     ContextMenu,
     Rate {
-        kind: RatingKind,
+        kind: RateKind,
         current: bool,
         min_rating: i32,
         max_rating: i32,
@@ -679,10 +684,37 @@ impl ToDescription for CommonAction {
                             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
-            CommonAction::Rate { kind: RatingKind::Value(val), current: false, ..  } => format!("Set song rating to {val}").into(),
-            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: false, .. } => "Open a modal popup with song rating options".into(),
-            CommonAction::Rate { kind: RatingKind::Value(val), current: true, .. } => format!("Set currently plyaing song's rating to {val}").into(),
-            CommonAction::Rate { kind: RatingKind::Modal { .. }, current: true, .. } => "Open a modal popup with song rating options for the currently playing song".into(),
+            CommonAction::Rate { kind: RateKind::Modal { .. }, current, .. } => {
+                let mut buf = String::from("Open a modal popup with song rating options");
+                if *current {
+                    buf.push_str(" for the currently playing song");
+                }
+                buf.into()
+            },
+            CommonAction::Rate { kind: RateKind::Value(val), current, ..  } => {
+                if *current {
+                    format!("Set currently playing song's rating to {val}")
+                } else {
+                    format!("Set song rating to {val}")
+                }.into()
+            }
+            CommonAction::Rate { kind: k @ RateKind::Like() | k @ RateKind::Dislike() | k @ RateKind::Neutral(), current , .. } => {
+                let mut buf = String::from("Set the ");
+                if *current {
+                    buf.push_str("currently playing song's");
+                } else {
+                    buf.push_str("song's under the cursor");
+                }
+                buf.push_str(" like state to ");
+                match k {
+                    RateKind::Like() => buf.push_str("like"),
+                    RateKind::Dislike() => buf.push_str("dislike"),
+                    RateKind::Neutral() => buf.push_str("neutral"),
+                    _ => {}
+                }
+
+                buf.into()
+            },
         }
     }
 }
@@ -765,10 +797,10 @@ impl TryFrom<CommonActionFile> for CommonAction {
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
             CommonActionFile::Rate { kind, current, min_rating, max_rating } => {
                 match &kind {
-                    RatingKind::Modal { values, custom } => {
-                        if values.is_empty() && !custom {
+                    RateKind::Modal { values, custom, like } => {
+                        if values.is_empty() && !custom && !like {
                             bail!(
-                                "At least one of 'values' or 'custom' must be set for rating modal"
+                                "At least one of 'values', 'custom' or 'like' must be set for rating modal"
                             );
                         }
 
@@ -785,11 +817,12 @@ impl TryFrom<CommonActionFile> for CommonAction {
                             }
                         }
                     }
-                    RatingKind::Value(v) => {
+                    RateKind::Value(v) => {
                         if *v < min_rating || *v > max_rating {
                             bail!("Rating must be between {min_rating} and {max_rating}");
                         }
                     }
+                    _ => {}
                 }
                 CommonAction::Rate { kind, current, min_rating, max_rating }
             }

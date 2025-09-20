@@ -27,7 +27,7 @@ use crate::{
     config::{
         Config,
         cli::Args,
-        keys::{CommonAction, GlobalAction, actions::RatingKind},
+        keys::{CommonAction, GlobalAction, actions::RateKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -35,7 +35,7 @@ use crate::{
         command::{create_env, run_external},
         config_watcher::ERROR_CONFIG_MODAL_ID,
     },
-    ctx::{Ctx, FETCH_SONG_STICKERS},
+    ctx::{Ctx, FETCH_SONG_STICKERS, LIKE_STICKER, RATING_STICKER},
     mpd::{
         commands::{State, idle::IdleEvent},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
@@ -542,7 +542,7 @@ impl<'ui> Ui<'ui> {
                 CommonAction::Rate { kind, current: true, min_rating, max_rating } => {
                     if let Some((_, song)) = ctx.find_current_song_in_queue() {
                         match kind {
-                            RatingKind::Modal { values, custom } => {
+                            RateKind::Modal { values, custom, like } => {
                                 let items = vec![Enqueue::File { path: song.file.clone() }];
                                 modal!(
                                     ctx,
@@ -552,15 +552,37 @@ impl<'ui> Ui<'ui> {
                                         *min_rating,
                                         *max_rating,
                                         *custom,
+                                        *like,
                                         ctx
                                     )
                                 );
                             }
-                            RatingKind::Value(value) => {
+                            RateKind::Value(value) => {
                                 let uri = song.file.clone();
                                 let value = value.to_string();
                                 ctx.command(move |client| {
-                                    client.set_sticker(&uri, "rating", &value)?;
+                                    client.set_sticker(&uri, RATING_STICKER, &value)?;
+                                    Ok(())
+                                });
+                            }
+                            RateKind::Like() => {
+                                let uri = song.file.clone();
+                                ctx.command(move |client| {
+                                    client.set_sticker(&uri, LIKE_STICKER, "2")?;
+                                    Ok(())
+                                });
+                            }
+                            RateKind::Dislike() => {
+                                let uri = song.file.clone();
+                                ctx.command(move |client| {
+                                    client.set_sticker(&uri, LIKE_STICKER, "0")?;
+                                    Ok(())
+                                });
+                            }
+                            RateKind::Neutral() => {
+                                let uri = song.file.clone();
+                                ctx.command(move |client| {
+                                    client.set_sticker(&uri, LIKE_STICKER, "1")?;
                                     Ok(())
                                 });
                             }

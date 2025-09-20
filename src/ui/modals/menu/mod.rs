@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::{
     config::keys::actions::AddOpts,
-    ctx::Ctx,
+    ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     shared::{
         key_event::KeyEvent,
         macros::status_error,
@@ -174,10 +174,12 @@ pub fn create_rating_modal<'a>(
     min_rating: i32,
     max_rating: i32,
     custom: bool,
+    like: bool,
     ctx: &Ctx,
 ) -> MenuModal<'a> {
     let clone = items.clone();
     let clone2 = items.clone();
+    let clone3 = items.clone();
 
     MenuModal::new(ctx)
         .input_section(ctx, "Rating", move |section| {
@@ -203,7 +205,7 @@ pub fn create_rating_modal<'a>(
 
                 if !value.trim().is_empty() {
                     ctx.command(move |client| {
-                        client.set_sticker_multiple("rating", value, clone2)?;
+                        client.set_sticker_multiple(RATING_STICKER, value, clone2)?;
                         Ok(())
                     });
                 }
@@ -222,7 +224,7 @@ pub fn create_rating_modal<'a>(
 
             section.action(move |ctx, value| {
                 ctx.command(move |client| {
-                    client.set_sticker_multiple("rating", value, clone)?;
+                    client.set_sticker_multiple(RATING_STICKER, value, clone)?;
                     Ok(())
                 });
                 Ok(())
@@ -231,14 +233,57 @@ pub fn create_rating_modal<'a>(
             Some(section)
         })
         .list_section(ctx, |section| {
-            let section = section.item("Clear rating", |ctx| {
+            if !like {
+                return None;
+            }
+            let clone = items.clone();
+            let section = section.item("Like", |ctx| {
                 ctx.command(move |client| {
-                    client.delete_sticker_multiple("rating", items)?;
+                    client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), clone)?;
                     Ok(())
                 });
                 Ok(())
             });
-            let section = section.item("Cancel", |_ctx| Ok(()));
+            let clone = items.clone();
+            let section = section.item("Neutral", |ctx| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+            let clone = items.clone();
+            let section = section.item("Dislike", |ctx| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+            Some(section)
+        })
+        .list_section(ctx, |mut section| {
+            if custom || !values.is_empty() {
+                section.add_item("Clear rating", |ctx| {
+                    ctx.command(move |client| {
+                        client.delete_sticker_multiple(RATING_STICKER, clone3)?;
+                        Ok(())
+                    });
+                    Ok(())
+                });
+            }
+            if like {
+                section.add_item("Clear like state", |ctx| {
+                    ctx.command(move |client| {
+                        client.delete_sticker_multiple(LIKE_STICKER, items)?;
+                        Ok(())
+                    });
+                    Ok(())
+                });
+            }
+
+            section.add_item("Cancel", |_ctx| Ok(()));
+
             Some(section)
         })
         .build()

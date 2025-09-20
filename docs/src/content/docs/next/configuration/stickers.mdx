@@ -21,4 +21,5 @@ You can display these stickers using the `Sticker("<name>")` property.
 | Name      | Description                                                                                                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | rating    | Used to store ratings. Has to be a valid positive integer in the 0-10 range. Numbers outside this range are permitted too if configured to do so but might not work in other MPD clients/rmpc functionality. |
+| like      | Used to store like status. Possible values are `0`, `1` and `2` meaning "disliked", "neutral" and "liked" respectively                                                                                       |
 | playCount | How many times a song was played. Requires <a href={path("guides/on_song_change/#track-song-play-count")}>configuration</a>.                                                                                 |

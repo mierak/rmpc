@@ -19,6 +19,7 @@ pub const STRIP_DIACRITICS_KEY: &str = "strip_diacritics";
 pub const RATING_MODE_KEY: &str = "rating";
 pub const RATING_VALUE_KEY: &str = "rating_value";
 pub const RESET_BUTTON_KEY: &str = "reset";
+pub const LIKE_KEY: &str = "like";
 
 #[derive(derive_more::Debug)]
 #[allow(clippy::struct_excessive_bools)]
@@ -41,6 +42,7 @@ pub(super) struct InputGroups {
     strip_diacritics: bool,
     search_mode: SearchMode,
     rating_mode: RatingMode,
+    liked_mode: LikedMode,
 }
 
 #[bon]
@@ -50,7 +52,7 @@ impl InputGroups {
         search_config: &Search,
         initial_fold_case: bool,
         initial_strip_diacritics: bool,
-        rating_supported: bool,
+        stickers_supported: bool,
         strip_diacritics_supported: bool,
         text_style: Style,
         separator_style: Style,
@@ -68,7 +70,7 @@ impl InputGroups {
             }));
         }
 
-        if rating_supported {
+        if stickers_supported {
             inputs.push(InputType::Separator);
             inputs.push(InputType::Spinner(SpinnerInput {
                 key: RATING_MODE_KEY,
@@ -80,6 +82,12 @@ impl InputGroups {
                 label: format!(" {:<18}:", "Value"),
                 value: "0".to_owned(),
                 initial_value: Some("0".to_owned()),
+            }));
+
+            inputs.push(InputType::Separator);
+            inputs.push(InputType::Spinner(SpinnerInput {
+                key: LIKE_KEY,
+                label: format!(" {:<18}:", "Liked"),
             }));
         }
 
@@ -126,6 +134,7 @@ impl InputGroups {
             strip_diacritics: initial_strip_diacritics,
             search_mode: search_config.mode.into(),
             rating_mode: RatingMode::default(),
+            liked_mode: LikedMode::default(),
         }
     }
 
@@ -137,7 +146,7 @@ impl InputGroups {
         self.textbox_value(RATING_VALUE_KEY).unwrap_or_default()
     }
 
-    pub fn sticker_filter(&self) -> Result<Option<StickerFilter>, std::num::ParseIntError> {
+    pub fn rating_filter(&self) -> Result<Option<StickerFilter>, std::num::ParseIntError> {
         let value = self.rating_value().trim().parse()?;
         Ok(match self.rating_mode {
             RatingMode::Equals => Some(StickerFilter::EqualsInt(value)),
@@ -145,6 +154,15 @@ impl InputGroups {
             RatingMode::LessThan => Some(StickerFilter::LessThanInt(value)),
             RatingMode::Any => None,
         })
+    }
+
+    pub fn liked_filter(&self) -> Option<StickerFilter> {
+        match self.liked_mode {
+            LikedMode::Any => None,
+            LikedMode::Liked => Some(StickerFilter::EqualsInt(2)),
+            LikedMode::Neutral => Some(StickerFilter::EqualsInt(1)),
+            LikedMode::Disliked => Some(StickerFilter::EqualsInt(0)),
+        }
     }
 
     pub fn fold_case(&self) -> bool {
@@ -197,6 +215,9 @@ impl InputGroups {
                     RATING_MODE_KEY => {
                         self.rating_mode.cycle();
                     }
+                    LIKE_KEY => {
+                        self.liked_mode.cycle();
+                    }
                     _ => {}
                 }
 
@@ -233,6 +254,9 @@ impl InputGroups {
                     }
                     RATING_MODE_KEY => {
                         self.rating_mode = RatingMode::default();
+                    }
+                    LIKE_KEY => {
+                        self.liked_mode = LikedMode::default();
                     }
                     _ => {}
                 },
@@ -358,6 +382,19 @@ pub(super) enum SearchMode {
 }
 
 #[derive(Debug, Default, Clone, Copy, IntoStaticStr, VariantNames, FromRepr)]
+pub(super) enum LikedMode {
+    #[default]
+    #[strum(serialize = "Any")]
+    Any,
+    #[strum(serialize = "Liked")]
+    Liked,
+    #[strum(serialize = "Neutral")]
+    Neutral,
+    #[strum(serialize = "Disliked")]
+    Disliked,
+}
+
+#[derive(Debug, Default, Clone, Copy, IntoStaticStr, VariantNames, FromRepr)]
 pub(super) enum RatingMode {
     #[default]
     #[strum(serialize = "Any")]
@@ -405,6 +442,15 @@ impl RatingMode {
     fn cycle(&mut self) {
         let i = *self as usize;
         if let Some(new) = RatingMode::from_repr((i + 1) % RatingMode::VARIANTS.len()) {
+            *self = new;
+        }
+    }
+}
+
+impl LikedMode {
+    fn cycle(&mut self) {
+        let i = *self as usize;
+        if let Some(new) = LikedMode::from_repr((i + 1) % LikedMode::VARIANTS.len()) {
             *self = new;
         }
     }
@@ -501,6 +547,7 @@ impl Widget for &mut InputGroups {
                             }
                             SEARCH_MODE_KEY => self.search_mode.into(),
                             RATING_MODE_KEY => self.rating_mode.into(),
+                            LIKE_KEY => self.liked_mode.into(),
                             _ => "",
                         });
 
