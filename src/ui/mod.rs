@@ -27,7 +27,7 @@ use crate::{
     config::{
         Config,
         cli::Args,
-        keys::GlobalAction,
+        keys::{CommonAction, GlobalAction, actions::RatingKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -49,8 +49,9 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
-        mpd_client_ext::MpdClientExt,
+        mpd_client_ext::{Enqueue, MpdClientExt},
     },
+    ui::modals::menu::create_rating_modal,
 };
 
 pub mod browser;
@@ -531,6 +532,37 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::AddRandom => {
                     modal!(ctx, AddRandomModal::new(ctx));
                 }
+            }
+        } else if let Some(action) = key.as_common_action(ctx) {
+            #[allow(
+                clippy::collapsible_match,
+                reason = "Future expansion, remove when adding other actions"
+            )]
+            match action {
+                CommonAction::Rating { kind, current: true } => {
+                    if let Some((_, song)) = ctx.find_current_song_in_queue() {
+                        match kind {
+                            RatingKind::Modal { values, custom } => {
+                                let items = vec![Enqueue::File { path: song.file.clone() }];
+                                modal!(
+                                    ctx,
+                                    create_rating_modal(items, values.as_slice(), *custom, ctx)
+                                );
+                            }
+                            RatingKind::Value(value) => {
+                                let uri = song.file.clone();
+                                let value = value.to_string();
+                                ctx.command(move |client| {
+                                    client.set_sticker(&uri, "rating", &value)?;
+                                    Ok(())
+                                });
+                            }
+                        }
+                    } else {
+                        status_error!("No song is currently playing");
+                    }
+                }
+                _ => {}
             }
         }
 

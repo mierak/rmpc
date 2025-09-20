@@ -555,6 +555,8 @@ pub enum CommonActionFile {
     Rating {
         #[serde(default)]
         kind: RatingKind,
+        #[serde(default)]
+        current: bool,
     },
 }
 
@@ -595,6 +597,7 @@ pub enum CommonAction {
     ContextMenu,
     Rating {
         kind: RatingKind,
+        current: bool,
     },
 }
 
@@ -664,8 +667,10 @@ impl ToDescription for CommonAction {
                             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
-            CommonAction::Rating { kind: RatingKind::Value(val)  } => format!("Set song rating to {val}").into(),
-            CommonAction::Rating { kind: RatingKind::Modal { .. } } => "Open a modal popup with song rating options".into(),
+            CommonAction::Rating { kind: RatingKind::Value(val), current: false  } => format!("Set song rating to {val}").into(),
+            CommonAction::Rating { kind: RatingKind::Modal { .. }, current: false } => "Open a modal popup with song rating options".into(),
+            CommonAction::Rating { kind: RatingKind::Value(val), current: true  } => format!("Set currently plyaing song's rating to {val}").into(),
+            CommonAction::Rating { kind: RatingKind::Modal { .. }, current: true } => "Open a modal popup with song rating options for the currently playing song".into(),
         }
     }
 }
@@ -744,7 +749,7 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
-            CommonActionFile::Rating { kind } => CommonAction::Rating { kind },
+            CommonActionFile::Rating { kind, current } => CommonAction::Rating { kind, current },
         }
     }
 }
