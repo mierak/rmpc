@@ -170,8 +170,16 @@ attempts to stop you.
 
 `Rate(kind: <kind>, current: <bool>, min_rating: <number>, max_rating: <number>)`
 
-Possible values for the action `<kind>` are either a `Modal` or `Value`. Where modal takes a list
-of values to show for rating selector and whether to show a text input for custom rating.
+Possible values for the action `<kind>` are either a `Modal`, `Value`, `Like()`, `Neutral()`
+or `Dislike()`.
+These mean:
+
+- Modal - display a menu modal with possible options, takes a list of values to show for rating
+  selector, whether to show a text input for custom rating and whether to show like options
+- Value - set rating value directly
+- Like - set liked state directly
+- Neutral - set neutral state directly
+- Dislike - set disliked state directly
 
 The rating is applied to the currently playing song if any when `current` is set to true.
 
@@ -193,11 +201,19 @@ Rate(kind: Value(3), current: false),
 Rate(kind: Value(3)),
 ```
 
-- Open a modal which shows options to set rating (0-10) of the currently playing song as well as
-  input a custom value or clear the rating completely.
+- Set liked state of the song(s) under the cursor in either queue or the browser panes directly
 
 ```rust showLineNumbers=false
-Rate(kind: Modal(values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true), current: false),
+Rate(kind: Like(), current: false),
+Rate(kind: Neutral(), current: false),
+Rate(kind: Dislike(), current: false),
+```
+
+- Open a modal which shows options to set rating (0-10) of the currently playing song as well as
+  input a custom value or clear the rating completely and options to like the song.
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true, like: true), current: false),
 // or equivalent
 Rate(kind: Modal(), current: false),
 ```
@@ -212,6 +228,12 @@ Rate(kind: Modal(values: [], custom: true), current: false),
 
 ```rust showLineNumbers=false
 Rate(kind: Modal(values: [], custom: true), current: false, max_rating: 100),
+```
+
+- Open a modal which shows only the like options
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: false, like: true), current: false),
 ```
 
 #### AddOptions

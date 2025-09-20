@@ -34,6 +34,8 @@ All notable changes to this project will be documented in this file.
 - Stickers are now usable in `browser_song_format`
 - Rating support, rating can be set on a song. The rating can be displayed in the queue table and
 browser panes as well as searched for in the Search pane
+- Liked state support, songs can now be liked, disliked or set to neutral and searched for in the
+Search pane
 
 ### Changed
 
