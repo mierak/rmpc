@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use anyhow::Result;
 use bon::Builder;
 use itertools::Itertools;
@@ -253,6 +255,12 @@ impl<T: Clone> PropertyKindOrText<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReplacementFile<T: Clone> {
+    pub input: String,
+    pub replacement: PropertyFile<T>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TransformFile<T: Clone> {
     Truncate {
         content: Box<PropertyFile<T>>,
@@ -260,11 +268,16 @@ pub enum TransformFile<T: Clone> {
         #[serde(default = "defaults::bool::<false>")]
         from_start: bool,
     },
+    Replace {
+        content: Box<PropertyFile<T>>,
+        replacements: Vec<ReplacementFile<T>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Transform<T> {
     Truncate { content: Box<Property<T>>, length: usize, from_start: bool },
+    Replace { content: Box<Property<T>>, replacements: BTreeMap<String, Property<T>> },
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -494,6 +507,16 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
                     content: Box::new((*content).try_into()?),
                     length,
                     from_start,
+                }),
+                PropertyKindFileOrText::Transform(TransformFile::Replace {
+                    content,
+                    replacements,
+                }) => PropertyKindOrText::Transform(Transform::Replace {
+                    content: Box::new((*content).try_into()?),
+                    replacements: replacements
+                        .into_iter()
+                        .map(|r| -> Result<_> { Ok((r.input, r.replacement.try_into()?)) })
+                        .try_collect()?,
                 }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => {

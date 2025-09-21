@@ -242,6 +242,16 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
                     length,
                     from_start,
                 }),
+                PropertyKindFileOrText::Transform(TransformFile::Replace {
+                    content,
+                    replacements,
+                }) => PropertyKindOrText::Transform(Transform::Replace {
+                    content: Box::new((*content).try_into()?),
+                    replacements: replacements
+                        .into_iter()
+                        .map(|r| -> Result<_> { Ok((r.input, r.replacement.try_into()?)) })
+                        .try_collect()?,
+                }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.into()),
                 PropertyKindFileOrText::Group(group) => {

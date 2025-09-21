@@ -562,6 +562,9 @@ impl Song {
                 PropertyKindOrText::Transform(Transform::Truncate { .. }) => format
                     .as_string(Some(self), "", TagResolutionStrategy::All, ctx)
                     .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
+                PropertyKindOrText::Transform(Transform::Replace { .. }) => format
+                    .as_string(Some(self), "", TagResolutionStrategy::All, ctx)
+                    .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
             };
             if match_found.is_some_and(|v| v) {
                 return true;
@@ -659,6 +662,52 @@ impl Song {
                 }
                 return Some(buf);
             }
+            PropertyKindOrText::Transform(Transform::Replace { content, replacements }) => self
+                .as_line_ellipsized(content, max_len, symbols, tag_separator, strategy, ctx)
+                .and_then(|line| {
+                    let mut content = String::new();
+                    for span in &line.spans {
+                        content.push_str(span.content.as_ref());
+                    }
+
+                    if let Some(replacement) = replacements.get(&content) {
+                        return self
+                            .as_line_ellipsized(
+                                replacement,
+                                max_len,
+                                symbols,
+                                tag_separator,
+                                strategy,
+                                ctx,
+                            )
+                            .or_else(|| {
+                                replacement.default.as_ref().and_then(|format| {
+                                    self.as_line_ellipsized(
+                                        format,
+                                        max_len,
+                                        symbols,
+                                        tag_separator,
+                                        strategy,
+                                        ctx,
+                                    )
+                                })
+                            });
+                    }
+
+                    Some(line)
+                })
+                .or_else(|| {
+                    format.default.as_ref().and_then(|format| {
+                        self.as_line_ellipsized(
+                            format,
+                            max_len,
+                            symbols,
+                            tag_separator,
+                            strategy,
+                            ctx,
+                        )
+                    })
+                }),
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
                 self.as_line_ellipsized(content, max_len, symbols, tag_separator, strategy, ctx)
                     .map(|mut line| {
@@ -751,6 +800,27 @@ impl Property<SongProperty> {
                 }
                 return Some(buf);
             }
+            PropertyKindOrText::Transform(Transform::Replace { content, replacements }) => content
+                .as_string(song, tag_separator, strategy, ctx)
+                .and_then(|result| {
+                    if let Some(replacement) = replacements.get(&result) {
+                        return replacement.as_string(song, tag_separator, strategy, ctx).or_else(
+                            || {
+                                replacement
+                                    .default
+                                    .as_ref()
+                                    .and_then(|d| d.as_string(song, tag_separator, strategy, ctx))
+                            },
+                        );
+                    }
+
+                    Some(result)
+                })
+                .or_else(|| {
+                    self.default
+                        .as_ref()
+                        .and_then(|d| d.as_string(song, tag_separator, strategy, ctx))
+                }),
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
                 content
                     .as_string(song, tag_separator, strategy, ctx)
@@ -992,6 +1062,38 @@ impl Property<PropertyKind> {
                 }
                 return Some(Either::Right(buf));
             }
+            PropertyKindOrText::Transform(Transform::Replace { content, replacements }) => {
+                match content.as_span(song, ctx, tag_separator, strategy) {
+                    Some(Either::Left(span)) => {
+                        if let Some(replacement) = replacements.get(span.content.as_ref()) {
+                            return replacement
+                                .as_span(song, ctx, tag_separator, strategy)
+                                .or_else(|| {
+                                    replacement.default_as_span(song, ctx, tag_separator, strategy)
+                                });
+                        }
+
+                        Some(Either::Left(span))
+                    }
+                    Some(Either::Right(spans)) => {
+                        let mut content = String::new();
+                        for span in &spans {
+                            content.push_str(span.content.as_ref());
+                        }
+
+                        if let Some(replacement) = replacements.get(&content) {
+                            return replacement
+                                .as_span(song, ctx, tag_separator, strategy)
+                                .or_else(|| {
+                                    replacement.default_as_span(song, ctx, tag_separator, strategy)
+                                });
+                        }
+
+                        Some(Either::Right(spans))
+                    }
+                    None => self.default_as_span(song, ctx, tag_separator, strategy),
+                }
+            }
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
                 let truncate_fn =
                     if *from_start { Span::truncate_start } else { Span::truncate_end };
@@ -1166,6 +1268,232 @@ mod format_tests {
         mpd::commands::{Song, State, Status, Volume, status::OnOffOneshot},
         tests::fixtures::ctx,
     };
+
+    mod replace {
+        use super::*;
+        use crate::config::theme::{SymbolsConfig, properties::Transform};
+
+        #[rstest]
+        // simple 1:1 replace
+        #[case(PropertyKindOrText::Text("abcdefgh".into()),
+            None,
+            "abcdefgh",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "replaced text")]
+        // No replace input found
+        #[case(PropertyKindOrText::Text("a".into()),
+            None,
+            "abcdefgh",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "a")]
+        // Replace of group
+        #[case(PropertyKindOrText::Group(vec![Property { kind: PropertyKindOrText::Text("a".into()), style: None, default: None }, Property { kind: PropertyKindOrText::Text("b".into()), style: None, default: None }]),
+            None,
+            "ab",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "replaced text")]
+        // No replace of input found, fallback to original default
+        #[case(PropertyKindOrText::Sticker("does not exist".into()),
+            Some(PropertyKindOrText::Text("original default".into())),
+            "does not match",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "original default")]
+        // Replace found, but resolved to None - use replacement's default
+        #[case(PropertyKindOrText::Text("a".into()),
+            Some(PropertyKindOrText::Text("original default".into())),
+            "a",
+            PropertyKindOrText::Sticker("does not exist".into()),
+            Some(PropertyKindOrText::Text("replacement default".into())),
+            "replacement default")]
+        fn as_span(
+            #[case] input_props: PropertyKindOrText<PropertyKind>,
+            #[case] input_default: Option<PropertyKindOrText<PropertyKind>>,
+            #[case] input: String,
+            #[case] replace_props: PropertyKindOrText<PropertyKind>,
+            #[case] replace_default: Option<PropertyKindOrText<PropertyKind>>,
+            #[case] expected: String,
+            ctx: Ctx,
+        ) {
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Transform(Transform::Replace {
+                    content: Box::new(Property { kind: input_props, style: None, default: None }),
+                    replacements: [(input, Property {
+                        kind: replace_props,
+                        style: None,
+                        default: replace_default
+                            .map(|d| Box::new(Property { kind: d, style: None, default: None })),
+                    })]
+                    .into_iter()
+                    .collect(),
+                }),
+                style: None,
+                default: input_default
+                    .map(|d| Box::new(Property { kind: d, style: None, default: None })),
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                match result {
+                    Some(Either::Left(v)) => Some(v.content.into_owned()),
+                    Some(Either::Right(v)) =>
+                        Some(v.iter().map(|s| s.content.clone()).collect::<String>()),
+                    None => None,
+                },
+                Some(expected)
+            );
+        }
+
+        #[rstest]
+        // simple 1:1 replace
+        #[case(PropertyKindOrText::Text("abcdefgh".into()),
+            None,
+            "abcdefgh",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "replaced text")]
+        // No replace input found
+        #[case(PropertyKindOrText::Text("a".into()),
+            None,
+            "abcdefgh",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "a")]
+        // Replace of group
+        #[case(PropertyKindOrText::Group(vec![Property { kind: PropertyKindOrText::Text("a".into()), style: None, default: None }, Property { kind: PropertyKindOrText::Text("b".into()), style: None, default: None }]),
+            None,
+            "ab",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "replaced text")]
+        // No replace of input found, fallback to original default
+        #[case(PropertyKindOrText::Sticker("does not exist".into()),
+            Some(PropertyKindOrText::Text("original default".into())),
+            "does not match",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "original default")]
+        // Replace found, but resolved to None - use replacement's default
+        #[case(PropertyKindOrText::Text("a".into()),
+            Some(PropertyKindOrText::Text("original default".into())),
+            "a",
+            PropertyKindOrText::Sticker("does not exist".into()),
+            Some(PropertyKindOrText::Text("replacement default".into())),
+            "replacement default")]
+        fn as_string(
+            #[case] input_props: PropertyKindOrText<SongProperty>,
+            #[case] input_default: Option<PropertyKindOrText<SongProperty>>,
+            #[case] input: String,
+            #[case] replace_props: PropertyKindOrText<SongProperty>,
+            #[case] replace_default: Option<PropertyKindOrText<SongProperty>>,
+            #[case] expected: &str,
+            ctx: Ctx,
+        ) {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Transform(Transform::Replace {
+                    content: Box::new(Property { kind: input_props, style: None, default: None }),
+                    replacements: [(input, Property {
+                        kind: replace_props,
+                        style: None,
+                        default: replace_default
+                            .map(|d| Box::new(Property { kind: d, style: None, default: None })),
+                    })]
+                    .into_iter()
+                    .collect(),
+                }),
+                style: None,
+                default: input_default
+                    .map(|d| Box::new(Property { kind: d, style: None, default: None })),
+            };
+
+            let result = format.as_string(None, "", TagResolutionStrategy::All, &ctx);
+
+            assert_eq!(result, Some(expected.to_string()));
+        }
+
+        #[rstest]
+        #[rstest]
+        // simple 1:1 replace
+        #[case(PropertyKindOrText::Text("abcdefgh".into()),
+            None,
+            "abcdefgh",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "replaced text")]
+        // No replace input found
+        #[case(PropertyKindOrText::Text("a".into()),
+            None,
+            "abcdefgh",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "a")]
+        // Replace of group
+        #[case(PropertyKindOrText::Group(vec![Property { kind: PropertyKindOrText::Text("a".into()), style: None, default: None }, Property { kind: PropertyKindOrText::Text("b".into()), style: None, default: None }]),
+            None,
+            "ab",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "replaced text")]
+        // No replace of input found, fallback to original default
+        #[case(PropertyKindOrText::Sticker("does not exist".into()),
+            Some(PropertyKindOrText::Text("original default".into())),
+            "does not match",
+            PropertyKindOrText::Text("replaced text".into()),
+            None,
+            "original default")]
+        // Replace found, but resolved to None - use replacement's default
+        #[case(PropertyKindOrText::Text("a".into()),
+            Some(PropertyKindOrText::Text("original default".into())),
+            "a",
+            PropertyKindOrText::Sticker("does not exist".into()),
+            Some(PropertyKindOrText::Text("replacement default".into())),
+            "replacement default")]
+        fn as_line_ellipsized(
+            #[case] input_props: PropertyKindOrText<SongProperty>,
+            #[case] input_default: Option<PropertyKindOrText<SongProperty>>,
+            #[case] input: String,
+            #[case] replace_props: PropertyKindOrText<SongProperty>,
+            #[case] replace_default: Option<PropertyKindOrText<SongProperty>>,
+            #[case] expected: String,
+            ctx: Ctx,
+        ) {
+            let format = Property::<SongProperty> {
+                kind: PropertyKindOrText::Transform(Transform::Replace {
+                    content: Box::new(Property { kind: input_props, style: None, default: None }),
+                    replacements: [(input, Property {
+                        kind: replace_props,
+                        style: None,
+                        default: replace_default
+                            .map(|d| Box::new(Property { kind: d, style: None, default: None })),
+                    })]
+                    .into_iter()
+                    .collect(),
+                }),
+                style: None,
+                default: input_default
+                    .map(|d| Box::new(Property { kind: d, style: None, default: None })),
+            };
+
+            let song = Song::default();
+            let result = song.as_line_ellipsized(
+                &format,
+                999,
+                &SymbolsConfig::default(),
+                "",
+                TagResolutionStrategy::All,
+                &ctx,
+            );
+
+            assert_eq!(
+                result.map(|line| line.spans.iter().map(|s| s.content.clone()).collect::<String>()),
+                Some(expected)
+            );
+        }
+    }
 
     mod truncate {
         use itertools::Itertools;
