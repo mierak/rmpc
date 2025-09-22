@@ -15,7 +15,7 @@ Description, configuration and installation methods can be found on [the rmpc we
 - Album cover art display if your terminal supports either of Kitty, Sixel, Iterm2 protocols, or via ueberzuggpp
 - Cava integration for music visualisation
 - Support for [synchronized lyrics](https://en.wikipedia.org/wiki/LRC_(file_format))
-- Ability to play music from youtube
+- Ability to play music from YouTube
 - Configurable (T)UI
   - Configure what information(if any!) is displayed in the header
   - Configure what columns are displayed on the queue screen

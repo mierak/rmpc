@@ -256,8 +256,8 @@ impl<T: Clone> PropertyKindOrText<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReplacementFile<T: Clone> {
-    pub input: String,
-    pub replacement: PropertyFile<T>,
+    pub r#match: String,
+    pub replace: PropertyFile<T>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -515,7 +515,7 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
                     content: Box::new((*content).try_into()?),
                     replacements: replacements
                         .into_iter()
-                        .map(|r| -> Result<_> { Ok((r.input, r.replacement.try_into()?)) })
+                        .map(|r| -> Result<_> { Ok((r.r#match, r.replace.try_into()?)) })
                         .try_collect()?,
                 }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),

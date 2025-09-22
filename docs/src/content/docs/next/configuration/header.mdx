@@ -69,7 +69,7 @@ style the property directly.
 />
 
 Truncate the given property to a specified length. If `from_start` is true, the property is instead
-truncated from start.
+truncated from start. Ignores style definition, instead style the property directly.
 
 For example to truncate song's `date` in the `song_table_format` to the first 4 characters:
 
@@ -78,6 +78,37 @@ For example to truncate song's `date` in the `song_table_format` to the first 4 
     prop: (kind: Transform(Truncate(content: (kind: Property(Other("date"))), from_start: false, length: 4))),
     width: "20%",
     label: "Date"
+),
+```
+
+#### Replace
+
+<ConfigValue
+    name="kind"
+    type="other"
+    customText="Transform(Replace(content: <property>, replacements: <replacement[]>))"
+    link="#property"
+/>
+
+Replaces the content if any replacement matches. The `content` is first resolved to a string and is
+then matched against the replacements. The whole string must match from beginning to the end. The
+`Replace` transform has no effect if no match is found.
+
+`replacements` is an array of tuples: `(match: "<string>", replace: <property>)` where `replace` is
+rendered instead if `match` exactly matches the resolved property.
+
+For example, to replace the `like` sticker value with a colored heart depending on the status in the
+`song_table_format` (needs a nerd font):
+
+```rust
+(
+    prop: (kind: Transform(Replace(content: (kind: Sticker("like")), replacements: [
+        (match: "0", replace: (kind: Text(" "), style: (fg: "blue"))), // Replace "disliked" with a blue broken heart
+        (match: "1", replace: (kind: Text(" "), style: (fg: "white"))), // Replace "neutral" with a white heart outline
+        (match: "2", replace: (kind: Text(" "), style: (fg: "red"))), // Replace "liked" with a red heart
+    ]))),
+    width: "2",
+    alignment: Right,
 ),
 ```
 

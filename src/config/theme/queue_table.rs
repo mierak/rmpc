@@ -249,7 +249,7 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
                     content: Box::new((*content).try_into()?),
                     replacements: replacements
                         .into_iter()
-                        .map(|r| -> Result<_> { Ok((r.input, r.replacement.try_into()?)) })
+                        .map(|r| -> Result<_> { Ok((r.r#match, r.replace.try_into()?)) })
                         .try_collect()?,
                 }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
