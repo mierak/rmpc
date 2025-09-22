@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 browser panes as well as searched for in the Search pane
 - Liked state support, songs can now be liked, disliked or set to neutral and searched for in the
 Search pane
+- Added `Replace` transform
 
 ### Changed
 
