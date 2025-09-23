@@ -73,7 +73,7 @@ impl<'a> YtDlp<'a> {
     }
 
     fn search_single(kind: YtDlpHostKind, query: &str) -> anyhow::Result<String> {
-        Ok(Self::search_many(kind, query, 1)?[0].url.clone())
+        Ok(std::mem::take(&mut Self::search_many(kind, query, 1)?[0].url))
     }
 
     pub fn search_single_auto(query: &str, soundcloud: bool) -> anyhow::Result<String> {

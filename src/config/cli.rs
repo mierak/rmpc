@@ -228,7 +228,7 @@ pub enum Command {
         #[arg(short = 'i', long = "interactive")]
         interactive: bool,
         /// How many results to show with --list
-        #[arg(long = "limit", default_value_t = 5)]
+        #[arg(long = "limit", default_value_t = 5, requires("interactive"))]
         limit: usize,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and

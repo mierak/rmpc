@@ -331,11 +331,10 @@ impl<'ui> Ui<'ui> {
                                         limit,
                                         interactive,
                                         position,
-                                    )? {
-                                        if ctx.work_sender.send(WorkRequest::Command(cmd)).is_err()
-                                        {
-                                            log::error!("Failed to send command");
-                                        }
+                                    )? && let Err(e) =
+                                        ctx.work_sender.send(WorkRequest::Command(cmd))
+                                    {
+                                        log::error!("Failed to send command: {e}");
                                     }
                                     Ok(())
                                 }
@@ -581,12 +580,11 @@ impl<'ui> Ui<'ui> {
         let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
 
         if interactive {
-            let items = YtDlp::search_many(kind, query.trim(), limit)?;
+            let mut items = YtDlp::search_many(kind, query.trim(), limit)?;
             let labels: Vec<String> = items
                 .iter()
                 .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
                 .collect();
-            let items_cloned = items.clone();
 
             modal!(
                 ctx,
@@ -596,7 +594,7 @@ impl<'ui> Ui<'ui> {
                     .confirm_label("Select")
                     .options(labels)
                     .on_confirm(move |ctx, _label, idx| {
-                        let url = items_cloned[idx].url.clone();
+                        let url = std::mem::take(&mut items[idx].url);
                         if ctx
                             .work_sender
                             .send(WorkRequest::Command(Command::AddYt { url, position }))
