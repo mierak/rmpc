@@ -28,8 +28,6 @@ use crate::{
     config::{
         Config,
         cli::{Args, Command},
-        keys::GlobalAction,
-        cli::Args,
         keys::{CommonAction, GlobalAction, actions::RateKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
@@ -53,9 +51,8 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
-        mpd_client_ext::MpdClientExt,
-        ytdlp::{YtDlp, YtDlpHostKind},
         mpd_client_ext::{Enqueue, MpdClientExt},
+        ytdlp::{YtDlp, YtDlpHostKind},
     },
     ui::modals::menu::create_rating_modal,
 };
