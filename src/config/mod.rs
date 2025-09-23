@@ -410,7 +410,7 @@ impl ConfigFile {
             mpd_idle_read_timeout_ms: self.mpd_idle_read_timeout_ms.map(Duration::from_millis),
             enable_mouse: self.enable_mouse,
             enable_config_hot_reload: self.enable_config_hot_reload,
-            keybinds: self.keybinds.into(),
+            keybinds: self.keybinds.try_into()?,
             select_current_song_on_change: self.select_current_song_on_change,
             center_current_song_on_change: self.center_current_song_on_change,
             search: self.search.try_into()?,

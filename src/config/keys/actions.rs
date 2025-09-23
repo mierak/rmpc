@@ -1,5 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
+use anyhow::bail;
 use itertools::Itertools;
 use strum::{Display, EnumDiscriminants, VariantArray};
 
@@ -12,7 +13,7 @@ use crate::{
 
 // Global actions
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum GlobalAction {
     Quit,
@@ -57,9 +58,7 @@ pub enum GlobalAction {
     },
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum GlobalActionFile {
     Quit,
     ShowHelp,
@@ -209,10 +208,10 @@ impl ToDescription for GlobalAction {
 
 // Albums actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum AlbumsActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum AlbumsActions {}
 
 impl From<AlbumsActionsFile> for AlbumsActions {
@@ -229,10 +228,10 @@ impl ToDescription for AlbumsActions {
 
 // Artists actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum ArtistsActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum ArtistsActions {}
 
 impl ToDescription for ArtistsActions {
@@ -249,10 +248,10 @@ impl From<ArtistsActionsFile> for ArtistsActions {
 
 // Directories actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum DirectoriesActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq)]
 pub enum DirectoriesActions {}
 
 impl ToDescription for DirectoriesActions {
@@ -269,7 +268,7 @@ impl From<DirectoriesActionsFile> for DirectoriesActions {
 
 // Logs actions
 #[cfg(debug_assertions)]
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum LogsActionsFile {
     Clear,
     ToggleScroll,
@@ -277,7 +276,7 @@ pub enum LogsActionsFile {
 
 #[cfg(debug_assertions)]
 #[allow(dead_code)]
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum LogsActions {
     Clear,
     ToggleScroll,
@@ -306,7 +305,7 @@ impl ToDescription for LogsActions {
 
 // Queue actions
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
 pub enum QueueActionsFile {
     Delete,
     DeleteAll,
@@ -318,7 +317,7 @@ pub enum QueueActionsFile {
     Shuffle,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, Copy, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum QueueActions {
     Delete,
@@ -372,7 +371,6 @@ impl ToDescription for QueueActions {
     serde::Deserialize,
     PartialEq,
     Eq,
-    Hash,
     Clone,
     Copy,
     Ord,
@@ -399,9 +397,7 @@ impl From<Position> for Option<QueuePosition> {
     }
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
 pub enum AddKind {
     Modal(Vec<(String, AddOpts)>),
     Action(AddOpts),
@@ -460,7 +456,6 @@ impl Default for AddKind {
     serde::Deserialize,
     PartialEq,
     Eq,
-    Hash,
     Clone,
     Copy,
     Ord,
@@ -474,9 +469,7 @@ pub enum AutoplayKind {
     None,
 }
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct AddOpts {
     #[serde(default)]
     pub autoplay: AutoplayKind,
@@ -506,11 +499,31 @@ impl AddOpts {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum RateKind {
+    Modal {
+        #[serde(default = "crate::config::defaults::rating_options")]
+        values: Vec<i32>,
+        #[serde(default = "crate::config::defaults::bool::<true>")]
+        custom: bool,
+        #[serde(default = "crate::config::defaults::bool::<true>")]
+        like: bool,
+    },
+    Value(i32),
+    Like(),
+    Dislike(),
+    Neutral(),
+}
+
+impl Default for RateKind {
+    fn default() -> Self {
+        RateKind::Modal { values: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true, like: true }
+    }
+}
+
 // Common actions
 
-#[derive(
-    Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone, Ord, PartialOrd,
-)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum CommonActionFile {
     Down,
     Up,
@@ -550,9 +563,19 @@ pub enum CommonActionFile {
     },
     ShowInfo,
     ContextMenu {},
+    Rate {
+        #[serde(default)]
+        kind: RateKind,
+        #[serde(default)]
+        current: bool,
+        #[serde(default = "crate::config::defaults::i32::<0>")]
+        min_rating: i32,
+        #[serde(default = "crate::config::defaults::i32::<10>")]
+        max_rating: i32,
+    },
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, EnumDiscriminants)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum CommonAction {
     Down,
@@ -587,6 +610,12 @@ pub enum CommonAction {
     },
     ShowInfo,
     ContextMenu,
+    Rate {
+        kind: RateKind,
+        current: bool,
+        min_rating: i32,
+        max_rating: i32,
+    },
 }
 
 impl ToDescription for CommonAction {
@@ -608,60 +637,93 @@ impl ToDescription for CommonAction {
             CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
             CommonAction::Select => {
-                        "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
-                    }
+                                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
+                            }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
             CommonAction::Delete => {
-                        "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
-                    }
+                                "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
+                            }
             CommonAction::Rename => "Rename. Currently only for playlists".into(),
             CommonAction::Close => {
-                        "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
-                    }
+                                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
+                            }
             CommonAction::Confirm => {
-                        "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
-                    }
+                                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
+                            }
             CommonAction::FocusInput => {
-                        "Focuses textbox if any is on the screen and is not focused".into()
-                    }
+                                "Focuses textbox if any is on the screen and is not focused".into()
+                            }
             CommonAction::PaneDown => "Focus the pane below the current one".into(),
             CommonAction::PaneUp => "Focus the pane above the current one".into(),
             CommonAction::PaneRight => "Focus the pane to the right of the current one".into(),
             CommonAction::PaneLeft => "Focus the pane to the left of the current one".into(),
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => format!("Open add menu modal with {} options", items.len()).into(),
             CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                        let mut buf = String::from("Add");
-                        if opts.all {
-                            buf.push_str(" all items");
-                        } else {
-                            buf.push_str(" item");
-                        }
-                        buf.push_str(match opts.position {
-                            Position::AfterCurrentSong => " after the current song",
-                            Position::BeforeCurrentSong => " before the current song",
-                            Position::StartOfQueue => " at the start of the queue",
-                            Position::EndOfQueue => " at the end of the queue",
-                            Position::Replace => " and replace the queue",
-                        });
+                                let mut buf = String::from("Add");
+                                if opts.all {
+                                    buf.push_str(" all items");
+                                } else {
+                                    buf.push_str(" item");
+                                }
+                                buf.push_str(match opts.position {
+                                    Position::AfterCurrentSong => " after the current song",
+                                    Position::BeforeCurrentSong => " before the current song",
+                                    Position::StartOfQueue => " at the start of the queue",
+                                    Position::EndOfQueue => " at the end of the queue",
+                                    Position::Replace => " and replace the queue",
+                                });
 
-                        buf.push_str(match opts.autoplay {
-                            AutoplayKind::First => " and play the first item",
-                            AutoplayKind::Hovered => " and play the hovered item",
-                            AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
-                            AutoplayKind::None => "",
-                        });
+                                buf.push_str(match opts.autoplay {
+                                    AutoplayKind::First => " and play the first item",
+                                    AutoplayKind::Hovered => " and play the hovered item",
+                                    AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
+                                    AutoplayKind::None => "",
+                                });
 
-                        buf.into()
-                    },
+                                buf.into()
+                            },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
+            CommonAction::Rate { kind: RateKind::Modal { .. }, current, .. } => {
+                let mut buf = String::from("Open a modal popup with song rating options");
+                if *current {
+                    buf.push_str(" for the currently playing song");
+                }
+                buf.into()
+            },
+            CommonAction::Rate { kind: RateKind::Value(val), current, ..  } => {
+                if *current {
+                    format!("Set currently playing song's rating to {val}")
+                } else {
+                    format!("Set song rating to {val}")
+                }.into()
+            }
+            CommonAction::Rate { kind: k @ RateKind::Like() | k @ RateKind::Dislike() | k @ RateKind::Neutral(), current , .. } => {
+                let mut buf = String::from("Set the ");
+                if *current {
+                    buf.push_str("currently playing song's");
+                } else {
+                    buf.push_str("song's under the cursor");
+                }
+                buf.push_str(" like state to ");
+                match k {
+                    RateKind::Like() => buf.push_str("like"),
+                    RateKind::Dislike() => buf.push_str("dislike"),
+                    RateKind::Neutral() => buf.push_str("neutral"),
+                    _ => {}
+                }
+
+                buf.into()
+            },
         }
     }
 }
 
-impl From<CommonActionFile> for CommonAction {
-    fn from(value: CommonActionFile) -> Self {
-        match value {
+impl TryFrom<CommonActionFile> for CommonAction {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CommonActionFile) -> Result<Self, Self::Error> {
+        Ok(match value {
             CommonActionFile::Up => CommonAction::Up,
             CommonActionFile::Down => CommonAction::Down,
             CommonActionFile::UpHalf => CommonAction::UpHalf,
@@ -733,14 +795,45 @@ impl From<CommonActionFile> for CommonAction {
             CommonActionFile::ShowInfo => CommonAction::ShowInfo,
             CommonActionFile::AddOptions { kind } => CommonAction::AddOptions { kind },
             CommonActionFile::ContextMenu {} => CommonAction::ContextMenu,
-        }
+            CommonActionFile::Rate { kind, current, min_rating, max_rating } => {
+                match &kind {
+                    RateKind::Modal { values, custom, like } => {
+                        if values.is_empty() && !custom && !like {
+                            bail!(
+                                "At least one of 'values', 'custom' or 'like' must be set for rating modal"
+                            );
+                        }
+
+                        if !values.is_empty() {
+                            if let Some(min) = values.iter().min()
+                                && *min < min_rating
+                            {
+                                bail!("Rating must be at least {min_rating}");
+                            }
+                            if let Some(max) = values.iter().max()
+                                && *max > max_rating
+                            {
+                                bail!("Rating must be at most {max_rating}");
+                            }
+                        }
+                    }
+                    RateKind::Value(v) => {
+                        if *v < min_rating || *v > max_rating {
+                            bail!("Rating must be between {min_rating} and {max_rating}");
+                        }
+                    }
+                    _ => {}
+                }
+                CommonAction::Rate { kind, current, min_rating, max_rating }
+            }
+        })
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum SearchActionsFile {}
 
-#[derive(Debug, Display, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum SearchActions {}
 
 impl ToDescription for SearchActions {

@@ -1,4 +1,5 @@
 use enum_map::{Enum, EnumMap};
+use itertools::Itertools;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, Padding},
@@ -6,7 +7,7 @@ use ratatui::{
 use style::Styled;
 
 use crate::{
-    config::Config,
+    ctx::Ctx,
     ui::dirstack::{Dir, DirStack, DirStackItem},
 };
 
@@ -60,8 +61,9 @@ where
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut DirStack<T>,
-        config: &Config,
+        ctx: &Ctx,
     ) {
+        let config = &ctx.config;
         let scrollbar_margin = match config.theme.scrollbar.as_ref() {
             Some(scrollbar) if config.theme.draw_borders => {
                 let scrollbar_track = &scrollbar.symbols[0];
@@ -71,9 +73,8 @@ where
         };
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
 
-        let previous = state.previous().to_list_items(config);
-        let current = state.current().to_list_items(config);
-        let preview = state.preview().cloned();
+        let previous = state.previous().to_list_items(ctx);
+        let current = state.current().to_list_items(ctx);
 
         let [previous_area, current_area, preview_area] = *Layout::horizontal([
             Constraint::Percentage(config.theme.column_widths[0]),
@@ -84,21 +85,36 @@ where
             return;
         };
 
+        self.areas[BrowserArea::Preview] = preview_area;
         if config.theme.column_widths[2] > 0 {
-            self.areas[BrowserArea::Preview] = preview_area;
-
-            let mut result = Vec::new();
-            for group in preview.unwrap_or_default() {
-                if let Some(name) = group.name {
-                    let mut item = ListItem::new(name);
-                    if let Some(style) = group.header_style {
-                        item = item.style(style);
+            let result = if let Some(current) = state.current().selected()
+                && current.is_file()
+            {
+                let previews = current.to_file_preview(ctx);
+                let mut result = Vec::new();
+                for group in previews {
+                    if let Some(name) = group.name {
+                        let mut item = ListItem::new(name);
+                        if let Some(style) = group.header_style {
+                            item = item.style(style);
+                        }
+                        result.push(item);
                     }
-                    result.push(item);
+                    result.extend(group.items);
+                    result.push(ListItem::new(Span::raw("")));
                 }
-                result.extend(group.items);
-                result.push(ListItem::new(Span::raw("")));
-            }
+
+                result
+            } else if state.current().selected().is_some() {
+                state.preview().map_or(Vec::new(), |p| {
+                    p.iter()
+                        .take(self.areas[BrowserArea::Preview].height as usize)
+                        .map(|item| item.to_list_item_simple(ctx))
+                        .collect_vec()
+                })
+            } else {
+                Vec::new()
+            };
 
             let preview = List::new(result).style(config.as_text_style());
             ratatui::widgets::Widget::render(preview, preview_area, buf);

@@ -14,20 +14,22 @@ pub use stack::DirStack;
 pub use state::DirState;
 
 use super::dir_or_song::DirOrSong;
-use crate::{config::Config, mpd::commands::Song};
+use crate::{ctx::Ctx, mpd::commands::Song, shared::mpd_query::PreviewGroup};
 
 pub trait DirStackItem {
     fn as_path(&self) -> &str;
-    fn matches(&self, config: &Config, filter: &str) -> bool;
+    fn is_file(&self) -> bool;
+    fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup>;
+    fn matches(&self, ctx: &Ctx, filter: &str) -> bool;
     fn to_list_item<'a>(
         &self,
-        config: &Config,
+        ctx: &Ctx,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a>;
-    fn to_list_item_simple<'a>(&self, config: &Config) -> ListItem<'a> {
-        self.to_list_item(config, false, false, None)
+    fn to_list_item_simple<'a>(&self, ctx: &Ctx) -> ListItem<'a> {
+        self.to_list_item(ctx, false, false, None)
     }
 }
 
@@ -39,79 +41,82 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn matches(&self, config: &Config, filter: &str) -> bool {
+    fn is_file(&self) -> bool {
+        match self {
+            DirOrSong::Dir { .. } => false,
+            DirOrSong::Song(_) => true,
+        }
+    }
+
+    fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup> {
+        match self {
+            DirOrSong::Dir { .. } => Vec::new(),
+            DirOrSong::Song(s) => s.to_file_preview(ctx),
+        }
+    }
+
+    fn matches(&self, ctx: &Ctx, filter: &str) -> bool {
         match self {
             DirOrSong::Dir { name, .. } => if name.is_empty() { "Untitled" } else { name.as_str() }
                 .to_lowercase()
                 .contains(&filter.to_lowercase()),
-            DirOrSong::Song(s) => s.matches(config.theme.browser_song_format.0.as_slice(), filter),
+            DirOrSong::Song(s) => {
+                s.matches(ctx.config.theme.browser_song_format.0.as_slice(), filter, ctx)
+            }
         }
     }
 
     fn to_list_item<'a>(
         &self,
-        config: &Config,
+        ctx: &Ctx,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a> {
-        let marker_span = if is_marked {
-            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
-        } else {
-            Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
-        };
-
-        let mut value = match self {
-            DirOrSong::Dir { name, playlist: is_playlist, .. } => Line::from(vec![
-                marker_span,
-                if *is_playlist {
+        match self {
+            DirOrSong::Dir { name, playlist: is_playlist, .. } => {
+                let config = &ctx.config;
+                let marker_span = if is_marked {
                     Span::styled(
-                        config.theme.symbols.playlist.clone(),
-                        config.theme.symbols.playlist_style.unwrap_or_default(),
+                        config.theme.symbols.marker.clone(),
+                        config.theme.highlighted_item_style,
                     )
                 } else {
-                    Span::styled(
-                        config.theme.symbols.dir.clone(),
-                        config.theme.symbols.dir_style.unwrap_or_default(),
-                    )
-                },
-                Span::from(" "),
-                Span::from(if name.is_empty() {
-                    Cow::Borrowed("Untitled")
-                } else {
-                    Cow::Owned(name.to_owned())
-                }),
-            ]),
-            DirOrSong::Song(s) => {
-                let spans = [
+                    Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
+                };
+                let mut value = Line::from(vec![
                     marker_span,
-                    Span::styled(
-                        config.theme.symbols.song.clone(),
-                        config.theme.symbols.song_style.unwrap_or_default(),
-                    ),
-                    Span::from(" "),
-                ]
-                .into_iter()
-                .chain(config.theme.browser_song_format.0.iter().map(|prop| {
-                    Span::from(
-                        prop.as_string(
-                            Some(s),
-                            &config.theme.format_tag_separator,
-                            config.theme.multiple_tag_resolution_strategy,
+                    if *is_playlist {
+                        Span::styled(
+                            config.theme.symbols.playlist.clone(),
+                            config.theme.symbols.playlist_style.unwrap_or_default(),
                         )
-                        .unwrap_or_default(),
-                    )
-                }));
-                Line::from(spans.collect_vec())
+                    } else {
+                        Span::styled(
+                            config.theme.symbols.dir.clone(),
+                            config.theme.symbols.dir_style.unwrap_or_default(),
+                        )
+                    },
+                    Span::from(" "),
+                    Span::from(if name.is_empty() {
+                        Cow::Borrowed("Untitled")
+                    } else {
+                        Cow::Owned(name.to_owned())
+                    }),
+                ]);
+
+                if let Some(content) = additional_content {
+                    value.push_span(Span::raw(content));
+                }
+                if matches_filter {
+                    ListItem::from(value).style(config.theme.highlighted_item_style)
+                } else {
+                    ListItem::from(value)
+                }
             }
-        };
-        if let Some(content) = additional_content {
-            value.push_span(Span::raw(content));
-        }
-        if matches_filter {
-            ListItem::from(value).style(config.theme.highlighted_item_style)
-        } else {
-            ListItem::from(value)
+            DirOrSong::Song(s) => {
+                s.to_list_item(ctx, is_marked, matches_filter, additional_content)
+            }
         }
     }
 }
@@ -121,41 +126,64 @@ impl DirStackItem for Song {
         &self.file
     }
 
-    fn matches(&self, config: &Config, filter: &str) -> bool {
-        self.matches(config.theme.browser_song_format.0.as_slice(), filter)
+    fn is_file(&self) -> bool {
+        true
+    }
+
+    fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup> {
+        let key_style = ctx.config.theme.preview_label_style;
+        let group_style = ctx.config.theme.preview_metadata_group_style;
+        self.to_preview(key_style, group_style, ctx)
+    }
+
+    fn matches(&self, ctx: &Ctx, filter: &str) -> bool {
+        self.matches(ctx.config.theme.browser_song_format.0.as_slice(), filter, ctx)
     }
 
     fn to_list_item<'a>(
         &self,
-        config: &Config,
+        ctx: &Ctx,
         is_marked: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a> {
+        let config = &ctx.config;
         let marker_span = if is_marked {
             Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {
             Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
 
-        let title = self.title_str(&config.theme.format_tag_separator).into_owned();
-        let artist = self.artist_str(&config.theme.format_tag_separator).into_owned();
-        let separator_span = Span::from(" - ");
-        let icon_span = Span::styled(
-            format!("{} ", config.theme.symbols.song),
-            config.theme.symbols.song_style.unwrap_or_default(),
-        );
-        let mut result =
-            vec![marker_span, icon_span, Span::from(artist), separator_span, Span::from(title)];
-        if let Some(content) = additional_content {
-            result.push(Span::raw(content));
-        }
-        let mut result = ListItem::new(Line::from(result));
-        if matches_filter {
-            result = result.style(config.theme.highlighted_item_style);
-        }
+        let spans = [
+            marker_span,
+            Span::styled(
+                config.theme.symbols.song.clone(),
+                config.theme.symbols.song_style.unwrap_or_default(),
+            ),
+            Span::from(" "),
+        ]
+        .into_iter()
+        .chain(config.theme.browser_song_format.0.iter().map(|prop| {
+            Span::from(
+                prop.as_string(
+                    Some(self),
+                    &config.theme.format_tag_separator,
+                    config.theme.multiple_tag_resolution_strategy,
+                    ctx,
+                )
+                .unwrap_or_default(),
+            )
+        }));
+        let mut value = Line::from(spans.collect_vec());
 
-        result
+        if let Some(content) = additional_content {
+            value.push_span(Span::raw(content));
+        }
+        if matches_filter {
+            ListItem::from(value).style(config.theme.highlighted_item_style)
+        } else {
+            ListItem::from(value)
+        }
     }
 }
 
@@ -208,17 +236,26 @@ impl DirStackItem for String {
         self
     }
 
-    fn matches(&self, _config: &Config, filter: &str) -> bool {
+    fn is_file(&self) -> bool {
+        true
+    }
+
+    fn to_file_preview(&self, _ctx: &Ctx) -> Vec<PreviewGroup> {
+        Vec::new()
+    }
+
+    fn matches(&self, _ctx: &Ctx, filter: &str) -> bool {
         self.to_lowercase().contains(&filter.to_lowercase())
     }
 
     fn to_list_item<'a>(
         &self,
-        config: &Config,
+        ctx: &Ctx,
         is_marked: bool,
         matches_filter: bool,
         _additional_content: Option<String>,
     ) -> ListItem<'a> {
+        let config = &ctx.config;
         let marker_span = if is_marked {
             Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
         } else {

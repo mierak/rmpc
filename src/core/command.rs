@@ -100,7 +100,7 @@ impl Command {
                 }))
             }
             Command::Queue => Ok(Box::new(|client| {
-                let queue = client.playlist_info(false)?;
+                let queue = client.playlist_info()?;
                 if let Some(queue) = queue {
                     println!("{}", serde_json::ser::to_string(&queue)?);
                     Ok(())
@@ -417,7 +417,7 @@ impl Command {
             })),
             Command::Sticker { cmd: StickerCmd::Find { uri, key } } => {
                 Ok(Box::new(move |client| {
-                    let stickers = client.find_stickers(&uri, &key)?;
+                    let stickers = client.find_stickers(&uri, &key, None)?;
                     println!("{}", serde_json::ser::to_string(&stickers)?);
                     Ok(())
                 }))

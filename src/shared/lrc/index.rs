@@ -252,7 +252,6 @@ mod tests {
             file: String::new(),
             duration,
             metadata,
-            stickers: None,
             last_modified: DateTime::default(),
             added: Some(DateTime::default()),
         }

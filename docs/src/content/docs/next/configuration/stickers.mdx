@@ -1,0 +1,25 @@
+---
+title: Stickers
+description: Overview of what stickers are used by rmpc
+sidebar:
+    order: 35
+---
+
+import { path } from "../data.ts";
+
+Rmpc uses MPD's stickers for some of its functionality like rating, liked status and might use more
+in the future.
+
+These stickers are simple key-value pairs attached to songs and can be used to store arbitrary data.
+You must have [sticker_file](https://mpd.readthedocs.io/en/latest/mpd.conf.5.html#optional-parameters)
+set in your MPD's configuration to use this functionality.
+
+You can display these stickers using the `Sticker("<name>")` property.
+
+## Stickers used by rmpc
+
+| Name      | Description                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| rating    | Used to store ratings. Has to be a valid positive integer in the 0-10 range. Numbers outside this range are permitted too if configured to do so but might not work in other MPD clients/rmpc functionality. |
+| like      | Used to store like status. Possible values are `0`, `1` and `2` meaning "disliked", "neutral" and "liked" respectively                                                                                       |
+| playCount | How many times a song was played. Requires <a href={path("guides/on_song_change/#track-song-play-count")}>configuration</a>.                                                                                 |

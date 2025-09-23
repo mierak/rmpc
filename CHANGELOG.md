@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file.
 - Added `keep_state_on_song_change` and equivalent flag to cli
 - Added `ignore_leading_the` when sorting entries in browsers
 - More information about the system to debuginfo
+- Stickers are now usable in `browser_song_format`
+- Rating support, rating can be set on a song. The rating can be displayed in the queue table and
+browser panes as well as searched for in the Search pane
+- Liked state support, songs can now be liked, disliked or set to neutral and searched for in the
+Search pane
+- Added `Replace` transform
 
 ### Changed
 
@@ -72,6 +78,7 @@ scrolled down
 - Konsole terminal now does not autodetect to Kitty image protocol, it instead uses ueberzugpp if
 available and Block if not
 - Fix Iterm2 image protocol sometimes rendering too late
+- Fix playlists not using playlist style and icon in the Playlists pane
 
 ## [0.9.0] - 2025-06-23
 

@@ -513,7 +513,6 @@ fn song(name: &str) -> Song {
         file: name.to_string(),
         duration: Some(Duration::from_secs(1)),
         metadata: HashMap::new(),
-        stickers: None,
         last_modified: *NOW,
         added: None,
     }

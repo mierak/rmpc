@@ -11,17 +11,20 @@ use ratatui::{
 
 use crate::{
     config::keys::actions::AddOpts,
-    ctx::Ctx,
+    ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     shared::{
         key_event::KeyEvent,
+        macros::status_error,
         mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
+    ui::modals::menu::select_section::SelectSection,
 };
 
 mod input_section;
 mod list_section;
 pub mod modal;
 mod multi_action_section;
+mod select_section;
 
 trait Section {
     fn down(&mut self) -> bool;
@@ -50,6 +53,7 @@ trait Section {
 #[derive(Debug)]
 enum SectionType<'a> {
     Menu(ListSection),
+    Select(SelectSection),
     Multi(MultiActionSection<'a>),
     Input(InputSection<'a>),
 }
@@ -60,6 +64,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.down(),
             SectionType::Multi(s) => s.down(),
             SectionType::Input(s) => s.down(),
+            SectionType::Select(s) => s.down(),
         }
     }
 
@@ -68,6 +73,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.up(),
             SectionType::Multi(s) => s.up(),
             SectionType::Input(s) => s.up(),
+            SectionType::Select(s) => s.up(),
         }
     }
 
@@ -76,6 +82,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.right(),
             SectionType::Multi(s) => s.right(),
             SectionType::Input(s) => s.right(),
+            SectionType::Select(s) => s.right(),
         }
     }
 
@@ -84,6 +91,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.left(),
             SectionType::Multi(s) => s.left(),
             SectionType::Input(s) => s.left(),
+            SectionType::Select(s) => s.left(),
         }
     }
 
@@ -92,6 +100,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.unselect(),
             SectionType::Multi(s) => s.unselect(),
             SectionType::Input(s) => s.unselect(),
+            SectionType::Select(s) => s.unselect(),
         }
     }
 
@@ -100,6 +109,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.unfocus(),
             SectionType::Multi(s) => s.unfocus(),
             SectionType::Input(s) => s.unfocus(),
+            SectionType::Select(s) => s.unfocus(),
         }
     }
 
@@ -108,6 +118,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.confirm(ctx),
             SectionType::Multi(s) => s.confirm(ctx),
             SectionType::Input(s) => s.confirm(ctx),
+            SectionType::Select(s) => s.confirm(ctx),
         }
     }
 
@@ -116,6 +127,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.len(),
             SectionType::Multi(s) => s.len(),
             SectionType::Input(s) => s.len(),
+            SectionType::Select(s) => s.len(),
         }
     }
 
@@ -124,6 +136,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => Widget::render(s, area, buf),
             SectionType::Multi(s) => Widget::render(s, area, buf),
             SectionType::Input(s) => Widget::render(s, area, buf),
+            SectionType::Select(s) => Widget::render(s, area, buf),
         }
     }
 
@@ -132,6 +145,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.key_input(key, ctx),
             SectionType::Multi(s) => s.key_input(key, ctx),
             SectionType::Input(s) => s.key_input(key, ctx),
+            SectionType::Select(s) => s.key_input(key, ctx),
         }
     }
 
@@ -140,6 +154,7 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.left_click(pos),
             SectionType::Multi(s) => s.left_click(pos),
             SectionType::Input(s) => s.left_click(pos),
+            SectionType::Select(s) => s.left_click(pos),
         }
     }
 
@@ -148,8 +163,130 @@ impl Section for SectionType<'_> {
             SectionType::Menu(s) => s.double_click(pos, ctx),
             SectionType::Multi(s) => s.double_click(pos, ctx),
             SectionType::Input(s) => s.double_click(pos, ctx),
+            SectionType::Select(s) => s.double_click(pos, ctx),
         }
     }
+}
+
+pub fn create_rating_modal<'a>(
+    items: Vec<Enqueue>,
+    values: &[i32],
+    min_rating: i32,
+    max_rating: i32,
+    custom: bool,
+    like: bool,
+    ctx: &Ctx,
+) -> MenuModal<'a> {
+    let clone = items.clone();
+    let clone2 = items.clone();
+    let clone3 = items.clone();
+
+    MenuModal::new(ctx)
+        .input_section(ctx, "Rating", move |section| {
+            if !custom {
+                return None;
+            }
+
+            let section = section.action(move |ctx, value| {
+                let Ok(v) = value.trim().parse::<i32>() else {
+                    status_error!("Rating must be a valid number");
+                    return;
+                };
+
+                if v < min_rating {
+                    status_error!("Rating must be at least {min_rating}");
+                    return;
+                }
+
+                if v > max_rating {
+                    status_error!("Rating must be at most {max_rating}");
+                    return;
+                }
+
+                if !value.trim().is_empty() {
+                    ctx.command(move |client| {
+                        client.set_sticker_multiple(RATING_STICKER, value, clone2)?;
+                        Ok(())
+                    });
+                }
+            });
+
+            Some(section)
+        })
+        .select_section(ctx, move |mut section| {
+            if values.is_empty() {
+                return None;
+            }
+
+            for i in values {
+                section.add_item(i.to_string(), i.to_string());
+            }
+
+            section.action(move |ctx, value| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(RATING_STICKER, value, clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+
+            Some(section)
+        })
+        .list_section(ctx, |section| {
+            if !like {
+                return None;
+            }
+            let clone = items.clone();
+            let section = section.item("Like", |ctx| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+            let clone = items.clone();
+            let section = section.item("Neutral", |ctx| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+            let clone = items.clone();
+            let section = section.item("Dislike", |ctx| {
+                ctx.command(move |client| {
+                    client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), clone)?;
+                    Ok(())
+                });
+                Ok(())
+            });
+            Some(section)
+        })
+        .list_section(ctx, |mut section| {
+            if custom || !values.is_empty() {
+                section.add_item("Clear rating", |ctx| {
+                    ctx.command(move |client| {
+                        client.delete_sticker_multiple(RATING_STICKER, clone3)?;
+                        Ok(())
+                    });
+                    Ok(())
+                });
+            }
+            if like {
+                section.add_item("Clear like state", |ctx| {
+                    ctx.command(move |client| {
+                        client.delete_sticker_multiple(LIKE_STICKER, items)?;
+                        Ok(())
+                    });
+                    Ok(())
+                });
+            }
+
+            section.add_item("Cancel", |_ctx| Ok(()));
+
+            Some(section)
+        })
+        .build()
 }
 
 pub fn create_add_modal<'a>(
