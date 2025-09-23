@@ -53,6 +53,14 @@ pub enum AddRandom {
     Genre,
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+#[clap(rename_all = "lower")]
+pub enum Provider {
+    Youtube,
+    Soundcloud,
+    Nicovideo,
+}
+
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
 pub enum Command {
@@ -221,9 +229,9 @@ pub enum Command {
         /// Search query (song/artist/title…)
         #[arg(value_name = "QUERY")]
         query: String,
-        /// Search soundCloud instead of youTube
-        #[arg(short = 's', long = "soundcloud")]
-        soundcloud: bool,
+        /// Which provider to search (default: youtube)
+        #[arg(long = "provider", value_enum, default_value_t = Provider::Youtube)]
+        provider: Provider,
         /// Show an interactive list to pick a result
         #[arg(short = 'i', long = "interactive")]
         interactive: bool,

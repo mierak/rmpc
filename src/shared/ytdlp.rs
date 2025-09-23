@@ -72,25 +72,20 @@ impl<'a> YtDlp<'a> {
         Ok(file_path)
     }
 
-    fn search_single(kind: YtDlpHostKind, query: &str) -> anyhow::Result<String> {
+    pub fn search_single(kind: YtDlpHostKind, query: &str) -> anyhow::Result<String> {
         Ok(std::mem::take(&mut Self::search_many(kind, query, 1)?[0].url))
     }
 
-    pub fn search_single_auto(query: &str, soundcloud: bool) -> anyhow::Result<String> {
-        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
-        Self::search_single(kind, query)
-    }
-
-    pub fn search_pick_cli_auto(
+    pub fn search_pick_cli(
+        kind: YtDlpHostKind,
         query: &str,
-        soundcloud: bool,
         limit: usize,
     ) -> anyhow::Result<String> {
         use dialoguer::{Select, theme::ColorfulTheme};
 
-        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
         let items = Self::search_many(kind, query, limit)?;
 
+        // Build labels + a trailing “Cancel”
         let mut labels: Vec<String> = items
             .iter()
             .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())

@@ -27,7 +27,7 @@ use crate::{
     MpdQueryResult,
     config::{
         Config,
-        cli::{Args, Command},
+        cli::{Args, Command, Provider},
         keys::{CommonAction, GlobalAction, actions::RateKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
@@ -319,7 +319,7 @@ impl<'ui> Ui<'ui> {
                                     command:
                                         Some(Command::SearchYt {
                                             query,
-                                            soundcloud,
+                                            provider,
                                             limit,
                                             interactive,
                                             position,
@@ -329,7 +329,7 @@ impl<'ui> Ui<'ui> {
                                     if let Some(cmd) = Self::resolve_searchyt(
                                         ctx,
                                         &query,
-                                        soundcloud,
+                                        provider,
                                         limit,
                                         interactive,
                                         position,
@@ -634,12 +634,12 @@ impl<'ui> Ui<'ui> {
     fn resolve_searchyt(
         ctx: &Ctx,
         query: &str,
-        soundcloud: bool,
+        provider: Provider,
         limit: usize,
         interactive: bool,
         position: Option<QueuePosition>,
     ) -> anyhow::Result<Option<Command>> {
-        let kind = if soundcloud { YtDlpHostKind::Soundcloud } else { YtDlpHostKind::Youtube };
+        let kind: YtDlpHostKind = provider.into();
 
         if interactive {
             let mut items = YtDlp::search_many(kind, query.trim(), limit)?;
@@ -672,7 +672,7 @@ impl<'ui> Ui<'ui> {
             return Ok(None);
         }
 
-        let url = YtDlp::search_single_auto(query.trim(), soundcloud)?;
+        let url = YtDlp::search_single(kind, query.trim())?;
         Ok(Some(Command::AddYt { url, position }))
     }
 
