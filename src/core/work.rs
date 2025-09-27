@@ -45,12 +45,11 @@ fn handle_work_request(
                 Ok(WorkDone::SearchYtResults { items, position })
             } else {
                 let url = YtDlp::search_single(kind, &query)?;
-                let cfg = config.clone();
+                let files = YtDlp::init_and_download(config, &url)?;
                 let cb = move |client: &mut crate::mpd::client::Client<'_>| -> anyhow::Result<()> {
-                    let files = YtDlp::init_and_download(&cfg, &url)?;
                     client.send_start_cmd_list()?;
-                    for f in files {
-                        client.send_add(&f, position)?;
+                    for f in &files {
+                        client.send_add(f, position)?;
                     }
                     client.send_execute_cmd_list()?;
                     client.read_ok()?;
