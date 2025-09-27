@@ -304,7 +304,7 @@ impl YtDlpHost {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum YtDlpHostKind {
     Youtube,
     Soundcloud,

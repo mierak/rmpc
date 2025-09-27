@@ -10,7 +10,6 @@ use modals::{
     keybinds::KeybindsModal,
     menu::modal::MenuModal,
     outputs::OutputsModal,
-    select_modal::SelectModal,
 };
 use panes::{PaneContainer, Panes, pane_call};
 use ratatui::{
@@ -27,7 +26,7 @@ use crate::{
     MpdQueryResult,
     config::{
         Config,
-        cli::{Args, Command, Provider},
+        cli::{Args, Command},
         keys::{CommonAction, GlobalAction, actions::RateKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
@@ -38,7 +37,6 @@ use crate::{
     },
     ctx::{Ctx, FETCH_SONG_STICKERS, LIKE_STICKER, RATING_STICKER},
     mpd::{
-        QueuePosition,
         commands::{State, idle::IdleEvent},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{MpdClient, MpdCommand, ValueChange},
@@ -52,7 +50,7 @@ use crate::{
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
         mpd_client_ext::{Enqueue, MpdClientExt},
-        ytdlp::{YtDlp, YtDlpHostKind},
+        ytdlp::YtDlpHostKind,
     },
     ui::modals::menu::create_rating_modal,
 };
@@ -320,23 +318,22 @@ impl<'ui> Ui<'ui> {
                                         Some(Command::SearchYt {
                                             query,
                                             provider,
-                                            limit,
                                             interactive,
+                                            limit,
                                             position,
                                         }),
                                     ..
                                 }) => {
-                                    if let Some(cmd) = Self::resolve_searchyt(
-                                        ctx,
-                                        &query,
-                                        provider,
+                                    let kind: YtDlpHostKind = provider.into();
+
+                                    if let Err(e) = ctx.work_sender.send(WorkRequest::SearchYt {
+                                        query,
+                                        kind,
                                         limit,
                                         interactive,
                                         position,
-                                    )? && let Err(e) =
-                                        ctx.work_sender.send(WorkRequest::Command(cmd))
-                                    {
-                                        log::error!("Failed to send command: {e}");
+                                    }) {
+                                        log::error!("Failed to send SearchYt work: {e}");
                                     }
                                     Ok(())
                                 }
@@ -629,51 +626,6 @@ impl<'ui> Ui<'ui> {
         }
 
         Ok(KeyHandleResult::None)
-    }
-
-    fn resolve_searchyt(
-        ctx: &Ctx,
-        query: &str,
-        provider: Provider,
-        limit: usize,
-        interactive: bool,
-        position: Option<QueuePosition>,
-    ) -> anyhow::Result<Option<Command>> {
-        let kind: YtDlpHostKind = provider.into();
-
-        if interactive {
-            let mut items = YtDlp::search_many(kind, query.trim(), limit)?;
-            let labels: Vec<String> = items
-                .iter()
-                .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
-                .collect();
-
-            modal!(
-                ctx,
-                SelectModal::builder()
-                    .ctx(ctx)
-                    .title("Search results")
-                    .confirm_label("Select")
-                    .options(labels)
-                    .on_confirm(move |ctx, _label, idx| {
-                        let url = std::mem::take(&mut items[idx].url);
-                        if ctx
-                            .work_sender
-                            .send(WorkRequest::Command(Command::AddYt { url, position }))
-                            .is_err()
-                        {
-                            log::error!("Failed to send enqueue command");
-                        }
-                        Ok(())
-                    })
-                    .build()
-            );
-
-            return Ok(None);
-        }
-
-        let url = YtDlp::search_single(kind, query.trim())?;
-        Ok(Some(Command::AddYt { url, position }))
     }
 
     pub fn before_show(&mut self, area: Rect, ctx: &mut Ctx) -> Result<()> {
