@@ -121,10 +121,11 @@ impl<'a> YtDlp<'a> {
             .entries
             .into_iter()
             .filter_map(|e| {
-                let url = e
-                    .url
-                    .or(e.webpage_url)
-                    .or_else(|| e.id.clone().map(|id| kind.watch_url(&id)))?;
+                let url = match kind {
+                    YtDlpHostKind::Soundcloud => e.webpage_url.or(e.url),
+                    _ => e.url.or(e.webpage_url),
+                }
+                .or_else(|| e.id.clone().map(|id| kind.watch_url(&id)))?;
                 Some(SearchItem { title: e.title, url })
             })
             .collect::<Vec<_>>();
