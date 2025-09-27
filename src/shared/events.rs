@@ -9,6 +9,7 @@ use super::{
     lrc::{LrcIndex, LrcIndexEntry},
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
+    ytdlp::{SearchItem, YtDlpHostKind},
 };
 use crate::{
     config::{
@@ -18,7 +19,7 @@ use crate::{
         tabs::PaneType,
         theme::UiConfig,
     },
-    mpd::commands::IdleEvent,
+    mpd::{QueuePosition, commands::IdleEvent},
     ui::UiAppEvent,
 };
 
@@ -40,6 +41,13 @@ pub(crate) enum WorkRequest {
         /// Absolute path to the lrc file
         path: PathBuf,
     },
+    SearchYt {
+        query: String,
+        kind: YtDlpHostKind,
+        limit: usize,
+        interactive: bool,
+        position: Option<QueuePosition>,
+    },
     Command(Command),
 }
 
@@ -49,6 +57,7 @@ pub(crate) enum WorkDone {
     LyricsIndexed { index: LrcIndex },
     SingleLrcIndexed { lrc_entry: Option<LrcIndexEntry> },
     MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
+    SearchYtResults { items: Vec<SearchItem>, position: Option<QueuePosition> },
     None,
 }
 

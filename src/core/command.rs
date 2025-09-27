@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 use crate::{
     config::{
-        cli::{AddRandom, Command, StickerCmd},
+        cli::{AddRandom, Command, Provider, StickerCmd},
         cli_config::CliConfig,
     },
     ctx::Ctx,
@@ -22,7 +22,7 @@ use crate::{
         lrc::{LrcIndex, get_lrc_path},
         macros::status_error,
         mpd_client_ext::MpdClientExt,
-        ytdlp::YtDlp,
+        ytdlp::{YtDlp, YtDlpHostKind},
     },
 };
 
@@ -272,8 +272,13 @@ impl Command {
                     Ok(())
                 }))
             }
-            Command::SearchYt { query, position } => {
-                let chosen_url = YtDlp::search_youtube_single(query.trim())?;
+            Command::SearchYt { query, provider, interactive, limit, position } => {
+                let kind: YtDlpHostKind = provider.into();
+                let chosen_url = if interactive {
+                    YtDlp::search_pick_cli(kind, query.trim(), limit)?
+                } else {
+                    YtDlp::search_single(kind, query.trim())?
+                };
                 let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
                 Ok(Box::new(move |client| {
                     client.send_start_cmd_list()?;
@@ -422,6 +427,16 @@ impl Command {
                 client.send_message(&channel, &content)?;
                 Ok(())
             })),
+        }
+    }
+}
+
+impl From<Provider> for YtDlpHostKind {
+    fn from(p: Provider) -> Self {
+        match p {
+            Provider::Youtube => YtDlpHostKind::Youtube,
+            Provider::Soundcloud => YtDlpHostKind::Soundcloud,
+            Provider::Nicovideo => YtDlpHostKind::NicoVideo,
         }
     }
 }

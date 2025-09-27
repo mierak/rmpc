@@ -53,6 +53,14 @@ pub enum AddRandom {
     Genre,
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+#[clap(rename_all = "lower")]
+pub enum Provider {
+    Youtube,
+    Soundcloud,
+    Nicovideo,
+}
+
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
 pub enum Command {
@@ -215,12 +223,21 @@ pub enum Command {
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
-    /// Search youtube song by name and add the first result to the current
-    /// queue.
+    /// Search and add the first match to the current queue (youTube by
+    /// default).
     SearchYt {
         /// Search query (song/artist/title…)
         #[arg(value_name = "QUERY")]
         query: String,
+        /// Which provider to search (default: youtube)
+        #[arg(long = "provider", value_enum, default_value_t = Provider::Youtube)]
+        provider: Provider,
+        /// Show an interactive list to pick a result
+        #[arg(short = 'i', long = "interactive")]
+        interactive: bool,
+        /// How many results to show with --list
+        #[arg(long = "limit", default_value_t = 5, requires("interactive"))]
+        limit: usize,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and
         /// +<number> or -<number> (relative)
