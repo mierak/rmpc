@@ -5,11 +5,13 @@ use crossbeam::channel::{Receiver, Sender};
 
 use crate::{
     config::{Config, cli_config::CliConfig},
+    mpd::{mpd_client::MpdCommand, proto_client::ProtoClient},
     shared::{
         events::{AppEvent, ClientRequest, WorkDone, WorkRequest},
         lrc::LrcIndex,
         macros::try_skip,
-        mpd_query::MpdCommand,
+        mpd_query::MpdCommand as QueryCmd,
+        ytdlp::YtDlp,
     },
 };
 
@@ -37,10 +39,34 @@ fn handle_work_request(
     config: &CliConfig,
 ) -> Result<WorkDone> {
     match request {
+        WorkRequest::SearchYt { query, kind, limit, interactive, position } => {
+            if interactive {
+                let items = YtDlp::search_many(kind, &query, limit)?;
+                Ok(WorkDone::SearchYtResults { items, position })
+            } else {
+                let url = YtDlp::search_single(kind, &query)?;
+                let cfg = config.clone();
+                let cb = move |client: &mut crate::mpd::client::Client<'_>| -> anyhow::Result<()> {
+                    let files = YtDlp::init_and_download(&cfg, &url)?;
+                    client.send_start_cmd_list()?;
+                    for f in files {
+                        client.send_add(&f, position)?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_ok()?;
+                    Ok(())
+                };
+                try_skip!(
+                    client_tx.send(ClientRequest::Command(QueryCmd { callback: Box::new(cb) })),
+                    "Failed to send client request for SearchYt"
+                );
+                Ok(WorkDone::None)
+            }
+        }
         WorkRequest::Command(command) => {
             let callback = command.execute(config)?; // TODO log
             try_skip!(
-                client_tx.send(ClientRequest::Command(MpdCommand { callback })),
+                client_tx.send(ClientRequest::Command(QueryCmd { callback })),
                 "Failed to send client request to complete command"
             );
             Ok(WorkDone::None)

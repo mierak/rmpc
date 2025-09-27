@@ -10,7 +10,11 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    config::{Config, cli::RemoteCommandQuery},
+    WorkRequest,
+    config::{
+        Config,
+        cli::{Command, RemoteCommandQuery},
+    },
     ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
@@ -32,7 +36,14 @@ use crate::{
             run_status_update,
         },
     },
-    ui::{KeyHandleResult, StatusMessage, Ui, UiAppEvent, UiEvent, modals::info_modal::InfoModal},
+    ui::{
+        KeyHandleResult,
+        StatusMessage,
+        Ui,
+        UiAppEvent,
+        UiEvent,
+        modals::{info_modal::InfoModal, select_modal::SelectModal},
+    },
 };
 
 static ON_RESIZE_SCHEDULE_ID: LazyLock<Id> = LazyLock::new(id::new);
@@ -246,6 +257,37 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::WorkDone(Ok(result)) => match result {
+                    WorkDone::SearchYtResults { mut items, position } => {
+                        let labels: Vec<String> = items
+                            .iter()
+                            .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
+                            .collect();
+
+                        let modal = SelectModal::builder()
+                            .ctx(&ctx)
+                            .title("Search results")
+                            .confirm_label("Select")
+                            .options(labels)
+                            .on_confirm(move |ctx, _label, idx| {
+                                let url = std::mem::take(&mut items[idx].url);
+                                if let Err(e) = ctx
+                                    .work_sender
+                                    .send(WorkRequest::Command(Command::AddYt { url, position }))
+                                {
+                                    log::error!("Failed to send enqueue command: {e}");
+                                }
+                                Ok(())
+                            })
+                            .build();
+
+                        if let Err(err) =
+                            ui.on_ui_app_event(UiAppEvent::Modal(Box::new(modal)), &mut ctx)
+                        {
+                            log::error!(error:? = err; "UI failed to handle modal event");
+                        }
+
+                        render_wanted = true;
+                    }
                     WorkDone::LyricsIndexed { index } => {
                         ctx.lrc_index = index;
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut ctx) {
