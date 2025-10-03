@@ -454,6 +454,10 @@ fn main_task<B: Backend + std::io::Write>(
                         ("global_queue_update", None, MpdQueryResult::Queue(queue)) => {
                             ctx.queue = queue.unwrap_or_default();
                             render_wanted = true;
+                            log::debug!(len = ctx.queue.len(); "Queue updated");
+                            if let Err(err) = ui.on_event(UiEvent::QueueChanged, &mut ctx) {
+                                status_error!(error:? = err; "Ui failed to handle queue changed event, error: '{}'", err.to_status());
+                            }
                         }
                         (
                             EXTERNAL_COMMAND,

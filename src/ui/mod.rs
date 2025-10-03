@@ -878,6 +878,7 @@ pub enum UiAppEvent {
 #[allow(dead_code)]
 pub enum UiEvent {
     Player,
+    QueueChanged,
     Database,
     Output,
     StoredPlaylist,

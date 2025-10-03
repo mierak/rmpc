@@ -59,6 +59,14 @@ where
         result
     }
 
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
     pub fn new_with_state(items: Vec<T>, state: DirState<S>) -> Self {
         return Self { items, state, filter: None, matched_item_count: 0 };
     }
@@ -207,6 +215,10 @@ where
 
     pub fn prev(&mut self, scrolloff: usize, wrap: bool) {
         self.state.prev(scrolloff, wrap);
+    }
+
+    pub fn select_idx_opt(&mut self, idx: Option<usize>, scrolloff: usize) {
+        self.state.select(idx, scrolloff);
     }
 
     pub fn select_idx(&mut self, idx: usize, scrolloff: usize) {
