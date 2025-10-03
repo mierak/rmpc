@@ -2,7 +2,7 @@ use enum_map::{Enum, EnumMap};
 use itertools::Itertools;
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem, Padding},
+    widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
 use style::Styled;
 
@@ -60,10 +60,11 @@ where
         &mut self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        state: &mut DirStack<T>,
+        state: &mut DirStack<T, ListState>,
         ctx: &Ctx,
     ) {
         let config = &ctx.config;
+        let song_format = ctx.config.theme.browser_song_format.0.as_slice();
         let scrollbar_margin = match config.theme.scrollbar.as_ref() {
             Some(scrollbar) if config.theme.draw_borders => {
                 let scrollbar_track = &scrollbar.symbols[0];
@@ -73,8 +74,8 @@ where
         };
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
 
-        let previous = state.previous().to_list_items(ctx);
-        let current = state.current().to_list_items(ctx);
+        let previous = state.previous().to_list_items(song_format, ctx);
+        let current = state.current().to_list_items(song_format, ctx);
 
         let [previous_area, current_area, preview_area] = *Layout::horizontal([
             Constraint::Percentage(config.theme.column_widths[0]),

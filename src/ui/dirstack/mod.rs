@@ -14,13 +14,18 @@ pub use stack::DirStack;
 pub use state::DirState;
 
 use super::dir_or_song::DirOrSong;
-use crate::{ctx::Ctx, mpd::commands::Song, shared::mpd_query::PreviewGroup};
+use crate::{
+    config::theme::properties::{Property, SongProperty},
+    ctx::Ctx,
+    mpd::commands::Song,
+    shared::mpd_query::PreviewGroup,
+};
 
 pub trait DirStackItem {
     fn as_path(&self) -> &str;
     fn is_file(&self) -> bool;
     fn to_file_preview(&self, ctx: &Ctx) -> Vec<PreviewGroup>;
-    fn matches(&self, ctx: &Ctx, filter: &str) -> bool;
+    fn matches(&self, song_format: &[Property<SongProperty>], ctx: &Ctx, filter: &str) -> bool;
     fn to_list_item<'a>(
         &self,
         ctx: &Ctx,
@@ -55,14 +60,12 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn matches(&self, ctx: &Ctx, filter: &str) -> bool {
+    fn matches(&self, song_format: &[Property<SongProperty>], ctx: &Ctx, filter: &str) -> bool {
         match self {
             DirOrSong::Dir { name, .. } => if name.is_empty() { "Untitled" } else { name.as_str() }
                 .to_lowercase()
                 .contains(&filter.to_lowercase()),
-            DirOrSong::Song(s) => {
-                s.matches(ctx.config.theme.browser_song_format.0.as_slice(), filter, ctx)
-            }
+            DirOrSong::Song(s) => s.matches(song_format, filter, ctx),
         }
     }
 
@@ -136,8 +139,8 @@ impl DirStackItem for Song {
         self.to_preview(key_style, group_style, ctx)
     }
 
-    fn matches(&self, ctx: &Ctx, filter: &str) -> bool {
-        self.matches(ctx.config.theme.browser_song_format.0.as_slice(), filter, ctx)
+    fn matches(&self, song_format: &[Property<SongProperty>], ctx: &Ctx, filter: &str) -> bool {
+        self.matches(song_format, filter, ctx)
     }
 
     fn to_list_item<'a>(
@@ -244,7 +247,7 @@ impl DirStackItem for String {
         Vec::new()
     }
 
-    fn matches(&self, _ctx: &Ctx, filter: &str) -> bool {
+    fn matches(&self, _: &[Property<SongProperty>], _ctx: &Ctx, filter: &str) -> bool {
         self.to_lowercase().contains(&filter.to_lowercase())
     }
 

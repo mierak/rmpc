@@ -204,7 +204,7 @@ available and Block if not
 - Increased default album art `max_size_px` to `(1200, 1200)`.
 - Improved navigation between Pane splits by including recency bias
 - CLI now parses only the required part of the config
-- Status messages will now disappar automatically even when idle
+- Status messages will now disappear automatically even when idle
 - Lyrics should now sync better because they are now scheduled precisely instead of periodically
 - MSRV to 1.82
 - Song metadata is now split into groups

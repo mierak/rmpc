@@ -4,20 +4,33 @@ use std::{
 };
 
 use log::error;
-use ratatui::widgets::{ListItem, ListState};
+use ratatui::widgets::ListItem;
 
 use super::{DirStackItem, state::DirState};
-use crate::{ctx::Ctx, shared::macros::status_warn};
+use crate::{
+    config::theme::properties::{Property, SongProperty},
+    ctx::Ctx,
+    shared::macros::status_warn,
+    ui::dirstack::ScrollingState,
+};
 
 #[derive(Debug)]
-pub struct Dir<T: std::fmt::Debug + DirStackItem + Clone + Send> {
+pub struct Dir<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     pub items: Vec<T>,
-    pub state: DirState<ListState>,
+    pub state: DirState<S>,
     filter: Option<String>,
     matched_item_count: usize,
 }
 
-impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for Dir<T> {
+impl<T, S> Default for Dir<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     fn default() -> Self {
         Self {
             items: Vec::default(),
@@ -29,7 +42,11 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for Dir<T> {
 }
 
 #[allow(dead_code)]
-impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
+impl<T, S> Dir<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     pub fn new(root: Vec<T>) -> Self {
         let mut result = Self {
             items: Vec::new(),
@@ -47,7 +64,15 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         result
     }
 
-    pub fn new_with_state(items: Vec<T>, state: DirState<ListState>) -> Self {
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn new_with_state(items: Vec<T>, state: DirState<S>) -> Self {
         return Self { items, state, filter: None, matched_item_count: 0 };
     }
 
@@ -55,34 +80,40 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.filter.as_deref()
     }
 
-    pub fn set_filter(&mut self, value: Option<String>, ctx: &Ctx) {
+    pub fn set_filter(
+        &mut self,
+        value: Option<String>,
+        song_format: &[Property<SongProperty>],
+        ctx: &Ctx,
+    ) {
         self.matched_item_count = if let Some(ref filter) = value {
-            self.items.iter().filter(|item| item.matches(ctx, filter)).count()
+            self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count()
         } else {
             0
         };
         self.filter = value;
     }
 
-    pub fn push_filter(&mut self, char: char, ctx: &Ctx) {
+    pub fn push_filter(&mut self, char: char, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         if let Some(ref mut filter) = self.filter {
             filter.push(char);
             self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(ctx, filter)).count();
+                self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count();
         }
     }
 
-    pub fn pop_filter(&mut self, ctx: &Ctx) {
+    pub fn pop_filter(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         if let Some(ref mut filter) = self.filter {
             filter.pop();
             self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(ctx, filter)).count();
+                self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count();
         }
     }
 
     pub fn to_list_items_range<'a>(
         &self,
         range: impl RangeBounds<usize>,
+        song_format: &[Property<SongProperty>],
         ctx: &Ctx,
     ) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
@@ -106,7 +137,8 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
             .skip(start)
             .take(end.saturating_sub(start))
             .map(|(i, item)| {
-                let matches = self.filter.as_ref().is_some_and(|v| item.matches(ctx, v));
+                let matches =
+                    self.filter.as_ref().is_some_and(|v| item.matches(song_format, ctx, v));
                 let is_current = current_item_idx.is_some_and(|idx| i == idx);
                 if matches {
                     already_matched = already_matched.saturating_add(1);
@@ -121,8 +153,12 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
             .collect()
     }
 
-    pub fn to_list_items<'a>(&self, ctx: &Ctx) -> Vec<ListItem<'a>> {
-        self.to_list_items_range(.., ctx)
+    pub fn to_list_items<'a>(
+        &self,
+        song_format: &[Property<SongProperty>],
+        ctx: &Ctx,
+    ) -> Vec<ListItem<'a>> {
+        self.to_list_items_range(.., song_format, ctx)
     }
 
     pub fn selected(&self) -> Option<&T> {
@@ -197,6 +233,10 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.state.prev(scrolloff, wrap);
     }
 
+    pub fn select_idx_opt(&mut self, idx: Option<usize>, scrolloff: usize) {
+        self.state.select(idx, scrolloff);
+    }
+
     pub fn select_idx(&mut self, idx: usize, scrolloff: usize) {
         self.state.select(Some(idx), scrolloff);
     }
@@ -237,7 +277,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.state.first();
     }
 
-    pub fn jump_next_matching(&mut self, ctx: &Ctx) {
+    pub fn jump_next_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -250,14 +290,14 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         let length = self.items.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.items[i].matches(ctx, filter) {
+            if self.items[i].matches(song_format, ctx, filter) {
                 self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_previous_matching(&mut self, ctx: &Ctx) {
+    pub fn jump_previous_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -270,14 +310,14 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         let length = self.items.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.items[i].matches(ctx, filter) {
+            if self.items[i].matches(song_format, ctx, filter) {
                 self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_first_matching(&mut self, ctx: &Ctx) {
+    pub fn jump_first_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -286,7 +326,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         self.items
             .iter()
             .enumerate()
-            .find(|(_, item)| item.matches(ctx, filter))
+            .find(|(_, item)| item.matches(song_format, ctx, filter))
             .inspect(|(idx, _)| self.state.select(Some(*idx), ctx.config.scrolloff));
     }
 }
@@ -295,12 +335,13 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
 #[allow(clippy::unwrap_used)]
 mod tests {
 
+    use ratatui::widgets::ListState;
     use rstest::rstest;
 
     use super::{Dir, DirState};
     use crate::{ctx::Ctx, tests::fixtures::ctx};
 
-    fn create_subject() -> Dir<String> {
+    fn create_subject() -> Dir<String, ListState> {
         let mut res = Dir {
             items: vec!["a", "b", "c", "d", "f"].into_iter().map(ToOwned::to_owned).collect(),
             state: DirState::default(),
@@ -467,7 +508,7 @@ mod tests {
 
         #[rstest]
         fn jumps_by_half_viewport(ctx: Ctx) {
-            let mut val: Dir<String> = Dir {
+            let mut val: Dir<String, ListState> = Dir {
                 items: vec!["aa", "ab", "c", "ad"].into_iter().map(ToOwned::to_owned).collect(),
                 ..Default::default()
             };
@@ -476,10 +517,10 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_next_matching(&ctx);
+            val.jump_next_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(1));
 
-            val.jump_next_matching(&ctx);
+            val.jump_next_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(3));
         }
     }
@@ -489,7 +530,7 @@ mod tests {
 
         #[rstest]
         fn jumps_by_half_viewport(ctx: Ctx) {
-            let mut val: Dir<String> = Dir {
+            let mut val: Dir<String, ListState> = Dir {
                 items: vec!["aa", "ab", "c", "ad", "padding"]
                     .into_iter()
                     .map(ToOwned::to_owned)
@@ -501,10 +542,10 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_previous_matching(&ctx);
+            val.jump_previous_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(3));
 
-            val.jump_previous_matching(&ctx);
+            val.jump_previous_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(1));
         }
     }
@@ -514,7 +555,7 @@ mod tests {
 
         #[rstest]
         fn filter_changes_recounts_matched_items(ctx: Ctx) {
-            let mut val: Dir<String> = Dir {
+            let mut val: Dir<String, ListState> = Dir {
                 items: vec!["aa", "ab", "c", "ad", "padding"]
                     .into_iter()
                     .map(ToOwned::to_owned)
@@ -522,19 +563,19 @@ mod tests {
                 filter: None,
                 ..Default::default()
             };
-            val.set_filter(Some("a".to_string()), &ctx);
+            val.set_filter(Some("a".to_string()), &[], &ctx);
             assert_eq!(val.matched_item_count, 4);
 
-            val.push_filter('d', &ctx);
+            val.push_filter('d', &[], &ctx);
             assert_eq!(val.matched_item_count, 2);
 
-            val.pop_filter(&ctx);
+            val.pop_filter(&[], &ctx);
             assert_eq!(val.matched_item_count, 4);
 
-            val.pop_filter(&ctx);
+            val.pop_filter(&[], &ctx);
             assert_eq!(val.matched_item_count, 5);
 
-            val.set_filter(None, &ctx);
+            val.set_filter(None, &[], &ctx);
             assert_eq!(val.matched_item_count, 0);
         }
     }

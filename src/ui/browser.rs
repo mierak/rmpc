@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossterm::event::KeyCode;
 use enum_map::EnumMap;
 use itertools::Itertools;
-use ratatui::prelude::Rect;
+use ratatui::{prelude::Rect, widgets::ListState};
 
 use super::{
     dirstack::{DirStack, DirStackItem},
@@ -45,8 +45,8 @@ pub(in crate::ui) trait BrowserPane<T>: Pane
 where
     T: DirStackItem + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    fn stack(&self) -> &DirStack<T>;
-    fn stack_mut(&mut self) -> &mut DirStack<T>;
+    fn stack(&self) -> &DirStack<T, ListState>;
+    fn stack_mut(&mut self) -> &mut DirStack<T, ListState>;
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect>;
     fn scrollbar_area(&self) -> Option<Rect> {
         let areas = self.browser_areas();
@@ -88,11 +88,12 @@ where
             return Ok(());
         }
 
+        let song_format = ctx.config.theme.browser_song_format.0.as_slice();
         let config = &ctx.config;
         match event.as_common_action(ctx) {
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
-                self.stack_mut().current_mut().set_filter(None, ctx);
+                self.stack_mut().current_mut().set_filter(None, song_format, ctx);
                 self.prepare_preview(ctx);
             }
             Some(CommonAction::Confirm) => {
@@ -103,12 +104,12 @@ where
                 event.stop_propagation();
                 match event.code() {
                     KeyCode::Char(c) => {
-                        self.stack_mut().current_mut().push_filter(c, ctx);
-                        self.stack_mut().current_mut().jump_first_matching(ctx);
+                        self.stack_mut().current_mut().push_filter(c, song_format, ctx);
+                        self.stack_mut().current_mut().jump_first_matching(song_format, ctx);
                         self.prepare_preview(ctx);
                     }
                     KeyCode::Backspace => {
-                        self.stack_mut().current_mut().pop_filter(ctx);
+                        self.stack_mut().current_mut().pop_filter(song_format, ctx);
                         ctx.render()?;
                     }
                     _ => {}
@@ -371,17 +372,25 @@ where
             }
             CommonAction::EnterSearch => {
                 self.set_filter_input_mode_active(true);
-                self.stack_mut().current_mut().set_filter(Some(String::new()), ctx);
+                self.stack_mut().current_mut().set_filter(
+                    Some(String::new()),
+                    ctx.config.theme.browser_song_format.0.as_slice(),
+                    ctx,
+                );
 
                 ctx.render()?;
             }
             CommonAction::NextResult => {
-                self.stack_mut().current_mut().jump_next_matching(ctx);
+                self.stack_mut()
+                    .current_mut()
+                    .jump_next_matching(ctx.config.theme.browser_song_format.0.as_slice(), ctx);
                 self.prepare_preview(ctx);
                 ctx.render()?;
             }
             CommonAction::PreviousResult => {
-                self.stack_mut().current_mut().jump_previous_matching(ctx);
+                self.stack_mut()
+                    .current_mut()
+                    .jump_previous_matching(ctx.config.theme.browser_song_format.0.as_slice(), ctx);
                 self.prepare_preview(ctx);
                 ctx.render()?;
             }
