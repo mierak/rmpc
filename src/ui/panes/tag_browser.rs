@@ -3,7 +3,7 @@ use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 use anyhow::{Context, Result};
 use enum_map::EnumMap;
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect};
+use ratatui::{Frame, prelude::Rect, widgets::ListState};
 
 use super::Pane;
 use crate::{
@@ -37,7 +37,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct TagBrowserPane {
-    stack: DirStack<DirOrSong>,
+    stack: DirStack<DirOrSong, ListState>,
     filter_input_mode: bool,
     root_tag: Tag,
     separator: Option<Arc<str>>,
@@ -417,11 +417,11 @@ impl Pane for TagBrowserPane {
 }
 
 impl BrowserPane<DirOrSong> for TagBrowserPane {
-    fn stack(&self) -> &DirStack<DirOrSong> {
+    fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }
 
-    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong> {
+    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong, ListState> {
         &mut self.stack
     }
 

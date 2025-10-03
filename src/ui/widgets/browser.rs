@@ -2,7 +2,7 @@ use enum_map::{Enum, EnumMap};
 use itertools::Itertools;
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem, Padding},
+    widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
 use style::Styled;
 
@@ -60,7 +60,7 @@ where
         &mut self,
         area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
-        state: &mut DirStack<T>,
+        state: &mut DirStack<T, ListState>,
         ctx: &Ctx,
     ) {
         let config = &ctx.config;

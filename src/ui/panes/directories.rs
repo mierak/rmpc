@@ -1,7 +1,7 @@
 use anyhow::Result;
 use enum_map::EnumMap;
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect};
+use ratatui::{Frame, prelude::Rect, widgets::ListState};
 
 use super::Pane;
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct DirectoriesPane {
-    stack: DirStack<DirOrSong>,
+    stack: DirStack<DirOrSong, ListState>,
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
     initialized: bool,
@@ -244,11 +244,11 @@ impl Pane for DirectoriesPane {
 }
 
 impl BrowserPane<DirOrSong> for DirectoriesPane {
-    fn stack(&self) -> &DirStack<DirOrSong> {
+    fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }
 
-    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong> {
+    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong, ListState> {
         &mut self.stack
     }
 

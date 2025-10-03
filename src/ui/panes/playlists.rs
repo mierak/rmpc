@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use anyhow::{Context, Result, anyhow};
 use enum_map::EnumMap;
 use itertools::Itertools;
-use ratatui::{Frame, prelude::Rect};
+use ratatui::{Frame, prelude::Rect, widgets::ListState};
 
 use super::Pane;
 use crate::{
@@ -39,7 +39,7 @@ mod tests;
 
 #[derive(Debug)]
 pub struct PlaylistsPane {
-    stack: DirStack<DirOrSong>,
+    stack: DirStack<DirOrSong, ListState>,
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
     initialized: bool,
@@ -337,11 +337,11 @@ impl Pane for PlaylistsPane {
 }
 
 impl BrowserPane<DirOrSong> for PlaylistsPane {
-    fn stack(&self) -> &DirStack<DirOrSong> {
+    fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }
 
-    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong> {
+    fn stack_mut(&mut self) -> &mut DirStack<DirOrSong, ListState> {
         &mut self.stack
     }
 

@@ -4,20 +4,28 @@ use std::{
 };
 
 use log::error;
-use ratatui::widgets::{ListItem, ListState};
+use ratatui::widgets::ListItem;
 
 use super::{DirStackItem, state::DirState};
-use crate::{ctx::Ctx, shared::macros::status_warn};
+use crate::{ctx::Ctx, shared::macros::status_warn, ui::dirstack::ScrollingState};
 
 #[derive(Debug)]
-pub struct Dir<T: std::fmt::Debug + DirStackItem + Clone + Send> {
+pub struct Dir<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     pub items: Vec<T>,
-    pub state: DirState<ListState>,
+    pub state: DirState<S>,
     filter: Option<String>,
     matched_item_count: usize,
 }
 
-impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for Dir<T> {
+impl<T, S> Default for Dir<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     fn default() -> Self {
         Self {
             items: Vec::default(),
@@ -29,7 +37,11 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for Dir<T> {
 }
 
 #[allow(dead_code)]
-impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
+impl<T, S> Dir<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     pub fn new(root: Vec<T>) -> Self {
         let mut result = Self {
             items: Vec::new(),
@@ -47,7 +59,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
         result
     }
 
-    pub fn new_with_state(items: Vec<T>, state: DirState<ListState>) -> Self {
+    pub fn new_with_state(items: Vec<T>, state: DirState<S>) -> Self {
         return Self { items, state, filter: None, matched_item_count: 0 };
     }
 
@@ -295,12 +307,13 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Dir<T> {
 #[allow(clippy::unwrap_used)]
 mod tests {
 
+    use ratatui::widgets::ListState;
     use rstest::rstest;
 
     use super::{Dir, DirState};
     use crate::{ctx::Ctx, tests::fixtures::ctx};
 
-    fn create_subject() -> Dir<String> {
+    fn create_subject() -> Dir<String, ListState> {
         let mut res = Dir {
             items: vec!["a", "b", "c", "d", "f"].into_iter().map(ToOwned::to_owned).collect(),
             state: DirState::default(),
@@ -467,7 +480,7 @@ mod tests {
 
         #[rstest]
         fn jumps_by_half_viewport(ctx: Ctx) {
-            let mut val: Dir<String> = Dir {
+            let mut val: Dir<String, ListState> = Dir {
                 items: vec!["aa", "ab", "c", "ad"].into_iter().map(ToOwned::to_owned).collect(),
                 ..Default::default()
             };
@@ -489,7 +502,7 @@ mod tests {
 
         #[rstest]
         fn jumps_by_half_viewport(ctx: Ctx) {
-            let mut val: Dir<String> = Dir {
+            let mut val: Dir<String, ListState> = Dir {
                 items: vec!["aa", "ab", "c", "ad", "padding"]
                     .into_iter()
                     .map(ToOwned::to_owned)
@@ -514,7 +527,7 @@ mod tests {
 
         #[rstest]
         fn filter_changes_recounts_matched_items(ctx: Ctx) {
-            let mut val: Dir<String> = Dir {
+            let mut val: Dir<String, ListState> = Dir {
                 items: vec!["aa", "ab", "c", "ad", "padding"]
                     .into_iter()
                     .map(ToOwned::to_owned)

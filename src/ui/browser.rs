@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossterm::event::KeyCode;
 use enum_map::EnumMap;
 use itertools::Itertools;
-use ratatui::prelude::Rect;
+use ratatui::{prelude::Rect, widgets::ListState};
 
 use super::{
     dirstack::{DirStack, DirStackItem},
@@ -45,8 +45,8 @@ pub(in crate::ui) trait BrowserPane<T>: Pane
 where
     T: DirStackItem + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    fn stack(&self) -> &DirStack<T>;
-    fn stack_mut(&mut self) -> &mut DirStack<T>;
+    fn stack(&self) -> &DirStack<T, ListState>;
+    fn stack_mut(&mut self) -> &mut DirStack<T, ListState>;
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect>;
     fn scrollbar_area(&self) -> Option<Rect> {
         let areas = self.browser_areas();

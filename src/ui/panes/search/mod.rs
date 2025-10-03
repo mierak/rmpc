@@ -8,7 +8,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Styled, Stylize},
     text::Span,
-    widgets::{Block, Borders, List, ListItem, Padding},
+    widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
 
 use super::{CommonAction, Pane};
@@ -54,7 +54,7 @@ mod inputs;
 pub struct SearchPane {
     inputs: InputGroups,
     phase: Phase,
-    songs_dir: Dir<Song>,
+    songs_dir: Dir<Song, ListState>,
     column_areas: EnumMap<BrowserArea, Rect>,
 }
 

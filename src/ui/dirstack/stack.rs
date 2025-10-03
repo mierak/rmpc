@@ -1,21 +1,34 @@
 use super::{DirStackItem, dir::Dir, state::DirState};
+use crate::ui::dirstack::ScrollingState;
 
 #[derive(Debug)]
-pub struct DirStack<T: std::fmt::Debug + DirStackItem + Clone + Send> {
-    current: Dir<T>,
-    others: Vec<Dir<T>>,
+pub struct DirStack<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
+    current: Dir<T, S>,
+    others: Vec<Dir<T, S>>,
     preview: Option<Vec<T>>,
     path: Vec<String>,
 }
 
-impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Default for DirStack<T> {
+impl<T, S> Default for DirStack<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     fn default() -> Self {
         DirStack::new(Vec::default())
     }
 }
 
 #[allow(dead_code)]
-impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
+impl<T, S> DirStack<T, S>
+where
+    T: std::fmt::Debug + DirStackItem + Clone + Send,
+    S: ScrollingState + std::fmt::Debug + Default,
+{
     pub fn new(root: Vec<T>) -> Self {
         let mut result =
             Self { others: Vec::new(), path: Vec::new(), current: Dir::default(), preview: None };
@@ -26,24 +39,24 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
     }
 
     /// Returns the element at the top of the stack
-    pub fn current(&self) -> &Dir<T> {
+    pub fn current(&self) -> &Dir<T, S> {
         &self.current
     }
 
     /// Returns the element at the top of the stack
-    pub fn current_mut(&mut self) -> &mut Dir<T> {
+    pub fn current_mut(&mut self) -> &mut Dir<T, S> {
         &mut self.current
     }
 
     /// Returns the element at the second element from the top of the stack
-    pub fn previous(&self) -> &Dir<T> {
+    pub fn previous(&self) -> &Dir<T, S> {
         self.others
             .last()
             .expect("Previous items to always contain at least one item. This should have been handled in pop()")
     }
 
     /// Returns the element at the second element from the top of the stack
-    pub fn previous_mut(&mut self) -> &mut Dir<T> {
+    pub fn previous_mut(&mut self) -> &mut Dir<T, S> {
         self.others
             .last_mut()
             .expect("Previous items to always contain at least one item. This should have been handled in pop()")
@@ -104,7 +117,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
         self.others.push(old_current_dir);
     }
 
-    pub fn pop(&mut self) -> Option<Dir<T>> {
+    pub fn pop(&mut self) -> Option<Dir<T, S>> {
         if self.others.len() > 1 {
             let top = self.others.pop().expect("There should always be at least two elements");
             self.path.pop();
@@ -117,14 +130,17 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> DirStack<T> {
 
 #[cfg(test)]
 mod tests {
+
     mod new {
+        use ratatui::widgets::ListState;
+
         use crate::ui::dirstack::DirStack;
 
         #[test]
         fn creates_with_correct_current() {
             let input = vec!["test".to_owned()];
 
-            let result: DirStack<String> = DirStack::new(input.clone());
+            let result: DirStack<String, ListState> = DirStack::new(input.clone());
 
             assert_eq!(result.current().items, input);
         }
@@ -133,7 +149,7 @@ mod tests {
         fn selects_none_when_input_is_empty() {
             let input = Vec::new();
 
-            let result: DirStack<String> = DirStack::new(input.clone());
+            let result: DirStack<String, ListState> = DirStack::new(input.clone());
 
             assert_eq!(result.current().selected(), None);
         }
@@ -142,19 +158,21 @@ mod tests {
         fn selects_first_when_input_is_not_empty() {
             let input = vec!["test".to_owned(), "test2".to_owned(), "test3".to_owned()];
 
-            let result: DirStack<String> = DirStack::new(input.clone());
+            let result: DirStack<String, ListState> = DirStack::new(input.clone());
 
             assert_eq!(result.current().selected(), Some("test".to_owned()).as_ref());
         }
     }
 
     mod next_path {
+        use ratatui::widgets::ListState;
+
         use crate::ui::dirstack::DirStack;
 
         #[test]
         fn returns_none_when_nothing_is_selected() {
             let input = vec!["test".to_owned(), "test2".to_owned(), "test3".to_owned()];
-            let mut subject: DirStack<String> = DirStack::new(input.clone());
+            let mut subject: DirStack<String, ListState> = DirStack::new(input.clone());
             subject.current_mut().state.select(None, 0);
 
             let result = subject.next_path();
@@ -165,7 +183,7 @@ mod tests {
         #[test]
         fn returns_correct_path() {
             let level1 = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
-            let mut subject: DirStack<String> = DirStack::new(level1.clone());
+            let mut subject: DirStack<String, ListState> = DirStack::new(level1.clone());
             subject.current_mut().state.select(Some(1), 0);
             let level2 = vec!["d".to_owned(), "e".to_owned(), "f".to_owned()];
             subject.push(level2);
@@ -178,12 +196,14 @@ mod tests {
     }
 
     mod push {
+        use ratatui::widgets::ListState;
+
         use crate::ui::dirstack::DirStack;
 
         #[test]
         fn puts_current_to_top_of_others_and_new_input_to_current() {
             let input = vec!["test".to_owned(), "test2".to_owned(), "test3".to_owned()];
-            let mut subject: DirStack<String> = DirStack::new(input.clone());
+            let mut subject: DirStack<String, ListState> = DirStack::new(input.clone());
             subject.current_mut().state.select(Some(1), 0);
             let input2 = vec!["test4".to_owned(), "test3".to_owned(), "test4".to_owned()];
             subject.previous_mut().state.select(Some(2), 0);
@@ -198,11 +218,13 @@ mod tests {
     }
 
     mod pop {
+        use ratatui::widgets::ListState;
+
         use crate::ui::dirstack::DirStack;
 
         #[test]
         fn previous_element_is_moved_to_current() {
-            let mut subject: DirStack<String> = DirStack::new(Vec::new());
+            let mut subject: DirStack<String, ListState> = DirStack::new(Vec::new());
             let el: Vec<String> =
                 vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
             let el2: Vec<String> =
@@ -217,7 +239,7 @@ mod tests {
 
         #[test]
         fn returns_the_popped_element() {
-            let mut val: DirStack<String> = DirStack::new(Vec::new());
+            let mut val: DirStack<String, ListState> = DirStack::new(Vec::new());
             let el: Vec<String> =
                 vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
             val.push(el.clone());
@@ -229,7 +251,7 @@ mod tests {
 
         #[test]
         fn leaves_at_least_one_element_in_others() {
-            let mut val: DirStack<String> = DirStack::new(Vec::new());
+            let mut val: DirStack<String, ListState> = DirStack::new(Vec::new());
             val.push(Vec::new());
             assert!(val.pop().is_some());
             assert!(val.pop().is_none());
