@@ -7,7 +7,12 @@ use log::error;
 use ratatui::widgets::ListItem;
 
 use super::{DirStackItem, state::DirState};
-use crate::{ctx::Ctx, shared::macros::status_warn, ui::dirstack::ScrollingState};
+use crate::{
+    config::theme::properties::{Property, SongProperty},
+    ctx::Ctx,
+    shared::macros::status_warn,
+    ui::dirstack::ScrollingState,
+};
 
 #[derive(Debug)]
 pub struct Dir<T, S>
@@ -75,34 +80,40 @@ where
         self.filter.as_deref()
     }
 
-    pub fn set_filter(&mut self, value: Option<String>, ctx: &Ctx) {
+    pub fn set_filter(
+        &mut self,
+        value: Option<String>,
+        song_format: &[Property<SongProperty>],
+        ctx: &Ctx,
+    ) {
         self.matched_item_count = if let Some(ref filter) = value {
-            self.items.iter().filter(|item| item.matches(ctx, filter)).count()
+            self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count()
         } else {
             0
         };
         self.filter = value;
     }
 
-    pub fn push_filter(&mut self, char: char, ctx: &Ctx) {
+    pub fn push_filter(&mut self, char: char, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         if let Some(ref mut filter) = self.filter {
             filter.push(char);
             self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(ctx, filter)).count();
+                self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count();
         }
     }
 
-    pub fn pop_filter(&mut self, ctx: &Ctx) {
+    pub fn pop_filter(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         if let Some(ref mut filter) = self.filter {
             filter.pop();
             self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(ctx, filter)).count();
+                self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count();
         }
     }
 
     pub fn to_list_items_range<'a>(
         &self,
         range: impl RangeBounds<usize>,
+        song_format: &[Property<SongProperty>],
         ctx: &Ctx,
     ) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
@@ -126,7 +137,8 @@ where
             .skip(start)
             .take(end.saturating_sub(start))
             .map(|(i, item)| {
-                let matches = self.filter.as_ref().is_some_and(|v| item.matches(ctx, v));
+                let matches =
+                    self.filter.as_ref().is_some_and(|v| item.matches(song_format, ctx, v));
                 let is_current = current_item_idx.is_some_and(|idx| i == idx);
                 if matches {
                     already_matched = already_matched.saturating_add(1);
@@ -141,8 +153,12 @@ where
             .collect()
     }
 
-    pub fn to_list_items<'a>(&self, ctx: &Ctx) -> Vec<ListItem<'a>> {
-        self.to_list_items_range(.., ctx)
+    pub fn to_list_items<'a>(
+        &self,
+        song_format: &[Property<SongProperty>],
+        ctx: &Ctx,
+    ) -> Vec<ListItem<'a>> {
+        self.to_list_items_range(.., song_format, ctx)
     }
 
     pub fn selected(&self) -> Option<&T> {
@@ -261,7 +277,7 @@ where
         self.state.first();
     }
 
-    pub fn jump_next_matching(&mut self, ctx: &Ctx) {
+    pub fn jump_next_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -274,14 +290,14 @@ where
         let length = self.items.len();
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.items[i].matches(ctx, filter) {
+            if self.items[i].matches(song_format, ctx, filter) {
                 self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_previous_matching(&mut self, ctx: &Ctx) {
+    pub fn jump_previous_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -294,14 +310,14 @@ where
         let length = self.items.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.items[i].matches(ctx, filter) {
+            if self.items[i].matches(song_format, ctx, filter) {
                 self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
         }
     }
 
-    pub fn jump_first_matching(&mut self, ctx: &Ctx) {
+    pub fn jump_first_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             status_warn!("No filter set");
             return;
@@ -310,7 +326,7 @@ where
         self.items
             .iter()
             .enumerate()
-            .find(|(_, item)| item.matches(ctx, filter))
+            .find(|(_, item)| item.matches(song_format, ctx, filter))
             .inspect(|(idx, _)| self.state.select(Some(*idx), ctx.config.scrolloff));
     }
 }
@@ -501,10 +517,10 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_next_matching(&ctx);
+            val.jump_next_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(1));
 
-            val.jump_next_matching(&ctx);
+            val.jump_next_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(3));
         }
     }
@@ -526,10 +542,10 @@ mod tests {
 
             val.filter = Some("a".to_string());
 
-            val.jump_previous_matching(&ctx);
+            val.jump_previous_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(3));
 
-            val.jump_previous_matching(&ctx);
+            val.jump_previous_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(1));
         }
     }
@@ -547,19 +563,19 @@ mod tests {
                 filter: None,
                 ..Default::default()
             };
-            val.set_filter(Some("a".to_string()), &ctx);
+            val.set_filter(Some("a".to_string()), &[], &ctx);
             assert_eq!(val.matched_item_count, 4);
 
-            val.push_filter('d', &ctx);
+            val.push_filter('d', &[], &ctx);
             assert_eq!(val.matched_item_count, 2);
 
-            val.pop_filter(&ctx);
+            val.pop_filter(&[], &ctx);
             assert_eq!(val.matched_item_count, 4);
 
-            val.pop_filter(&ctx);
+            val.pop_filter(&[], &ctx);
             assert_eq!(val.matched_item_count, 5);
 
-            val.set_filter(None, &ctx);
+            val.set_filter(None, &[], &ctx);
             assert_eq!(val.matched_item_count, 0);
         }
     }

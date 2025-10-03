@@ -712,7 +712,7 @@ impl Pane for QueuePane {
                 }
                 Some(CommonAction::Close) => {
                     self.filter_input_mode = false;
-                    self.queue.set_filter(None, ctx);
+                    self.queue.set_filter(None, self.column_formats.as_slice(), ctx);
 
                     ctx.render()?;
                 }
@@ -720,12 +720,12 @@ impl Pane for QueuePane {
                     event.stop_propagation();
                     match event.code() {
                         KeyCode::Char(c) => {
-                            self.queue.push_filter(c, ctx);
-                            self.queue.jump_first_matching(ctx);
+                            self.queue.push_filter(c, self.column_formats.as_slice(), ctx);
+                            self.queue.jump_first_matching(self.column_formats.as_slice(), ctx);
                             ctx.render()?;
                         }
                         KeyCode::Backspace => {
-                            self.queue.pop_filter(ctx);
+                            self.queue.pop_filter(self.column_formats.as_slice(), ctx);
                             ctx.render()?;
                         }
                         _ => {}
@@ -1060,17 +1060,17 @@ impl Pane for QueuePane {
                 CommonAction::Left => {}
                 CommonAction::EnterSearch => {
                     self.filter_input_mode = true;
-                    self.queue.set_filter(Some(String::new()), ctx);
+                    self.queue.set_filter(Some(String::new()), self.column_formats.as_slice(), ctx);
 
                     ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.queue.jump_next_matching(ctx);
+                    self.queue.jump_next_matching(self.column_formats.as_slice(), ctx);
 
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.queue.jump_previous_matching(ctx);
+                    self.queue.jump_previous_matching(self.column_formats.as_slice(), ctx);
 
                     ctx.render()?;
                 }

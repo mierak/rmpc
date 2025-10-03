@@ -145,8 +145,10 @@ impl SearchPane {
             }
             b.padding(Padding::new(0, column_right_padding, 0, 0))
         };
-        let current = List::new(self.songs_dir.to_list_items(ctx))
-            .highlight_style(config.theme.current_item_style);
+        let current = List::new(
+            self.songs_dir.to_list_items(ctx.config.theme.browser_song_format.0.as_slice(), ctx),
+        )
+        .highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
         directory.state.set_content_and_viewport_len(directory.items.len(), area.height.into());
@@ -400,10 +402,11 @@ impl SearchPane {
         let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
             return Ok(());
         };
+        let song_format = ctx.config.theme.browser_song_format.0.as_slice();
         match event.as_common_action(ctx) {
             Some(CommonAction::Close) => {
                 *filter_input_on = false;
-                self.songs_dir.set_filter(None, ctx);
+                self.songs_dir.set_filter(None, song_format, ctx);
 
                 ctx.render()?;
             }
@@ -416,13 +419,13 @@ impl SearchPane {
                 event.stop_propagation();
                 match event.code() {
                     KeyCode::Char(c) => {
-                        self.songs_dir.push_filter(c, ctx);
-                        self.songs_dir.jump_first_matching(ctx);
+                        self.songs_dir.push_filter(c, song_format, ctx);
+                        self.songs_dir.jump_first_matching(song_format, ctx);
 
                         ctx.render()?;
                     }
                     KeyCode::Backspace => {
-                        self.songs_dir.pop_filter(ctx);
+                        self.songs_dir.pop_filter(song_format, ctx);
 
                         ctx.render()?;
                     }
@@ -515,18 +518,26 @@ impl SearchPane {
                     ctx.render()?;
                 }
                 CommonAction::EnterSearch => {
-                    self.songs_dir.set_filter(Some(String::new()), ctx);
+                    self.songs_dir.set_filter(
+                        Some(String::new()),
+                        ctx.config.theme.browser_song_format.0.as_slice(),
+                        ctx,
+                    );
                     *filter_input_on = true;
 
                     ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.songs_dir.jump_next_matching(ctx);
+                    self.songs_dir
+                        .jump_next_matching(ctx.config.theme.browser_song_format.0.as_slice(), ctx);
 
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.songs_dir.jump_previous_matching(ctx);
+                    self.songs_dir.jump_previous_matching(
+                        ctx.config.theme.browser_song_format.0.as_slice(),
+                        ctx,
+                    );
 
                     ctx.render()?;
                 }
@@ -880,9 +891,11 @@ impl Pane for SearchPane {
 
                 // Render only the part of the preview that is actually supposed to be shown
                 let offset = self.songs_dir.state.offset();
-                let items = self
-                    .songs_dir
-                    .to_list_items_range(offset..offset + previous_area.height as usize, ctx);
+                let items = self.songs_dir.to_list_items_range(
+                    offset..offset + previous_area.height as usize,
+                    ctx.config.theme.browser_song_format.0.as_slice(),
+                    ctx,
+                );
                 let preview = List::new(items).style(ctx.config.as_text_style());
                 frame.render_widget(preview, preview_area);
             }
