@@ -60,7 +60,18 @@ where
         &self,
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + Sync + Clone + 'static;
-    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()>;
+    fn fetch_data(&self, selected: &T, ctx: &Ctx) -> Result<()>;
+    fn fetch_data_internal(&mut self, ctx: &Ctx) -> Result<()> {
+        // Only attempt to fetch for empty directories
+        if self.stack().next_dir_items().is_none_or(|d| d.is_empty())
+            && let Some(selected) = self.stack().current().selected()
+            && !selected.is_file()
+        {
+            self.fetch_data(selected, ctx)
+        } else {
+            Ok(())
+        }
+    }
     fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> (Vec<Enqueue>, Option<usize>);
     fn open(&mut self, ctx: &Ctx) -> Result<()>;
     fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
@@ -94,7 +105,7 @@ where
             Some(CommonAction::Close) => {
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().set_filter(None, song_format, ctx);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
@@ -106,7 +117,7 @@ where
                     KeyCode::Char(c) => {
                         self.stack_mut().current_mut().push_filter(c, song_format, ctx);
                         self.stack_mut().current_mut().jump_first_matching(song_format, ctx);
-                        self.prepare_preview(ctx);
+                        self.fetch_data_internal(ctx);
                     }
                     KeyCode::Backspace => {
                         self.stack_mut().current_mut().pop_filter(song_format, ctx);
@@ -136,7 +147,6 @@ where
                     .marked_items()
                     .map(|item| self.list_songs_in_item(item.clone()))
                     .collect();
-                let path = self.stack().path().to_owned();
                 let command = std::sync::Arc::clone(command);
                 ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
                     let songs: Vec<_> = marked_items
@@ -150,7 +160,6 @@ where
             GlobalAction::ExternalCommand { command, .. } => {
                 if let Some(selected) = self.stack().current().selected() {
                     let selected = selected.clone();
-                    let path = self.stack().path().to_owned();
                     let songs = self.list_songs_in_item(selected);
                     let command = std::sync::Arc::clone(command);
                     ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
@@ -183,7 +192,7 @@ where
             let current = self.stack_mut().current_mut().selected_with_idx().map(|(i, _)| i);
             self.stack_mut().current_mut().scroll_to(perc, ctx.config.scrolloff);
             if current != self.stack().current().selected_with_idx().map(|(i, _)| i) {
-                self.prepare_preview(ctx)?;
+                self.fetch_data_internal(ctx);
             }
             ctx.render()?;
             return Ok(true);
@@ -212,12 +221,13 @@ where
                 if prev_area.contains(position) =>
             {
                 let clicked_row: usize = event.y.saturating_sub(prev_area.y).into();
-                let prev_stack = self.stack_mut().previous_mut();
-                if let Some(idx_to_select) = prev_stack.state.get_at_rendered_row(clicked_row) {
-                    prev_stack.select_idx(idx_to_select, ctx.config.scrolloff);
+                if let Some(prev_stack) = self.stack_mut().previous_mut() {
+                    if let Some(idx_to_select) = prev_stack.state.get_at_rendered_row(clicked_row) {
+                        prev_stack.select_idx(idx_to_select, ctx.config.scrolloff);
+                    }
+                    self.stack_mut().leave();
+                    self.fetch_data_internal(ctx);
                 }
-                self.stack_mut().pop();
-                self.prepare_preview(ctx);
             }
             MouseEventKind::DoubleClick if current_area.contains(position) => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
@@ -226,7 +236,7 @@ where
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
                     self.next(ctx)?;
-                    self.prepare_preview(ctx);
+                    self.fetch_data_internal(ctx);
                 }
             }
             MouseEventKind::MiddleClick if current_area.contains(position) => {
@@ -250,7 +260,7 @@ where
                         }
                     }
 
-                    self.prepare_preview(ctx);
+                    self.fetch_data_internal(ctx);
                 }
             }
             MouseEventKind::LeftClick if current_area.contains(position) => {
@@ -260,7 +270,7 @@ where
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
                     self.stack_mut().current_mut().select_idx(idx_to_select, ctx.config.scrolloff);
-                    self.prepare_preview(ctx);
+                    self.fetch_data_internal(ctx);
                 }
             }
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick
@@ -270,22 +280,22 @@ where
                 // Offset does not need to be accounted for since it is always
                 // scrolled all the way to the top when going
                 // deeper
-                let idx_to_select = self.stack().preview().and_then(|preview| {
+                let idx_to_select = self.stack().next_dir_items().and_then(|preview| {
                     if clicked_row < preview.len() { Some(clicked_row) } else { None }
                 });
 
                 self.next(ctx)?;
                 self.stack_mut().current_mut().select_idx(idx_to_select.unwrap_or_default(), 0);
 
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
                 self.stack_mut().current_mut().scroll_up(1, ctx.config.scrolloff);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
                 self.stack_mut().current_mut().scroll_down(1, ctx.config.scrolloff);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
             }
             MouseEventKind::RightClick => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
@@ -294,7 +304,7 @@ where
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
                     self.stack_mut().current_mut().select_idx(idx_to_select, ctx.config.scrolloff);
-                    self.prepare_preview(ctx);
+                    self.fetch_data_internal(ctx);
                 }
 
                 self.open_context_menu(ctx)?;
@@ -315,12 +325,12 @@ where
         match action.to_owned() {
             CommonAction::Up => {
                 self.stack_mut().current_mut().prev(config.scrolloff, config.wrap_navigation);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::Down => {
                 self.stack_mut().current_mut().next(config.scrolloff, config.wrap_navigation);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::MoveUp => {
@@ -331,43 +341,42 @@ where
             }
             CommonAction::DownHalf => {
                 self.stack_mut().current_mut().next_half_viewport(ctx.config.scrolloff);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::UpHalf => {
                 self.stack_mut().current_mut().prev_half_viewport(ctx.config.scrolloff);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::PageUp => {
                 self.stack_mut().current_mut().prev_viewport(ctx.config.scrolloff);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::PageDown => {
                 self.stack_mut().current_mut().next_viewport(ctx.config.scrolloff);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::Bottom => {
                 self.stack_mut().current_mut().last();
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::Top => {
                 self.stack_mut().current_mut().first();
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::Right => {
                 self.next(ctx)?;
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::Left => {
-                self.stack_mut().pop();
-                self.stack_mut().clear_preview();
-                self.prepare_preview(ctx);
+                self.stack_mut().leave();
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::EnterSearch => {
@@ -384,14 +393,14 @@ where
                 self.stack_mut()
                     .current_mut()
                     .jump_next_matching(ctx.config.theme.browser_song_format.0.as_slice(), ctx);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::PreviousResult => {
                 self.stack_mut()
                     .current_mut()
                     .jump_previous_matching(ctx.config.theme.browser_song_format.0.as_slice(), ctx);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::InvertSelection => {
@@ -404,7 +413,7 @@ where
                 self.stack_mut()
                     .current_mut()
                     .next(ctx.config.scrolloff, ctx.config.wrap_navigation);
-                self.prepare_preview(ctx);
+                self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             CommonAction::Close if !self.stack().current().marked().is_empty() => {

@@ -14,7 +14,7 @@ use crate::{
         mpd_client::MpdClient,
     },
     shared::{events::ClientRequest, macros::try_skip},
-    ui::dir_or_song::DirOrSong,
+    ui::{dir_or_song::DirOrSong, dirstack::Path},
 };
 
 pub const EXTERNAL_COMMAND: &str = "external_command";
@@ -80,11 +80,10 @@ impl PreviewGroup {
 #[derive(Debug)]
 #[allow(unused, clippy::large_enum_variant)]
 pub(crate) enum MpdQueryResult {
-    SongsList { data: Vec<Song>, origin_path: Option<Vec<String>> },
-    Song { data: Song, origin_path: Option<Vec<String>> },
+    SongsList { data: Vec<Song>, path: Option<Path> },
+    LsInfo { data: Vec<String>, path: Option<Path> },
+    DirOrSong { data: Vec<DirOrSong>, path: Option<Path> },
     SearchResult { data: Vec<Song> },
-    LsInfo { data: Vec<String>, origin_path: Option<Vec<String>> },
-    DirOrSong { data: Vec<DirOrSong>, origin_path: Option<Vec<String>> },
     AddToPlaylist { playlists: Vec<String>, song_file: String },
     AddToPlaylistMultiple { playlists: Vec<String>, song_files: Vec<String> },
     AlbumArt(Option<Vec<u8>>),

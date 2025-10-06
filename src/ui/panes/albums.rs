@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect, widgets::ListState};
@@ -6,12 +6,11 @@ use ratatui::{Frame, prelude::Rect, widgets::ListState};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{keys::actions::Position, sort_mode::SortOptions, tabs::PaneType},
+    config::{keys::actions::Position, tabs::PaneType},
     ctx::Ctx,
     mpd::{
         client::Client,
         commands::Song,
-        errors::MpdError,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
     shared::{
@@ -38,8 +37,7 @@ pub struct AlbumsPane {
 }
 
 const INIT: &str = "init";
-const OPEN_OR_PLAY: &str = "open_or_play";
-const PREVIEW: &str = "preview";
+const FETCH_DATA: &str = "fetch_data";
 
 impl AlbumsPane {
     pub fn new(_ctx: &Ctx) -> Self {
@@ -52,16 +50,7 @@ impl AlbumsPane {
     }
 
     fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
-        let Some(current) = self.stack.current().selected() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
-        };
-        let Some(next_path) = self.stack.next_path() else {
-            log::error!("Failed to move deeper inside dir. Next path is None");
-            return Ok(());
-        };
-
-        match self.stack.path() {
+        match &self.stack.path()[..] {
             [_album] => {
                 let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 let queue_len = ctx.queue.len();
@@ -82,18 +71,7 @@ impl AlbumsPane {
                 }
             }
             [] => {
-                let current = current.clone();
-                let sort_order = ctx.config.browser_song_sort.clone();
-                ctx.query()
-                    .id(OPEN_OR_PLAY)
-                    .replace_id(OPEN_OR_PLAY)
-                    .target(PaneType::Albums)
-                    .query(move |client| {
-                        let data = list_titles(client, current.as_path(), &sort_order)?.collect();
-                        Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
-                    });
-                self.stack_mut().push(Vec::new());
-                self.stack_mut().clear_preview();
+                self.stack_mut().enter();
                 ctx.render()?;
             }
             _ => {
@@ -122,7 +100,7 @@ impl Pane for AlbumsPane {
         if !self.initialized {
             ctx.query().id(INIT).replace_id(INIT).target(PaneType::Albums).query(move |client| {
                 let result = client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+                Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
             });
             self.initialized = true;
         }
@@ -137,7 +115,7 @@ impl Pane for AlbumsPane {
                     move |client| {
                         let result =
                             client.list_tag(Tag::Album, None).context("Cannot list tags")?;
-                        Ok(MpdQueryResult::LsInfo { data: result.0, origin_path: None })
+                        Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
                     },
                 );
             }
@@ -169,19 +147,17 @@ impl Pane for AlbumsPane {
         ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::DirOrSong { data, origin_path }) => {
-                if let Some(origin_path) = origin_path
-                    && origin_path != self.stack().path()
-                {
-                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+            (FETCH_DATA, MpdQueryResult::DirOrSong { data, path }) => {
+                let Some(path) = path else {
+                    log::error!(path:?, current_path:? = self.stack().path(); "Cannot insert data because path is not provided");
                     return Ok(());
-                }
+                };
 
-                self.stack_mut().set_preview(Some(data));
-
+                self.stack_mut().insert(path, data);
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
-            (INIT, MpdQueryResult::LsInfo { data, origin_path: _ }) => {
+            (INIT, MpdQueryResult::LsInfo { data, path: _ }) => {
                 let root = data
                     .into_iter()
                     .sorted_by(|a, b| {
@@ -190,53 +166,13 @@ impl Pane for AlbumsPane {
                     .map(DirOrSong::name_only)
                     .collect_vec();
                 self.stack = DirStack::new(root);
-                self.prepare_preview(ctx)?;
-            }
-            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
-                if let Some(origin_path) = origin_path
-                    && origin_path != self.stack().path()
-                {
-                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
-                    return Ok(());
-                }
-                self.stack_mut().replace(data);
-                self.prepare_preview(ctx)?;
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
             _ => {}
         }
         Ok(())
     }
-}
-
-fn list_titles(
-    client: &mut impl MpdClient,
-    album: &str,
-    sort_opts: &SortOptions,
-) -> Result<impl Iterator<Item = DirOrSong>, MpdError> {
-    Ok(client
-        .find(&[Filter::new(Tag::Album, album)])?
-        .into_iter()
-        .sorted_by(|a, b| a.with_custom_sort(sort_opts).cmp(&b.with_custom_sort(sort_opts)))
-        .map(DirOrSong::Song))
-}
-
-fn find_song(
-    client: &mut impl MpdClient,
-    album: &str,
-    file: &str,
-    sort_opts: &SortOptions,
-) -> Result<Song, MpdError> {
-    Ok(client
-        .find(&[Filter::new(Tag::File, file), Filter::new(Tag::Album, album)])?
-        .into_iter()
-        .sorted_by(|a, b| a.with_custom_sort(sort_opts).cmp(&b.with_custom_sort(sort_opts)))
-        .next()
-        .context(anyhow!(
-            "Expected to find exactly one song: album: '{}', current: '{}'",
-            album,
-            file
-        ))?)
 }
 
 impl BrowserPane<DirOrSong> for AlbumsPane {
@@ -274,39 +210,32 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
     }
 
-    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
-        let Some(current) = self.stack().current().selected().map(DirStackItem::as_path) else {
+    fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
+        let current = selected.as_path().to_owned();
+        let Some(path) = self.stack().next_path() else {
+            log::error!(stack:? = self.stack; "Cannot fetch data because next path is not available");
             return Ok(());
         };
-        let current = current.to_owned();
-        let origin_path = Some(self.stack().path().to_vec());
 
-        self.stack_mut().clear_preview();
-        match self.stack.path() {
-            [album] => {
-                let album = album.clone();
-                let sort_order = ctx.config.browser_song_sort.clone();
-                ctx.query()
-                    .id(PREVIEW)
-                    .replace_id("albums_preview")
-                    .target(PaneType::Albums)
-                    .query(move |client| {
-                        let song = find_song(client, &album, &current, &sort_order)?;
-                        Ok(MpdQueryResult::DirOrSong {
-                            data: vec![DirOrSong::Song(song)],
-                            origin_path,
-                        })
-                    });
-            }
+        match &self.stack.path()[..] {
+            [_album] => {}
             [] => {
                 let sort_order = ctx.config.browser_song_sort.clone();
                 ctx.query()
-                    .id(PREVIEW)
-                    .replace_id("albums_preview")
+                    .id(FETCH_DATA)
+                    .replace_id("albums_data")
                     .target(PaneType::Albums)
                     .query(move |client| {
-                        let data = list_titles(client, &current, &sort_order)?.collect();
-                        Ok(MpdQueryResult::DirOrSong { data, origin_path })
+                        let data = client
+                            .find(&[Filter::new(Tag::Album, current)])?
+                            .into_iter()
+                            .sorted_by(|a, b| {
+                                a.with_custom_sort(&sort_order)
+                                    .cmp(&b.with_custom_sort(&sort_order))
+                            })
+                            .map(DirOrSong::Song)
+                            .collect();
+                        Ok(MpdQueryResult::DirOrSong { data, path: Some(path) })
                     });
             }
 
@@ -320,7 +249,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         &self,
         items: impl Iterator<Item = &'a DirOrSong>,
     ) -> (Vec<Enqueue>, Option<usize>) {
-        match self.stack.path() {
+        match &self.stack.path()[..] {
             [album] => {
                 let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
                 items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {

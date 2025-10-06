@@ -63,6 +63,7 @@ remote commands inside scripts triggered by rmpc
 - Browsers now properly use case insensitive sorting
 - Refactored and improved image backend detection
 - `JumpToCurrent` now jumps to last playing song in stopped state
+- Directories now keep their state when going back out of them
 
 ### Fixed
 
