@@ -433,7 +433,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
                         let name = item.dir_name_or_file();
                         let path = path.join(name);
 
-                        self.stack.dirs.get(&path).map(|dir| {
+                        self.stack.get(&path).map(|dir| {
                             dir.items.iter().filter_map(|song| match song {
                                 DirOrSong::Dir { .. } => None,
                                 DirOrSong::Song(song) => Some(Enqueue::Find {
@@ -538,7 +538,6 @@ mod tests {
 
     fn pane_albums(pane: &TagBrowserPane) -> Vec<String> {
         pane.stack
-            .dirs
             .get(&"artist".into())
             .expect("expected artist dir to exist")
             .items
@@ -563,7 +562,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "album_a"]),
@@ -588,7 +587,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "(2020) album_a"]),
@@ -614,7 +613,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "(2019) album_b"]),
@@ -640,7 +639,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "album_a"]),
@@ -666,7 +665,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "(1969) album_a"]), // Uses originaldate, not date
@@ -690,7 +689,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "(1969) album_a"]), // Uses originaldate (first in list)
@@ -713,7 +712,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.dirs.keys().sorted().collect_vec(), vec![
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
             &Path::from([]),
             &Path::from("artist"),
             &Path::from(["artist", "(<no date>) album_a"]) // Falls back to default

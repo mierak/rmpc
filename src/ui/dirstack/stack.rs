@@ -10,7 +10,7 @@ where
     S: ScrollingState + std::fmt::Debug + Default,
 {
     path: Path,
-    pub dirs: HashMap<Path, Dir<T, S>>,
+    dirs: HashMap<Path, Dir<T, S>>,
     empty: Dir<T, S>,
 }
 
@@ -40,6 +40,14 @@ where
 
     pub fn len(&self) -> usize {
         self.dirs.len()
+    }
+
+    pub fn get(&self, path: &Path) -> Option<&Dir<T, S>> {
+        self.dirs.get(path)
+    }
+
+    pub fn contained_paths(&self) -> impl Iterator<Item = &Path> {
+        self.dirs.keys()
     }
 
     pub fn current(&self) -> &Dir<T, S> {
