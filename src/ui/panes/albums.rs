@@ -50,7 +50,7 @@ impl AlbumsPane {
     }
 
     fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [_album] => {
                 let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 let queue_len = ctx.queue.len();
@@ -217,7 +217,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
             return Ok(());
         };
 
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [_album] => {}
             [] => {
                 let sort_order = ctx.config.browser_song_sort.clone();
@@ -249,7 +249,7 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         &self,
         items: impl Iterator<Item = &'a DirOrSong>,
     ) -> (Vec<Enqueue>, Option<usize>) {
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [album] => {
                 let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
                 items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {

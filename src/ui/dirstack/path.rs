@@ -1,8 +1,5 @@
-use derive_more::{Deref, DerefMut};
-
-#[derive(Debug, Default, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deref, DerefMut)]
-// TODO make priv
-pub struct Path(pub Vec<String>);
+#[derive(Debug, Default, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Path(Vec<String>);
 
 impl Path {
     pub fn new() -> Self {
@@ -25,6 +22,10 @@ impl Path {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub fn as_slice(&self) -> &[String] {
+        self.0.as_slice()
     }
 }
 

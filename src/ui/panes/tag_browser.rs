@@ -90,7 +90,7 @@ impl TagBrowserPane {
     }
 
     fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [_artist, _album] => {
                 let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
                 if !items.is_empty() {
@@ -270,8 +270,7 @@ impl Pane for TagBrowserPane {
     ) -> Result<()> {
         match (id, data) {
             (FETCH_SONGS, MpdQueryResult::SongsList { data, path }) => {
-                let Some(root_path) = path.and_then(|mut v| v.first_mut().map(std::mem::take))
-                else {
+                let Some(root_path) = path.and_then(|v| v.as_slice().iter().next().cloned()) else {
                     return Ok(());
                 };
 
@@ -341,7 +340,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         let separator = self.separator.clone();
         let path = self.stack().path().to_owned();
 
-        let album_songs = match &self.stack.path()[..] {
+        let album_songs = match self.stack.path().as_slice() {
             [_artist] => self
                 .stack
                 .next_dir_items()
@@ -375,7 +374,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
     }
 
     fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [_artist, _album] => {
                 ctx.render()?;
             }
@@ -411,7 +410,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         &self,
         items: impl Iterator<Item = &'a DirOrSong>,
     ) -> (Vec<Enqueue>, Option<usize>) {
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [_tag_value, _album] => {
                 let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
 

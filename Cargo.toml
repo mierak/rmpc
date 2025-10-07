@@ -25,7 +25,7 @@ strum = { workspace = true }
 flate2 = { version = "1.1.2" }
 itertools = "0.14.0"
 ron = "0.10.1"
-derive_more = { version = "2.0.1", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref", "deref_mut", "debug"] }
+derive_more = { version = "2.0.1", features = ["into_iterator", "into", "as_ref", "into_iterator", "display", "deref", "debug"] }
 rustix = { version = "1.0.7", features = ["termios", "fs", "stdio", "process"] }
 bitflags = { version = "2.9.1", features = ["serde"] }
 log = { version = "0.4.27", features = ["kv"] }

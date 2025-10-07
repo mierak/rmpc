@@ -217,7 +217,7 @@ impl Pane for PlaylistsPane {
                 let old_viewport_len = self.stack.current().state.viewport_len();
                 let old_content_len = self.stack.current().state.content_len();
                 let old_marked = self.stack.current().marked().clone();
-                match &self.stack.path()[..] {
+                match self.stack.path().as_slice() {
                     [playlist_name] => {
                         let Some((selected_idx, selected_playlist)) =
                             self.stack().previous().map(|prev| {
@@ -368,7 +368,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
-        match &self.stack.path()[..] {
+        match self.stack.path().as_slice() {
             [] => {
                 let DirOrSong::Dir { name: playlist, .. } = selected else {
                     log::error!(selected:? = selected; "Expected playlist to be selected");
@@ -447,7 +447,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn delete<'a>(&self, items: impl Iterator<Item = (usize, &'a DirOrSong)>) -> Vec<MpdDelete> {
-        match &self.stack().path()[..] {
+        match self.stack().path().as_slice() {
             [playlist] => {
                 let playlist: Arc<str> = Arc::from(playlist.as_str());
                 items

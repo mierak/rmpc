@@ -11,6 +11,7 @@ where
 {
     path: Path,
     pub dirs: HashMap<Path, Dir<T, S>>,
+    empty: Dir<T, S>,
 }
 
 impl<T, S> Default for DirStack<T, S>
@@ -30,7 +31,8 @@ where
     S: ScrollingState + std::fmt::Debug + Default,
 {
     pub fn new(root: Vec<T>) -> Self {
-        let mut result = Self { dirs: HashMap::new(), path: Path::new() };
+        let mut result =
+            Self { dirs: HashMap::new(), path: Path::new(), empty: Dir::new(Vec::new()) };
 
         result.dirs.insert(result.path.clone(), Dir::new(root));
         result
@@ -41,15 +43,11 @@ where
     }
 
     pub fn current(&self) -> &Dir<T, S> {
-        self.dirs
-            .get(&self.path)
-            .expect("Path to exist in the directories. Should have been ensured in enter()")
+        self.dirs.get(&self.path).unwrap_or(&self.empty)
     }
 
     pub fn current_mut(&mut self) -> &mut Dir<T, S> {
-        self.dirs
-            .get_mut(&self.path)
-            .expect("Path to exist in the directories. Should have been ensured in enter()")
+        self.dirs.get_mut(&self.path).unwrap_or(&mut self.empty)
     }
 
     pub fn previous(&self) -> Option<&Dir<T, S>> {
