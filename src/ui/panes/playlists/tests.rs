@@ -27,7 +27,7 @@ mod on_idle_event {
     use crate::{
         ctx::Ctx,
         shared::mpd_query::MpdQueryResult,
-        ui::panes::playlists::{INIT, OPEN_OR_PLAY, REINIT},
+        ui::panes::playlists::{INIT, REINIT},
     };
 
     mod browsing_playlists {
@@ -41,7 +41,7 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
@@ -54,10 +54,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong {
-                        data: vec![dir("pl2"), dir("pl4")],
-                        origin_path: None,
-                    },
+                    MpdQueryResult::DirOrSong { data: vec![dir("pl2"), dir("pl4")], path: None },
                     true,
                     &ctx,
                 )
@@ -76,7 +73,7 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
@@ -89,7 +86,7 @@ mod on_idle_event {
                     REINIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
@@ -109,7 +106,7 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
@@ -120,10 +117,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     REINIT,
-                    MpdQueryResult::DirOrSong {
-                        data: vec![dir("pl1"), dir("pl2")],
-                        origin_path: None,
-                    },
+                    MpdQueryResult::DirOrSong { data: vec![dir("pl1"), dir("pl2")], path: None },
                     true,
                     &ctx,
                 )
@@ -142,7 +136,7 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
@@ -152,10 +146,7 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong {
-                        data: vec![dir("pl3"), dir("pl4")],
-                        origin_path: None,
-                    },
+                    MpdQueryResult::DirOrSong { data: vec![dir("pl3"), dir("pl4")], path: None },
                     true,
                     &ctx,
                 )
@@ -172,6 +163,7 @@ mod on_idle_event {
         use crate::{
             shared::events::{ClientRequest, WorkRequest},
             tests::fixtures::{client_request_channel, work_request_channel},
+            ui::panes::playlists::FETCH_DATA,
         };
 
         #[rstest]
@@ -183,27 +175,33 @@ mod on_idle_event {
             let rx = client_request_channel.1.clone();
             let ctx = ctx(work_request_channel, client_request_channel);
             let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
+            // init playlists
             screen
                 .on_query_finished(
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
+            // select third playlist ind init its songs
             screen.stack.current_mut().select_idx(2, 0);
-            screen.stack_mut().push(Vec::new());
+            screen.stack_mut().enter();
             screen
                 .on_query_finished(
-                    OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
+                    FETCH_DATA,
+                    MpdQueryResult::DirOrSong {
+                        data: initial_songs.iter().cloned().map(DirOrSong::Song).collect(),
+                        path: Some("pl3".into()),
+                    },
                     true,
                     &ctx,
                 )
                 .unwrap();
+            // select third song - s3
             screen.stack.current_mut().select_idx(2, 0);
             assert_eq!(
                 screen.stack.current().selected(),
@@ -216,24 +214,26 @@ mod on_idle_event {
             let rx2 = rx.clone();
             let new_songs = vec![song("s2"), song("s3"), song("s4")];
             let new_songs2 = new_songs.clone();
+            // send in new songs without s1
             std::thread::spawn(move || {
                 let req = rx2.recv().unwrap();
                 if let ClientRequest::QuerySync(qry) = req {
                     qry.tx.send(MpdQueryResult::Any(Box::new(new_songs2))).unwrap();
                 }
             });
+            // trigger reinit of playlists without pl1
             screen
                 .on_query_finished(
                     REINIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
-            assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
+            assert_eq!(screen.stack.previous().and_then(|p| p.selected()), Some(&dir("pl3")));
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[1].clone()))
@@ -254,18 +254,21 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
-            screen.stack_mut().push(Vec::new());
+            screen.stack_mut().enter();
             screen
                 .on_query_finished(
-                    OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
+                    FETCH_DATA,
+                    MpdQueryResult::DirOrSong {
+                        data: initial_songs.iter().cloned().map(DirOrSong::Song).collect(),
+                        path: Some("pl3".into()),
+                    },
                     true,
                     &ctx,
                 )
@@ -292,13 +295,13 @@ mod on_idle_event {
                     REINIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
-            assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
+            assert_eq!(screen.stack.previous().and_then(|p| p.selected()), Some(&dir("pl3")));
 
             assert_eq!(
                 screen.stack.current().selected(),
@@ -320,18 +323,21 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
-            screen.stack_mut().push(Vec::new());
+            screen.stack_mut().enter();
             screen
                 .on_query_finished(
-                    OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
+                    FETCH_DATA,
+                    MpdQueryResult::DirOrSong {
+                        data: initial_songs.iter().cloned().map(DirOrSong::Song).collect(),
+                        path: Some("pl3".into()),
+                    },
                     true,
                     &ctx,
                 )
@@ -358,13 +364,13 @@ mod on_idle_event {
                     REINIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
-            assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
+            assert_eq!(screen.stack.previous().and_then(|p| p.selected()), Some(&dir("pl3")));
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[0].clone()))
@@ -385,18 +391,21 @@ mod on_idle_event {
                     INIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
-            screen.stack_mut().push(Vec::new());
+            screen.stack_mut().enter();
             screen
                 .on_query_finished(
-                    OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
+                    FETCH_DATA,
+                    MpdQueryResult::DirOrSong {
+                        data: initial_songs.iter().cloned().map(DirOrSong::Song).collect(),
+                        path: Some("pl3".into()),
+                    },
                     true,
                     &ctx,
                 )
@@ -423,13 +432,13 @@ mod on_idle_event {
                     REINIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
-            assert_eq!(screen.stack.previous().selected(), Some(&dir("pl3")));
+            assert_eq!(screen.stack.previous().and_then(|p| p.selected()), Some(&dir("pl3")));
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[1].clone()))
@@ -449,17 +458,20 @@ mod on_idle_event {
             screen
                 .on_query_finished(
                     INIT,
-                    MpdQueryResult::DirOrSong { data: initial_playlists, origin_path: None },
+                    MpdQueryResult::DirOrSong { data: initial_playlists, path: None },
                     true,
                     &ctx,
                 )
                 .unwrap();
             screen.stack.current_mut().select_idx(2, 0);
-            screen.stack_mut().push(Vec::new());
+            screen.stack_mut().enter();
             screen
                 .on_query_finished(
-                    OPEN_OR_PLAY,
-                    MpdQueryResult::SongsList { data: initial_songs.clone(), origin_path: None },
+                    FETCH_DATA,
+                    MpdQueryResult::DirOrSong {
+                        data: initial_songs.iter().cloned().map(DirOrSong::Song).collect(),
+                        path: Some("pl3".into()),
+                    },
                     true,
                     &ctx,
                 )
@@ -486,13 +498,13 @@ mod on_idle_event {
                     REINIT,
                     MpdQueryResult::DirOrSong {
                         data: vec![dir("pl1"), dir("pl2"), dir("pl4")],
-                        origin_path: None,
+                        path: None,
                     },
                     true,
                     &ctx,
                 )
                 .unwrap();
-            assert_eq!(screen.stack.previous().selected(), Some(&dir("pl4")));
+            assert_eq!(screen.stack.previous().and_then(|p| p.selected()), Some(&dir("pl4")));
             assert_eq!(
                 screen.stack.current().selected(),
                 Some(&DirOrSong::Song(new_songs[1].clone()))

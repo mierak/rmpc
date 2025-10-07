@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, sync::Arc};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect, widgets::ListState};
@@ -12,7 +12,7 @@ use crate::{
     ctx::Ctx,
     mpd::{
         client::Client,
-        commands::{Song, lsinfo::LsInfoEntry},
+        commands::Song,
         mpd_client::{MpdClient, SingleOrRange},
     },
     shared::{
@@ -43,13 +43,11 @@ pub struct PlaylistsPane {
     filter_input_mode: bool,
     browser: Browser<DirOrSong>,
     initialized: bool,
-    selected_song: Option<(usize, String)>,
 }
 
 const INIT: &str = "init";
 const REINIT: &str = "reinit";
-const OPEN_OR_PLAY: &str = "open_or_play";
-const PREVIEW: &str = "preview";
+const FETCH_DATA: &str = "fetch_data";
 const PLAYLIST_INFO: &str = "preview";
 
 impl PlaylistsPane {
@@ -59,33 +57,18 @@ impl PlaylistsPane {
             filter_input_mode: false,
             browser: Browser::new(),
             initialized: false,
-            selected_song: None,
         }
     }
 
     fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
             log::error!("Failed to move deeper inside dir. Current value is None");
-
-            ctx.render()?;
-            return Ok(());
-        };
-        let Some(next_path) = self.stack.next_path() else {
-            log::error!("Failed to move deeper inside dir. Next path is None");
             return Ok(());
         };
 
         match selected {
-            DirOrSong::Dir { name: playlist, .. } => {
-                let playlist = playlist.clone();
-                ctx.query().id(OPEN_OR_PLAY).target(PaneType::Playlists).query(move |client| {
-                    Ok(MpdQueryResult::SongsList {
-                        data: client.list_playlist_info(&playlist, None)?,
-                        origin_path: Some(next_path),
-                    })
-                });
-                self.stack_mut().push(Vec::new());
-                self.stack_mut().clear_preview();
+            DirOrSong::Dir { .. } => {
+                self.stack_mut().enter();
                 ctx.render()?;
             }
             DirOrSong::Song(_song) => {
@@ -137,7 +120,7 @@ impl Pane for PlaylistsPane {
                         .sorted_by(|a, b| compare.compare(&a.name, &b.name))
                         .map(|playlist| DirOrSong::playlist_name_only(playlist.name))
                         .collect();
-                    Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
+                    Ok(MpdQueryResult::DirOrSong { data: result, path: None })
                 },
             );
 
@@ -167,7 +150,7 @@ impl Pane for PlaylistsPane {
                             })
                             .map(|playlist| DirOrSong::playlist_name_only(playlist.name))
                             .collect();
-                        Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
+                        Ok(MpdQueryResult::DirOrSong { data: result, path: None })
                     },
                 );
             }
@@ -212,92 +195,101 @@ impl Pane for PlaylistsPane {
                 );
                 ctx.render()?;
             }
-            (PREVIEW, MpdQueryResult::DirOrSong { data, origin_path }) => {
-                if let Some(origin_path) = origin_path
-                    && origin_path != self.stack().path()
-                {
-                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+            (FETCH_DATA, MpdQueryResult::DirOrSong { data, path }) => {
+                let Some(path) = path else {
+                    log::error!(path:?, current_path:? = self.stack().path(); "Cannot insert data because path is not provided");
                     return Ok(());
-                }
+                };
 
-                self.stack_mut().set_preview(Some(data));
+                self.stack_mut().insert(path, data);
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
-            (OPEN_OR_PLAY, MpdQueryResult::SongsList { data, origin_path }) => {
-                if let Some(origin_path) = origin_path
-                    && origin_path != self.stack().path()
-                {
-                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
-                    return Ok(());
-                }
-                self.stack_mut().replace(data.into_iter().map(DirOrSong::Song).collect());
-                self.prepare_preview(ctx)?;
-                ctx.render()?;
-            }
-            (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
+            (INIT, MpdQueryResult::DirOrSong { data, path: _ }) => {
                 self.stack = DirStack::new(data);
-                self.prepare_preview(ctx)?;
+                if let Some(sel) = self.stack.current().selected() {
+                    self.fetch_data(sel, ctx)?;
+                }
+                ctx.render()?;
             }
             (REINIT, MpdQueryResult::DirOrSong { data, .. }) => {
                 let mut new_stack = DirStack::new(data);
                 let old_viewport_len = self.stack.current().state.viewport_len();
                 let old_content_len = self.stack.current().state.content_len();
                 let old_marked = self.stack.current().marked().clone();
-                match self.stack.path() {
+                match self.stack.path().as_slice() {
                     [playlist_name] => {
-                        let (selected_idx, selected_playlist) = self
-                            .stack()
-                            .previous()
-                            .selected_with_idx()
-                            .map_or((0, playlist_name.as_str()), |(idx, playlist)| {
-                                (idx, playlist.as_path())
-                            });
+                        let Some((selected_idx, selected_playlist)) =
+                            self.stack().previous().map(|prev| {
+                                prev.selected_with_idx()
+                                    .map_or((0, playlist_name.as_str()), |(idx, playlist)| {
+                                        (idx, playlist.as_path())
+                                    })
+                            })
+                        else {
+                            log::error!(stack:? = self.stack(); "Reinitializing playlists. Current path sugsests that we are inside a playlist but previous is None");
+                            return Ok(());
+                        };
+
                         let idx_to_select = new_stack
                             .current()
                             .items
                             .iter()
                             .find_position(|item| item.as_path() == selected_playlist)
                             .map_or(selected_idx, |(idx, _)| idx);
-                        new_stack.current_mut().state.set_viewport_len(old_viewport_len);
 
+                        new_stack.current_mut().state.set_viewport_len(old_viewport_len); // is this needed?
                         new_stack
                             .current_mut()
                             .state
                             .select(Some(idx_to_select), ctx.config.scrolloff);
 
-                        if let Some((idx, DirOrSong::Song(song))) =
-                            self.stack().current().selected_with_idx()
-                        {
-                            self.selected_song = Some((idx, song.as_path().to_owned()));
-                        }
-                        let playlist = playlist_name.to_owned();
-                        self.stack = new_stack;
-                        self.stack_mut().current_mut().state.set_content_len(old_content_len);
-                        self.stack_mut().current_mut().state.set_viewport_len(old_viewport_len);
+                        log::debug!(stack:? = new_stack; "Reinitializing playlist stack");
+
+                        let selected_song = self.stack().current().selected_with_idx();
+
+                        // Get the actually selected playlist after the resolution. If none is
+                        // selected then it means that we have no more playlists to go into so we
+                        // end here
+                        let Some(new_playlist) = new_stack.current().selected() else {
+                            return Ok(());
+                        };
+
+                        let playlist = new_playlist.as_path().to_owned();
+                        new_stack.current_mut().state.set_content_len(old_content_len);
+                        new_stack.current_mut().state.set_viewport_len(old_viewport_len);
 
                         let songs = ctx.query_sync(move |client| {
                             Ok(client.list_playlist_info(&playlist, None)?)
                         })?;
 
-                        self.stack_mut().push(songs.into_iter().map(DirOrSong::Song).collect());
-                        self.prepare_preview(ctx)?;
-                        if let Some((idx, song)) = &self.selected_song {
-                            let idx_to_select = self
-                                .stack
+                        // Calculate next path based on the playlist that was selected, can be
+                        // either the same playlist by name or the same index. If no playllist is
+                        // selected, ie the stack is empty, we end here
+                        let Some(next_path) = new_stack.next_path() else {
+                            log::debug!(stack:? = new_stack; "No playlist selected after reinit, not entering");
+                            return Ok(());
+                        };
+                        new_stack
+                            .insert(next_path, songs.into_iter().map(DirOrSong::Song).collect());
+                        new_stack.enter();
+
+                        if let Some((idx, song)) = selected_song {
+                            let idx_to_select = new_stack
                                 .current()
                                 .items
                                 .iter()
-                                .find_position(|item| item.as_path() == song)
-                                .map_or(*idx, |(idx, _)| idx);
-                            self.stack.current_mut().state.set_viewport_len(old_viewport_len);
-                            self.stack
+                                .find_position(|item| item.as_path() == song.as_path())
+                                .map_or(idx, |(idx, _)| idx);
+                            new_stack.current_mut().state.set_viewport_len(old_viewport_len);
+                            new_stack
                                 .current_mut()
                                 .state
                                 .select(Some(idx_to_select), ctx.config.scrolloff);
                         }
-                        *self.stack_mut().current_mut().marked_mut() = old_marked;
-                        self.stack_mut().clear_preview();
-                        self.prepare_preview(ctx)?;
+                        *new_stack.current_mut().marked_mut() = old_marked;
+
+                        self.stack = new_stack;
                         ctx.render()?;
                     }
                     [] => {
@@ -323,7 +315,9 @@ impl Pane for PlaylistsPane {
                             .select(Some(idx_to_select), ctx.config.scrolloff);
 
                         self.stack = new_stack;
-                        self.prepare_preview(ctx)?;
+                        if let Some(sel) = self.stack.current().selected() {
+                            self.fetch_data(sel, ctx)?;
+                        }
                     }
                     _ => {
                         log::error!(stack:? = self.stack; "Invalid playlist stack state");
@@ -373,40 +367,31 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         }
     }
 
-    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
-        let s = self.stack().current().selected().cloned();
-        self.stack_mut().clear_preview();
-        let origin_path = Some(self.stack().path().to_vec());
-        ctx.query().id(PREVIEW).replace_id("playlists_preview").target(PaneType::Playlists).query(
-            move |client| {
-                let data = s.as_ref().map_or(Ok(Vec::new()), move |current| -> Result<_> {
-                    let response = match current {
-                        DirOrSong::Dir { name: d, .. } => client
-                            .list_playlist_info(d, None)?
+    fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
+        match self.stack.path().as_slice() {
+            [] => {
+                let DirOrSong::Dir { name: playlist, .. } = selected else {
+                    log::error!(selected:? = selected; "Expected playlist to be selected");
+                    return Ok(());
+                };
+                let path = self.stack.next_path();
+                let playlist = playlist.to_owned();
+                ctx.query()
+                    .id(FETCH_DATA)
+                    .replace_id("playlists_data")
+                    .target(PaneType::Playlists)
+                    .query(move |client| {
+                        let data = client
+                            .list_playlist_info(&playlist, None)?
                             .into_iter()
                             .map(DirOrSong::Song)
-                            .collect_vec(),
-                        DirOrSong::Song(song) => {
-                            match client
-                                .lsinfo(Some(&song.file))
-                                .context(anyhow!("File '{}' was listed but not found", song.file))?
-                                .0
-                                .pop()
-                            {
-                                Some(LsInfoEntry::File(song)) => {
-                                    vec![DirOrSong::Song(song)]
-                                }
-                                _ => Vec::new(),
-                            }
-                        }
-                    };
+                            .collect_vec();
+                        Ok(MpdQueryResult::DirOrSong { data, path })
+                    });
+            }
+            _ => {}
+        }
 
-                    Ok(response)
-                })?;
-
-                Ok(MpdQueryResult::DirOrSong { data, origin_path })
-            },
-        );
         Ok(())
     }
 
@@ -446,7 +431,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                     .id(PLAYLIST_INFO)
                     .query(move |client| {
                         let playlist = client.list_playlist_info(&playlist, None)?;
-                        Ok(MpdQueryResult::SongsList { data: playlist, origin_path: None })
+                        Ok(MpdQueryResult::SongsList { data: playlist, path: None })
                     });
             }
             DirOrSong::Song(_) => {}
@@ -462,7 +447,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn delete<'a>(&self, items: impl Iterator<Item = (usize, &'a DirOrSong)>) -> Vec<MpdDelete> {
-        match self.stack().path() {
+        match self.stack().path().as_slice() {
             [playlist] => {
                 let playlist: Arc<str> = Arc::from(playlist.as_str());
                 items
@@ -525,7 +510,9 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
     }
 
     fn move_selected(&mut self, direction: MoveDirection, ctx: &Ctx) -> Result<()> {
-        let Some(DirOrSong::Dir { name: playlist, .. }) = self.stack.previous().selected() else {
+        let Some(DirOrSong::Dir { name: playlist, .. }) =
+            self.stack.previous().and_then(|p| p.selected())
+        else {
             return Ok(());
         };
 

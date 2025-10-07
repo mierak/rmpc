@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use super::{DirStackItem, dir::Dir, state::DirState};
-use crate::ui::dirstack::ScrollingState;
+use crate::ui::dirstack::{ScrollingState, path::Path};
 
 #[derive(Debug)]
 pub struct DirStack<T, S>
@@ -7,10 +9,9 @@ where
     T: std::fmt::Debug + DirStackItem + Clone + Send,
     S: ScrollingState + std::fmt::Debug + Default,
 {
-    current: Dir<T, S>,
-    others: Vec<Dir<T, S>>,
-    preview: Option<Vec<T>>,
-    path: Vec<String>,
+    path: Path,
+    dirs: HashMap<Path, Dir<T, S>>,
+    empty: Dir<T, S>,
 }
 
 impl<T, S> Default for DirStack<T, S>
@@ -31,99 +32,105 @@ where
 {
     pub fn new(root: Vec<T>) -> Self {
         let mut result =
-            Self { others: Vec::new(), path: Vec::new(), current: Dir::default(), preview: None };
-        result.push(Vec::new());
-        result.current = Dir::new(root);
+            Self { dirs: HashMap::new(), path: Path::new(), empty: Dir::new(Vec::new()) };
 
+        result.dirs.insert(result.path.clone(), Dir::new(root));
         result
     }
 
-    /// Returns the element at the top of the stack
+    pub fn len(&self) -> usize {
+        self.dirs.len()
+    }
+
+    pub fn get(&self, path: &Path) -> Option<&Dir<T, S>> {
+        self.dirs.get(path)
+    }
+
+    pub fn contained_paths(&self) -> impl Iterator<Item = &Path> {
+        self.dirs.keys()
+    }
+
     pub fn current(&self) -> &Dir<T, S> {
-        &self.current
+        self.dirs.get(&self.path).unwrap_or(&self.empty)
     }
 
-    /// Returns the element at the top of the stack
     pub fn current_mut(&mut self) -> &mut Dir<T, S> {
-        &mut self.current
+        self.dirs.get_mut(&self.path).unwrap_or(&mut self.empty)
     }
 
-    /// Returns the element at the second element from the top of the stack
-    pub fn previous(&self) -> &Dir<T, S> {
-        self.others
-            .last()
-            .expect("Previous items to always contain at least one item. This should have been handled in pop()")
+    pub fn previous(&self) -> Option<&Dir<T, S>> {
+        // If path is empty, meaning we are at root, there is no previous directory...
+        if self.path.is_empty() {
+            None
+        } else {
+            let mut path = self.path.clone();
+            path.pop();
+            self.dirs.get(&path)
+        }
     }
 
-    /// Returns the element at the second element from the top of the stack
-    pub fn previous_mut(&mut self) -> &mut Dir<T, S> {
-        self.others
-            .last_mut()
-            .expect("Previous items to always contain at least one item. This should have been handled in pop()")
+    pub fn previous_mut(&mut self) -> Option<&mut Dir<T, S>> {
+        // If path is empty, meaning we are at root, there is no previous directory...
+        if self.path.is_empty() {
+            None
+        } else {
+            let mut path = self.path.clone();
+            path.pop();
+            self.dirs.get_mut(&path)
+        }
     }
 
-    pub fn path(&self) -> &[String] {
+    pub fn next(&self) -> Option<&Dir<T, S>> {
+        self.next_path().and_then(|path| self.dirs.get(&path))
+    }
+
+    pub fn next_mut(&mut self) -> Option<&mut Dir<T, S>> {
+        self.next_path().and_then(|path| self.dirs.get_mut(&path))
+    }
+
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
-    pub fn next_path(&self) -> Option<Vec<String>> {
-        if let Some(current) = self.current().selected().map(DirStackItem::as_path) {
-            let mut res = self.path().to_vec();
-            res.push(current.to_owned());
-            Some(res)
-        } else {
-            None
-        }
+    pub fn next_path(&self) -> Option<Path> {
+        self.current().selected().map(DirStackItem::as_path).map(|current| self.path.join(current))
     }
 
-    /// Returns the element at the second element from the top of the stack
-    pub fn preview(&self) -> Option<&Vec<T>> {
-        self.preview.as_ref()
+    // Returns items of the directory that is pointed to by the currently selected
+    // item if any
+    pub fn next_dir_items(&self) -> Option<&Vec<T>> {
+        self.next_path().and_then(|path| self.dirs.get(&path).map(|d| &d.items))
     }
 
-    pub fn clear_preview(&mut self) {
-        if let Some(ref mut p) = self.preview {
-            p.clear();
-        }
-    }
-
-    /// Returns the element at the second element from the top of the stack
-    pub fn set_preview(&mut self, preview: Option<Vec<T>>) -> &Self {
-        self.preview = preview;
-        self
-    }
-
-    pub fn replace(&mut self, head: Vec<T>) {
-        if self.pop().is_some() {
-            let len = head.len();
-            self.push(head);
-            self.current_mut().state.set_content_len(Some(len));
-        }
-    }
-
-    pub fn push(&mut self, head: Vec<T>) {
+    pub fn insert(&mut self, path: Path, items: Vec<T>) {
         let mut new_state = DirState::default();
-        if !head.is_empty() {
+        if !items.is_empty() {
             new_state.select(Some(0), 0);
         }
-        new_state.set_content_len(Some(head.len()));
+        new_state.set_content_len(Some(items.len()));
 
-        if let Some(current) = self.current().selected().map(DirStackItem::as_path) {
-            self.path.push(current.to_owned());
-        }
-
-        let old_current_dir =
-            std::mem::replace(&mut self.current, Dir::new_with_state(head, new_state));
-        self.others.push(old_current_dir);
+        self.dirs.insert(path, Dir::new_with_state(items, new_state));
     }
 
-    pub fn pop(&mut self) -> Option<Dir<T, S>> {
-        if self.others.len() > 1 {
-            let top = self.others.pop().expect("There should always be at least two elements");
-            self.path.pop();
-            Some(std::mem::replace(&mut self.current, top))
+    pub fn enter(&mut self) {
+        if let Some(next_path) = self.next_path() {
+            self.path = next_path;
+            // Ensure that the new path exists even if empty - it might get filled
+            // asynchronously
+            if !self.dirs.contains_key(&self.path) {
+                self.dirs.insert(self.path.clone(), Dir::default());
+            }
         } else {
-            None
+            log::error!(stack:? = self; "Cannot enter because next path is not available");
+        }
+    }
+
+    pub fn leave(&mut self) -> bool {
+        if self.path.is_empty() {
+            false
+        } else {
+            self.path.pop();
+            true
         }
     }
 }
@@ -167,7 +174,7 @@ mod tests {
     mod next_path {
         use ratatui::widgets::ListState;
 
-        use crate::ui::dirstack::DirStack;
+        use crate::ui::dirstack::{DirStack, Path};
 
         #[test]
         fn returns_none_when_nothing_is_selected() {
@@ -185,78 +192,51 @@ mod tests {
             let level1 = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
             let mut subject: DirStack<String, ListState> = DirStack::new(level1.clone());
             subject.current_mut().state.select(Some(1), 0);
+            subject.enter();
             let level2 = vec!["d".to_owned(), "e".to_owned(), "f".to_owned()];
-            subject.push(level2);
+            subject.insert("b".into(), level2);
             subject.current_mut().state.select(Some(2), 0);
 
             let result = subject.next_path();
 
-            assert_eq!(result, Some(vec!["b".to_owned(), "f".to_owned()]));
+            assert_eq!(result, Some(Path::from(["b", "f"])));
         }
     }
 
-    mod push {
+    mod leave {
         use ratatui::widgets::ListState;
 
-        use crate::ui::dirstack::DirStack;
+        use crate::ui::dirstack::{DirStack, Path};
 
         #[test]
-        fn puts_current_to_top_of_others_and_new_input_to_current() {
-            let input = vec!["test".to_owned(), "test2".to_owned(), "test3".to_owned()];
-            let mut subject: DirStack<String, ListState> = DirStack::new(input.clone());
-            subject.current_mut().state.select(Some(1), 0);
-            let input2 = vec!["test4".to_owned(), "test3".to_owned(), "test4".to_owned()];
-            subject.previous_mut().state.select(Some(2), 0);
+        fn enter_and_leave_alters_path_correctly() {
+            let mut subject: DirStack<String, ListState> = DirStack::new(vec!["first".to_owned()]);
+            subject.insert("first".into(), vec!["second".to_owned()]);
+            subject.insert(["first", "second"].into(), vec!["third".to_owned()]);
+            subject.insert(["first", "second", "third"].into(), vec!["fourth".to_owned()]);
 
-            subject.push(input2.clone());
+            assert_eq!(subject.path(), &Path::new());
 
-            assert_eq!(subject.current().items, input2);
-            assert_eq!(subject.current().selected(), Some(input2[2].clone()).as_ref());
-            assert_eq!(subject.previous().items, input);
-            assert_eq!(subject.previous().selected(), Some(input[1].clone()).as_ref());
-        }
-    }
+            subject.current_mut().select_idx(0, 0);
+            subject.enter();
+            assert_eq!(subject.path(), &Path::from(["first"]));
 
-    mod pop {
-        use ratatui::widgets::ListState;
+            subject.current_mut().select_idx(0, 0);
+            subject.enter();
+            assert_eq!(subject.path(), &Path::from(["first", "second"]));
 
-        use crate::ui::dirstack::DirStack;
+            subject.current_mut().select_idx(0, 0);
+            subject.enter();
+            assert_eq!(subject.path(), &Path::from(["first", "second", "third"]));
 
-        #[test]
-        fn previous_element_is_moved_to_current() {
-            let mut subject: DirStack<String, ListState> = DirStack::new(Vec::new());
-            let el: Vec<String> =
-                vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
-            let el2: Vec<String> =
-                vec!["e", "f", "g", "h"].into_iter().map(ToOwned::to_owned).collect();
-            subject.push(el.clone());
-            subject.push(el2.clone());
-
-            subject.pop();
-
-            assert_eq!(el, subject.current().items);
+            subject.leave();
+            assert_eq!(subject.path(), &Path::from(["first", "second"]));
         }
 
         #[test]
-        fn returns_the_popped_element() {
+        fn returns_false_on_root() {
             let mut val: DirStack<String, ListState> = DirStack::new(Vec::new());
-            let el: Vec<String> =
-                vec!["a", "b", "c", "d"].into_iter().map(ToOwned::to_owned).collect();
-            val.push(el.clone());
-
-            let result = val.pop();
-
-            assert_eq!(Some(el), result.map(|v| v.items));
-        }
-
-        #[test]
-        fn leaves_at_least_one_element_in_others() {
-            let mut val: DirStack<String, ListState> = DirStack::new(Vec::new());
-            val.push(Vec::new());
-            assert!(val.pop().is_some());
-            assert!(val.pop().is_none());
-
-            val.previous();
+            assert!(!val.leave());
         }
     }
 }

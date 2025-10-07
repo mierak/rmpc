@@ -36,8 +36,7 @@ pub struct DirectoriesPane {
 }
 
 const INIT: &str = "init";
-const OPEN_OR_PLAY: &str = "open_or_play";
-const PREVIEW: &str = "preview";
+const FETCH_DATA: &str = "fetch_data";
 
 impl DirectoriesPane {
     pub fn new(_ctx: &Ctx) -> Self {
@@ -54,45 +53,10 @@ impl DirectoriesPane {
             log::error!("Failed to move deeper inside dir. Current value is None");
             return Ok(());
         };
-        let Some(next_path) = self.stack.next_path() else {
-            log::error!("Failed to move deeper inside dir. Next path is None");
-            return Ok(());
-        };
 
-        let sort = ctx.config.directories_sort.clone();
         match selected {
-            DirOrSong::Dir { playlist: is_playlist, .. } => {
-                let is_playlist = *is_playlist;
-                let playlist_display_mode = ctx.config.show_playlists_in_browser;
-                ctx.query()
-                    .id(OPEN_OR_PLAY)
-                    .replace_id(OPEN_OR_PLAY)
-                    .target(PaneType::Directories)
-                    .query(move |client| {
-                        let data = if is_playlist {
-                            client
-                                .list_playlist_info(&next_path.join("/").to_string(), None)?
-                                .into_iter()
-                                .map(DirOrSong::Song)
-                                .sorted_by(|a, b| {
-                                    a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
-                                })
-                                .collect()
-                        } else {
-                            client
-                                .lsinfo(Some(&next_path.join("/").to_string()))?
-                                .into_iter()
-                                .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
-                                .sorted_by(|a, b| {
-                                    a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
-                                })
-                                .collect()
-                        };
-
-                        Ok(MpdQueryResult::DirOrSong { data, origin_path: Some(next_path) })
-                    });
-                self.stack_mut().push(Vec::new());
-                self.stack_mut().clear_preview();
+            DirOrSong::Dir { .. } => {
+                self.stack_mut().enter();
                 ctx.render()?;
             }
             DirOrSong::Song(_) => {
@@ -153,7 +117,7 @@ impl Pane for DirectoriesPane {
                         .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
                         .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)))
                         .collect::<Vec<_>>();
-                    Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
+                    Ok(MpdQueryResult::DirOrSong { data: result, path: None })
                 },
             );
             self.initialized = true;
@@ -177,7 +141,7 @@ impl Pane for DirectoriesPane {
                                 a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
                             })
                             .collect::<Vec<_>>();
-                        Ok(MpdQueryResult::DirOrSong { data: result, origin_path: None })
+                        Ok(MpdQueryResult::DirOrSong { data: result, path: None })
                     },
                 );
             }
@@ -209,32 +173,19 @@ impl Pane for DirectoriesPane {
         ctx: &Ctx,
     ) -> Result<()> {
         match (id, data) {
-            (PREVIEW, MpdQueryResult::DirOrSong { data, origin_path }) => {
-                if let Some(origin_path) = origin_path
-                    && origin_path != self.stack().path()
-                {
-                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping preview because it does not belong to this path");
+            (FETCH_DATA, MpdQueryResult::DirOrSong { data, path }) => {
+                let Some(path) = path else {
+                    log::error!(path:?, current_path:? = self.stack().path(); "Cannot insert data because path is not provided");
                     return Ok(());
-                }
+                };
 
-                self.stack_mut().set_preview(Some(data));
-
+                self.stack_mut().insert(path, data);
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
-            (INIT, MpdQueryResult::DirOrSong { data, origin_path: _ }) => {
+            (INIT, MpdQueryResult::DirOrSong { data, path: _ }) => {
                 self.stack = DirStack::new(data);
-                self.prepare_preview(ctx)?;
-                ctx.render()?;
-            }
-            (OPEN_OR_PLAY, MpdQueryResult::DirOrSong { data, origin_path }) => {
-                if let Some(origin_path) = origin_path
-                    && origin_path != self.stack().path()
-                {
-                    log::trace!(origin_path:?, current_path:? = self.stack().path(); "Dropping result because it does not belong to this path");
-                    return Ok(());
-                }
-                self.stack_mut().replace(data);
-                self.prepare_preview(ctx)?;
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
             _ => {}
@@ -284,39 +235,37 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         }
     }
 
-    fn prepare_preview(&mut self, ctx: &Ctx) -> Result<()> {
-        let origin_path = Some(self.stack().path().to_vec());
-        match &self.stack.current().selected() {
-            Some(DirOrSong::Dir { playlist: is_playlist, .. }) => {
+    fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
+        match selected {
+            DirOrSong::Dir { playlist: is_playlist, .. } => {
                 let Some(next_path) = self.stack.next_path() else {
                     log::error!("Failed to move deeper inside dir. Next path is None");
                     return Ok(());
                 };
-                let next_path = next_path.join("/").to_string();
+
                 let is_playlist = *is_playlist;
                 let playlist_display_mode = ctx.config.show_playlists_in_browser;
 
-                self.stack_mut().clear_preview();
                 let sort = ctx.config.directories_sort.clone();
                 ctx.query()
-                    .id(PREVIEW)
-                    .replace_id("directories_preview")
+                    .id(FETCH_DATA)
+                    .replace_id("directories_data")
                     .target(PaneType::Directories)
                     .query(move |client| {
                         let data: Vec<_> = if is_playlist {
                             client
-                                .list_playlist_info(&next_path, None)?
+                                .list_playlist_info(&next_path.to_string(), None)?
                                 .into_iter()
                                 .map(DirOrSong::Song)
                                 .collect()
                         } else {
-                            match client.lsinfo(Some(&next_path)) {
+                            match client.lsinfo(Some(&next_path.to_string())) {
                                 Ok(val) => val,
                                 Err(err) => {
                                     log::error!(error:? = err; "Failed to get lsinfo for dir",);
                                     return Ok(MpdQueryResult::DirOrSong {
                                         data: Vec::new(),
-                                        origin_path: None,
+                                        path: None,
                                     });
                                 }
                             }
@@ -329,25 +278,10 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             .collect()
                         };
 
-                        Ok(MpdQueryResult::DirOrSong { data, origin_path })
+                        Ok(MpdQueryResult::DirOrSong { data, path: Some(next_path) })
                     });
             }
-            Some(DirOrSong::Song(song)) => {
-                let file = song.file.clone();
-                ctx.query()
-                    .id(PREVIEW)
-                    .replace_id("directories_preview")
-                    .target(PaneType::Directories)
-                    .query(move |client| {
-                        Ok(MpdQueryResult::DirOrSong {
-                            data: client
-                                .find_one(&[Filter::new(Tag::File, &file)])?
-                                .map_or_else(Vec::new, |s| vec![DirOrSong::Song(s)]),
-                            origin_path,
-                        })
-                    });
-            }
-            None => {}
+            DirOrSong::Song(_) => {}
         }
         Ok(())
     }

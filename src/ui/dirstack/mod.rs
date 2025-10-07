@@ -7,9 +7,11 @@ use ratatui::{
 };
 
 mod dir;
+mod path;
 mod stack;
 mod state;
 pub use dir::Dir;
+pub use path::Path;
 pub use stack::DirStack;
 pub use state::DirState;
 

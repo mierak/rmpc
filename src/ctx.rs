@@ -144,7 +144,7 @@ impl Ctx {
         if !stickers.is_empty() {
             let uris = stickers.into_iter().collect();
             log::debug!(uris:?; "Fetching stickers after frame");
-            self.query().id(FETCH_SONG_STICKERS).query(|client| {
+            self.query().id(FETCH_SONG_STICKERS).replace_id(FETCH_SONG_STICKERS).query(|client| {
                 let stickers = client.fetch_song_stickers(uris)?;
                 Ok(MpdQueryResult::SongStickers(stickers))
             });
