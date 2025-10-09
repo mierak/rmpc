@@ -1,0 +1,16 @@
+---
+import Default from "@astrojs/starlight/components/ContentPanel.astro";
+const isNext = Astro.url.pathname.startsWith("/rmpc/next");
+const section = Astro.url.pathname.replace("/rmpc/", "").replace(/\/.*/, "");
+---
+
+{
+    (
+        //@ts-ignore}
+        <div data-pagefind-filter="section[content]" content={section}>
+            <Default>
+                <slot />
+            </Default>
+        </div>
+    )
+}

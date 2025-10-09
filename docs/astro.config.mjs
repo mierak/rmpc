@@ -225,6 +225,8 @@ export default defineConfig({
                 Hero: "./src/components/Hero.astro",
                 Header: "./src/components/Header.astro",
                 Banner: "./src/components/Banner.astro",
+                Search: "./src/components/Search.astro",
+                ContentPanel: "./src/components/ContentPanel.astro",
             },
         }),
         react(),
