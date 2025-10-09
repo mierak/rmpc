@@ -17,7 +17,6 @@ const shouldShowBanner = isGitVersion && !url.pathname.includes("try-without-ins
     const banner = document.querySelector(".sl-banner");
     if (banner) {
         const shouldHide = sessionStorage.getItem("banner-closed");
-        console.log("Banner visibility check:", shouldHide, shouldShowBanner);
         if (shouldHide !== "true" && shouldShowBanner) {
             banner.style.display = "flex";
         }
