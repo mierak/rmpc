@@ -61,7 +61,7 @@ All song paths are listed as their path relative to MPD's music directory.
     - In `Browser`, `Albums`, `Playlists` and `Artists` it will list all songs contained in the currently highlighted item and all its subdirectories.
       If the item is a single song, only that one song will be present. If you mark multiple directories/songs, all of them will be listed
       in `$SELECTED_SONGS`.
-    - In `Queue`, only the song under cursor will be listed.
+    - In `Queue`, the song under cursor or all marked items will be listed.
     - In `Search`, While on the search stage, all the songs will be listed and while on the song list stage, only the song under cursor or
       all marked songs will be listed.
 
@@ -302,8 +302,8 @@ AddOptions()
 
 ```rust showLineNumbers=false
 AddOptions(kind: Modal([
-    ("End of queue and play", (all: false, autoplay: First, position: EndOfQueue),
-    ("After the current song", (all: false, autoplay: None, position: AfterCurrentSong),
+    ("End of queue and play", (all: false, autoplay: First, position: EndOfQueue)),
+    ("After the current song", (all: false, autoplay: None, position: AfterCurrentSong)),
 ]))
 ```
 
