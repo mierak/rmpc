@@ -42,8 +42,9 @@ Search pane
 
 ### Changed
 
-- Add support for soundcloud on `searchyt`
 - **Breaking**: TabName equality comparison is now case-insensitive.
+- **Breaking**: `$SELECTED_SONGS` in queue now contains marked songs as well
+- Add support for soundcloud on `searchyt`
 - Improved `.lrc` lyrics files parser performance and fixed parsing issues
 - Normalized duration formatting across `QueueTimeTotal` and `QueueTimeRemaining` properties for both standard (MM:SS/H:MM:SS) and verbose formats
 - Confirm action in browsers, which either opens a directory or adds the hovered song to the queue

@@ -109,40 +109,29 @@ impl QueuePane {
 
     fn enqueue_items(&self, all: bool) -> (Vec<Enqueue>, Option<usize>) {
         let hovered = self.queue.selected().map(|s| s.file.as_str());
+        self.items(all).fold((Vec::new(), None), |mut acc, (idx, song)| {
+            let path = song.file.clone();
+            if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
+                acc.1 = Some(idx);
+            }
+
+            acc.0.push(Enqueue::File { path });
+
+            acc
+        })
+    }
+
+    fn items<'a>(&'a self, all: bool) -> Box<dyn Iterator<Item = (usize, &'a Song)> + 'a> {
         if all {
-            self.queue.items.iter().enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
-                let path = item.file.clone();
-                if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
-                    acc.1 = Some(idx);
-                }
-
-                acc.0.push(Enqueue::File { path });
-
-                acc
-            })
+            Box::new(self.queue.items.iter().enumerate())
         } else if self.queue.marked().is_empty() {
-            (
-                self.queue
-                    .selected()
-                    .map_or(Vec::new(), |v| vec![Enqueue::File { path: v.file.clone() }]),
-                None,
-            )
+            if let Some((idx, item)) = self.queue.selected_with_idx() {
+                Box::new(std::iter::once((idx, item)))
+            } else {
+                Box::new(std::iter::empty::<(usize, &Song)>())
+            }
         } else {
-            self.queue
-                .marked()
-                .iter()
-                .filter_map(|idx| self.queue.items.get(*idx))
-                .enumerate()
-                .fold((Vec::new(), None), |mut acc, (idx, item)| {
-                    let path = item.file.clone();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &path) {
-                        acc.1 = Some(idx);
-                    }
-
-                    acc.0.push(Enqueue::File { path });
-
-                    acc
-                })
+            Box::new(self.queue.marked().iter().map(|idx| (*idx, &self.queue.items[*idx])))
         }
     }
 
@@ -1203,8 +1192,9 @@ impl Pane for QueuePane {
         } else if let Some(action) = event.as_global_action(ctx) {
             match action {
                 GlobalAction::ExternalCommand { command, .. } => {
-                    let song = self.queue.selected().map(|song| song.file.as_str());
-                    run_external(command.clone(), create_env(ctx, song));
+                    let songs =
+                        create_env(ctx, self.items(false).map(|(_, song)| song.file.as_str()));
+                    run_external(command.clone(), songs);
                 }
                 _ => {
                     event.abandon();
