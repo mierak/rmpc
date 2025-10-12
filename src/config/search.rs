@@ -1,12 +1,14 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use super::defaults;
 use crate::mpd::mpd_client::FilterKind;
 
 #[derive(Debug, Default, Clone)]
 pub struct Search {
     pub case_sensitive: bool,
     pub ignore_diacritics: bool,
+    pub search_button: bool,
     pub mode: FilterKind,
     pub tags: Vec<SearchableTag>,
 }
@@ -16,6 +18,8 @@ pub struct SearchFile {
     case_sensitive: bool,
     #[serde(default)]
     ignore_diacritics: bool,
+    #[serde(default = "defaults::bool::<false>")]
+    search_button: bool,
     mode: FilterKindFile,
     tags: Vec<SearchableTagFile>,
 }
@@ -44,6 +48,7 @@ impl TryFrom<SearchFile> for Search {
         Ok(Self {
             case_sensitive: value.case_sensitive,
             ignore_diacritics: value.ignore_diacritics,
+            search_button: value.search_button,
             mode: value.mode.into(),
             tags: if value.tags.is_empty() {
                 vec![SearchableTag { label: "Any Tag".to_string(), value: "any".to_string() }]
@@ -63,6 +68,7 @@ impl Default for SearchFile {
         Self {
             case_sensitive: false,
             ignore_diacritics: false,
+            search_button: false,
             mode: FilterKindFile::Contains,
             tags: [
                 SearchableTagFile { value: "any".to_string(), label: "Any Tag".to_string() },

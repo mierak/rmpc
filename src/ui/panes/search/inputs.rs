@@ -19,6 +19,7 @@ pub const STRIP_DIACRITICS_KEY: &str = "strip_diacritics";
 pub const RATING_MODE_KEY: &str = "rating";
 pub const RATING_VALUE_KEY: &str = "rating_value";
 pub const RESET_BUTTON_KEY: &str = "reset";
+pub const SEARCH_BUTTON_KEY: &str = "search_button";
 pub const LIKE_KEY: &str = "like";
 
 #[derive(derive_more::Debug)]
@@ -26,6 +27,7 @@ pub const LIKE_KEY: &str = "like";
 pub(super) struct InputGroups {
     pub inputs: Vec<InputType>,
 
+    search_button: bool,
     initial_fold_case: bool,
     initial_strip_diacritics: bool,
 
@@ -52,6 +54,7 @@ impl InputGroups {
         search_config: &Search,
         initial_fold_case: bool,
         initial_strip_diacritics: bool,
+        search_button: bool,
         stickers_supported: bool,
         strip_diacritics_supported: bool,
         text_style: Style,
@@ -115,12 +118,20 @@ impl InputGroups {
             label: " Reset".to_owned(),
         }));
 
+        if search_button {
+            inputs.push(InputType::Button(ButtonInput {
+                key: SEARCH_BUTTON_KEY,
+                label: " Search".to_owned(),
+            }));
+        }
+
         Self {
             inputs,
 
             focused_idx: 0,
             area: Rect::default(),
 
+            search_button,
             initial_fold_case,
             initial_strip_diacritics,
             insert_mode: false,
@@ -189,11 +200,12 @@ impl InputGroups {
         &self.inputs[self.focused_idx]
     }
 
-    pub fn activate_focused(&mut self) -> bool {
+    pub fn activate_focused(&mut self) -> ActionResult {
         match &mut self.inputs[self.focused_idx] {
             InputType::Textbox(_) | InputType::Numberbox(_) => {
                 self.insert_mode = !self.insert_mode;
-                true
+
+                if self.search_button { ActionResult::None } else { ActionResult::Search }
             }
             InputType::Spinner(input) => {
                 match input.key {
@@ -221,14 +233,16 @@ impl InputGroups {
                     _ => {}
                 }
 
-                true
+                if self.search_button { ActionResult::None } else { ActionResult::Search }
             }
             InputType::Button(ButtonInput { key: RESET_BUTTON_KEY, .. }) => {
                 self.reset_all();
-                true
+
+                ActionResult::Reset
             }
-            InputType::Button(_) => false,
-            InputType::Separator => false,
+            InputType::Button(ButtonInput { key: SEARCH_BUTTON_KEY, .. }) => ActionResult::Search,
+            InputType::Button(_) => ActionResult::None,
+            InputType::Separator => ActionResult::None,
         }
     }
 
@@ -454,6 +468,12 @@ impl LikedMode {
             *self = new;
         }
     }
+}
+
+pub(super) enum ActionResult {
+    None,
+    Search,
+    Reset,
 }
 
 #[derive(derive_more::Debug)]
