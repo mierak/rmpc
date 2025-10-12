@@ -12,7 +12,7 @@ use rstest::fixture;
 use crate::{
     config::{Config, ConfigFile, tabs::TabName},
     core::scheduler::Scheduler,
-    ctx::Ctx,
+    ctx::{Ctx, StickersSupport},
     mpd::{commands::Status, version::Version},
     shared::{
         events::{ClientRequest, WorkRequest},
@@ -71,7 +71,7 @@ pub fn ctx(
         needs_render: Cell::new(false),
         stickers_to_fetch: RefCell::new(HashSet::new()),
         lrc_index: LrcIndex::default(),
-        stickers_supported: true,
+        stickers_supported: StickersSupport::Unsupported,
         rendered_frames: 0,
         scheduler,
         db_update_start: None,

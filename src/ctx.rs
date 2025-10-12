@@ -30,7 +30,7 @@ use crate::{
     shared::{
         events::ClientRequest,
         lrc::{Lrc, LrcIndex, get_lrc_path},
-        macros::status_warn,
+        macros::{status_error, status_warn},
         mpd_client_ext::MpdClientExt,
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
@@ -71,7 +71,7 @@ pub struct Ctx {
     pub(crate) messages: RingVec<10, StatusMessage>,
     pub(crate) last_status_update: Instant,
     pub(crate) song_played: Option<Duration>,
-    pub(crate) stickers_supported: bool,
+    pub(crate) stickers_supported: StickersSupport,
 }
 
 #[bon]
@@ -85,7 +85,11 @@ impl Ctx {
         mut scheduler: Scheduler<(Sender<AppEvent>, Sender<ClientRequest>), DefaultTimeProvider>,
     ) -> Result<Self> {
         let supported_commands: HashSet<String> = client.supported_commands.clone();
-        let stickers_supported = supported_commands.contains("sticker");
+        let stickers_supported = if supported_commands.contains("sticker") {
+            StickersSupport::Supported
+        } else {
+            StickersSupport::Unsupported
+        };
         log::info!(supported_commands:? = supported_commands; "Supported commands by server");
 
         let status = client.get_status()?;
@@ -142,12 +146,35 @@ impl Ctx {
 
         let stickers = self.stickers_to_fetch.take();
         if !stickers.is_empty() {
-            let uris = stickers.into_iter().collect();
-            log::debug!(uris:?; "Fetching stickers after frame");
-            self.query().id(FETCH_SONG_STICKERS).replace_id(FETCH_SONG_STICKERS).query(|client| {
-                let stickers = client.fetch_song_stickers(uris)?;
-                Ok(MpdQueryResult::SongStickers(stickers))
-            });
+            match self.stickers_supported {
+                StickersSupport::Unsupported => {
+                    self.stickers_supported = StickersSupport::UnsupportedAndChecked;
+                    // Shoot a dummy sticker request to MPD to see what error we get to determine
+                    // what exactly is wrong.
+                    self.command(|client| {
+                        if let Err(err) = client.sticker("", "test") {
+                            status_error!(
+                                "Stickers are not supported by MPD server: '{}'",
+                                err.detail_or_display()
+                            );
+                        } else {
+                            status_error!("Stickers are not supported by MPD server");
+                        }
+                        Ok(())
+                    });
+                }
+                StickersSupport::UnsupportedAndChecked => {}
+                StickersSupport::Supported => {
+                    let uris = stickers.into_iter().collect();
+                    log::debug!(uris:?; "Fetching stickers after frame");
+                    self.query().id(FETCH_SONG_STICKERS).replace_id(FETCH_SONG_STICKERS).query(
+                        |client| {
+                            let stickers = client.fetch_song_stickers(uris)?;
+                            Ok(MpdQueryResult::SongStickers(stickers))
+                        },
+                    );
+                }
+            }
         }
     }
 
@@ -243,6 +270,9 @@ impl Ctx {
     }
 
     pub(crate) fn song_stickers(&self, uri: &str) -> Option<&HashMap<String, String>> {
+        if matches!(self.stickers_supported, StickersSupport::UnsupportedAndChecked) {
+            return None;
+        }
         let stickers = self.stickers.get(uri);
 
         if stickers.is_none() {
@@ -266,5 +296,22 @@ impl Ctx {
 
     pub(crate) fn stickers(&self) -> &HashMap<String, HashMap<String, String>> {
         &self.stickers
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StickersSupport {
+    Supported,
+    Unsupported,
+    UnsupportedAndChecked,
+}
+
+impl From<StickersSupport> for bool {
+    fn from(value: StickersSupport) -> Self {
+        match value {
+            StickersSupport::Supported => true,
+            StickersSupport::Unsupported => false,
+            StickersSupport::UnsupportedAndChecked => false,
+        }
     }
 }

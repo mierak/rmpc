@@ -73,7 +73,7 @@ impl SearchPane {
             .separator_style(config.theme.borders_style)
             .current_item_style(config.theme.current_item_style)
             .highlight_item_style(config.theme.highlighted_item_style)
-            .stickers_supported(ctx.stickers_supported)
+            .stickers_supported(ctx.stickers_supported.into())
             .strip_diacritics_supported(ctx.mpd_version >= Version::new(0, 25, 0))
             .build();
 
@@ -191,7 +191,7 @@ impl SearchPane {
             _ => None,
         });
 
-        let stickers_supported = ctx.stickers_supported;
+        let stickers_supported = ctx.stickers_supported.into();
         let fold_case = self.inputs.fold_case();
         let strip_diacritics = self.inputs.strip_diacritics();
         let Ok(rating_filter) = self.inputs.rating_filter() else {

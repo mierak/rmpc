@@ -670,7 +670,7 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Ui
             }
         }
         IdleEvent::Sticker => {
-            if ctx.stickers_supported {
+            if ctx.stickers_supported.into() {
                 let songs: Vec<_> = ctx.stickers().keys().cloned().collect();
                 ctx.query().id(GLOBAL_STICKERS_UPDATE).replace_id("global_stickers_update").query(
                     move |client| {
