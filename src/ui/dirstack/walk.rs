@@ -205,7 +205,7 @@ mod test {
         stack.insert(["dirA"].into(), vec![song("songA1"), song("songA2")]);
         stack.insert(["dirB"].into(), vec![
             DirOrSong::name_only("dirB1".to_owned()),
-            song("songBa"),
+            song("songBaa"),
         ]);
         stack.insert(["dirB", "dirB1"].into(), vec![song("songB1a"), song("songB1b")]);
         stack.insert(["dirC"].into(), vec![]);
@@ -213,7 +213,7 @@ mod test {
 
         let result = stack.walk_dir(["dirB"].into()).collect_vec();
 
-        assert_eq!(result, vec![&song("songB1a"), &song("songB1b"), &song("songBa")],);
+        assert_eq!(result, vec![&song("songB1a"), &song("songB1b"), &song("songBaa")],);
     }
 
     #[test]
