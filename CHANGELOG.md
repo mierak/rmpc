@@ -39,6 +39,7 @@ browser panes as well as searched for in the Search pane
 Search pane
 - Added `Replace` transform
 - Added section filter to docs search
+- `search_button` config option for search pane
 
 ### Changed
 

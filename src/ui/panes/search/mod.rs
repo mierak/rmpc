@@ -43,7 +43,7 @@ use crate::{
             menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
-        panes::search::inputs::{InputGroups, InputType, TextboxInput},
+        panes::search::inputs::{ActionResult, InputGroups, InputType, TextboxInput},
         widgets::browser::BrowserArea,
     },
 };
@@ -68,6 +68,7 @@ impl SearchPane {
             .search_config(&config.search)
             .initial_fold_case(!config.search.case_sensitive)
             .initial_strip_diacritics(config.search.ignore_diacritics)
+            .search_button(config.search.search_button)
             .text_style(config.as_text_style())
             .separator_style(config.theme.borders_style)
             .current_item_style(config.theme.current_item_style)
@@ -168,6 +169,14 @@ impl SearchPane {
                 self.column_areas[BrowserArea::Scrollbar],
                 directory.state.as_scrollbar_state_ref(),
             );
+        }
+    }
+
+    /// Trigger search if search should be done on any change. Does nothing when
+    /// a dedicated search button is used.
+    fn maybe_search_on_change(&mut self, ctx: &Ctx) {
+        if !ctx.config.search.search_button {
+            self.search(ctx);
         }
     }
 
@@ -352,8 +361,15 @@ impl SearchPane {
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
                 CommonAction::Confirm => {
-                    if self.inputs.activate_focused() {
-                        self.search(ctx);
+                    match self.inputs.activate_focused() {
+                        ActionResult::Search => {
+                            self.search(ctx);
+                        }
+                        ActionResult::Reset => {
+                            self.inputs.reset_focused();
+                            self.songs_dir = Dir::default();
+                        }
+                        ActionResult::None => {}
                     }
                     ctx.render()?;
                 }
@@ -381,7 +397,11 @@ impl SearchPane {
                 // This action only makes sense when opts.all is true while we are on the
                 // search column.
                 CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
-                CommonAction::Delete => self.inputs.reset_focused(),
+                CommonAction::Delete => {
+                    self.inputs.reset_focused();
+                    self.songs_dir = Dir::default();
+                    ctx.render()?;
+                }
                 CommonAction::PaneDown => {}
                 CommonAction::PaneUp => {}
                 CommonAction::PaneRight => {}
@@ -959,6 +979,7 @@ impl Pane for SearchPane {
     ) -> Result<()> {
         match (id, data) {
             (SEARCH, MpdQueryResult::SearchResult { data }) => {
+                status_info!("Found {} matching songs", data.len());
                 self.songs_dir = Dir::new(data);
                 ctx.render()?;
             }
@@ -1028,7 +1049,7 @@ impl Pane for SearchPane {
                         if self.inputs.insert_mode {
                             self.phase = Phase::Search;
                             self.inputs.insert_mode = false;
-                            self.search(ctx);
+                            self.maybe_search_on_change(ctx);
                         }
 
                         self.inputs.focus_input_at(event.into());
@@ -1050,10 +1071,17 @@ impl Pane for SearchPane {
             }
             MouseEventKind::DoubleClick => match self.phase {
                 Phase::Search => {
-                    if self.column_areas[BrowserArea::Current].contains(event.into())
-                        && self.inputs.activate_focused()
-                    {
-                        self.search(ctx);
+                    if self.column_areas[BrowserArea::Current].contains(event.into()) {
+                        match self.inputs.activate_focused() {
+                            ActionResult::Search => {
+                                self.search(ctx);
+                            }
+                            ActionResult::Reset => {
+                                self.inputs.reset_focused();
+                                self.songs_dir = Dir::default();
+                            }
+                            ActionResult::None => {}
+                        }
                     }
                     ctx.render()?;
                 }
@@ -1098,7 +1126,7 @@ impl Pane for SearchPane {
                     if self.inputs.insert_mode {
                         self.inputs.insert_mode = false;
                         self.phase = Phase::Search;
-                        self.search(ctx);
+                        self.maybe_search_on_change(ctx);
                     }
                     self.inputs.next_non_wrapping();
                     ctx.render()?;
@@ -1113,7 +1141,7 @@ impl Pane for SearchPane {
                     if self.inputs.insert_mode {
                         self.inputs.insert_mode = false;
                         self.phase = Phase::Search;
-                        self.search(ctx);
+                        self.maybe_search_on_change(ctx);
                     }
                     self.inputs.prev_non_wrapping();
                     ctx.render()?;
@@ -1151,14 +1179,14 @@ impl Pane for SearchPane {
                 Some(CommonAction::Close) => {
                     self.phase = Phase::Search;
                     self.inputs.insert_mode = false;
-                    self.search(ctx);
+                    self.maybe_search_on_change(ctx);
 
                     ctx.render()?;
                 }
                 Some(CommonAction::Confirm) => {
                     self.phase = Phase::Search;
                     self.inputs.insert_mode = false;
-                    self.search(ctx);
+                    self.maybe_search_on_change(ctx);
 
                     ctx.render()?;
                 }
