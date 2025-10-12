@@ -21,7 +21,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_info},
         mouse_event::MouseEvent,
-        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt, MpdDelete},
+        mpd_client_ext::{Autoplay, MpdClientExt, MpdDelete},
     },
     status_warn,
     ui::{
@@ -393,28 +393,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         }
 
         Ok(())
-    }
-
-    fn enqueue<'a>(
-        &self,
-        items: impl Iterator<Item = &'a DirOrSong>,
-    ) -> (Vec<Enqueue>, Option<usize>) {
-        let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
-        items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
-            match item {
-                DirOrSong::Dir { name, .. } => {
-                    acc.0.push(Enqueue::Playlist { name: name.to_owned() });
-                }
-                DirOrSong::Song(song) => {
-                    let filename = song.file.clone();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
-                        acc.1 = Some(idx);
-                    }
-                    acc.0.push(Enqueue::File { path: song.file.clone() });
-                }
-            }
-            acc
-        })
     }
 
     fn open(&mut self, ctx: &Ctx) -> Result<()> {

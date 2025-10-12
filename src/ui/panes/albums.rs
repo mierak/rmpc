@@ -11,13 +11,13 @@ use crate::{
     mpd::{
         client::Client,
         commands::Song,
-        mpd_client::{Filter, FilterKind, MpdClient, Tag},
+        mpd_client::{Filter, MpdClient, Tag},
     },
     shared::{
         cmp::StringCompare,
         key_event::KeyEvent,
         mouse_event::MouseEvent,
-        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
+        mpd_client_ext::{Autoplay, MpdClientExt},
     },
     ui::{
         UiEvent,
@@ -243,41 +243,6 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
         }
 
         Ok(())
-    }
-
-    fn enqueue<'a>(
-        &self,
-        items: impl Iterator<Item = &'a DirOrSong>,
-    ) -> (Vec<Enqueue>, Option<usize>) {
-        match self.stack.path().as_slice() {
-            [album] => {
-                let hovered = self.stack.current().selected().map(|item| item.dir_name_or_file());
-                items.enumerate().fold((Vec::new(), None), |mut acc, (idx, item)| {
-                    let filename = item.dir_name_or_file().into_owned();
-                    if hovered.as_ref().is_some_and(|hovered| hovered == &filename) {
-                        acc.1 = Some(idx);
-                    }
-                    acc.0.push(Enqueue::Find {
-                        filter: vec![
-                            (Tag::File, FilterKind::Exact, filename),
-                            (Tag::Album, FilterKind::Exact, album.clone()),
-                        ],
-                    });
-
-                    acc
-                })
-            }
-            [] => (
-                items
-                    .map(|item| item.dir_name_or_file().into_owned())
-                    .map(|name| Enqueue::Find {
-                        filter: vec![(Tag::Album, FilterKind::Exact, name)],
-                    })
-                    .collect_vec(),
-                None,
-            ),
-            _ => (Vec::new(), None),
-        }
     }
 
     fn open(&mut self, ctx: &Ctx) -> Result<()> {

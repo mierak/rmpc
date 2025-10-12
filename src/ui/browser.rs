@@ -4,10 +4,6 @@ use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{prelude::Rect, widgets::ListState};
 
-use super::{
-    dirstack::{DirStack, DirStackItem},
-    panes::Pane,
-};
 use crate::{
     MpdQueryResult,
     config::keys::{
@@ -25,11 +21,13 @@ use crate::{
         mpd_query::EXTERNAL_COMMAND,
     },
     ui::{
+        dirstack::{DirStack, DirStackItem, WalkDirStackItem},
         modals::{
             input_modal::InputModal,
             menu::{create_add_modal, create_rating_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
+        panes::Pane,
         widgets::browser::BrowserArea,
     },
 };
@@ -72,7 +70,27 @@ where
             Ok(())
         }
     }
-    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> (Vec<Enqueue>, Option<usize>);
+    fn enqueue<'a>(&self, items: impl Iterator<Item = &'a T>) -> (Vec<Enqueue>, Option<usize>) {
+        let path = self.stack().path();
+        let hovered = self.stack().current().selected();
+        let (items, idx) = items
+            .flat_map(|item| item.walk(self.stack(), path.clone()))
+            .enumerate()
+            .fold((Vec::new(), None), |mut acc, (idx, item)| {
+                let filename = item.as_path().to_owned();
+                if let Some(hovered) = hovered
+                    && hovered.is_file()
+                    && hovered.as_path() == filename
+                {
+                    acc.1 = Some(idx);
+                }
+                acc.0.push(Enqueue::File { path: filename });
+
+                acc
+            });
+
+        (items, idx)
+    }
     fn open(&mut self, ctx: &Ctx) -> Result<()>;
     fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())

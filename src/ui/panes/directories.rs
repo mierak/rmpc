@@ -225,11 +225,16 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Clone + 'static {
         move |client| {
             Ok(match item {
-                DirOrSong::Dir { full_path, .. } => client.find(&[Filter::new_with_kind(
-                    Tag::File,
-                    &full_path,
-                    FilterKind::StartsWith,
-                )])?,
+                DirOrSong::Dir { full_path, playlist: false, .. } => {
+                    client.find(&[Filter::new_with_kind(
+                        Tag::File,
+                        &full_path,
+                        FilterKind::StartsWith,
+                    )])?
+                }
+                DirOrSong::Dir { name, playlist: true, .. } => {
+                    client.list_playlist_info(&name, None)?
+                }
                 DirOrSong::Song(song) => vec![song.clone()],
             })
         }
