@@ -26,6 +26,15 @@ impl From<std::io::Error> for MpdError {
     }
 }
 
+impl MpdError {
+    pub fn detail_or_display(&self) -> String {
+        match self {
+            MpdError::Mpd(failure) => failure.message.to_string(),
+            _ => self.to_string(),
+        }
+    }
+}
+
 impl Display for MpdError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
