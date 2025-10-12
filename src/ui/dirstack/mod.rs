@@ -10,10 +10,12 @@ mod dir;
 mod path;
 mod stack;
 mod state;
+mod walk;
 pub use dir::Dir;
 pub use path::Path;
 pub use stack::DirStack;
 pub use state::DirState;
+pub use walk::WalkDirStackItem;
 
 use super::dir_or_song::DirOrSong;
 use crate::{

@@ -82,6 +82,7 @@ scrolled down
 available and Block if not
 - Fix Iterm2 image protocol sometimes rendering too late
 - Fix playlists not using playlist style and icon in the Playlists pane
+- Order of added songs when adding them from browser panes
 
 ## [0.9.0] - 2025-06-23
 
