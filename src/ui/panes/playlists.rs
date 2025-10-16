@@ -417,13 +417,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         Ok(())
     }
 
-    fn initial_playlist_name(&self) -> Option<String> {
-        self.stack().current().selected().and_then(|item| match item {
-            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
-            DirOrSong::Song(_) => None,
-        })
-    }
-
     fn delete<'a>(&self, items: impl Iterator<Item = (usize, &'a DirOrSong)>) -> Vec<MpdDelete> {
         match self.stack().path().as_slice() {
             [playlist] => {

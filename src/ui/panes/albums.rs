@@ -248,11 +248,4 @@ impl BrowserPane<DirOrSong> for AlbumsPane {
     fn open(&mut self, ctx: &Ctx) -> Result<()> {
         self.open_or_play(true, ctx)
     }
-
-    fn initial_playlist_name(&self) -> Option<String> {
-        self.stack().current().selected().and_then(|item| match item {
-            DirOrSong::Dir { name, .. } => Some(name.to_owned()),
-            DirOrSong::Song(_) => None,
-        })
-    }
 }

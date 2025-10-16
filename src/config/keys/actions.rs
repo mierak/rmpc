@@ -521,6 +521,25 @@ impl Default for RateKind {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum SaveKind {
+    Modal {
+        #[serde(default = "crate::config::defaults::bool::<false>")]
+        all: bool,
+    },
+    Playlist {
+        name: String,
+        #[serde(default = "crate::config::defaults::bool::<false>")]
+        all: bool,
+    },
+}
+
+impl Default for SaveKind {
+    fn default() -> Self {
+        SaveKind::Modal { all: false }
+    }
+}
+
 // Common actions
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
@@ -573,6 +592,10 @@ pub enum CommonActionFile {
         #[serde(default = "crate::config::defaults::i32::<10>")]
         max_rating: i32,
     },
+    Save {
+        #[serde(default)]
+        kind: SaveKind,
+    },
 }
 
 #[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq)]
@@ -616,6 +639,9 @@ pub enum CommonAction {
         min_rating: i32,
         max_rating: i32,
     },
+    Save {
+        kind: SaveKind,
+    },
 }
 
 impl ToDescription for CommonAction {
@@ -637,84 +663,85 @@ impl ToDescription for CommonAction {
             CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
             CommonAction::Select => {
-                                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
-                            }
+                                        "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
+                                    }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
             CommonAction::Delete => {
-                                "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
-                            }
+                                        "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
+                                    }
             CommonAction::Rename => "Rename. Currently only for playlists".into(),
             CommonAction::Close => {
-                                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
-                            }
+                                        "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
+                                    }
             CommonAction::Confirm => {
-                                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
-                            }
+                                        "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
+                                    }
             CommonAction::FocusInput => {
-                                "Focuses textbox if any is on the screen and is not focused".into()
-                            }
+                                        "Focuses textbox if any is on the screen and is not focused".into()
+                                    }
             CommonAction::PaneDown => "Focus the pane below the current one".into(),
             CommonAction::PaneUp => "Focus the pane above the current one".into(),
             CommonAction::PaneRight => "Focus the pane to the right of the current one".into(),
             CommonAction::PaneLeft => "Focus the pane to the left of the current one".into(),
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => format!("Open add menu modal with {} options", items.len()).into(),
             CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                                let mut buf = String::from("Add");
-                                if opts.all {
-                                    buf.push_str(" all items");
-                                } else {
-                                    buf.push_str(" item");
-                                }
-                                buf.push_str(match opts.position {
-                                    Position::AfterCurrentSong => " after the current song",
-                                    Position::BeforeCurrentSong => " before the current song",
-                                    Position::StartOfQueue => " at the start of the queue",
-                                    Position::EndOfQueue => " at the end of the queue",
-                                    Position::Replace => " and replace the queue",
-                                });
+                                        let mut buf = String::from("Add");
+                                        if opts.all {
+                                            buf.push_str(" all items");
+                                        } else {
+                                            buf.push_str(" item");
+                                        }
+                                        buf.push_str(match opts.position {
+                                            Position::AfterCurrentSong => " after the current song",
+                                            Position::BeforeCurrentSong => " before the current song",
+                                            Position::StartOfQueue => " at the start of the queue",
+                                            Position::EndOfQueue => " at the end of the queue",
+                                            Position::Replace => " and replace the queue",
+                                        });
 
-                                buf.push_str(match opts.autoplay {
-                                    AutoplayKind::First => " and play the first item",
-                                    AutoplayKind::Hovered => " and play the hovered item",
-                                    AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
-                                    AutoplayKind::None => "",
-                                });
+                                        buf.push_str(match opts.autoplay {
+                                            AutoplayKind::First => " and play the first item",
+                                            AutoplayKind::Hovered => " and play the hovered item",
+                                            AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
+                                            AutoplayKind::None => "",
+                                        });
 
-                                buf.into()
-                            },
+                                        buf.into()
+                                    },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
             CommonAction::Rate { kind: RateKind::Modal { .. }, current, .. } => {
-                let mut buf = String::from("Open a modal popup with song rating options");
-                if *current {
-                    buf.push_str(" for the currently playing song");
-                }
-                buf.into()
-            },
+                        let mut buf = String::from("Open a modal popup with song rating options");
+                        if *current {
+                            buf.push_str(" for the currently playing song");
+                        }
+                        buf.into()
+                    },
             CommonAction::Rate { kind: RateKind::Value(val), current, ..  } => {
-                if *current {
-                    format!("Set currently playing song's rating to {val}")
-                } else {
-                    format!("Set song rating to {val}")
-                }.into()
-            }
+                        if *current {
+                            format!("Set currently playing song's rating to {val}")
+                        } else {
+                            format!("Set song rating to {val}")
+                        }.into()
+                    }
             CommonAction::Rate { kind: k @ RateKind::Like() | k @ RateKind::Dislike() | k @ RateKind::Neutral(), current , .. } => {
-                let mut buf = String::from("Set the ");
-                if *current {
-                    buf.push_str("currently playing song's");
-                } else {
-                    buf.push_str("song's under the cursor");
-                }
-                buf.push_str(" like state to ");
-                match k {
-                    RateKind::Like() => buf.push_str("like"),
-                    RateKind::Dislike() => buf.push_str("dislike"),
-                    RateKind::Neutral() => buf.push_str("neutral"),
-                    _ => {}
-                }
+                        let mut buf = String::from("Set the ");
+                        if *current {
+                            buf.push_str("currently playing song's");
+                        } else {
+                            buf.push_str("song's under the cursor");
+                        }
+                        buf.push_str(" like state to ");
+                        match k {
+                            RateKind::Like() => buf.push_str("like"),
+                            RateKind::Dislike() => buf.push_str("dislike"),
+                            RateKind::Neutral() => buf.push_str("neutral"),
+                            _ => {}
+                        }
 
-                buf.into()
-            },
+                        buf.into()
+                    },
+            CommonAction::Save { kind } => Cow::Borrowed("Save current queue as a new playlist"),
         }
     }
 }
@@ -826,6 +853,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                 }
                 CommonAction::Rate { kind, current, min_rating, max_rating }
             }
+            CommonActionFile::Save { kind } => CommonAction::Save { kind },
         })
     }
 }

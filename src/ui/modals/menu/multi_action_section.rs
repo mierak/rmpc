@@ -128,39 +128,11 @@ impl Section for MultiActionSection<'_> {
         self.items.len()
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Widget::render(self, area, buf);
+    fn preffered_height(&self) -> u16 {
+        self.items.len() as u16
     }
 
-    fn left_click(&mut self, position: Position) {
-        if !self.area.contains(position) {
-            return;
-        }
-
-        let items_len = self.items.len();
-        for item in &mut self.items {
-            let idx = position.y.saturating_sub(self.area.y) as usize;
-            if idx < items_len {
-                self.selected_idx = Some(idx);
-            } else {
-                self.selected_idx = None;
-            }
-
-            let res = item.buttons.get_button_idx_at(position);
-            if let Some(idx) = res {
-                item.buttons_state.select(idx);
-            }
-        }
-    }
-
-    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
-        self.confirm(ctx)?;
-        Ok(false)
-    }
-}
-
-impl Widget for &mut MultiActionSection<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, _ctx: &Ctx) {
         self.area = area;
 
         for (idx, item) in self.items.iter_mut().enumerate() {
@@ -187,5 +159,31 @@ impl Widget for &mut MultiActionSection<'_> {
 
             item.buttons.render(buttons_area, buf, &mut item.buttons_state);
         }
+    }
+
+    fn left_click(&mut self, position: Position) {
+        if !self.area.contains(position) {
+            return;
+        }
+
+        let items_len = self.items.len();
+        for item in &mut self.items {
+            let idx = position.y.saturating_sub(self.area.y) as usize;
+            if idx < items_len {
+                self.selected_idx = Some(idx);
+            } else {
+                self.selected_idx = None;
+            }
+
+            let res = item.buttons.get_button_idx_at(position);
+            if let Some(idx) = res {
+                item.buttons_state.select(idx);
+            }
+        }
+    }
+
+    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
+        self.confirm(ctx)?;
+        Ok(false)
     }
 }

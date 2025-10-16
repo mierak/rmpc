@@ -44,9 +44,10 @@ impl Modal for MenuModal<'_> {
     }
 
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
-        let needed_height: usize = self.sections.iter().map(|section| section.len()).sum::<usize>()
-            + 1
-            + self.sections.len();
+        let needed_height: usize =
+            self.sections.iter().map(|section| section.preffered_height() as usize).sum::<usize>()
+                + 1
+                + self.sections.len();
 
         let popup_area = frame.area().centered_exact(self.width, needed_height as u16);
         frame.render_widget(Clear, popup_area);
@@ -63,7 +64,7 @@ impl Modal for MenuModal<'_> {
         let content_area = block.inner(popup_area);
 
         let areas = Layout::vertical(Itertools::intersperse(
-            self.sections.iter().map(|s| Constraint::Length(s.len() as u16)),
+            self.sections.iter_mut().map(|s| Constraint::Length(s.preffered_height())),
             Constraint::Length(1),
         ))
         .split(content_area);
@@ -71,7 +72,7 @@ impl Modal for MenuModal<'_> {
         let mut section_idx = 0;
         for (idx, area) in areas.iter().enumerate() {
             if idx % 2 == 0 {
-                self.sections[section_idx].render(*area, frame.buffer_mut());
+                self.sections[section_idx].render(*area, frame.buffer_mut(), ctx);
                 self.areas[section_idx] = *area;
                 section_idx += 1;
             } else {
@@ -149,7 +150,9 @@ impl Modal for MenuModal<'_> {
         match event.kind {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.section_idx_at_position(event.into()) {
-                    self.sections[self.current_section_idx].unselect();
+                    if idx != self.current_section_idx {
+                        self.sections[self.current_section_idx].unselect();
+                    }
                     self.current_section_idx = idx;
                     self.sections[idx].left_click(event.into());
                     ctx.render()?;

@@ -37,8 +37,21 @@ impl<'a> InputSection<'a> {
         }
     }
 
+    pub fn add_action(
+        &mut self,
+        action: impl FnOnce(&Ctx, String) + Send + Sync + 'static,
+    ) -> &mut Self {
+        self.action = Some(Box::new(action));
+        self
+    }
+
     pub fn action(mut self, action: impl FnOnce(&Ctx, String) + Send + Sync + 'static) -> Self {
         self.action = Some(Box::new(action));
+        self
+    }
+
+    pub fn add_initial_value(&mut self, value: impl Into<String>) -> &mut Self {
+        self.value = value.into();
         self
     }
 }
@@ -63,7 +76,7 @@ impl Section for InputSection<'_> {
         self.is_current = false;
     }
 
-    fn confirm(&mut self, ctx: &crate::ctx::Ctx) -> Result<bool> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if self.is_focused {
             if let Some(cb) = self.action.take() {
                 (cb)(ctx, std::mem::take(&mut self.value));
@@ -79,8 +92,26 @@ impl Section for InputSection<'_> {
         1
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Widget::render(self, area, buf);
+    fn preffered_height(&self) -> u16 {
+        1
+    }
+
+    fn render(&mut self, area: Rect, buf: &mut Buffer, _ctx: &Ctx) {
+        self.area = area;
+
+        let input = Input::default()
+            .set_label_style(if self.is_current {
+                self.current_item_style
+            } else {
+                Style::default()
+            })
+            .spacing(1)
+            .set_borderless(true)
+            .set_label(self.label.as_ref())
+            .set_focused(self.is_focused)
+            .set_text(&self.value);
+
+        input.render(area, buf);
     }
 
     fn left_click(&mut self, pos: Position) {
@@ -118,25 +149,5 @@ impl Section for InputSection<'_> {
         }
 
         Ok(())
-    }
-}
-
-impl Widget for &mut InputSection<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        self.area = area;
-
-        let input = Input::default()
-            .set_label_style(if self.is_current {
-                self.current_item_style
-            } else {
-                Style::default()
-            })
-            .spacing(1)
-            .set_borderless(true)
-            .set_label(self.label.as_ref())
-            .set_focused(self.is_focused)
-            .set_text(&self.value);
-
-        input.render(area, buf);
     }
 }

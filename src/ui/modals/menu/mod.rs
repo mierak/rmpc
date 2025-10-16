@@ -1,18 +1,20 @@
 use anyhow::Result;
 use input_section::InputSection;
+use itertools::Itertools;
 use list_section::ListSection;
 use modal::MenuModal;
 use multi_action_section::MultiActionSection;
 use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
-    widgets::Widget,
 };
 
 use crate::{
     config::keys::actions::AddOpts,
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
+    mpd::mpd_client::MpdClient,
     shared::{
+        cmp::StringCompare,
         key_event::KeyEvent,
         macros::status_error,
         mpd_client_ext::{Enqueue, MpdClientExt as _},
@@ -44,7 +46,8 @@ trait Section {
     }
 
     fn len(&self) -> usize;
-    fn render(&mut self, area: Rect, buf: &mut Buffer);
+    fn preffered_height(&self) -> u16;
+    fn render(&mut self, area: Rect, buf: &mut Buffer, ctx: &Ctx);
 
     fn left_click(&mut self, pos: ratatui::layout::Position);
     fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> Result<bool>;
@@ -131,12 +134,21 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn render(&mut self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+    fn preffered_height(&self) -> u16 {
         match self {
-            SectionType::Menu(s) => Widget::render(s, area, buf),
-            SectionType::Multi(s) => Widget::render(s, area, buf),
-            SectionType::Input(s) => Widget::render(s, area, buf),
-            SectionType::Select(s) => Widget::render(s, area, buf),
+            SectionType::Menu(s) => s.preffered_height(),
+            SectionType::Multi(s) => s.preffered_height(),
+            SectionType::Input(s) => s.preffered_height(),
+            SectionType::Select(s) => s.preffered_height(),
+        }
+    }
+
+    fn render(&mut self, area: Rect, buf: &mut ratatui::buffer::Buffer, ctx: &Ctx) {
+        match self {
+            SectionType::Menu(s) => s.render(area, buf, ctx),
+            SectionType::Multi(s) => s.render(area, buf, ctx),
+            SectionType::Input(s) => s.render(area, buf, ctx),
+            SectionType::Select(s) => s.render(area, buf, ctx),
         }
     }
 
@@ -317,4 +329,50 @@ pub fn create_add_modal<'a>(
         })
         .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
         .build()
+}
+
+pub fn create_save_modal<'a>(
+    song_paths: Vec<String>,
+    initial_playlist_name: Option<String>,
+    ctx: &Ctx,
+) -> Result<MenuModal<'a>> {
+    let playlists =
+        ctx.query_sync(|client| Ok(client.list_playlists()?))?.into_iter().sorted_by(|a, b| {
+            StringCompare::builder().fold_case(true).build().compare(&a.name, &b.name)
+        });
+
+    Ok(MenuModal::new(ctx)
+        .input_section(ctx, "New playlist", |mut sect| {
+            sect.add_initial_value(initial_playlist_name.unwrap_or_default());
+            let song_paths = song_paths.clone();
+            sect.add_action(|ctx, value| {
+                if !value.is_empty() {
+                    ctx.command(move |client| {
+                        client.create_playlist(&value, song_paths)?;
+                        Ok(())
+                    });
+                }
+            });
+            Some(sect)
+        })
+        .list_section(ctx, move |mut sect| {
+            for mut playlist in playlists {
+                let pl_name = std::mem::take(&mut playlist.name);
+                let song_paths = song_paths.clone();
+                sect.add_item(pl_name.clone(), move |ctx| {
+                    ctx.command(move |client| {
+                        client.add_to_playlist_multiple(&pl_name, song_paths)?;
+                        Ok(())
+                    });
+                    Ok(())
+                });
+                sect.add_max_height(8);
+            }
+            Some(sect)
+        })
+        .list_section(ctx, |mut section| {
+            section.add_item("Cancel", |_ctx| Ok(()));
+            Some(section)
+        })
+        .build())
 }

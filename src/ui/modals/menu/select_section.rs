@@ -37,11 +37,6 @@ impl SelectSection {
         }
     }
 
-    pub fn item(mut self, label: impl Into<String>, value: impl Into<String>) -> Self {
-        self.items.push(SelectItem { label: label.into(), value: value.into() });
-        self
-    }
-
     pub fn action(
         &mut self,
         on_confirm: impl FnOnce(&Ctx, String) -> Result<()> + Send + Sync + 'static,
@@ -53,15 +48,6 @@ impl SelectSection {
     pub fn add_item(&mut self, label: impl Into<String>, value: impl Into<String>) -> &mut Self {
         self.items.push(SelectItem { label: label.into(), value: value.into() });
         self
-    }
-
-    pub fn item_at_position(&mut self, position: Position) -> Option<&mut SelectItem> {
-        if !self.area.contains(position) {
-            return None;
-        }
-
-        let idx = position.y.saturating_sub(self.area.y) as usize;
-        self.items.get_mut(idx)
     }
 
     pub fn select_item_at_position(&mut self, position: Position) {
@@ -116,22 +102,11 @@ impl Section for SelectSection {
         self.items.len()
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        Widget::render(self, area, buf);
+    fn preffered_height(&self) -> u16 {
+        self.items.len() as u16
     }
 
-    fn left_click(&mut self, position: Position) {
-        self.select_item_at_position(position);
-    }
-
-    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
-        self.confirm(ctx)?;
-        Ok(false)
-    }
-}
-
-impl Widget for &mut SelectSection {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, _ctx: &Ctx) {
         self.area = area;
 
         for (idx, item) in self.items.iter().enumerate() {
@@ -145,5 +120,14 @@ impl Widget for &mut SelectSection {
             item_area.height = 1;
             text.render(item_area, buf);
         }
+    }
+
+    fn left_click(&mut self, position: Position) {
+        self.select_item_at_position(position);
+    }
+
+    fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
+        self.confirm(ctx)?;
+        Ok(false)
     }
 }

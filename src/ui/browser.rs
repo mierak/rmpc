@@ -9,13 +9,13 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, Position, RateKind},
+        actions::{AddKind, Position, RateKind, SaveKind},
     },
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         key_event::KeyEvent,
-        macros::modal,
+        macros::{modal, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt, MpdDelete},
         mpd_query::EXTERNAL_COMMAND,
@@ -24,7 +24,7 @@ use crate::{
         dirstack::{DirStack, DirStackItem, WalkDirStackItem},
         modals::{
             input_modal::InputModal,
-            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, create_save_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
         panes::Pane,
@@ -95,8 +95,17 @@ where
     fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
+
     fn initial_playlist_name(&self) -> Option<String> {
-        None
+        if !self.stack().current().marked().is_empty() {
+            None
+        } else if let Some(selected) = self.stack().current().selected()
+            && !selected.is_file()
+        {
+            Some(selected.as_path().to_owned())
+        } else {
+            None
+        }
     }
 
     fn delete<'a>(&self, item: impl Iterator<Item = (usize, &'a T)>) -> Vec<MpdDelete> {
@@ -552,6 +561,54 @@ where
             }
             CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                 event.abandon();
+            }
+            CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                let list_songs_fns = self
+                    .items(all)
+                    .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
+                    .collect_vec();
+                if list_songs_fns.is_empty() {
+                    status_warn!("No songs selected to save");
+                    return Ok(());
+                }
+
+                ctx.command(move |client| {
+                    let songs = list_songs_fns
+                        .into_iter()
+                        .map(|cb| -> Result<_> { cb(client) })
+                        .collect::<Result<Vec<Vec<_>>>>()?
+                        .into_iter()
+                        .flatten()
+                        .map(|song| song.file)
+                        .collect();
+
+                    client.add_to_playlist_multiple(&name, songs)?;
+                    Ok(())
+                });
+            }
+            CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                let list_songs_fns = self
+                    .items(all)
+                    .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
+                    .collect_vec();
+                if list_songs_fns.is_empty() {
+                    status_warn!("No songs selected to save");
+                    return Ok(());
+                }
+
+                let song_paths = ctx.query_sync(|client| {
+                    Ok(list_songs_fns
+                        .into_iter()
+                        .map(|cb| -> Result<_> { cb(client) })
+                        .collect::<Result<Vec<Vec<_>>>>()?
+                        .into_iter()
+                        .flatten()
+                        .map(|song| song.file)
+                        .collect())
+                })?;
+
+                let modal = create_save_modal(song_paths, self.initial_playlist_name(), ctx)?;
+                modal!(ctx, modal);
             }
         }
 

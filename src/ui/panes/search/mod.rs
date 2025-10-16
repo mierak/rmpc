@@ -17,7 +17,7 @@ use crate::{
     config::{
         keys::{
             GlobalAction,
-            actions::{AddKind, Position, RateKind},
+            actions::{AddKind, Position, RateKind, SaveKind},
         },
         tabs::PaneType,
     },
@@ -40,7 +40,7 @@ use crate::{
         dirstack::Dir,
         modals::{
             input_modal::InputModal,
-            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, create_save_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
         panes::search::inputs::{ActionResult, InputGroups, InputType, TextboxInput},
@@ -412,6 +412,30 @@ impl SearchPane {
                     event.abandon();
                 }
                 CommonAction::Rate { .. } => {}
+                CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                    // TODO only "all"
+                    let song_paths: Vec<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to save");
+                        return Ok(());
+                    }
+                    ctx.command(move |client| {
+                        client.add_to_playlist_multiple(&name, song_paths)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                    // TODO only "all"
+                    let song_paths: Vec<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to save");
+                        return Ok(());
+                    }
+                    let modal = create_save_modal(song_paths, None, ctx)?;
+                    modal!(ctx, modal);
+                }
             }
         }
 
@@ -691,6 +715,28 @@ impl SearchPane {
                 }
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
+                }
+                CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                    let song_paths: Vec<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to save");
+                        return Ok(());
+                    }
+                    ctx.command(move |client| {
+                        client.add_to_playlist_multiple(&name, song_paths)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                    let song_paths: Vec<_> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to save");
+                        return Ok(());
+                    }
+                    let modal = create_save_modal(song_paths, None, ctx)?;
+                    modal!(ctx, modal);
                 }
             }
         }

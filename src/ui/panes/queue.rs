@@ -18,7 +18,7 @@ use crate::{
         keys::{
             GlobalAction,
             QueueActions,
-            actions::{AddKind, AutoplayKind, RateKind},
+            actions::{AddKind, AutoplayKind, RateKind, SaveKind},
         },
         tabs::PaneType,
         theme::{
@@ -36,7 +36,7 @@ use crate::{
     shared::{
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         key_event::KeyEvent,
-        macros::{modal, status_error, status_info},
+        macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
     },
@@ -47,7 +47,7 @@ use crate::{
             confirm_modal::ConfirmModal,
             info_list_modal::InfoListModal,
             input_modal::InputModal,
-            menu::{create_add_modal, create_rating_modal, modal::MenuModal},
+            menu::{create_add_modal, create_rating_modal, create_save_modal, modal::MenuModal},
             select_modal::SelectModal,
         },
     },
@@ -1187,6 +1187,28 @@ impl Pane for QueuePane {
                 }
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
+                }
+                CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                    let song_paths: Vec<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to save");
+                        return Ok(());
+                    }
+                    ctx.command(move |client| {
+                        client.add_to_playlist_multiple(&name, song_paths)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                    let song_paths: Vec<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to save");
+                        return Ok(());
+                    }
+                    let modal = create_save_modal(song_paths, None, ctx)?;
+                    modal!(ctx, modal);
                 }
             }
         } else if let Some(action) = event.as_global_action(ctx) {
