@@ -25,6 +25,8 @@ use crossterm::event::{KeyCode, KeyModifiers};
 pub use key::Key;
 use serde::{Deserialize, Serialize};
 
+use crate::config::keys::actions::SaveKind;
+
 pub(crate) mod actions;
 pub mod key;
 
@@ -135,6 +137,7 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('i'), modifiers: M::NONE    }, C::FocusInput),
                 (Key { key: K::Char('B'), modifiers: M::SHIFT   }, C::ShowInfo),
                 (Key { key: K::Char('z'), modifiers: M::CONTROL }, C::ContextMenu {}),
+                (Key { key: K::Char('s'), modifiers: M::CONTROL }, C::Save { kind: SaveKind::default() }),
             ]),
             #[cfg(debug_assertions)]
             logs: HashMap::from([
@@ -145,7 +148,6 @@ impl Default for KeyConfigFile {
                 (Key { key: K::Char('d'), modifiers: M::NONE    }, Q::Delete),
                 (Key { key: K::Char('D'), modifiers: M::SHIFT   }, Q::DeleteAll),
                 (Key { key: K::Enter,     modifiers: M::NONE    }, Q::Play),
-                (Key { key: K::Char('s'), modifiers: M::CONTROL }, Q::Save),
                 (Key { key: K::Char('a'), modifiers: M::NONE    }, Q::AddToPlaylist),
                 (Key { key: K::Char('C'), modifiers: M::SHIFT   }, Q::JumpToCurrent),
                 (Key { key: K::Char('X'), modifiers: M::SHIFT   }, Q::Shuffle),

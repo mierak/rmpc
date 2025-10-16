@@ -40,6 +40,7 @@ Search pane
 - Added `Replace` transform
 - Added section filter to docs search
 - `search_button` config option for search pane
+- Configurable `Save()` keybind in the navigation section
 
 ### Changed
 
@@ -84,6 +85,11 @@ available and Block if not
 - Fix Iterm2 image protocol sometimes rendering too late
 - Fix playlists not using playlist style and icon in the Playlists pane
 - Order of added songs when adding them from browser panes
+
+### Deprecated
+
+- `Save` keybind in the queue section. Use the new configurable `Save()` keybind in the navigation
+section instead
 
 ## [0.9.0] - 2025-06-23
 

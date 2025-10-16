@@ -6,8 +6,8 @@ use super::ScrollingState;
 
 #[derive(Debug, Default)]
 pub struct DirState<T: ScrollingState> {
-    scrollbar_state: ScrollbarState,
-    inner: T,
+    pub scrollbar_state: ScrollbarState,
+    pub inner: T,
     pub marked: BTreeSet<usize>,
     content_len: Option<usize>,
     viewport_len: Option<usize>,
@@ -429,6 +429,11 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn offset(&self) -> usize {
         self.inner.offset()
+    }
+
+    pub fn set_offset(&mut self, offset: usize) {
+        self.inner.set_offset(offset);
+        self.scrollbar_state = self.scrollbar_state.position(offset);
     }
 }
 

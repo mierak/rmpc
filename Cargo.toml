@@ -94,3 +94,4 @@ cast_sign_loss = "allow"
 
 [lints.rust]
 unused_macros = "allow"
+deprecated = "allow"
