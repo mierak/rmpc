@@ -310,6 +310,7 @@ pub enum QueueActionsFile {
     Delete,
     DeleteAll,
     Play,
+    #[deprecated]
     Save,
     AddToPlaylist,
     ShowInfo,
@@ -323,6 +324,7 @@ pub enum QueueActions {
     Delete,
     DeleteAll,
     Play,
+    #[deprecated]
     Save,
     AddToPlaylist,
     JumpToCurrent,

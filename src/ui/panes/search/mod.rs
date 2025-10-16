@@ -412,10 +412,9 @@ impl SearchPane {
                     event.abandon();
                 }
                 CommonAction::Rate { .. } => {}
-                CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
-                    // TODO only "all"
+                CommonAction::Save { kind: SaveKind::Playlist { name, all: true } } => {
                     let song_paths: Vec<String> =
-                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                        self.items(true).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
@@ -425,10 +424,9 @@ impl SearchPane {
                         Ok(())
                     });
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all } } => {
-                    // TODO only "all"
+                CommonAction::Save { kind: SaveKind::Modal { all: true } } => {
                     let song_paths: Vec<String> =
-                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                        self.items(true).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
@@ -436,6 +434,7 @@ impl SearchPane {
                     let modal = create_save_modal(song_paths, None, ctx)?;
                     modal!(ctx, modal);
                 }
+                CommonAction::Save { .. } => {}
             }
         }
 

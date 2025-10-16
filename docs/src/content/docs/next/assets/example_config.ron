@@ -95,11 +95,11 @@
             "D":         Delete,
             "B":         ShowInfo,
             "<C-z>":     ContextMenu(),
+            "<C-s>":     Save(kind: Modal(all: false)),
         },
         queue: {
             "D":       DeleteAll,
             "<CR>":    Play,
-            "<C-s>":   Save,
             "a":       AddToPlaylist,
             "d":       Delete,
             "C":       JumpToCurrent,
