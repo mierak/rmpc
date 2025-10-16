@@ -111,6 +111,10 @@ impl Section for ListSection {
         true
     }
 
+    fn selected(&self) -> Option<usize> {
+        self.state.get_selected()
+    }
+
     fn select(&mut self, idx: usize) {
         self.state.select(Some(idx), 0);
     }
@@ -196,17 +200,7 @@ impl Section for ListSection {
         Ok(false)
     }
 
-    fn find_next(&self, filter: &str) -> Option<usize> {
-        let start = self.state.get_selected().map_or(0, |s| s + 1);
-        (start..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
-    }
-
-    fn find_prev(&self, filter: &str) -> Option<usize> {
-        let selected = self.state.get_selected().unwrap_or(self.items.len());
-        (0..selected).rev().find(|&i| self.items[i].label.to_lowercase().contains(filter))
-    }
-
-    fn find_first(&self, filter: &str) -> Option<usize> {
-        (0..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.items.iter().map(|i| i.label.as_str()))
     }
 }

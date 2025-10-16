@@ -37,6 +37,7 @@ trait Section {
     fn left(&mut self) -> bool {
         true
     }
+    fn selected(&self) -> Option<usize>;
     fn select(&mut self, idx: usize);
     fn unselect(&mut self);
     fn unfocus(&mut self) {}
@@ -53,9 +54,7 @@ trait Section {
     fn left_click(&mut self, pos: ratatui::layout::Position);
     fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> Result<bool>;
 
-    fn find_next(&self, filter: &str) -> Option<usize>;
-    fn find_prev(&self, filter: &str) -> Option<usize>;
-    fn find_first(&self, filter: &str) -> Option<usize>;
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_>;
 }
 
 #[derive(Debug)]
@@ -100,6 +99,15 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.left(),
             SectionType::Input(s) => s.left(),
             SectionType::Select(s) => s.left(),
+        }
+    }
+
+    fn selected(&self) -> Option<usize> {
+        match self {
+            SectionType::Menu(s) => s.selected(),
+            SectionType::Multi(s) => s.selected(),
+            SectionType::Input(s) => s.selected(),
+            SectionType::Select(s) => s.selected(),
         }
     }
 
@@ -193,30 +201,12 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn find_next(&self, filter: &str) -> Option<usize> {
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         match self {
-            SectionType::Menu(s) => s.find_next(filter),
-            SectionType::Multi(s) => s.find_next(filter),
-            SectionType::Input(s) => s.find_next(filter),
-            SectionType::Select(s) => s.find_next(filter),
-        }
-    }
-
-    fn find_prev(&self, filter: &str) -> Option<usize> {
-        match self {
-            SectionType::Menu(s) => s.find_prev(filter),
-            SectionType::Multi(s) => s.find_prev(filter),
-            SectionType::Input(s) => s.find_prev(filter),
-            SectionType::Select(s) => s.find_prev(filter),
-        }
-    }
-
-    fn find_first(&self, filter: &str) -> Option<usize> {
-        match self {
-            SectionType::Menu(s) => s.find_first(filter),
-            SectionType::Multi(s) => s.find_first(filter),
-            SectionType::Input(s) => s.find_first(filter),
-            SectionType::Select(s) => s.find_first(filter),
+            SectionType::Menu(s) => s.item_labels_iter(),
+            SectionType::Multi(s) => s.item_labels_iter(),
+            SectionType::Input(s) => s.item_labels_iter(),
+            SectionType::Select(s) => s.item_labels_iter(),
         }
     }
 }

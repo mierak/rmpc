@@ -85,6 +85,10 @@ impl Section for SelectSection {
         self.selected_idx.is_some()
     }
 
+    fn selected(&self) -> Option<usize> {
+        self.selected_idx
+    }
+
     fn select(&mut self, idx: usize) {
         self.selected_idx = Some(idx);
     }
@@ -139,17 +143,7 @@ impl Section for SelectSection {
         Ok(false)
     }
 
-    fn find_next(&self, filter: &str) -> Option<usize> {
-        let start = self.selected_idx.map_or(0, |s| s + 1);
-        (start..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
-    }
-
-    fn find_prev(&self, filter: &str) -> Option<usize> {
-        let selected_idx = self.selected_idx.unwrap_or(self.items.len());
-        (0..selected_idx).rev().find(|&i| self.items[i].label.to_lowercase().contains(filter))
-    }
-
-    fn find_first(&self, filter: &str) -> Option<usize> {
-        (0..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.items.iter().map(|i| i.label.as_str()))
     }
 }

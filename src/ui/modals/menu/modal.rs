@@ -32,6 +32,7 @@ use crate::{
 #[derive(Debug)]
 pub struct MenuModal<'a> {
     sections: Vec<SectionType<'a>>,
+    sections_labels: Vec<Vec<String>>,
     current_section_idx: usize,
     areas: Vec<Rect>,
     input_focused: bool,
@@ -264,6 +265,7 @@ impl<'a> MenuModal<'a> {
     pub fn new(_ctx: &Ctx) -> Self {
         Self {
             sections: Vec::default(),
+            sections_labels: Vec::default(),
             current_section_idx: 0,
             areas: Vec::new(),
             input_focused: false,
@@ -279,16 +281,34 @@ impl<'a> MenuModal<'a> {
             return;
         };
 
-        let length = self.sections.len();
-        let selected = self.current_section_idx;
-        for i in selected..length + selected {
-            let i = i % length;
-            if let Some(idx) = self.sections[i].find_next(filter) {
-                if i != self.current_section_idx {
-                    self.sections[self.current_section_idx].unselect();
+        let sect_count = self.sections.len();
+        let curr_sect_idx = self.current_section_idx;
+        for i in curr_sect_idx..sect_count + curr_sect_idx {
+            let sect_i = i % sect_count;
+
+            let sect = &self.sections[sect_i];
+            let start = sect.selected().map_or(0, |s| s + 1);
+
+            for label_idx in start..sect.len() {
+                let label = &self.sections_labels[sect_i][label_idx];
+                if label.contains(filter) {
+                    if sect_i != self.current_section_idx {
+                        self.sections[self.current_section_idx].unselect();
+                    }
+                    self.current_section_idx = sect_i;
+                    self.sections[sect_i].select(label_idx);
+                    return;
                 }
-                self.current_section_idx = i;
-                self.sections[i].select(idx);
+            }
+        }
+
+        // if nothing was found, try to search the current section again from
+        // the start to wrap around inside just the section itself
+        let sect = &self.sections[self.current_section_idx];
+        for label_idx in 0..sect.len() {
+            let label = &self.sections_labels[self.current_section_idx][label_idx];
+            if label.contains(filter) {
+                self.sections[self.current_section_idx].select(label_idx);
                 break;
             }
         }
@@ -299,16 +319,34 @@ impl<'a> MenuModal<'a> {
             return;
         };
 
-        let length = self.sections.len();
-        let selected = self.current_section_idx;
-        for i in (0..=length).rev() {
-            let i = (i + selected) % length;
-            if let Some(idx) = self.sections[i].find_prev(filter) {
-                if i != self.current_section_idx {
-                    self.sections[self.current_section_idx].unselect();
+        let sect_count = self.sections.len();
+        let curr_sect_idx = self.current_section_idx;
+        for i in (0..=sect_count).rev() {
+            let sect_i = (i + curr_sect_idx) % sect_count;
+
+            let sect = &self.sections[sect_i];
+            let end = sect.selected().unwrap_or(sect.len());
+
+            for label_idx in (0..end).rev() {
+                let label = &self.sections_labels[sect_i][label_idx];
+                if label.contains(filter) {
+                    if sect_i != self.current_section_idx {
+                        self.sections[self.current_section_idx].unselect();
+                    }
+                    self.current_section_idx = sect_i;
+                    self.sections[sect_i].select(label_idx);
+                    return;
                 }
-                self.current_section_idx = i;
-                self.sections[i].select(idx);
+            }
+        }
+
+        // if nothing was found, try to search the current section again from
+        // the end to wrap around inside just the section itself
+        let sect = &self.sections[self.current_section_idx];
+        for label_idx in (0..sect.len()).rev() {
+            let label = &self.sections_labels[self.current_section_idx][label_idx];
+            if label.contains(filter) {
+                self.sections[self.current_section_idx].select(label_idx);
                 break;
             }
         }
@@ -319,14 +357,17 @@ impl<'a> MenuModal<'a> {
             return;
         };
 
-        for i in 0..self.sections.len() {
-            if let Some(idx) = self.sections[i].find_first(filter) {
-                if i != self.current_section_idx {
-                    self.sections[self.current_section_idx].unselect();
+        for sect_i in 0..self.sections_labels.len() {
+            for label_idx in 0..self.sections_labels[sect_i].len() {
+                let label = &self.sections_labels[sect_i][label_idx];
+                if label.contains(filter) {
+                    if sect_i != self.current_section_idx {
+                        self.sections[self.current_section_idx].unselect();
+                    }
+                    self.current_section_idx = sect_i;
+                    self.sections[sect_i].select(label_idx);
+                    return;
                 }
-                self.current_section_idx = i;
-                self.sections[i].select(idx);
-                break;
             }
         }
     }
@@ -343,6 +384,11 @@ impl<'a> MenuModal<'a> {
             self.current_section_idx = i;
             s.down();
         }
+        self.sections_labels =
+            self.sections.iter().fold(Vec::<Vec<String>>::new(), |mut acc, s| {
+                acc.push(s.item_labels_iter().map(|l| l.to_lowercase()).collect());
+                acc
+            });
         self
     }
 

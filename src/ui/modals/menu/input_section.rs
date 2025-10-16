@@ -67,6 +67,10 @@ impl Section for InputSection<'_> {
         self.is_current
     }
 
+    fn selected(&self) -> Option<usize> {
+        if self.is_current { Some(0) } else { None }
+    }
+
     fn select(&mut self, idx: usize) {
         self.is_current = idx == 0;
     }
@@ -164,15 +168,7 @@ impl Section for InputSection<'_> {
         Ok(())
     }
 
-    fn find_next(&self, filter: &str) -> Option<usize> {
-        if !self.is_current && self.label.to_lowercase().contains(filter) { Some(0) } else { None }
-    }
-
-    fn find_prev(&self, filter: &str) -> Option<usize> {
-        if !self.is_current && self.label.to_lowercase().contains(filter) { Some(0) } else { None }
-    }
-
-    fn find_first(&self, filter: &str) -> Option<usize> {
-        if self.label.to_lowercase().contains(filter) { Some(0) } else { None }
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(std::iter::once(self.label.as_ref()))
     }
 }
