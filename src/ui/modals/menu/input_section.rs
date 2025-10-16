@@ -92,7 +92,7 @@ impl Section for InputSection<'_> {
         1
     }
 
-    fn preffered_height(&self) -> u16 {
+    fn preferred_height(&self) -> u16 {
         1
     }
 

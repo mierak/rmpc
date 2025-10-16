@@ -96,7 +96,11 @@ where
         Ok(())
     }
 
-    fn initial_playlist_name(&self) -> Option<String> {
+    fn initial_playlist_name(&self, all: bool) -> Option<String> {
+        if all {
+            return self.stack().path().current_dir().map(|v| v.to_owned());
+        }
+
         if !self.stack().current().marked().is_empty() {
             None
         } else if let Some(selected) = self.stack().current().selected()
@@ -607,7 +611,7 @@ where
                         .collect())
                 })?;
 
-                let modal = create_save_modal(song_paths, self.initial_playlist_name(), ctx)?;
+                let modal = create_save_modal(song_paths, self.initial_playlist_name(all), ctx)?;
                 modal!(ctx, modal);
             }
         }
@@ -683,7 +687,7 @@ where
                 }
 
                 let songs_in_items_clone = list_songs_in_items.clone();
-                let initial_playlist_name = self.initial_playlist_name();
+                let initial_playlist_name = self.initial_playlist_name(false);
                 section.add_item("Create playlist", move |ctx| {
                     modal!(
                         ctx,

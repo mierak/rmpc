@@ -102,7 +102,7 @@ impl Section for SelectSection {
         self.items.len()
     }
 
-    fn preffered_height(&self) -> u16 {
+    fn preferred_height(&self) -> u16 {
         self.items.len() as u16
     }
 

@@ -128,7 +128,7 @@ impl Section for ListSection {
         self.items.len()
     }
 
-    fn preffered_height(&self) -> u16 {
+    fn preferred_height(&self) -> u16 {
         let len = self.items.len();
         self.max_height.map_or(len, |mh| len.min(mh)) as u16
     }

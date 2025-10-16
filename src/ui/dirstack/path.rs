@@ -27,6 +27,10 @@ impl Path {
     pub fn as_slice(&self) -> &[String] {
         self.0.as_slice()
     }
+
+    pub fn current_dir(&self) -> Option<&str> {
+        self.0.last().map(|s| s.as_str())
+    }
 }
 
 impl std::fmt::Display for Path {

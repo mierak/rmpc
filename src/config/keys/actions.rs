@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, fmt::Write, sync::Arc};
 
 use anyhow::bail;
 use itertools::Itertools;
@@ -741,7 +741,29 @@ impl ToDescription for CommonAction {
 
                         buf.into()
                     },
-            CommonAction::Save { kind } => Cow::Borrowed("Save current queue as a new playlist"),
+            CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                let mut buf = String::from("Open a modal popup with options to save ");
+                if *all {
+                    buf.push_str("all items");
+                } else {
+                    buf.push_str("the item under cursor");
+                }
+                buf.push_str(" to either a new or existing playlist");
+
+                buf.into()
+            },
+            CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                let mut buf = String::from("Save ");
+                if *all {
+                    buf.push_str("all items");
+                } else {
+                    buf.push_str("the item under cursor");
+                }
+
+                write!(buf, " to playlist '{name}'").expect("Write to string buf should never fail");
+
+                buf.into()
+            }
         }
     }
 }

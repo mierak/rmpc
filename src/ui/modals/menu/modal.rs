@@ -45,7 +45,7 @@ impl Modal for MenuModal<'_> {
 
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let needed_height: usize =
-            self.sections.iter().map(|section| section.preffered_height() as usize).sum::<usize>()
+            self.sections.iter().map(|section| section.preferred_height() as usize).sum::<usize>()
                 + 1
                 + self.sections.len();
 
@@ -64,7 +64,7 @@ impl Modal for MenuModal<'_> {
         let content_area = block.inner(popup_area);
 
         let areas = Layout::vertical(Itertools::intersperse(
-            self.sections.iter_mut().map(|s| Constraint::Length(s.preffered_height())),
+            self.sections.iter_mut().map(|s| Constraint::Length(s.preferred_height())),
             Constraint::Length(1),
         ))
         .split(content_area);

@@ -40,6 +40,7 @@ Search pane
 - Added `Replace` transform
 - Added section filter to docs search
 - `search_button` config option for search pane
+- Configurable `Save()` keybind in the navigation section
 
 ### Changed
 

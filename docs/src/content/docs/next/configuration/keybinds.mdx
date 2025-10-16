@@ -148,6 +148,7 @@ list and controlling search mode.
 |                 | [AddOptions()](#addoptions) | Add item(s) to the queue with specified options. More info [in its section](#addoptions)                                           |
 |                 | ContextMenu()               | Show a context menu with select few actions that can be done on the current item(s)                                                |
 |                 | [Rate()](#rate)             | Set song rating, must have <a href={path("configuration/stickers#rating")}>stickers</a> configured                                 |
+|                 | [Save()](#save)             | Save item(s) to a playlist with specified options. More info [in its section](#save)                                               |
 
 #### Rate
 
@@ -234,6 +235,56 @@ Rate(kind: Modal(values: [], custom: true), current: false, max_rating: 100),
 
 ```rust showLineNumbers=false
 Rate(kind: Modal(values: [], custom: false, like: true), current: false),
+```
+
+#### Save
+
+A configurable keybind used to manipulate playlists. Allows you to save either a single or all items
+under the cursor in browser panes to either a new or an existing playlist.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+#### Syntax
+
+`Save(kind: <kind>)`
+
+Possible values for the action `<kind>` are either a `Modal()` or `Playlist()`.
+
+These mean:
+
+- Modal - display a menu modal with possible options
+- Playlist - save the items to a specified playlist directly, the playlist will be created if it does
+  not exist
+
+##### Examples
+
+- Adds items under cursor to a playlist named "myplaylist"
+
+```rust showLineNumbers=false
+Save(kind: Playlist(name: "myplaylist"))
+```
+
+- Adds all items in the current directory to a playlist named "myplaylist"
+
+```rust showLineNumbers=false
+Save(kind: Playlist(name: "myplaylist", all: true))
+```
+
+- Display a modal with options to save items under the cursor to either a new or an existing playlist
+
+```rust showLineNumbers=false
+Save()
+// or equivalent
+Save(kind: Modal())
+// or equivalent
+Save(kind: Modal(all: false))
+```
+
+- Display a modal with options to save all items to either a new or an existing playlist
+
+```rust showLineNumbers=false
+Save(kind: Modal(all: true))
 ```
 
 #### AddOptions

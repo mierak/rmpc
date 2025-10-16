@@ -46,7 +46,7 @@ trait Section {
     }
 
     fn len(&self) -> usize;
-    fn preffered_height(&self) -> u16;
+    fn preferred_height(&self) -> u16;
     fn render(&mut self, area: Rect, buf: &mut Buffer, ctx: &Ctx);
 
     fn left_click(&mut self, pos: ratatui::layout::Position);
@@ -134,12 +134,12 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn preffered_height(&self) -> u16 {
+    fn preferred_height(&self) -> u16 {
         match self {
-            SectionType::Menu(s) => s.preffered_height(),
-            SectionType::Multi(s) => s.preffered_height(),
-            SectionType::Input(s) => s.preffered_height(),
-            SectionType::Select(s) => s.preffered_height(),
+            SectionType::Menu(s) => s.preferred_height(),
+            SectionType::Multi(s) => s.preferred_height(),
+            SectionType::Input(s) => s.preferred_height(),
+            SectionType::Select(s) => s.preferred_height(),
         }
     }
 
@@ -342,6 +342,7 @@ pub fn create_save_modal<'a>(
         });
 
     Ok(MenuModal::new(ctx)
+        .width(80)
         .input_section(ctx, "New playlist", |mut sect| {
             sect.add_initial_value(initial_playlist_name.unwrap_or_default());
             let song_paths = song_paths.clone();
@@ -366,7 +367,7 @@ pub fn create_save_modal<'a>(
                     });
                     Ok(())
                 });
-                sect.add_max_height(8);
+                sect.add_max_height(12);
             }
             Some(sect)
         })
