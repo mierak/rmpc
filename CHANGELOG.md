@@ -85,6 +85,7 @@ available and Block if not
 - Fix Iterm2 image protocol sometimes rendering too late
 - Fix playlists not using playlist style and icon in the Playlists pane
 - Order of added songs when adding them from browser panes
+- Marked items in Queue not being cleared on database update
 
 ### Deprecated
 
