@@ -111,8 +111,14 @@ impl Section for ListSection {
         true
     }
 
+    fn select(&mut self, idx: usize) {
+        self.state.select(Some(idx), 0);
+    }
+
     fn unselect(&mut self) {
+        let offset = self.state.offset();
         self.state.inner.select(None);
+        self.state.set_offset(offset);
     }
 
     fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
@@ -133,7 +139,7 @@ impl Section for ListSection {
         self.max_height.map_or(len, |mh| len.min(mh)) as u16
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer, ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         let should_show_scrollbar = ctx.config.as_styled_scrollbar().is_some()
             && self.max_height.is_some_and(|h| h < self.items.len());
 
@@ -158,6 +164,10 @@ impl Section for ListSection {
 
             if self.state.get_selected().is_some_and(|i| i == idx) {
                 text = text.style(self.current_item_style);
+            } else if let Some(f) = filter
+                && item.label.to_lowercase().contains(f)
+            {
+                text = text.style(ctx.config.theme.highlighted_item_style);
             }
             let idx = idx - self.state.offset();
 
@@ -184,5 +194,19 @@ impl Section for ListSection {
     fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
         self.confirm(ctx)?;
         Ok(false)
+    }
+
+    fn find_next(&self, filter: &str) -> Option<usize> {
+        let start = self.state.get_selected().map_or(0, |s| s + 1);
+        (start..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
+    }
+
+    fn find_prev(&self, filter: &str) -> Option<usize> {
+        let selected = self.state.get_selected().unwrap_or(self.items.len());
+        (0..selected).rev().find(|&i| self.items[i].label.to_lowercase().contains(filter))
+    }
+
+    fn find_first(&self, filter: &str) -> Option<usize> {
+        (0..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
     }
 }

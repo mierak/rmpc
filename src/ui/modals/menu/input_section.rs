@@ -67,6 +67,10 @@ impl Section for InputSection<'_> {
         self.is_current
     }
 
+    fn select(&mut self, idx: usize) {
+        self.is_current = idx == 0;
+    }
+
     fn unfocus(&mut self) {
         self.is_focused = false;
     }
@@ -96,7 +100,7 @@ impl Section for InputSection<'_> {
         1
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer, _ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         self.area = area;
 
         let input = Input::default()
@@ -108,6 +112,15 @@ impl Section for InputSection<'_> {
             .spacing(1)
             .set_borderless(true)
             .set_label(self.label.as_ref())
+            .set_label_style(if self.is_current && !self.is_focused {
+                ctx.config.theme.current_item_style
+            } else if let Some(f) = filter
+                && self.label.to_lowercase().contains(f)
+            {
+                ctx.config.theme.highlighted_item_style
+            } else {
+                Style::default()
+            })
             .set_focused(self.is_focused)
             .set_text(&self.value);
 
@@ -149,5 +162,17 @@ impl Section for InputSection<'_> {
         }
 
         Ok(())
+    }
+
+    fn find_next(&self, filter: &str) -> Option<usize> {
+        if !self.is_current && self.label.to_lowercase().contains(filter) { Some(0) } else { None }
+    }
+
+    fn find_prev(&self, filter: &str) -> Option<usize> {
+        if !self.is_current && self.label.to_lowercase().contains(filter) { Some(0) } else { None }
+    }
+
+    fn find_first(&self, filter: &str) -> Option<usize> {
+        if self.label.to_lowercase().contains(filter) { Some(0) } else { None }
     }
 }

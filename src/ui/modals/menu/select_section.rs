@@ -85,6 +85,10 @@ impl Section for SelectSection {
         self.selected_idx.is_some()
     }
 
+    fn select(&mut self, idx: usize) {
+        self.selected_idx = Some(idx);
+    }
+
     fn unselect(&mut self) {
         self.selected_idx = None;
     }
@@ -106,7 +110,7 @@ impl Section for SelectSection {
         self.items.len() as u16
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer, _ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         self.area = area;
 
         for (idx, item) in self.items.iter().enumerate() {
@@ -114,6 +118,10 @@ impl Section for SelectSection {
 
             if self.selected_idx.is_some_and(|i| i == idx) {
                 text = text.style(self.current_item_style);
+            } else if let Some(f) = filter
+                && item.label.to_lowercase().contains(f)
+            {
+                text = text.style(ctx.config.theme.highlighted_item_style);
             }
 
             let mut item_area = area.shrink_from_top(idx as u16);
@@ -129,5 +137,19 @@ impl Section for SelectSection {
     fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
         self.confirm(ctx)?;
         Ok(false)
+    }
+
+    fn find_next(&self, filter: &str) -> Option<usize> {
+        let start = self.selected_idx.map_or(0, |s| s + 1);
+        (start..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
+    }
+
+    fn find_prev(&self, filter: &str) -> Option<usize> {
+        let selected_idx = self.selected_idx.unwrap_or(self.items.len());
+        (0..selected_idx).rev().find(|&i| self.items[i].label.to_lowercase().contains(filter))
+    }
+
+    fn find_first(&self, filter: &str) -> Option<usize> {
+        (0..self.items.len()).find(|&i| self.items[i].label.to_lowercase().contains(filter))
     }
 }

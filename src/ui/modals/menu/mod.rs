@@ -37,6 +37,7 @@ trait Section {
     fn left(&mut self) -> bool {
         true
     }
+    fn select(&mut self, idx: usize);
     fn unselect(&mut self);
     fn unfocus(&mut self) {}
 
@@ -47,10 +48,14 @@ trait Section {
 
     fn len(&self) -> usize;
     fn preferred_height(&self) -> u16;
-    fn render(&mut self, area: Rect, buf: &mut Buffer, ctx: &Ctx);
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx);
 
     fn left_click(&mut self, pos: ratatui::layout::Position);
     fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> Result<bool>;
+
+    fn find_next(&self, filter: &str) -> Option<usize>;
+    fn find_prev(&self, filter: &str) -> Option<usize>;
+    fn find_first(&self, filter: &str) -> Option<usize>;
 }
 
 #[derive(Debug)]
@@ -95,6 +100,15 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.left(),
             SectionType::Input(s) => s.left(),
             SectionType::Select(s) => s.left(),
+        }
+    }
+
+    fn select(&mut self, idx: usize) {
+        match self {
+            SectionType::Menu(s) => s.select(idx),
+            SectionType::Multi(s) => s.select(idx),
+            SectionType::Input(s) => s.select(idx),
+            SectionType::Select(s) => s.select(idx),
         }
     }
 
@@ -143,12 +157,12 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn render(&mut self, area: Rect, buf: &mut ratatui::buffer::Buffer, ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         match self {
-            SectionType::Menu(s) => s.render(area, buf, ctx),
-            SectionType::Multi(s) => s.render(area, buf, ctx),
-            SectionType::Input(s) => s.render(area, buf, ctx),
-            SectionType::Select(s) => s.render(area, buf, ctx),
+            SectionType::Menu(s) => s.render(area, buf, filter, ctx),
+            SectionType::Multi(s) => s.render(area, buf, filter, ctx),
+            SectionType::Input(s) => s.render(area, buf, filter, ctx),
+            SectionType::Select(s) => s.render(area, buf, filter, ctx),
         }
     }
 
@@ -176,6 +190,33 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.double_click(pos, ctx),
             SectionType::Input(s) => s.double_click(pos, ctx),
             SectionType::Select(s) => s.double_click(pos, ctx),
+        }
+    }
+
+    fn find_next(&self, filter: &str) -> Option<usize> {
+        match self {
+            SectionType::Menu(s) => s.find_next(filter),
+            SectionType::Multi(s) => s.find_next(filter),
+            SectionType::Input(s) => s.find_next(filter),
+            SectionType::Select(s) => s.find_next(filter),
+        }
+    }
+
+    fn find_prev(&self, filter: &str) -> Option<usize> {
+        match self {
+            SectionType::Menu(s) => s.find_prev(filter),
+            SectionType::Multi(s) => s.find_prev(filter),
+            SectionType::Input(s) => s.find_prev(filter),
+            SectionType::Select(s) => s.find_prev(filter),
+        }
+    }
+
+    fn find_first(&self, filter: &str) -> Option<usize> {
+        match self {
+            SectionType::Menu(s) => s.find_first(filter),
+            SectionType::Multi(s) => s.find_first(filter),
+            SectionType::Input(s) => s.find_first(filter),
+            SectionType::Select(s) => s.find_first(filter),
         }
     }
 }
