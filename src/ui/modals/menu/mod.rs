@@ -37,6 +37,8 @@ trait Section {
     fn left(&mut self) -> bool {
         true
     }
+    fn selected(&self) -> Option<usize>;
+    fn select(&mut self, idx: usize);
     fn unselect(&mut self);
     fn unfocus(&mut self) {}
 
@@ -47,10 +49,12 @@ trait Section {
 
     fn len(&self) -> usize;
     fn preferred_height(&self) -> u16;
-    fn render(&mut self, area: Rect, buf: &mut Buffer, ctx: &Ctx);
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx);
 
     fn left_click(&mut self, pos: ratatui::layout::Position);
     fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> Result<bool>;
+
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_>;
 }
 
 #[derive(Debug)]
@@ -95,6 +99,24 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.left(),
             SectionType::Input(s) => s.left(),
             SectionType::Select(s) => s.left(),
+        }
+    }
+
+    fn selected(&self) -> Option<usize> {
+        match self {
+            SectionType::Menu(s) => s.selected(),
+            SectionType::Multi(s) => s.selected(),
+            SectionType::Input(s) => s.selected(),
+            SectionType::Select(s) => s.selected(),
+        }
+    }
+
+    fn select(&mut self, idx: usize) {
+        match self {
+            SectionType::Menu(s) => s.select(idx),
+            SectionType::Multi(s) => s.select(idx),
+            SectionType::Input(s) => s.select(idx),
+            SectionType::Select(s) => s.select(idx),
         }
     }
 
@@ -143,12 +165,12 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn render(&mut self, area: Rect, buf: &mut ratatui::buffer::Buffer, ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         match self {
-            SectionType::Menu(s) => s.render(area, buf, ctx),
-            SectionType::Multi(s) => s.render(area, buf, ctx),
-            SectionType::Input(s) => s.render(area, buf, ctx),
-            SectionType::Select(s) => s.render(area, buf, ctx),
+            SectionType::Menu(s) => s.render(area, buf, filter, ctx),
+            SectionType::Multi(s) => s.render(area, buf, filter, ctx),
+            SectionType::Input(s) => s.render(area, buf, filter, ctx),
+            SectionType::Select(s) => s.render(area, buf, filter, ctx),
         }
     }
 
@@ -176,6 +198,15 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.double_click(pos, ctx),
             SectionType::Input(s) => s.double_click(pos, ctx),
             SectionType::Select(s) => s.double_click(pos, ctx),
+        }
+    }
+
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        match self {
+            SectionType::Menu(s) => s.item_labels_iter(),
+            SectionType::Multi(s) => s.item_labels_iter(),
+            SectionType::Input(s) => s.item_labels_iter(),
+            SectionType::Select(s) => s.item_labels_iter(),
         }
     }
 }

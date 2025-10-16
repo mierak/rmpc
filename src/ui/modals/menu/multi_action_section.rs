@@ -108,6 +108,14 @@ impl Section for MultiActionSection<'_> {
         true
     }
 
+    fn selected(&self) -> Option<usize> {
+        self.selected_idx
+    }
+
+    fn select(&mut self, idx: usize) {
+        self.selected_idx = Some(idx);
+    }
+
     fn unselect(&mut self) {
         self.selected_idx = None;
     }
@@ -132,7 +140,7 @@ impl Section for MultiActionSection<'_> {
         self.items.len() as u16
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer, _ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         self.area = area;
 
         for (idx, item) in self.items.iter_mut().enumerate() {
@@ -140,6 +148,10 @@ impl Section for MultiActionSection<'_> {
 
             if self.selected_idx.is_some_and(|i| i == idx) {
                 text = text.style(self.current_item_style);
+            } else if let Some(f) = filter
+                && item.label.to_lowercase().contains(f)
+            {
+                text = text.style(ctx.config.theme.highlighted_item_style);
             }
 
             let mut item_area = area.shrink_from_top(idx as u16);
@@ -185,5 +197,9 @@ impl Section for MultiActionSection<'_> {
     fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
         self.confirm(ctx)?;
         Ok(false)
+    }
+
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.items.iter().map(|i| i.label.as_str()))
     }
 }

@@ -111,8 +111,18 @@ impl Section for ListSection {
         true
     }
 
+    fn selected(&self) -> Option<usize> {
+        self.state.get_selected()
+    }
+
+    fn select(&mut self, idx: usize) {
+        self.state.select(Some(idx), 0);
+    }
+
     fn unselect(&mut self) {
+        let offset = self.state.offset();
         self.state.inner.select(None);
+        self.state.set_offset(offset);
     }
 
     fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
@@ -133,7 +143,7 @@ impl Section for ListSection {
         self.max_height.map_or(len, |mh| len.min(mh)) as u16
     }
 
-    fn render(&mut self, area: Rect, buf: &mut Buffer, ctx: &Ctx) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         let should_show_scrollbar = ctx.config.as_styled_scrollbar().is_some()
             && self.max_height.is_some_and(|h| h < self.items.len());
 
@@ -158,6 +168,10 @@ impl Section for ListSection {
 
             if self.state.get_selected().is_some_and(|i| i == idx) {
                 text = text.style(self.current_item_style);
+            } else if let Some(f) = filter
+                && item.label.to_lowercase().contains(f)
+            {
+                text = text.style(ctx.config.theme.highlighted_item_style);
             }
             let idx = idx - self.state.offset();
 
@@ -184,5 +198,9 @@ impl Section for ListSection {
     fn double_click(&mut self, _pos: Position, ctx: &Ctx) -> Result<bool> {
         self.confirm(ctx)?;
         Ok(false)
+    }
+
+    fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.items.iter().map(|i| i.label.as_str()))
     }
 }
