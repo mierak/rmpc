@@ -41,6 +41,7 @@ Search pane
 - Added section filter to docs search
 - `search_button` config option for search pane
 - Configurable `Save()` keybind in the navigation section
+- Added `SeekToStart` global action to seek to the beginning of the currently playing track
 
 ### Changed
 

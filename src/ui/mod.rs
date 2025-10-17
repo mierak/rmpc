@@ -486,6 +486,14 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
+                GlobalAction::SeekToStart
+                    if matches!(ctx.status.state, State::Play | State::Pause) =>
+                {
+                    ctx.command(move |client| {
+                        client.seek_current(ValueChange::Set(0))?;
+                        Ok(())
+                    });
+                }
                 GlobalAction::Update => {
                     ctx.command(move |client| {
                         client.update(None)?;
@@ -522,6 +530,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::Stop => {}
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
+                GlobalAction::SeekToStart => {}
                 GlobalAction::ExternalCommand { command, .. } => {
                     run_external(command.clone(), create_env(ctx, std::iter::empty::<&str>()));
                 }
