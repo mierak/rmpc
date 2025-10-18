@@ -527,22 +527,35 @@ impl Default for RateKind {
     }
 }
 
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
+pub enum DuplicateStrategy {
+    All,
+    None,
+    NonDuplicate,
+    #[default]
+    Ask,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum SaveKind {
     Modal {
         #[serde(default = "crate::config::defaults::bool::<false>")]
         all: bool,
+        #[serde(default)]
+        duplicates_strategy: DuplicateStrategy,
     },
     Playlist {
         name: String,
         #[serde(default = "crate::config::defaults::bool::<false>")]
         all: bool,
+        #[serde(default)]
+        duplicates_strategy: DuplicateStrategy,
     },
 }
 
 impl Default for SaveKind {
     fn default() -> Self {
-        SaveKind::Modal { all: false }
+        SaveKind::Modal { all: false, duplicates_strategy: DuplicateStrategy::default() }
     }
 }
 
@@ -747,18 +760,26 @@ impl ToDescription for CommonAction {
 
                         buf.into()
                     },
-            CommonAction::Save { kind: SaveKind::Modal { all } } => {
+            CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
                 let mut buf = String::from("Open a modal popup with options to save ");
                 if *all {
                     buf.push_str("all items");
                 } else {
                     buf.push_str("the item under cursor");
                 }
-                buf.push_str(" to either a new or existing playlist");
+                buf.push_str(" to either a new or existing playlist. ");
+
+                match duplicates_strategy {
+                    DuplicateStrategy::All => buf.push_str("All songs will all be added"),
+                    DuplicateStrategy::None => buf.push_str("No songs will be added"),
+                    DuplicateStrategy::NonDuplicate => buf.push_str("Only non-duplicate songs will be added"),
+                    DuplicateStrategy::Ask => buf.push_str("A modal asking what to do will be shown"),
+                }
+                buf.push_str(" if any songs already exist in the target playlist.");
 
                 buf.into()
             },
-            CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+            CommonAction::Save { kind: SaveKind::Playlist { name, all, duplicates_strategy } } => {
                 let mut buf = String::from("Save ");
                 if *all {
                     buf.push_str("all items");
@@ -766,7 +787,15 @@ impl ToDescription for CommonAction {
                     buf.push_str("the item under cursor");
                 }
 
-                write!(buf, " to playlist '{name}'").expect("Write to string buf should never fail");
+                write!(buf, " to playlist '{name}'. ").expect("Write to string buf should never fail.");
+
+                match duplicates_strategy {
+                    DuplicateStrategy::All => buf.push_str("All songs will all be added"),
+                    DuplicateStrategy::None => buf.push_str("No songs will be added"),
+                    DuplicateStrategy::NonDuplicate => buf.push_str("Only non-duplicate songs will be added"),
+                    DuplicateStrategy::Ask => buf.push_str("A modal asking what to do will be shown"),
+                }
+                buf.push_str(" if any songs already exist in the target playlist.");
 
                 buf.into()
             }

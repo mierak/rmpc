@@ -258,12 +258,21 @@ These mean:
 - Playlist - save the items to a specified playlist directly, the playlist will be created if it does
   not exist
 
+Both kinds also take additional options:
+
+- `all` - Controls whether to add all items in the current directory or just the marked ones/the
+  one under the cursor. Can be either `true` or `false`. Defaults to `false`.
+- `duplicates_strategy` - what to do when the playlist you are adding songs to already contains some
+  or all of the songs you are adding. Possible values are: `All`, `None`, `NonDuplicate`, `Ask`. These
+  add all the songs anyway, no songs at all, only the non duplicate songs or display a modal asking
+  you what to do respectively. Defaults to `Ask`.
+
 ##### Examples
 
 - Adds items under cursor to a playlist named "myplaylist"
 
 ```rust showLineNumbers=false
-Save(kind: Playlist(name: "myplaylist"))
+Save(kind: Playlist(name: "myplaylist", duplicates_strategy: Ask))
 ```
 
 - Adds all items in the current directory to a playlist named "myplaylist"
@@ -279,7 +288,7 @@ Save()
 // or equivalent
 Save(kind: Modal())
 // or equivalent
-Save(kind: Modal(all: false))
+Save(kind: Modal(all: false, duplicates_strategy: Ask))
 ```
 
 - Display a modal with options to save all items to either a new or an existing playlist
