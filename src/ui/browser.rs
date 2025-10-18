@@ -24,7 +24,13 @@ use crate::{
         dirstack::{DirStack, DirStackItem, WalkDirStackItem},
         modals::{
             input_modal::InputModal,
-            menu::{create_add_modal, create_rating_modal, create_save_modal, modal::MenuModal},
+            menu::{
+                add_to_playlist_or_show_modal,
+                create_add_modal,
+                create_rating_modal,
+                create_save_modal,
+                modal::MenuModal,
+            },
             select_modal::SelectModal,
         },
         panes::Pane,
@@ -137,6 +143,7 @@ where
                 self.set_filter_input_mode_active(false);
                 self.stack_mut().current_mut().set_filter(None, song_format, ctx);
                 self.fetch_data_internal(ctx);
+                ctx.render()?;
             }
             Some(CommonAction::Confirm) => {
                 self.set_filter_input_mode_active(false);
@@ -149,6 +156,7 @@ where
                         self.stack_mut().current_mut().push_filter(c, song_format, ctx);
                         self.stack_mut().current_mut().jump_first_matching(song_format, ctx);
                         self.fetch_data_internal(ctx);
+                        ctx.render()?;
                     }
                     KeyCode::Backspace => {
                         self.stack_mut().current_mut().pop_filter(song_format, ctx);
@@ -323,10 +331,12 @@ where
             MouseEventKind::ScrollUp if current_area.contains(position) => {
                 self.stack_mut().current_mut().scroll_up(1, ctx.config.scrolloff);
                 self.fetch_data_internal(ctx);
+                ctx.render()?;
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
                 self.stack_mut().current_mut().scroll_down(1, ctx.config.scrolloff);
                 self.fetch_data_internal(ctx);
+                ctx.render()?;
             }
             MouseEventKind::RightClick => {
                 let clicked_row: usize = event.y.saturating_sub(current_area.y).into();
@@ -566,7 +576,7 @@ where
             CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                 event.abandon();
             }
-            CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+            CommonAction::Save { kind: SaveKind::Playlist { name, all, duplicates_strategy } } => {
                 let list_songs_fns = self
                     .items(all)
                     .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
@@ -576,21 +586,20 @@ where
                     return Ok(());
                 }
 
-                ctx.command(move |client| {
-                    let songs = list_songs_fns
+                let all_songs = ctx.query_sync(move |client| {
+                    Ok(list_songs_fns
                         .into_iter()
                         .map(|cb| -> Result<_> { cb(client) })
                         .collect::<Result<Vec<Vec<_>>>>()?
                         .into_iter()
                         .flatten()
                         .map(|song| song.file)
-                        .collect();
+                        .collect())
+                })?;
 
-                    client.add_to_playlist_multiple(&name, songs)?;
-                    Ok(())
-                });
+                add_to_playlist_or_show_modal(name, all_songs, duplicates_strategy, ctx);
             }
-            CommonAction::Save { kind: SaveKind::Modal { all } } => {
+            CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
                 let list_songs_fns = self
                     .items(all)
                     .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
@@ -611,7 +620,12 @@ where
                         .collect())
                 })?;
 
-                let modal = create_save_modal(song_paths, self.initial_playlist_name(all), ctx)?;
+                let modal = create_save_modal(
+                    song_paths,
+                    self.initial_playlist_name(all),
+                    duplicates_strategy,
+                    ctx,
+                )?;
                 modal!(ctx, modal);
             }
         }

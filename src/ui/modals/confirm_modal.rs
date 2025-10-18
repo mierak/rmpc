@@ -2,12 +2,14 @@ use std::borrow::Cow;
 
 use anyhow::Result;
 use bon::bon;
+use itertools::Itertools;
 use ratatui::{
     Frame,
     prelude::{Constraint, Layout},
     style::Style,
     symbols::border,
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    text::Line,
+    widgets::{Block, Borders, Clear},
 };
 
 use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
@@ -25,42 +27,69 @@ use crate::{
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
 };
 
-pub struct ConfirmModal<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> {
+pub struct ConfirmModal<'a> {
     id: Id,
-    message: Cow<'a, str>,
+    message: Vec<Cow<'a, str>>,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
-    on_confirm: Callback,
-    size: Size,
+    size: Option<Size>,
+    action: Action<'a>,
 }
 
-impl<Callback: FnMut(&Ctx) -> Result<()>> std::fmt::Debug for ConfirmModal<'_, Callback> {
+impl std::fmt::Debug for ConfirmModal<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ConfirmModal(message = {}, button_group = {:?}, button_group_state = {:?})",
+            "ConfirmModal(message = {:?}, button_group = {:?}, button_group_state = {:?})",
             self.message, self.button_group, self.button_group_state,
         )
     }
 }
 
-#[allow(dead_code)]
-#[bon]
-impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
-    #[builder]
-    pub fn new(
-        ctx: &Ctx,
-        size: impl Into<Size>,
+type Callback<'a> = Box<dyn FnOnce(&Ctx) -> Result<()> + Send + Sync + 'a>;
+
+pub enum Action<'a> {
+    Single {
         confirm_label: Option<&'a str>,
         cancel_label: Option<&'a str>,
-        on_confirm: Callback,
-        message: impl Into<Cow<'a, str>>,
+        on_confirm: Callback<'a>,
+    },
+    CustomButtons {
+        buttons: Vec<(&'a str, Callback<'a>)>,
+    },
+}
+
+impl Default for Action<'_> {
+    fn default() -> Self {
+        Self::CustomButtons { buttons: Vec::default() }
+    }
+}
+
+#[allow(dead_code)]
+#[bon]
+impl<'a> ConfirmModal<'a> {
+    #[builder]
+    #[builder(on(Size, into))]
+    pub fn new(
+        ctx: &Ctx,
+        size: Option<Size>,
+        message: Vec<impl Into<Cow<'a, str>>>,
+        action: Action<'a>,
     ) -> Self {
         let mut button_group_state = ButtonGroupState::default();
-        let buttons = vec![
-            Button::default().label(confirm_label.unwrap_or("Confirm")),
-            Button::default().label(cancel_label.unwrap_or("Cancel")),
-        ];
+
+        let buttons = match &action {
+            Action::Single { confirm_label, cancel_label, on_confirm: _ } => {
+                vec![
+                    Button::default().label(confirm_label.unwrap_or("Confirm")),
+                    Button::default().label(cancel_label.unwrap_or("Cancel")),
+                ]
+            }
+            Action::CustomButtons { buttons } => {
+                buttons.iter().map(|b| Button::default().label(b.0)).collect()
+            }
+        };
+
         button_group_state.set_button_count(buttons.len());
         let button_group = ButtonGroup::default()
             .active_style(ctx.config.theme.current_item_style)
@@ -75,22 +104,37 @@ impl<'a, Callback: FnMut(&Ctx) -> Result<()> + 'a> ConfirmModal<'a, Callback> {
 
         Self {
             id: id::new(),
-            message: message.into(),
+            message: message.into_iter().map(|line| line.into()).collect(),
             button_group_state,
             button_group,
-            on_confirm,
-            size: size.into(),
+            action,
+            size,
         }
     }
 }
 
-impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
+impl Modal for ConfirmModal<'_> {
     fn id(&self) -> Id {
         self.id
     }
 
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
-        let popup_area = frame.area().centered_exact(self.size.width, self.size.height);
+        let width = match (frame.area().width, self.size) {
+            (fw, Some(Size { width, .. })) => width.min(fw),
+            (fw, None) if fw > 120 => fw / 2,
+            (fw, None) => fw,
+        };
+
+        let lines = self
+            .message
+            .iter()
+            .flat_map(|message| message.lines())
+            .flat_map(|line| textwrap::wrap(line, (width as usize).saturating_sub(2)))
+            .collect_vec();
+
+        let popup_area = frame
+            .area()
+            .centered_exact(width, self.size.map_or(u16::try_from(lines.len())? + 4, |v| v.height));
         frame.render_widget(Clear, popup_area);
 
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
@@ -103,19 +147,24 @@ impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
-        let paragraph = Paragraph::new(self.message.as_ref())
-            .style(ctx.config.as_text_style())
-            .wrap(Wrap { trim: true })
-            .block(block.clone())
-            .centered();
-
         let [content_area, buttons_area] =
-            *Layout::vertical([Constraint::Min(3), Constraint::Length(3)]).split(popup_area)
-        else {
-            return Ok(());
-        };
+            Layout::vertical([Constraint::Min(2), Constraint::Length(3)]).areas(popup_area);
 
-        frame.render_widget(paragraph, content_area);
+        let areas = Layout::vertical((0..lines.len()).map(|_| Constraint::Length(1)))
+            .split(block.inner(content_area));
+        frame.render_widget(&block, content_area);
+
+        for (idx, message) in lines.iter().enumerate() {
+            // TODO centered default
+            let paragraph =
+                Line::from(message.as_ref()).style(ctx.config.as_text_style()).left_aligned();
+
+            let Some(area) = areas.get(idx) else {
+                continue;
+            };
+            frame.render_widget(paragraph, *area);
+        }
+
         frame.render_stateful_widget(
             &mut self.button_group,
             buttons_area,
@@ -136,14 +185,20 @@ impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    self.button_group_state = ButtonGroupState::default();
                     self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
-                    if self.button_group_state.selected == 0 {
-                        (self.on_confirm)(ctx)?;
+                    match std::mem::take(&mut self.action) {
+                        Action::Single { on_confirm, .. } => {
+                            if self.button_group_state.selected == 0 {
+                                (on_confirm)(ctx)?;
+                            }
+                        }
+                        Action::CustomButtons { mut buttons } => {
+                            (buttons.remove(self.button_group_state.selected).1)(ctx)?;
+                        }
                     }
-                    self.button_group_state = ButtonGroupState::default();
+
                     self.hide(ctx)?;
                 }
                 _ => {}
@@ -174,16 +229,21 @@ impl<Callback: FnMut(&Ctx) -> Result<()>> Modal for ConfirmModal<'_, Callback> {
                 }
             }
             MouseEventKind::DoubleClick => {
-                match self.button_group.get_button_idx_at(event.into()) {
-                    Some(0) => {
-                        (self.on_confirm)(ctx)?;
-                        self.hide(ctx)?;
+                match std::mem::take(&mut self.action) {
+                    Action::Single { on_confirm, .. } => {
+                        match self.button_group.get_button_idx_at(event.into()) {
+                            Some(0) => {
+                                (on_confirm)(ctx)?;
+                            }
+                            Some(_) => {}
+                            None => {}
+                        }
                     }
-                    Some(_) => {
-                        self.hide(ctx)?;
+                    Action::CustomButtons { mut buttons } => {
+                        (buttons.remove(self.button_group_state.selected).1)(ctx)?;
                     }
-                    None => {}
                 }
+                self.hide(ctx)?;
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::RightClick => {}

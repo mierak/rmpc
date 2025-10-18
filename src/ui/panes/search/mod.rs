@@ -40,7 +40,13 @@ use crate::{
         dirstack::Dir,
         modals::{
             input_modal::InputModal,
-            menu::{create_add_modal, create_rating_modal, create_save_modal, modal::MenuModal},
+            menu::{
+                add_to_playlist_or_show_modal,
+                create_add_modal,
+                create_rating_modal,
+                create_save_modal,
+                modal::MenuModal,
+            },
             select_modal::SelectModal,
         },
         panes::search::inputs::{ActionResult, InputGroups, InputType, TextboxInput},
@@ -412,26 +418,27 @@ impl SearchPane {
                     event.abandon();
                 }
                 CommonAction::Rate { .. } => {}
-                CommonAction::Save { kind: SaveKind::Playlist { name, all: true } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Playlist { name, all: true, duplicates_strategy },
+                } => {
                     let song_paths: Vec<String> =
                         self.items(true).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
                     }
-                    ctx.command(move |client| {
-                        client.add_to_playlist_multiple(&name, song_paths)?;
-                        Ok(())
-                    });
+
+                    add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all: true } } => {
+                CommonAction::Save { kind: SaveKind::Modal { all: true, duplicates_strategy } } => {
                     let song_paths: Vec<String> =
                         self.items(true).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
                     }
-                    let modal = create_save_modal(song_paths, None, ctx)?;
+
+                    let modal = create_save_modal(song_paths, None, duplicates_strategy, ctx)?;
                     modal!(ctx, modal);
                 }
                 CommonAction::Save { .. } => {}
@@ -657,7 +664,7 @@ impl SearchPane {
                 CommonAction::PaneLeft => {}
                 CommonAction::ShowInfo => {}
                 CommonAction::ContextMenu => {
-                    self.open_result_phase_context_menu(ctx)?;
+                    self.open_result_phase_context_menu(ctx);
                 }
                 CommonAction::Rate {
                     kind: RateKind::Value(value),
@@ -715,26 +722,27 @@ impl SearchPane {
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
                 }
-                CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Playlist { name, all, duplicates_strategy },
+                } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
                     }
-                    ctx.command(move |client| {
-                        client.add_to_playlist_multiple(&name, song_paths)?;
-                        Ok(())
-                    });
+
+                    add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
                     let song_paths: Vec<_> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
                     }
-                    let modal = create_save_modal(song_paths, None, ctx)?;
+
+                    let modal = create_save_modal(song_paths, None, duplicates_strategy, ctx)?;
                     modal!(ctx, modal);
                 }
             }
@@ -743,7 +751,7 @@ impl SearchPane {
         Ok(())
     }
 
-    fn open_result_phase_context_menu(&self, ctx: &Ctx) -> Result<()> {
+    fn open_result_phase_context_menu(&self, ctx: &Ctx) {
         let modal = MenuModal::new(ctx)
             .list_section(ctx, move |mut section| {
                 if !self.songs_dir.items.is_empty() {
@@ -879,7 +887,6 @@ impl SearchPane {
             })
             .build();
         modal!(ctx, modal);
-        Ok(())
     }
 
     fn scrollbar_area(&self) -> Option<Rect> {
@@ -1204,7 +1211,7 @@ impl Pane for SearchPane {
                         self.songs_dir.select_idx(idx, ctx.config.scrolloff);
                         ctx.render()?;
                     }
-                    self.open_result_phase_context_menu(ctx)?;
+                    self.open_result_phase_context_menu(ctx);
                 }
                 _ => {}
             },

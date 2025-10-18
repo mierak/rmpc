@@ -44,10 +44,16 @@ use crate::{
         UiEvent,
         dirstack::Dir,
         modals::{
-            confirm_modal::ConfirmModal,
+            confirm_modal::{Action, ConfirmModal},
             info_list_modal::InfoListModal,
             input_modal::InputModal,
-            menu::{create_add_modal, create_rating_modal, create_save_modal, modal::MenuModal},
+            menu::{
+                add_to_playlist_or_show_modal,
+                create_add_modal,
+                create_rating_modal,
+                create_save_modal,
+                modal::MenuModal,
+            },
             select_modal::SelectModal,
         },
     },
@@ -135,7 +141,7 @@ impl QueuePane {
         }
     }
 
-    fn open_context_menu(&mut self, ctx: &Ctx) -> Result<()> {
+    fn open_context_menu(&mut self, ctx: &Ctx) {
         let selected_song = self.queue.selected().cloned();
         let selected_song_id = selected_song.as_ref().map(|s| s.id);
 
@@ -238,8 +244,6 @@ impl QueuePane {
             .build();
 
         modal!(ctx, modal);
-
-        Ok(())
     }
 }
 
@@ -613,7 +617,7 @@ impl Pane for QueuePane {
 
                     ctx.render()?;
                 }
-                self.open_context_menu(ctx)?;
+                self.open_context_menu(ctx);
             }
             MouseEventKind::Drag { .. } => {}
         }
@@ -752,13 +756,20 @@ impl Pane for QueuePane {
                 QueueActions::DeleteAll => {
                     modal!(
                         ctx,
-                        ConfirmModal::builder().ctx(ctx)
-                            .message("Are you sure you want to clear the queue? This action cannot be undone.")
-                            .on_confirm(|ctx| {
-                                ctx.command(|client| Ok(client.clear()?));
-                                Ok(())
+                        ConfirmModal::builder()
+                            .ctx(ctx)
+                            .message(vec![
+                                "Are you sure you want to clear the queue?",
+                                "This action cannot be undone."
+                            ])
+                            .action(Action::Single {
+                                on_confirm: Box::new(|ctx| {
+                                    ctx.command(|client| Ok(client.clear()?));
+                                    Ok(())
+                                }),
+                                confirm_label: Some("Clear"),
+                                cancel_label: None,
                             })
-                            .confirm_label("Clear")
                             .size((45, 6))
                             .build()
                     );
@@ -1134,7 +1145,7 @@ impl Pane for QueuePane {
                 CommonAction::PaneRight => {}
                 CommonAction::PaneLeft => {}
                 CommonAction::ContextMenu => {
-                    self.open_context_menu(ctx)?;
+                    self.open_context_menu(ctx);
                 }
                 CommonAction::Rate {
                     kind: RateKind::Value(value),
@@ -1192,26 +1203,26 @@ impl Pane for QueuePane {
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
                 }
-                CommonAction::Save { kind: SaveKind::Playlist { name, all } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Playlist { name, all, duplicates_strategy },
+                } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
                     }
-                    ctx.command(move |client| {
-                        client.add_to_playlist_multiple(&name, song_paths)?;
-                        Ok(())
-                    });
+
+                    add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all } } => {
+                CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
                         status_warn!("No songs selected to save");
                         return Ok(());
                     }
-                    let modal = create_save_modal(song_paths, None, ctx)?;
+                    let modal = create_save_modal(song_paths, None, duplicates_strategy, ctx)?;
                     modal!(ctx, modal);
                 }
             }
