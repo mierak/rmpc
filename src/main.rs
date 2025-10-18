@@ -22,7 +22,7 @@ use crate::{
         ConfigFile,
         cli::{Args, Command},
     },
-    mpd::client::Client,
+    mpd::{client::Client, mpd_client::MpdClient},
     shared::{
         dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
         env::ENV,
@@ -144,6 +144,15 @@ fn main() -> Result<()> {
                 }
             };
 
+            let mpd_info =
+                Client::init(config.address.clone(), config.password.clone(), "debug", None, false)
+                    .and_then(|mut client| -> Result<_, _> {
+                        let version = client.version();
+                        let commands = client.commands().map(|c| c.0)?;
+                        let not_commands = client.not_commands().map(|c| c.0)?;
+                        Ok((version, commands, not_commands))
+                    });
+
             println!(
                 "rmpc {}{}",
                 env!("CARGO_PKG_VERSION"),
@@ -160,6 +169,17 @@ fn main() -> Result<()> {
             println!("{:<20} {:?}", "Resolved Address", config.address);
             println!("{:<20} {mpd_host}", "MPD_HOST");
             println!("{:<20} {mpd_port}", "MPD_PORT");
+            match mpd_info {
+                Ok((version, commands, not_commands)) => {
+                    println!("{:<20} Success", "Connection");
+                    println!("{:<20} {version}", "Version");
+                    println!("{:<20} {commands:?}", "Supported commands");
+                    println!("{:<20} {not_commands:?}", "Unsupported commands");
+                }
+                Err(err) => {
+                    println!("{:<20} Error {err:?}", "Connection");
+                }
+            }
 
             println!("\nYoutube playback:");
             println!("{:<20} {:?}", "Cache dir", config.cache_dir);

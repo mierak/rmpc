@@ -88,6 +88,7 @@ pub trait MpdCommand {
     fn send_binary_limit(&mut self, limit: u64) -> MpdResult<()>;
     fn send_password(&mut self, password: &str) -> MpdResult<()>;
     fn send_commands(&mut self) -> MpdResult<()>;
+    fn send_not_commands(&mut self) -> MpdResult<()>;
     fn send_update(&mut self, path: Option<&str>) -> MpdResult<()>;
     fn send_rescan(&mut self, path: Option<&str>) -> MpdResult<()>;
     fn send_idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<()>;
@@ -213,6 +214,7 @@ pub trait MpdClient: Sized {
     fn binary_limit(&mut self, limit: u64) -> MpdResult<()>;
     fn password(&mut self, password: &str) -> MpdResult<()>;
     fn commands(&mut self) -> MpdResult<MpdList>;
+    fn not_commands(&mut self) -> MpdResult<MpdList>;
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>>;
@@ -387,6 +389,10 @@ impl MpdClient for Client<'_> {
     // Lists commands supported by the MPD server
     fn commands(&mut self) -> MpdResult<MpdList> {
         self.send_commands().and_then(|()| self.read_response())
+    }
+
+    fn not_commands(&mut self) -> MpdResult<MpdList> {
+        self.send_not_commands().and_then(|()| self.read_response())
     }
 
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update> {
@@ -850,12 +856,12 @@ impl MpdClient for Client<'_> {
         self.send_new_partition(name).and_then(|()| self.read_ok())
     }
 
-    fn list_partitions(&mut self) -> MpdResult<MpdList> {
-        self.send_list_partitions().and_then(|()| self.read_response())
-    }
-
     fn delete_partition(&mut self, name: &str) -> MpdResult<()> {
         self.send_delete_partition(name).and_then(|()| self.read_ok())
+    }
+
+    fn list_partitions(&mut self) -> MpdResult<MpdList> {
+        self.send_list_partitions().and_then(|()| self.read_response())
     }
 
     fn move_output(&mut self, output_name: &str) -> MpdResult<()> {
@@ -900,6 +906,10 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_commands(&mut self) -> MpdResult<()> {
         self.execute("commands")
+    }
+
+    fn send_not_commands(&mut self) -> MpdResult<()> {
+        self.execute("notcommands")
     }
 
     fn send_update(&mut self, path: Option<&str>) -> MpdResult<()> {
@@ -1347,12 +1357,12 @@ impl<T: SocketClient> MpdCommand for T {
         self.execute(&format!("newpartition {}", name.quote_and_escape()))
     }
 
-    fn send_list_partitions(&mut self) -> MpdResult<()> {
-        self.execute("listpartitions")
-    }
-
     fn send_delete_partition(&mut self, name: &str) -> MpdResult<()> {
         self.execute(&format!("delpartition {}", name.quote_and_escape()))
+    }
+
+    fn send_list_partitions(&mut self) -> MpdResult<()> {
+        self.execute("listpartitions")
     }
 
     fn send_move_output(&mut self, output_name: &str) -> MpdResult<()> {
