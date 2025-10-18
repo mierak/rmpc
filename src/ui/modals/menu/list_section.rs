@@ -33,6 +33,7 @@ pub struct MenuItem {
     pub on_confirm: Option<Box<dyn FnOnce(&Ctx) -> Result<()> + Send + Sync + 'static>>,
 }
 
+#[allow(dead_code)]
 impl ListSection {
     pub fn new(current_item_style: Style) -> Self {
         Self {
@@ -173,7 +174,7 @@ impl Section for ListSection {
             {
                 text = text.style(ctx.config.theme.highlighted_item_style);
             }
-            let idx = idx - self.state.offset();
+            let idx = idx.saturating_sub(self.state.offset());
 
             let mut item_area = list_area.shrink_from_top(idx as u16);
             item_area.height = 1;

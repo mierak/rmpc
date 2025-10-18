@@ -393,19 +393,14 @@ pub fn create_save_modal<'a>(
             });
             Some(sect)
         })
-        .list_section(ctx, move |mut sect| {
+        .select_section(ctx, move |mut sect| {
+            sect.action(move |ctx, playlist_name| {
+                add_to_playlist_or_show_modal(playlist_name, song_paths, duplicate_strategy, ctx);
+                Ok(())
+            });
             for mut playlist in playlists {
                 let playlist_name = std::mem::take(&mut playlist.name);
-                let song_paths = song_paths.clone();
-                sect.add_item(playlist_name.clone(), move |ctx| {
-                    add_to_playlist_or_show_modal(
-                        playlist_name,
-                        song_paths,
-                        duplicate_strategy,
-                        ctx,
-                    );
-                    Ok(())
-                });
+                sect.add_item(playlist_name.clone(), playlist_name);
                 sect.add_max_height(12);
             }
             Some(sect)
