@@ -200,11 +200,17 @@ impl SearchPane {
         let stickers_supported = ctx.stickers_supported.into();
         let fold_case = self.inputs.fold_case();
         let strip_diacritics = self.inputs.strip_diacritics();
-        let Ok(rating_filter) = self.inputs.rating_filter() else {
-            status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value());
-            return;
-        };
         let liked_filter = self.inputs.liked_filter();
+
+        let rating_filter = if self.inputs.is_rating_filter_active() {
+            let Ok(rating_filter) = self.inputs.rating_filter() else {
+                status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value());
+                return;
+            };
+            rating_filter
+        } else {
+            None
+        };
 
         let mut filter = filter.collect_vec();
 
@@ -1231,15 +1237,27 @@ impl Pane for SearchPane {
                 Some(CommonAction::Close) => {
                     self.phase = Phase::Search;
                     self.inputs.insert_mode = false;
-                    self.maybe_search_on_change(ctx);
+                    if let InputType::Numberbox(TextboxInput { value, .. }) =
+                        self.inputs.focused_mut()
+                        && value.is_empty()
+                    {
+                        value.push('0');
+                    }
 
+                    self.maybe_search_on_change(ctx);
                     ctx.render()?;
                 }
                 Some(CommonAction::Confirm) => {
                     self.phase = Phase::Search;
                     self.inputs.insert_mode = false;
-                    self.maybe_search_on_change(ctx);
+                    if let InputType::Numberbox(TextboxInput { value, .. }) =
+                        self.inputs.focused_mut()
+                        && value.is_empty()
+                    {
+                        value.push('0');
+                    }
 
+                    self.maybe_search_on_change(ctx);
                     ctx.render()?;
                 }
                 _ => {
