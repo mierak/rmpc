@@ -157,6 +157,10 @@ impl InputGroups {
         self.textbox_value(RATING_VALUE_KEY).unwrap_or_default()
     }
 
+    pub fn is_rating_filter_active(&self) -> bool {
+        !matches!(self.rating_mode, RatingMode::Any)
+    }
+
     pub fn rating_filter(&self) -> Result<Option<StickerFilter>, std::num::ParseIntError> {
         let value = self.rating_value().trim().parse()?;
         Ok(match self.rating_mode {
@@ -296,7 +300,7 @@ impl InputGroups {
     }
 
     pub fn next_non_wrapping(&mut self) {
-        self.focused_idx = self.focused_idx.min(self.inputs.len() - 1);
+        self.focused_idx = (self.focused_idx + 1).min(self.inputs.len() - 1);
 
         if matches!(self.focused(), InputType::Separator) {
             self.next_non_wrapping();
