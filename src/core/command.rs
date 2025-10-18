@@ -36,6 +36,7 @@ impl Command {
             Command::Theme { .. } => bail!("Cannot use theme command here."),
             Command::Version => bail!("Cannot use version command here."),
             Command::DebugInfo => bail!("Cannot use debuginfo command here."),
+            Command::Raw { .. } => bail!("Cannot use raw command here."),
             Command::Remote { .. } => bail!("Cannot use remote command here."),
             Command::AddRandom { tag, count } => Ok(Box::new(move |client| {
                 match tag {
