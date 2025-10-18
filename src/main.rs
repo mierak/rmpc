@@ -281,6 +281,7 @@ fn main() -> Result<()> {
                     )?
                 }
                 Err(err) => {
+                    eprintln!("{err}");
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
                             message: vec![err.to_string()],
