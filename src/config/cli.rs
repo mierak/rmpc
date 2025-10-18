@@ -114,6 +114,12 @@ pub enum Command {
     },
     /// Prints information about optional runtime dependencies
     DebugInfo,
+    /// Sends a raw command to MPD and prints the response
+    #[clap(hide = true)]
+    Raw {
+        /// Command to send to MPD
+        command: String,
+    },
     /// Prints the rmpc version
     Version,
     /// Prints the list of songs in the current queue
