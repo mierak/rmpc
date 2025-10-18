@@ -137,6 +137,10 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn not_commands(&mut self) -> MpdResult<MpdList> {
+        todo!("Not yet implemented")
+    }
+
     fn update(&mut self, _path: Option<&str>) -> MpdResult<Update> {
         todo!("Not yet implemented")
     }
@@ -537,6 +541,10 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn clear_playlist(&mut self, _name: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
     fn delete_from_playlist(
         &mut self,
         _playlist_name: &str,
@@ -649,10 +657,6 @@ impl MpdClient for TestMpdClient {
     }
 
     fn send_message(&mut self, _channel: &str, _content: &str) -> MpdResult<()> {
-        todo!("Not yet implemented")
-    }
-
-    fn clear_playlist(&mut self, _name: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 
