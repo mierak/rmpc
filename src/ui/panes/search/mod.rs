@@ -17,7 +17,7 @@ use crate::{
     config::{
         keys::{
             GlobalAction,
-            actions::{AddKind, Position, RateKind, SaveKind},
+            actions::{AddKind, DeleteKind, Position, RateKind, SaveKind},
         },
         tabs::PaneType,
     },
@@ -43,8 +43,10 @@ use crate::{
             menu::{
                 add_to_playlist_or_show_modal,
                 create_add_modal,
+                create_delete_modal,
                 create_rating_modal,
                 create_save_modal,
+                delete_from_playlist_or_show_confirmation,
                 modal::MenuModal,
             },
             select_modal::SelectModal,
@@ -448,6 +450,37 @@ impl SearchPane {
                     modal!(ctx, modal);
                 }
                 CommonAction::Save { .. } => {}
+                CommonAction::DeleteFromPlaylist {
+                    kind: DeleteKind::Playlist { name, all: true, confirmation },
+                } => {
+                    let song_paths: HashSet<String> =
+                        self.items(true).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to delete");
+                        return Ok(());
+                    }
+
+                    delete_from_playlist_or_show_confirmation(
+                        name,
+                        &song_paths,
+                        confirmation,
+                        ctx,
+                    )?;
+                }
+                CommonAction::DeleteFromPlaylist {
+                    kind: DeleteKind::Modal { all: true, confirmation },
+                } => {
+                    let song_paths: HashSet<_> =
+                        self.items(true).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to delete");
+                        return Ok(());
+                    }
+
+                    let modal = create_delete_modal(song_paths, confirmation, ctx)?;
+                    modal!(ctx, modal);
+                }
+                CommonAction::DeleteFromPlaylist { .. } => {}
             }
         }
 
@@ -749,6 +782,36 @@ impl SearchPane {
                     }
 
                     let modal = create_save_modal(song_paths, None, duplicates_strategy, ctx)?;
+                    modal!(ctx, modal);
+                }
+                CommonAction::DeleteFromPlaylist {
+                    kind: DeleteKind::Playlist { name, all, confirmation },
+                } => {
+                    let song_paths: HashSet<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to delete");
+                        return Ok(());
+                    }
+
+                    delete_from_playlist_or_show_confirmation(
+                        name,
+                        &song_paths,
+                        confirmation,
+                        ctx,
+                    )?;
+                }
+                CommonAction::DeleteFromPlaylist {
+                    kind: DeleteKind::Modal { all, confirmation },
+                } => {
+                    let song_paths: HashSet<_> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to delete");
+                        return Ok(());
+                    }
+
+                    let modal = create_delete_modal(song_paths, confirmation, ctx)?;
                     modal!(ctx, modal);
                 }
             }

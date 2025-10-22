@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use enum_map::{Enum, EnumMap, enum_map};
@@ -18,7 +20,7 @@ use crate::{
         keys::{
             GlobalAction,
             QueueActions,
-            actions::{AddKind, AutoplayKind, RateKind, SaveKind},
+            actions::{AddKind, AutoplayKind, DeleteKind, RateKind, SaveKind},
         },
         tabs::PaneType,
         theme::{
@@ -50,8 +52,10 @@ use crate::{
             menu::{
                 add_to_playlist_or_show_modal,
                 create_add_modal,
+                create_delete_modal,
                 create_rating_modal,
                 create_save_modal,
+                delete_from_playlist_or_show_confirmation,
                 modal::MenuModal,
             },
             select_modal::SelectModal,
@@ -1223,6 +1227,36 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
                     let modal = create_save_modal(song_paths, None, duplicates_strategy, ctx)?;
+                    modal!(ctx, modal);
+                }
+                CommonAction::DeleteFromPlaylist {
+                    kind: DeleteKind::Playlist { name, all, confirmation },
+                } => {
+                    let song_paths: HashSet<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to delete");
+                        return Ok(());
+                    }
+
+                    delete_from_playlist_or_show_confirmation(
+                        name,
+                        &song_paths,
+                        confirmation,
+                        ctx,
+                    )?;
+                }
+                CommonAction::DeleteFromPlaylist {
+                    kind: DeleteKind::Modal { all, confirmation },
+                } => {
+                    let song_paths: HashSet<String> =
+                        self.items(all).map(|(_, song)| song.file.clone()).collect();
+                    if song_paths.is_empty() {
+                        status_warn!("No songs selected to delete");
+                        return Ok(());
+                    }
+
+                    let modal = create_delete_modal(song_paths, confirmation, ctx)?;
                     modal!(ctx, modal);
                 }
             }

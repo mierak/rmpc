@@ -14,11 +14,14 @@ use ratatui::{
 use crate::{
     config::keys::actions::{AddOpts, DuplicateStrategy},
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
-    mpd::mpd_client::MpdClient,
+    mpd::{
+        mpd_client::{MpdClient, MpdCommand, SingleOrRange},
+        proto_client::ProtoClient,
+    },
     shared::{
         cmp::StringCompare,
         key_event::KeyEvent,
-        macros::{modal, status_error},
+        macros::{modal, status_error, status_info, status_warn},
         mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
     ui::modals::{
@@ -524,4 +527,99 @@ fn create_duplicate_songs_modal<'a>(
             ],
         })
         .build()
+}
+
+pub fn create_delete_modal<'a>(
+    song_paths: HashSet<String>,
+    confirmation: bool,
+    ctx: &Ctx,
+) -> Result<MenuModal<'a>> {
+    let playlists =
+        ctx.query_sync(|client| Ok(client.list_playlists()?))?.into_iter().sorted_by(|a, b| {
+            StringCompare::builder().fold_case(true).build().compare(&a.name, &b.name)
+        });
+
+    Ok(MenuModal::new(ctx)
+        .select_section(ctx, move |mut sect| {
+            for playlist in playlists {
+                sect.add_item(playlist.name.clone(), playlist.name);
+            }
+            sect.add_max_height(12);
+            sect.action(move |ctx, playlist| {
+                delete_from_playlist_or_show_confirmation(
+                    playlist,
+                    &song_paths,
+                    confirmation,
+                    ctx,
+                )?;
+                Ok(())
+            });
+            Some(sect)
+        })
+        .list_section(ctx, |mut sect| {
+            sect.add_item("Cancel", |_| Ok(()));
+            Some(sect)
+        })
+        .build())
+}
+
+pub fn delete_from_playlist_or_show_confirmation(
+    playlist_name: String,
+    song_paths: &HashSet<String>,
+    confirmation: bool,
+    ctx: &Ctx,
+) -> Result<()> {
+    let pl_name = playlist_name.clone();
+    let songs_in_playlist = ctx.query_sync(move |client| {
+        Ok(client.list_playlist_info(&pl_name, None)?.into_iter().map(|s| s.file).collect_vec())
+    })?;
+
+    let mut songs_to_remove_in_playlist = Vec::new();
+    for (idx, song) in songs_in_playlist.into_iter().enumerate() {
+        if song_paths.contains(&song) {
+            songs_to_remove_in_playlist.push((idx, song));
+        }
+    }
+    let songs_to_remove = songs_to_remove_in_playlist.len();
+
+    if songs_to_remove == 0 {
+        status_warn!("No matching songs found in playlist");
+        return Ok(());
+    }
+
+    let confirmation_message =
+        format!("Remove {songs_to_remove} song(s) from playlist \"{playlist_name}\"?");
+
+    let delete_songs = move |ctx: &Ctx| {
+        ctx.command(move |client| {
+            client.send_start_cmd_list()?;
+            for (idx, _path) in songs_to_remove_in_playlist.iter().rev() {
+                client.send_delete_from_playlist(&playlist_name, &SingleOrRange::single(*idx))?;
+            }
+            client.send_execute_cmd_list()?;
+            client.read_ok()?;
+            status_info!("Removed {songs_to_remove} song(s) from playlist \"{playlist_name}\"",);
+            Ok(())
+        });
+    };
+
+    if confirmation {
+        let modal = ConfirmModal::builder()
+            .ctx(ctx)
+            .message(vec![confirmation_message])
+            .action(Action::Single {
+                confirm_label: Some("Delete"),
+                cancel_label: None,
+                on_confirm: Box::new(|ctx| {
+                    delete_songs(ctx);
+                    Ok(())
+                }),
+            })
+            .build();
+        modal!(ctx, modal);
+    } else {
+        delete_songs(ctx);
+    }
+
+    Ok(())
 }
