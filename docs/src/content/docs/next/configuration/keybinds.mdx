@@ -297,6 +297,50 @@ Save(kind: Modal(all: false, duplicates_strategy: Ask))
 Save(kind: Modal(all: true))
 ```
 
+#### DeleteFromPlaylist
+
+A configurable keybind used to manipulate playlists. Allows you to delete either a single or all items
+under the cursor in browser panes from an existing playlist.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+#### Syntax
+
+`DeleteFromPlaylist(kind: <kind>)`
+
+Possible values for the action `<kind>` are either a `Modal()` or `Playlist()`.
+
+These mean:
+
+- Modal - display a menu modal with possible options
+- Playlist - delete the items from a specified playlist directly
+
+Both kinds also take additional options:
+
+- `all` - Controls whether to delete all items in the current directory or just the marked ones/the
+  one under the cursor. Can be either `true` or `false`. Defaults to `false`.
+- `confirmartion` - Whether to display a confirmation dialog when executing the delete action.
+  Defaults to `true`.
+
+##### Examples
+
+- delete items under cursor from a playlist named "myplaylist"
+
+```rust showLineNumbers=false
+DeleteFromPlaylist(kind: Playlist(name: "myplaylist", confirmation: true))
+```
+
+- Display a modal with options to dellete items under the cursor from an existing playlist
+
+```rust showLineNumbers=false
+DeleteFromPlaylist()
+// or equivalent
+DeleteFromPlaylist(kind: Modal())
+// or equivalent
+DeleteFromPlaylist(kind: Modal(all: false, confirmation: true))
+```
+
 #### AddOptions
 
 A configurable keybind to add items to the the queue. Allows you to add either a single or all items,

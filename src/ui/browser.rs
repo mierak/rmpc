@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use enum_map::EnumMap;
@@ -9,7 +11,7 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, Position, RateKind, SaveKind},
+        actions::{AddKind, DeleteKind, Position, RateKind, SaveKind},
     },
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
@@ -27,8 +29,10 @@ use crate::{
             menu::{
                 add_to_playlist_or_show_modal,
                 create_add_modal,
+                create_delete_modal,
                 create_rating_modal,
                 create_save_modal,
+                delete_from_playlist_or_show_confirmation,
                 modal::MenuModal,
             },
             select_modal::SelectModal,
@@ -64,6 +68,24 @@ where
         &self,
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + Sync + Clone + 'static;
+    fn list_songs_in_items(
+        &self,
+        all: bool,
+    ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + Sync + Clone + 'static {
+        let list_songs_fns =
+            self.items(all).map(|(_, item)| self.list_songs_in_item(item.to_owned())).collect_vec();
+        |client| {
+            let song_paths: Vec<_> = list_songs_fns
+                .into_iter()
+                .map(|cb| -> Result<_> { cb(client) })
+                .collect::<Result<Vec<Vec<_>>>>()?
+                .into_iter()
+                .flatten()
+                .collect();
+
+            Ok(song_paths)
+        }
+    }
     fn fetch_data(&self, selected: &T, ctx: &Ctx) -> Result<()>;
     fn fetch_data_internal(&mut self, ctx: &Ctx) -> Result<()> {
         // Only attempt to fetch for empty directories
@@ -577,48 +599,28 @@ where
                 event.abandon();
             }
             CommonAction::Save { kind: SaveKind::Playlist { name, all, duplicates_strategy } } => {
-                let list_songs_fns = self
-                    .items(all)
-                    .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
-                    .collect_vec();
-                if list_songs_fns.is_empty() {
+                let list_songs = self.list_songs_in_items(all);
+                let all_songs: Vec<_> = ctx.query_sync(move |client| {
+                    Ok(list_songs(client)?.into_iter().map(|s| s.file).collect())
+                })?;
+
+                if all_songs.is_empty() {
                     status_warn!("No songs selected to save");
                     return Ok(());
                 }
-
-                let all_songs = ctx.query_sync(move |client| {
-                    Ok(list_songs_fns
-                        .into_iter()
-                        .map(|cb| -> Result<_> { cb(client) })
-                        .collect::<Result<Vec<Vec<_>>>>()?
-                        .into_iter()
-                        .flatten()
-                        .map(|song| song.file)
-                        .collect())
-                })?;
 
                 add_to_playlist_or_show_modal(name, all_songs, duplicates_strategy, ctx);
             }
             CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
-                let list_songs_fns = self
-                    .items(all)
-                    .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
-                    .collect_vec();
-                if list_songs_fns.is_empty() {
+                let list_songs = self.list_songs_in_items(all);
+                let song_paths: Vec<_> = ctx.query_sync(move |client| {
+                    Ok(list_songs(client)?.into_iter().map(|s| s.file).collect())
+                })?;
+
+                if song_paths.is_empty() {
                     status_warn!("No songs selected to save");
                     return Ok(());
                 }
-
-                let song_paths = ctx.query_sync(|client| {
-                    Ok(list_songs_fns
-                        .into_iter()
-                        .map(|cb| -> Result<_> { cb(client) })
-                        .collect::<Result<Vec<Vec<_>>>>()?
-                        .into_iter()
-                        .flatten()
-                        .map(|song| song.file)
-                        .collect())
-                })?;
 
                 let modal = create_save_modal(
                     song_paths,
@@ -626,6 +628,35 @@ where
                     duplicates_strategy,
                     ctx,
                 )?;
+                modal!(ctx, modal);
+            }
+            CommonAction::DeleteFromPlaylist {
+                kind: DeleteKind::Playlist { name, all, confirmation },
+            } => {
+                let list_songs = self.list_songs_in_items(all);
+                let song_paths: HashSet<_> = ctx.query_sync(move |client| {
+                    Ok(list_songs(client)?.into_iter().map(|s| s.file).collect())
+                })?;
+
+                if song_paths.is_empty() {
+                    status_warn!("No songs selected to delete");
+                    return Ok(());
+                }
+
+                delete_from_playlist_or_show_confirmation(name, &song_paths, confirmation, ctx)?;
+            }
+            CommonAction::DeleteFromPlaylist { kind: DeleteKind::Modal { all, confirmation } } => {
+                let list_songs = self.list_songs_in_items(all);
+                let song_paths: HashSet<_> = ctx.query_sync(move |client| {
+                    Ok(list_songs(client)?.into_iter().map(|s| s.file).collect())
+                })?;
+
+                if song_paths.is_empty() {
+                    status_warn!("No songs selected to delete");
+                    return Ok(());
+                }
+
+                let modal = create_delete_modal(song_paths, confirmation, ctx)?;
                 modal!(ctx, modal);
             }
         }
