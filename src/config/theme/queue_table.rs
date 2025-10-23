@@ -75,8 +75,7 @@ pub struct SongTableColumnFile {
     /// Property to display in the column
     /// Can be one of: `Duration`, `Filename`, `Artist`, `AlbumArtist`, `Title`,
     /// `Album`, `Date`, `Genre` or `Comment`
-    pub(super) prop: Option<PropertyFile<SongPropertyFile>>,
-    pub(super) format: Option<String>,
+    pub(super) prop: SongFormatOrProps<PropertyFile<SongPropertyFile>>,
     /// Label to display in the column header
     /// If not set, the property name will be used
     pub(super) label: Option<String>,
@@ -259,6 +258,16 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<SongProperty> {
                     content: Box::new((*content).try_into()?),
                     length,
                     from_start,
+                }),
+                PropertyKindFileOrText::Transform(TransformFile::Replace {
+                    content,
+                    replacements,
+                }) => PropertyKindOrText::Transform(Transform::Replace {
+                    content: Box::new((*content).try_into()?),
+                    replacements: replacements
+                        .into_iter()
+                        .map(|r| -> Result<_> { Ok((r.r#match, r.replace.try_into()?)) })
+                        .try_collect()?,
                 }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(PropertyKindFile::Song(prop)) => {
