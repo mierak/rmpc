@@ -15,6 +15,7 @@ use crate::{
     config::keys::actions::{AddOpts, DuplicateStrategy},
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{
+        errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{MpdClient, MpdCommand, SingleOrRange},
         proto_client::ProtoClient,
     },
@@ -570,9 +571,18 @@ pub fn delete_from_playlist_or_show_confirmation(
     ctx: &Ctx,
 ) -> Result<()> {
     let pl_name = playlist_name.clone();
-    let songs_in_playlist = ctx.query_sync(move |client| {
-        Ok(client.list_playlist_info(&pl_name, None)?.into_iter().map(|s| s.file).collect_vec())
-    })?;
+    let Some(songs_in_playlist) =
+        ctx.query_sync(move |client| match client.list_playlist_info(&pl_name, None) {
+            Ok(val) => Ok(Some(val.into_iter().map(|s| s.file).collect_vec())),
+            Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) => {
+                status_warn!("Cannot remove song(s) from playlist, playlist does not exist");
+                Ok(None)
+            }
+            Err(err) => Err(err.into()),
+        })?
+    else {
+        return Ok(());
+    };
 
     let mut songs_to_remove_in_playlist = Vec::new();
     for (idx, song) in songs_in_playlist.into_iter().enumerate() {
