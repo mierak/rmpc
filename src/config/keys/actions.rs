@@ -829,7 +829,7 @@ impl ToDescription for CommonAction {
 
                 buf.into()
             }
-            CommonAction::DeleteFromPlaylist { kind: DeleteKind::Modal { all, confirmation } } => { 
+            CommonAction::DeleteFromPlaylist { kind: DeleteKind::Modal { all, confirmation } } => {
                 let mut buf = String::from("Open a modal popup to delete ");
                 if *all {
                     buf.push_str("all items");
@@ -845,7 +845,7 @@ impl ToDescription for CommonAction {
 
                 buf.into()
             }
-            CommonAction::DeleteFromPlaylist { kind: DeleteKind::Playlist { name ,all, confirmation } } => { 
+            CommonAction::DeleteFromPlaylist { kind: DeleteKind::Playlist { name ,all, confirmation } } => {
                 let mut buf = String::from("Delete ");
                 if *all {
                     buf.push_str("all items");
