@@ -1,0 +1,26 @@
+---
+title: Angmin
+description: A minimal, simple and purple theme
+sidebar:
+    order: 1
+---
+
+import { Image } from "astro:assets";
+import { Code } from "@astrojs/starlight/components";
+import img from "../assets/themes/angmin/angmin.png";
+import theme from "../assets/themes/angmin/theme.ron?raw";
+import config from "../assets/themes/angmin/config.ron?raw";
+
+A simple, minimal and purple theme for rmpc.
+
+## Preview
+
+<Image src={img} width={800} alt="" />
+
+## Config
+
+<Code code={theme} lang="rust" title="theme.ron" />
+
+You also need to put the following tabs config into your `config.ron` to get the album art on the right.
+
+<Code code={config} lang="rust" title="config.ron" />
