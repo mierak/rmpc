@@ -2,7 +2,7 @@
 title: Tabs
 description: Configuring rmpc's tabs
 sidebar:
-    order: 12
+    order: 13
 ---
 
 import ConfigValue from "../../../../components/ConfigValue.tsx";
@@ -33,13 +33,8 @@ Each tab has a name which will be displayed in the tab bar and can be used in th
 
 <ConfigValue name="pane" type={["Pane", "Split", "Component"]} link="#pane--split--component" />
 
-`pane_type` to display in the given Pane. Can be etither `Split` or `Pane`. `Split` means that given pane will be split
-into multiple sub panes. `Pane` simply displays the given `pane_type`.
-
-## Pane | Split | Component
-
-- `Pane(<pane_type>)` - Displays the given pane type itself.
-- `Split(direction: Horizontal | Vertical, borders: <borders>, panes: <sub_panes[]>)` splits the pane into multiple sub panes. Each split has
+- `Pane(<pane>)` - Displays the given pane type itself. Available panes are listed in the <a href={path("configuration/panes")}>panes</a> page.
+- `Split(direction: Horizontal | Vertical, borders: <borders>, panes: <sub_pane[]>)` splits the pane into multiple [sub pane](#sub_pane)s. Each split has
   a direction and a list of sub panes. More info on borders in [their section](#borders).
 - `Component("<component_name>")` - Displays a <a href={path("configuration/layout#components")}>component</a>
 
@@ -49,9 +44,9 @@ into multiple sub panes. `Pane` simply displays the given `pane_type`.
 
 Determines which direction the pane will be split into.
 
-### panes
+### sub_pane
 
-<ConfigValue name="panes" customText="(size: '50%', borders: <borders>, pane: Split() | Pane(<pane_type>)" />
+<ConfigValue name="panes" customText="(size: '50%', borders: <borders>, pane: Pane | Split | Component" />
 
 Sub panes for the given split. The size can be either percent (`50%`), exact value(`3`) or a
 ratio (`0.4r`).
@@ -64,29 +59,6 @@ ratio (`0.4r`).
   square size at all times. Note that the sizes here are in terminal cell width/height and not pixels.
 
 Each sub pane can be either a `Pane` or another `Split`. Sub pane can also have borders, more info in [their section](#borders).
-
-## pane_type
-
-Rmpc has several pane_types which can be displayed. These are:
-
-- `AlbumArt` - The album art. Cannot be focused.
-- `Cava` - Displays a music visualiser using Cava. More info on its own <a href={path("configuration/cava")}>page</a>.
-- `Queue` - Table of the current song queue.
-- `Directories` - Browse music library by directory.
-- `Browser` - A music library browser. Allows you to specify a root tag and an optional separator. `Browser(root_tag: "<tag>", separator: ";")`.
-  Separator can be used to create multiple entries from one tag value, for example if a song has multiple `genre` values separated by `;`.
-- `Artists` - Browse music library by `artist` tag. Equivalent to `Browser(root_tag: "artist")`
-- `AlbumArtists` - Browse music library by `albumartist` tag. Equivalent to `Browser(root_tag: "albumartist")`
-- `Albums` - Browse music library by `album` tag.
-- `Playlists` - Browse saved playlists.
-- `Search` - Search music library.
-- `Lyrics` - Display synced lyrics.
-- `ProgressBar` - Displays the progress of the currently playing song
-- `Header` - Displays various information about the current song and MPD's states, configurable in your theme
-- `Tabs` - Displays a simple tab bar showing what tabs are available and which one is active
-- `Property` - A special pane which can display any property as described in the <a href={path("configuration/header/#header_property")}>Header config</a>
-  including styling, default values etc. Check the [Example](#property-pane) for more info.
-- `Volume` - Interactive volume slider with mouse support. Supports `Volume(kind: Slider(<config>))` configuration.
 
 ## borders
 
@@ -166,7 +138,7 @@ tabs: [
 
 </details>
 
-### Property pane
+### More complex example using Property panes
 
 <ConfigValue
     name="pane"
@@ -252,41 +224,3 @@ tabs: [
 </details>
 
 <Image src={example_property_pane} width={800} alt="Example property pane" />
-
-### Volume Pane
-
-<ConfigValue name="Volume" customText="Volume(kind: Slider(<config>))" />
-
-The Volume pane provides an interactive volume slider with mouse support. You can click to set volume directly or use scroll wheel to adjust volume in steps.
-
-Currently, only the `Slider` kind is supported.
-
-<ConfigValue name="kind" customText="Slider(symbols: <symbols[]>, track_style: <style>, filled_style: <style>, thumb_style: <style>)" />
-
-Configure the appearance of the volume slider:
-
-- `symbols` - Array of 5 strings defining the visual elements: `[start, filled, thumb, empty, end]`
-  - `start` - Symbol at the beginning of the slider (default: "♪")
-  - `filled` - Symbol for the filled portion (default: "─")
-  - `thumb` - Symbol for the current position indicator (default: "●") 
-  - `empty` - Symbol for the empty portion (default: "─")
-  - `end` - Symbol at the end of the slider (default: "♫")
-
-- `filled_style` - Style for the filled portion of the slider (default: blue foreground)
-- `thumb_style` - Style for the thumb/position indicator (default: blue foreground)
-- `track_style` - Style for the empty portion of the slider (default: dark gray foreground)
-
-#### Example
-
-```rust
-Volume(
-    kind: Slider(
-        symbols: ["🔈", "━", "●", "━", "🔊"],
-        track_style: (fg: "gray"),
-        filled_style: (fg: "green"),
-        thumb_style: (fg: "white", bg: "green"),
-    )
-)
-```
-
-This creates a volume slider with speaker icons at the ends, using green for the filled portion and a white thumb with green background.
