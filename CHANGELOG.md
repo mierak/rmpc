@@ -43,6 +43,7 @@ Search pane
 - Configurable `Save()` keybind in the navigation section
 - Added `SeekToStart` global action to seek to the beginning of the currently playing track
 - `DeleteFromPlaylist` action to delete songs in browsers panes from selected playlist
+- Added crossfade control to Outputs modal
 
 ### Changed
 
