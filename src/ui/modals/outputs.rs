@@ -103,6 +103,8 @@ impl Modal for OutputsModal {
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Outputs");
 
+        let table_area = popup_area.inner(Margin { horizontal: 1, vertical: 1 });
+
         let rows = self.outputs.iter().map(|output| match output.kind {
             PartitionedOutputKind::OtherPartition => Row::new([
                 Cell::new(output.name.as_str()),
@@ -118,10 +120,8 @@ impl Modal for OutputsModal {
             ]),
         });
 
-        let table_container = popup_area.inner(Margin { horizontal: 1, vertical: 1 });
-
         self.scrolling_state
-            .set_content_and_viewport_len(self.outputs.len(), table_container.height.into());
+            .set_content_and_viewport_len(self.outputs.len(), table_area.height.into());
 
         let table = Table::new(rows, [
             Constraint::Percentage(80),
@@ -134,12 +134,11 @@ impl Modal for OutputsModal {
         .header(Row::new(["Name", "Plugin", "Enabled", "Partition"]))
         .row_highlight_style(ctx.config.theme.current_item_style);
 
-        let table_area = table_container.inner(Margin { horizontal: 1, vertical: 0 });
+        let table_area = table_area.inner(Margin { horizontal: 1, vertical: 0 });
         self.outputs_table_area = table_area;
 
         frame.render_widget(block, popup_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-
         if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
                 scrollbar,
