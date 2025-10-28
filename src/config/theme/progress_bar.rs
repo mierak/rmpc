@@ -21,6 +21,9 @@ pub struct ProgressBarConfig {
     /// Fall sback to black for foreground and default color for background
     /// For transparent track you should set the track symbol to empty string
     pub track_style: Style,
+    /// Whether to use only the track symbol and style when the progress is
+    /// empty (0%).
+    pub use_track_when_empty: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -29,6 +32,8 @@ pub struct ProgressBarConfigFile {
     pub(super) track_style: Option<StyleFile>,
     pub(super) elapsed_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
+    #[serde(default = "super::defaults::bool::<false>")]
+    pub(super) use_track_when_empty: bool,
 }
 
 impl Default for ProgressBarConfigFile {
@@ -56,6 +61,7 @@ impl Default for ProgressBarConfigFile {
                 bg: None,
                 modifiers: None,
             }),
+            use_track_when_empty: false,
         }
     }
 }
@@ -85,6 +91,7 @@ impl ProgressBarConfigFile {
             elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::Black), None)?,
+            use_track_when_empty: self.use_track_when_empty,
         })
     }
 }
