@@ -1004,19 +1004,6 @@ impl Config {
         self.theme.text_color.map(|color| Style::default().fg(color)).unwrap_or_default()
     }
 
-    fn as_styled_progress_bar(&self) -> widgets::progress_bar::ProgressBar<'_> {
-        let progress_bar_colors = &self.theme.progress_bar;
-        widgets::progress_bar::ProgressBar::default()
-            .elapsed_style(progress_bar_colors.elapsed_style)
-            .thumb_style(progress_bar_colors.thumb_style)
-            .track_style(progress_bar_colors.track_style)
-            .start_char(&self.theme.progress_bar.symbols[0])
-            .elapsed_char(&self.theme.progress_bar.symbols[1])
-            .thumb_char(&self.theme.progress_bar.symbols[2])
-            .track_char(&self.theme.progress_bar.symbols[3])
-            .end_char(&self.theme.progress_bar.symbols[4])
-    }
-
     fn as_styled_scrollbar(&self) -> Option<ratatui::widgets::Scrollbar<'_>> {
         let scrollbar = self.theme.scrollbar.as_ref()?;
         let symbols = &scrollbar.symbols;

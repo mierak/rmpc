@@ -1,10 +1,11 @@
+use bon::Builder;
 use ratatui::{
     prelude::{Buffer, Rect},
     style::{Color, Style},
     widgets::Widget,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Builder)]
 pub struct ProgressBar<'a> {
     value: f32,
     start_char: &'a str,
@@ -15,66 +16,7 @@ pub struct ProgressBar<'a> {
     elapsed_style: Style,
     thumb_style: Style,
     track_style: Style,
-}
-
-#[allow(dead_code)]
-impl<'a> ProgressBar<'a> {
-    pub fn value(mut self, val: f32) -> Self {
-        self.value = val;
-        self
-    }
-
-    pub fn fg(mut self, color: Color) -> Self {
-        self.elapsed_style = self.elapsed_style.fg(color);
-        self.thumb_style = self.thumb_style.fg(color);
-        self
-    }
-
-    pub fn bg(mut self, color: Color) -> Self {
-        self.thumb_style = self.thumb_style.bg(color);
-        self.track_style = self.track_style.fg(color);
-        self
-    }
-
-    pub fn start_char(mut self, start: &'a str) -> Self {
-        self.start_char = start;
-        self
-    }
-
-    pub fn elapsed_char(mut self, elapsed: &'a str) -> Self {
-        self.elapsed_char = elapsed;
-        self
-    }
-
-    pub fn thumb_char(mut self, thumb: &'a str) -> Self {
-        self.thumb_char = thumb;
-        self
-    }
-
-    pub fn track_char(mut self, track: &'a str) -> Self {
-        self.track_char = track;
-        self
-    }
-
-    pub fn end_char(mut self, end: &'a str) -> Self {
-        self.end_char = end;
-        self
-    }
-
-    pub fn elapsed_style(mut self, style: Style) -> Self {
-        self.elapsed_style = style;
-        self
-    }
-
-    pub fn thumb_style(mut self, style: Style) -> Self {
-        self.thumb_style = style;
-        self
-    }
-
-    pub fn track_style(mut self, style: Style) -> Self {
-        self.track_style = style;
-        self
-    }
+    use_track_when_empty: bool,
 }
 
 impl Widget for ProgressBar<'_> {
@@ -84,36 +26,45 @@ impl Widget for ProgressBar<'_> {
         }
 
         let left = area.left();
-        let right = area.right();
         let top = area.top();
-
-        let len = right.saturating_sub(left);
+        let len = area.width;
 
         buf.set_string(left, top, self.track_char.repeat(len as usize), self.track_style);
 
-        let elapsed_len = (len as f32 * self.value) as usize;
-        buf.set_string(left, top, self.elapsed_char.repeat(elapsed_len), self.elapsed_style);
-        if elapsed_len < (len.saturating_sub(1)) as usize && elapsed_len > 0 {
-            buf.set_string(left + elapsed_len as u16, top, self.thumb_char, self.thumb_style);
-        }
+        let filled_cols = ((len as f32 * self.value).round() as u16).min(len);
 
-        buf.set_string(
-            left,
-            top,
-            self.start_char,
-            if elapsed_len > 0 { self.elapsed_style } else { self.track_style },
-        );
+        for i in 0..len {
+            let x = left + i;
+            let last_idx = len.saturating_sub(1);
 
-        buf.set_string(
-            right.saturating_sub(1),
-            top,
-            self.end_char,
-            if elapsed_len < (len.saturating_sub(1)) as usize {
-                self.track_style
+            let (char, style) = if i == 0 && self.use_track_when_empty && filled_cols == 0 {
+                // start char
+                (self.track_char, self.track_style)
+            } else if i == last_idx && self.use_track_when_empty && filled_cols < last_idx {
+                // end char
+                (self.track_char, self.track_style)
+            } else if i == 0 {
+                // start char
+                let style = if filled_cols == 0 { self.track_style } else { self.elapsed_style };
+                (self.start_char, style)
+            } else if i == last_idx {
+                // end char
+                let style =
+                    if filled_cols < last_idx { self.track_style } else { self.elapsed_style };
+                (self.end_char, style)
+            } else if i == filled_cols {
+                // thumb
+                (self.thumb_char, self.thumb_style)
+            } else if i < filled_cols {
+                // elapsed
+                (self.elapsed_char, self.elapsed_style)
             } else {
-                self.elapsed_style
-            },
-        );
+                // track
+                (self.track_char, self.track_style)
+            };
+
+            buf.set_string(x, top, char, style);
+        }
     }
 }
 
@@ -129,6 +80,7 @@ impl Default for ProgressBar<'_> {
             elapsed_style: Style::default().fg(Color::Blue),
             thumb_style: Style::default().bg(Color::Black).fg(Color::Blue),
             track_style: Style::default().bg(Color::Black),
+            use_track_when_empty: false,
         }
     }
 }
@@ -151,9 +103,9 @@ mod tests {
             thumb_char: "T",
             track_char: "B",
             end_char: "E",
+            value: 0.0,
             ..Default::default()
-        }
-        .value(0.0);
+        };
         let area = Rect::new(0, 0, 5, 1);
         let mut buf = Buffer { area, content: vec![Cell::default(); 5] };
 
@@ -174,9 +126,9 @@ mod tests {
             thumb_char: "T",
             track_char: "B",
             end_char: "E",
+            value: 1.0,
             ..Default::default()
-        }
-        .value(1.0);
+        };
         let area = Rect::new(0, 0, 5, 1);
         let mut buf = Buffer { area, content: vec![Cell::default(); 5] };
 
@@ -196,10 +148,10 @@ mod tests {
             elapsed_char: "E",
             thumb_char: "T",
             track_char: "B",
-            end_char: "E",
+            end_char: "X",
+            value: 0.49,
             ..Default::default()
-        }
-        .value(0.5);
+        };
         let area = Rect::new(0, 0, 5, 1);
         let mut buf = Buffer { area, content: vec![Cell::default(); 5] };
 
@@ -209,6 +161,30 @@ mod tests {
         assert_eq!(buf[(1, 0)].symbol(), "E");
         assert_eq!(buf[(2, 0)].symbol(), "T");
         assert_eq!(buf[(3, 0)].symbol(), "B");
-        assert_eq!(buf[(4, 0)].symbol(), "E");
+        assert_eq!(buf[(4, 0)].symbol(), "X");
+    }
+
+    #[test]
+    fn only_track_when_empty() {
+        let wg = ProgressBar {
+            start_char: "S",
+            elapsed_char: "E",
+            thumb_char: "T",
+            track_char: "B",
+            end_char: "E",
+            value: 0.0,
+            use_track_when_empty: true,
+            ..Default::default()
+        };
+        let area = Rect::new(0, 0, 5, 1);
+        let mut buf = Buffer { area, content: vec![Cell::default(); 5] };
+
+        wg.render(area, &mut buf);
+
+        assert_eq!(buf[(0, 0)].symbol(), "B");
+        assert_eq!(buf[(1, 0)].symbol(), "B");
+        assert_eq!(buf[(2, 0)].symbol(), "B");
+        assert_eq!(buf[(3, 0)].symbol(), "B");
+        assert_eq!(buf[(4, 0)].symbol(), "B");
     }
 }
