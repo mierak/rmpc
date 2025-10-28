@@ -124,6 +124,12 @@ pub enum Command {
     Version,
     /// Prints the list of songs in the current queue
     Queue,
+    /// Lists files from the music database. If no file is specified, lists all
+    /// songs in the database
+    ListAll {
+        /// Files to list from MPD's music database
+        files: Vec<String>,
+    },
     /// Plays song at the position in the current playlist. Defaults to current
     /// paused song.
     Play {
