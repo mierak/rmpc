@@ -1,10 +1,9 @@
 use anyhow::Result;
 use ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
+    layout::{Constraint, Margin, Rect},
     style::Style,
     symbols::border,
-    text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, TableState},
+    widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
 };
 
 use super::{Modal, RectExt};
@@ -76,25 +75,6 @@ impl OutputsModal {
         });
     }
 
-    pub fn increase_crossfade(&mut self, ctx: &Ctx) {
-        let current_xfade = ctx.status.xfade.unwrap_or(0);
-        let new_xfade = current_xfade.saturating_add(1);
-        self.set_crossfade(ctx, new_xfade);
-    }
-
-    pub fn decrease_crossfade(&mut self, ctx: &Ctx) {
-        let current_xfade = ctx.status.xfade.unwrap_or(0);
-        let new_xfade = current_xfade.saturating_sub(1);
-        self.set_crossfade(ctx, new_xfade);
-    }
-
-    fn set_crossfade(&mut self, ctx: &Ctx, seconds: u32) {
-        ctx.command(move |client| {
-            client.crossfade(seconds)?;
-            Ok(())
-        });
-    }
-
     fn refresh_outputs(&mut self, ctx: &Ctx) {
         let current_partition = ctx.status.partition.clone();
         ctx.query().id("refresh_outputs").replace_id("refresh_outputs").query(move |client| {
@@ -110,7 +90,7 @@ impl Modal for OutputsModal {
     }
 
     fn render(&mut self, frame: &mut ratatui::Frame, ctx: &mut Ctx) -> anyhow::Result<()> {
-        let popup_area = frame.area().centered_exact(70, 12);
+        let popup_area = frame.area().centered_exact(70, 10);
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
@@ -122,10 +102,6 @@ impl Modal for OutputsModal {
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
             .title("Outputs");
-
-        let [table_container, crossfade_area] =
-            Layout::vertical([Constraint::Min(5), Constraint::Length(1)])
-                .areas(popup_area.inner(Margin { horizontal: 1, vertical: 1 }));
 
         let rows = self.outputs.iter().map(|output| match output.kind {
             PartitionedOutputKind::OtherPartition => Row::new([
@@ -141,6 +117,8 @@ impl Modal for OutputsModal {
                 Cell::new("current"),
             ]),
         });
+
+        let table_container = popup_area.inner(Margin { horizontal: 1, vertical: 1 });
 
         self.scrolling_state
             .set_content_and_viewport_len(self.outputs.len(), table_container.height.into());
@@ -159,22 +137,8 @@ impl Modal for OutputsModal {
         let table_area = table_container.inner(Margin { horizontal: 1, vertical: 0 });
         self.outputs_table_area = table_area;
 
-        let current_xfade = ctx.status.xfade.unwrap_or(0);
-        let crossfade_text = Line::from(vec![
-            Span::raw("Crossfade: "),
-            Span::styled(
-                format!("{current_xfade} seconds"),
-                ctx.config.theme.highlighted_item_style,
-            ),
-            Span::raw(" (← / → to adjust)"),
-        ]);
-        let crossfade_widget = Paragraph::new(crossfade_text)
-            .style(ctx.config.as_text_style())
-            .alignment(ratatui::prelude::Alignment::Center);
-
         frame.render_widget(block, popup_area);
         frame.render_stateful_widget(table, table_area, self.scrolling_state.as_render_state_ref());
-        frame.render_widget(crossfade_widget, crossfade_area);
 
         if let Some(scrollbar) = ctx.config.as_styled_scrollbar() {
             frame.render_stateful_widget(
@@ -242,14 +206,6 @@ impl Modal for OutputsModal {
                 CommonAction::Top => {
                     self.scrolling_state.first();
 
-                    ctx.render()?;
-                }
-                CommonAction::Left => {
-                    self.decrease_crossfade(ctx);
-                    ctx.render()?;
-                }
-                CommonAction::Right => {
-                    self.increase_crossfade(ctx);
                     ctx.render()?;
                 }
                 CommonAction::Confirm => {
