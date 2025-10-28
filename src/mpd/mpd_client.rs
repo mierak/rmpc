@@ -36,7 +36,10 @@ use super::{
     proto_client::{ProtoClient, SocketClient},
     version::Version,
 };
-use crate::shared::{ext::error::ErrorExt, macros::status_error};
+use crate::{
+    mpd::commands::list_all::ListAll,
+    shared::{ext::error::ErrorExt, macros::status_error},
+};
 
 type MpdResult<T> = Result<T, MpdError>;
 
@@ -271,7 +274,7 @@ pub trait MpdClient: Sized {
     fn add_random_songs(&mut self, count: usize, filter: Option<&[Filter<'_>]>) -> MpdResult<()>;
     fn add_random_tag(&mut self, count: usize, tag: Tag) -> MpdResult<()>;
     /// Do not use this unless absolutely necessary
-    fn list_all(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
+    fn list_all(&mut self, path: Option<&str>) -> MpdResult<ListAll>;
     fn lsinfo(&mut self, path: Option<&str>) -> MpdResult<LsInfo>;
     fn list_files(&mut self, path: Option<&str>) -> MpdResult<ListFiles>;
     fn read_picture(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
@@ -637,7 +640,7 @@ impl MpdClient for Client<'_> {
         self.send_execute_cmd_list().and_then(|()| self.read_ok())
     }
 
-    fn list_all(&mut self, path: Option<&str>) -> MpdResult<LsInfo> {
+    fn list_all(&mut self, path: Option<&str>) -> MpdResult<ListAll> {
         self.send_list_all(path).and_then(|()| self.read_response())
     }
 
