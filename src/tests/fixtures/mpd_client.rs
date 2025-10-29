@@ -20,6 +20,7 @@ use crate::mpd::{
         Update,
         Volume,
         list::MpdList,
+        list_all::ListAll,
         list_playlist::FileList,
         metadata_tag::MetadataTagExt,
         mpd_config::MpdConfig,
@@ -473,7 +474,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn list_all(&mut self, _: Option<&str>) -> MpdResult<LsInfo> {
+    fn list_all(&mut self, _: Option<&str>) -> MpdResult<ListAll> {
         todo!("Not yet implemented")
     }
 

@@ -14,6 +14,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    ui::widgets::progress_bar::ProgressBar,
 };
 
 #[derive(Debug)]
@@ -39,14 +40,26 @@ impl Pane for ProgressBarPane {
                 frame.render_widget(status_bar, self.area);
             }
             _ => {
-                let elapsed_bar = ctx.config.as_styled_progress_bar();
-                let elapsed_bar = if ctx.status.duration == Duration::ZERO {
-                    elapsed_bar.value(0.0)
+                let bar_cfg = &ctx.config.theme.progress_bar;
+                let value = if ctx.status.duration == Duration::ZERO {
+                    0.0
                 } else {
-                    elapsed_bar
-                        .value(ctx.status.elapsed.as_secs_f32() / ctx.status.duration.as_secs_f32())
+                    ctx.status.elapsed.as_secs_f32() / ctx.status.duration.as_secs_f32()
                 };
-                frame.render_widget(elapsed_bar, self.area);
+                let bar = ProgressBar::builder()
+                    .elapsed_style(bar_cfg.elapsed_style)
+                    .thumb_style(bar_cfg.thumb_style)
+                    .track_style(bar_cfg.track_style)
+                    .start_char(&bar_cfg.symbols[0])
+                    .elapsed_char(&bar_cfg.symbols[1])
+                    .thumb_char(&bar_cfg.symbols[2])
+                    .track_char(&bar_cfg.symbols[3])
+                    .end_char(&bar_cfg.symbols[4])
+                    .use_track_when_empty(ctx.config.theme.progress_bar.use_track_when_empty)
+                    .value(value)
+                    .build();
+
+                frame.render_widget(bar, self.area);
             }
         }
 

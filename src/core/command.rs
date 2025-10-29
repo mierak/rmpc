@@ -109,6 +109,21 @@ impl Command {
                     std::process::exit(1);
                 }
             })),
+            Command::ListAll { files } => Ok(Box::new(|client| {
+                let result = if files.is_empty() {
+                    client.list_all(None)?
+                } else {
+                    client.send_start_cmd_list()?;
+                    for file in files {
+                        client.send_list_all(Some(&file))?;
+                    }
+                    client.send_execute_cmd_list()?;
+                    client.read_response()?
+                };
+
+                result.into_files().for_each(|file| println!("{file}"));
+                Ok(())
+            })),
             Command::Play { position: None } => Ok(Box::new(|client| Ok(client.play()?))),
             Command::Play { position: Some(pos) } => {
                 Ok(Box::new(move |client| Ok(client.play_pos(pos)?)))

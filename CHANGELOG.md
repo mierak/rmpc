@@ -44,6 +44,8 @@ Search pane
 - Added `SeekToStart` global action to seek to the beginning of the currently playing track
 - `DeleteFromPlaylist` action to delete songs in browsers panes from selected playlist
 - Added `CrossfadeUp` and `CrossfadeDown` global actions
+- `listall` command to cli
+- `use_track_when_empty` to progress bar, renders track symbol instead of start/end when they are empty
 
 ### Changed
 
@@ -71,6 +73,7 @@ remote commands inside scripts triggered by rmpc
 - Refactored and improved image backend detection
 - `JumpToCurrent` now jumps to last playing song in stopped state
 - Directories now keep their state when going back out of them
+- Nord theme update
 
 ### Fixed
 
