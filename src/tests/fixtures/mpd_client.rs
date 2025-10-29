@@ -183,6 +183,11 @@ impl MpdClient for TestMpdClient {
         Ok(())
     }
 
+    fn crossfade(&mut self, seconds: u32) -> MpdResult<()> {
+        self.status.xfade = Some(seconds);
+        Ok(())
+    }
+
     fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
         Ok(self.current_song_idx.and_then(|idx| self.songs.get(idx).cloned()))
     }

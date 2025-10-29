@@ -102,6 +102,7 @@ pub trait MpdCommand {
     fn send_get_volume(&mut self) -> MpdResult<()>;
     fn send_set_volume(&mut self, volume: Volume) -> MpdResult<()>;
     fn send_volume(&mut self, change: ValueChange) -> MpdResult<()>;
+    fn send_crossfade(&mut self, seconds: u32) -> MpdResult<()>;
     fn send_get_current_song(&mut self) -> MpdResult<()>;
     fn send_get_status(&mut self) -> MpdResult<()>;
     fn send_pause_toggle(&mut self) -> MpdResult<()>;
@@ -228,6 +229,7 @@ pub trait MpdClient: Sized {
     fn set_volume(&mut self, volume: Volume) -> MpdResult<()>;
     /// Set playback volume relative to current
     fn volume(&mut self, change: ValueChange) -> MpdResult<()>;
+    fn crossfade(&mut self, seconds: u32) -> MpdResult<()>;
     fn get_current_song(&mut self) -> MpdResult<Option<Song>>;
     fn get_status(&mut self) -> MpdResult<Status>;
     // Playback control
@@ -429,6 +431,10 @@ impl MpdClient for Client<'_> {
 
     fn volume(&mut self, change: ValueChange) -> MpdResult<()> {
         self.send_volume(change).and_then(|()| self.read_ok())
+    }
+
+    fn crossfade(&mut self, seconds: u32) -> MpdResult<()> {
+        self.send_crossfade(seconds).and_then(|()| self.read_ok())
     }
 
     fn get_current_song(&mut self) -> MpdResult<Option<Song>> {
@@ -974,6 +980,10 @@ impl<T: SocketClient> MpdCommand for T {
             }
             ValueChange::Set(val) => self.execute(&format!("setvol {val}")),
         }
+    }
+
+    fn send_crossfade(&mut self, seconds: u32) -> MpdResult<()> {
+        self.execute(&format!("crossfade {seconds}"))
     }
 
     fn send_get_current_song(&mut self) -> MpdResult<()> {

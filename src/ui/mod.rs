@@ -470,6 +470,22 @@ impl<'ui> Ui<'ui> {
                         Ok(())
                     });
                 }
+                GlobalAction::CrossfadeUp => {
+                    let current_xfade = ctx.status.xfade.unwrap_or(0);
+                    let new_xfade = current_xfade.saturating_add(1);
+                    ctx.command(move |client| {
+                        client.crossfade(new_xfade)?;
+                        Ok(())
+                    });
+                }
+                GlobalAction::CrossfadeDown => {
+                    let current_xfade = ctx.status.xfade.unwrap_or(0);
+                    let new_xfade = current_xfade.saturating_sub(1);
+                    ctx.command(move |client| {
+                        client.crossfade(new_xfade)?;
+                        Ok(())
+                    });
+                }
                 GlobalAction::SeekForward
                     if matches!(ctx.status.state, State::Play | State::Pause) =>
                 {

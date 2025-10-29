@@ -43,6 +43,7 @@ Search pane
 - Configurable `Save()` keybind in the navigation section
 - Added `SeekToStart` global action to seek to the beginning of the currently playing track
 - `DeleteFromPlaylist` action to delete songs in browsers panes from selected playlist
+- Added `CrossfadeUp` and `CrossfadeDown` global actions
 - `listall` command to cli
 - `use_track_when_empty` to progress bar, renders track symbol instead of start/end when they are empty
 
