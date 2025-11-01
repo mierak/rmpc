@@ -401,20 +401,11 @@ fn main() -> Result<()> {
 
             let event_loop_handle = core::event_loop::init(ctx, event_rx, terminal)?;
 
-            let original_hook = std::panic::take_hook();
-            std::panic::set_hook(Box::new(move |panic| {
-                crossterm::terminal::disable_raw_mode().expect("Disabling of raw mode to succeed");
-                crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen)
-                    .expect("Exit from alternate screen to succeed");
-                original_hook(panic);
-            }));
-
             info!("Application initialized successfully");
 
-            let mut terminal = event_loop_handle.join().expect("event loop to not panic");
+            event_loop_handle.join().expect("event loop to not panic");
 
-            Terminal::restore(&mut terminal, enable_mouse)
-                .context("Terminal restore to succeed")?;
+            Terminal::restore(enable_mouse);
         }
     }
 

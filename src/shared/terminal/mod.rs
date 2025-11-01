@@ -11,7 +11,6 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::prelude::Backend;
 
 use crate::{
     config::album_art::{ImageMethod, ImageMethodFile},
@@ -180,10 +179,7 @@ impl Terminal {
         }
     }
 
-    pub fn restore<B: Backend + std::io::Write>(
-        terminal: &mut ratatui::Terminal<B>,
-        enable_mouse: bool,
-    ) -> Result<()> {
+    pub fn try_restore(enable_mouse: bool) -> std::io::Result<()> {
         let mut writer = TERMINAL.writer();
         if enable_mouse {
             execute!(writer, DisableMouseCapture)?;
@@ -199,10 +195,22 @@ impl Terminal {
         }
         disable_raw_mode()?;
         execute!(writer, LeaveAlternateScreen)?;
-        Ok(terminal.show_cursor()?)
+        Ok(())
+    }
+
+    pub fn restore(enable_mouse: bool) {
+        if let Err(err) = Self::try_restore(enable_mouse) {
+            eprintln!("Failed to restore terminal state after panic: {err}");
+        }
     }
 
     pub fn setup(enable_mouse: bool) -> Result<ratatui::Terminal<CrosstermLockingBackend>> {
+        let original_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            Self::restore(enable_mouse);
+            original_hook(info);
+        }));
+
         enable_raw_mode()?;
         let mut writer = TERMINAL.writer();
         execute!(writer, EnterAlternateScreen)?;
