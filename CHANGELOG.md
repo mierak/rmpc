@@ -93,6 +93,7 @@ available and Block if not
 - Fix playlists not using playlist style and icon in the Playlists pane
 - Order of added songs when adding them from browser panes
 - Marked items in Queue not being cleared on database update
+- Improved behavior if rmpc happens to panic at certain time
 
 ### Deprecated
 
