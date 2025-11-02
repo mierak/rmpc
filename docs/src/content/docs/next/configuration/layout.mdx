@@ -2,7 +2,7 @@
 title: Layout
 description: Configuring rmpc's base layout
 sidebar:
-    order: 11
+    order: 12
 ---
 
 import { LinkCard, CardGrid } from "@astrojs/starlight/components";
@@ -16,13 +16,9 @@ import example_layout_default_borders from "../assets/example_layout_default_bor
 Layout controls the base layout of the application. This layout is similar to <a href={path("configuration/tabs#pane--split--component")}>tabs</a>
 configuration except it contains a single `Pane` or `Split`. It is configured inside your <a href={path("configuration/theme#layout")}>theme.ron</a>.
 
-<ConfigValue
-    name="layout"
-    type={["Pane", "Split", "Component"]}
-    link={path("configuration/tabs/#pane--split--component")}
-/>
+<ConfigValue name="layout" type={["Pane", "Split", "Component"]} link={path("configuration/tabs/#pane")} />
 
-The layout can use any non-focusable `Pane` (these currently are `AlbumArt`, `Lyrics`, `ProgressBar`, `Header` and `Tabs`)
+The layout can use any non-focusable `Pane` (these currently are `AlbumArt`, `Lyrics`, `ProgressBar`, `Header`, `Tabs` and `Cava`)
 and additionally must contain exactly one special `TabContent` pane which will display content of the
 currently active tab configured in <a href={path("configuration/tabs")}>tabs</a>. The pane sizes can be either a percent
 value ie. `"100%"` or size in terminal cells (rows or columns, depending on the split direction) ie. `"5"`.
@@ -36,7 +32,7 @@ For example you cannot display album art in the base layout and in the queue tab
 
 <ConfigValue name="components" type="other" customText="Map<string, Pane | Split | Component>" />
 
-Components are reusable blocks of panes. They can be used to define some part of UI once and reuse it in multiple tabs, layout
+Components are reusable blocks of panes. They can be used to define some part of UI once and reused in multiple tabs, layout
 and even included in other components without having to copy the definition to each tab separately. They can also be used to
 restructure your `layout` and `tabs` to make them more readable.
 

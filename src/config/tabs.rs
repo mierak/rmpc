@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Result, ensure};
+use chumsky::Parser;
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{layout::Direction, widgets::Borders};
@@ -11,6 +12,8 @@ use unicase::UniCase;
 
 use super::theme::{
     PercentOrLength,
+    SongFormatOrProps,
+    parser::{self, make_error_report},
     properties::{Property, PropertyFile, PropertyKind, PropertyKindFile},
     queue_table::ParseSizeError,
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
@@ -76,7 +79,7 @@ pub enum PaneTypeFile {
     #[cfg(debug_assertions)]
     FrameCount,
     Property {
-        content: Vec<PropertyFile<PropertyKindFile>>,
+        content: SongFormatOrProps<PropertyFormatFile>,
         #[serde(default)]
         align: super::theme::properties::Alignment,
         #[serde(default)]
@@ -88,6 +91,9 @@ pub enum PaneTypeFile {
     },
     Cava,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PropertyFormatFile(pub Vec<PropertyFile<PropertyKindFile>>);
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(strum::Display, Hash))]
@@ -161,7 +167,7 @@ impl Pane {
 }
 
 impl TryFrom<PaneTypeFile> for PaneType {
-    type Error = anyhow::Error;
+    type Error = PaneConversionError;
 
     fn try_from(value: PaneTypeFile) -> Result<PaneType, Self::Error> {
         Ok(match value {
@@ -187,16 +193,26 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::TabContent => PaneType::TabContent,
             #[cfg(debug_assertions)]
             PaneTypeFile::FrameCount => PaneType::FrameCount,
-            PaneTypeFile::Property { content: properties, align, scroll_speed } => {
-                PaneType::Property {
-                    content: properties
+            PaneTypeFile::Property { content, align, scroll_speed } => PaneType::Property {
+                content: match content {
+                    SongFormatOrProps::Props(p) => {
+                        p.0.into_iter()
+                            .map(|prop| -> Result<_> { prop.try_into() })
+                            .try_collect()?
+                    }
+                    SongFormatOrProps::Format(s) => parser::parser()
+                        .parse(&s)
+                        .into_result()
+                        .map_err(|errs| {
+                            PaneConversionError::FormatError(make_error_report(errs, &s))
+                        })?
                         .into_iter()
-                        .map(|prop| prop.try_into().expect(""))
-                        .collect_vec(),
-                    align: align.into(),
-                    scroll_speed,
-                }
-            }
+                        .map(|prop| -> Result<_> { prop.try_into() })
+                        .try_collect()?,
+                },
+                align: align.into(),
+                scroll_speed,
+            },
             PaneTypeFile::Browser { root_tag: tag, separator } => {
                 PaneType::Browser { root_tag: tag, separator }
             }
@@ -385,6 +401,8 @@ pub enum PaneConversionError {
     ParseError(#[from] ParseSizeError),
     #[error("Failed to parse pane: {0}")]
     Generic(#[from] anyhow::Error),
+    #[error("Invalid property format: {0}")]
+    FormatError(String),
 }
 
 impl PaneOrSplitFile {
