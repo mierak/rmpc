@@ -1,0 +1,336 @@
+---
+title: Properties
+description: Configuration of properties
+sidebar:
+    order: 16
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
+import PropertyTable from "../../../../components/PropertyTable.astro";
+
+You can use the so-called properties in various places in rmpc. These allow you to customize what information is shown
+and how the program looks as a whole. These properties are usable in the <a href={path("configuration/layout")}>layout</a>, <a href={path("configuration/tabs")}>tabs</a>, <a href={path("configuration/theme/#browser_song_format")}>browser_song_format</a>, <a href={path("configuration/theme/#song_table_format")}>song_table_format</a>, and <a href={path("configuration/layout#components")}>components</a>.
+
+## Definition
+
+`prop: (kind: <kind>, style: <style>, default: <prop>)`
+
+Every definition is a struct which contains `kind`, `style`, and `default`. The default is simply
+another property which is used as a fallback value if the first property could not be resolved.
+
+Style is a struct with three properties: `fg`, `bg`, and `modifiers`, and is described in more detail <a href={path("configuration/style-color")}>here</a>.
+
+The `kind` one of the [available kinds](#available-kinds). The `Property` kind can then be either `Song`, `Status`, or `Widget`. Or, in the case of `song_table_format`
+or `browser_song_format`, just the `Song` type is available.
+
+There are some variations in the kind definition. For example, the `Property` panes allow you to
+use all property kinds, ie. `Property(Status(..))`. But the `song_table_format` and `browser_song_format` allow only
+the `Song` property kind thus the Property type is omitted: ie. `Property(Title)` instead of `Property(Song(Title))`.
+
+## Available kinds
+
+The properties are divided into a few categories:
+
+<PropertyTable
+    headers={["Type", "Description"]}
+    rows={[
+        {
+            cells: ["`Text`", "Displays a raw text value "],
+            example: '(kind: Text("Hello world!")),',
+        },
+        {
+            cells: [
+                "`Sticker`",
+                "Displays sticker value of a song. These stickers can be used to, for example, track play count of songs",
+            ],
+            example: '(kind: Sticker("playCount")),',
+        },
+        {
+            cells: [
+                "`Group`",
+                "Groups one or more properties together. If any of the properties resolves to an empty value, the whole group will not be shown.",
+            ],
+            example:
+                '(kind: Group([(kind: Property(Song(Artist))), (kind: Text("-")), (kind: Property(Song(Title)))]), default: (kind: Text("Unknown"))),',
+            exampleDescription:
+                'Displays `artist - title` but if either artist or the title are not present in the metadata "Unknown" is shown instead.',
+        },
+        {
+            cells: [
+                "`Transform`",
+                "Applies a transformation on the properties in question, like truncating the value to a specified number of characters.",
+            ],
+            exampleDescription: "Check the tables below for examples",
+        },
+        {
+            cells: [
+                "`Property`",
+                "Displays song's metadata values or information about rmpc's and MPD's status. These properties are further divided into three categories: <br /> `Song` - Displays metadata of either the currently playing song or controls format of songs in lists and tables depending on the context.<br /> `Status` - Displays rmpc's or MPD's status like the playback state, volume, currently active tab, and others.<br /> `Widget` - More involved properties with custom display options; these are mostly obsolete nowadays and kept for backward compatibility. <br /><br /> Only the `Song` type is available in `song_table_format` or `browser_song_format` and the category name (`Song`) is omitted there.",
+            ],
+            exampleDescription: "Check the tables below for examples",
+        },
+    ]}
+/>
+
+## Available property kinds
+
+Below are tables showing all available properties. The table rows are expandable and contain info
+about parameters and examples. All the examples below assume that the properties are NOT used in the
+`song_table_format` or `browser_song_format`.
+
+### Song properties
+
+{/* <!-- prettier-ignore-start --> */}
+
+<PropertyTable
+    headers={["Property", "Description"]}
+    rows={[
+        {
+            cells: ["`File`", "Song's full path from MPD's music directory"],
+            example: '(kind: Property(Song(File))),'
+        },
+        {
+            cells: ["`Filename`", "Song's filename"],
+            example: '(kind: Property(Song(Filename))),'
+        },
+        {
+            cells: ["`FileExtension`", "Song's file extension"],
+            example: '(kind: Property(Song(FileExtension))),'
+        },
+        {
+            cells: ["`Title`", "Value of the title tag"],
+            example: '(kind: Property(Song(Title))),'
+        },
+        {
+            cells: ["`Artist`", "Value of the artist tag"],
+            example: '(kind: Property(Song(Artist))),'
+        },
+        {
+            cells: ["`Album`", "Value of the album tag"],
+            example: '(kind: Property(Song(Album))),'
+        },
+        {
+            cells: ["`Duration`", "Song's duration"],
+            example: '(kind: Property(Song(Duration))),'
+        },
+        {
+            cells: ["`Track`", "Value of the track tag"],
+            example: '(kind: Property(Song(Track))),'
+        },
+        {
+            cells: ["`Disc`", "Value of the disc tag"],
+            example: '(kind: Property(Song(Disc))),'
+        },
+        {
+            cells: ["`Position`", "Value of the position tag"],
+            example: '(kind: Property(Song(Position))),'
+        },
+        {
+            cells: ["`Other(value)`", "Display any arbitrary metadata tag supported by MPD"],
+            parameters: ["`value`: String, required, name of the tag to display"],
+            example: '(kind: Property(Song(Other("albumartist")))),',
+            exampleDescription: "Display value of the albumartist tag"
+        },
+    ]}
+/>
+{/* <!-- prettier-ignore-end --> */}
+
+### Status properties
+
+{/* <!-- prettier-ignore-start --> */}
+
+<PropertyTable
+    headers={["Property", "Description"]}
+    rows={[
+        {
+            cells: ["`Volume`", "Current volume as number from 0 to 100"],
+            example: '(kind: Property(Status(Volume))),'
+        },
+        {
+            cells: ["`StateV2(...)`", "Current playback state, one of `Playing`, `Paused`, `Stopped`"],
+            parameters: [
+                "`playing_label`: String, optional, defaults to `Playing`",
+                "`paused_label`: String, optional, defaults to `Paused`",
+                "`stopped_label`: String, optional, defaults to `Stopped`",
+                "`playing_style`: Style, optional",
+                "`paused_style`: Style, optional",
+                "`stopped_style`: Style, optional",
+            ],
+            example: '(kind: Property(Status(StateV2(playing_label: "P", paused_label: "||", stopped_label: "S", playing_style: (fg: "blue"), paused_style: (fg: "yellow"), stopped_style: (fg: "red"))))),'
+        },
+        {
+            cells: ["`RepeatV2(...)`", "Repeat status"],
+            parameters: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+            ],
+            example: '(kind: Property(Status(RepeatV2(on_label: "ON", off_label: "OFF", on_style: (fg: "blue"), on_off: (fg: "red"))))),'
+        },
+        {
+            cells: ["`RandomV2(...)`", "Random status"],
+            parameters: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+            ],
+            example: '(kind: Property(Status(SingleV2(on_label: "ON", off_label: "OFF", on_style: (fg: "blue"), on_off: (fg: "red"))))),'
+        },
+        {
+            cells: ["`SingleV2(...)`", "Single status"],
+            parameters: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`oneshot_label`: String, optional, defaults to `Oneshot`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+                "`oneshot_style`: Style, optional",
+            ],
+            example: '(kind: Property(Status(SingleV2(on_label: "ON", off_label: "OFF", oneshot_label: "OS_ON", on_style: (fg: "blue"), on_off: (fg: "red"), oneshot_style: (fg: "yellow"))))),'
+        },
+        {
+            cells: ["`ConsumeV2(...)`", "Consume status"],
+            parameters: [
+                "`on_label`: String, optional, defaults to `On`",
+                "`off_label`: String, optional, defaults to `Off`",
+                "`oneshot_label`: String, optional, defaults to `Oneshot`",
+                "`on_style`: Style, optional",
+                "`off_style`: Style, optional",
+                "`oneshot_style`: Style, optional",
+            ],
+            example: '(kind: Property(Status(ConsumeV2(on_label: "ON", off_label: "OFF", oneshot_label: "OS_ON", on_style: (fg: "blue"), on_off: (fg: "red"), oneshot_style: (fg: "yellow"))))),'
+        },
+        {
+            cells: ["`Partition`", "Currently active partition"],
+            example: '(kind: Property(Status(Partition))),'
+        },
+        {
+            cells: ["`Elapsed`", "How much of the currently playing song has elapsed"],
+            example: '(kind: Property(Status(Elapsed))),'
+        },
+        {
+            cells: ["`Duration`", "Total duration of the currently playing song"],
+            example: '(kind: Property(Status(Duration))),'
+        },
+        {
+            cells: ["`Crossfade`", "Number of crossfade seconds"],
+            example: '(kind: Property(Status(Crossfade))),'
+        },
+        {
+            cells: ["`Bitrate`", "Currently playing song's bitrate in kbps"],
+            example: '(kind: Property(Status(Bitrate))),'
+        },
+        {
+            cells: ["`QueueLength(...)`", "Number of songs in the queue"],
+            parameters: [
+                "`thousands_separator`: String, optional, defaults to `,`",
+            ],
+            example: '(kind: Property(Status(QueueLength(thousands_separator: ",")))),'
+        },
+        {
+            cells: ["`QueueTimeTotal(...)`", "Total duration of songs in the queue"],
+            parameters: [
+                "`separator`: String, optional",
+            ],
+            example: '\
+    (kind: Property(Status(QueueTimeTotal())))                       // "4:06" (default, no separator)\n\
+    (kind: Property(Status(QueueTimeTotal(separator: ","))))         // "4m,6s"\n\
+    (kind: Property(Status(QueueTimeTotal(separator: " "))))         // "4m 6s"\n\
+    (kind: Property(Status(QueueTimeTotal(separator: ""))))          // "4m6s" (no space)\
+',
+            exampleDescription: [
+                "When `separator` is `None` (default): Uses standard time format (e.g., `4:06`, `1:23:45`)",
+                "When `separator` is provided (`,` in the example): Uses verbose format with abbreviated units (e.g., `4m, 6s`, `1h, 23m, 45s`)"
+            ],
+        },
+        {
+            cells: ["`QueueTimeRemaining(...)`", "Total time left in the queue (remainder of current song + the rest of the queue)"],
+            parameters: ["`separator`: String, optional"],
+            example: '\
+    (kind: Property(Status(QueueTimeRemaining())))                       // "2:34" (default, no separator)\n\
+    (kind: Property(Status(QueueTimeRemaining(separator: ","))))         // "2m,34s"\n\
+    (kind: Property(Status(QueueTimeRemaining(separator: " "))))         // "2m 34s"\n\
+    (kind: Property(Status(QueueTimeRemaining(separator: ""))))          // "2m34s" (no space)\
+',
+            exampleDescription: [
+                 "When `separator` is `None` (default): Uses standard time format (e.g., `4:06`, `1:23:45`)",
+                 "When `separator` is provided (`,` in the example): Uses verbose format with abbreviated units (e.g., `4m, 6s`, `1h, 23m, 45s`)"
+            ],
+
+        },
+        {
+            cells: ["`ActiveTab`", "Currently active tab"],
+            example: '(kind: Property(Status(ActiveTab))),'
+        },
+    ]}
+
+/>
+{/* <!-- prettier-ignore-end --> */}
+
+### Widget properties
+
+{/* <!-- prettier-ignore-start --> */}
+
+<PropertyTable
+    headers={["Property", "Description"]}
+    rows={[
+        { 
+            cells: ["`ScanStatus`", "Displays a spinner when MPD's database update is in progress"],
+            example: '(kind: Property(Widget(ScanStatus))),'
+        },
+        {
+            cells: ["`States(...)`", "Playback modifiers in format `Repeat / Random / Consume / Single`"],
+            example: '(kind: Property(Widget(States(active_style: (fg: "blue"), separator_style: (fg: "gray"))))),',
+            parameters: [
+                "`active_style`: Style, optional",
+                "`separator_style`: Style, optional",
+            ],
+        },
+        { 
+            cells: ["`Volume`", "Current volume in format: `Volume: ▁▂▃▄▅▆▇ 100%`"],
+            example: '(kind: Property(Widget(Volume))),'
+        },
+    ]}
+/>
+{/* <!-- prettier-ignore-end --> */}
+
+### Transforms
+
+{/* <!-- prettier-ignore-start --> */}
+
+<PropertyTable
+    headers={["Transform", "Description"]}
+    rows={[
+        {
+            cells: ["`Truncate(...)`", "Truncate the value to specified number of characters"],
+            parameters: [
+                "`content`: Property, content that is to be truncated",
+                "`from_start`: bool, optional, whether to truncate from the start of the input",
+                "`length`: number, length in characters to truncate to",
+            ],
+            exampleDescription: "Show value of the date tag and truncates it to the first 4 characters: 2025-01-01 -> 2025",
+            example: '(kind: Transform(Truncate(content: (kind: Property(Song(Other("date")))), length: 4, from_start: false)))',
+        },
+        {
+            cells: ["`Replace(...)`", "Replace the value with another property if matched"],
+            parameters: [
+                "`content`: Property, content that is to be replaced if matched",
+                "`replacements`: array of objects to defining one or more replacements",
+            ],
+            exampleDescription: "Replace the liked sticker value with a heart emoji",
+            example: '\
+(kind: Transform(Replace(content: (kind: Sticker("like")), replacements: [ \n\
+      (match: "0", replace: (kind: Text("💔"))), // Replace "disliked" with a broken heart \n\
+      (match: "1", replace: (kind: Text("💙"))), // Replace "neutral" with a blue hearst \n\
+      (match: "2", replace: (kind: Text("❤️"))), // Replace "liked" with a red heart \n\
+])))'
+
+        },
+    ]}
+
+/>
+{/* <!-- prettier-ignore-end --> */}

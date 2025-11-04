@@ -76,18 +76,25 @@ Add [`rmpc`](https://search.nixos.org/packages?channel=unstable&query=rmpc) (ava
 
 ### Precompiled binaries
 
-[//]: <> ( This needs major reworking, but I think it's good enough for now )
-
 Download the precompiled binaries from the github [releases page](https://github.com/mierak/rmpc/releases/latest/).
 After it's done downloading, untar the archive, set execute permission and run rmpc.
 
 ### Using cargo
 
+compile the latest version from source
+
 ```bash frame=none showLineNumbers=false
-# compile the latest version from source
 cargo install rmpc --locked
-# or download precompiled binary with cargo binstall
+```
+
+download precompiled binary with [cargo binstall](https://github.com/cargo-bins/cargo-binstall)
+
+```bash frame=none showLineNumbers=false
 cargo binstall rmpc
-# or compile the latest work in progress version from git
+```
+
+compile the latest work in progress version from git
+
+```bash frame=none showLineNumbers=false
 cargo install --git https://github.com/mierak/rmpc --locked
 ```

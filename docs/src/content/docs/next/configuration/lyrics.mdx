@@ -7,7 +7,7 @@ sidebar:
 
 ## Lyrics
 
-Rmpc supports displaying [synchronized lyrics](https://en.wikipedia.org/wiki/LRC_\(file_format\)) in the `Lyrics` pane.
+Rmpc supports displaying [synchronized lyrics](<https://en.wikipedia.org/wiki/LRC_(file_format)>) in the `Lyrics` pane.
 Other lyrics formats are not supported. The `lyrics_dir` must be configured for the resolution to work. All `lrc` files
 must be on the client side.
 
@@ -15,7 +15,7 @@ must be on the client side.
 
 LRC files are text files with a specific structure:
 
-```lrc
+```
 [ar:Artist Name]
 [ti:Song Title]
 [al:Album Name]
@@ -30,6 +30,7 @@ LRC files are text files with a specific structure:
 #### What gets parsed and what gets ignored
 
 **Metadata tags** (at the beginning of file):
+
 - `[ar:Artist Name]` - Artist name (required for matching)
 - `[ti:Song Title]` - Song title (required for matching)
 - `[al:Album Name]` - Album name (optional)
@@ -38,6 +39,7 @@ LRC files are text files with a specific structure:
 - `[offset:-500]` - Time adjustment in milliseconds
 
 **Timestamp lines** (lyrics with timing):
+
 - `[00:12.34]First line of lyrics`
 - `[1:23.45]Second line` (single digit minutes work)
 - `[00:30.5]Third line` (different decimal places work)
@@ -45,6 +47,7 @@ LRC files are text files with a specific structure:
 - `[00:10.00][Intro] Welcome` (non-timestamp content like `[Intro]` becomes part of lyrics)
 
 **What gets ignored:**
+
 - `# Comments like this`
 - `[custom:unknown tags]`
 - `[tool:editor name]`
@@ -65,6 +68,7 @@ Lrc files are resolved by rmpc via two methods (in order):
 Rmpc will create an index of all `.lrc` files in your `lyrics_dir` on startup.
 
 **How songs match to LRC files:**
+
 - Artist and title must match exactly (case insensitive)
 - Album is optional - if present in both, it must match
 - If LRC has a length tag, it must be within ±5 seconds of song length
@@ -83,7 +87,7 @@ Following examples assume that your MPD's music directory is set to `/home/user/
 
 ### Example LRC file
 
-```lrc
+```
 # This is a comment - ignored
 [ti:My Song]
 [ar:Artist Name]
@@ -107,6 +111,7 @@ This line has no brackets - ignored
 ```
 
 **What rmpc sees in this example:**
+
 - **Song info:** "My Song" by "Artist Name" from "Album Name"
 - **Timing:** All timestamps shifted 500ms earlier (offset)
 - **Lyrics:** 9 lines with valid timestamps (invalid lines skipped)
@@ -115,17 +120,20 @@ This line has no brackets - ignored
 ### Important Notes for Users
 
 **What works:**
+
 - Most LRC files from any source work without modification
 - Files with some parsing errors still work - only invalid lines are skipped
 - Large timestamp values are supported (up to 99:59.99)
 
 **For best results:**
+
 - Use standard `[MM:SS.xx]` format for timestamps
 - Include `[ar:]` (artist) and `[ti:]` (title) tags for proper song matching
 - Files with no valid timestamps will appear empty in the lyrics pane
 - Only consecutive timestamps at the start of a line are parsed - everything after the first non-timestamp tag becomes lyrics content
 
 **Troubleshooting:**
+
 - If lyrics don't show up, check that artist/title metadata matches your song
 - Missing or mismatched metadata prevents automatic matching
 - Lines like `[00:10.00][tag:value][00:12.00]text` will create one line at 10.00s with content `[tag:value][00:12.00]text` - only consecutive timestamps are parsed

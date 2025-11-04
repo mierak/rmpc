@@ -1,0 +1,224 @@
+---
+import { Code } from "astro-expressive-code/components";
+
+type TableRow = {
+    cells: string[];
+    parameters?: string[];
+    example?: string;
+    exampleDescription?: string | string[];
+};
+
+export interface Props {
+    headers: string[];
+    rows: TableRow[];
+}
+
+const { headers, rows } = Astro.props;
+
+function allBackticksToCodeBlock(input: string): string {
+    let out = "";
+    let inBacktick = false;
+    for (const c of input) {
+        if (c === "`") {
+            inBacktick = !inBacktick;
+            out += inBacktick ? '<code dir="auto">' : "</code>";
+        } else {
+            out += c;
+        }
+    }
+    if (inBacktick) {
+        throw new Error("Unmatched backticks in input string");
+    }
+    return out;
+}
+
+const processedRows = rows.map((row) => {
+    const cells = row.cells.map(allBackticksToCodeBlock);
+    const parameters = row?.parameters?.map(allBackticksToCodeBlock);
+    let exampleDescription = row.exampleDescription;
+    if (exampleDescription && typeof exampleDescription === "string") {
+        exampleDescription = allBackticksToCodeBlock(exampleDescription);
+    } else if (exampleDescription && Array.isArray(exampleDescription)) {
+        exampleDescription = exampleDescription.map(allBackticksToCodeBlock);
+    }
+    const hasExpandedContent = (parameters && parameters.length > 0) || row.example || !!exampleDescription;
+    return { cells, parameters, example: row.example, exampleDescription, hasExpandedContent };
+});
+---
+
+<style>
+    table.expandable-table {
+        margin-top: 1rem;
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    table.expandable-table th,
+    table.expandable-table td {
+        vertical-align: top;
+        padding: 0.25rem 0.5rem;
+    }
+
+    table.expandable-table tbody tr.expanded-parent {
+        border-bottom: 0;
+    }
+
+    table.expandable-table button.expand-toggle {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 2px 6px;
+        font-size: 16px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    table.expandable-table button.expand-toggle span.symbol {
+        margin: 0 0.5rem;
+        font-weight: 600;
+    }
+
+    tr.expanded-content-row {
+        display: none;
+    }
+
+    tr.expanded-content-row[data-expanded="true"] {
+        display: table-row;
+    }
+
+    tr.expandable-row[data-expanded="true"] td {
+        border-bottom: 0px;
+    }
+
+    tr > td:nth-child(2) {
+        white-space: nowrap;
+    }
+</style>
+
+<property-table>
+    <table class="expandable-table">
+        <thead>
+            <tr>
+                <th></th>
+                {headers.map((header, hIdx) => <th style={hIdx === 0 ? "padding-inline-start:0" : ""}>{header}</th>)}
+            </tr>
+        </thead>
+        <tbody>
+            {
+                processedRows.map((row, idx) => {
+                    return (
+                        <>
+                            <tr
+                                id={`expandable-row-${idx}`}
+                                class="expandable-row"
+                                data-row={idx}
+                                data-expanded={false}
+                            >
+                                <td style="padding-inline-start:0;padding-inline-end:0;width:1%;">
+                                    {row.hasExpandedContent && (
+                                        <button
+                                            class="expand-toggle"
+                                            type="button"
+                                            aria-expanded="false"
+                                            aria-controls={`expanded-row-${idx}`}
+                                            data-toggle={idx}
+                                        >
+                                            <span class="symbol">+</span>
+                                            <span class="sr-only">Expand row</span>
+                                        </button>
+                                    )}
+                                </td>
+                                {row.cells.map((cellHtml, cIdx) => (
+                                    <td style={cIdx === 0 ? "padding-inline-start: 0" : ""} set:html={cellHtml} />
+                                ))}
+                            </tr>
+                            {row.hasExpandedContent && (
+                                <tr id={`expanded-row-${idx}`} class="expanded-content-row" data-expanded="false">
+                                    <td
+                                        colspan={headers.length + 1}
+                                        style={{
+                                            paddingLeft: "3rem",
+                                            paddingBottom: "1.5em",
+                                            paddingTop: "1.0em",
+                                            lineHeight: "var(--sl-line-height,1.4)",
+                                        }}
+                                    >
+                                        {row.parameters && (
+                                            <>
+                                                <h6>Parameters</h6>
+                                                <ul>
+                                                    {row.parameters.map((contentHtml) => (
+                                                        <li set:html={contentHtml} />
+                                                    ))}
+                                                </ul>
+                                            </>
+                                        )}
+                                        {(row.example || row.exampleDescription) && (
+                                            <div>
+                                                <h6>Example</h6>
+                                                {row.exampleDescription &&
+                                                    typeof row.exampleDescription === "string" && (
+                                                        <p set:html={row.exampleDescription} />
+                                                    )}
+                                                {row.exampleDescription && Array.isArray(row.exampleDescription) && (
+                                                    <ul>
+                                                        {row.exampleDescription.map((l) => (
+                                                            <li set:html={l} />
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                                {row.example && (
+                                                    <Code
+                                                        lang="rust"
+                                                        showLineNumbers={false}
+                                                        code={row.example}
+                                                        preserveIndent={false}
+                                                        wrap
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
+                        </>
+                    );
+                })
+            }
+        </tbody>
+    </table>
+</property-table>
+
+<script>
+    class PropertyTable extends HTMLElement {
+        connectedCallback() {
+            this.addEventListener("click", (e) => {
+                const btn = e.target instanceof Element ? e.target.closest("button.expand-toggle") : null;
+                if (!btn) return;
+
+                const rowIndex = btn.getAttribute("data-toggle");
+                if (rowIndex == null) return;
+
+                const expandableRow = this.querySelector("#expandable-row-" + rowIndex);
+                const expandedRow = this.querySelector("#expanded-row-" + rowIndex);
+                if (!expandedRow || !expandableRow) return;
+
+                const isExpandableRowExpanded = expandableRow.getAttribute("data-expanded") === "true";
+                expandableRow.setAttribute("data-expanded", String(!isExpandableRowExpanded));
+
+                const isExpanded = expandedRow.getAttribute("data-expanded") === "true";
+                expandedRow.setAttribute("data-expanded", String(!isExpanded));
+
+                btn.setAttribute("aria-expanded", String(!isExpanded));
+                const symbolSpan = btn.querySelector("span.symbol");
+                if (symbolSpan) symbolSpan.textContent = isExpanded ? "+" : "−";
+
+                const srOnly = btn.querySelector(".sr-only");
+                if (srOnly) srOnly.textContent = isExpanded ? "Expand row" : "Collapse row";
+            });
+        }
+    }
+
+    customElements.define("property-table", PropertyTable);
+</script>

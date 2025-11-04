@@ -94,6 +94,7 @@ available and Block if not
 - Order of added songs when adding them from browser panes
 - Marked items in Queue not being cleared on database update
 - Improved behavior if rmpc happens to panic at certain time
+- Group not falling back to its default value
 
 ### Deprecated
 
