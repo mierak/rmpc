@@ -2,7 +2,7 @@
 title: Theme
 description: Configuring rmpc theme
 sidebar:
-    order: 40
+    order: 11
 ---
 
 import { Steps } from "@astrojs/starlight/components";
@@ -323,28 +323,119 @@ Configures the columns of the song table. This property is described in its own 
     href={path("configuration/song-table/")}
 />
 
+Defaults to 4 columns: Artist, Title, Album and Duration:
+
+<details>
+
+<summary>Click to expand</summary>
+
+```rust
+song_table_format: [
+    (
+        prop: "$artist|'Unknown'",
+        width: "20%",
+    ),
+    (
+        prop: "$title|'Unknown'",
+        width: "35%",
+    ),
+    (
+        prop: "$album{fg: white}|'Unknown Album'{fg: white}",
+        width: "30%",
+    ),
+    (
+        prop: "$duration|'-'",
+        width: "15%",
+        alignment: Right,
+    ),
+],
+```
+
+or equivalent:
+
+```rust
+song_table_format: [
+    (
+        prop: (kind: Property(Artist),
+            default: (kind: Text("Unknown"))
+        ),
+        width: "20%",
+    ),
+    (
+        prop: (kind: Property(Title),
+            default: (kind: Text("Unknown"))
+        ),
+        width: "35%",
+    ),
+    (
+        prop: (kind: Property(Album), style: (fg: "white"),
+            default: (kind: Text("Unknown Album"), style: (fg: "white"))
+        ),
+        width: "30%",
+    ),
+    (
+        prop: (kind: Property(Duration),
+            default: (kind: Text("-"))
+        ),
+        width: "15%",
+        alignment: Right,
+    ),
+],
+```
+
+</details>
+
 ### browser_song_format
 
 <ConfigValue
     name="browser_song_format"
     type="other"
-    customText="<song_table_format>"
-    link={path("configuration/song-table#property")}
+    customText="<property[]>"
+    link={path("configuration/properties")}
 />
 
-Format used to display song in the various browser panes (albums, artists, ...). Is the same format
-as <a href={path("configuration/theme#song_table_format")}>song_table_format</a> except the styles are ignored.
+Format used to display song in the various browser panes (directories, albums, artists, ...).
+Is the same format as <a href={path("configuration/song-table#prop")}>song_table_format</a> except the styles are ignored.
 
-Defaults to `Track Artist - Title`
+Defaults to `Track Artist - Title`:
+
+<details>
+
+<summary>Click to expand</summary>
+
+```rust
+browser_song_format: "[$track ' '][$artist ' - ' $title]|$filename",
+```
+
+or equivalent:
+
+```rust
+browser_song_format: [
+    (
+        kind: Group([
+            (kind: Property(Track)),
+            (kind: Text(" ")),
+        ])
+    ),
+    (
+        kind: Group([
+            (kind: Property(Artist)),
+            (kind: Text(" - ")),
+            (kind: Property(Title)),
+        ]),
+        default: (kind: Property(Filename))
+    ),
+],
+```
+
+</details>
 
 ### header
 
-<ConfigValue name="header" type="other" customText="<header[]>" link={path("configuration/header/")} />
+<ConfigValue name="header" type="other" customText="<header[]>" link={path("configuration/panes#header")} />
 
-Configuration of the header. Header is displayed at the top of the window. It can display info about current song, the
-player state and custom widgets. This property is described in its own page:
-
-<LinkCard title="header" description="Configuration of the window header" href={path("configuration/header/")} />
+Configuration of the header pane. More info property in the <a href={path("configuration/panes#header")}>panes</a>
+page.
 
 ### lyrics
 

@@ -10,18 +10,20 @@ import ConfigValue from "../../../../components/ConfigValue.tsx";
 import { path } from "../data.ts";
 
 <ConfigValue name="song_table_format" type="other" customText="<song_table_column[]>" link="#song_table_column" />
-An array of `Property` objects which serve as a template for table of songs thathat are currently in the queue. Each
-property is a `song_table_format`.
+An array of objects which serve as a template for table of songs that are currently in the queue. Each object represents
+a column in the table.
 
 ## song_table_column
 
-Describes a single column in the song table. This is a recursive data structure. Whenever a property is not defined the
-`default` fallback is used. This fallback can also have a default value.
+Describes a single column in the song table. Allows you to specify the label, alignment, width and a property
+to display in the column.
 
 ### prop
 
-<ConfigValue name="prop" type="other" customText="<property>" link="#property" />
-Property of the song to display in the column. Described in [its own section](#property)
+<ConfigValue name="prop" type="other" customText="<property>" link="../properties" />
+Property of the song to display in the column. Described in <a href={path("configuration/properties")}>its own page</a>.
+Only `Song` properties are allowed for the `Property` and thus the property type is omitted here. Check the
+[example](#example) or the <a href={path("reference/theme")}>default theme</a> for more info.
 
 ### width
 
@@ -38,108 +40,28 @@ Percentage of the table reserved for this column. Sum of these value must be 100
 
 ### label
 
-<ConfigValue name="label" type="string" optional />
+<ConfigValue name="label" type="string" />
 Optional label for the column. Displayed in the table header. Name of the property is used if not provided.
-
-## property
-
-<ConfigValue type="other" customText="(kind: <property_kind>, style: <style>, default: <property>)" />
-
-### kind
-
-<ConfigValue name="kind" type="other" customText="<property_kind>" link="#property_kind" />
-What property to display. Described in [its own section](#property_kind)
-
-### style
-
-<ConfigValue name="style" type="other" customText="<style>" />
-Style for the property.
-
-### default
-
-<ConfigValue name="default" type="other" customText="<property>" />
-This is a normal [property](#property). It is used as a fallback value when the current property is not defined
-
-## property_kind
-
-Kind can be one of three values, static `Text`, `Group` or `Property` which shows one of the metadata tags which are present on the
-song. There are a few predefined tags that can be used, but a special value is provided to display any arbitrary tag.
-
-### Text
-
-<ConfigValue name="kind" type="other" customText='Text("<string>")' />
-Will display static text in the table. Mostly useful for default values. For example if a song is missing an album tag,
-"Unknown Album" can be displayed by specifying `Text("Unknown Album")` as the default.
-
-### Group
-
-<ConfigValue name="kind" type="other" customText="Group(<property>[])" link="#property" />
-
-A special kind of property that groups multiple properties together. If any of the properties in the group results
-in a `None` value, the whole group is considered `None` and the default value is used.
-
-Consider the following example:
-
-```rust
-(
-    kind: Group([
-        (kind: Property(Artist)),
-        (kind: Text(" - ")),
-        (kind: Property(Title)),
-    ]),
-    default: (kind: Property(Filename))
-),
-
-```
-
-If the `artist` or the `title` of the song is missing in its metadata, the whole group will be skipped, including the `Text`
-property and the song's `filename` will be displayed instead. A group can also contain another group.
-
-### Property
-
-<ConfigValue
-    name="kind"
-    type={[
-        "Property(File)",
-        "Property(Filename)",
-        "Property(FileExtension)",
-        "Property(Title)",
-        "Property(Artist)",
-        "Property(Album)",
-        "Property(Duration)",
-        "Property(Disc)",
-        "Property(Position)",
-        'Property(Other("<tag_name>"))',
-    ]}
-/>
-Will display value of the respective tag from the song. Since tags are not guaranteed to be present, a fallback value
-can be specified with the `default` field. Since song files can have arbitrary tags the `Other` variant can be used to
-display any tag supported by MPD, even those not explicitly supported by rmpc.
-
-### Sticker
-
-<ConfigValue name="kind" type="other" customText='Sticker("<sticker_key>")' />
-
-Will display value of the respective MPD sticker on a song. Requires your MPD to have [sticker_file](https://mpd.readthedocs.io/en/latest/mpd.conf.5.html#optional-parameters)
-set in its `mpd.conf`. You can use this to for example display play count of the song with the following <a href={path("guides/on_song_change/#track-song-play-count")}>on_song_change</a>.
-Please note that fetching the stickers is somewhat inefficient as they have to be fetched separately for each song so your mileage may vary if your current queue is too large.
 
 ## Example
 
-This configuration displays a table with single column. This column displays the Artist of the song if it is present and
-"Unknown Artist" with red foreground and black background otherwise.
+This configuration displays a table with a single column.
+
+This column displays Artist of the song followed by a dash and Title of the song. If either the
+artist or title is missing in song's metadata its Filename is shown instead.
 
 ```rust
 song_table_format: [
     (
-        prop: (kind: Property(Artist),
-            default: (
-                kind: Text("Unknown Artist"),
-                style: (fg: "red", bg: "black"),
-                default: None
-            )
+        prop: (
+            kind: Group([
+                (kind: Property(Artist)),
+                (kind: Text(" - ")),
+                (kind: Property(Title)),
+            ]),
+            default: (kind: Property(Filename))
         ),
-        width_percent: 100,
+        width: "100%",
     ),
 ]
 ```

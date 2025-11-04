@@ -1057,7 +1057,7 @@ impl Property<PropertyKind> {
                     match format.as_span(song, ctx, tag_separator, strategy) {
                         Some(Either::Left(span)) => buf.push(span),
                         Some(Either::Right(spans)) => buf.extend(spans),
-                        None => return None,
+                        None => return self.default_as_span(song, ctx, tag_separator, strategy),
                     }
                 }
                 return Some(Either::Right(buf));
