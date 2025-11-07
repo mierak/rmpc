@@ -168,7 +168,7 @@ impl TagBrowserPane {
                     AlbumDisplayMode::SplitByDate => {
                         format!("({date}) {album}")
                     }
-                    AlbumDisplayMode::NameOnly => album.to_string(),
+                    AlbumDisplayMode::NameOnly => album.clone(),
                 };
                 (name, songs)
             })

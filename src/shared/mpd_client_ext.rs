@@ -481,7 +481,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
 
         self.send_start_cmd_list()?;
         for uri in uris {
-            self.send_set_sticker(&uri, key, &value.to_string())?;
+            self.send_set_sticker(&uri, key, &value.clone())?;
         }
         self.send_execute_cmd_list()?;
         self.read_ok()?;

@@ -29,7 +29,7 @@ impl From<std::io::Error> for MpdError {
 impl MpdError {
     pub fn detail_or_display(&self) -> String {
         match self {
-            MpdError::Mpd(failure) => failure.message.to_string(),
+            MpdError::Mpd(failure) => failure.message.clone(),
             _ => self.to_string(),
         }
     }

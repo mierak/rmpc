@@ -770,7 +770,7 @@ impl Property<SongProperty> {
         ctx: &Ctx,
     ) -> Option<String> {
         match &self.kind {
-            PropertyKindOrText::Text(value) => Some((*value).to_string()),
+            PropertyKindOrText::Text(value) => Some((*value).clone()),
             PropertyKindOrText::Sticker(key) => song
                 .and_then(|s| ctx.song_stickers(&s.file))
                 .and_then(|s| s.get(key))

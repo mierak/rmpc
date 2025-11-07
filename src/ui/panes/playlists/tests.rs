@@ -174,7 +174,7 @@ mod on_idle_event {
         ) {
             let rx = client_request_channel.1.clone();
             let ctx = ctx(work_request_channel, client_request_channel);
-            let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
+            let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             // init playlists
             screen
                 .on_query_finished(
@@ -248,7 +248,7 @@ mod on_idle_event {
         ) {
             let rx = client_request_channel.1.clone();
             let ctx = ctx(work_request_channel, client_request_channel);
-            let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
+            let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
                     INIT,
@@ -317,7 +317,7 @@ mod on_idle_event {
         ) {
             let rx = client_request_channel.1.clone();
             let ctx = ctx(work_request_channel, client_request_channel);
-            let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
+            let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
                     INIT,
@@ -385,7 +385,7 @@ mod on_idle_event {
         ) {
             let rx = client_request_channel.1.clone();
             let ctx = ctx(work_request_channel, client_request_channel);
-            let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
+            let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
                     INIT,
@@ -453,7 +453,7 @@ mod on_idle_event {
         ) {
             let rx = client_request_channel.1.clone();
             let ctx = ctx(work_request_channel, client_request_channel);
-            let initial_songs = vec![song("s1"), song("s2"), song("s3"), song("s4")];
+            let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             let initial_playlists = vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")];
             screen
                 .on_query_finished(
