@@ -151,7 +151,7 @@ impl<'a> YtDlp<'a> {
                     .get_args()
                     .map(|arg| format!("\"{}\"", arg.to_string_lossy()))
                     .join(" ")
-                    .to_string();
+                    .clone();
                 log::debug!(args = args.as_str(); "Executing yt-dlp");
 
                 let out = command.output()?;
@@ -216,7 +216,7 @@ impl<'a> YtDlp<'a> {
             .get_args()
             .map(|arg| format!("\"{}\"", arg.to_string_lossy()))
             .join(" ")
-            .to_string();
+            .clone();
         log::debug!(args = args.as_str(); "Executing yt-dlp");
 
         let out = command.output()?;
