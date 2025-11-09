@@ -165,7 +165,7 @@ impl Widget for &mut Tabs<'_> {
 
         let titles_length = self.titles.len();
         for (i, title) in self.titles.iter().enumerate() {
-            let last_title = titles_length - 1 == i;
+            let last_title = titles_length.saturating_sub(1) == i;
             let remaining_width = tabs_area.right().saturating_sub(x);
             if remaining_width == 0 {
                 // make the rest of the areas empty since we ran out of space
@@ -173,7 +173,8 @@ impl Widget for &mut Tabs<'_> {
                 break;
             }
             let pos = buf.set_line(x, tabs_area.top(), title, remaining_width);
-            self.areas[i] = Rect { x, y: tabs_area.top(), width: pos.0 - x, height: 1 };
+            self.areas[i] =
+                Rect { x, y: tabs_area.top(), width: pos.0.saturating_sub(x), height: 1 };
 
             if i == self.selected {
                 buf.set_style(
@@ -184,15 +185,19 @@ impl Widget for &mut Tabs<'_> {
             x = pos.0.saturating_add(1);
             let remaining_width = tabs_area.right().saturating_sub(x);
             if remaining_width == 0 || last_title {
-                if i < self.areas.len() - 2 {
+                if i < self.areas.len().saturating_sub(2) {
                     // make the rest of the areas empty since we ran out of
                     // space
                     self.areas[i + 1..].iter_mut().for_each(|a| *a = Rect::default());
                 }
                 break;
             }
-            let pos =
-                buf.set_span(x - 1, tabs_area.top(), &self.divider, self.divider.width() as u16);
+            let pos = buf.set_span(
+                x.saturating_sub(1),
+                tabs_area.top(),
+                &self.divider,
+                self.divider.width() as u16,
+            );
             x = pos.0;
         }
     }
