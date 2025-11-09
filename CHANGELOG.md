@@ -95,6 +95,7 @@ available and Block if not
 - Marked items in Queue not being cleared on database update
 - Improved behavior if rmpc happens to panic at certain time
 - Group not falling back to its default value
+- Panic when only one tab is defined in the config
 
 ### Deprecated
 
