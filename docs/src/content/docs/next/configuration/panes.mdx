@@ -113,11 +113,11 @@ Currently, only the `Slider` kind is supported.
 
 Configure the appearance of the volume slider:
 
-- `symbols` - Array of 5 strings defining the visual elements: `[start, filled, thumb, empty, end]`
+- `symbols` - An object with 5 one character long strings:
     - `start` - Symbol at the beginning of the slider (default: "♪")
     - `filled` - Symbol for the filled portion (default: "─")
     - `thumb` - Symbol for the current position indicator (default: "●")
-    - `empty` - Symbol for the empty portion (default: "─")
+    - `track` - Symbol for the empty portion (default: "─")
     - `end` - Symbol at the end of the slider (default: "♫")
 
 - `filled_style` - Style for the filled portion of the slider (default: blue foreground)
@@ -129,10 +129,16 @@ Configure the appearance of the volume slider:
 ```rust
 Volume(
     kind: Slider(
-        symbols: ["🔈", "━", "●", "━", "🔊"],
+        symbols: (
+            start: "♪",
+            filled: "─",
+            thumb: "●",
+            track: "─",
+            end: "♫",
+        ),
         track_style: (fg: "gray"),
         filled_style: (fg: "green"),
-        thumb_style: (fg: "white", bg: "green"),
+        thumb_style: (fg: "white"),
     )
 )
 ```

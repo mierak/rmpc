@@ -12,7 +12,7 @@ pub struct VolumeSliderConfig {
     /// Third symbol is used for the thumb
     /// Fourth symbol is used for the empty part of the volume slider
     /// Fifth symbol is used for the end boundary of the volume slider
-    pub symbols: [String; 5],
+    pub symbols: Symbols,
     /// Style for the filled part of the volume slider
     /// Falls back to blue for foreground and default color for background
     pub filled_style: Style,
@@ -26,22 +26,37 @@ pub struct VolumeSliderConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VolumeSliderConfigFile {
-    pub(super) symbols: Vec<String>,
+    #[serde(default)]
+    pub(super) symbols: Symbols,
     pub(super) track_style: Option<StyleFile>,
     pub(super) filled_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
+}
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Symbols {
+    pub start: Option<String>,
+    pub filled: String,
+    pub thumb: String,
+    pub track: String,
+    pub end: Option<String>,
+}
+
+impl Default for Symbols {
+    fn default() -> Symbols {
+        Symbols {
+            start: Some("♪".to_owned()),
+            filled: "─".to_owned(),
+            thumb: "●".to_owned(),
+            track: "─".to_owned(),
+            end: Some("♫".to_owned()),
+        }
+    }
 }
 
 impl Default for VolumeSliderConfigFile {
     fn default() -> Self {
         Self {
-            symbols: vec![
-                "♪".to_owned(),
-                "─".to_owned(),
-                "●".to_owned(),
-                "─".to_owned(),
-                "♫".to_owned(),
-            ],
+            symbols: Symbols::default(),
             filled_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
                 bg: None,
@@ -62,15 +77,9 @@ impl Default for VolumeSliderConfigFile {
 }
 
 impl VolumeSliderConfigFile {
-    pub fn into_config(mut self) -> Result<VolumeSliderConfig> {
-        let start = std::mem::take(&mut self.symbols[0]);
-        let filled = std::mem::take(&mut self.symbols[1]);
-        let thumb = std::mem::take(&mut self.symbols[2]);
-        let track = std::mem::take(&mut self.symbols[3]);
-        let end = std::mem::take(&mut self.symbols[4]);
-
+    pub fn into_config(self) -> Result<VolumeSliderConfig> {
         Ok(VolumeSliderConfig {
-            symbols: [start, filled, thumb, track, end],
+            symbols: self.symbols,
             filled_style: self.filled_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::DarkGray), None)?,
@@ -85,30 +94,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::config::theme::{Style, StyleFile, volume_slider::VolumeSliderConfigFile};
-
-    #[test]
-    fn maps_symbols() {
-        let input = VolumeSliderConfigFile {
-            symbols: vec![
-                "a".to_owned(),
-                "b".to_owned(),
-                "c".to_owned(),
-                "d".to_owned(),
-                "e".to_owned(),
-            ],
-            ..Default::default()
-        };
-
-        let result = input.into_config().unwrap().symbols;
-
-        assert_eq!(result, [
-            "a".to_owned(),
-            "b".to_owned(),
-            "c".to_owned(),
-            "d".to_owned(),
-            "e".to_owned()
-        ]);
-    }
 
     #[test_case(None,         None,         Style::default().fg(RC::Blue)                ; "uses default colors")]
     #[test_case(Some("none"), Some("none"), Style::default().fg(RC::Blue)                ; "uses default colors when whole value is None")]
