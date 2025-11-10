@@ -53,6 +53,7 @@ impl std::hash::Hash for TabName {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum PaneTypeFile {
     Queue,
     #[cfg(debug_assertions)]
@@ -283,6 +284,7 @@ impl From<&DirectionFile> for Direction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum PaneOrSplitFile {
     Pane(PaneTypeFile),
     Component(String),

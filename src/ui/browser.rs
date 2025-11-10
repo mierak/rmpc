@@ -273,10 +273,6 @@ where
         let preview_area = areas[BrowserArea::Preview];
 
         let position = event.into();
-        let drag_start_position = match event.kind {
-            MouseEventKind::Drag { drag_start_position } => Some(drag_start_position),
-            _ => None,
-        };
         match event.kind {
             MouseEventKind::LeftClick | MouseEventKind::DoubleClick
                 if prev_area.contains(position) =>
