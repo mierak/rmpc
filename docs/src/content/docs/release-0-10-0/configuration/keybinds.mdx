@@ -1,0 +1,428 @@
+---
+title: Keybinds
+description: Configuration of rmpc keybinds
+sidebar:
+    order: 30
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
+
+## Keybinds
+
+<ConfigValue
+    name="keybinds"
+    type="other"
+    customText="(global: <kebyinds_map>, navigation: <keybinds_map>, queue: <keybinds_map>)"
+/>
+
+Keybinds are configured in the config file. There are different keybinds for different panes and actions. Keybinds are
+optional and do not have be specified in the config file. If omitted the default keybinds below are used. By default the
+keybinds are vim-like, but you can change them to whatever you want.
+
+Rmpc supports kitty's keyboard protocol, meaning you can use advanced key combinations like mixing
+modifier keys such as control and shift in one keybind. You must be running supported terminal.
+This does not work in tmux. See [kitty's site](https://sw.kovidgoyal.net/kitty/keyboard-protocol/)
+for more info.
+
+:::note
+All configured keybinds can also be triggered remotely using the `rmpc remote keybind` command.
+:::
+
+## keybinds_map
+
+<ConfigValue name="global" type="other" customText='{ "p": Play, "s": Stop, "X": Stop, ...}' />
+
+Is a simple list of key-value pairs where the left side is key to use specified as a string and the right side is a name of the action.
+You can also bind multiple keys to a single action by specifying it multiple times with a different key.
+
+## Keybind syntax
+
+Keybind syntax is similar to vim keybinds. To map action to letter `a` you write `a` and to map an action to an uppercase `A`
+you would write `A`. To combine `a` key with a modifiers like `Ctrl` you would write `<C-a>` and likewise for an uppercase
+`A`: `<C-A>`. If a special key like `Tab` is used on its own you have to wrap it angle brackets like so: `<Tab>`.
+In case of the `Alt` key (sometimes also called `Meta` key) you would write `<A-x>`.
+
+### ExternalCommand
+
+`ExternalCommand(command: ["/path/to/my/script.sh", "arg1", "arg2"], description: "Description to show in Help modal.")`
+
+Can be used to bind any script/shell command to a key. This command gets info about MPD's and rmpc's state as environment variables.
+All song paths are listed as their path relative to MPD's music directory.
+
+#### Environment
+
+- `$CURRENT_SONG`: can be used to access the currently playing song.
+- `$STATE`: Can be one of `Playing`, `Paused` or `Stopped`
+- All metadata of the currently playing song (if any). For example `ARTIST`, `TITLE`, `DURATION`,
+- `$SELECTED_SONGS`: contains a list of songs that are selected in the various panes. Songs are separated by `\n`, their order is undefined
+  and should not be relied upon.
+    - In `Browser`, `Albums`, `Playlists` and `Artists` it will list all songs contained in the currently highlighted item and all its subdirectories.
+      If the item is a single song, only that one song will be present. If you mark multiple directories/songs, all of them will be listed
+      in `$SELECTED_SONGS`.
+    - In `Queue`, the song under cursor or all marked items will be listed.
+    - In `Search`, While on the search stage, all the songs will be listed and while on the song list stage, only the song under cursor or
+      all marked songs will be listed.
+
+## Default keybinds
+
+Below you can find list of all the possible actions along with a short description and their default values.
+
+### Global
+
+These keybinds work everywhere (except when a modal is active) and are used to control things like playback, navigation
+between different tabs and exiting rmpc.
+
+|    Default Key     | Action                                      | Info                                                                                                                         |
+| :----------------: | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+|        `q`         | Quit                                        | Exit rmpc                                                                                                                    |
+|        `~`         | ShowHelp                                    | Show help modal with the current keybinds and their description                                                              |
+|        `:`         | CommandMode                                 | Enter command mode. Commands that can be used are the same as in the CLI                                                     |
+|                    | ExternalCommand                             | Special keybind that allows you to bind external commands to a key. Check [ExternalCommand](#externalcommand) for more info. |
+|        `q`         | ShowHelp                                    | Show keybinds modal                                                                                                          |
+|        `I`         | ShowCurrentSongInfo                         | Show metadata of the currently playing song in a modal popup                                                                 |
+|        `O`         | ShowOutputs                                 | Show MPD outputs config modal                                                                                                |
+|        `P`         | ShowDecoders                                | Show MPD decoder plugins in a modal popup                                                                                    |
+|        `z`         | ToggleRepeat                                | Toggle repeat                                                                                                                |
+|        `x`         | ToggleRandom                                | Toggles random                                                                                                               |
+|        `c`         | ToggleConsume                               | Remove song from the queue after playing                                                                                     |
+|        `v`         | ToggleSingle                                | Whether to stop playing after single track or repeat track/playlist when repeat is on                                        |
+|        `p`         | TogglePause                                 | Pause/Unpause playback                                                                                                       |
+|                    | ToggleSingleOnOff                           | Toggles single mode on or off, skipping oneshot                                                                              |
+|                    | ToggleConsumeOnOff                          | Toggles consume mode on or off, skipping oneshot                                                                             |
+|        `s`         | Stop                                        | Stop playback                                                                                                                |
+|        `.`         | VolumeUp                                    | Raise volume                                                                                                                 |
+|        `,`         | VolumeDown                                  | Lower volume                                                                                                                 |
+|        `f`         | SeekForward                                 | Seek currently playing track forwards                                                                                        |
+|        `b`         | SeekBack                                    | Seek currently playing track backwards                                                                                       |
+|                    | SeekToStart                                 | Seek to the beginning of the currently playing track                                                                         |
+|                    | CrossfadeUp                                 | Increase crossfade duration                                                                                                  |
+|                    | CrossfadeDown                               | Decrease crossfade duration                                                                                                  |
+|        `>`         | NextTrack                                   | Play next track in the queue                                                                                                 |
+|        `<`         | PreviousTrack                               | Play previous track in the queue                                                                                             |
+|  `Right` / `Tab`   | NextTab                                     | Switch to next tab                                                                                                           |
+| `Left` / `<S-Tab>` | PreviousTab                                 | Switch to previous tab                                                                                                       |
+|        `1`         | SwitchToTab("Queue")                        | Switch directly to Queue tab                                                                                                 |
+|        `2`         | SwitchToTab("Directories")                  | Switch directly to Directories tab                                                                                           |
+|        `3`         | SwitchToTab("Artists")                      | Switch directly to Artists tab                                                                                               |
+|        `4`         | SwitchToTab("Album")                        | Switch directly to Albums tab                                                                                                |
+|        `5`         | SwitchToTab("Playlists")                    | Switch directly to Playlists tab                                                                                             |
+|        `6`         | SwitchToTab("Search")                       | Switch directly to Search tab                                                                                                |
+|        `R`         | AddRandom                                   | Add random songs to the queue                                                                                                |
+|        `u`         | Update                                      | Update music library                                                                                                         |
+|        `U`         | Rescan                                      | Rescan music library (including unmodified files)                                                                            |
+|                    | Partition()                                 | Open a partition management modal                                                                                            |
+|                    | Partition(name: "mypart", autocreate: true) | Switch to partition "mypart" directly and create it if it does not exist already                                             |
+
+### Navigation
+
+These keybinds are used to navigate the different tabs and to interact with the items on the screen. Also includes
+some more advanced ones like moving the cursor up or down half a page, moving the cursor to the top or bottom of the
+list and controlling search mode.
+
+|   Default Key   | Action                      | Info                                                                                                                               |
+| :-------------: | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `<C-c>` / `Esc` | Close                       | Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.                                               |
+|       `k`       | Up                          | Up                                                                                                                                 |
+|       `l`       | Right                       | Right                                                                                                                              |
+|    `<Space>`    | Select                      | Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist                 |
+|   `<C-Space>`   | InvertSelection             | Inverts the current selected items                                                                                                 |
+|     `Enter`     | Confirm                     | Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor |
+|       `K`       | MoveUp                      | Move current item up, for example song in a queue                                                                                  |
+|       `J`       | MoveDown                    | Move current item down, for example song in a queue                                                                                |
+|       `g`       | Top                         | Jump all the way to the top                                                                                                        |
+|       `G`       | Bottom                      | Jump all the way to the bottom                                                                                                     |
+|     `<C-n>`     | NextResult                  | When a filter is active, jump to the next result                                                                                   |
+|       `N`       | PreviousResult              | When a filter is active, jump to the previous result                                                                               |
+|       `j`       | Down                        | Down                                                                                                                               |
+|       `D`       | Delete                      | Delete. For example a playlist, song from a playlist or wipe the current queue.                                                    |
+|     `<C-u>`     | UpHalf                      | Jump by half a screen up                                                                                                           |
+|     `<C-d>`     | DownHalf                    | Jump by half a screen down                                                                                                         |
+|                 | PageUp                      | Jump a screen up                                                                                                                   |
+|                 | PageDown                    | Jump a screen down                                                                                                                 |
+|       `i`       | FocusInput                  | Focuses textbox if any is on the screen and is not focused                                                                         |
+|       `/`       | EnterSearch                 | Enter search mode                                                                                                                  |
+|       `h`       | Left                        | Left                                                                                                                               |
+|       `r`       | Rename                      | Rename. Currently only for playlists                                                                                               |
+|       `a`       | Add                         | Add item to queue                                                                                                                  |
+|       `A`       | AddAll                      | Add all items to queue                                                                                                             |
+|       `B`       | ShowInfo                    | Show info about the item under cursor in a modal popup                                                                             |
+|                 | [AddOptions()](#addoptions) | Add item(s) to the queue with specified options. More info [in its section](#addoptions)                                           |
+|                 | ContextMenu()               | Show a context menu with select few actions that can be done on the current item(s)                                                |
+|                 | [Rate()](#rate)             | Set song rating, must have <a href={path("configuration/stickers#rating")}>stickers</a> configured                                 |
+|                 | [Save()](#save)             | Save item(s) to a playlist with specified options. More info [in its section](#save)                                               |
+
+#### Rate
+
+A configurable keybind used to rate songs. Allows you to rate either the currently playing song or
+the song(s) under cursor in the browser panes and the queue.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+Must have stickers configured, please check <a href={path("configuration/stickers#rating")}>stickers</a>
+page for more information.
+
+:::note
+It is highly advised to keep ratings in the 0-10 range. Other MPD clients or some other rmpc
+functionality might assume that this is the case and will not work otherwise but rmpc will make no
+attempts to stop you.
+:::
+
+#### Syntax
+
+`Rate(kind: <kind>, current: <bool>, min_rating: <number>, max_rating: <number>)`
+
+Possible values for the action `<kind>` are either a `Modal`, `Value`, `Like()`, `Neutral()`
+or `Dislike()`.
+These mean:
+
+- Modal - display a menu modal with possible options, takes a list of values to show for rating
+  selector, whether to show a text input for custom rating and whether to show like options
+- Value - set rating value directly
+- Like - set liked state directly
+- Neutral - set neutral state directly
+- Dislike - set disliked state directly
+
+The rating is applied to the currently playing song if any when `current` is set to true.
+
+Min and max rating are 0 and 10 respectively by default if not provided.
+
+##### Examples
+
+- Set currently rating of the currently playing song to 6
+
+```rust showLineNumbers=false
+Rate(kind: Value(6), current: true),
+```
+
+- Set rating of song(s) under the cursor in either queue or the browser panes to 3.
+
+```rust showLineNumbers=false
+Rate(kind: Value(3), current: false),
+// or equivalent
+Rate(kind: Value(3)),
+```
+
+- Set liked state of the song(s) under the cursor in either queue or the browser panes directly
+
+```rust showLineNumbers=false
+Rate(kind: Like(), current: false),
+Rate(kind: Neutral(), current: false),
+Rate(kind: Dislike(), current: false),
+```
+
+- Open a modal which shows options to set rating (0-10) of the currently playing song as well as
+  input a custom value or clear the rating completely and options to like the song.
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], custom: true, like: true), current: false),
+// or equivalent
+Rate(kind: Modal(), current: false),
+```
+
+- Open a modal which shows only text input for rating
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: true), current: false),
+```
+
+- Open a modal which shows only text input for rating and allows you to set rating up to 100
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: true), current: false, max_rating: 100),
+```
+
+- Open a modal which shows only the like options
+
+```rust showLineNumbers=false
+Rate(kind: Modal(values: [], custom: false, like: true), current: false),
+```
+
+#### Save
+
+A configurable keybind used to manipulate playlists. Allows you to save either a single or all items
+under the cursor in browser panes to either a new or an existing playlist.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+#### Syntax
+
+`Save(kind: <kind>)`
+
+Possible values for the action `<kind>` are either a `Modal()` or `Playlist()`.
+
+These mean:
+
+- Modal - display a menu modal with possible options
+- Playlist - save the items to a specified playlist directly, the playlist will be created if it does
+  not exist
+
+Both kinds also take additional options:
+
+- `all` - Controls whether to add all items in the current directory or just the marked ones/the
+  one under the cursor. Can be either `true` or `false`. Defaults to `false`.
+- `duplicates_strategy` - what to do when the playlist you are adding songs to already contains some
+  or all of the songs you are adding. Possible values are: `All`, `None`, `NonDuplicate`, `Ask`. These
+  add all the songs anyway, no songs at all, only the non duplicate songs or display a modal asking
+  you what to do respectively. Defaults to `Ask`.
+
+##### Examples
+
+- Adds items under cursor to a playlist named "myplaylist"
+
+```rust showLineNumbers=false
+Save(kind: Playlist(name: "myplaylist", duplicates_strategy: Ask))
+```
+
+- Adds all items in the current directory to a playlist named "myplaylist"
+
+```rust showLineNumbers=false
+Save(kind: Playlist(name: "myplaylist", all: true))
+```
+
+- Display a modal with options to save items under the cursor to either a new or an existing playlist
+
+```rust showLineNumbers=false
+Save()
+// or equivalent
+Save(kind: Modal())
+// or equivalent
+Save(kind: Modal(all: false, duplicates_strategy: Ask))
+```
+
+- Display a modal with options to save all items to either a new or an existing playlist
+
+```rust showLineNumbers=false
+Save(kind: Modal(all: true))
+```
+
+#### DeleteFromPlaylist
+
+A configurable keybind used to manipulate playlists. Allows you to delete either a single or all items
+under the cursor in browser panes from an existing playlist.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+#### Syntax
+
+`DeleteFromPlaylist(kind: <kind>)`
+
+Possible values for the action `<kind>` are either a `Modal()` or `Playlist()`.
+
+These mean:
+
+- Modal - display a menu modal with possible options
+- Playlist - delete the items from a specified playlist directly
+
+Both kinds also take additional options:
+
+- `all` - Controls whether to delete all items in the current directory or just the marked ones/the
+  one under the cursor. Can be either `true` or `false`. Defaults to `false`.
+- `confirmartion` - Whether to display a confirmation dialog when executing the delete action.
+  Defaults to `true`.
+
+##### Examples
+
+- delete items under cursor from a playlist named "myplaylist"
+
+```rust showLineNumbers=false
+DeleteFromPlaylist(kind: Playlist(name: "myplaylist", confirmation: true))
+```
+
+- Display a modal with options to dellete items under the cursor from an existing playlist
+
+```rust showLineNumbers=false
+DeleteFromPlaylist()
+// or equivalent
+DeleteFromPlaylist(kind: Modal())
+// or equivalent
+DeleteFromPlaylist(kind: Modal(all: false, confirmation: true))
+```
+
+#### AddOptions
+
+A configurable keybind to add items to the the queue. Allows you to add either a single or all items,
+select a position at which they will be added as well as to choose whether you want to automatically
+play the added items.
+
+A modal window with options to select is displayed instead when no configuration is provided or if
+the keybind is directly configured to display a modal.
+
+##### Syntax
+
+`AddOptions(kind: <kind>)`
+
+Possible values for the action `<kind>` are either a `Modal` or `Action`. Where `Modal` takes a list of
+tuples of a label and the action configuration and `Action` takes just a single action configuration.
+
+Possible `position`s are: `StartOfQueue`, `EndOfQueue`, `BeforeCurrentSong`, `AfterCurrentSong` and
+`Replace`.
+
+Possible `autoplay` values are:
+
+- `None` - Do not play added items
+- `First` - Play the first added item
+- `Hovered` - Play the hovered item after adding. Nothing will be played if no item is hovered or
+  you are adding several marked items while hovering over a non-marked item. This works on a best
+  effort basis due to technical reasons and only when adding just songs and not directories.
+- `HoveredOrFirst` - Same as `Hovered` but if no hovered item could be determined, start playing
+  from the `First` item instead.
+
+Possible values for `all`:
+
+- `true` - Add all items in the current directory
+- `false` - Add all marked items and only the hovered item if non are marked
+
+##### Examples
+
+- Add a single item or the marked items at the end of the queue
+
+```rust showLineNumbers=false
+AddOptions(kind: Action(all: false, autoplay: None, position: EndOfQueue))
+```
+
+- Add a single item or the marked items at the start of the queue and start playing from the hovered
+  item
+
+```rust showLineNumbers=false
+AddOptions(kind: Action(all: false, autoplay: Hovered, position: StartOfQueue))
+```
+
+- Add a single item or the marked items after the current and start playing from the hovered item
+  or from the first item if no item was hovered.
+
+```rust showLineNumbers=false
+AddOptions(kind: Action(all: false, autoplay: HoveredOrFirst, position: AfterCurrentSong))
+```
+
+- Open a modal window with the default configuration
+
+```rust showLineNumbers=false
+AddOptions()
+```
+
+- Open a modal window with the configured options
+
+```rust showLineNumbers=false
+AddOptions(kind: Modal([
+    ("End of queue and play", (all: false, autoplay: First, position: EndOfQueue)),
+    ("After the current song", (all: false, autoplay: None, position: AfterCurrentSong)),
+]))
+```
+
+### Queue
+
+Keybinds specific to the queue pane.
+
+| Default Key | Action        | Info                                                          |
+| :---------: | ------------- | ------------------------------------------------------------- |
+|     `D`     | DeleteAll     | Clear current queue                                           |
+|   `Enter`   | Play          | Play song under cursor                                        |
+|     `a`     | AddToPlaylist | Add song under cursor to an existing playlist                 |
+|     `d`     | Delete        | Remove song under cursor from the queue                       |
+|     `C`     | JumpToCurrent | Moves the cursor in Queue table to the currently playing song |
+|     `X`     | Shuffle       | Shuffles the whole queue or selected range(s)                 |

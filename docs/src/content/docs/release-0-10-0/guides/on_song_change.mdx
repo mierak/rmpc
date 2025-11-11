@@ -1,0 +1,186 @@
+---
+title: Execute on song change
+description: Execute a script when the song changes.
+sidebar:
+    order: 5
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { path } from "../data.ts";
+
+Rmpc provides <a href={path("configuration#on_song_change")}>on_song_change</a> property in the config file
+which can be used to run a command whenever the song changes. This can be used for various purposes
+like showing a desktop notification, automatic lyrics download and more.
+
+All song metadata are available to the script as environment variables. For example `$TITLE`, `$FILE`, `$DURATION`, etc.
+
+Additional environment variables available to the script are:
+
+- `$VERSION` - rmpc's version
+- `$PID` - intended for use with the `remote` command and allows it to target specific rmpc instance
+- `$LRC_FILE` - contains the path where rmpc expects to find the lrc file
+- `$HAS_LRC` - indicates whether any lyrics were found for the current song.
+- `$PREV_SONG` - file path of the previous song, if any, use `rmpc song --path "$PREV_SONG"` to query its metadata
+- `$PREV_ELAPSED` - how much of the previous song was really played, in seconds
+
+## Desktop notification on song change
+
+Assuming you have a notification daemon with support for images like [dunst](https://dunst-project.org/) running.
+
+<Steps>
+1. Create a script and place it somewhere. For example `~/.config/rmpc/notify`. Below is an example of such script.
+Edit it to your needs or create a new one.
+
+    ```bash title=~/.config/rmpc/notify
+    #!/usr/bin/env sh
+
+    # Directory where to store temporary data
+    TMP_DIR="/tmp/rmpc"
+
+    # Ensure the directory is created
+    mkdir -p "$TMP_DIR"
+
+    # Where to temporarily store the album art received from rmpc
+    ALBUM_ART_PATH="$TMP_DIR/notification_cover"
+
+    # Path to fallback album art if no album art is found by rmpc/mpd
+    # Change this to your needs
+    DEFAULT_ALBUM_ART_PATH="$TMP_DIR/default_album_art.jpg"
+
+    # Save album art of the currently playing song to a file
+    if ! rmpc albumart --output "$ALBUM_ART_PATH"; then
+        # Use default album art if rmpc returns non-zero exit code
+        ALBUM_ART_PATH="${DEFAULT_ALBUM_ART_PATH}"
+    fi
+
+    # Send the notification
+    notify-send -i "${ALBUM_ART_PATH}" "Now Playing" "$ARTIST - $TITLE"
+    ```
+
+2.  Make the script executable
+
+    ```bash
+    chmod +x ~/.config/rmpc/notify
+    ```
+
+3.  In your rmpc's `config.ron` specify <a href={path("configuration#on_song_change")}>on_song_change</a> property
+    and point it at location of the script from step 1.
+
+        ```rust title=config.ron
+        #![enable(implicit_some)]
+        #![enable(unwrap_newtypes)]
+        #![enable(unwrap_variant_newtypes)]
+        (
+            address: "/tmp/mpd_socket",
+            on_song_change: ["~/.config/rmpc/notify"],
+        ...
+
+        ```
+
+4.  Restart rmpc
+
+</Steps>
+
+## Track song play count
+
+This allows you to track and display song's play count in the queue table (or header). Please note that rmpc has to be running
+for the script to execute and increment the play count.
+
+<Steps>
+    1. Configure [sticker_file](https://mpd.readthedocs.io/en/latest/mpd.conf.5.html#optional-parameters) in your `mpd.conf`
+
+    2. Create a script and place it somewhere. For example `~/.config/rmpc/playcount` and make the script executable. Or append it to an existing `on_song_change` script.
+
+    3. Increment playCount sticker on the song inside the script. (requires jq)
+        ```bash
+        #!/usr/bin/env sh
+
+        sticker=$(rmpc sticker get "$FILE" "playCount" | jq -r '.value')
+        if [ -z "$sticker" ]; then
+            rmpc sticker set "$FILE" "playCount" "1"
+        else
+            rmpc sticker set "$FILE" "playCount" "$((sticker + 1))"
+        fi
+        ```
+
+    4. Change your `config.ron` to execute the script you created on song change
+        ```rust title=config.ron
+        #![enable(implicit_some)]
+        #![enable(unwrap_newtypes)]
+        #![enable(unwrap_variant_newtypes)]
+        (
+            address: "/tmp/mpd_socket",
+            on_song_change: ["~/.config/rmpc/playcount"],
+        ...
+
+        ```
+    5. Change your theme to include play count sticker, for example in the queue table
+
+        ```rust title=theme.ron
+        #![enable(implicit_some)]
+        #![enable(unwrap_newtypes)]
+        #![enable(unwrap_variant_newtypes)]
+        (
+            song_table_format: [
+                (
+                    ...
+                ),
+                (
+                    prop: (kind: Sticker("playCount"), default: (kind: Text("0"))),
+                    width: "9",
+                    alignment: Right,
+                    label: "Playcount"
+                ),
+                (
+                    ...
+                ),
+            ],
+        ...
+
+        ```
+
+</Steps>
+
+## Automatically fetch lyrics
+
+Provided by [wvffle on github](https://github.com/mierak/rmpc/issues/230). This script allows you to automatically
+download lrc files from [lrclib.net](https://lrclib.net). Status message is also displayed in rmpc when the operation
+finishes. The script assumes you have your `lyrics_dir` configured. The script is just an example and you are encouraged
+to create your own!
+
+```bash
+#!/bin/env sh
+
+LRCLIB_INSTANCE="https://lrclib.net"
+
+if [ "$HAS_LRC" = "false" ]; then
+    mkdir -p "$(dirname "$LRC_FILE")"
+
+    LYRICS="$(curl -X GET -sG \
+        -H "Lrclib-Client: rmpc-$VERSION" \
+        --data-urlencode "artist_name=$ARTIST" \
+        --data-urlencode "track_name=$TITLE" \
+        --data-urlencode "album_name=$ALBUM" \
+        "$LRCLIB_INSTANCE/api/get" | jq -r '.syncedLyrics')"
+
+    if [ -z "$LYRICS" ]; then
+        rmpc remote --pid "$PID" status "Failed to download lyrics for $ARTIST - $TITLE" --level error
+        exit
+    fi
+
+    if [ "$LYRICS" = "null" ]; then
+        rmpc remote --pid "$PID" status "Lyrics for $ARTIST - $TITLE not found" --level warn
+        exit
+    fi
+
+    echo "[ar:$ARTIST]" >"$LRC_FILE"
+    {
+        echo "[al:$ALBUM]"
+        echo "[ti:$TITLE]"
+    } >>"$LRC_FILE"
+    echo "$LYRICS" | sed -E '/^\[(ar|al|ti):/d' >>"$LRC_FILE"
+
+    rmpc remote --pid "$PID" indexlrc --path "$LRC_FILE"
+    rmpc remote --pid "$PID" status "Downloaded lyrics for $ARTIST - $TITLE" --level info
+fi
+```

@@ -1,0 +1,67 @@
+---
+title: Song table format
+description: Configuration of the table of songs on the queue page
+sidebar:
+    order: 50
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
+
+<ConfigValue name="song_table_format" type="other" customText="<song_table_column[]>" link="#song_table_column" />
+An array of objects which serve as a template for table of songs that are currently in the queue. Each object represents
+a column in the table.
+
+## song_table_column
+
+Describes a single column in the song table. Allows you to specify the label, alignment, width and a property
+to display in the column.
+
+### prop
+
+<ConfigValue name="prop" type="other" customText="<property>" link="../properties" />
+Property of the song to display in the column. Described in <a href={path("configuration/properties")}>its own page</a>.
+Only `Song` properties are allowed for the `Property` and thus the property type is omitted here. Check the
+[example](#example) or the <a href={path("reference/theme")}>default theme</a> for more info.
+
+### width
+
+<ConfigValue name="width" type="string" />
+Portion of the table width reserved for this column. Can be one of:
+
+- Exact value: `"5"` which will result in 5 column width
+- Percentage: `"50%"` which will result in half the table width
+
+### alignment
+
+<ConfigValue name="alignment" type={["Left", "Right", "Center"]} />
+Percentage of the table reserved for this column. Sum of these value must be 100.
+
+### label
+
+<ConfigValue name="label" type="string" />
+Optional label for the column. Displayed in the table header. Name of the property is used if not provided.
+
+## Example
+
+This configuration displays a table with a single column.
+
+This column displays Artist of the song followed by a dash and Title of the song. If either the
+artist or title is missing in song's metadata its Filename is shown instead.
+
+```rust
+song_table_format: [
+    (
+        prop: (
+            kind: Group([
+                (kind: Property(Artist)),
+                (kind: Text(" - ")),
+                (kind: Property(Title)),
+            ]),
+            default: (kind: Property(Filename))
+        ),
+        width: "100%",
+    ),
+]
+```

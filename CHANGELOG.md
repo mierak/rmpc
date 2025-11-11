@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.10.0] - 2025-11-11
+
+### Added
+
 - Added --interactive: interactive picker (TUI list / CLI prompt) with --limit N for `searchyt`.
 - Added youtube song by name support: `searchyt "query"` (uses first YouTube result; TUI supported).
 - Added interactive scrollbar support to browser panes and search pane results:
@@ -449,7 +457,8 @@ section instead
 
 ## [0.1.0] - 2024-06-21
 
-[unreleased]: https://github.com/mierak/rmpc/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/mierak/rmpc/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/mierak/rmpc/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/mierak/rmpc/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/mierak/rmpc/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/mierak/rmpc/compare/v0.6.0...v0.7.0

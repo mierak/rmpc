@@ -1,0 +1,446 @@
+---
+title: Theme
+description: Configuring rmpc theme
+sidebar:
+    order: 11
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+import ConfigValue from "../../../../components/ConfigValue.tsx";
+import { path } from "../data.ts";
+
+A theme determines the look of rmpc. You can customize it by creating a custom theme file placed in the themes
+directory and then configuring the `theme` property in the config file filename of the theme.
+
+The following paths are checked in order they are listed here:
+
+- `<rmpc config dir>/themes/<theme>.ron`
+- `<rmpc config dir>/themes/<theme>`
+- `<rmpc config dir>/<theme>.ron`
+- `<rmpc config dir>/<theme>`
+- `<theme>`
+- `Specific path specified by the --theme flag`
+
+## Bootstrapping a theme file
+
+<Steps>
+1. Config file can be bootstrapped by running the following command:
+    ```bash frame=none showLineNumbers=false
+    rmpc theme > ~/.config/rmpc/themes/<theme_name>.ron
+    ```
+2. Use the theme in your config by editing the `theme` property `~/.config/rmpc/config.ron` file like so:
+    ```rust showLineNumbers=false
+    theme: Some("<theme_name>")
+    ```
+3. Restart rmpc
+</Steps>
+
+## Theme file structure
+
+Below is a list of properties that can be changed.
+
+### layout
+
+<ConfigValue name="layout" type="other" customText="Pane | Split | Component" />
+
+Base layout of the application, lets you configure where the various components are placed on the screen.
+
+<LinkCard title="layout" description="Configuration of rmpc's base layout" href={path("configuration/layout/")} />
+
+### components
+
+<ConfigValue name="components" type="other" customText="Map<string, Pane | Split | Component>" />
+
+Reusable components which can be used in tabs, layout or other components. Check
+out <a href={path("configuration/layout#components")}>components</a> section in the layout page for more information.
+
+### default_album_art_path
+
+<ConfigValue name="default_album_art_path" type="string" optional />
+
+A default image is displayed if a song does not have an album art. This property can override that default image.
+
+### cava
+
+<ConfigValue name="cava" type="other" customText="<Cava>" link={path("configuration/cava")} />
+
+Configures how the Cava music visualizer is displayed. More info on the <a href={path("configuration/cava")}>cava</a> page.
+
+### show_song_table_header
+
+<ConfigValue name="show_song_table_header" type="boolean" />
+
+If set to false, the header of the song table is not displayed. Default is `true`.
+
+### song_table_album_separator
+
+<ConfigValue name="song_table_album_separator" type={["None", "Underline"]} />
+
+Visually separate albums in the queue. A song is considered as being in another album when `albumartist`
+or `album` are different from the previous song. Defaults to `None`.
+
+### draw_borders
+
+<ConfigValue name="draw_borders" type="boolean" />
+Whether to draw borders in the UI.
+
+### symbols
+
+Symbols to use in the various browser panes (artist, search, ...)
+
+<ConfigValue name="symbols" type="other" customText="<Symbols>" />
+
+#### symbols.song
+
+<ConfigValue name="song" type="string" customText="S" />
+
+#### symbols.dir
+
+<ConfigValue name="dir" type="string" customText="D" />
+
+#### symbols.marker
+
+<ConfigValue name="marker" type="string" customText="M" />
+
+This symbol is used for selected items in the browser panes.
+
+#### symbols.ellipsis
+
+<ConfigValue name="ellipsis" type="string" customText="..." />
+
+Symbol used to indicate text truncation when content exceeds the available
+display space.
+
+#### symbols.song_style
+
+<ConfigValue name="song_style" customText="<style>" />
+
+Style to use for the song symbol.
+
+#### symbols.dir_style
+
+<ConfigValue name="dir_style" customText="<style>" />
+
+Style to use for the dir symbol.
+
+### level_styles
+
+Configures style of various messages depending on their level, ie. info or error.
+
+<ConfigValue name="level_styles" type="other" customText="LevelStyles" />
+
+Defaults to:
+
+```rust
+level_styles: (
+    info: (fg: "blue", bg: "black"),
+    warn: (fg: "yellow", bg: "black"),
+    error: (fg: "red", bg: "black"),
+    debug: (fg: "light_green", bg: "black"),
+    trace: (fg: "magenta", bg: "black"),
+),
+```
+
+### progress_bar
+
+Progress bar at the bottom of the window.
+
+<ConfigValue name="progress_bar" type="other" customText="ProgressBar" />
+
+#### progress_bar.symbols
+
+<ConfigValue name="symbols" type="string" customText="[start, elapsed, thumb, track, end]" />
+
+Array of five single character strings that determine the look of the progress bar. First value is the start character, second is the elapsed part of
+the progress bar, third is the thumb, fourth is the empty track and the fifth is the end character. Default is `["[", "-", ">", " ", "]"]
+
+#### progress_bar.track_style
+
+<ConfigValue name="track_style" type="string" customText="<style>" />
+
+Style of the empty track part of the progress bar.
+
+#### progress_bar.elapsed_style
+
+<ConfigValue name="elapsed_style" type="string" customText="<style>" />
+
+Style of the elapsed part of the progress bar.
+
+#### progress_bar.thumb_style
+
+<ConfigValue name="thumb_style" type="string" customText="<style>" />
+
+Style of the progress bar thumb.
+
+#### progress_bar.use_track_when_empty
+
+<ConfigValue name="use_track_when_empty" type="bool" />
+
+Render track symbol and style instead of the start/end symbols when they are empty (either not
+playing or song is at the very start). Defaults to `false`.
+
+### scrollbar
+
+<ConfigValue name="scrollbar" type="other" customText="Scrollbar" />
+
+Configure the style of scrollbars in rmpc. Passing in `None` hides them.
+
+#### scrollbar.symbols
+
+<ConfigValue name="track_style" type="string" customText="[track, thumb, end_top, end_bot]" />
+
+Array of four single character strings that determine the look of the scrollbars. First value is the track, second is
+the thumb, third is the top end and the fourth is the bottom end. Default is `["│", "█", "▲", "▼"]`
+
+#### scrollbar.track_style
+
+<ConfigValue name="track_style" type="string" customText="<style>" />
+
+#### scrollbar.ends_style
+
+<ConfigValue name="ends_style" type="string" customText="<style>" />
+
+#### scrollbar.thumb_style
+
+<ConfigValue name="thumb_style" type="string" customText="<style>" />
+
+### browser_column_widths
+
+<ConfigValue name="browser_column_widths" type="number" customText="[number, number, number]" />
+
+Three numerical values that determine the percent width of the columns in the browser tab. Default is `[20, 38, 42]`.
+Meaning the first column takes 20% of the width, the second 38% and the third 42%.
+
+### background_color
+
+<ConfigValue name="background_color" type="string" customText="color" />
+
+Background color of the main window.
+
+### header_background_color
+
+<ConfigValue name="background_color" type="string" customText="color" />
+
+Background color of the window header. The header is at the top of the window and contains tab bar and user configurable
+data.
+
+### modal_background_color
+
+<ConfigValue name="background_color" type="string" customText="color" />
+
+Background color of modal dialogs.
+
+### modal_backdrop
+
+<ConfigValue name="modal_backdrop" type="boolean" />
+
+Enables a backdrop behind modals for increased visual clarity. Defaults to `false`.
+
+### text_color
+
+<ConfigValue name="text_color" type="string" customText="color" />
+
+Foreground color of basic text. Defaults to your terminal's foreground color.
+
+### preview_label_style
+
+<ConfigValue name="preview_label_style" type="other" customText="<style>" />
+
+Style of song metadata labels in browser previews.
+
+### preview_metadata_group_style
+
+<ConfigValue name="preview_metadata_group_style" type="other" customText="<style>" />
+
+Style of song metadata group headers in browser previews.
+
+### tab_bar
+
+Tab bar at the top of the window below header. Shows what tab is currently active.
+
+#### ~~tab_bar.enabled~~
+
+Do not use. Deprecated in favor of the <a href={path("configuration/layout")}>layout config</a>.
+
+#### tab_bar.active_style
+
+<ConfigValue name="active_style" type="other" customText="<style>" />
+
+Style for the active tab.
+
+#### tab_bar.inactive_style
+
+<ConfigValue name="inactive_style" type="other" customText="<style>" />
+
+Style for all tabs except the active one.
+
+### highlighted_item_style
+
+<ConfigValue name="highlighted_item_style" type="other" customText="<style>" />
+
+### current_item_style
+
+<ConfigValue name="current_item_style" type="other" customText="<style>" />
+
+### borders_style
+
+<ConfigValue name="borders_style" type="other" customText="<style>" />
+
+### highlight_border_style
+
+<ConfigValue name="highlight_border_style" type="other" customText="<style>" />
+
+### format_tag_separator
+
+<ConfigValue name="format_tag_separator" type="string" />
+
+Use this to separate entries when a song has multiple values for a tag. For example, a song with
+two values for `artist` and `|` as a separator will show `artist1 | artist2`. Default is `|`.
+
+### multiple_tag_resolution_strategy
+
+<ConfigValue name="multiple_tag_resolution_strategy" type={["All", "First", "Last", "Nth(<number>)"]} />
+
+What strategy to choose when a song has multiple values for a tag. `All` uses #format_tag_separator to join
+all values to one. `First` and `Last` choose the first and last value respectively and `Nth` chooses exactly
+which one to take. Last value is used when index given to `Nth` is larger than the count of available values.
+
+### song_table_format
+
+<ConfigValue
+    name="song_table_format"
+    type="other"
+    customText="<song_table_format>"
+    link={path("configuration/song-table/")}
+/>
+
+Configures the columns of the song table. This property is described in its own page:
+
+<LinkCard
+    title="song_table_format"
+    description="Configuration of the table of songs on the queue page"
+    href={path("configuration/song-table/")}
+/>
+
+Defaults to 4 columns: Artist, Title, Album and Duration:
+
+<details>
+
+<summary>Click to expand</summary>
+
+```rust
+song_table_format: [
+    (
+        prop: "$artist|'Unknown'",
+        width: "20%",
+    ),
+    (
+        prop: "$title|'Unknown'",
+        width: "35%",
+    ),
+    (
+        prop: "$album{fg: white}|'Unknown Album'{fg: white}",
+        width: "30%",
+    ),
+    (
+        prop: "$duration|'-'",
+        width: "15%",
+        alignment: Right,
+    ),
+],
+```
+
+or equivalent:
+
+```rust
+song_table_format: [
+    (
+        prop: (kind: Property(Artist),
+            default: (kind: Text("Unknown"))
+        ),
+        width: "20%",
+    ),
+    (
+        prop: (kind: Property(Title),
+            default: (kind: Text("Unknown"))
+        ),
+        width: "35%",
+    ),
+    (
+        prop: (kind: Property(Album), style: (fg: "white"),
+            default: (kind: Text("Unknown Album"), style: (fg: "white"))
+        ),
+        width: "30%",
+    ),
+    (
+        prop: (kind: Property(Duration),
+            default: (kind: Text("-"))
+        ),
+        width: "15%",
+        alignment: Right,
+    ),
+],
+```
+
+</details>
+
+### browser_song_format
+
+<ConfigValue
+    name="browser_song_format"
+    type="other"
+    customText="<property[]>"
+    link={path("configuration/properties")}
+/>
+
+Format used to display song in the various browser panes (directories, albums, artists, ...).
+Is the same format as <a href={path("configuration/song-table#prop")}>song_table_format</a> except the styles are ignored.
+
+Defaults to `Track Artist - Title`:
+
+<details>
+
+<summary>Click to expand</summary>
+
+```rust
+browser_song_format: "[$track ' '][$artist ' - ' $title]|$filename",
+```
+
+or equivalent:
+
+```rust
+browser_song_format: [
+    (
+        kind: Group([
+            (kind: Property(Track)),
+            (kind: Text(" ")),
+        ])
+    ),
+    (
+        kind: Group([
+            (kind: Property(Artist)),
+            (kind: Text(" - ")),
+            (kind: Property(Title)),
+        ]),
+        default: (kind: Property(Filename))
+    ),
+],
+```
+
+</details>
+
+### header
+
+<ConfigValue name="header" type="other" customText="<header[]>" link={path("configuration/panes#header")} />
+
+Configuration of the header pane. More info property in the <a href={path("configuration/panes#header")}>panes</a>
+page.
+
+### lyrics
+
+### lyrics.timestamp
+
+<ConfigValue name="lyrics.timestamp" type="boolean" default="false" />
+
+Sets the visibility of the timestamps in the lyrics pane.

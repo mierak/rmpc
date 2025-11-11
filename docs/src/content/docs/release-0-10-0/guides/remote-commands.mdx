@@ -1,0 +1,253 @@
+---
+title: Remote commands
+description: Control rmpc remotely from command line and scripts
+sidebar:
+    order: 7
+---
+
+import { path } from "../data.ts";
+
+rmpc provides powerful remote command capabilities that allow you to control a running rmpc instance from the command line. this is especially useful for scripting and window manager integration.
+
+## overview
+
+the remote command system allows you to:
+
+- **emulate key presses** (`keybind`) - trigger any keybind as if pressed in the interface
+- **switch tabs directly** (`switchtab`) - change to a specific tab without relying on keybinds
+- **send status messages** - display custom messages in the status bar
+- **update configuration** - modify theme and other settings remotely
+- **target specific instances** - send commands to a particular rmpc process by pid
+- **query rmpc's state** - check which tab is currently active and more in the future
+
+## usage
+
+all remote commands follow this pattern:
+
+```bash
+rmpc remote [--pid <pid>] <command> <args>
+```
+
+If `--pid` is not specified and `$PID` environment variable(usually set by rmpc in triggered scripts)
+is not found, the command will be sent to all running rmpc instances.
+
+## keybind command
+
+The `keybind` command emulates pressing a key combination in the running rmpc interface.
+
+### syntax
+
+```bash
+rmpc remote keybind <key>
+```
+
+### examples
+
+```bash
+# press 'p' (typically play/pause)
+rmpc remote keybind p
+```
+
+### common key examples
+
+```bash
+# basic navigation
+rmpc remote keybind j  # move down
+rmpc remote keybind k  # move up
+rmpc remote keybind h  # move left
+rmpc remote keybind l  # move right
+
+# playback control
+rmpc remote keybind p      # toggle play/pause
+rmpc remote keybind s      # stop playback
+rmpc remote keybind ">"    # next track
+rmpc remote keybind "<"    # previous track
+
+# tab switching (numbers)
+rmpc remote keybind 1      # switch to queue tab
+rmpc remote keybind 2      # switch to directories tab
+rmpc remote keybind 3      # switch to artists tab
+rmpc remote keybind 4      # switch to album artists tab
+rmpc remote keybind 5      # switch to albums tab
+rmpc remote keybind 6      # switch to playlists tab
+rmpc remote keybind 7      # switch to search tab
+
+# volume control
+rmpc remote keybind "."    # volume up
+rmpc remote keybind ","    # volume down
+
+# seek control
+rmpc remote keybind f      # seek forward
+rmpc remote keybind b      # seek backward
+
+# modes
+rmpc remote keybind z      # toggle repeat
+rmpc remote keybind x      # toggle random
+rmpc remote keybind c      # toggle consume
+rmpc remote keybind v      # toggle single
+
+# help and info
+rmpc remote keybind "~"       # Show help
+rmpc remote keybind I         # Show current song info
+rmpc remote keybind O         # Show outputs
+rmpc remote keybind P         # Show decoders
+```
+
+### Key Format Notes
+
+For special keys, use the angle bracket format to ensure proper recognition:
+
+```bash
+# Correct formats for special keys
+rmpc remote keybind "<CR>"     # Enter key
+rmpc remote keybind "<Space>"  # Space key
+rmpc remote keybind "<Esc>"    # Escape key
+rmpc remote keybind "<Tab>"    # Tab key
+rmpc remote keybind "<BS>"     # Backspace key
+
+# Modifiers use angle brackets too
+rmpc remote keybind "<C-p>"    # Ctrl+p
+rmpc remote keybind "<S-CR>"   # Shift+Enter
+rmpc remote keybind "<A-h>"    # Alt+h
+```
+
+## switchtab command
+
+The `switchtab` command provides a direct way to switch between tabs without relying on keybind configuration.
+
+### Syntax
+
+```bash
+rmpc remote switchtab <tab-name>
+```
+
+### Examples
+
+```bash
+# Switch to specific tabs
+rmpc remote switchtab "Queue"
+rmpc remote switchtab "Directories"
+rmpc remote switchtab "Artists"
+rmpc remote switchtab "Albums"
+rmpc remote switchtab "Playlists"
+rmpc remote switchtab "Search"
+rmpc remote switchtab "Lyrics"
+
+# Works with custom tab names too
+rmpc remote switchtab "My Custom Tab"
+
+# Tab names are case-insensitive
+rmpc remote switchtab "queue"     # same as "Queue"
+rmpc remote switchtab "ARTISTS"   # same as "Artists"
+rmpc remote switchtab "playlists" # same as "Playlists"
+```
+
+### Tab Name Validation
+
+The `switchtab` command validates that the specified tab exists in your configuration using **case-insensitive matching**. This means you can use any capitalization you prefer - `queue`, `Queue`, `QUEUE`, etc. will all match the same tab.
+
+If you try to switch to a non-existent tab, the command will fail with an error message listing all available tabs.
+
+You can check your available tabs by looking at your configuration file or using `rmpc config` to see the configured tabs.
+
+## query command
+
+The `query` command gets information from a running rmpc instance and prints it as a result. You
+can specify more than one thing to query and the result will be concatenation of all the responses.
+
+Response is a json object where each queried item is a key and its value is the response.
+
+### Queryable information
+
+#### activetab
+
+Query rmpc's currently active tab name.
+
+```bash
+rmpc remote query active-tab
+
+# which responnds with
+{"activetab": "Queue"}
+```
+
+## Other Remote Commands
+
+Besides `keybind`, rmpc supports several other remote commands:
+
+### Status Messages
+
+Display custom messages in the rmpc status bar:
+
+```bash
+# Show an info message for 5 seconds (default)
+rmpc remote status "Hello from script!"
+
+# Show an error message for 10 seconds
+rmpc remote status --level error --timeout 10000 "Something went wrong"
+
+# Show a warning message
+rmpc remote status --level warn "Check your config"
+```
+
+### Lyrics Index
+
+Notify rmpc about new lyrics files:
+
+```bash
+# Tell rmpc to index a new .lrc file
+rmpc remote indexlrc --path /path/to/song.lrc
+```
+
+### Set Commands
+
+Update configuration in a running rmpc instance:
+
+```bash
+# Update theme from file
+rmpc remote set theme /path/to/new-theme.ron
+
+# Update theme from stdin
+cat new-theme.ron | rmpc remote set theme -
+```
+
+## Targeting Specific Instances
+
+If you have multiple rmpc instances running, you can target a specific one using the `--pid` option:
+
+```bash
+# Find rmpc processes
+ps aux | grep rmpc
+
+# Send command to specific instance
+rmpc remote --pid 12345 keybind p
+rmpc remote --pid 12345 switchtab "Queue"
+rmpc remote --pid 12345 status "Hello from specific instance"
+```
+
+## Error Handling
+
+Remote commands will fail silently if:
+
+- If no PID was specified and no rmpc instance is running
+- The specified PID doesn't exist
+- Tab name doesn't exist in your configuration (for switchtab commands)
+
+**Note**: Command execution errors (like invalid tab names) are logged in the running rmpc instance at the warn level, not displayed to the CLI caller. Check the rmpc logs for detailed error messages if commands aren't working as expected.
+
+To see these errors, you can:
+
+- Run rmpc with debug logging: `RUST_LOG=debug rmpc`
+- Check rmpc's log output in your terminal
+- Look for "Socket command execution failed" messages
+
+## Tips and Best Practices
+
+- **Use quotes for special characters**: Always quote keys with special characters like `">"` or `"<"` or `"<Tab>"`
+- **Check keybind configuration**: The remote keybind command uses your configured keybinds from your config file
+- **Test interactively first**: Try commands manually before adding them to scripts
+
+## See Also
+
+- <a href={path("configuration/keybinds")}>Keybind Configuration</a> - Configure what keys do what
+- <a href={path("configuration/tabs")}>Tab Configuration</a> - Set up custom tab names
+- <a href={path("reference/cli-command-mode")}>CLI Reference</a> - Full command reference

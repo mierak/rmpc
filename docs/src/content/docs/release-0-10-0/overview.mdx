@@ -1,0 +1,80 @@
+---
+title: Overview of rmpc
+description: Overview of rmpc features
+---
+
+import { Image } from "astro:assets";
+import { path } from "./data.ts";
+
+Rmpc is a beautiful, modern and configurable terminal based Music Player Daemon client. It was inspired by ncmpcpp
+and aims to provide an alternative with support for album art through kitty image protocol without any ugly hacks.
+It also features ranger/lf inspired browsing of songs and other goodies.
+
+## Main Features
+
+- Album cover art display if your terminal supports either of Kitty, Sixel, Iterm2 protocols, or via ueberzuggpp
+- Cava integration for music visualisation
+- Support for [synchronized lyrics](<https://en.wikipedia.org/wiki/LRC_(file_format)>)
+- Ability to play music from YouTube
+- Configurable (T)UI
+    - Configure what information(if any!) is displayed in the header
+    - Configure what columns are displayed on the queue pane
+    - Completely customize what tabs are rendered and mix and match their content
+    - Create any color theme you want
+    - Every keybind can be changed, vim-like by default
+- Ranger/LF-like three-column browser through your music library
+- Basic playlist management
+- Support scripting through basic CLI mode and script hooks
+- **Remote control** - Send commands to running rmpc instances (useful for window manager integration).
+
+## Showcase
+
+import queueImg from "./assets/queue.png";
+import searchImg from "./assets/search.png";
+import browserImg from "./assets/browser.png";
+
+### Queue pane
+
+Here you can see your current playlist and interact with it. You can move songs around, delete them or create playlists.
+
+<Image src={queueImg} width={800} alt="Screenshot of the Queue tab" />
+
+### Browser pane
+
+This screen is where you can browse your music library. You can add songs to your queue from here.
+
+<Image src={browserImg} width={800} alt="Screenshot of the Directories tab" />
+
+### Search pane
+
+A powerful search inside your music database. Features several modes and filters, like searching by artist or album
+or searching with regexes.
+
+<Image src={searchImg} width={800} alt="Screenshot of the Search tab" />
+
+### Command line interface
+
+Some basic features are also available on the command line. Use `rmpc --help` to get a list of available commands or
+check out the <a href={path("reference/cli-command-mode")}>CLI reference</a>.
+
+Rmpc also supports **remote commands** that allow you to control running instances from scripts, or other terminal sessions. For example:
+
+```bash
+# Emulate pressing the play/pause key
+rmpc remote keybind p
+
+# Switch to Queue tab directly (case-insensitive)
+rmpc remote switch-tab "Queue"
+rmpc remote switch-tab "queue"    # same as above
+
+# Switch to Queue tab (number 1 key)
+rmpc remote keybind 1
+
+# Next track
+rmpc remote keybind ">"
+
+# Volume up
+rmpc remote keybind "."
+```
+
+Learn more about remote control in the <a href={path("guides/remote-commands")}>Remote Commands Guide</a>.

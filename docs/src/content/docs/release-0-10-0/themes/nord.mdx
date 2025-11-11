@@ -1,0 +1,27 @@
+---
+title: Nord
+description: Nord theme with default colors
+sidebar:
+    order: 1
+---
+
+import { Image } from "astro:assets";
+import { Code } from "@astrojs/starlight/components";
+import img1 from "../assets/themes/nord/nord.png";
+import theme1 from "../assets/themes/nord/theme.ron?raw";
+import theme2 from "../assets/themes/nord/config.ron?raw";
+
+You must add the tab section to your `config.ron`.
+Requires a Nerd Font for some of the symbols.
+
+The space below the cover art is for synced lyrics (.lrc).
+
+## Preview
+
+<Image src={img1} width={1000} alt="" />
+
+## Config
+
+<Code code={theme1} lang="rust" title="theme.ron" />
+
+<Code code={theme2} lang="rust" title="config.ron" />
