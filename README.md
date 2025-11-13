@@ -1,0 +1,1 @@
+Collection of redirects to the new location: https://rmpc.mierak.dev. Should include all the routes at the time of generating, all further docs development will happen at https://github.com/rmpc-org/rmpc-org.github.io
