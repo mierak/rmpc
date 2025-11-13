@@ -583,9 +583,6 @@ pub mod utils {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-
-    use walkdir::WalkDir;
-
     #[cfg(debug_assertions)]
     use crate::config::keys::KeyConfigFile;
     use crate::config::{ConfigFile, theme::UiConfigFile};
@@ -594,10 +591,8 @@ mod tests {
     #[cfg(debug_assertions)]
     fn example_config_equals_default() {
         let config = ConfigFile::default();
-        let path = format!(
-            "{}/docs/src/content/docs/next/assets/example_config.ron",
-            std::env::var("CARGO_MANIFEST_DIR").unwrap()
-        );
+        let path =
+            format!("{}/assets/example_config.ron", std::env::var("CARGO_MANIFEST_DIR").unwrap());
 
         let mut f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         f.keybinds.logs = KeyConfigFile::default().logs;
@@ -609,10 +604,8 @@ mod tests {
     #[cfg(not(debug_assertions))]
     fn example_config_equals_default() {
         let config = ConfigFile::default();
-        let path = format!(
-            "{}/docs/src/content/docs/next/assets/example_config.ron",
-            std::env::var("CARGO_MANIFEST_DIR").unwrap()
-        );
+        let path =
+            format!("{}/assets/example_config.ron", std::env::var("CARGO_MANIFEST_DIR").unwrap());
 
         let f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
 
@@ -622,31 +615,11 @@ mod tests {
     #[test]
     fn example_theme_equals_default() {
         let theme = UiConfigFile::default();
-        let path = format!(
-            "{}/docs/src/content/docs/next/assets/example_theme.ron",
-            std::env::var("CARGO_MANIFEST_DIR").unwrap()
-        );
+        let path =
+            format!("{}/assets/example_theme.ron", std::env::var("CARGO_MANIFEST_DIR").unwrap());
 
         let file = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
 
         assert_eq!(theme, file);
-    }
-
-    #[test]
-    fn gallery_themes_are_valid() {
-        let path = format!(
-            "{}/docs/src/content/docs/next/assets/themes",
-            std::env::var("CARGO_MANIFEST_DIR").unwrap()
-        );
-
-        for entry in WalkDir::new(path).follow_links(true).into_iter().filter_map(Result::ok) {
-            let f_name = entry.file_name().to_string_lossy();
-
-            if f_name.ends_with("theme.ron") {
-                dbg!(entry.path());
-                ron::de::from_str::<UiConfigFile>(&std::fs::read_to_string(entry.path()).unwrap())
-                    .unwrap();
-            }
-        }
     }
 }

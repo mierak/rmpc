@@ -4,11 +4,10 @@ version = "0.10.0"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "A beautiful and configurable TUI client for MPD"
-homepage = "https://mierak.github.io/rmpc/"
+homepage = "https://rmpc.mierak.dev"
 repository = "https://github.com/mierak/rmpc"
 readme = "README.md"
 rust-version = "1.88.0"
-exclude = ["/docs/**/*", "!/docs/src/content/docs/next/assets/example_theme.ron", "!/docs/src/content/docs/next/assets/example_config.ron"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
