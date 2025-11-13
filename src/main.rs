@@ -54,14 +54,10 @@ fn main() -> Result<()> {
     let config_path = args.config_path();
     match args.command {
         Some(Command::Config { current: false }) => {
-            std::io::stdout().write_all(include_bytes!(
-                "../docs/src/content/docs/next/assets/example_config.ron"
-            ))?;
+            std::io::stdout().write_all(include_bytes!("../assets/example_config.ron"))?;
         }
         Some(Command::Theme { current: false }) => {
-            std::io::stdout().write_all(include_bytes!(
-                "../docs/src/content/docs/next/assets/example_theme.ron"
-            ))?;
+            std::io::stdout().write_all(include_bytes!("../assets/example_theme.ron"))?;
         }
         Some(Command::Config { current: true }) => match File::open(&config_path) {
             Ok(mut file) => {

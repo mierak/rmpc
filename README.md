@@ -4,11 +4,11 @@ Rmpc is a beautiful, modern and configurable terminal based Music Player Daemon 
 heavily inspired by [ncmpcpp](https://github.com/ncmpcpp/ncmpcpp) and
 [ranger](https://github.com/ranger/ranger)/[lf](https://github.com/gokcehan/lf) file managers.
 
-![preview](docs/public/preview.png)
+![preview](assets/preview.png)
 
 ## Get started
 
-Description, configuration and installation methods can be found on [the rmpc website](https://mierak.github.io/rmpc/)
+Description, configuration and installation methods can be found on [the rmpc website](https://rmpc.mierak.dev)
 
 ## Main Features
 
@@ -26,8 +26,3 @@ Description, configuration and installation methods can be found on [the rmpc we
 - Support scripting through basic CLI mode and script hooks
 
 And more to come
-
-> [!IMPORTANT]
-> Rmpc is still in early development, and is not yet complete. It should be stable enough and I have
-> been daily driving it for quite a while, but expect some bugs and possibly breaking changes to the
-> config file.

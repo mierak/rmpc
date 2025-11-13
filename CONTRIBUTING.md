@@ -85,15 +85,15 @@ pull requests.
 * [Format](#formatting-the-code) the code
 * Run clippy (stable)
 * Ensure that all tests pass by running `cargo test`
-* Update the documentation if your feature changed or added behavior
+* Update the [documentation](https://github.com/rmpc-org/rmpc-org.github.io) if your feature changed, added or removed behavior
 * Note your change in the changelog
 * Address all comments in the pull request
 
 ## Documentation
 
-The documentation lies in the `docs` directory in the repository root. The docs area created with
-[astro](https://astro.build/) javascript framework. All contributions and improvements to the
-documentation are welcome.
+The documentation lies in a separate [repository](https://github.com/rmpc-org/rmpc-org.github.io).
+The docs area created with [astro](https://astro.build/) javascript framework. All contributions 
+and improvements to the documentation are welcome.
 
 There are multiple sections in the docs, primarily `src/content/docs/next` and `src/content/docs/release`
 which correspond to the current dev and release version respectively.
@@ -101,9 +101,8 @@ which correspond to the current dev and release version respectively.
 To run the documentation locally:
 
 1. Ensure you have [node.js](https://nodejs.org/en) installed.
-2. Go to the docs directory and install dependencies
+2. Go to the repository root and install dependencies
 ```bash
-cd docs
 npm install
 ```
 3. Run the dev server
@@ -111,6 +110,6 @@ npm install
 npm run dev
 ```
 
-A local HTTP server will be started. Navigate to http://localhost:4321/rmpc and you should see the
+A local HTTP server will be started. Navigate to http://localhost:4321 and you should see the
 docs website. All changes you make to the docs should be automatically reflected in your browser.
 
