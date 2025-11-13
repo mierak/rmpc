@@ -10,6 +10,11 @@ pub fn init(event_tx: Sender<AppEvent>) -> std::io::Result<std::thread::JoinHand
 }
 
 fn input_poll_task(event_tx: &Sender<AppEvent>) {
+    // Sometimes in there are inputs left in the buffer(because of tmux maybe?)
+    // before starting to read inputs (from reading terminal sequences), this
+    // results in random stuff happening in the program. Simply drain them.
+    drain_crossterm_events();
+
     let mut mouse_event_tracker = MouseEventTracker::default();
     loop {
         match crossterm::event::poll(Duration::from_millis(250)) {
@@ -41,5 +46,11 @@ fn input_poll_task(event_tx: &Sender<AppEvent>) {
             Ok(_) => {}
             Err(e) => log::warn!(error:? = e; "Error when polling for event"),
         }
+    }
+}
+
+fn drain_crossterm_events() {
+    while crossterm::event::poll(Duration::from_millis(0)).unwrap_or(false) {
+        let _ = crossterm::event::read();
     }
 }

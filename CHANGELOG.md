@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Ignore rare phantom inputs from querying terminal for protocol support on startup
+
 ## [0.10.0] - 2025-11-11
 
 ### Added
