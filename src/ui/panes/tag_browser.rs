@@ -10,7 +10,6 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
-        keys::actions::Position,
         tabs::PaneType,
     },
     ctx::Ctx,
@@ -23,7 +22,6 @@ use crate::{
         cmp::StringCompare,
         key_event::KeyEvent,
         mouse_event::MouseEvent,
-        mpd_client_ext::{Autoplay, MpdClientExt},
         string_util::StringExt,
     },
     ui::{
@@ -87,43 +85,6 @@ impl TagBrowserPane {
                 FilterKind::Regex,
             ),
         }
-    }
-
-    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
-        match self.stack.path().as_slice() {
-            [_artist, _album] => {
-                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
-                if !items.is_empty() {
-                    let queue_len = ctx.queue.len();
-                    let (position, autoplay) = if autoplay {
-                        (Position::Replace, Autoplay::Hovered {
-                            queue_len,
-                            current_song_idx: None,
-                            hovered_song_idx,
-                        })
-                    } else {
-                        (Position::EndOfQueue, Autoplay::None)
-                    };
-                    ctx.command(move |client| {
-                        client.enqueue_multiple(items, position, autoplay)?;
-                        Ok(())
-                    });
-                }
-            }
-            [_artist] => {
-                self.stack_mut().enter();
-                ctx.render()?;
-            }
-            [] => {
-                self.stack_mut().enter();
-                ctx.render()?;
-            }
-            _ => {
-                log::error!("Unexpected nesting in Artists dir structure");
-            }
-        }
-
-        Ok(())
     }
 
     fn process_songs(&mut self, artist: String, data: Vec<Song>, ctx: &Ctx) {
@@ -328,10 +289,6 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         self.filter_input_mode
     }
 
-    fn next(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(false, ctx)
-    }
-
     fn list_songs_in_item(
         &self,
         item: DirOrSong,
@@ -404,10 +361,6 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
             _ => {}
         }
         Ok(())
-    }
-
-    fn open(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(true, ctx)
     }
 }
 

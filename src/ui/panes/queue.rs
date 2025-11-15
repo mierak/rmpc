@@ -32,6 +32,7 @@ use crate::{
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{
         QueuePosition,
+        client::Client,
         commands::Song,
         mpd_client::{MpdClient, SingleOrRange},
     },
@@ -40,7 +41,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
-        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
+        mpd_client_ext::{Enqueue, MpdClientExt},
     },
     ui::{
         UiEvent,
@@ -1103,11 +1104,14 @@ impl Pane for QueuePane {
                     let (enqueue, _hovered_song_idx) = self.enqueue_items(options.all);
 
                     if !enqueue.is_empty() {
-                        ctx.command(move |client| {
-                            client.enqueue_multiple(enqueue, options.position, Autoplay::None)?;
-
-                            Ok(())
-                        });
+                        Client::resolve_and_enqueue(
+                            ctx,
+                            enqueue,
+                            options.position,
+                            AutoplayKind::None,
+                            None,
+                            None,
+                        );
                         self.queue.marked_mut().clear();
                     }
                 }

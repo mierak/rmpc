@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `AfterCurrentAlbum` and `BeforeCurrentAlbum` to `AddOptions` keybind
+
 ### Changed
 
 - Moved docs to a new [repository](https://github.com/rmpc-org/rmpc-org.github.io) and [domain](https://rmpc.mierak.dev/)

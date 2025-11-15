@@ -6,18 +6,14 @@ use ratatui::{Frame, prelude::Rect, widgets::ListState};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{keys::actions::Position, tabs::PaneType},
+    config::tabs::PaneType,
     ctx::Ctx,
     mpd::{
         client::Client,
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
-    shared::{
-        key_event::KeyEvent,
-        mouse_event::MouseEvent,
-        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
-    },
+    shared::{key_event::KeyEvent, mouse_event::MouseEvent, mpd_client_ext::Enqueue},
     ui::{
         UiEvent,
         browser::BrowserPane,
@@ -46,50 +42,6 @@ impl DirectoriesPane {
             browser: Browser::new(),
             initialized: false,
         }
-    }
-
-    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
-        let Some(selected) = self.stack.current().selected() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
-        };
-
-        match selected {
-            DirOrSong::Dir { .. } => {
-                self.stack_mut().enter();
-                ctx.render()?;
-            }
-            DirOrSong::Song(_) => {
-                let (items, hovered_song_idx) = self.enqueue(
-                    self.stack()
-                        .current()
-                        .items
-                        .iter()
-                        // Only add songs here in case the directory contains combination of
-                        // directories, playlists and songs to be able to use autoplay from the
-                        // hovered song properly.
-                        .filter(|item| matches!(item, DirOrSong::Song(_))),
-                );
-                if !items.is_empty() {
-                    let queue_len = ctx.queue.len();
-                    let (position, autoplay) = if autoplay {
-                        (Position::Replace, Autoplay::Hovered {
-                            queue_len,
-                            current_song_idx: None,
-                            hovered_song_idx,
-                        })
-                    } else {
-                        (Position::EndOfQueue, Autoplay::None)
-                    };
-                    ctx.command(move |client| {
-                        client.enqueue_multiple(items, position, autoplay)?;
-                        Ok(())
-                    });
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -215,10 +167,6 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         self.filter_input_mode
     }
 
-    fn next(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(false, ctx)
-    }
-
     fn list_songs_in_item(
         &self,
         item: DirOrSong,
@@ -330,9 +278,5 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         };
 
         (items, hovered_idx)
-    }
-
-    fn open(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(true, ctx)
     }
 }

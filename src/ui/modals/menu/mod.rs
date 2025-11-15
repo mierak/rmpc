@@ -15,6 +15,7 @@ use crate::{
     config::keys::actions::{AddOpts, DuplicateStrategy},
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{
+        client::Client,
         errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{MpdClient, MpdCommand, SingleOrRange},
         proto_client::ProtoClient,
@@ -347,20 +348,20 @@ pub fn create_add_modal<'a>(
 ) -> MenuModal<'a> {
     MenuModal::new(ctx)
         .list_section(ctx, |section| {
-            let queue_len = ctx.queue.len();
             let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
             let mut section = section;
 
             for (label, options, (enqueue, hovered_idx)) in opts {
                 section = section.item(label, move |ctx| {
                     if !enqueue.is_empty() {
-                        ctx.command(move |client| {
-                            let autoplay =
-                                options.autoplay(queue_len, current_song_idx, hovered_idx);
-                            client.enqueue_multiple(enqueue, options.position, autoplay)?;
-
-                            Ok(())
-                        });
+                        Client::resolve_and_enqueue(
+                            ctx,
+                            enqueue,
+                            options.position,
+                            options.autoplay,
+                            current_song_idx,
+                            hovered_idx,
+                        );
                     }
                     Ok(())
                 });

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Write, sync::Arc};
+use std::{borrow::Cow, fmt::Write, ops::Range, sync::Arc};
 
 use anyhow::bail;
 use itertools::Itertools;
@@ -7,8 +7,8 @@ use strum::{Display, EnumDiscriminants, VariantArray};
 use super::ToDescription;
 use crate::{
     config::{tabs::TabName, utils::tilde_expand},
-    mpd::QueuePosition,
-    shared::mpd_client_ext::Autoplay,
+    mpd::{QueuePosition, commands::Song},
+    shared::macros::status_warn,
 };
 
 // Global actions
@@ -393,22 +393,12 @@ impl ToDescription for QueueActions {
 pub enum Position {
     AfterCurrentSong,
     BeforeCurrentSong,
+    AfterCurrentAlbum,
+    BeforeCurrentAlbum,
     StartOfQueue,
     #[default]
     EndOfQueue,
     Replace,
-}
-
-impl From<Position> for Option<QueuePosition> {
-    fn from(value: Position) -> Self {
-        match value {
-            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
-            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
-            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
-            Position::EndOfQueue => None,
-            Position::Replace => None,
-        }
-    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
@@ -494,22 +484,206 @@ pub struct AddOpts {
 }
 
 impl AddOpts {
-    pub fn autoplay(
+    pub fn autoplay_idx_and_queue_position(
         self,
-        queue_len: usize,
+        queue: &[Song],
         current_song_idx: Option<usize>,
         hovered_song_idx: Option<usize>,
-    ) -> Autoplay {
-        match self.autoplay {
-            AutoplayKind::First => Autoplay::First { queue_len, current_song_idx },
-            AutoplayKind::Hovered => {
-                Autoplay::Hovered { queue_len, current_song_idx, hovered_song_idx }
+    ) -> anyhow::Result<(Option<usize>, Option<QueuePosition>)> {
+        let ranges = Self::to_album_ranges(queue);
+        Ok((
+            self.autoplay_idx(queue, current_song_idx, hovered_song_idx, &ranges)?,
+            self.queue_position(current_song_idx, &ranges)?,
+        ))
+    }
+
+    fn to_album_ranges(queue: &[Song]) -> Vec<Range<usize>> {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < queue.len() {
+            let a = queue[i].metadata.get("album");
+            let aa = queue[i].metadata.get("album_artist");
+            let mut j = i + 1;
+            while j < queue.len()
+                && queue[j].metadata.get("album") == a
+                && queue[j].metadata.get("album_artist") == aa
+            {
+                j += 1;
             }
-            AutoplayKind::HoveredOrFirst => {
-                Autoplay::HoveredOrFirst { queue_len, current_song_idx, hovered_song_idx }
-            }
-            AutoplayKind::None => Autoplay::None,
+            out.push(i..j);
+            i = j;
         }
+        out
+    }
+
+    fn queue_position(
+        self,
+        current_song_idx: Option<usize>,
+        same_album_ranges: &[Range<usize>],
+    ) -> anyhow::Result<Option<QueuePosition>> {
+        macro_rules! find_range_or_bail {
+            ($curr_idx:expr) => {
+                same_album_ranges
+                    .iter()
+                    .find(|range| range.contains(&$curr_idx))
+                    .ok_or_else(|| anyhow::anyhow!("Current song's album range not found"))?
+            };
+        }
+        Ok(match self.position {
+            Position::AfterCurrentSong => Some(QueuePosition::RelativeAdd(0)),
+            Position::BeforeCurrentSong => Some(QueuePosition::RelativeSub(0)),
+            Position::AfterCurrentAlbum => {
+                let Some(current_song_idx) = current_song_idx else {
+                    bail!("No current song to queue after its album");
+                };
+
+                let range = find_range_or_bail!(current_song_idx);
+
+                Some(QueuePosition::Absolute(range.end))
+            }
+            Position::BeforeCurrentAlbum => {
+                let Some(current_song_idx) = current_song_idx else {
+                    bail!("No current song to queue before its album");
+                };
+
+                let range = find_range_or_bail!(current_song_idx);
+
+                Some(QueuePosition::Absolute(range.start))
+            }
+            Position::StartOfQueue => Some(QueuePosition::Absolute(0)),
+            Position::EndOfQueue => None,
+            Position::Replace => None,
+        })
+    }
+
+    fn autoplay_idx(
+        self,
+        queue: &[Song],
+        current_song_idx: Option<usize>,
+        hovered_song_idx: Option<usize>,
+        same_album_ranges: &[Range<usize>],
+    ) -> anyhow::Result<Option<usize>> {
+        let queue_len = queue.len();
+        macro_rules! find_range_or_bail {
+            ($curr_idx:expr) => {
+                same_album_ranges
+                    .iter()
+                    .find(|range| range.contains(&$curr_idx))
+                    .ok_or_else(|| anyhow::anyhow!("Current song's album range not found"))?
+            };
+        }
+        Ok(match (self.autoplay, current_song_idx, hovered_song_idx) {
+            (AutoplayKind::First, Some(curr), _) => match self.position {
+                Position::AfterCurrentSong => Some(curr + 1),
+                Position::BeforeCurrentSong => Some(curr),
+                Position::AfterCurrentAlbum => same_album_ranges
+                    .iter()
+                    .find(|range| range.contains(&curr))
+                    .map(|album_range| album_range.end)
+                    .or_else(|| {
+                        status_warn!("Current song's album range not found");
+                        None
+                    }),
+                Position::BeforeCurrentAlbum => same_album_ranges
+                    .iter()
+                    .find(|range| range.contains(&curr))
+                    .map(|album_range| album_range.start)
+                    .or_else(|| {
+                        status_warn!("Current song's album range not found");
+                        None
+                    }),
+                Position::StartOfQueue => Some(0),
+                Position::EndOfQueue => Some(queue_len),
+                Position::Replace => Some(0),
+            },
+            (AutoplayKind::First, None, _) => match self.position {
+                Position::AfterCurrentSong => {
+                    bail!("No current song to queue after");
+                }
+                Position::BeforeCurrentSong => {
+                    bail!("No current song to queue before");
+                }
+                Position::AfterCurrentAlbum => {
+                    bail!("No current song to queue after its album");
+                }
+                Position::BeforeCurrentAlbum => {
+                    bail!("No current song to queue before its album");
+                }
+                Position::StartOfQueue => Some(0),
+                Position::EndOfQueue => Some(queue_len),
+                Position::Replace => Some(0),
+            },
+            (AutoplayKind::Hovered, curr, hovered) => match self.position {
+                Position::AfterCurrentSong => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue after");
+                    };
+
+                    hovered.map(|i| i + 1 + current_song_idx)
+                }
+                Position::BeforeCurrentSong => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue before");
+                    };
+
+                    hovered.map(|i| i + current_song_idx)
+                }
+                Position::AfterCurrentAlbum => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue after its album");
+                    };
+
+                    let range = find_range_or_bail!(current_song_idx);
+                    hovered.map(|i| i + range.end)
+                }
+                Position::BeforeCurrentAlbum => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue before its album");
+                    };
+
+                    let range = find_range_or_bail!(current_song_idx);
+                    hovered.map(|i| i + range.start)
+                }
+                Position::StartOfQueue => hovered,
+                Position::EndOfQueue => hovered.map(|i| i + queue_len),
+                Position::Replace => hovered,
+            },
+            (AutoplayKind::HoveredOrFirst, curr, hovered) => match self.position {
+                Position::AfterCurrentSong => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue after");
+                    };
+
+                    hovered.map(|i| i + 1 + current_song_idx).or(Some(current_song_idx + 1))
+                }
+                Position::BeforeCurrentSong => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue before");
+                    };
+                    hovered.map(|i| i + current_song_idx).or(Some(current_song_idx))
+                }
+                Position::AfterCurrentAlbum => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue after its album");
+                    };
+
+                    let range = find_range_or_bail!(current_song_idx);
+                    hovered.map(|i| i + range.end).or(Some(range.end))
+                }
+                Position::BeforeCurrentAlbum => {
+                    let Some(current_song_idx) = curr else {
+                        bail!("No current song to queue before its album");
+                    };
+
+                    let range = find_range_or_bail!(current_song_idx);
+                    hovered.map(|i| i + range.start).or(Some(range.start))
+                }
+                Position::StartOfQueue => hovered.or(Some(0)),
+                Position::EndOfQueue => hovered.map(|i| i + queue_len).or(Some(queue_len)),
+                Position::Replace => hovered.or(Some(0)),
+            },
+            (AutoplayKind::None, _, _) => None,
+        })
     }
 }
 
@@ -720,84 +894,86 @@ impl ToDescription for CommonAction {
             CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
             CommonAction::Select => {
-                                        "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
-                                    }
+                "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
+            }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
             CommonAction::Delete => {
-                                        "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
-                                    }
+                "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
+            }
             CommonAction::Rename => "Rename. Currently only for playlists".into(),
             CommonAction::Close => {
-                                        "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
-                                    }
+                "Close/Stop whatever action is currently going on. Cancel filter, close a modal, etc.".into()
+            }
             CommonAction::Confirm => {
-                                        "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
-                                    }
+                "Confirm whatever action is currently going on. In browser panes it either enters a directory or adds and plays a song under cursor".into()
+            }
             CommonAction::FocusInput => {
-                                        "Focuses textbox if any is on the screen and is not focused".into()
-                                    }
+                "Focuses textbox if any is on the screen and is not focused".into()
+            }
             CommonAction::PaneDown => "Focus the pane below the current one".into(),
             CommonAction::PaneUp => "Focus the pane above the current one".into(),
             CommonAction::PaneRight => "Focus the pane to the right of the current one".into(),
             CommonAction::PaneLeft => "Focus the pane to the left of the current one".into(),
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => format!("Open add menu modal with {} options", items.len()).into(),
             CommonAction::AddOptions { kind: AddKind::Action(opts) } => {
-                                        let mut buf = String::from("Add");
-                                        if opts.all {
-                                            buf.push_str(" all items");
-                                        } else {
-                                            buf.push_str(" item");
-                                        }
-                                        buf.push_str(match opts.position {
-                                            Position::AfterCurrentSong => " after the current song",
-                                            Position::BeforeCurrentSong => " before the current song",
-                                            Position::StartOfQueue => " at the start of the queue",
-                                            Position::EndOfQueue => " at the end of the queue",
-                                            Position::Replace => " and replace the queue",
-                                        });
+                let mut buf = String::from("Add");
+                if opts.all {
+                    buf.push_str(" all items");
+                } else {
+                    buf.push_str(" item");
+                }
+                buf.push_str(match opts.position {
+                    Position::AfterCurrentSong => " after the current song",
+                    Position::BeforeCurrentSong => " before the current song",
+                    Position::AfterCurrentAlbum => todo!(),
+                    Position::BeforeCurrentAlbum => todo!(),
+                    Position::StartOfQueue => " at the start of the queue",
+                    Position::EndOfQueue => " at the end of the queue",
+                    Position::Replace => " and replace the queue",
+                });
 
-                                        buf.push_str(match opts.autoplay {
-                                            AutoplayKind::First => " and play the first item",
-                                            AutoplayKind::Hovered => " and play the hovered item",
-                                            AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
-                                            AutoplayKind::None => "",
-                                        });
+                buf.push_str(match opts.autoplay {
+                    AutoplayKind::First => " and play the first item",
+                    AutoplayKind::Hovered => " and play the hovered item",
+                    AutoplayKind::HoveredOrFirst => " and play hovered item or first if no song is hovered",
+                    AutoplayKind::None => "",
+                });
 
-                                        buf.into()
-                                    },
+                buf.into()
+            },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
             CommonAction::ContextMenu => "Show context menu".into(),
             CommonAction::Rate { kind: RateKind::Modal { .. }, current, .. } => {
-                        let mut buf = String::from("Open a modal popup with song rating options");
-                        if *current {
-                            buf.push_str(" for the currently playing song");
-                        }
-                        buf.into()
-                    },
+                let mut buf = String::from("Open a modal popup with song rating options");
+                if *current {
+                    buf.push_str(" for the currently playing song");
+                }
+                buf.into()
+            },
             CommonAction::Rate { kind: RateKind::Value(val), current, ..  } => {
-                        if *current {
-                            format!("Set currently playing song's rating to {val}")
-                        } else {
-                            format!("Set song rating to {val}")
-                        }.into()
-                    }
+                if *current {
+                    format!("Set currently playing song's rating to {val}")
+                } else {
+                    format!("Set song rating to {val}")
+                }.into()
+            }
             CommonAction::Rate { kind: k @ RateKind::Like() | k @ RateKind::Dislike() | k @ RateKind::Neutral(), current , .. } => {
-                        let mut buf = String::from("Set the ");
-                        if *current {
-                            buf.push_str("currently playing song's");
-                        } else {
-                            buf.push_str("song's under the cursor");
-                        }
-                        buf.push_str(" like state to ");
-                        match k {
-                            RateKind::Like() => buf.push_str("like"),
-                            RateKind::Dislike() => buf.push_str("dislike"),
-                            RateKind::Neutral() => buf.push_str("neutral"),
-                            _ => {}
-                        }
+                let mut buf = String::from("Set the ");
+                if *current {
+                    buf.push_str("currently playing song's");
+                } else {
+                    buf.push_str("song's under the cursor");
+                }
+                buf.push_str(" like state to ");
+                match k {
+                    RateKind::Like() => buf.push_str("like"),
+                    RateKind::Dislike() => buf.push_str("dislike"),
+                    RateKind::Neutral() => buf.push_str("neutral"),
+                    _ => {}
+                }
 
-                        buf.into()
-                    },
+                buf.into()
+            },
             CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
                 let mut buf = String::from("Open a modal popup with options to save ");
                 if *all {
