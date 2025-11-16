@@ -925,8 +925,8 @@ impl ToDescription for CommonAction {
                 buf.push_str(match opts.position {
                     Position::AfterCurrentSong => " after the current song",
                     Position::BeforeCurrentSong => " before the current song",
-                    Position::AfterCurrentAlbum => todo!(),
-                    Position::BeforeCurrentAlbum => todo!(),
+                    Position::AfterCurrentAlbum => " after the current album",
+                    Position::BeforeCurrentAlbum => " before the current album",
                     Position::StartOfQueue => " at the start of the queue",
                     Position::EndOfQueue => " at the end of the queue",
                     Position::Replace => " and replace the queue",
