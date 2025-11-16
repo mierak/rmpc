@@ -525,6 +525,7 @@ where
             CommonAction::Close => {}
             CommonAction::Confirm if self.stack().current().marked().is_empty() => {
                 self.open(true, ctx)?;
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
             CommonAction::ShowInfo => {
